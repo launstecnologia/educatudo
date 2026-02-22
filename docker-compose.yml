@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+
+  php:
+    build: ./docker/php
+    container_name: php_app
+    mem_limit: 512m
+    ports:
+      - "8000:80"
+    volumes:
+      - ./src:/var/www/html
+    env_file:
+      - ./src/.env
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8.0
+    command: --log-bin-trust-function-creators=1
+    container_name: mysql_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: projeto
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
