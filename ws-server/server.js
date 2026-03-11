@@ -21,7 +21,7 @@ function broadcastMaster() {
       professores: Object.keys(escolas[escola].professores).length
     };
   }
-  const payload = JSON.stringify({ type: 'master_update', data: resumo });
+  const payload = JSON.stringify({ type: 'dashboard', data: resumo });
   wss.clients.forEach((client) => {
     if (client.readyState === 1) {
       client.send(payload);
@@ -47,6 +47,9 @@ function removeClient(client) {
 }
 
 wss.on('connection', (ws) => {
+  // Enviar estado atual ao novo cliente (ex.: dashboard master) assim que conecta
+  broadcastMaster();
+
   ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data.toString());
