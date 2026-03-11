@@ -61,6 +61,10 @@ wss.on('connection', (ws) => {
   ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data.toString());
+      if (msg.type === 'get_dashboard') {
+        if (ws.readyState === 1) ws.send(getDashboardPayload());
+        return;
+      }
       if (msg.type !== 'login') return;
       const escola = String(msg.escola || '').trim().toLowerCase();
       const usuario_id = String(msg.usuario_id ?? '');
