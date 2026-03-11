@@ -1,0 +1,12 @@
+{
+  "name": "educatudo-ws-presence",
+  "version": "1.0.0",
+  "description": "WebSocket server for presence online per school (tenant)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
