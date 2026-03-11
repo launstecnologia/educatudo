@@ -13,7 +13,7 @@ const escolas = {};
 
 const wss = new WebSocket.Server({ port: PORT });
 
-function broadcastMaster() {
+function getDashboardPayload() {
   const resumo = {};
   for (const escola in escolas) {
     resumo[escola] = {
@@ -21,7 +21,11 @@ function broadcastMaster() {
       professores: Object.keys(escolas[escola].professores).length
     };
   }
-  const payload = JSON.stringify({ type: 'dashboard', data: resumo });
+  return JSON.stringify({ type: 'dashboard', data: resumo });
+}
+
+function broadcastMaster() {
+  const payload = getDashboardPayload();
   wss.clients.forEach((client) => {
     if (client.readyState === 1) {
       client.send(payload);
@@ -47,8 +51,12 @@ function removeClient(client) {
 }
 
 wss.on('connection', (ws) => {
-  // Enviar estado atual ao novo cliente (ex.: dashboard master) assim que conecta
-  broadcastMaster();
+  // Enviar estado atual só para este cliente (evita race: ao dar F5 o master recebe o resumo)
+  setImmediate(() => {
+    if (ws.readyState === 1) {
+      ws.send(getDashboardPayload());
+    }
+  });
 
   ws.on('message', (data) => {
     try {
