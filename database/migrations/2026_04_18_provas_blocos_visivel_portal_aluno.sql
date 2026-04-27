@@ -1,12 +1,11 @@
--- Portal do aluno: exibir ou não o evento de prova (ex.: provas bimestrais só internas).
--- Execute no banco da escola (MySQL/MariaDB).
+-- Mesmo conteúdo que src/database/migrations/2026_04_18_provas_blocos_visivel_portal_aluno.sql
+-- (cópia na raiz do monorepo para quem só versiona a pasta database/ do deploy legado).
 
 ALTER TABLE provas_blocos
   ADD COLUMN visivel_no_portal_aluno TINYINT(1) NOT NULL DEFAULT 1
     COMMENT '1=aluno vê no portal; 0=só coordenação/professor'
   AFTER bimestre;
 
--- Eventos com bimestre (prova bimestral): por padrão não aparecem para o aluno até a coordenação ativar.
 UPDATE provas_blocos
 SET visivel_no_portal_aluno = 0
 WHERE deleted_at IS NULL
