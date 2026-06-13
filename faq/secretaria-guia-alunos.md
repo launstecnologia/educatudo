@@ -14,7 +14,9 @@
 | Trocar de turma (continua na escola) | **Remanejamento** | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
 | Saída da escola (TR) | **Transferência escolar** | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
 | Inativar um aluno | Ficha do aluno → **Inativar / TR** | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
-| Matrículas / cursos paralelos | Ficha do aluno → Matrículas | Este guia (seção abaixo) |
+| Matrículas / cursos paralelos | Ficha do aluno → Matrículas ou Turma → Vincular aluno | Este guia (seções abaixo) |
+| Conferir vínculos e divergências | **Saúde Acadêmica** | [rematricula-manual.md](./rematricula-manual.md) (checklist) |
+| Rematrícula (manual até wizard) | Remanejamento + matrículas na ficha | [rematricula-manual.md](./rematricula-manual.md) |
 | Transferência em lote (legado) | `/admin/students/transfer` | Use só se já conhecer o fluxo antigo |
 
 ---
@@ -67,6 +69,37 @@ Na **ficha do aluno** → seção **Matrículas**:
 | **Sincronizar com cadastro** | Alinha matrícula ativa à turma principal do cadastro |
 
 **Quando usar:** aluno em mais de uma turma/curso no mesmo ano, ou quando a coordenação exige registro formal separado do campo turma do cadastro.
+
+Na ficha do aluno, use **Matrícula** (Ações Rápidas) e desmarque **Definir como turma principal** ao vincular curso extra em paralelo.
+
+---
+
+## Curso extra (Música, Robótica, etc.)
+
+### Cadastro da estrutura
+
+1. **Acadêmico → Curso** → tipo **Extra** (sem série)
+2. **Acadêmico → Turmas** → turma vinculada ao curso extra
+3. Vincular alunos na turma ou na ficha do aluno
+
+### Vincular aluno já matriculado no regular
+
+| Caminho | Observação |
+|---------|------------|
+| Ficha do aluno → **Matrícula** | Desmarque **Definir como turma principal** |
+| Turma extra → **Vincular aluno** | Não altera a turma principal |
+| Curso → **Importar / vincular (CSV)** | Alunos existentes recebem só matrícula adicional |
+
+### Aluno só do curso extra
+
+- Cadastre o aluno (sem turma no form) → **Matrícula** na turma extra **com** turma principal marcada, **ou**
+- Importe via CSV na turma extra (aluno novo recebe esta turma como principal)
+
+### Limitações conhecidas
+
+- **Faltas, provas, jornadas e lista de chamada oficial** usam a **turma principal** (`alunos.turma_id`)
+- Matrícula extra aparece na ficha da turma com badge **Matriculado**
+- Para trocar a turma principal, use matrícula marcando **Definir como turma principal** ou remanejamento
 
 ---
 
@@ -130,6 +163,8 @@ Detalhes: [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.m
 - [ ] Lista de chamada conferida e PDF impresso por turma
 - [ ] Eventos de **faltas** criados por bimestre
 - [ ] Responsáveis vinculados onde necessário
+- [ ] **Saúde Acadêmica** conferida (`/admin/saude-academica`) — sem alertas críticos
+- [ ] Rematrículas do ano validadas — [rematricula-manual.md](./rematricula-manual.md)
 
 ---
 
