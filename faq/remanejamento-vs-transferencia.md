@@ -2,7 +2,7 @@
 
 ## Remanejamento (troca interna de turma)
 
-- **Menu:** Admin → Alunos → fluxo **Remanejamento** (`/admin/students/remanejamento`)
+- **Menu:** Admin → **Acadêmico → Movimentação de alunos** → aba **Remanejamento** (`/admin/students/remanejamento`)
 - O aluno **permanece ativo** na escola
 - Troca a turma principal, sincroniza matrícula e histórico
 - Gera **novo número de chamada** na turma de destino
@@ -10,17 +10,16 @@
 
 ## Transferência escolar (saída / TR)
 
-- **Menu:** Admin → Alunos → **Transferência escolar (TR)** (`/admin/students/transferencia-escolar`)
+- **Menu:** Admin → **Acadêmico → Movimentação de alunos** → aba **Saída da escola (TR)** (`/admin/students/transferencia-escolar`)
 - **Inativa** o aluno com motivo TRANSFERENCIA (governança LGPD: senha + CONFIRMAR)
 - Encerra matrículas ativas
 - Marca **TR** na lista de chamada da turma de origem (histórico preservado)
 - Opcional: remove a turma do cadastro após o TR
 
-## Transferência em lote (legado)
+## Rota legada `/admin/students/transfer`
 
-- Rota antiga: `/admin/students/transfer`
-- Continua funcionando para mover turma em lote
-- Para **saída da escola**, use sempre **Transferência escolar (TR)**, não o legado
+- Redireciona automaticamente para **Remanejamento**
+- Use **Saída da escola (TR)** para aluno que deixa a escola — não remanejamento
 
 ## Inativar um aluno na ficha
 

@@ -11,13 +11,12 @@
 | Cadastrar aluno novo | Admin → Alunos → Novo | [como-cadastrar-aluno.md](./como-cadastrar-aluno.md) |
 | Lista numerada da turma (PDF) | Turmas → turma → **Lista de chamada** | [lista-de-chamada.md](./lista-de-chamada.md) |
 | Lançar faltas do bimestre | Admin → **Faltas** | [faltas-e-lista-de-chamada.md](./faltas-e-lista-de-chamada.md) |
-| Trocar de turma (continua na escola) | **Remanejamento** | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
-| Saída da escola (TR) | **Transferência escolar** | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
+| Trocar de turma (continua na escola) | **Acadêmico → Movimentação de alunos** (Remanejamento) | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
+| Saída da escola (TR) | **Acadêmico → Movimentação de alunos** (aba TR) | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
 | Inativar um aluno | Ficha do aluno → **Inativar / TR** | [remanejamento-vs-transferencia.md](./remanejamento-vs-transferencia.md) |
 | Matrículas / cursos paralelos | Ficha do aluno → Matrículas ou Turma → Vincular aluno | Este guia (seções abaixo) |
 | Conferir vínculos e divergências | **Saúde Acadêmica** | [rematricula-manual.md](./rematricula-manual.md) (checklist) |
-| Rematrícula (manual até wizard) | Remanejamento + matrículas na ficha | [rematricula-manual.md](./rematricula-manual.md) |
-| Transferência em lote (legado) | `/admin/students/transfer` | Use só se já conhecer o fluxo antigo |
+| Rematrícula (manual até wizard) | **Acadêmico → Movimentação de alunos** + matrículas na ficha | [rematricula-manual.md](./rematricula-manual.md) |
 
 ---
 
@@ -129,15 +128,17 @@ Guia: [faltas-e-lista-de-chamada.md](./faltas-e-lista-de-chamada.md)
 
 ## Movimentações de turma
 
+**Menu:** Admin → **Acadêmico → Movimentação de alunos**
+
 ### Remanejamento (troca interna)
 
-- URL: `/admin/students/remanejamento`
+- Aba **Remanejamento** — URL: `/admin/students/remanejamento`
 - Aluno **permanece ativo**
 - Nova turma + novo nº de chamada + matrícula sincronizada
 
 ### Transferência escolar (TR)
 
-- URL: `/admin/students/transferencia-escolar`
+- Aba **Saída da escola (TR)** — URL: `/admin/students/transferencia-escolar`
 - Inativa o aluno, encerra matrículas, marca TR na lista
 - Exige observação, senha do operador e digitar **CONFIRMAR**
 

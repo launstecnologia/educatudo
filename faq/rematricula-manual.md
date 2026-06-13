@@ -30,7 +30,7 @@ Para o índice completo da secretaria, veja [secretaria-guia-alunos.md](./secret
 
 **Opção A — Remanejamento em lote (mesma escola, troca de turma principal)**
 
-1. Admin → **Remanejamento** (`/admin/students/remanejamento`)
+1. Admin → **Acadêmico → Movimentação de alunos** → aba **Remanejamento** (`/admin/students/remanejamento`)
 2. Selecione turma origem → turma destino → alunos
 3. O sistema atualiza turma principal, matrícula, histórico e lista de chamada
 
