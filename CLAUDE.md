@@ -99,8 +99,15 @@ src/
 ├── .env                             ← variáveis de ambiente (não commitado)
 ├── config/
 │   ├── app.php                      ← configuração global (lê .env)
-│   ├── routes/                      ← rotas separadas por perfil (TODO: dividir routes.php)
-│   └── routes.php                   ← todas as rotas (1521 linhas — dividir futuramente)
+│   ├── routes/                      ← rotas por perfil
+│   │   ├── master.php               ← painel SaaS (sem auth)
+│   │   ├── public.php               ← rotas públicas + ApiAuth JWT
+│   │   ├── student.php              ← aluno (dentro do Auth middleware)
+│   │   ├── monitor.php              ← monitor de sala
+│   │   ├── teacher.php              ← professor
+│   │   ├── admin.php                ← coordenação/direção
+│   │   └── parents.php              ← pais + notificações
+│   └── routes.php                   ← orquestrador (~20 linhas)
 ├── app/
 │   ├── Core/                        ← infraestrutura (não tocar sem entender o impacto)
 │   │   ├── bootstrap_multi_tenant.php
@@ -218,7 +225,7 @@ Views/
     teacher/meu-modulo/              ← views de professor
 ```
 
-Adicionar rotas em `config/routes.php` com comentário de seção.
+Adicionar rotas no arquivo `config/routes/<perfil>.php` correspondente (student, teacher, admin, master, public).
 
 Se o módulo for opcional por escola, registrar em `FeatureGate.php`.
 
@@ -334,7 +341,7 @@ Todas as chamadas externas com IA que demoram mais de 2s **devem ser assíncrona
 
 | Precisa saber | Onde olhar |
 |---|---|
-| Rotas disponíveis | `src/config/routes.php` |
+| Rotas disponíveis | `src/config/routes.php` (orquestrador) + `src/config/routes/*.php` (por perfil) |
 | Schema do banco master | `src/database/migrations/multi_tenant_master.sql` |
 | Schema de tenant | migrations numeradas em `src/database/migrations/` |
 | Como o tenant é resolvido | `src/app/Core/TenantResolver.php` |
@@ -365,5 +372,5 @@ Todas as chamadas externas com IA que demoram mais de 2s **devem ser assíncrona
 - `Database::setCurrentInstance()` é estático global — seguro em PHP-FPM (isolamento por processo), não usar em Swoole/RoadRunner/ReactPHP sem refatorar
 - `ATTR_EMULATE_PREPARES=true` em alguns casos — necessário para evitar erro HY093 em queries com parâmetros repetidos
 - Redis opcional com fallback para file cache — em produção multi-servidor, Redis deve ser obrigatório e o fallback desabilitado
-- `routes.php` com 1521 linhas — dividir em arquivos por perfil é uma das melhorias planejadas
+- `routes.php` é agora um orquestrador (~20 linhas) que carrega `config/routes/*.php` divididos por perfil
 - Módulos sem Model/Service (Games, Exercises, Apostilas, Minicursos, EducaHits) — toda lógica está no Controller; ao tocar nesses módulos, extrair para Service antes de adicionar features
