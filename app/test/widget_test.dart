@@ -29,7 +29,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('EducaTudo Pais'), findsOneWidget);
+    expect(find.text('Portal dos Responsáveis'), findsOneWidget);
     expect(find.byKey(const Key('cpfField')), findsOneWidget);
     expect(find.byKey(const Key('passwordField')), findsOneWidget);
     expect(find.byKey(const Key('loginButton')), findsOneWidget);

@@ -10,7 +10,7 @@ class EducaTudoApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'EducaTudo Pais',
+      title: 'EducaColag Pais',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: ref.watch(routerProvider),

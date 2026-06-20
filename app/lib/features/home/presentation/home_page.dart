@@ -36,7 +36,7 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inicio'),
+        title: const Text('EducaColag'),
         actions: [
           IconButton(
             tooltip: 'Trocar aluno',
@@ -54,20 +54,68 @@ class HomePage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            'Ola, ${parent?.name.split(' ').first ?? 'responsavel'}!',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 16),
-          Card(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(16),
-              leading: CircleAvatar(child: Text(student.name.characters.first)),
-              title: Text(student.name),
-              subtitle: student.classLabel.isEmpty
-                  ? const Text('Aluno selecionado')
-                  : Text(student.classLabel),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2857A5), Color(0xFF3B88C3)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x302857A5),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 78,
+                  height: 64,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Image.asset(
+                    'assets/images/colag_logo.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Olá, ${parent?.name.split(' ').first ?? 'responsável'}!',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: const Color(0xFFDCEBFF)),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        student.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        student.classLabel.isEmpty
+                            ? 'Aluno selecionado'
+                            : student.classLabel,
+                        style: const TextStyle(color: Color(0xFFDCEBFF)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -92,12 +140,14 @@ class HomePage extends ConsumerWidget {
                     value: data.averageGrade?.toStringAsFixed(1) ?? '--',
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _SummaryCard(
                     label: 'Provas',
                     value: '${data.totalExams}',
                   ),
                 ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _SummaryCard(
                     label: 'Atividades',
@@ -132,9 +182,34 @@ class HomePage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(module.$1),
-                        const SizedBox(height: 8),
-                        Text(module.$2),
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Icon(
+                            module.$1,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                module.$2,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_rounded, size: 17),
+                          ],
+                        ),
                       ],
                     ),
                   ),
