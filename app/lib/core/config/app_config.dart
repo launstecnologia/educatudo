@@ -16,7 +16,7 @@ class AppConfig {
 
   static const apiOrigin = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://colag.educatudo.com',
   );
 
   static String get apiBaseUrl {

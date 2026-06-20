@@ -28,12 +28,11 @@ flutter doctor
 flutter pub get
 flutter test
 flutter run \
-  --dart-define=APP_ENV=dev \
-  --dart-define=API_BASE_URL=http://10.0.2.2:8000
+  --dart-define=APP_ENV=dev
 ```
 
-`10.0.2.2` acessa o localhost do Mac a partir do emulador Android. Para um
-aparelho físico, informe o endereço acessível do servidor de desenvolvimento.
+Por padrão, o app usa a escola COLAG em `https://colag.educatudo.com`. Para
+testar outro ambiente, informe `--dart-define=API_BASE_URL=https://...`.
 
 ## Gerar APK
 
