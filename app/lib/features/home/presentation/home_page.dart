@@ -21,15 +21,17 @@ class HomePage extends ConsumerWidget {
     }
     final summary = ref.watch(homeSummaryProvider(student.id));
 
-    const modules = [
-      (Icons.assignment_outlined, 'Provas'),
-      (Icons.route_outlined, 'Jornadas'),
-      (Icons.edit_note_outlined, 'Redacao'),
-      (Icons.menu_book_outlined, 'Plano de aula'),
-      (Icons.workspace_premium_outlined, 'Boletim'),
-      (Icons.chat_bubble_outline, 'Mensagens'),
-      (Icons.event_busy_outlined, 'Faltas'),
-      (Icons.notifications_outlined, 'Notificacoes'),
+    final modules = [
+      (Icons.assignment_outlined, 'Provas', '/students/${student.id}/exams'),
+      (Icons.route_outlined, 'Jornadas', '/students/${student.id}/journeys'),
+      (Icons.edit_note_outlined, 'Redação', '/students/${student.id}/writing'),
+      (
+        Icons.menu_book_outlined,
+        'Plano de aula',
+        '/students/${student.id}/lesson-plans',
+      ),
+      (Icons.campaign_outlined, 'Recados', '/students/${student.id}/notices'),
+      (Icons.notifications_outlined, 'Notificações', '/notifications'),
     ];
 
     return Scaffold(
@@ -123,9 +125,7 @@ class HomePage extends ConsumerWidget {
               return Card(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${module.$2} em breve.')),
-                  ),
+                  onTap: () => context.push(module.$3),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(

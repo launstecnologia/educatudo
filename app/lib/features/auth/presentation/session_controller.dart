@@ -5,6 +5,7 @@ import '../../../core/push/push_service.dart';
 import '../../../core/storage/token_storage.dart';
 import '../data/auth_repository.dart';
 import '../domain/parent.dart';
+import '../../students/presentation/selected_student_controller.dart';
 
 final sessionControllerProvider =
     AsyncNotifierProvider<SessionController, Parent?>(SessionController.new);
@@ -15,9 +16,15 @@ class SessionController extends AsyncNotifier<Parent?> {
     final storage = ref.read(tokenStorageProvider);
     if (await storage.read() == null) return null;
     try {
-      return await ref.read(authRepositoryProvider).me();
+      final parent = await ref.read(authRepositoryProvider).me();
+      await ref.read(pushServiceProvider).registerForCurrentSession();
+      return parent;
     } on ApiException catch (error) {
-      if (error.isUnauthorized) await storage.clear();
+      if (error.isUnauthorized) {
+        await ref.read(pushServiceProvider).unregister();
+        await storage.clear();
+        ref.read(selectedStudentProvider.notifier).clear();
+      }
       return null;
     }
   }
@@ -41,6 +48,7 @@ class SessionController extends AsyncNotifier<Parent?> {
   Future<void> logout() async {
     await ref.read(pushServiceProvider).unregister();
     await ref.read(tokenStorageProvider).clear();
+    ref.read(selectedStudentProvider.notifier).clear();
     state = const AsyncData(null);
   }
 }
