@@ -27,6 +27,12 @@ GET    /students/{student_id}/lesson-plans
 GET    /students/{student_id}/grades
 GET    /students/{student_id}/report-card
 GET    /students/{student_id}/school-messages
+GET    /students/{student_id}/school-communications
+GET    /students/{student_id}/school-communications/{communication_id}
+POST   /students/{student_id}/school-communications/{communication_id}/read
+POST   /students/{student_id}/school-communications/{communication_id}/replies
+GET    /students/{student_id}/calendar-events?from=YYYY-MM-DD&to=YYYY-MM-DD
+POST   /students/{student_id}/calendar-events/{event_id}/read
 GET    /students/{student_id}/absences
 GET    /notifications
 PATCH  /notifications/{notification_id}/read
@@ -37,6 +43,11 @@ GET    /app/config
 ```
 
 Listagens devem aceitar paginação e filtros. Datas são ISO-8601 com timezone.
+
+`school-communications` é o canal escola → responsáveis, com público geral,
+por turma ou individual, anexos, prioridade, leitura e respostas. Ele é
+independente de `notices`, que permanece como o mural professor → aluno apenas
+espelhado para os responsáveis.
 
 ## Respostas
 

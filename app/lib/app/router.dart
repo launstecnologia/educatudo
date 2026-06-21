@@ -11,6 +11,9 @@ import '../features/home/presentation/home_page.dart';
 import '../features/journeys/presentation/journeys_page.dart';
 import '../features/lesson_plans/presentation/lesson_plan_detail_page.dart';
 import '../features/lesson_plans/presentation/lesson_plans_page.dart';
+import '../features/school_calendar/presentation/school_calendar_page.dart';
+import '../features/school_communication/presentation/school_communication_detail_page.dart';
+import '../features/school_communication/presentation/school_communications_page.dart';
 import '../features/students/presentation/student_selector_page.dart';
 import '../features/writing_journeys/presentation/writing_page.dart';
 
@@ -47,6 +50,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (_, _) => const NotificationsPage(),
+      ),
+      GoRoute(
+        path: '/students/:studentId/school-communications',
+        builder: (_, state) => SchoolCommunicationsPage(
+          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '/students/:studentId/school-communications/:communicationId',
+        builder: (_, state) => SchoolCommunicationDetailPage(
+          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+          communicationId:
+              int.tryParse(state.pathParameters['communicationId'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '/students/:studentId/calendar',
+        builder: (_, state) => SchoolCalendarPage(
+          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: '/students/:studentId/exams',

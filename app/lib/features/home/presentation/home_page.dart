@@ -31,6 +31,16 @@ class HomePage extends ConsumerWidget {
         '/students/${student.id}/lesson-plans',
       ),
       (Icons.campaign_outlined, 'Recados', '/students/${student.id}/notices'),
+      (
+        Icons.forum_outlined,
+        'Comunicação',
+        '/students/${student.id}/school-communications',
+      ),
+      (
+        Icons.calendar_month_outlined,
+        'Calendário',
+        '/students/${student.id}/calendar',
+      ),
       (Icons.notifications_outlined, 'Notificações', '/notifications'),
     ];
 
