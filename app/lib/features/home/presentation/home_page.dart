@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
 import '../../auth/presentation/session_controller.dart';
+import '../../school_calendar/data/school_calendar_repository.dart';
+import '../../school_calendar/domain/school_event.dart';
 import '../../students/domain/student.dart';
 import '../../students/presentation/selected_student_controller.dart';
 import '../data/home_repository.dart';
@@ -21,10 +23,16 @@ class HomePage extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final summary = ref.watch(homeSummaryProvider(student.id));
+    final agenda = ref.watch(schoolEventsProvider(student.id));
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref.refresh(homeSummaryProvider(student.id).future),
+          onRefresh: () async {
+            await Future.wait([
+              ref.refresh(homeSummaryProvider(student.id).future),
+              ref.refresh(schoolEventsProvider(student.id).future),
+            ]);
+          },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
             children: [
@@ -39,15 +47,15 @@ class HomePage extends ConsumerWidget {
                 onChange: () => context.go('/students'),
               ),
               const SizedBox(height: 18),
-              summary.when(
+              agenda.when(
                 loading: () => const LinearProgressIndicator(),
                 error: (_, _) => _Error(
                   onRetry: () =>
-                      ref.invalidate(homeSummaryProvider(student.id)),
+                      ref.invalidate(schoolEventsProvider(student.id)),
                 ),
-                data: (data) => _PerformanceCard(
-                  summary: data,
-                  onTap: () => context.push('/students/${student.id}/exams'),
+                data: (events) => _NextAgendaCard(
+                  event: _nextEvent(events),
+                  onTap: () => context.push('/students/${student.id}/calendar'),
                 ),
               ),
               const SizedBox(height: 24),
@@ -90,6 +98,14 @@ class HomePage extends ConsumerWidget {
       ),
       bottomNavigationBar: _BottomNav(studentId: student.id),
     );
+  }
+
+  SchoolEvent? _nextEvent(List<SchoolEvent> events) {
+    final now = DateTime.now();
+    final upcoming =
+        events.where((event) => !event.startsAt.isBefore(now)).toList()
+          ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    return upcoming.isEmpty ? null : upcoming.first;
   }
 
   void _profile(BuildContext context, WidgetRef ref) {
@@ -314,13 +330,12 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _PerformanceCard extends StatelessWidget {
-  const _PerformanceCard({required this.summary, required this.onTap});
-  final HomeSummary summary;
+class _NextAgendaCard extends StatelessWidget {
+  const _NextAgendaCard({required this.event, required this.onTap});
+  final SchoolEvent? event;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    final status = summary.accessStatus, next = summary.nextExam;
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -336,43 +351,33 @@ class _PerformanceCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _HeroMetric(
-                  label: 'MÉDIA GERAL',
-                  value: summary.averageGrade?.toStringAsFixed(1) ?? '--',
-                  detail: '★ ★ ★ ★ ☆',
-                ),
-              ),
-              Container(width: 1, height: 90, color: Colors.white30),
-              Expanded(
-                child: _HeroMetric(
-                  label: 'STATUS',
-                  value: status == null
-                      ? '--'
-                      : status.isAtSchool
-                      ? 'Na escola'
-                      : 'Fora',
-                  detail: status?.at == null
-                      ? 'Sem registro'
-                      : DateFormat('HH:mm').format(status!.at!.toLocal()),
-                ),
-              ),
-              Container(width: 1, height: 90, color: Colors.white30),
-              Expanded(
-                child: _HeroMetric(
-                  label: 'PRÓXIMA PROVA',
-                  value: next?.subjectName ?? next?.title ?? '--',
-                  detail: next?.date == null
-                      ? 'Não agendada'
-                      : DateFormat('dd/MM').format(next!.date!.toLocal()),
-                  small: true,
-                ),
-              ),
-            ],
+          const Icon(
+            Icons.calendar_month_outlined,
+            color: Colors.white,
+            size: 34,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
+          const Text(
+            'PRÓXIMA AGENDA',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            event?.title ?? 'Nenhum compromisso agendado',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _details(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+          ),
+          const SizedBox(height: 16),
           OutlinedButton(
             onPressed: onTap,
             style: OutlinedButton.styleFrom(
@@ -383,7 +388,7 @@ class _PerformanceCard extends StatelessWidget {
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Ver desempenho completo'),
+                Text('Ver agenda completa'),
                 SizedBox(width: 10),
                 Icon(Icons.arrow_forward),
               ],
@@ -393,48 +398,16 @@ class _PerformanceCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({
-    required this.label,
-    required this.value,
-    required this.detail,
-    this.small = false,
-  });
-  final String label, value, detail;
-  final bool small;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
-    child: Column(
-      children: [
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          value,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: small ? 17 : 29,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 7),
-        Text(
-          detail,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-        ),
-      ],
-    ),
-  );
+  String _details() {
+    if (event == null) return 'Consulte o calendário escolar';
+    final date = event!.startsAt.toLocal();
+    final when = event!.allDay
+        ? DateFormat('dd/MM/yyyy').format(date)
+        : DateFormat('dd/MM/yyyy • HH:mm').format(date);
+    final location = event!.location?.trim();
+    return location?.isNotEmpty == true ? '$when • $location' : when;
+  }
 }
 
 class _QuickGrid extends StatelessWidget {
