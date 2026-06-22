@@ -30,6 +30,7 @@ class SessionController extends AsyncNotifier<Parent?> {
   }
 
   Future<bool> login(String cpf, String password) async {
+    ref.read(selectedStudentProvider.notifier).clear();
     state = const AsyncLoading();
     try {
       final result = await ref
@@ -46,9 +47,9 @@ class SessionController extends AsyncNotifier<Parent?> {
   }
 
   Future<void> logout() async {
-    await ref.read(pushServiceProvider).unregister();
-    await ref.read(tokenStorageProvider).clear();
     ref.read(selectedStudentProvider.notifier).clear();
     state = const AsyncData(null);
+    await ref.read(pushServiceProvider).unregister();
+    await ref.read(tokenStorageProvider).clear();
   }
 }

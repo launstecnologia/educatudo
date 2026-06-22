@@ -234,46 +234,56 @@ class _StudentCard extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     child: Padding(
       padding: const EdgeInsets.all(18),
-      child: Row(
+      child: Column(
         children: [
-          _Avatar(student: student),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  student.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 19,
-                  ),
-                ),
-                Text(
-                  student.classLabel.isEmpty
-                      ? 'Aluno selecionado'
-                      : student.classLabel,
-                  style: const TextStyle(color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 6),
-                const Row(
+          Row(
+            children: [
+              _Avatar(student: student),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.verified_user_outlined,
-                      size: 18,
-                      color: Color(0xFF1D4ED8),
+                    Text(
+                      student.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 19,
+                      ),
                     ),
-                    SizedBox(width: 6),
-                    Text('Colégio Almeida Garrett'),
+                    Text(
+                      student.classLabel.isEmpty
+                          ? 'Aluno selecionado'
+                          : student.classLabel,
+                      style: const TextStyle(color: Color(0xFF64748B)),
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          OutlinedButton.icon(
-            onPressed: onChange,
-            icon: const Icon(Icons.swap_horiz),
-            label: const Text('Trocar'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.verified_user_outlined,
+                size: 18,
+                color: Color(0xFF1D4ED8),
+              ),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'Colégio Almeida Garrett',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: onChange,
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('Trocar'),
+              ),
+            ],
           ),
         ],
       ),
@@ -314,9 +324,7 @@ class _PerformanceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF075CE5), Color(0xFF6946C7), Color(0xFFFF7800)],
-        ),
+        color: const Color(0xFF2457B8),
         borderRadius: BorderRadius.circular(26),
         boxShadow: const [
           BoxShadow(

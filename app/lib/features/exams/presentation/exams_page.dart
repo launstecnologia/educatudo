@@ -40,18 +40,18 @@ class ExamsPage extends ConsumerWidget {
                       _Overall(exams: items),
                       const SizedBox(height: 22),
                       Text(
-                        'Desempenho por matéria',
+                        'Grupos de provas',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 10),
                       ...groups.entries.map(
-                        (entry) => _SubjectCard(
-                          name: entry.key,
+                        (entry) => _GroupCard(
+                          title: entry.value.first.groupTitle,
                           exams: entry.value,
                           onTap: () => context.push(
-                            '/students/$studentId/exams/subject?name=${Uri.encodeQueryComponent(entry.key)}',
+                            '/students/$studentId/exams/group?key=${Uri.encodeQueryComponent(entry.key)}',
                           ),
                         ),
                       ),
@@ -66,10 +66,7 @@ class ExamsPage extends ConsumerWidget {
   Map<String, List<Exam>> _groups(List<Exam> exams) {
     final map = <String, List<Exam>>{};
     for (final exam in exams) {
-      final key = exam.subjectName?.trim().isNotEmpty == true
-          ? exam.subjectName!.trim()
-          : 'Sem matéria';
-      map.putIfAbsent(key, () => []).add(exam);
+      map.putIfAbsent(exam.groupKey, () => []).add(exam);
     }
     return map;
   }
@@ -136,13 +133,13 @@ class _Metric extends StatelessWidget {
   );
 }
 
-class _SubjectCard extends StatelessWidget {
-  const _SubjectCard({
-    required this.name,
+class _GroupCard extends StatelessWidget {
+  const _GroupCard({
+    required this.title,
     required this.exams,
     required this.onTap,
   });
-  final String name;
+  final String title;
   final List<Exam> exams;
   final VoidCallback onTap;
   @override
@@ -167,14 +164,14 @@ class _SubjectCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      title,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
                     ),
                     Text(
-                      '${exams.length} prova(s) · $correct acertos · $wrong erros',
+                      '${exams.length} matéria(s) · $correct acertos · $wrong erros · ${rate.toStringAsFixed(0)}%',
                     ),
                   ],
                 ),

@@ -81,10 +81,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: '/students/:studentId/exams/subject',
-        builder: (_, state) => ExamSubjectDetailPage(
+        path: '/students/:studentId/exams/group',
+        builder: (_, state) => ExamGroupDetailPage(
           studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-          subjectName: state.uri.queryParameters['name'] ?? 'Sem matéria',
+          groupKey: state.uri.queryParameters['key'] ?? '',
         ),
       ),
       GoRoute(

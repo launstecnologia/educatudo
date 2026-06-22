@@ -44,7 +44,21 @@ class LessonPlan {
 
   static String? _text(dynamic value) {
     if (value == null) return null;
-    final text = value is List ? value.join('\n') : value.toString();
-    return text.trim().isEmpty ? null : text.trim();
+    var text = value is List ? value.join('\n') : value.toString();
+    text = text
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</(p|div|li|h[1-6])>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#039;', "'")
+        .replaceAll(RegExp(r'\n[ \t]+'), '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+    return text.isEmpty ? null : text;
   }
 }

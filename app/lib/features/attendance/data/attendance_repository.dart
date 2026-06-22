@@ -16,6 +16,10 @@ class AttendanceRepository {
   Future<AccessHistory> list(int studentId) async {
     final response = await _dio.get<dynamic>(
       '/students/$studentId/access-events',
+      options: Options(
+        sendTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ),
     );
     final raw = response.data is Map ? response.data['data'] : response.data;
     return AccessHistory.fromJson(
