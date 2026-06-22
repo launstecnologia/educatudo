@@ -27,6 +27,8 @@ GET    /students/{student_id}/lesson-plans
 GET    /students/{student_id}/grades
 GET    /students/{student_id}/report-card
 GET    /students/{student_id}/school-messages
+GET    /students/{student_id}/access-events?from=YYYY-MM-DD&to=YYYY-MM-DD
+GET    /students/{student_id}/report-card
 GET    /students/{student_id}/school-communications
 GET    /students/{student_id}/school-communications/{communication_id}
 POST   /students/{student_id}/school-communications/{communication_id}/read
@@ -48,6 +50,10 @@ Listagens devem aceitar paginação e filtros. Datas são ISO-8601 com timezone.
 por turma ou individual, anexos, prioridade, leitura e respostas. Ele é
 independente de `notices`, que permanece como o mural professor → aluno apenas
 espelhado para os responsáveis.
+
+`access-events` retorna o status atual (`is_at_school`) e o histórico de
+entradas/saídas reconhecidas. `report-card` usa os mesmos boletins oficiais e
+as mesmas regras de visibilidade da área `/pais`.
 
 ## Respostas
 

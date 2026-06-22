@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/session_controller.dart';
+import '../features/attendance/presentation/attendance_page.dart';
 import '../features/communication/presentation/notices_page.dart';
 import '../features/communication/presentation/notifications_page.dart';
 import '../features/exams/presentation/exams_page.dart';
+import '../features/exams/presentation/exam_subject_detail_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/journeys/presentation/journeys_page.dart';
 import '../features/lesson_plans/presentation/lesson_plan_detail_page.dart';
@@ -14,6 +16,7 @@ import '../features/lesson_plans/presentation/lesson_plans_page.dart';
 import '../features/school_calendar/presentation/school_calendar_page.dart';
 import '../features/school_communication/presentation/school_communication_detail_page.dart';
 import '../features/school_communication/presentation/school_communications_page.dart';
+import '../features/report_card/presentation/report_card_page.dart';
 import '../features/students/presentation/student_selector_page.dart';
 import '../features/writing_journeys/presentation/writing_page.dart';
 
@@ -74,6 +77,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/students/:studentId/exams',
         builder: (_, state) => ExamsPage(
+          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '/students/:studentId/exams/subject',
+        builder: (_, state) => ExamSubjectDetailPage(
+          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+          subjectName: state.uri.queryParameters['name'] ?? 'Sem matéria',
+        ),
+      ),
+      GoRoute(
+        path: '/students/:studentId/attendance',
+        builder: (_, state) => AttendancePage(
+          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '/students/:studentId/report-card',
+        builder: (_, state) => ReportCardPage(
           studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
         ),
       ),
