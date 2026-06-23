@@ -432,7 +432,12 @@ class _StatsStrip extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(item.$1, color: item.$4, size: 27),
+                    _FloatingIcon(
+                      icon: item.$1,
+                      color: item.$4,
+                      size: 27,
+                      delay: Duration(milliseconds: index * 180),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       '${item.$2}',
@@ -483,10 +488,11 @@ class _NextAgendaCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.calendar_month_outlined,
+          const _FloatingIcon(
+            icon: Icons.calendar_month_outlined,
             color: Colors.white,
             size: 34,
+            delay: Duration(milliseconds: 120),
           ),
           const SizedBox(height: 10),
           const Text(
@@ -640,7 +646,12 @@ class _QuickGrid extends StatelessWidget {
                         color: item.$5.withValues(alpha: .11),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(item.$1, color: item.$5, size: 27),
+                      child: _FloatingIcon(
+                        icon: item.$1,
+                        color: item.$5,
+                        size: 27,
+                        delay: Duration(milliseconds: i * 110),
+                      ),
                     ),
                     const SizedBox(width: 9),
                     Expanded(
@@ -683,6 +694,66 @@ class _QuickGrid extends StatelessWidget {
       },
     );
   }
+}
+
+class _FloatingIcon extends StatefulWidget {
+  const _FloatingIcon({
+    required this.icon,
+    required this.color,
+    required this.size,
+    this.delay = Duration.zero,
+  });
+
+  final IconData icon;
+  final Color color;
+  final double size;
+  final Duration delay;
+
+  @override
+  State<_FloatingIcon> createState() => _FloatingIconState();
+}
+
+class _FloatingIconState extends State<_FloatingIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1250),
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    Future<void>.delayed(widget.delay, () {
+      if (mounted && !MediaQuery.disableAnimationsOf(context)) {
+        _controller.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _animation,
+    builder: (_, child) {
+      final progress = _controller.isAnimating ? _animation.value : .5;
+      return Transform.translate(
+        offset: Offset(0, -2.5 * progress),
+        child: Transform.rotate(
+          angle: (progress - .5) * .06,
+          child: Transform.scale(scale: .96 + progress * .07, child: child),
+        ),
+      );
+    },
+    child: Icon(widget.icon, color: widget.color, size: widget.size),
+  );
 }
 
 class _RecentActivity extends StatelessWidget {
