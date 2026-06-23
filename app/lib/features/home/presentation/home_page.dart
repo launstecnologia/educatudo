@@ -36,15 +36,18 @@ class HomePage extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
             children: [
-              _Header(
+              _StudentHero(
                 parentName: parent?.name ?? 'Responsável',
+                student: student,
                 onNotifications: () => context.push('/notifications'),
                 onProfile: () => _profile(context, ref),
+                onChange: () => context.go('/students'),
               ),
               const SizedBox(height: 18),
-              _StudentCard(
-                student: student,
-                onChange: () => context.go('/students'),
+              summary.when(
+                loading: () => const SizedBox(height: 104),
+                error: (_, _) => const SizedBox(),
+                data: (data) => _StatsStrip(summary: data),
               ),
               const SizedBox(height: 18),
               agenda.when(
@@ -60,7 +63,7 @@ class HomePage extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Acesso rápido',
+                'Acompanhamento',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
@@ -152,14 +155,17 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({
+class _StudentHero extends StatelessWidget {
+  const _StudentHero({
     required this.parentName,
+    required this.student,
     required this.onNotifications,
     required this.onProfile,
+    required this.onChange,
   });
+  final Student student;
   final String parentName;
-  final VoidCallback onNotifications, onProfile;
+  final VoidCallback onNotifications, onProfile, onChange;
   @override
   Widget build(BuildContext context) {
     final hour = DateTime.now().hour,
@@ -168,46 +174,146 @@ class _Header extends StatelessWidget {
             : hour < 18
             ? 'Boa tarde'
             : 'Boa noite';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 58,
-              height: 52,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Image.asset('assets/images/colag_logo.png'),
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutCubic,
+      tween: Tween(begin: 0, end: 1),
+      builder: (context, value, child) => Transform.translate(
+        offset: Offset(0, 22 * (1 - value)),
+        child: Opacity(opacity: value, child: child),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 235),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF075CE5), Color(0xFF1939A8)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x40075CE5),
+              blurRadius: 28,
+              offset: Offset(0, 12),
             ),
-            const Spacer(),
-            _RoundButton(
-              icon: Icons.notifications_none,
-              onTap: onNotifications,
-              showDot: true,
-            ),
-            const SizedBox(width: 10),
-            _RoundButton(icon: Icons.person_outline, onTap: onProfile),
           ],
         ),
-        const SizedBox(height: 20),
-        Text(
-          '$greeting, ${parentName.split(' ').first}! 👋',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF172C73),
-          ),
+        child: Stack(
+          children: [
+            const Positioned(
+              right: -20,
+              top: -35,
+              child: _DecorativeCircle(size: 145),
+            ),
+            const Positioned(
+              left: 115,
+              bottom: -58,
+              child: _DecorativeCircle(size: 120),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 58,
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Image.asset('assets/images/colag_logo.png'),
+                    ),
+                    const Spacer(),
+                    _RoundButton(
+                      icon: Icons.notifications_none,
+                      onTap: onNotifications,
+                      showDot: true,
+                      dark: true,
+                    ),
+                    const SizedBox(width: 8),
+                    _RoundButton(
+                      icon: Icons.person_outline,
+                      onTap: onProfile,
+                      dark: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 17),
+                Text(
+                  '$greeting, ${parentName.split(' ').first}! 👋',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _Avatar(student: student, radius: 35),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            student.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 23,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            student.classLabel.isEmpty
+                                ? 'Aluno selecionado'
+                                : student.classLabel,
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: onChange,
+                      tooltip: 'Trocar aluno',
+                      icon: const Icon(Icons.swap_horiz),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF1745B8),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
-        const Text(
-          'Acompanhe tudo sobre a vida escolar.',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 16),
-        ),
-      ],
+      ),
     );
   }
+}
+
+class _DecorativeCircle extends StatelessWidget {
+  const _DecorativeCircle({required this.size});
+  final double size;
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white.withValues(alpha: .12), width: 2),
+      color: Colors.white.withValues(alpha: .04),
+    ),
+  );
 }
 
 class _RoundButton extends StatelessWidget {
@@ -215,20 +321,22 @@ class _RoundButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.showDot = false,
+    this.dark = false,
   });
   final IconData icon;
   final VoidCallback onTap;
   final bool showDot;
+  final bool dark;
   @override
   Widget build(BuildContext context) => Stack(
     children: [
       Material(
-        color: Colors.white,
+        color: dark ? Colors.white.withValues(alpha: .18) : Colors.white,
         shape: const CircleBorder(),
         elevation: 3,
         child: IconButton(
           onPressed: onTap,
-          icon: Icon(icon),
+          icon: Icon(icon, color: dark ? Colors.white : null),
           padding: const EdgeInsets.all(14),
         ),
       ),
@@ -242,74 +350,10 @@ class _RoundButton extends StatelessWidget {
   );
 }
 
-class _StudentCard extends StatelessWidget {
-  const _StudentCard({required this.student, required this.onChange});
-  final Student student;
-  final VoidCallback onChange;
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _Avatar(student: student),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      student.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 19,
-                      ),
-                    ),
-                    Text(
-                      student.classLabel.isEmpty
-                          ? 'Aluno selecionado'
-                          : student.classLabel,
-                      style: const TextStyle(color: Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(
-                Icons.verified_user_outlined,
-                size: 18,
-                color: Color(0xFF1D4ED8),
-              ),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: Text(
-                  'Colégio Almeida Garrett',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: onChange,
-                icon: const Icon(Icons.swap_horiz, size: 18),
-                label: const Text('Trocar'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.student});
+  const _Avatar({required this.student, this.radius = 38});
   final Student student;
+  final double radius;
   @override
   Widget build(BuildContext context) {
     final raw = student.photoUrl ?? '',
@@ -317,7 +361,7 @@ class _Avatar extends StatelessWidget {
             ? raw
             : '${AppConfig.apiOrigin}/${raw.replaceFirst(RegExp(r'^/+'), '')}';
     return CircleAvatar(
-      radius: 38,
+      radius: radius,
       backgroundColor: const Color(0xFFDCE9FF),
       backgroundImage: raw.isNotEmpty ? NetworkImage(url) : null,
       child: raw.isEmpty
@@ -326,6 +370,94 @@ class _Avatar extends StatelessWidget {
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             )
           : null,
+    );
+  }
+}
+
+class _StatsStrip extends StatelessWidget {
+  const _StatsStrip({required this.summary});
+  final HomeSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (
+        Icons.assignment_turned_in_outlined,
+        summary.totalExams,
+        'Provas',
+        const Color(0xFF075CE5),
+      ),
+      (
+        Icons.route_outlined,
+        summary.totalExercises,
+        'Atividades',
+        const Color(0xFF0F9F91),
+      ),
+      (
+        Icons.edit_note_outlined,
+        summary.totalEssays,
+        'Redações',
+        const Color(0xFF8B5CF6),
+      ),
+    ];
+    return Row(
+      children: items.indexed.map((entry) {
+        final (index, item) = entry;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(left: index == 0 ? 0 : 8),
+            child: TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 450 + index * 120),
+              curve: Curves.easeOutBack,
+              tween: Tween(begin: .82, end: 1),
+              builder: (context, value, child) =>
+                  Transform.scale(scale: value, child: child),
+              child: Container(
+                height: 108,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x120F172A),
+                      blurRadius: 18,
+                      offset: Offset(0, 7),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(item.$1, color: item.$4, size: 27),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${item.$2}',
+                      style: TextStyle(
+                        color: item.$4,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      item.$3,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -458,58 +590,92 @@ class _QuickGrid extends StatelessWidget {
         '/students/$studentId/lesson-plans',
         const Color(0xFF2563EB),
       ),
+      (
+        Icons.forum_outlined,
+        'Comunicação',
+        'Fale com a escola',
+        '/students/$studentId/school-communications',
+        const Color(0xFF0891B2),
+      ),
+      (
+        Icons.calendar_month_outlined,
+        'Calendário',
+        'Datas importantes',
+        '/students/$studentId/calendar',
+        const Color(0xFFF59E0B),
+      ),
     ];
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 1.55,
+        childAspectRatio: 1.48,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
       itemCount: items.length,
       itemBuilder: (_, i) {
         final item = items[i];
-        return Card(
-          child: InkWell(
-            onTap: () => context.push(item.$4),
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: item.$5.withValues(alpha: .1),
-                      borderRadius: BorderRadius.circular(12),
+        return TweenAnimationBuilder<double>(
+          duration: Duration(milliseconds: 350 + i * 70),
+          curve: Curves.easeOutCubic,
+          tween: Tween(begin: 0, end: 1),
+          builder: (context, value, child) => Transform.translate(
+            offset: Offset(0, 14 * (1 - value)),
+            child: Opacity(opacity: value, child: child),
+          ),
+          child: Card(
+            child: InkWell(
+              onTap: () => context.push(item.$4),
+              borderRadius: BorderRadius.circular(18),
+              child: Padding(
+                padding: const EdgeInsets.all(13),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: item.$5.withValues(alpha: .11),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(item.$1, color: item.$5, size: 27),
                     ),
-                    child: Icon(item.$1, color: item.$5),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.$2,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        Text(
-                          item.$3,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.$2,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
-                        ),
-                      ],
+                          Text(
+                            item.$3,
+                            maxLines: 2,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.arrow_forward_ios, size: 15),
-                ],
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: item.$5.withValues(alpha: .11),
+                      child: Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: item.$5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
