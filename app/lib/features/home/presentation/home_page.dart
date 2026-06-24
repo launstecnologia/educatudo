@@ -34,7 +34,7 @@ class HomePage extends ConsumerWidget {
             ]);
           },
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 110),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
             children: [
               _StudentHero(
                 parentName: parent?.name ?? 'Responsável',
@@ -99,7 +99,6 @@ class HomePage extends ConsumerWidget {
           ),
         ),
       ),
-      bottomNavigationBar: _BottomNav(studentId: student.id),
     );
   }
 
@@ -661,8 +660,8 @@ class _QuickGrid extends StatelessWidget {
                         children: [
                           Text(
                             item.$2,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                            softWrap: true,
                             style: const TextStyle(fontWeight: FontWeight.w900),
                           ),
                           Text(
@@ -831,53 +830,6 @@ class _RecentActivity extends StatelessWidget {
     'communication' => Colors.blue,
     _ => Colors.grey,
   };
-}
-
-class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.studentId});
-  final int studentId;
-  @override
-  Widget build(BuildContext context) => NavigationBar(
-    selectedIndex: 0,
-    onDestinationSelected: (i) {
-      switch (i) {
-        case 1:
-          context.push('/students/$studentId/exams');
-          return;
-        case 2:
-          context.push('/students/$studentId/school-communications');
-          return;
-        case 3:
-          context.push('/students/$studentId/calendar');
-          return;
-        case 4:
-          context.go('/students');
-          return;
-        default:
-          return;
-      }
-    },
-    destinations: const [
-      NavigationDestination(
-        icon: Icon(Icons.home_outlined),
-        selectedIcon: Icon(Icons.home),
-        label: 'Início',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.insights_outlined),
-        label: 'Desempenho',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.chat_bubble_outline),
-        label: 'Comunicação',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.calendar_month_outlined),
-        label: 'Agenda',
-      ),
-      NavigationDestination(icon: Icon(Icons.person_outline), label: 'Perfil'),
-    ],
-  );
 }
 
 class _Error extends StatelessWidget {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_bottom_nav.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/session_controller.dart';
 import '../features/attendance/presentation/attendance_page.dart';
@@ -43,86 +44,105 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/students',
         builder: (_, _) => const StudentSelectorPage(),
       ),
-      GoRoute(path: '/home', builder: (_, _) => const HomePage()),
-      GoRoute(
-        path: '/students/:studentId/notices',
-        builder: (_, state) => NoticesPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/notifications',
-        builder: (_, _) => const NotificationsPage(),
-      ),
-      GoRoute(
-        path: '/students/:studentId/school-communications',
-        builder: (_, state) => SchoolCommunicationsPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/school-communications/:communicationId',
-        builder: (_, state) => SchoolCommunicationDetailPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-          communicationId:
-              int.tryParse(state.pathParameters['communicationId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/calendar',
-        builder: (_, state) => SchoolCalendarPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/exams',
-        builder: (_, state) => ExamsPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/exams/group',
-        builder: (_, state) => ExamGroupDetailPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-          groupKey: state.uri.queryParameters['key'] ?? '',
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/attendance',
-        builder: (_, state) => AttendancePage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/report-card',
-        builder: (_, state) => ReportCardPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/journeys',
-        builder: (_, state) => JourneysPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/lesson-plans',
-        builder: (_, state) => LessonPlansPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/lesson-plans/:planId',
-        builder: (_, state) => LessonPlanDetailPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-          planId: int.tryParse(state.pathParameters['planId'] ?? '') ?? 0,
-        ),
-      ),
-      GoRoute(
-        path: '/students/:studentId/writing',
-        builder: (_, state) => WritingPage(
-          studentId: int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
-        ),
+      ShellRoute(
+        builder: (_, state, child) =>
+            AppShell(location: state.uri.path, child: child),
+        routes: [
+          GoRoute(path: '/home', builder: (_, _) => const HomePage()),
+          GoRoute(
+            path: '/students/:studentId/notices',
+            builder: (_, state) => NoticesPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/notifications',
+            builder: (_, _) => const NotificationsPage(),
+          ),
+          GoRoute(
+            path: '/students/:studentId/school-communications',
+            builder: (_, state) => SchoolCommunicationsPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/school-communications/:communicationId',
+            builder: (_, state) => SchoolCommunicationDetailPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+              communicationId:
+                  int.tryParse(state.pathParameters['communicationId'] ?? '') ??
+                  0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/calendar',
+            builder: (_, state) => SchoolCalendarPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/exams',
+            builder: (_, state) => ExamsPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/exams/group',
+            builder: (_, state) => ExamGroupDetailPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+              groupKey: state.uri.queryParameters['key'] ?? '',
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/attendance',
+            builder: (_, state) => AttendancePage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/report-card',
+            builder: (_, state) => ReportCardPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/journeys',
+            builder: (_, state) => JourneysPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/lesson-plans',
+            builder: (_, state) => LessonPlansPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/lesson-plans/:planId',
+            builder: (_, state) => LessonPlanDetailPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+              planId: int.tryParse(state.pathParameters['planId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/writing',
+            builder: (_, state) => WritingPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+        ],
       ),
     ],
   );
