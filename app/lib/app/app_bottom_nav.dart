@@ -34,6 +34,7 @@ class _AppBottomNav extends StatelessWidget {
         location.contains('/journeys') ||
         location.contains('/writing') ||
         location.contains('/lesson-plans') ||
+        location.contains('/finance') ||
         location.contains('/attendance');
     final communication =
         location.contains('/school-communications') ||

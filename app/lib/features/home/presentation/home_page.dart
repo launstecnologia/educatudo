@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/school/school_config.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../../school_calendar/data/school_calendar_repository.dart';
 import '../../school_calendar/domain/school_event.dart';
@@ -16,6 +17,7 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final parent = ref.watch(sessionControllerProvider).value,
         student = ref.watch(selectedStudentProvider);
+    final school = ref.watch(schoolConfigProvider);
     if (student == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/students');
@@ -39,6 +41,7 @@ class HomePage extends ConsumerWidget {
               _StudentHero(
                 parentName: parent?.name ?? 'Responsável',
                 student: student,
+                school: school,
                 onNotifications: () => context.push('/notifications'),
                 onProfile: () => _profile(context, ref),
                 onChange: () => context.go('/students'),
@@ -158,12 +161,14 @@ class _StudentHero extends StatelessWidget {
   const _StudentHero({
     required this.parentName,
     required this.student,
+    required this.school,
     required this.onNotifications,
     required this.onProfile,
     required this.onChange,
   });
   final Student student;
   final String parentName;
+  final AsyncValue<SchoolConfig> school;
   final VoidCallback onNotifications, onProfile, onChange;
   @override
   Widget build(BuildContext context) {
@@ -224,7 +229,7 @@ class _StudentHero extends StatelessWidget {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Image.asset('assets/images/colag_logo.png'),
+                      child: SchoolLogo(config: school),
                     ),
                     const Spacer(),
                     _RoundButton(
@@ -355,14 +360,12 @@ class _Avatar extends StatelessWidget {
   final double radius;
   @override
   Widget build(BuildContext context) {
-    final raw = student.photoUrl ?? '',
-        url = raw.startsWith('http')
-            ? raw
-            : '${AppConfig.apiOrigin}/${raw.replaceFirst(RegExp(r'^/+'), '')}';
+    final raw = student.photoUrl ?? '';
+    final url = _normalizeUrl(raw);
     return CircleAvatar(
       radius: radius,
       backgroundColor: const Color(0xFFDCE9FF),
-      backgroundImage: raw.isNotEmpty ? NetworkImage(url) : null,
+      backgroundImage: url != null ? NetworkImage(url) : null,
       child: raw.isEmpty
           ? Text(
               student.name.characters.first,
@@ -370,6 +373,19 @@ class _Avatar extends StatelessWidget {
             )
           : null,
     );
+  }
+
+  String? _normalizeUrl(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final origin = AppConfig.apiOrigin.endsWith('/')
+        ? AppConfig.apiOrigin.substring(0, AppConfig.apiOrigin.length - 1)
+        : AppConfig.apiOrigin;
+    if (value.startsWith('/')) return '$origin$value';
+    return '$origin/$value';
   }
 }
 
@@ -609,86 +625,105 @@ class _QuickGrid extends StatelessWidget {
         '/students/$studentId/calendar',
         const Color(0xFFF59E0B),
       ),
-    ];
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.48,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+      (
+        Icons.account_balance_wallet_outlined,
+        'Financeiro',
+        'Faturas e contrato',
+        '/students/$studentId/finance',
+        const Color(0xFF0F766E),
       ),
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final item = items[i];
-        return TweenAnimationBuilder<double>(
-          duration: Duration(milliseconds: 350 + i * 70),
-          curve: Curves.easeOutCubic,
-          tween: Tween(begin: 0, end: 1),
-          builder: (context, value, child) => Transform.translate(
-            offset: Offset(0, 14 * (1 - value)),
-            child: Opacity(opacity: value, child: child),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTight = constraints.maxWidth < 370;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: isTight ? 1.08 : 1.34,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
-          child: Card(
-            child: InkWell(
-              onTap: () => context.push(item.$4),
-              borderRadius: BorderRadius.circular(18),
-              child: Padding(
-                padding: const EdgeInsets.all(13),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: item.$5.withValues(alpha: .11),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: _FloatingIcon(
-                        icon: item.$1,
-                        color: item.$5,
-                        size: 27,
-                        delay: Duration(milliseconds: i * 110),
-                      ),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.$2,
-                            maxLines: 2,
-                            softWrap: true,
-                            style: const TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                          Text(
-                            item.$3,
-                            maxLines: 2,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF64748B),
+          itemCount: items.length,
+          itemBuilder: (_, i) {
+            final item = items[i];
+            return TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 350 + i * 70),
+              curve: Curves.easeOutCubic,
+              tween: Tween(begin: 0, end: 1),
+              builder: (context, value, child) => Transform.translate(
+                offset: Offset(0, 14 * (1 - value)),
+                child: Opacity(opacity: value, child: child),
+              ),
+              child: Card(
+                child: InkWell(
+                  onTap: () => context.push(item.$4),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Padding(
+                    padding: EdgeInsets.all(isTight ? 12 : 14),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: item.$5.withValues(alpha: .11),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: _FloatingIcon(
+                                icon: item.$1,
+                                color: item.$5,
+                                size: 27,
+                                delay: Duration(milliseconds: i * 110),
+                              ),
                             ),
+                            const Spacer(),
+                            CircleAvatar(
+                              radius: 13,
+                              backgroundColor: item.$5.withValues(alpha: .11),
+                              child: Icon(
+                                Icons.arrow_forward_ios,
+                                size: 12,
+                                color: item.$5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: isTight ? 10 : 12),
+                        Text(
+                          item.$2,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: true,
+                          style: TextStyle(
+                            height: 1.05,
+                            fontSize: isTight ? 15 : 16,
+                            fontWeight: FontWeight.w900,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.$3,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            height: 1.15,
+                            fontSize: isTight ? 11 : 12,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                     ),
-                    CircleAvatar(
-                      radius: 13,
-                      backgroundColor: item.$5.withValues(alpha: .11),
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        size: 12,
-                        color: item.$5,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );

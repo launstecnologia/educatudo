@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/school/school_config.dart';
 import '../../../app/theme/app_theme.dart';
 import 'session_controller.dart';
 
@@ -40,6 +41,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
+    final school = ref.watch(schoolConfigProvider);
     final error = session.hasError
         ? (session.error is ApiException
               ? (session.error! as ApiException).message
@@ -80,11 +82,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Center(
-                          child: Image.asset(
-                            'assets/images/colag_logo.png',
+                          child: SchoolLogo(
+                            config: school,
                             width: 210,
-                            fit: BoxFit.contain,
-                            semanticLabel: 'Logo Colégio Almeida Garrett',
+                            height: 95,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -183,10 +184,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 18),
-                        const Text(
-                          'EducaTudo • Colégio Almeida Garrett',
+                        Text(
+                          'EducaTudo • ${school.asData?.value.name ?? 'Escola'}',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: Color(0xFF7890AD),
                             fontSize: 12,
                           ),

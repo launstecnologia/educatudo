@@ -10,6 +10,7 @@ import '../features/communication/presentation/notices_page.dart';
 import '../features/communication/presentation/notifications_page.dart';
 import '../features/exams/presentation/exams_page.dart';
 import '../features/exams/presentation/exam_subject_detail_page.dart';
+import '../features/finance/presentation/finance_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/journeys/presentation/journeys_page.dart';
 import '../features/lesson_plans/presentation/lesson_plan_detail_page.dart';
@@ -109,6 +110,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/students/:studentId/report-card',
             builder: (_, state) => ReportCardPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path: '/students/:studentId/finance',
+            builder: (_, state) => FinancePage(
               studentId:
                   int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
             ),
