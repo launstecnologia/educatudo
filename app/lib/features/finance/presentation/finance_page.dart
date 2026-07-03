@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -66,7 +67,10 @@ class FinancePage extends ConsumerWidget {
                       'Nenhuma fatura encontrada. Se a escola já usa financeiro, atualize a API no servidor.',
                 )
               else
-                ...data.invoices.map(_InvoiceCard.new),
+                ...data.invoices.map(
+                  (invoice) =>
+                      _InvoiceCard(invoice: invoice, studentId: studentId),
+                ),
               const SizedBox(height: 22),
               _SectionTitle(
                 title: 'Matrícula e contratos',
@@ -189,8 +193,9 @@ class _SummaryValue extends StatelessWidget {
 }
 
 class _InvoiceCard extends StatelessWidget {
-  const _InvoiceCard(this.invoice);
+  const _InvoiceCard({required this.invoice, required this.studentId});
   final FinanceInvoice invoice;
+  final int studentId;
 
   @override
   Widget build(BuildContext context) {
@@ -248,19 +253,17 @@ class _InvoiceCard extends StatelessWidget {
                   money.format(invoice.amount),
                   style: TextStyle(color: color, fontWeight: FontWeight.w900),
                 ),
-                if (invoice.paymentUrl != null &&
-                    invoice.paymentUrl!.isNotEmpty) ...[
+                if (!invoice.isPaid) ...[
                   const SizedBox(height: 6),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
+                  FilledButton(
+                    style: FilledButton.styleFrom(
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
-                    onPressed: () => launchUrl(
-                      Uri.parse(invoice.paymentUrl!),
-                      mode: LaunchMode.externalApplication,
+                    onPressed: () => context.push(
+                      '/students/$studentId/finance/invoices/${invoice.source}/${invoice.id}/payment',
                     ),
-                    child: const Text('Abrir'),
+                    child: const Text('Pagar'),
                   ),
                 ],
               ],

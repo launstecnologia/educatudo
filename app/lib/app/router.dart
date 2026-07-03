@@ -11,6 +11,7 @@ import '../features/communication/presentation/notifications_page.dart';
 import '../features/exams/presentation/exams_page.dart';
 import '../features/exams/presentation/exam_subject_detail_page.dart';
 import '../features/finance/presentation/finance_page.dart';
+import '../features/finance/presentation/finance_payment_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/journeys/presentation/journeys_page.dart';
 import '../features/lesson_plans/presentation/lesson_plan_detail_page.dart';
@@ -119,6 +120,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, state) => FinancePage(
               studentId:
                   int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+            ),
+          ),
+          GoRoute(
+            path:
+                '/students/:studentId/finance/invoices/:source/:invoiceId/payment',
+            builder: (_, state) => FinancePaymentPage(
+              studentId:
+                  int.tryParse(state.pathParameters['studentId'] ?? '') ?? 0,
+              source: state.pathParameters['source'] ?? '',
+              invoiceId:
+                  int.tryParse(state.pathParameters['invoiceId'] ?? '') ?? 0,
             ),
           ),
           GoRoute(
