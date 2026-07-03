@@ -208,67 +208,78 @@ class _InvoiceCard extends StatelessWidget {
         : invoice.isOverdue
         ? const Color(0xFFDC2626)
         : const Color(0xFFF59E0B);
+    final paymentRoute =
+        '/students/$studentId/finance/invoices/${invoice.source}/${invoice.id}/payment';
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: color.withValues(alpha: .12),
-              child: Icon(Icons.receipt_long_outlined, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    invoice.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_status(invoice.status)} • vence em $date',
-                    style: const TextStyle(color: Color(0xFF64748B)),
-                  ),
-                  if (invoice.barcode != null && invoice.barcode!.isNotEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: invoice.isPaid ? null : () => context.push(paymentRoute),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: color.withValues(alpha: .12),
+                child: Icon(Icons.receipt_long_outlined, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      invoice.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_status(invoice.status)} • vence em $date',
+                      style: const TextStyle(color: Color(0xFF64748B)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        'Boleto disponível',
-                        style: TextStyle(color: Color(0xFF075CE5)),
+                        invoice.isPaid
+                            ? 'Pagamento registrado'
+                            : 'Toque para abrir boleto/PIX',
+                        style: TextStyle(
+                          color: invoice.isPaid
+                              ? const Color(0xFF16A34A)
+                              : const Color(0xFF075CE5),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    money.format(invoice.amount),
+                    style: TextStyle(color: color, fontWeight: FontWeight.w900),
+                  ),
+                  if (!invoice.isPaid) ...[
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      onPressed: () => context.push(paymentRoute),
+                      child: const Text('Pagar'),
+                    ),
+                  ],
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  money.format(invoice.amount),
-                  style: TextStyle(color: color, fontWeight: FontWeight.w900),
-                ),
-                if (!invoice.isPaid) ...[
-                  const SizedBox(height: 6),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    onPressed: () => context.push(
-                      '/students/$studentId/finance/invoices/${invoice.source}/${invoice.id}/payment',
-                    ),
-                    child: const Text('Pagar'),
-                  ),
-                ],
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -315,27 +326,49 @@ class _DocumentCard extends StatelessWidget {
   final String? url;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 12),
-    child: ListTile(
-      leading: CircleAvatar(
-        backgroundColor: const Color(0xFFE8F1FF),
-        child: Icon(icon, color: const Color(0xFF075CE5)),
-      ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
-      subtitle: Text(subtitle),
-      trailing: url == null || url!.isEmpty
-          ? null
-          : IconButton(
-              tooltip: 'Abrir contrato',
-              icon: const Icon(Icons.open_in_new),
-              onPressed: () => launchUrl(
-                Uri.parse(url!),
-                mode: LaunchMode.externalApplication,
-              ),
+  Widget build(BuildContext context) {
+    final canOpen = url != null && url!.isNotEmpty;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: canOpen ? () => _open(url!) : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFFE8F1FF),
+              child: Icon(icon, color: const Color(0xFF075CE5)),
             ),
-    ),
-  );
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            subtitle: Text(
+              canOpen
+                  ? '$subtitle\nToque para ler/assinar'
+                  : '$subtitle\nContrato ainda não gerado',
+            ),
+            isThreeLine: true,
+            trailing: canOpen
+                ? FilledButton(
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    onPressed: () => _open(url!),
+                    child: const Text('Abrir'),
+                  )
+                : const Icon(Icons.lock_outline, color: Color(0xFF94A3B8)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _open(String url) {
+    launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
 }
 
 class _SectionTitle extends StatelessWidget {
