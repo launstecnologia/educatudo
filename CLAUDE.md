@@ -116,6 +116,6 @@ Fluxo spec-driven: atualizar a spec → Plan Mode → aprovar → implementar.
 
 Ferramentas do projeto:
 - **Subagents**: `code-reviewer` (invocar após qualquer mudança em PHP) e `migration-checker` (após criar/alterar migration)
-- **Comandos**: `/new-module <nome>` · `/migration <descrição>` · `/fix-issue <problema>`
+- **Comandos**: `/task <pedido>` (fluxo padrão para criar qualquer coisa) · `/new-module <nome>` · `/migration <descrição>` · `/fix-issue <problema>`
 - **Skill** `testing`: rodar/escrever testes Playwright (ficam na raiz, não em `src/`)
 - **Hooks** (`.claude/settings.json`): `php -l` após editar `.php` (se PHP estiver no PATH) e bloqueio de edição direta de `.env`
