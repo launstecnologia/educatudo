@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v php >/dev/null 2>&1 || exit 0; f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.php) out=$(php -l \"$f\" 2>&1) || { echo \"$out\" >&2; exit 2; } ;; esac"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.env|*/.env|*.env.production) echo 'Bloqueado: nunca editar .env diretamente. Edite .env.example e avise o usuário.' >&2; exit 2 ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

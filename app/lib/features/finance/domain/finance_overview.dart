@@ -11,17 +11,26 @@ class FinanceOverview {
   final List<FinanceContract> contracts;
   final List<EnrollmentContract> enrollments;
 
-  factory FinanceOverview.fromJson(Map<String, dynamic> json) =>
-      FinanceOverview(
-        summary: FinanceSummary.fromJson(_map(json['summary'])),
-        invoices: _list(json['invoices']).map(FinanceInvoice.fromJson).toList(),
-        contracts: _list(
-          json['contracts'],
-        ).map(FinanceContract.fromJson).toList(),
-        enrollments: _list(
-          json['enrollments'],
-        ).map(EnrollmentContract.fromJson).toList(),
-      );
+  factory FinanceOverview.fromJson(Map<String, dynamic> json) {
+    final invoices =
+        _list(json['invoices']).map(FinanceInvoice.fromJson).toList()
+          ..sort((a, b) {
+            if (a.isPaid != b.isPaid) return a.isPaid ? 1 : -1;
+            final ad = a.dueDate ?? DateTime(9999);
+            final bd = b.dueDate ?? DateTime(9999);
+            return ad.compareTo(bd);
+          });
+    return FinanceOverview(
+      summary: FinanceSummary.fromJson(_map(json['summary'])),
+      invoices: invoices,
+      contracts: _list(
+        json['contracts'],
+      ).map(FinanceContract.fromJson).toList(),
+      enrollments: _list(
+        json['enrollments'],
+      ).map(EnrollmentContract.fromJson).toList(),
+    );
+  }
 
   static Map<String, dynamic> _map(dynamic value) => value is Map
       ? value.map((key, value) => MapEntry('$key', value))
@@ -109,6 +118,7 @@ class FinanceContract {
     this.enrollmentStatus,
     this.contractUrl,
     this.pdfUrl,
+    this.items = const [],
     this.signedAt,
   });
 
@@ -117,6 +127,7 @@ class FinanceContract {
   final String? schoolYear, paymentPlan, enrollmentType, enrollmentStatus;
   final double netAmount;
   final String? contractUrl, pdfUrl;
+  final List<FinanceContractItem> items;
   final DateTime? signedAt;
 
   factory FinanceContract.fromJson(Map<String, dynamic> json) =>
@@ -130,7 +141,31 @@ class FinanceContract {
         netAmount: double.tryParse('${json['net_amount'] ?? 0}') ?? 0,
         contractUrl: json['contract_url']?.toString(),
         pdfUrl: json['pdf_url']?.toString(),
+        items: FinanceOverview._list(
+          json['items'],
+        ).map(FinanceContractItem.fromJson).toList(),
         signedAt: DateTime.tryParse(json['signed_at']?.toString() ?? ''),
+      );
+}
+
+class FinanceContractItem {
+  const FinanceContractItem({
+    required this.description,
+    required this.category,
+    required this.netAmount,
+    this.installmentsCount,
+  });
+
+  final String description, category;
+  final double netAmount;
+  final int? installmentsCount;
+
+  factory FinanceContractItem.fromJson(Map<String, dynamic> json) =>
+      FinanceContractItem(
+        description: json['description']?.toString() ?? 'Item do contrato',
+        category: json['category']?.toString() ?? '',
+        netAmount: double.tryParse('${json['net_amount'] ?? 0}') ?? 0,
+        installmentsCount: int.tryParse('${json['installments_count'] ?? ''}'),
       );
 }
 
