@@ -66,6 +66,7 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 - **Prepared statements sempre** — parâmetros nomeados (`:id`), cast explícito de ids. Zero concatenação em SQL.
 - **Controller magro**: coordena e renderiza. Mais de ~50 linhas de lógica de negócio → extrair para Service. Todo módulo novo tem Service, mesmo pequeno.
 - **Módulo novo** segue Controllers/<Mod> + Models/<Mod> + Service + Views por perfil; rotas em `config/routes/<perfil>.php`; se opcional por escola, registrar no `FeatureGate`. Use o comando `/new-module`.
+- **Tela nova ou alterada do admin** (listagem, formulário, dashboard): ler `prompts/admin_ui_sistema.md` antes de implementar — é o índice do design system (cores, botões, tabela, dropdown de ações, badges, formulário, filtros, paginação), com links pros arquivos por assunto. Se for cadastro simples de entidade única (CRUD sem sub-recursos, ex. Usuários/Professores/Monitores), ver também a skill `educatudo-admin-ui` — cobre a exceção de offcanvas em vez de página própria.
 
 ## Migrações
 
@@ -103,6 +104,7 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 | Rotas | `src/config/routes/*.php` (por perfil) |
 | Schema master / tenant | `src/database/migrations/` |
 | Permissões de admin · feature flags | `src/app/Core/AdminPermissionMatrix.php` · `FeatureGate.php` |
+| Padrão visual de tela admin (cores, tabela, formulário, dropdown, offcanvas) | `prompts/admin_ui_sistema.md` (índice) + skill `educatudo-admin-ui` para o padrão de offcanvas em cadastro simples |
 | Documentação técnica detalhada | `src/DOCUMENTATION.md` e `src/docs/` (30+ arquivos) |
 | API de pais (JWT) | `src/docs/API_PAIS_ROTAS_E_CAMPOS.md` |
 
