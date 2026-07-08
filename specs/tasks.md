@@ -17,3 +17,4 @@
 
 <!-- mover itens concluídos para cá com a data -->
 - [x] Aplicar design system (padrão real do projeto, offcanvas para criar/editar) na tela Admin > Usuários (`app/Views/admin/usuarios/*`, `UsuarioController`) — 2026-07-07
+- [x] Aplicar padrão offcanvas em Admin > Professores, Monitores, Perfis de Permissão e Instituição/Unidades — 2026-07-07
