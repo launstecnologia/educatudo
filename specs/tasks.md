@@ -21,3 +21,4 @@
 - [x] Transformar cadastro de Máscara de Acessibilidade (EducaInclui) em wizard de 5 etapas (`app/Views/admin/accommodations/manage.php`, `AccommodationController`) — code-reviewer aprovado; falta verificação manual em navegador — 2026-07-08
 - [x] Sidebar admin: renomear "Versões adaptadas" para "Avaliação Adaptativa" (herda ícone do EducaInclui) e remover item de menu "EducaInclui" (`admin_sidebar.php`) — 2026-07-08
 - [x] Detalhe do aluno: botão "EducaInclui / Laudo" abre offcanvas de resumo em vez de navegar (`students/show.php`, `AccommodationController::resumoJson`) — code-reviewer aprovado — 2026-07-08
+- [x] Wizard EducaInclui: corrigir redirects de upload/análise/ativação/aprovação que voltavam pra Etapa 1; adicionar loading + sucesso/erro real (polling `AIJobPoller`) na análise de laudo por IA — code-reviewer aprovado — 2026-07-08

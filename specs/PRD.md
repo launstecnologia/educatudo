@@ -205,16 +205,3 @@ A disponibilidade real por escola depende das flags do `FeatureGate` (`jornadas`
 
 ## 9. Feature em andamento
 
-<!-- Preencher a cada nova feature. Fluxo: preencher aqui → Plan Mode → aprovar → implementar. -->
-
-### Problema
-
-### Comportamento esperado
-
-### Perfis afetados
-
-### Fora de escopo
-
-### Critérios de aceite
-
-- [ ]
