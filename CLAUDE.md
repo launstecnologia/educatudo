@@ -1,6 +1,7 @@
 # CLAUDE.md — EducaTudo
 
 Guia de contexto para agentes de IA e desenvolvedores novos. Leia antes de tocar em qualquer código.
+Guia de "como pedir as coisas" pra quem é novo trabalhando com IA neste repo: @.claude/docs/working-with-ai.md
 
 ## O que é este projeto
 
@@ -107,6 +108,7 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 | Padrão visual de tela admin (cores, tabela, formulário, dropdown, offcanvas) | `prompts/admin_ui_sistema.md` (índice) + skill `educatudo-admin-ui` para o padrão de offcanvas em cadastro simples |
 | Documentação técnica detalhada | `src/DOCUMENTATION.md` e `src/docs/` (30+ arquivos) |
 | API de pais (JWT) | `src/docs/API_PAIS_ROTAS_E_CAMPOS.md` |
+| Como pedir alteração/módulo/migration pra IA (guia pra dev novo) | `.claude/docs/working-with-ai.md` |
 
 ## Especificações e workflow com Claude Code
 

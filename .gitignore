@@ -29,7 +29,7 @@ app/build/
 ws-server/node_modules/
 
 # Materiais locais ainda fora do fluxo principal de commit
-docs/
+/docs/
 prompts/*
 !prompts/admin_ui_sistema.md
 !prompts/admin_ui_sistema/
