@@ -33,7 +33,9 @@ from app.models.schemas import (
     QuestaoProva,
 )
 from app.services.chunk_service import montar_chunks
+from app.services.apostila_cleanup_service import limpar_dados_derivados_apostila
 from app.services.exercise_service import processar_exercicios_da_apostila
+from app.services.sugestoes_service import montar_sugestoes_chat
 from app.services.openai_service import (
     adicionar_textos_ao_vector_store_em_lote,
     criar_vector_store,
@@ -101,10 +103,13 @@ def _processar_apostila_background(apostila_id: int, pdf_path: str, titulo: str)
             db_erro.close()
 
     try:
-        # Sessão 1 (curta): cria/atualiza o registro e marca como "processando".
+        # Sessão 1 (curta): cria/atualiza o registro, limpa dados anteriores
+        # (reprocessamento) e marca como "processando".
         db = SessionLocal()
         try:
             apostila = _get_or_create_apostila(db, apostila_id, titulo, pdf_path)
+            limpar_dados_derivados_apostila(db, apostila_id, settings.pages_path)
+            apostila = db.get(ApostilaIA, apostila_id)
             apostila.status = ApostilaStatus.processando
             apostila.erro = None
             db.commit()
@@ -169,7 +174,7 @@ def _processar_apostila_background(apostila_id: int, pdf_path: str, titulo: str)
             [(p.numero_pagina, p.texto) for p in paginas if p.texto],
         )
 
-        # Sessão 3 (curta): grava o resultado final.
+        # Sessão 3 (curta): grava resultado final e sugestões dinâmicas de chat.
         db = SessionLocal()
         try:
             apostila = db.get(ApostilaIA, apostila_id)
@@ -177,6 +182,7 @@ def _processar_apostila_background(apostila_id: int, pdf_path: str, titulo: str)
             apostila.total_paginas = len(paginas)
             apostila.status = ApostilaStatus.pronto
             apostila.erro = None
+            apostila.sugestoes_chat = montar_sugestoes_chat(db, apostila_id)
             db.commit()
         finally:
             db.close()

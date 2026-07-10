@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.auth import require_internal_api_key
@@ -12,7 +13,9 @@ from app.models.schemas import ChatApostilaRequest, ChatApostilaResponse
 from app.services.rag_service import (
     ApostilaNaoEncontradaError,
     ApostilaSemVectorStoreError,
+    SessaoNaoEncontradaError,
     responder_pergunta_sobre_apostila,
+    stream_responder_pergunta_sobre_apostila,
 )
 
 logger = logging.getLogger("apostila_ai.routers.chat")
@@ -28,12 +31,18 @@ async def chat_apostila(
 ) -> ChatApostilaResponse:
     try:
         resultado = responder_pergunta_sobre_apostila(
-            db, payload.apostila_id, payload.professor_id, payload.pergunta
+            db,
+            payload.apostila_id,
+            payload.professor_id,
+            payload.pergunta,
+            sessao_id=payload.sessao_id,
         )
     except ApostilaNaoEncontradaError as exc:
         raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
     except ApostilaSemVectorStoreError as exc:
         raise HTTPException(status_code=409, detail={"error": str(exc)}) from exc
+    except SessaoNaoEncontradaError as exc:
+        raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
     except Exception as exc:
         logger.exception(
             "erro_chat_apostila apostila_id=%s", payload.apostila_id
@@ -43,3 +52,26 @@ async def chat_apostila(
         ) from exc
 
     return ChatApostilaResponse(**resultado)
+
+
+@router.post("/apostila/stream")
+async def chat_apostila_stream(
+    payload: ChatApostilaRequest, db: Session = Depends(get_db)
+) -> StreamingResponse:
+    """Streaming SSE da resposta do chat — tokens chegam incrementalmente."""
+    generator = stream_responder_pergunta_sobre_apostila(
+        db,
+        payload.apostila_id,
+        payload.professor_id,
+        payload.pergunta,
+        sessao_id=payload.sessao_id,
+    )
+    return StreamingResponse(
+        generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

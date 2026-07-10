@@ -140,6 +140,14 @@ def criar_vector_store(nome: str) -> str:
     return vector_store.id
 
 
+def remover_vector_store(vector_store_id: str) -> None:
+    """Remove um vector store OpenAI (best-effort — falha não interrompe fluxo)."""
+    if not vector_store_id:
+        return
+    client = get_client()
+    client.vector_stores.delete(vector_store_id)
+
+
 def adicionar_textos_ao_vector_store_em_lote(
     vector_store_id: str, paginas: list[tuple[int, str]]
 ) -> None:
@@ -180,44 +188,18 @@ def _limpar_marcadores_citacao(texto: str) -> str:
     return re.sub(r"【[^】]*】", "", texto).strip()
 
 
-def responder_com_file_search(
-    vector_store_id: str,
-    pergunta: str,
-    historico: list[tuple[str, str]] | None = None,
-) -> tuple[str, list[dict]]:
-    """Usa a Responses API com a tool file_search apontando para o vector
-    store da apostila. Retorna (texto_resposta, lista_de_citacoes) onde cada
-    citação é um dict com possíveis chaves 'filename' e 'texto'.
-
-    `historico` (opcional) é uma lista de (pergunta, resposta) anteriores
-    nesta mesma conversa, em ordem cronológica — dá ao modelo contexto de
-    continuidade para entender follow-ups como "pode gerar" ou "explica
-    melhor" sem o professor precisar repetir o assunto.
-    """
-    settings = get_settings()
-    client = get_client()
-
+def _montar_input_messages(
+    pergunta: str, historico: list[tuple[str, str]] | None = None
+) -> list[dict]:
     input_messages: list[dict] = []
     for pergunta_anterior, resposta_anterior in (historico or []):
         input_messages.append({"role": "user", "content": pergunta_anterior})
         input_messages.append({"role": "assistant", "content": resposta_anterior})
     input_messages.append({"role": "user", "content": pergunta})
+    return input_messages
 
-    response = client.responses.create(
-        model=settings.openai_model,
-        instructions=CHAT_SYSTEM_PROMPT,
-        input=input_messages,
-        tools=[
-            {
-                "type": "file_search",
-                "vector_store_ids": [vector_store_id],
-            }
-        ],
-        include=["file_search_call.results"],
-    )
 
-    resposta_texto = _limpar_marcadores_citacao(response.output_text or "")
-
+def _extrair_citacoes_da_response(response) -> list[dict]:  # noqa: ANN001
     citacoes: list[dict] = []
     try:
         for item in response.output:
@@ -239,8 +221,154 @@ def responder_com_file_search(
                             citacoes.append({"filename": filename, "texto": ""})
     except Exception:
         logger.warning("falha_ao_extrair_citacoes_file_search", exc_info=True)
+    return citacoes
 
+
+def _montar_instructions(resumo_sessao: str | None = None) -> str:
+    if resumo_sessao and resumo_sessao.strip():
+        return (
+            CHAT_SYSTEM_PROMPT
+            + "\n\nResumo da conversa até aqui (use para continuidade, mas responda com base na apostila):\n"
+            + resumo_sessao.strip()
+        )
+    return CHAT_SYSTEM_PROMPT
+
+
+def gerar_resumo_conversa_sessao(mensagens: list[tuple[str, str]]) -> str:
+    """Gera resumo rolling de uma sessão de chat para memória longa."""
+    if not mensagens:
+        return ""
+
+    settings = get_settings()
+    client = get_client()
+
+    linhas: list[str] = []
+    for pergunta, resposta in mensagens:
+        linhas.append(f"Usuário: {pergunta}")
+        linhas.append(f"Assistente: {resposta}")
+    historico_texto = "\n".join(linhas)[-12000:]
+
+    completion = client.chat.completions.create(
+        model=settings.openai_model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Resuma a conversa abaixo em português, em até 8 bullet points objetivos. "
+                    "Preserve temas discutidos, pedidos do usuário e conclusões importantes. "
+                    "Não invente informações."
+                ),
+            },
+            {"role": "user", "content": historico_texto},
+        ],
+        temperature=0.2,
+    )
+    return (completion.choices[0].message.content or "").strip()
+
+
+def responder_com_file_search(
+    vector_store_id: str,
+    pergunta: str,
+    historico: list[tuple[str, str]] | None = None,
+    resumo_sessao: str | None = None,
+) -> tuple[str, list[dict]]:
+    """Usa a Responses API com a tool file_search apontando para o vector
+    store da apostila. Retorna (texto_resposta, lista_de_citacoes) onde cada
+    citação é um dict com possíveis chaves 'filename' e 'texto'.
+
+    `historico` (opcional) é uma lista de (pergunta, resposta) anteriores
+    nesta mesma conversa, em ordem cronológica — dá ao modelo contexto de
+    continuidade para entender follow-ups como "pode gerar" ou "explica
+    melhor" sem o professor precisar repetir o assunto.
+    """
+    settings = get_settings()
+    client = get_client()
+    input_messages = _montar_input_messages(pergunta, historico)
+
+    response = client.responses.create(
+        model=settings.openai_model,
+        instructions=_montar_instructions(resumo_sessao),
+        input=input_messages,
+        tools=[
+            {
+                "type": "file_search",
+                "vector_store_ids": [vector_store_id],
+            }
+        ],
+        include=["file_search_call.results"],
+    )
+
+    resposta_texto = _limpar_marcadores_citacao(response.output_text or "")
+    citacoes = _extrair_citacoes_da_response(response)
     return resposta_texto, citacoes
+
+
+def iterar_resposta_com_file_search(
+    vector_store_id: str,
+    pergunta: str,
+    historico: list[tuple[str, str]] | None = None,
+    resumo_sessao: str | None = None,
+):
+    """Generator que emite tuplas (tipo_evento, payload) durante o streaming
+    da Responses API com file_search.
+
+    tipos emitidos:
+    - ("status", "consultando") — file_search em andamento
+    - ("token", str) — fragmento de texto da resposta
+    - ("concluido", {"resposta": str, "citacoes": list[dict]}) — fim com metadados
+    """
+    settings = get_settings()
+    client = get_client()
+    input_messages = _montar_input_messages(pergunta, historico)
+
+    stream = client.responses.create(
+        model=settings.openai_model,
+        instructions=_montar_instructions(resumo_sessao),
+        input=input_messages,
+        tools=[
+            {
+                "type": "file_search",
+                "vector_store_ids": [vector_store_id],
+            }
+        ],
+        include=["file_search_call.results"],
+        stream=True,
+    )
+
+    resposta_partes: list[str] = []
+    response_final = None
+
+    try:
+        for event in stream:
+            tipo = getattr(event, "type", None)
+
+            if tipo in (
+                "response.file_search_call.in_progress",
+                "response.file_search_call.searching",
+            ):
+                yield ("status", "consultando")
+
+            if tipo == "response.output_text.delta":
+                delta = getattr(event, "delta", "") or ""
+                if delta:
+                    resposta_partes.append(delta)
+                    yield ("token", delta)
+
+            if tipo == "response.completed":
+                response_final = getattr(event, "response", None)
+    finally:
+        close_fn = getattr(stream, "close", None)
+        if callable(close_fn):
+            close_fn()
+
+    if response_final is not None:
+        resposta_texto = _limpar_marcadores_citacao(response_final.output_text or "")
+        citacoes = _extrair_citacoes_da_response(response_final)
+    else:
+        resposta_texto = _limpar_marcadores_citacao("".join(resposta_partes))
+        citacoes = []
+
+    yield ("concluido", {"resposta": resposta_texto, "citacoes": citacoes})
 
 
 SLIDES_SYSTEM_PROMPT = """Você é um assistente pedagógico que redige roteiros de slides.

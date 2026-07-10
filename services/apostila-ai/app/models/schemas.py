@@ -26,19 +26,22 @@ class ProcessarApostilaResponse(BaseModel):
 class ChatApostilaRequest(BaseModel):
     apostila_id: int
     professor_id: int | None = None
+    sessao_id: int | None = None
     pergunta: str = Field(..., min_length=1)
+
+
+class ChatApostilaResponse(BaseModel):
+    resposta: str
+    conversa_id: int | None = None
+    sessao_id: int | None = None
+    paginas_usadas: list[int] = Field(default_factory=list)
+    paginas_com_imagem: list[int] = Field(default_factory=list)
+    fontes: list["FonteResposta"] = Field(default_factory=list)
 
 
 class FonteResposta(BaseModel):
     pagina: int
     trecho: str
-
-
-class ChatApostilaResponse(BaseModel):
-    resposta: str
-    paginas_usadas: list[int] = Field(default_factory=list)
-    paginas_com_imagem: list[int] = Field(default_factory=list)
-    fontes: list[FonteResposta] = Field(default_factory=list)
 
 
 class ExercicioResponse(BaseModel):

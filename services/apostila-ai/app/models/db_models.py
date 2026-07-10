@@ -64,6 +64,7 @@ class ApostilaIA(Base):
     total_paginas: Mapped[int] = mapped_column(Integer, default=0)
     erro: Mapped[str | None] = mapped_column(Text, nullable=True)
     vector_store_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sugestoes_chat: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[object] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -140,6 +141,34 @@ class ApostilaIAExercicio(Base):
     apostila: Mapped["ApostilaIA"] = relationship(back_populates="exercicios")
 
 
+class UsuarioTipo(str, enum.Enum):
+    professor = "professor"
+    aluno = "aluno"
+
+
+class ApostilaIASessao(Base):
+    __tablename__ = "apostila_ia_sessoes"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    apostila_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("apostilas_ia.id", ondelete="CASCADE")
+    )
+    usuario_id: Mapped[int] = mapped_column(BigInteger)
+    usuario_tipo: Mapped[UsuarioTipo] = mapped_column(
+        Enum(UsuarioTipo, native_enum=True)
+    )
+    titulo: Mapped[str] = mapped_column(String(255), default="Nova conversa")
+    resumo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[object] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    conversas: Mapped[list["ApostilaIAConversa"]] = relationship(
+        back_populates="sessao", cascade="all, delete-orphan"
+    )
+
+
 class ApostilaIAConversa(Base):
     __tablename__ = "apostila_ia_conversas"
 
@@ -148,9 +177,13 @@ class ApostilaIAConversa(Base):
         BigInteger, ForeignKey("apostilas_ia.id", ondelete="CASCADE")
     )
     professor_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    sessao_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("apostila_ia_sessoes.id", ondelete="CASCADE"), nullable=True
+    )
     pergunta: Mapped[str] = mapped_column(Text)
     resposta: Mapped[str] = mapped_column(Text)
     paginas_usadas: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, server_default=func.now())
 
     apostila: Mapped["ApostilaIA"] = relationship(back_populates="conversas")
+    sessao: Mapped["ApostilaIASessao | None"] = relationship(back_populates="conversas")
