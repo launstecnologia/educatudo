@@ -7,6 +7,7 @@ tabela apostila_ia_paginas como fonte autoritativa.
 """
 from __future__ import annotations
 
+import difflib
 import re
 from dataclasses import dataclass
 
@@ -60,8 +61,32 @@ def _extrair_pagina_do_rodape(texto: str) -> int | None:
         return None
 
 
+_PALAVRAS_PAGINA_REFERENCIA = ("pagina", "página", "pág", "pag")
+_SIMILARIDADE_MINIMA_TYPO = 0.8
+
+
+def _parece_palavra_pagina(palavra: str) -> bool:
+    """Tolera erro de digitação comum (ex.: "paina", "pagna" em vez de
+    "página") comparando a palavra digitada com as referências por
+    similaridade de string, em vez de exigir bater com o regex exato."""
+    normalizada = palavra.lower().strip(".,;:!?")
+    if not normalizada:
+        return False
+    return any(
+        difflib.SequenceMatcher(None, normalizada, referencia).ratio()
+        >= _SIMILARIDADE_MINIMA_TYPO
+        for referencia in _PALAVRAS_PAGINA_REFERENCIA
+    )
+
+
 def extrair_paginas_solicitadas(pergunta: str, max_paginas: int = 5) -> list[int]:
-    """Extrai números de página explícitos na pergunta (ex.: 'traga a página 50')."""
+    """Extrai números de página citados na pergunta (ex.: 'traga a página 50').
+
+    Tenta primeiro o padrão exato ("página"/"pág"/"pag" + número). Se não
+    achar nada, tenta um fallback tolerante a erro de digitação: qualquer
+    palavra parecida com "página" seguida de um número nas próximas duas
+    palavras (ex.: "resume paina 50", "traz a pagna 12 pra mim").
+    """
     if not pergunta or not pergunta.strip():
         return []
 
@@ -71,6 +96,23 @@ def extrair_paginas_solicitadas(pergunta: str, max_paginas: int = 5) -> list[int
         if numero <= 0 or numero in encontradas:
             continue
         encontradas.append(numero)
+        if len(encontradas) >= max_paginas:
+            return encontradas
+
+    if encontradas:
+        return encontradas
+
+    tokens = pergunta.split()
+    for i, token in enumerate(tokens):
+        if not _parece_palavra_pagina(token):
+            continue
+        for proximo in tokens[i + 1 : i + 3]:
+            numero_str = proximo.strip(".,;:!?º°")
+            if numero_str.isdigit():
+                numero = int(numero_str)
+                if numero > 0 and numero not in encontradas:
+                    encontradas.append(numero)
+                break
         if len(encontradas) >= max_paginas:
             break
 
