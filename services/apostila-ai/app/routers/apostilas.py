@@ -35,6 +35,7 @@ from app.models.schemas import (
 from app.services.chunk_service import montar_chunks
 from app.services.apostila_cleanup_service import limpar_dados_derivados_apostila
 from app.services.exercise_service import processar_exercicios_da_apostila
+from app.services.pagina_contexto_service import resolver_paginas_solicitadas
 from app.services.sugestoes_service import montar_sugestoes_chat
 from app.services.openai_service import (
     adicionar_textos_ao_vector_store_em_lote,
@@ -282,15 +283,16 @@ async def imagem_da_pagina(
     associado a um exercício ou explicação), se houver. O lado PHP atua como
     proxy autenticado entre o navegador do professor e este endpoint — só o
     backend conhece a X-Internal-Api-Key.
+
+    numero_pagina aqui é o número IMPRESSO (o que aparece em paginas_com_imagem
+    do chat, que já é o que o professor digitou/vê) — não a posição bruta no
+    PDF, que pode estar deslocada quando há capa/páginas de crédito antes do
+    início da numeração (ver pagina_contexto_service). Por isso resolve pelo
+    mesmo mecanismo do chat, em vez de filtrar numero_pagina diretamente —
+    senão a imagem servida seria da página física errada.
     """
-    pagina = (
-        db.query(ApostilaIAPagina)
-        .filter(
-            ApostilaIAPagina.apostila_id == apostila_id,
-            ApostilaIAPagina.numero_pagina == numero_pagina,
-        )
-        .first()
-    )
+    resolvidas = resolver_paginas_solicitadas(db, apostila_id, [numero_pagina])
+    pagina = resolvidas.get(numero_pagina)
     if pagina is None or not pagina.imagem_path or not os.path.isfile(pagina.imagem_path):
         raise HTTPException(status_code=404, detail={"error": "Imagem não encontrada"})
 
