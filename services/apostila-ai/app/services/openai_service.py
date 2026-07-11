@@ -82,6 +82,13 @@ Regras:
   apenas orientando a usar o botão "Gerar slides de um capítulo" abaixo do
   chat, que gera a apresentação de verdade (com link real)."""
 
+CHAT_PAGINA_DIRETA_ADDENDUM = """
+IMPORTANTE — texto de página(s) específica(s) foi fornecido abaixo na mensagem do usuário.
+- Use EXCLUSIVAMENTE esse texto para responder sobre o conteúdo da(s) página(s).
+- Não misture informações de outras páginas nem conhecimento geral.
+- Se o usuário pediu o conteúdo de uma página, resuma/explique fielmente o que está no texto fornecido.
+- Se o texto estiver vazio ou ilegível, diga que não há conteúdo textual disponível para essa página."""
+
 
 def _strip_markdown_fences(content: str) -> str:
     content = content.strip()
@@ -234,6 +241,31 @@ def _montar_instructions(resumo_sessao: str | None = None) -> str:
     return CHAT_SYSTEM_PROMPT
 
 
+def _montar_instructions_pagina_direta(resumo_sessao: str | None = None) -> str:
+    base = _montar_instructions(resumo_sessao)
+    return base + "\n" + CHAT_PAGINA_DIRETA_ADDENDUM
+
+
+def _montar_input_com_contexto_paginas(
+    pergunta: str,
+    historico: list[tuple[str, str]] | None,
+    contexto_paginas: str,
+) -> list[dict]:
+    input_messages = _montar_input_messages(pergunta, historico)
+    if not input_messages:
+        return input_messages
+
+    ultima = input_messages[-1]
+    ultima["content"] = (
+        "Conteúdo textual extraído da apostila (fonte autoritativa — "
+        "não invente além deste texto):\n\n"
+        f"{contexto_paginas}\n\n"
+        "---\n\n"
+        f"Pergunta do usuário: {pergunta}"
+    )
+    return input_messages
+
+
 def gerar_resumo_conversa_sessao(mensagens: list[tuple[str, str]]) -> str:
     """Gera resumo rolling de uma sessão de chat para memória longa."""
     if not mensagens:
@@ -369,6 +401,77 @@ def iterar_resposta_com_file_search(
         citacoes = []
 
     yield ("concluido", {"resposta": resposta_texto, "citacoes": citacoes})
+
+
+def responder_com_contexto_paginas(
+    contexto_paginas: str,
+    pergunta: str,
+    historico: list[tuple[str, str]] | None = None,
+    resumo_sessao: str | None = None,
+) -> tuple[str, list[dict]]:
+    """Responde com texto de página(s) injetado diretamente — sem file_search."""
+    settings = get_settings()
+    client = get_client()
+    input_messages = _montar_input_com_contexto_paginas(
+        pergunta, historico, contexto_paginas
+    )
+
+    response = client.responses.create(
+        model=settings.openai_model,
+        instructions=_montar_instructions_pagina_direta(resumo_sessao),
+        input=input_messages,
+    )
+
+    resposta_texto = _limpar_marcadores_citacao(response.output_text or "")
+    return resposta_texto, []
+
+
+def iterar_resposta_com_contexto_paginas(
+    contexto_paginas: str,
+    pergunta: str,
+    historico: list[tuple[str, str]] | None = None,
+    resumo_sessao: str | None = None,
+):
+    """Streaming sem file_search — contexto de página(s) já está no prompt."""
+    settings = get_settings()
+    client = get_client()
+    input_messages = _montar_input_com_contexto_paginas(
+        pergunta, historico, contexto_paginas
+    )
+
+    stream = client.responses.create(
+        model=settings.openai_model,
+        instructions=_montar_instructions_pagina_direta(resumo_sessao),
+        input=input_messages,
+        stream=True,
+    )
+
+    resposta_partes: list[str] = []
+    response_final = None
+
+    try:
+        for event in stream:
+            tipo = getattr(event, "type", None)
+
+            if tipo == "response.output_text.delta":
+                delta = getattr(event, "delta", "") or ""
+                if delta:
+                    resposta_partes.append(delta)
+                    yield ("token", delta)
+
+            if tipo == "response.completed":
+                response_final = getattr(event, "response", None)
+    finally:
+        close_fn = getattr(stream, "close", None)
+        if callable(close_fn):
+            close_fn()
+
+    if response_final is not None:
+        resposta_texto = _limpar_marcadores_citacao(response_final.output_text or "")
+    else:
+        resposta_texto = _limpar_marcadores_citacao("".join(resposta_partes))
+
+    yield ("concluido", {"resposta": resposta_texto, "citacoes": []})
 
 
 SLIDES_SYSTEM_PROMPT = """Você é um assistente pedagógico que redige roteiros de slides.

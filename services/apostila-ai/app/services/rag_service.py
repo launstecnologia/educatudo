@@ -19,8 +19,16 @@ from app.models.db_models import (
 from app.services.openai_service import (
     extrair_numero_pagina_do_filename,
     gerar_resumo_conversa_sessao,
+    iterar_resposta_com_contexto_paginas,
     iterar_resposta_com_file_search,
+    responder_com_contexto_paginas,
     responder_com_file_search,
+)
+from app.services.pagina_contexto_service import (
+    buscar_textos_paginas,
+    extrair_paginas_solicitadas,
+    montar_bloco_contexto_paginas,
+    montar_citacoes_paginas,
 )
 
 logger = logging.getLogger("apostila_ai.rag_service")
@@ -72,17 +80,32 @@ def _buscar_historico_recente(
 
 
 def _montar_metadados_resposta(
-    db: Session, apostila_id: int, citacoes: list[dict]
+    db: Session,
+    apostila_id: int,
+    citacoes: list[dict],
+    paginas_forcadas: list[int] | None = None,
 ) -> dict:
     paginas_usadas: list[int] = []
     fontes: list[dict] = []
-    for citacao in citacoes:
-        numero_pagina = extrair_numero_pagina_do_filename(citacao.get("filename"))
-        if numero_pagina is not None and numero_pagina not in paginas_usadas:
-            paginas_usadas.append(numero_pagina)
-            fontes.append({"pagina": numero_pagina, "trecho": citacao.get("texto", "")})
 
-    paginas_usadas.sort()
+    if paginas_forcadas:
+        paginas_usadas = sorted(set(paginas_forcadas))
+        for numero_pagina in paginas_usadas:
+            for citacao in citacoes:
+                if extrair_numero_pagina_do_filename(citacao.get("filename")) == numero_pagina:
+                    fontes.append(
+                        {"pagina": numero_pagina, "trecho": citacao.get("texto", "")}
+                    )
+                    break
+            else:
+                fontes.append({"pagina": numero_pagina, "trecho": ""})
+    else:
+        for citacao in citacoes:
+            numero_pagina = extrair_numero_pagina_do_filename(citacao.get("filename"))
+            if numero_pagina is not None and numero_pagina not in paginas_usadas:
+                paginas_usadas.append(numero_pagina)
+                fontes.append({"pagina": numero_pagina, "trecho": citacao.get("texto", "")})
+        paginas_usadas.sort()
 
     paginas_com_imagem: list[int] = []
     if paginas_usadas:
@@ -186,6 +209,23 @@ def _contexto_resumo_sessao(db: Session, sessao_id: int | None) -> str | None:
     return sessao.resumo
 
 
+def _resolver_contexto_paginas_direto(
+    db: Session, apostila_id: int, pergunta: str
+) -> tuple[str, list[dict], list[int]] | None:
+    """Se a pergunta cita página(s) e temos texto no banco, retorna contexto direto."""
+    paginas_solicitadas = extrair_paginas_solicitadas(pergunta)
+    if not paginas_solicitadas:
+        return None
+
+    textos = buscar_textos_paginas(db, apostila_id, paginas_solicitadas)
+    if not textos:
+        return None
+
+    contexto = montar_bloco_contexto_paginas(textos)
+    citacoes = montar_citacoes_paginas(textos)
+    return contexto, citacoes, sorted(textos.keys())
+
+
 def responder_pergunta_sobre_apostila(
     db: Session,
     apostila_id: int,
@@ -200,14 +240,27 @@ def responder_pergunta_sobre_apostila(
     historico = _buscar_historico_recente(db, sessao_id, apostila_id, professor_id)
     resumo_sessao = _contexto_resumo_sessao(db, sessao_id)
 
-    resposta_texto, citacoes = responder_com_file_search(
-        apostila.vector_store_id,
-        pergunta,
-        historico=historico,
-        resumo_sessao=resumo_sessao,
-    )
+    contexto_paginas = _resolver_contexto_paginas_direto(db, apostila_id, pergunta)
+    if contexto_paginas is not None:
+        contexto, citacoes, paginas_forcadas = contexto_paginas
+        resposta_texto, _ = responder_com_contexto_paginas(
+            contexto,
+            pergunta,
+            historico=historico,
+            resumo_sessao=resumo_sessao,
+        )
+    else:
+        resposta_texto, citacoes = responder_com_file_search(
+            apostila.vector_store_id,
+            pergunta,
+            historico=historico,
+            resumo_sessao=resumo_sessao,
+        )
+        paginas_forcadas = None
 
-    metadados = _montar_metadados_resposta(db, apostila_id, citacoes)
+    metadados = _montar_metadados_resposta(
+        db, apostila_id, citacoes, paginas_forcadas=paginas_forcadas
+    )
     conversa = _persistir_conversa(
         db,
         apostila_id,
@@ -258,21 +311,44 @@ def stream_responder_pergunta_sobre_apostila(
     historico = _buscar_historico_recente(db, sessao_id, apostila_id, professor_id)
     resumo_sessao = _contexto_resumo_sessao(db, sessao_id)
 
-    try:
-        for tipo, payload in iterar_resposta_com_file_search(
+    contexto_paginas = _resolver_contexto_paginas_direto(db, apostila_id, pergunta)
+    if contexto_paginas is not None:
+        contexto, citacoes_fixas, paginas_forcadas = contexto_paginas
+        gerador = iterar_resposta_com_contexto_paginas(
+            contexto,
+            pergunta,
+            historico=historico,
+            resumo_sessao=resumo_sessao,
+        )
+    else:
+        citacoes_fixas = None
+        paginas_forcadas = None
+        gerador = iterar_resposta_com_file_search(
             apostila.vector_store_id,
             pergunta,
             historico=historico,
             resumo_sessao=resumo_sessao,
-        ):
+        )
+
+    try:
+        for tipo, payload in gerador:
             if tipo == "status":
                 yield _formatar_sse("status", {"status": payload})
             elif tipo == "token":
                 yield _formatar_sse("token", {"text": payload})
             elif tipo == "concluido":
                 resposta_texto = payload["resposta"]
-                citacoes = payload["citacoes"]
-                metadados = _montar_metadados_resposta(db, apostila_id, citacoes)
+                citacoes = (
+                    citacoes_fixas
+                    if citacoes_fixas is not None
+                    else payload.get("citacoes") or []
+                )
+                metadados = _montar_metadados_resposta(
+                    db,
+                    apostila_id,
+                    citacoes,
+                    paginas_forcadas=paginas_forcadas,
+                )
                 conversa = _persistir_conversa(
                     db,
                     apostila_id,
