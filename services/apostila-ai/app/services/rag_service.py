@@ -25,10 +25,10 @@ from app.services.openai_service import (
     responder_com_file_search,
 )
 from app.services.pagina_contexto_service import (
-    buscar_textos_paginas,
+    PaginaResolvida,
     extrair_paginas_solicitadas,
-    montar_bloco_contexto_paginas,
     montar_citacoes_paginas,
+    resolver_paginas_solicitadas,
 )
 
 logger = logging.getLogger("apostila_ai.rag_service")
@@ -84,6 +84,7 @@ def _montar_metadados_resposta(
     apostila_id: int,
     citacoes: list[dict],
     paginas_forcadas: list[int] | None = None,
+    paginas_resolvidas: dict[int, PaginaResolvida] | None = None,
 ) -> dict:
     paginas_usadas: list[int] = []
     fontes: list[dict] = []
@@ -107,18 +108,30 @@ def _montar_metadados_resposta(
                 fontes.append({"pagina": numero_pagina, "trecho": citacao.get("texto", "")})
         paginas_usadas.sort()
 
-    paginas_com_imagem: list[int] = []
-    if paginas_usadas:
-        paginas_com_imagem_rows = (
-            db.query(ApostilaIAPagina.numero_pagina)
-            .filter(
-                ApostilaIAPagina.apostila_id == apostila_id,
-                ApostilaIAPagina.numero_pagina.in_(paginas_usadas),
-                ApostilaIAPagina.imagem_path.isnot(None),
-            )
-            .all()
+    if paginas_resolvidas is not None:
+        # Página pedida diretamente (ver _resolver_contexto_paginas_direto):
+        # já sabemos exatamente quais têm imagem, sem precisar de outra
+        # consulta — e sem o risco de bater no numero_pagina bruto errado
+        # (a página pedida pode estar deslocada da posição real no PDF, ver
+        # pagina_contexto_service._extrair_pagina_do_rodape).
+        paginas_com_imagem = sorted(
+            pagina
+            for pagina in paginas_usadas
+            if paginas_resolvidas.get(pagina) and paginas_resolvidas[pagina].tem_imagem
         )
-        paginas_com_imagem = sorted(row[0] for row in paginas_com_imagem_rows)
+    else:
+        paginas_com_imagem = []
+        if paginas_usadas:
+            paginas_com_imagem_rows = (
+                db.query(ApostilaIAPagina.numero_pagina)
+                .filter(
+                    ApostilaIAPagina.apostila_id == apostila_id,
+                    ApostilaIAPagina.numero_pagina.in_(paginas_usadas),
+                    ApostilaIAPagina.imagem_path.isnot(None),
+                )
+                .all()
+            )
+            paginas_com_imagem = sorted(row[0] for row in paginas_com_imagem_rows)
 
     return {
         "paginas_usadas": paginas_usadas,
@@ -211,19 +224,19 @@ def _contexto_resumo_sessao(db: Session, sessao_id: int | None) -> str | None:
 
 def _resolver_contexto_paginas_direto(
     db: Session, apostila_id: int, pergunta: str
-) -> tuple[str, list[dict], list[int]] | None:
-    """Se a pergunta cita página(s) e temos texto no banco, retorna contexto direto."""
+) -> tuple[dict[int, PaginaResolvida], list[dict], list[int]] | None:
+    """Se a pergunta cita página(s) e temos texto e/ou imagem no banco,
+    retorna o conteúdo direto (bypassa o file_search)."""
     paginas_solicitadas = extrair_paginas_solicitadas(pergunta)
     if not paginas_solicitadas:
         return None
 
-    textos = buscar_textos_paginas(db, apostila_id, paginas_solicitadas)
-    if not textos:
+    paginas = resolver_paginas_solicitadas(db, apostila_id, paginas_solicitadas)
+    if not paginas:
         return None
 
-    contexto = montar_bloco_contexto_paginas(textos)
-    citacoes = montar_citacoes_paginas(textos)
-    return contexto, citacoes, sorted(textos.keys())
+    citacoes = montar_citacoes_paginas(paginas)
+    return paginas, citacoes, sorted(paginas.keys())
 
 
 def responder_pergunta_sobre_apostila(
@@ -242,9 +255,9 @@ def responder_pergunta_sobre_apostila(
 
     contexto_paginas = _resolver_contexto_paginas_direto(db, apostila_id, pergunta)
     if contexto_paginas is not None:
-        contexto, citacoes, paginas_forcadas = contexto_paginas
+        paginas, citacoes, paginas_forcadas = contexto_paginas
         resposta_texto, _ = responder_com_contexto_paginas(
-            contexto,
+            paginas,
             pergunta,
             historico=historico,
             resumo_sessao=resumo_sessao,
@@ -257,9 +270,14 @@ def responder_pergunta_sobre_apostila(
             resumo_sessao=resumo_sessao,
         )
         paginas_forcadas = None
+        paginas = None
 
     metadados = _montar_metadados_resposta(
-        db, apostila_id, citacoes, paginas_forcadas=paginas_forcadas
+        db,
+        apostila_id,
+        citacoes,
+        paginas_forcadas=paginas_forcadas,
+        paginas_resolvidas=paginas,
     )
     conversa = _persistir_conversa(
         db,
@@ -313,9 +331,9 @@ def stream_responder_pergunta_sobre_apostila(
 
     contexto_paginas = _resolver_contexto_paginas_direto(db, apostila_id, pergunta)
     if contexto_paginas is not None:
-        contexto, citacoes_fixas, paginas_forcadas = contexto_paginas
+        paginas, citacoes_fixas, paginas_forcadas = contexto_paginas
         gerador = iterar_resposta_com_contexto_paginas(
-            contexto,
+            paginas,
             pergunta,
             historico=historico,
             resumo_sessao=resumo_sessao,
@@ -323,6 +341,7 @@ def stream_responder_pergunta_sobre_apostila(
     else:
         citacoes_fixas = None
         paginas_forcadas = None
+        paginas = None
         gerador = iterar_resposta_com_file_search(
             apostila.vector_store_id,
             pergunta,
@@ -348,6 +367,7 @@ def stream_responder_pergunta_sobre_apostila(
                     apostila_id,
                     citacoes,
                     paginas_forcadas=paginas_forcadas,
+                    paginas_resolvidas=paginas,
                 )
                 conversa = _persistir_conversa(
                     db,

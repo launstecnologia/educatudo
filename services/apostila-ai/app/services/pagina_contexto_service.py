@@ -1,16 +1,37 @@
-"""Detecção de pedidos por página e recuperação direta do texto no banco.
+"""Detecção de pedidos por página e recuperação direta do conteúdo no banco.
 
 Quando o usuário pede conteúdo de página(s) específica(s), o file_search
 semântico pode citar a página certa mas responder com texto de outra —
-usamos o texto_extraido da tabela apostila_ia_paginas como fonte autoritativa.
+usamos o texto_extraido (ou, na ausência dele, a imagem da página) da
+tabela apostila_ia_paginas como fonte autoritativa.
 """
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
 from app.models.db_models import ApostilaIAPagina
+
+
+@dataclass
+class PaginaResolvida:
+    """Conteúdo real de uma página, já resolvido para o número impresso
+    pedido pelo usuário (não a posição bruta no PDF — ver
+    resolver_paginas_solicitadas)."""
+
+    numero_pagina_raw: int
+    texto: str | None
+    imagem_path: str | None
+
+    @property
+    def tem_texto(self) -> bool:
+        return bool(self.texto and self.texto.strip())
+
+    @property
+    def tem_imagem(self) -> bool:
+        return bool(self.imagem_path)
 
 _PAGINA_RE = re.compile(
     r"\b(?:p[aá]g(?:ina|\.)?|pág\.?)\s*(\d{1,4})\b",
@@ -56,17 +77,19 @@ def extrair_paginas_solicitadas(pergunta: str, max_paginas: int = 5) -> list[int
     return encontradas
 
 
-def buscar_textos_paginas(
+def resolver_paginas_solicitadas(
     db: Session, apostila_id: int, numeros_pagina: list[int]
-) -> dict[int, str]:
-    """Retorna {pagina_pedida: texto} para as páginas pedidas.
+) -> dict[int, PaginaResolvida]:
+    """Para cada página pedida (número impresso, o que o usuário digitou),
+    resolve a linha real no banco — texto E imagem — buscando numa pequena
+    janela ao redor do número pedido, porque numero_pagina é a posição
+    bruta no PDF, que pode estar deslocada da numeração impressa (ver
+    _extrair_pagina_do_rodape). Prioriza a linha cujo rodapé do texto bate
+    exatamente com o número pedido; se a página não tiver texto (rodapé
+    ilegível, ex.: página só de imagem), cai no numero_pagina bruto exato.
 
-    Busca numa pequena janela ao redor de cada número pedido (não só o exato)
-    porque numero_pagina é a posição bruta no PDF, que pode estar deslocada
-    da numeração impressa (ver _extrair_pagina_do_rodape). Prioriza o texto
-    cujo rodapé bate exatamente com o número pedido; se nenhum bater (página
-    sem rodapé legível, ex.: imagem pura), cai no numero_pagina exato como
-    antes.
+    Retorna apenas as páginas em que achou algo (texto e/ou imagem) — página
+    sem nenhum dos dois simplesmente não aparece no resultado.
     """
     if not numeros_pagina:
         return {}
@@ -75,7 +98,11 @@ def buscar_textos_paginas(
     maximo = max(numeros_pagina) + _JANELA_BUSCA_OFFSET
 
     rows = (
-        db.query(ApostilaIAPagina.numero_pagina, ApostilaIAPagina.texto_extraido)
+        db.query(
+            ApostilaIAPagina.numero_pagina,
+            ApostilaIAPagina.texto_extraido,
+            ApostilaIAPagina.imagem_path,
+        )
         .filter(
             ApostilaIAPagina.apostila_id == apostila_id,
             ApostilaIAPagina.numero_pagina.between(minimo, maximo),
@@ -83,39 +110,33 @@ def buscar_textos_paginas(
         .all()
     )
 
-    por_rodape: dict[int, str] = {}
-    por_numero_pagina: dict[int, str] = {}
-    for numero_pagina, texto in rows:
-        texto_limpo = (texto or "").strip()
-        if not texto_limpo:
-            continue
-        por_numero_pagina[int(numero_pagina)] = texto_limpo
-        pagina_rodape = _extrair_pagina_do_rodape(texto_limpo)
-        if pagina_rodape is not None and pagina_rodape not in por_rodape:
-            por_rodape[pagina_rodape] = texto_limpo
+    por_rodape: dict[int, PaginaResolvida] = {}
+    por_numero_pagina: dict[int, PaginaResolvida] = {}
+    for numero_pagina, texto, imagem_path in rows:
+        texto_limpo = (texto or "").strip() or None
+        resolvida = PaginaResolvida(int(numero_pagina), texto_limpo, imagem_path)
+        por_numero_pagina[int(numero_pagina)] = resolvida
+        if texto_limpo:
+            pagina_rodape = _extrair_pagina_do_rodape(texto_limpo)
+            if pagina_rodape is not None and pagina_rodape not in por_rodape:
+                por_rodape[pagina_rodape] = resolvida
 
-    resultado: dict[int, str] = {}
+    resultado: dict[int, PaginaResolvida] = {}
     for pagina in numeros_pagina:
         if pagina in por_rodape:
             resultado[pagina] = por_rodape[pagina]
         elif pagina in por_numero_pagina:
-            resultado[pagina] = por_numero_pagina[pagina]
+            candidata = por_numero_pagina[pagina]
+            if candidata.tem_texto or candidata.tem_imagem:
+                resultado[pagina] = candidata
     return resultado
 
 
-def montar_bloco_contexto_paginas(paginas_texto: dict[int, str]) -> str:
-    """Formata o texto das páginas para injeção no prompt."""
-    partes: list[str] = []
-    for numero in sorted(paginas_texto.keys()):
-        partes.append(f"=== PÁGINA {numero} ===\n\n{paginas_texto[numero]}")
-    return "\n\n".join(partes)
-
-
-def montar_citacoes_paginas(paginas_texto: dict[int, str]) -> list[dict]:
+def montar_citacoes_paginas(paginas: dict[int, PaginaResolvida]) -> list[dict]:
     return [
         {
             "filename": f"pagina_{numero:04d}.txt",
-            "texto": texto[:500],
+            "texto": (pagina.texto or "")[:500],
         }
-        for numero, texto in sorted(paginas_texto.items())
+        for numero, pagina in sorted(paginas.items())
     ]

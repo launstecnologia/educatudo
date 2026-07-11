@@ -12,13 +12,17 @@ a tool `{"type": "file_search", "vector_store_ids": [...]}`.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
+import mimetypes
+import os
 import re
 
 from openai import OpenAI
 
 from app.config import get_settings
+from app.services.pagina_contexto_service import PaginaResolvida
 
 logger = logging.getLogger("apostila_ai.openai_service")
 
@@ -83,11 +87,16 @@ Regras:
   chat, que gera a apresentação de verdade (com link real)."""
 
 CHAT_PAGINA_DIRETA_ADDENDUM = """
-IMPORTANTE — texto de página(s) específica(s) foi fornecido abaixo na mensagem do usuário.
-- Use EXCLUSIVAMENTE esse texto para responder sobre o conteúdo da(s) página(s).
+IMPORTANTE — conteúdo de página(s) específica(s) foi fornecido abaixo na mensagem do usuário,
+como texto e/ou como imagem da página (quando a página não tem texto extraído, ex.: página
+que é só gráfico, foto, diagrama ou ilustração — nesse caso você recebe a imagem real da
+página e deve DESCREVER/EXPLICAR o que vê nela, igual faria com qualquer imagem enviada).
+- Use EXCLUSIVAMENTE esse conteúdo (texto e/ou imagem) para responder sobre a(s) página(s).
 - Não misture informações de outras páginas nem conhecimento geral.
-- Se o usuário pediu o conteúdo de uma página, resuma/explique fielmente o que está no texto fornecido.
-- Se o texto estiver vazio ou ilegível, diga que não há conteúdo textual disponível para essa página."""
+- Se o usuário pediu o conteúdo de uma página, resuma/explique fielmente o que está no texto
+  e/ou descreva o que aparece na imagem fornecida.
+- Se não houver nem texto nem imagem utilizável, diga que não há conteúdo disponível para
+  essa página."""
 
 
 def _strip_markdown_fences(content: str) -> str:
@@ -246,23 +255,76 @@ def _montar_instructions_pagina_direta(resumo_sessao: str | None = None) -> str:
     return base + "\n" + CHAT_PAGINA_DIRETA_ADDENDUM
 
 
-def _montar_input_com_contexto_paginas(
+def _codificar_imagem_base64(caminho_arquivo: str | None) -> str | None:
+    """Lê uma imagem de página do disco e retorna como data URL base64,
+    pronta para o bloco input_image da Responses API — mesmo mecanismo que
+    o ChatGPT usa para "ver" uma imagem enviada na conversa. Best-effort:
+    retorna None se o arquivo não existir ou não puder ser lido, sem
+    derrubar o chat."""
+    if not caminho_arquivo or not os.path.isfile(caminho_arquivo):
+        return None
+    try:
+        mime_type, _ = mimetypes.guess_type(caminho_arquivo)
+        mime_type = mime_type or "image/png"
+        with open(caminho_arquivo, "rb") as f:
+            dados = base64.b64encode(f.read()).decode("ascii")
+        return f"data:{mime_type};base64,{dados}"
+    except Exception:
+        logger.warning(
+            "falha_ao_ler_imagem_pagina caminho=%s", caminho_arquivo, exc_info=True
+        )
+        return None
+
+
+def _montar_input_com_paginas(
     pergunta: str,
     historico: list[tuple[str, str]] | None,
-    contexto_paginas: str,
+    paginas: dict[int, PaginaResolvida],
 ) -> list[dict]:
+    """Monta o input da Responses API misturando texto e imagem por página:
+    página com texto extraído entra como texto; página sem texto mas com
+    imagem (ex.: página só de gráfico/foto/diagrama) entra como bloco de
+    imagem de verdade — o modelo "olha" a imagem, igual faria com uma foto
+    enviada no ChatGPT.
+    """
     input_messages = _montar_input_messages(pergunta, historico)
     if not input_messages:
         return input_messages
 
-    ultima = input_messages[-1]
-    ultima["content"] = (
-        "Conteúdo textual extraído da apostila (fonte autoritativa — "
-        "não invente além deste texto):\n\n"
-        f"{contexto_paginas}\n\n"
-        "---\n\n"
-        f"Pergunta do usuário: {pergunta}"
+    partes_texto: list[str] = []
+    blocos_imagem: list[dict] = []
+    for numero in sorted(paginas.keys()):
+        pagina = paginas[numero]
+        if pagina.tem_texto:
+            partes_texto.append(f"=== PÁGINA {numero} ===\n\n{pagina.texto}")
+        elif pagina.tem_imagem:
+            data_url = _codificar_imagem_base64(pagina.imagem_path)
+            if data_url:
+                partes_texto.append(
+                    f"=== PÁGINA {numero} === (fornecida como imagem, veja abaixo)"
+                )
+                blocos_imagem.append({"type": "input_image", "image_url": data_url})
+
+    texto_contexto = (
+        "\n\n".join(partes_texto) if partes_texto else "(nenhum conteúdo disponível)"
     )
+
+    content_blocks: list[dict] = [
+        {
+            "type": "input_text",
+            "text": (
+                "Conteúdo extraído da apostila (fonte autoritativa — não "
+                "invente além deste conteúdo):\n\n"
+                f"{texto_contexto}\n\n"
+                "---\n\n"
+                f"Pergunta do usuário: {pergunta}"
+            ),
+        }
+    ]
+    content_blocks.extend(blocos_imagem)
+
+    ultima = input_messages[-1]
+    ultima["content"] = content_blocks
     return input_messages
 
 
@@ -404,17 +466,16 @@ def iterar_resposta_com_file_search(
 
 
 def responder_com_contexto_paginas(
-    contexto_paginas: str,
+    paginas: dict[int, PaginaResolvida],
     pergunta: str,
     historico: list[tuple[str, str]] | None = None,
     resumo_sessao: str | None = None,
 ) -> tuple[str, list[dict]]:
-    """Responde com texto de página(s) injetado diretamente — sem file_search."""
+    """Responde com texto e/ou imagem de página(s) injetado diretamente —
+    sem file_search."""
     settings = get_settings()
     client = get_client()
-    input_messages = _montar_input_com_contexto_paginas(
-        pergunta, historico, contexto_paginas
-    )
+    input_messages = _montar_input_com_paginas(pergunta, historico, paginas)
 
     response = client.responses.create(
         model=settings.openai_model,
@@ -427,17 +488,16 @@ def responder_com_contexto_paginas(
 
 
 def iterar_resposta_com_contexto_paginas(
-    contexto_paginas: str,
+    paginas: dict[int, PaginaResolvida],
     pergunta: str,
     historico: list[tuple[str, str]] | None = None,
     resumo_sessao: str | None = None,
 ):
-    """Streaming sem file_search — contexto de página(s) já está no prompt."""
+    """Streaming sem file_search — texto e/ou imagem de página(s) já estão
+    no prompt."""
     settings = get_settings()
     client = get_client()
-    input_messages = _montar_input_com_contexto_paginas(
-        pergunta, historico, contexto_paginas
-    )
+    input_messages = _montar_input_com_paginas(pergunta, historico, paginas)
 
     stream = client.responses.create(
         model=settings.openai_model,
