@@ -83,7 +83,9 @@ Safari renderiza `input[type="date"]` e `select` de forma diferente do Chrome
 (fonte maior, seta dupla nativa no select, alinhamento estranho na data) —
 quebra a consistência visual do filtro/form se não for normalizado.
 
-A normalização já está aplicada **globalmente** em `layouts/admin.php`
+A normalização já está aplicada **globalmente** via
+`layouts/components/form_control_safari.php`, incluído nos layouts
+(`admin`, `master`, `professor`, `student`, `parent`, `monitor`, `teacher`).
 (`-webkit-appearance: none` + tamanho de fonte fixo em date/time + seta
 customizada SVG no select). **Não é necessário repetir CSS por página** —
 só usar as classes Tailwind padrão do design system (`border border-gray-300

@@ -17,18 +17,20 @@
 
 ## Nomenclatura
 
-- Classes/métodos/arquivos em inglês. Tabelas do banco ficam em PT (legado — não renomear).
-- Exceções aceitas: `Simulados`, `BoletimConfig`, `GradeHoraria`.
-- Controllers prefixados por perfil: `Admin*`, `Student*`, `Teacher*`.
+- Classes/métodos/arquivos em **português** (decisão de 2026-07-08 — detalhe e racional em `.claude/docs/nomenclatura.md`). Tabelas do banco ficam em PT; legado em inglês só é renomeado caso a caso, nunca em lote.
+- Exceções que não se traduzem: siglas oficiais (`BNCC`, `ENEM`, `INEP`), nomes de marca/produto (`Tudinha`, `EducaLabs`, `EducaHits`, `EducaInclui`, `EducaShop`), sufixo arquitetural (`Controller`/`Service`/`Model`/`Middleware`).
+- Coluna do banco = chave do array de dados no Model/Controller = atributo `name=` do input no formulário — sempre o mesmo nome.
+- Controllers prefixados por perfil: `Admin*`, `Student*`, `Teacher*` (prefixo de perfil continua em inglês, é convenção estrutural, não vocabulário de negócio).
 
-Conflitos conhecidos a corrigir (não replicar o padrão antigo):
+Conflitos conhecidos a corrigir ao tocar no módulo (não replicar o padrão em inglês em código novo — lista completa em `.claude/docs/nomenclatura.md`):
 
-| Errado (PT) | Correto (EN) |
+| Hoje (EN) | Alvo (PT) |
 |---|---|
-| `AlunoMovimentacaoService` | `StudentMovementService` |
-| `JornadasRelatorioService` | `JourneyReportService` |
-| `RedacaoLivreEnvio` | `EssayFreeSubmission` |
-| `NotificacaoApi` | `ApiNotification` |
+| ~~`AccommodationController`~~ | ~~`EducaIncluiController`~~ — feito em 2026-07-08 (piloto do processo, ver `specs/tasks.md`) |
+| `FinanceController` | `FinanceiroController` |
+| `EnrollmentAdminController` | `MatriculaOnlineAdminController` (após decidir o par `matricula`/`enrollment` — ver doc) |
+| `CourseCatalogController` | `CatalogoCursoController` |
+| `PatrimonyAdminController` | `PatrimonioAdminController` |
 
 ## Segurança (resumo)
 

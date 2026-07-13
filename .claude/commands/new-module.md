@@ -11,6 +11,11 @@ Crie o módulo **$ARGUMENTS** seguindo o checklist do CLAUDE.md:
    - `app/Services/<Modulo>Service.php` — toda a lógica de negócio, mesmo que pequena (não replicar o antipadrão dos módulos antigos sem Service).
    - `app/Views/<perfil>/<modulo>/` — views por perfil.
 3. Rotas em `src/config/routes/<perfil>.php` (nunca direto em `routes.php`).
-4. Se opcional por escola: registrar em `src/app/Core/FeatureGate.php`.
-5. Se precisar de tabela: migration `NNN_descricao.sql` + `NNN_descricao_rollback.sql` em `src/database/migrations/`, depois invocar o subagent **migration-checker**.
-6. Nomes em inglês. Ao final, invocar o subagent **code-reviewer**.
+4. Se opcional por escola: registrar em `src/app/Core/FeatureGate.php` **e** nas listas `MODULOS_*` do Master (`MasterEscolaDetailController`).
+5. Se o módulo (ou qualquer ação dele) usar IA/OCR: seguir `.claude/docs/tudicoins.md` e `.cursor/rules/tudicoins.mdc` —
+   - chave em `CreditosModuleRegistry` (`escopo_ui`, `feature_modules`, `pagador`);
+   - item nas tabelas de custo TudiCoins do Master;
+   - débito via `CreditosService`;
+   - se for 100% IA (`modulo_inteiro`), o Master só habilita com TudiCoins ligado.
+6. Se precisar de tabela: migration `NNN_descricao.sql` + `NNN_descricao_rollback.sql` em `src/database/migrations/`, depois invocar o subagent **migration-checker**.
+7. Nomenclatura em português (ver `.claude/docs/nomenclatura.md`). Ao final, invocar o subagent **code-reviewer**.

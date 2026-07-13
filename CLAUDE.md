@@ -63,7 +63,7 @@ storage/                 logs/ (JSON com TENANT_ID) · uploads/ · drive/
 Detalhe completo com exemplos: @.claude/docs/coding-standards.md
 Código de referência para copiar estrutura: `.claude/examples/` (Controller, Service, Model).
 
-- **Nomenclatura em inglês** para classes/métodos/arquivos novos. Exceções: `Simulados`, `BoletimConfig`, `GradeHoraria`. Tabelas do banco ficam em PT (legado).
+- **Nomenclatura em português** para classes/métodos/arquivos novos (decisão de 2026-07-08, reverte a regra antiga). Exceções: siglas oficiais (`BNCC`, `ENEM`, `INEP`), nomes de marca/produto (`Tudinha`, `EducaLabs`, `EducaHits`, `EducaInclui`, `EducaShop`), e sufixo arquitetural (`Controller`/`Service`/`Model`/`Middleware`). Coluna do banco = chave do array de dados = atributo `name=` do input, sempre o mesmo nome. Tabelas do banco ficam em PT; legado em inglês só é renomeado caso a caso — nunca em lote. Mapa completo e estratégia de rename incremental: @.claude/docs/nomenclatura.md
 - **Prepared statements sempre** — parâmetros nomeados (`:id`), cast explícito de ids. Zero concatenação em SQL.
 - **Controller magro**: coordena e renderiza. Mais de ~50 linhas de lógica de negócio → extrair para Service. Todo módulo novo tem Service, mesmo pequeno.
 - **Módulo novo** segue Controllers/<Mod> + Models/<Mod> + Service + Views por perfil; rotas em `config/routes/<perfil>.php`; se opcional por escola, registrar no `FeatureGate`. Use o comando `/new-module`.
@@ -93,7 +93,8 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 - Não depender de file cache em produção para sessão/config de tenant — Redis é obrigatório
 - Não commitar `.env` com credenciais reais
 - Não rodar migrations diretamente no banco
-- Não replicar nomenclatura em PT em arquivos novos
+- Não replicar nomenclatura em inglês em arquivos novos (regra vigente desde 2026-07-08 — ver `.claude/docs/nomenclatura.md`)
+- Não renomear tabela envolvida em par ambíguo (ex.: `matricula`/`enrollment`, `financeiro_valores_mensais`/`finance_*`) sem decisão de produto — ver `.claude/docs/nomenclatura.md`
 
 ## Onde encontrar informações
 
@@ -102,6 +103,8 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 | Arquitetura, diretórios completos, crons, pontos de atenção | `.claude/docs/architecture.md` |
 | Env vars e integrações externas (OpenAI, Asaas, JaaS, S3…) | `.claude/docs/environment.md` |
 | Padrões de código com exemplos | `.claude/docs/coding-standards.md` |
+| Padrão de nomenclatura (PT vs EN) e estratégia de rename incremental | `.claude/docs/nomenclatura.md` |
+| TudiCoins (créditos de IA, gate, catálogo, carteira da escola) | `.claude/docs/tudicoins.md` |
 | Rotas | `src/config/routes/*.php` (por perfil) |
 | Schema master / tenant | `src/database/migrations/` |
 | Permissões de admin · feature flags | `src/app/Core/AdminPermissionMatrix.php` · `FeatureGate.php` |
