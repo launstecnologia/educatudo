@@ -406,7 +406,7 @@ class Database
             $stmt = $this->pdo->prepare($sql);
             $this->bindParamsComTipo($stmt, $params);
             $stmt->execute();
-            $this->recordMetrics($startTime, null, $sql, $params);
+            $this->recordMetrics($startTime, null, $sql, $params, $stmt);
             return $stmt;
         } catch (PDOException $e) {
             if ($this->isGoneAwayException($e) && !$this->inTransaction() && $this->reconnectIfPossible()) {
@@ -414,7 +414,7 @@ class Database
                     $stmt = $this->pdo->prepare($sql);
                     $this->bindParamsComTipo($stmt, $params);
                     $stmt->execute();
-                    $this->recordMetrics($startTime, null, $sql, $params);
+                    $this->recordMetrics($startTime, null, $sql, $params, $stmt);
                     return $stmt;
                 } catch (PDOException $retryException) {
                     $e = $retryException;
@@ -575,7 +575,7 @@ class Database
     /**
      * Acumula métricas em buffer por request; flush no shutdown evita I/O em toda query.
      */
-    private function recordMetrics($startTime, $error = null, $sql = null, $params = [])
+    private function recordMetrics($startTime, $error = null, $sql = null, $params = [], ?PDOStatement $stmt = null)
     {
         $queryTime = microtime(true) - $startTime;
         self::$metricsBuffer['db_queries']++;
@@ -590,6 +590,23 @@ class Database
         if ($queryTime > $slowThresholdSec) {
             self::$metricsBuffer['slow_queries']++;
         }
+
+        // Performance Profiler (app/Performance/*): coleta TODA query (não só as
+        // lentas) para detectar N+1 e montar o relatório por página. 100% opt-in
+        // via APP_DEBUG=true; \App\Performance\Profiler::isEnabled() é a única
+        // checagem feita quando desligado (overhead desprezível).
+        if ($sql !== null && is_string($sql) && class_exists(\App\Performance\Profiler::class) && \App\Performance\Profiler::isEnabled()) {
+            $rowCount = null;
+            if ($stmt !== null) {
+                try {
+                    $rowCount = $stmt->rowCount();
+                } catch (\Throwable $e) {
+                    $rowCount = null;
+                }
+            }
+            \App\Performance\QueryCollector::record($sql, is_array($params) ? $params : [], $queryTime, $rowCount, $error);
+        }
+
         if ($error !== null) {
             self::$metricsBuffer['db_errors']++;
             return;

@@ -416,26 +416,47 @@ class MediaStorageService
      */
     public function streamInline(string $type, string $key, string $filename, string $contentType = 'application/octet-stream'): bool
     {
+        return $this->streamWithDisposition($type, $key, $filename, $contentType, 'inline');
+    }
+
+    /**
+     * Stream como attachment (ex.: SVG legado — evita execução como stored XSS no browser).
+     */
+    public function streamAttachment(string $type, string $key, string $filename, string $contentType = 'application/octet-stream'): bool
+    {
+        return $this->streamWithDisposition($type, $key, $filename, $contentType, 'attachment');
+    }
+
+    private function streamWithDisposition(
+        string $type,
+        string $key,
+        string $filename,
+        string $contentType,
+        string $disposition
+    ): bool {
         $key = $this->normalizeKey($key);
         if (!$this->useS3 || $key === '') {
             return false;
         }
+        $disposition = $disposition === 'attachment' ? 'attachment' : 'inline';
 
         $s3Key = $this->buildS3ObjectKey($type, $key);
+        $safeName = str_replace('"', '\\"', $filename);
 
         try {
             $result = $this->s3Client->getObject([
                 'Bucket' => $this->bucket,
                 'Key' => $s3Key,
-                'ResponseContentDisposition' => 'inline',
+                'ResponseContentDisposition' => $disposition . '; filename="' . $safeName . '"',
                 'ResponseContentType' => $contentType,
             ]);
 
             if (!headers_sent()) {
                 header('Content-Type: ' . $contentType);
-                header('Content-Disposition: inline; filename="' . str_replace('"', '\\"', $filename) . '"');
+                header('Content-Disposition: ' . $disposition . '; filename="' . $safeName . '"');
+                header('X-Content-Type-Options: nosniff');
                 if (isset($result['ContentLength'])) {
-                    header('Content-Length: ' . (int)$result['ContentLength']);
+                    header('Content-Length: ' . (int) $result['ContentLength']);
                 }
                 header('Cache-Control: private, max-age=3600');
             }
@@ -451,7 +472,7 @@ class MediaStorageService
 
             return true;
         } catch (Exception $e) {
-            error_log('MediaStorageService S3 streamInline: ' . $e->getMessage());
+            error_log('MediaStorageService S3 streamWithDisposition: ' . $e->getMessage());
             return false;
         }
     }

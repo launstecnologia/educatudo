@@ -12,8 +12,13 @@ class JWTService
 
     public function __construct()
     {
-        $config = require __DIR__ . '/../../config/app.php';
-        $this->secret = env('JWT_SECRET', $config['app']['url'] ?? 'educatudo-secret');
+        $secret = trim((string) env('JWT_SECRET', ''));
+        if (strlen($secret) < 32) {
+            throw new RuntimeException(
+                'JWT_SECRET não configurado ou fraco. Defina um valor aleatório com pelo menos 32 caracteres no .env (ex.: openssl rand -hex 32).'
+            );
+        }
+        $this->secret = $secret;
         $this->ttl = (int) (env('JWT_TTL', 86400)); // 24h default
     }
 

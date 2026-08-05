@@ -208,6 +208,12 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => console.error('Erro ao buscar mensagens:', error));
     }
     
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+
     function adicionarMensagemAoChat(msg, container) {
         const isAluno = msg.remetente_tipo === 'aluno';
         const div = document.createElement('div');
@@ -219,17 +225,19 @@ document.addEventListener('DOMContentLoaded', function() {
             anexosHtml = '<div class="mt-3 space-y-2">';
             msg.anexos.forEach(anexo => {
                 const isImage = anexo.tipo_arquivo && anexo.tipo_arquivo.startsWith('image/');
+                const caminho = escapeHtml(anexo.caminho_arquivo || '');
+                const nomeArquivo = escapeHtml(anexo.nome_arquivo || 'arquivo');
                 if (isImage) {
                     anexosHtml += `<div class="border ${isAluno ? 'border-indigo-300' : 'border-gray-200'} rounded-lg p-2 bg-white bg-opacity-20">
-                        <img src="<?= URL ?>${anexo.caminho_arquivo}" alt="${anexo.nome_arquivo}" class="max-w-full h-auto rounded cursor-pointer" onclick="window.open('<?= URL ?>${anexo.caminho_arquivo}', '_blank')">
+                        <img src="<?= URL ?>${caminho}" alt="${nomeArquivo}" class="max-w-full h-auto rounded cursor-pointer" onclick="window.open(this.src, '_blank')">
                     </div>`;
                 } else {
                     anexosHtml += `<div class="border ${isAluno ? 'border-indigo-300' : 'border-gray-200'} rounded-lg p-2 bg-white bg-opacity-20">
-                        <a href="<?= URL ?>${anexo.caminho_arquivo}" target="_blank" class="flex items-center text-sm ${isAluno ? 'text-indigo-100' : 'text-indigo-600'} hover:underline">
+                        <a href="<?= URL ?>${caminho}" target="_blank" class="flex items-center text-sm ${isAluno ? 'text-indigo-100' : 'text-indigo-600'} hover:underline">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
                             </svg>
-                            ${anexo.nome_arquivo}
+                            ${nomeArquivo}
                         </a>
                     </div>`;
                 }
@@ -237,17 +245,18 @@ document.addEventListener('DOMContentLoaded', function() {
             anexosHtml += '</div>';
         }
         
+        const autor = isAluno ? 'Você' : escapeHtml(msg.professor_nome || 'Professor');
         div.innerHTML = `
             <div class="max-w-md ${isAluno ? 'bg-indigo-600 text-white rounded-2xl rounded-br-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-2xl rounded-bl-sm'} px-4 py-3 shadow-sm">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-xs font-semibold ${isAluno ? 'text-indigo-100' : 'text-gray-600'}">
-                        ${isAluno ? 'Você' : msg.professor_nome || 'Professor'}
+                        ${autor}
                     </span>
                     <span class="text-xs ${isAluno ? 'text-indigo-200' : 'text-gray-400'}">
                         ${new Date(msg.created_at).toLocaleString('pt-BR')}
                     </span>
                 </div>
-                <p style="white-space: pre-wrap; word-wrap: break-word;">${msg.mensagem}</p>
+                <p style="white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(msg.mensagem)}</p>
                 ${anexosHtml}
             </div>
         `;

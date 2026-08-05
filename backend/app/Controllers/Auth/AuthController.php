@@ -63,6 +63,14 @@ if (!class_exists('AuthController')) {
         return $token;
     }
 
+    private function isSecureCookieRequest(): bool
+    {
+        if (function_exists('educatudoDetectHttps')) {
+            return educatudoDetectHttps();
+        }
+        return !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    }
+
     private function setLoginCsrfCookie($token)
     {
         if (php_sapi_name() === 'cli') {
@@ -71,7 +79,7 @@ if (!class_exists('AuthController')) {
         $opts = [
             'expires' => time() + 600,
             'path' => '/',
-            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'secure' => $this->isSecureCookieRequest(),
             'httponly' => true,
             'samesite' => 'Lax',
         ];
@@ -86,7 +94,7 @@ if (!class_exists('AuthController')) {
         $opts = [
             'expires' => time() - 3600,
             'path' => '/',
-            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'secure' => $this->isSecureCookieRequest(),
             'httponly' => true,
             'samesite' => 'Lax',
         ];
@@ -776,6 +784,19 @@ if (!class_exists('AuthController')) {
                 return;
             }
             $this->json(['error' => 'Credenciais inválidas.'], 400);
+            return;
+        }
+
+        // 1) Validar CSRF (sessão ou double-submit cookie)
+        $postToken = isset($_POST['_token']) ? (string) $_POST['_token'] : '';
+        if (!$this->verifyLoginCsrfToken($postToken)) {
+            $this->writeLoginCsrfLog($this->getLoginCsrfFailureReason($postToken));
+            if ($formSubmit) {
+                $this->setFlashMessage('Sessão expirada. Recarregue a página e tente novamente.', 'error');
+                $this->redirect($this->getLoginUrlWithCacheBust($tipo));
+                return;
+            }
+            $this->json(['error' => 'Token CSRF inválido. Recarregue a página e tente novamente.'], 403);
             return;
         }
 

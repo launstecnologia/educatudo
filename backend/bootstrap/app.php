@@ -72,21 +72,62 @@ require_once BASE_PATH . '/vendor/autoload.php';
 // Helper de sanitização de rich text (rich_text_render / rich_text) disponível em todas as views.
 require_once BASE_PATH . '/app/Helpers/RichTextHelper.php';
 
+// ─── Helpers de ambiente (antes de session_start / URL) ───
+if (!function_exists('educatudoDetectHttps')) {
+    /**
+     * Detecta HTTPS real, inclusive atrás de proxy/CDN (X-Forwarded-Proto, Cloudflare).
+     */
+    function educatudoDetectHttps(): bool
+    {
+        $httpsOn = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+        $forwardedProto = '';
+        if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+            $forwardedProto = strtolower(trim(explode(',', (string) $_SERVER['HTTP_X_FORWARDED_PROTO'])[0]));
+        }
+        $forwardedSsl = !empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on';
+        $serverPort443 = !empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443;
+        $cfVisitorHttps = false;
+        if (!empty($_SERVER['HTTP_CF_VISITOR'])) {
+            $cf = json_decode((string) $_SERVER['HTTP_CF_VISITOR'], true);
+            $cfVisitorHttps = is_array($cf) && (($cf['scheme'] ?? '') === 'https');
+        }
+        return $httpsOn || $forwardedProto === 'https' || $forwardedSsl || $serverPort443 || $cfVisitorHttps;
+    }
+}
+
+// Ler chaves do .env usadas antes do config/app.php (SESSION_*, APP_ENV)
+$bootstrapEnv = [
+    'SESSION_DOMAIN' => '',
+    'SESSION_SECURE' => null,
+    'APP_ENV' => null,
+];
+if (file_exists(BASE_PATH . '/.env')) {
+    $envLines = @file(BASE_PATH . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    foreach ($envLines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || strpos($line, '=') === false) {
+            continue;
+        }
+        [$envName, $envValue] = explode('=', $line, 2);
+        $envName = trim($envName);
+        $envValue = trim($envValue, " \t\"'");
+        if (array_key_exists($envName, $bootstrapEnv)) {
+            $bootstrapEnv[$envName] = $envValue;
+        }
+    }
+}
+
 // ─── Configuração segura de sessão (antes de session_start) ───
 if (session_status() === PHP_SESSION_NONE) {
     if (!headers_sent()) {
-        $sessionDomain = '';
-        if (file_exists(BASE_PATH . '/.env')) {
-            $envLines = @file(BASE_PATH . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-            foreach ($envLines as $line) {
-                $line = trim($line);
-                if (strpos($line, 'SESSION_DOMAIN=') === 0) {
-                    $sessionDomain = trim(substr($line, 15), " \t\"'");
-                    break;
-                }
-            }
+        $sessionDomain = (string) ($bootstrapEnv['SESSION_DOMAIN'] ?? '');
+        // SESSION_SECURE explícito no .env tem prioridade; senão detecta HTTPS (proxy-aware).
+        if ($bootstrapEnv['SESSION_SECURE'] !== null && $bootstrapEnv['SESSION_SECURE'] !== '') {
+            $isSecure = strtolower((string) $bootstrapEnv['SESSION_SECURE']) === 'true'
+                || $bootstrapEnv['SESSION_SECURE'] === '1';
+        } else {
+            $isSecure = educatudoDetectHttps();
         }
-        $isSecure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         if (PHP_VERSION_ID >= 70300) {
             session_set_cookie_params([
                 'lifetime' => 0,
@@ -139,35 +180,45 @@ register_shutdown_function(function () {
     }
 });
 
+// Performance Profiler (app/Performance/*) — diagnóstico de queries/páginas
+// lentas, N+1, EXPLAIN automático e índices sugeridos. Só roda quando
+// APP_DEBUG=true (ver App\Performance\Profiler::isEnabled()); em produção com
+// APP_DEBUG=false (padrão) isso não gera nenhum overhead além de 1 bool check.
+if (class_exists(\App\Performance\Profiler::class) && \App\Performance\Profiler::isEnabled()) {
+    \App\Performance\RequestProfiler::start();
+    register_shutdown_function(function () {
+        try {
+            \App\Performance\RequestProfiler::finish();
+        } catch (\Throwable $e) {
+            error_log('RequestProfiler::finish() falhou: ' . $e->getMessage());
+        }
+    });
+}
+
 // Configuração da pasta base dinâmica (detecta automaticamente)
 $scriptPath = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
 $folder = ($scriptPath === '/' || $scriptPath === '') ? '' : $scriptPath;
 define('FOLDER', $folder);
 
-// Detectar URL base automaticamente
-// Importante: em produção atrás de proxy/load balancer, HTTPS pode não chegar como $_SERVER['HTTPS']='on'.
-// Então consideramos também headers comuns de proxy reverso.
-$protocol = 'http';
-$httpsOn = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-$forwardedProto = '';
-if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-    $forwardedProto = strtolower(trim(explode(',', (string)$_SERVER['HTTP_X_FORWARDED_PROTO'])[0]));
-}
-$forwardedSsl = !empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string)$_SERVER['HTTP_X_FORWARDED_SSL']) === 'on';
-$serverPort443 = !empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443;
-$cfVisitorHttps = false;
-if (!empty($_SERVER['HTTP_CF_VISITOR'])) {
-    $cf = json_decode((string)$_SERVER['HTTP_CF_VISITOR'], true);
-    $cfVisitorHttps = is_array($cf) && (($cf['scheme'] ?? '') === 'https');
-}
-if ($httpsOn || $forwardedProto === 'https' || $forwardedSsl || $serverPort443 || $cfVisitorHttps) {
-    $protocol = 'https';
-}
+// Detectar URL base automaticamente (mesma lógica de educatudoDetectHttps — proxy-aware)
+$protocol = educatudoDetectHttps() ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 define('URL', $protocol . '://' . $host . FOLDER);
 
-// Configuração de ambiente
-define('ENVIRONMENT', 'development'); // development, production
+// Ambiente: lê APP_ENV do .env; default fail-safe = production (não vaza erros se esquecer de setar)
+$appEnvRaw = strtolower(trim((string) ($bootstrapEnv['APP_ENV'] ?? '')));
+if ($appEnvRaw === '') {
+    $appEnvRaw = 'production';
+}
+// Aceita aliases comuns
+if (in_array($appEnvRaw, ['prod', 'production'], true)) {
+    $appEnvRaw = 'production';
+} elseif (in_array($appEnvRaw, ['dev', 'development', 'local'], true)) {
+    $appEnvRaw = 'development';
+} else {
+    $appEnvRaw = 'production';
+}
+define('ENVIRONMENT', $appEnvRaw);
 define('DEBUG', ENVIRONMENT === 'development');
 
 // Configuração de fuso horário (Brasil - Horário de Brasília)
@@ -219,6 +270,11 @@ spl_autoload_register(function ($class) use ($monitoringConfig) {
         BASE_PATH . '/app/Models/Simulados/' . $class . '.php',
         BASE_PATH . '/app/Middleware/' . $class . '.php'
     ];
+
+    // PSR-4 App\* → app\* (ex.: App\Performance\RequestProfiler → app/Performance/RequestProfiler.php)
+    if (strncmp($class, 'App/', 4) === 0) {
+        array_unshift($paths, BASE_PATH . '/app/' . substr($class, 4) . '.php');
+    }
 
     foreach ($paths as $path) {
         if (file_exists($path)) {

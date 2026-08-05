@@ -121,7 +121,7 @@ class SchoolSettingsAdminController extends AdminBaseController
 
     private function uploadSliderImageFromFile(array $file): string
     {
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
         if (!in_array($ext, $allowedExtensions, true)) {
             return '';
@@ -130,6 +130,15 @@ class SchoolSettingsAdminController extends AdminBaseController
             return '';
         }
         if ((int)($file['size'] ?? 0) > 10 * 1024 * 1024) {
+            return '';
+        }
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeReal = $finfo ? finfo_file($finfo, (string)($file['tmp_name'] ?? '')) : false;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        if (!$mimeReal || !in_array($mimeReal, $allowedMimes, true)) {
             return '';
         }
 
@@ -394,10 +403,19 @@ class SchoolSettingsAdminController extends AdminBaseController
             }
             
             $file = $_FILES['image'];
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg'];
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
             $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             
-            if (!in_array($fileExtension, $allowedExtensions)) {
+            if (!in_array($fileExtension, $allowedExtensions, true)) {
+                throw new Exception('Tipo de arquivo não permitido. Use: ' . implode(', ', $allowedExtensions));
+            }
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeReal = $finfo ? finfo_file($finfo, $file['tmp_name']) : false;
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+            if (!$mimeReal || !in_array($mimeReal, $allowedMimes, true)) {
                 throw new Exception('Tipo de arquivo não permitido. Use: ' . implode(', ', $allowedExtensions));
             }
             

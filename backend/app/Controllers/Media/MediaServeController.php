@@ -2,6 +2,10 @@
 /**
  * Serve mídia (layout, essays, etc.) por type + key.
  * S3/local: streaming pelo backend com fallback de keys legadas.
+ *
+ * Tipos públicos (logo/capa/avatar): acessíveis sem login, sempre no tenant do Host.
+ * Tipos privados (chat, redações, tickets…): exigem sessão autenticada.
+ * Parâmetro ?tenant= só é aceito se coincidir com o tenant resolvido na request.
  */
 require_once __DIR__ . '/../../Core/BaseController.php';
 require_once __DIR__ . '/../../Services/MediaStorageService.php';
@@ -27,6 +31,15 @@ class MediaServeController extends BaseController
         'simulados_alternativas' => 'simulados/alternativas',
     ];
 
+    /** Tipos que podem aparecer em páginas públicas (login, branding). */
+    private const PUBLIC_TYPES = [
+        'layout',
+        'dashboard_sliders',
+        'professores',
+        'avatars',
+        'essays_proposals',
+    ];
+
     /**
      * GET /media/serve?type=layout&key=teacher/45/logo_123.jpg
      */
@@ -38,7 +51,11 @@ class MediaServeController extends BaseController
         $type = isset($_GET['type']) ? trim((string) $_GET['type']) : '';
         $key = isset($_GET['key']) ? trim((string) $_GET['key']) : '';
         $tenantSlug = isset($_GET['tenant']) ? strtolower(trim((string) $_GET['tenant'])) : '';
-        $allowedTypes = ['layout', 'dashboard_sliders', 'professores', 'avatars', 'essays_proposals', 'redacoes', 'provas_questoes', 'chat', 'jornadas_exercicios', 'jornadas_documentos', 'jornadas_videos', 'arquivos', 'apostilas', 'tickets'];
+        $allowedTypes = [
+            'layout', 'dashboard_sliders', 'professores', 'avatars', 'essays_proposals',
+            'redacoes', 'provas_questoes', 'chat', 'jornadas_exercicios', 'jornadas_documentos',
+            'jornadas_videos', 'arquivos', 'apostilas', 'tickets',
+        ];
         if ($type === '' || $key === '' || !in_array($type, $allowedTypes, true)) {
             http_response_code(400);
             exit;
@@ -52,13 +69,37 @@ class MediaServeController extends BaseController
             exit;
         }
 
-        $config = $this->config;
+        $isMaster = !empty($_SESSION['master_user_id']);
+        $isLoggedIn = $isMaster
+            || (!empty($_SESSION['user_id']) && !empty($_SESSION['user_type']));
 
-        // Quando tenant é informado na URL, força leitura no prefixo da escola.
+        // Tipos privados: exige sessão autenticada (cookie enviado pelo <img>/<a>).
+        if (!in_array($type, self::PUBLIC_TYPES, true) && !$isLoggedIn) {
+            http_response_code(401);
+            exit;
+        }
+
+        $config = $this->config;
+        $resolvedTenant = strtolower(trim((string) (
+            (defined('TENANT_SLUG') ? TENANT_SLUG : '')
+            ?: ($config['tenant']['slug'] ?? '')
+            ?: ($config['school']['code'] ?? '')
+        )));
+
+        // Impede troca de tenant via query por anônimos/usuários de escola.
+        // Exceção: sessão Master (tickets/assets de escolas no painel master.*).
         if ($tenantSlug !== '') {
-            $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => $tenantSlug]);
-            $config['school'] = array_merge($config['school'] ?? [], ['code' => $tenantSlug]);
-            $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
+            $sameTenant = $resolvedTenant !== '' && hash_equals($resolvedTenant, $tenantSlug);
+            if (!$sameTenant && !$isMaster) {
+                http_response_code(403);
+                exit;
+            }
+            if (!$sameTenant && $isMaster) {
+                $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => $tenantSlug]);
+                $config['school'] = array_merge($config['school'] ?? [], ['code' => $tenantSlug]);
+                $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
+                $resolvedTenant = $tenantSlug;
+            }
         }
 
         // Compatibilidade legada: arquivos antigos de layout sem prefixo tenant.
@@ -67,25 +108,22 @@ class MediaServeController extends BaseController
             $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => '']);
             $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => false]);
         }
+
         $media = new MediaStorageService($config);
         $serveLocalTypes = ['layout', 'avatars', 'professores'];
         $serveFromLocal = in_array($type, $serveLocalTypes, true);
-        $candidateKeys = $this->buildCandidateKeys($type, $key, $tenantSlug !== '' ? $tenantSlug : (string)($config['tenant']['slug'] ?? ''));
+        $candidateKeys = $this->buildCandidateKeys($type, $key, $resolvedTenant);
 
         if (!$serveFromLocal && $media->isS3()) {
             $ext = strtolower(pathinfo($key, PATHINFO_EXTENSION));
-            $mimes = [
-                'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml',
-                'pdf' => 'application/pdf', 'txt' => 'text/plain', 'csv' => 'text/csv',
-                'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogg' => 'video/ogg',
-                'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'ppt' => 'application/vnd.ms-powerpoint', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            ];
-            $contentType = $mimes[$ext] ?? 'application/octet-stream';
+            $contentType = $this->mimeForExtension($ext);
+            $inline = $this->shouldServeInline($ext);
 
             foreach ($candidateKeys as $candidateKey) {
-                if ($media->streamInline($type, $candidateKey, basename($candidateKey), $contentType)) {
+                $ok = $inline
+                    ? $media->streamInline($type, $candidateKey, basename($candidateKey), $contentType)
+                    : $media->streamAttachment($type, $candidateKey, basename($candidateKey), $contentType);
+                if ($ok) {
                     exit;
                 }
             }
@@ -97,7 +135,10 @@ class MediaServeController extends BaseController
             $legacyConfig['school'] = array_merge($legacyConfig['school'] ?? [], ['code' => '']);
             $legacyMedia = new MediaStorageService($legacyConfig);
             foreach ($candidateKeys as $candidateKey) {
-                if ($legacyMedia->streamInline($type, $candidateKey, basename($candidateKey), $contentType)) {
+                $ok = $inline
+                    ? $legacyMedia->streamInline($type, $candidateKey, basename($candidateKey), $contentType)
+                    : $legacyMedia->streamAttachment($type, $candidateKey, basename($candidateKey), $contentType);
+                if ($ok) {
                     exit;
                 }
             }
@@ -116,19 +157,36 @@ class MediaServeController extends BaseController
             exit;
         }
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        $mimes = [
-            'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml',
-            'pdf' => 'application/pdf', 'txt' => 'text/plain', 'csv' => 'text/csv',
-            'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogg' => 'video/ogg',
-            'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'ppt' => 'application/vnd.ms-powerpoint', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        ];
-        header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
-        header('Content-Disposition: inline; filename="' . addslashes(basename($path)) . '"');
-        header('Cache-Control: public, max-age=86400');
+        $disposition = $this->shouldServeInline($ext) ? 'inline' : 'attachment';
+        header('Content-Type: ' . $this->mimeForExtension($ext));
+        header('Content-Disposition: ' . $disposition . '; filename="' . addslashes(basename($path)) . '"');
+        header('Cache-Control: ' . (in_array($type, self::PUBLIC_TYPES, true) ? 'public, max-age=86400' : 'private, max-age=3600'));
+        header('X-Content-Type-Options: nosniff');
         readfile($path);
         exit;
+    }
+
+    private function mimeForExtension(string $ext): string
+    {
+        $mimes = [
+            'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif',
+            'webp' => 'image/webp', 'svg' => 'image/svg+xml',
+            'pdf' => 'application/pdf', 'txt' => 'text/plain', 'csv' => 'text/csv',
+            'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogg' => 'video/ogg',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt' => 'application/vnd.ms-powerpoint',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ];
+        return $mimes[$ext] ?? 'application/octet-stream';
+    }
+
+    /** SVG nunca é inline (mitiga stored XSS de arquivos legados). */
+    private function shouldServeInline(string $ext): bool
+    {
+        return $ext !== 'svg';
     }
 
     private function buildCandidateKeys(string $type, string $key, string $tenantSlug): array

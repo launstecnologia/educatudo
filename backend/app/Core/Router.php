@@ -414,7 +414,18 @@ class Router
                         if (class_exists($controllerClass)) {
                             $instance = new $controllerClass();
                             if (method_exists($instance, $method)) {
-                                call_user_func_array([$instance, $method], $params);
+                                $profiler = class_exists(\App\Performance\RequestProfiler::class);
+                                if ($profiler) {
+                                    \App\Performance\RequestProfiler::setController($controller, $method);
+                                    \App\Performance\RequestProfiler::markControllerStart();
+                                }
+                                try {
+                                    call_user_func_array([$instance, $method], $params);
+                                } finally {
+                                    if ($profiler) {
+                                        \App\Performance\RequestProfiler::markControllerEnd();
+                                    }
+                                }
                                 return;
                             }
                         }

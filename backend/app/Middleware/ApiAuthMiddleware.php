@@ -16,6 +16,16 @@ class ApiAuthMiddleware
         self::$parentId = null;
         header('Content-Type: application/json; charset=utf-8');
 
+        $secret = trim((string) env('JWT_SECRET', ''));
+        if (strlen($secret) < 32) {
+            http_response_code(503);
+            echo json_encode([
+                'success' => false,
+                'message' => 'API temporariamente indisponível (JWT_SECRET não configurado).'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (preg_match('/^Bearer\s+(.+)$/i', trim($authHeader), $m)) {
             $token = trim($m[1]);
@@ -25,7 +35,16 @@ class ApiAuthMiddleware
         }
 
         require_once __DIR__ . '/../Services/JWTService.php';
-        $jwt = new JWTService();
+        try {
+            $jwt = new JWTService();
+        } catch (RuntimeException $e) {
+            http_response_code(503);
+            echo json_encode([
+                'success' => false,
+                'message' => 'API temporariamente indisponível (JWT_SECRET não configurado).'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $payload = $jwt->decode($token);
 
         if (!$payload) {

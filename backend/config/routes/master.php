@@ -15,6 +15,11 @@ $router->get('/master/escolas/verificar-dominios-cron', 'Master/MasterEscolasCon
 $router->get('/master/migrations', 'Master/MasterMigrationsController@index');
 $router->post('/master/migrations/executar-todas', 'Master/MasterMigrationsController@executarTodas');
 
+// Performance Profiler (diagnóstico de queries/páginas lentas — só popula dado com APP_DEBUG=true)
+$router->get('/master/performance', 'Master/MasterPerformanceController@index');
+$router->post('/master/performance/toggle', 'Master/MasterPerformanceController@toggle');
+$router->get('/master/performance/export', 'Master/MasterPerformanceController@export');
+
 // Wiki documentação (doc_sistema/)
 $router->get('/master/documentacao', 'Master/MasterDocSistemaController@index');
 $router->get('/master/documentacao/{pagina}', 'Master/MasterDocSistemaController@index');

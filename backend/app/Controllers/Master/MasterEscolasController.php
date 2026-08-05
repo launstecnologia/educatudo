@@ -673,7 +673,7 @@ class MasterEscolasController extends BaseController
         if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             return null;
         }
-        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if (!in_array($ext, $allowed, true)) {
             return null;
@@ -684,7 +684,7 @@ class MasterEscolasController extends BaseController
         }
         // Valida o MIME real do arquivo (não confia na extensão nem no
         // Content-Type enviado pelo navegador, ambos falsificáveis).
-        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mimeReal = $finfo ? finfo_file($finfo, $file['tmp_name']) : false;
         if ($finfo) {

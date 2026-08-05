@@ -19,7 +19,11 @@ class AuthController extends BaseController
     {
         parent::__construct();
         $this->db = Database::getInstance();
-        $this->jwt = new JWTService();
+        try {
+            $this->jwt = new JWTService();
+        } catch (RuntimeException $e) {
+            $this->jwt = null;
+        }
     }
 
     /**
@@ -32,6 +36,14 @@ class AuthController extends BaseController
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->json(['success' => false, 'message' => 'Método não permitido'], 405);
+            return;
+        }
+
+        if ($this->jwt === null) {
+            $this->json([
+                'success' => false,
+                'message' => 'API temporariamente indisponível (JWT_SECRET não configurado).'
+            ], 503);
             return;
         }
 

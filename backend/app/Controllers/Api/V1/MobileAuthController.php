@@ -13,13 +13,17 @@ class MobileAuthController extends BaseController
     {
         parent::__construct();
         $this->db = Database::getInstance();
-        $this->jwt = new JWTService();
+        try {
+            $this->jwt = new JWTService();
+        } catch (RuntimeException $e) {
+            $this->jwt = null;
+        }
     }
 
     public function login(): void
     {
         MobileApiAuthMiddleware::ensureRequestId();
-        if (!MobileApiAuthMiddleware::hasSecureJwtSecret()) {
+        if ($this->jwt === null || !MobileApiAuthMiddleware::hasSecureJwtSecret()) {
             $this->apiError('mobile_api_not_configured', 'API mobile temporariamente indisponível.', 503);
         }
 
@@ -72,7 +76,7 @@ class MobileAuthController extends BaseController
     public function refresh(): void
     {
         MobileApiAuthMiddleware::ensureRequestId();
-        if (!MobileApiAuthMiddleware::hasSecureJwtSecret()) {
+        if ($this->jwt === null || !MobileApiAuthMiddleware::hasSecureJwtSecret()) {
             $this->apiError('mobile_api_not_configured', 'API mobile temporariamente indisponível.', 503);
         }
         $refreshToken = trim((string) ($this->jsonInput()['refresh_token'] ?? ''));

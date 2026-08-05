@@ -518,7 +518,7 @@ class MasterEscolaDetailController extends BaseController
             return null;
         }
 
-        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if (!in_array($ext, $allowed, true)) {
             return null;
@@ -526,6 +526,15 @@ class MasterEscolaDetailController extends BaseController
 
         $maxSize = 10 * 1024 * 1024; // 10 MB (capas de login costumam ser maiores)
         if (($file['size'] ?? 0) > $maxSize) {
+            return null;
+        }
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeReal = $finfo ? finfo_file($finfo, $file['tmp_name']) : false;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        if (!$mimeReal || !in_array($mimeReal, $allowedMimes, true)) {
             return null;
         }
 
@@ -1705,7 +1714,7 @@ class MasterEscolaDetailController extends BaseController
 
         if (!empty($uploadFailures)) {
             $this->setFlashMessage(
-                'Layout salvo, mas a(s) imagem(ns) "' . implode('", "', $uploadFailures) . '" não puderam ser enviadas. Verifique formato (jpg, png, gif, webp, svg), tamanho (máx. 10 MB) e permissões da pasta storage/files no servidor.',
+                'Layout salvo, mas a(s) imagem(ns) "' . implode('", "', $uploadFailures) . '" não puderam ser enviadas. Verifique formato (jpg, png, gif, webp), tamanho (máx. 10 MB) e permissões da pasta storage/files no servidor.',
                 'warning'
             );
         } else {

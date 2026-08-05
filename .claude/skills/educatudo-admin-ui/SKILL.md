@@ -2,7 +2,7 @@
 name: educatudo-admin-ui
 description: >
   Padrao de OFFCANVAS para telas de cadastro simples do painel administrativo
-  do Educatudo (educatudo_oficial). Use quando for criar/ajustar uma tela de
+  do Educatudo. Use quando for criar/ajustar uma tela de
   CRUD simples (listagem + criar + editar de uma entidade unica, sem
   sub-recursos nem multiplas etapas) e precisar decidir ou implementar o
   padrao de offcanvas/drawer em vez de pagina propria. Tambem use ao

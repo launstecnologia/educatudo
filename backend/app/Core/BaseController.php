@@ -24,7 +24,7 @@ abstract class BaseController
             define('URL', $protocol . '://' . $host . FOLDER);
         }
         if (!defined('ENVIRONMENT')) {
-            define('ENVIRONMENT', 'development');
+            define('ENVIRONMENT', 'production');
         }
         if (!defined('DEBUG')) {
             define('DEBUG', ENVIRONMENT === 'development');
@@ -83,12 +83,22 @@ abstract class BaseController
         if ($viewFile === null) {
             throw new Exception("View não encontrada: {$view}");
         }
-        
+
         // Extrai as variáveis para o escopo da view
         extract($data);
-        
+
         // Inclui a view
-        include $viewFile;
+        $profiler = class_exists(\App\Performance\RequestProfiler::class);
+        if ($profiler) {
+            \App\Performance\RequestProfiler::markViewStart();
+        }
+        try {
+            include $viewFile;
+        } finally {
+            if ($profiler) {
+                \App\Performance\RequestProfiler::markViewEnd();
+            }
+        }
     }
     
     /**
@@ -123,11 +133,16 @@ abstract class BaseController
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
-        
+
         // Preserva o array $data original ANTES de qualquer extract
         // Faz uma cópia profunda para garantir que não será modificado
         $dataForLayout = is_array($data) ? unserialize(serialize($data)) : [];
-        
+
+        $profiler = class_exists(\App\Performance\RequestProfiler::class);
+        if ($profiler) {
+            \App\Performance\RequestProfiler::markViewStart();
+        }
+
         // Captura o conteúdo da view
         ob_start();
         try {
@@ -138,6 +153,9 @@ abstract class BaseController
             $content = ob_get_clean();
         } catch (Throwable $e) {
             ob_end_clean();
+            if ($profiler) {
+                \App\Performance\RequestProfiler::markViewEnd();
+            }
             require_once __DIR__ . '/../Core/Logger.php';
             Logger::error("Erro ao renderizar view {$view}: " . $e->getMessage(), [
                 'exception' => $e,
@@ -160,8 +178,14 @@ abstract class BaseController
             extract($dataForLayout);
             include $layoutFile;
             ob_end_flush();
+            if ($profiler) {
+                \App\Performance\RequestProfiler::markViewEnd();
+            }
         } catch (Throwable $e) {
             ob_end_clean();
+            if ($profiler) {
+                \App\Performance\RequestProfiler::markViewEnd();
+            }
             require_once __DIR__ . '/../Core/Logger.php';
             Logger::error("Erro ao renderizar layout {$layout}: " . $e->getMessage(), [
                 'exception' => $e,
