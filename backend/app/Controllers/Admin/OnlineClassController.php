@@ -1,9 +1,8 @@
 <?php
 
-require_once 'app/Core/BaseController.php';
-require_once 'app/Models/Education/OnlineClass.php';
-require_once 'app/Services/PandaVideoLiveService.php';
-require_once 'app/Services/JaasMeetService.php';
+require_once __DIR__ . '/../../Models/Education/OnlineClass.php';
+require_once __DIR__ . '/../../Services/PandaVideoLiveService.php';
+require_once __DIR__ . '/../../Services/JaasMeetService.php';
 
 if (!class_exists('OnlineClassController')) {
 class OnlineClassController extends BaseController
