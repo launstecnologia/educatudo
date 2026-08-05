@@ -6,20 +6,20 @@ $etapas = $relacoes['etapas'] ?? [];
 $rubrica = $relacoes['rubrica'] ?? [];
 $habilidades = $relacoes['habilidades'] ?? [];
 ?>
-<div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+<div class="mb-6 space-y-6">
     <div class="flex items-center justify-between gap-3">
         <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) ($projeto['id'] ?? 0) ?>/editar" class="text-sm text-primary hover:underline">← Voltar ao wizard</a>
-        <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800">Pré-visualização como aluno</span>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-medium">Pré-visualização como aluno</span>
     </div>
 
-    <div class="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-6 space-y-4">
         <?php if (!empty($projeto['capa_url'])): ?>
             <img src="<?= htmlspecialchars($projeto['capa_url']) ?>" alt="" class="w-full max-h-56 object-cover rounded-lg">
         <?php endif; ?>
         <?php if (!empty($projeto['area'])): ?>
             <p class="text-xs font-medium uppercase tracking-wide text-gray-500"><?= htmlspecialchars($projeto['area']) ?></p>
         <?php endif; ?>
-        <h1 class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h1>
+        <h2 class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h2>
         <?php if (!empty($projeto['subtitulo'])): ?>
             <p class="text-gray-600"><?= htmlspecialchars($projeto['subtitulo']) ?></p>
         <?php endif; ?>

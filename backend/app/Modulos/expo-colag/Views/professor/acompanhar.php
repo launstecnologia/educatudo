@@ -43,19 +43,19 @@ foreach ($atribuicoes as $a) {
     $atrPorTarefa[(int) $a['tarefa_id']][] = $a;
 }
 ?>
-<div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+<div class="mb-6 space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <a href="<?= URL ?>/professor/expo-colag" class="text-sm text-primary hover:underline">← Expo Colag</a>
-            <h1 class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h1>
+            <h2 class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h2>
             <p class="text-sm text-gray-600">
                 Status: <?= htmlspecialchars(str_replace('_', ' ', $projeto['status'] ?? '')) ?>
                 · <?= count($aprovados) ?> aprovado(s)
             </p>
         </div>
         <div class="flex gap-2">
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/editar" class="px-3 py-2 rounded-lg text-sm border border-gray-300 bg-white hover:bg-gray-50">Editar</a>
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="px-3 py-2 rounded-lg text-sm border border-gray-300 bg-white hover:bg-gray-50">Preview</a>
+            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/editar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Editar</a>
+            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Preview</a>
         </div>
     </div>
 

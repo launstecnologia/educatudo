@@ -53,7 +53,7 @@ class ExpoColagProfessorController extends BaseController
         $edicaoResult = $this->service->obterOuCriarEdicaoAtiva();
         $pendentes = $this->service->listarPendentesProfessor((int) $user['id']);
 
-        $this->viewWithLayout('teacher', 'professor/expo-colag/index', [
+        $this->viewWithLayout('professor', 'professor/expo-colag/index', [
             'user' => $user,
             'current_page' => 'expo-colag',
             'page_title' => 'Expo Colag',
@@ -75,7 +75,7 @@ class ExpoColagProfessorController extends BaseController
             return;
         }
 
-        $this->viewWithLayout('teacher', 'professor/expo-colag/acompanhar', [
+        $this->viewWithLayout('professor', 'professor/expo-colag/acompanhar', [
             'user' => $user,
             'current_page' => 'expo-colag',
             'page_title' => 'Acompanhar projeto',
@@ -263,7 +263,7 @@ class ExpoColagProfessorController extends BaseController
             $relacoes = $completo['relacoes'];
         }
 
-        $this->viewWithLayout('teacher', 'professor/expo-colag/wizard', [
+        $this->viewWithLayout('professor', 'professor/expo-colag/wizard', [
             'user' => $user,
             'current_page' => 'expo-colag',
             'page_title' => $projeto ? 'Editar projeto' : 'Criar projeto',
@@ -333,7 +333,7 @@ class ExpoColagProfessorController extends BaseController
             return;
         }
 
-        $this->viewWithLayout('teacher', 'professor/expo-colag/preview', [
+        $this->viewWithLayout('professor', 'professor/expo-colag/preview', [
             'user' => $user,
             'current_page' => 'expo-colag',
             'page_title' => 'Pré-visualização',

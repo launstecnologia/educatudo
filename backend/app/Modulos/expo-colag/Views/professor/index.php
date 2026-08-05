@@ -4,126 +4,124 @@ $projetos = $projetos ?? [];
 $pendentes = $pendentes ?? [];
 $edicao = $edicao ?? null;
 $csrf_token = $csrf_token ?? '';
+
+$badgeStatus = static function (string $st): string {
+    $map = [
+        'Rascunho' => 'bg-slate-100 text-slate-700',
+        'Publicado' => 'bg-sky-100 text-sky-800',
+        'Inscricoes_abertas' => 'bg-emerald-100 text-emerald-800',
+        'Em_execucao' => 'bg-violet-100 text-violet-800',
+        'Entrega' => 'bg-amber-100 text-amber-800',
+        'Avaliacao' => 'bg-orange-100 text-orange-800',
+        'Concluido' => 'bg-emerald-100 text-emerald-800',
+        'Cancelado' => 'bg-red-100 text-red-800',
+    ];
+    return $map[$st] ?? 'bg-slate-100 text-slate-700';
+};
 ?>
-<div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
+<div class="mb-6">
+    <div class="flex flex-wrap justify-between items-start gap-3">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Expo Colag</h1>
-            <p class="text-sm text-gray-600 mt-1">Crie e acompanhe os projetos da feira.</p>
+            <h2 class="text-2xl font-bold text-gray-900 mb-1">Expo Colag</h2>
+            <p class="text-gray-600 text-sm">
+                Crie e acompanhe os projetos da feira.
+                <?php if (!empty($edicao['data_evento'])): ?>
+                    Evento em <?= htmlspecialchars(date('d/m/Y', strtotime($edicao['data_evento']))) ?>.
+                <?php endif; ?>
+            </p>
         </div>
         <a href="<?= URL ?>/professor/expo-colag/criar"
-           class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium">
-            <i class="fa-solid fa-plus"></i>
+           class="inline-flex items-center px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Criar projeto
         </a>
     </div>
+</div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <a href="<?= URL ?>/professor/expo-colag/criar" class="rounded-xl border border-gray-200 bg-white p-6 hover:border-primary hover:shadow-md transition">
-            <div class="flex items-center gap-3">
-                <span class="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                    <i class="fa-solid fa-lightbulb text-xl"></i>
-                </span>
-                <div>
-                    <h2 class="font-semibold text-gray-900">Criar Projeto</h2>
-                    <p class="text-sm text-gray-600">Wizard em 6 blocos com rascunho persistente</p>
-                </div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+        <p class="text-xs text-gray-500">Projetos ativos</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1"><?= (int) ($indicadores['ativos'] ?? 0) ?></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+        <p class="text-xs text-gray-500">Inscrições pendentes</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1"><?= (int) ($indicadores['inscricoes_pendentes'] ?? 0) ?></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+        <p class="text-xs text-gray-500">Tarefas atrasadas</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1"><?= (int) ($indicadores['tarefas_atrasadas'] ?? 0) ?></p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+        <p class="text-xs text-gray-500">Entregas a avaliar</p>
+        <p class="text-2xl font-bold text-gray-900 mt-1"><?= (int) ($indicadores['entregas_avaliar'] ?? 0) ?></p>
+    </div>
+</div>
+
+<?php if (!empty($pendentes)): ?>
+<div class="bg-amber-50 border border-amber-200 rounded-xl shadow-sm mb-6 overflow-hidden">
+    <div class="px-5 py-3 border-b border-amber-100 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-amber-900">Inscrições aguardando aprovação</h3>
+        <span class="text-xs text-amber-700"><?= count($pendentes) ?></span>
+    </div>
+    <ul class="divide-y divide-amber-100">
+        <?php foreach ($pendentes as $pend): ?>
+        <li class="px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div>
+                <span class="font-medium text-gray-900"><?= htmlspecialchars($pend['aluno_nome'] ?? '') ?></span>
+                <span class="text-gray-500"> → <?= htmlspecialchars($pend['projeto_titulo'] ?? '') ?></span>
             </div>
-        </a>
-        <div class="rounded-xl border border-gray-200 bg-white p-6">
             <div class="flex items-center gap-3">
-                <span class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <i class="fa-solid fa-list-check text-xl"></i>
-                </span>
-                <div>
-                    <h2 class="font-semibold text-gray-900">Acompanhar Projetos</h2>
-                    <p class="text-sm text-gray-600">Tarefas, materiais, stand e QR</p>
-                </div>
+                <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $pend['projeto_id'] ?>/inscricoes/decidir">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                    <input type="hidden" name="inscricao_id" value="<?= (int) $pend['id'] ?>">
+                    <input type="hidden" name="decisao" value="aprovar">
+                    <input type="hidden" name="voltar" value="index">
+                    <button type="submit" class="text-emerald-700 font-medium hover:underline">Aprovar</button>
+                </form>
+                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $pend['projeto_id'] ?>/acompanhar?aba=participantes" class="text-primary font-medium hover:underline">Ver</a>
             </div>
-        </div>
+        </li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+<?php endif; ?>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-2">
+        <h3 class="text-lg font-semibold text-gray-900">Meus projetos</h3>
+        <span class="text-sm text-gray-500"><?= count($projetos) ?> itens</span>
     </div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-            <p class="text-xs text-gray-500">Projetos ativos</p>
-            <p class="text-2xl font-bold text-gray-900"><?= (int) ($indicadores['ativos'] ?? 0) ?></p>
+    <?php if (empty($projetos)): ?>
+        <div class="text-center py-12 px-5">
+            <p class="text-gray-500 mb-3">Nenhum projeto ainda.</p>
+            <a href="<?= URL ?>/professor/expo-colag/criar" class="inline-flex items-center px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90">
+                Criar o primeiro projeto
+            </a>
         </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-            <p class="text-xs text-gray-500">Tarefas atrasadas</p>
-            <p class="text-2xl font-bold text-gray-900"><?= (int) ($indicadores['tarefas_atrasadas'] ?? 0) ?></p>
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-            <p class="text-xs text-gray-500">Entregas a avaliar</p>
-            <p class="text-2xl font-bold text-gray-900"><?= (int) ($indicadores['entregas_avaliar'] ?? 0) ?></p>
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-            <p class="text-xs text-gray-500">Inscrições pendentes</p>
-            <p class="text-2xl font-bold text-gray-900"><?= (int) ($indicadores['inscricoes_pendentes'] ?? 0) ?></p>
-        </div>
-        <?php if (!empty($edicao['data_evento'])): ?>
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-            <p class="text-xs text-gray-500">Data do evento</p>
-            <p class="text-lg font-semibold text-gray-900"><?= htmlspecialchars(date('d/m/Y', strtotime($edicao['data_evento']))) ?></p>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <?php if (!empty($pendentes)): ?>
-    <div class="rounded-xl border border-amber-200 bg-amber-50/40 overflow-hidden">
-        <div class="px-6 py-4 border-b border-amber-100">
-            <h2 class="text-lg font-semibold text-amber-900">Inscrições aguardando aprovação</h2>
-        </div>
-        <ul class="divide-y divide-amber-100">
-            <?php foreach ($pendentes as $pend): ?>
-            <li class="px-6 py-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div>
-                    <span class="font-medium text-gray-900"><?= htmlspecialchars($pend['aluno_nome'] ?? '') ?></span>
-                    <span class="text-gray-500"> → <?= htmlspecialchars($pend['projeto_titulo'] ?? '') ?></span>
-                </div>
-                <div class="flex gap-2">
-                    <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $pend['projeto_id'] ?>/inscricoes/decidir">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                        <input type="hidden" name="inscricao_id" value="<?= (int) $pend['id'] ?>">
-                        <input type="hidden" name="decisao" value="aprovar">
-                        <input type="hidden" name="voltar" value="index">
-                        <button type="submit" class="text-emerald-700 font-medium hover:underline">Aprovar</button>
-                    </form>
-                    <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $pend['projeto_id'] ?>/acompanhar" class="text-primary hover:underline">Ver</a>
-                </div>
-            </li>
-            <?php endforeach; ?>
-        </ul>
-    </div>
-    <?php endif; ?>
-
-    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100">
-            <h2 class="text-lg font-semibold text-gray-900">Meus projetos</h2>
-        </div>
-        <?php if (empty($projetos)): ?>
-            <p class="px-6 py-8 text-sm text-gray-500">Nenhum projeto ainda. <a href="<?= URL ?>/professor/expo-colag/criar" class="text-primary font-medium">Criar o primeiro</a>.</p>
-        <?php else: ?>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-gray-50 text-left text-gray-600">
-                        <tr>
-                            <th class="px-6 py-3 font-medium">Título</th>
-                            <th class="px-6 py-3 font-medium">Status</th>
-                            <th class="px-6 py-3 font-medium">Vagas</th>
-                            <th class="px-6 py-3 font-medium">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <?php foreach ($projetos as $p): ?>
-                        <tr>
-                            <td class="px-6 py-3 font-medium text-gray-900"><?= htmlspecialchars($p['titulo'] ?? '') ?></td>
-                            <td class="px-6 py-3">
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">
-                                    <?= htmlspecialchars(str_replace('_', ' ', $p['status'] ?? '')) ?>
+    <?php else: ?>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vagas</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <?php foreach ($projetos as $p): ?>
+                        <?php $st = (string) ($p['status'] ?? ''); ?>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars($p['titulo'] ?? '') ?></td>
+                            <td class="px-4 py-3 text-sm">
+                                <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium <?= $badgeStatus($st) ?>">
+                                    <?= htmlspecialchars(str_replace('_', ' ', $st)) ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-3 text-gray-600"><?= (int) ($p['vagas_totais'] ?? 0) ?></td>
-                            <td class="px-6 py-3">
+                            <td class="px-4 py-3 text-sm text-gray-600"><?= (int) ($p['vagas_totais'] ?? 0) ?></td>
+                            <td class="px-4 py-3 text-sm text-right whitespace-nowrap">
                                 <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/acompanhar" class="text-primary font-medium hover:underline">Acompanhar</a>
                                 <span class="text-gray-300 mx-1">·</span>
                                 <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/editar" class="text-gray-600 hover:underline">Editar</a>
@@ -131,10 +129,9 @@ $csrf_token = $csrf_token ?? '';
                                 <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/preview" class="text-gray-600 hover:underline">Preview</a>
                             </td>
                         </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </div>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 </div>

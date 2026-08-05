@@ -60,7 +60,7 @@ if (!empty($projeto['formatos_aceitos'])) {
     $formatos = is_array($decoded) ? $decoded : [];
 }
 ?>
-<div class="max-w-5xl mx-auto px-4 py-6 space-y-6" id="expoWizard"
+<div class="mb-6 space-y-6" id="expoWizard"
      data-projeto-id="<?= $pid ?>"
      data-url-base="<?= htmlspecialchars(URL) ?>"
      data-alunos-url="<?= htmlspecialchars(URL . '/professor/expo-colag/alunos-turma') ?>"
@@ -69,10 +69,10 @@ if (!empty($projeto['formatos_aceitos'])) {
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-center gap-3">
             <a href="<?= URL ?>/professor/expo-colag" class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50" aria-label="Voltar">
-                <i class="fa-solid fa-arrow-left"></i>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
             </a>
             <div>
-                <h1 class="text-2xl font-bold text-gray-900"><?= $pid ? 'Editar projeto' : 'Criar projeto' ?></h1>
+                <h2 class="text-2xl font-bold text-gray-900"><?= $pid ? 'Editar projeto' : 'Criar projeto' ?></h2>
                 <p class="text-sm text-gray-600">Expo Colag · rascunho persistente em 6 blocos</p>
             </div>
         </div>
