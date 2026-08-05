@@ -53,6 +53,12 @@ class AvatarController extends BaseController
                 "SELECT * FROM avatares_alunos WHERE aluno_id = :aluno_id",
                 ['aluno_id' => $aluno['id']]
             );
+            if (is_array($avatar) && !empty($avatar['avatar_url']) && is_string($avatar['avatar_url'])) {
+                if (!class_exists('ContextoAluno')) {
+                    require_once __DIR__ . '/../../Core/ContextoAluno.php';
+                }
+                $avatar['avatar_url'] = ContextoAluno::normalizarUrlAvatar($avatar['avatar_url']);
+            }
 
             // Buscar dados de onboarding
             $onboarding = $this->db->fetch(
@@ -119,8 +125,8 @@ class AvatarController extends BaseController
                 throw new Exception('Avatar não encontrado no servidor');
             }
 
-            // URL estática versionada (não depende de S3/uploads)
-            $avatarUrl = '/public/assets/avatars/' . $nomeArquivo;
+            // URL estática versionada (docroot = public/, sem prefixo /public/)
+            $avatarUrl = '/assets/avatars/' . $nomeArquivo;
 
             // Verificar se já existe avatar
             $avatarExistenteId = $this->db->fetch(
@@ -179,6 +185,11 @@ class AvatarController extends BaseController
                     ]
                 );
             }
+
+            if (!class_exists('ContextoAluno')) {
+                require_once __DIR__ . '/../../Core/ContextoAluno.php';
+            }
+            ContextoAluno::gravarSessaoNoLogin($this->db, (int) $aluno['id']);
 
             $this->redirect('/avatar?success=Avatar selecionado com sucesso!');
 

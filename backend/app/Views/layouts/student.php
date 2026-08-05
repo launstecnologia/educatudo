@@ -15,6 +15,10 @@
             $avatar_url = ContextoAluno::getAvatarUrl(Database::getInstance());
         } catch (Exception $e) {
             $avatar_url = $_SESSION['avatar_url'] ?? null;
+            if (is_string($avatar_url)) {
+                $avatar_url = str_replace('/public/assets/', '/assets/', $avatar_url);
+                $avatar_url = str_replace('/public/uploads/', '/uploads/', $avatar_url);
+            }
         }
     }
     ?>
@@ -552,7 +556,7 @@
                 <div class="flex items-center">
                     <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 overflow-hidden">
                         <?php if (!empty($avatar_url)): ?>
-                            <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-full h-full object-cover rounded-full" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/uploads/','/uploads/');}">
+                            <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-full h-full object-cover rounded-full" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
                         <?php else: ?>
                             <span class="text-white font-semibold text-sm"><?= strtoupper(substr($user['nome'] ?? 'Aluno', 0, 2)) ?></span>
                         <?php endif; ?>
@@ -1528,7 +1532,7 @@
                         <div class="relative">
                             <button onclick="toggleUserDropdown()" class="flex items-center space-x-2 md:space-x-3 hover:bg-gray-50 px-2 md:px-3 py-2 rounded-lg transition-colors cursor-pointer">
                                 <?php if (!empty($avatar_url)): ?>
-                                    <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-8 h-8 object-cover rounded-full" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/uploads/','/uploads/');}">
+                                    <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-8 h-8 object-cover rounded-full" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
                                 <?php else: ?>
                                     <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden">
                                         <?= strtoupper(substr($user['nome'] ?? 'A', 0, 1)) ?>

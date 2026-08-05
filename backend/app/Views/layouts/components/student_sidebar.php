@@ -27,23 +27,18 @@
         <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-6 sidebar-user-info">
             <div class="flex items-center sidebar-user-info">
                 <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-3 sidebar-user-avatar overflow-hidden">
-                    <?php 
-                    // Verificar se o aluno tem avatar personalizado
-                    $avatar = null;
-                    if (isset($aluno['id'])) {
+                    <?php
+                    $sidebarAvatarUrl = $avatar_url ?? null;
+                    if (empty($sidebarAvatarUrl) && isset($aluno['id'])) {
                         try {
-                            $db = Database::getInstance();
-                            $avatar = $db->fetch(
-                                "SELECT * FROM avatares_alunos WHERE aluno_id = :aluno_id",
-                                ['aluno_id' => $aluno['id']]
-                            );
+                            require_once __DIR__ . '/../../../Core/ContextoAluno.php';
+                            $sidebarAvatarUrl = ContextoAluno::getAvatarUrl(Database::getInstance());
                         } catch (Exception $e) {
-                            // Se houver erro, usar iniciais
+                            $sidebarAvatarUrl = null;
                         }
                     }
-                    
-                    if ($avatar && !empty($avatar['avatar_url'])): ?>
-                        <img src="<?= htmlspecialchars($avatar['avatar_url']) ?>" alt="Avatar" class="w-full h-full object-cover">
+                    if (!empty($sidebarAvatarUrl)): ?>
+                        <img src="<?= htmlspecialchars($sidebarAvatarUrl) ?>" alt="Avatar" class="w-full h-full object-cover" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
                     <?php else: ?>
                         <span class="text-white font-semibold text-sm"><?= strtoupper(substr($aluno['nome_aluno'] ?? '', 0, 2)) ?></span>
                     <?php endif; ?>

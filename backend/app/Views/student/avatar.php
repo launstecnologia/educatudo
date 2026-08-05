@@ -185,13 +185,13 @@
                     <?php if (empty($avatars_predefinidos)): ?>
                         <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                             Nenhum avatar disponível no momento. Peça ao suporte para adicionar imagens em
-                            <code class="text-xs">public/assets/avatars/</code>.
+                            <code class="text-xs">public/assets/avatars/</code> (URL: /assets/avatars/).
                         </div>
                     <?php else: ?>
                     <div class="grid grid-cols-5 gap-4 mb-6">
                         <?php foreach ($avatars_predefinidos as $avatarFile): ?>
                             <?php
-                            $avatarUrl = URL . '/public/assets/avatars/' . rawurlencode($avatarFile);
+                            $avatarUrl = URL . '/assets/avatars/' . rawurlencode($avatarFile);
                             $avatarUrlAtual = (string) ($avatar['avatar_url'] ?? '');
                             $isSelected = $avatarUrlAtual !== '' && (
                                 basename(parse_url($avatarUrlAtual, PHP_URL_PATH) ?: $avatarUrlAtual) === $avatarFile
@@ -268,7 +268,7 @@ function selecionarAvatar(avatarFile) {
         selectedOption.appendChild(selectedText);
         
         // Atualizar preview
-        const avatarUrl = '<?= URL ?>/public/assets/avatars/' + encodeURIComponent(avatarFile);
+        const avatarUrl = '<?= URL ?>/assets/avatars/' + encodeURIComponent(avatarFile);
         const preview = document.getElementById('avatar-preview');
         const placeholder = document.getElementById('avatar-placeholder');
         

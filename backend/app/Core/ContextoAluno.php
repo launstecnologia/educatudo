@@ -74,7 +74,7 @@ class ContextoAluno
             'turma_id' => (int) ($row['turma_id'] ?? 0),
             'turma_nome' => (string) ($row['turma_nome'] ?? ''),
             'serie' => (string) ($row['serie'] ?? ''),
-            'avatar_url' => is_string($avatarUrl) ? trim($avatarUrl) : null,
+            'avatar_url' => is_string($avatarUrl) ? self::normalizarUrlAvatar(trim($avatarUrl)) : null,
             'turma_ids' => $turmaIds,
             'onboarding_completado' => $onboardingCompletado,
             'turmas_cursos_select' => $turmasSelect,
@@ -167,11 +167,16 @@ class ContextoAluno
         if (!is_string($url) || trim($url) === '') {
             return null;
         }
-        $url = trim($url);
-        if (strpos($url, '/public/uploads/') !== false && strpos($url, '/uploads/') === false) {
-            $url = str_replace('/public/uploads/', '/uploads/', $url);
-        }
-        return $url;
+        return self::normalizarUrlAvatar($url);
+    }
+
+    /**
+     * Docroot já é public/: URLs legadas /public/assets|uploads quebram na VPS.
+     */
+    public static function normalizarUrlAvatar(string $url): string
+    {
+        $url = str_replace('/public/assets/', '/assets/', $url);
+        return str_replace('/public/uploads/', '/uploads/', $url);
     }
 
     /**
