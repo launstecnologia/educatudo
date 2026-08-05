@@ -200,8 +200,10 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </a>
             <?php foreach ($professorExternalApps as $externalApp): ?>
             <?php
+                if ($externalApp['app'] === 'educahits') {
+                    continue;
+                }
                 $isEducaProf = $externalApp['app'] === 'educaprof';
-                $isEducaHits = $externalApp['app'] === 'educahits';
                 $isCurrentExternal = ($current_page ?? '') === $externalApp['current_page'] || (($current_page ?? '') === 'educaprof' && $isEducaProf);
             ?>
             <a href="<?= htmlspecialchars($externalApp['href']) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-3 <?= $isCurrentExternal ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
@@ -209,10 +211,6 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 20.055a12.083 12.083 0 01-6.16-9.477L12 14z"></path>
-                </svg>
-                <?php elseif ($isEducaHits): ?>
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm12-3a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
                 <?php else: ?>
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,15 +221,6 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </a>
             <?php endforeach; ?>
             <?php endif; ?>
-            
-            <!-- Diário de Classe -->
-            <a href="<?= URL ?>/professor/diario"
-               class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'diario_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 12h6m-6 4h6"></path>
-                </svg>
-                <span class="sidebar-text">Diário de Classe</span>
-            </a>
 
             <!-- AVA / EAD -->
             <?php require_once __DIR__ . '/../../../Core/FeatureGate.php'; if (FeatureGate::isModuleEnabled('ead')): ?>
@@ -274,6 +263,18 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </svg>
                 </button>
                 <div id="academico-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+                    <?php if (LayoutHelper::isModuleEnabled('expo_colag')): ?>
+                    <?php $expoColagEnabled = LayoutHelper::isModuleEnabled('expo_colag'); ?>
+                    <a href="<?= $expoColagEnabled ? URL . '/professor/expo-colag' : '#' ?>"
+                       onclick="<?= $expoColagEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Expo Colag\'); return false;' ?>"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'expo-colag' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$expoColagEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <span class="sidebar-text text-sm">Expo Colag</span>
+                    </a>
+                    <?php endif; ?>
+
                     <!-- Planos de Aula -->
                     <?php $planosAulaEnabled = $modulosProfessor['professor_planos_aula']; ?>
                     <a href="<?= $planosAulaEnabled ? URL . '/professor/planos-aula' : '#' ?>" 
@@ -475,20 +476,6 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
                 </svg>
                 <span class="sidebar-text">Gerar Slides</span>
-            </a>
-            <?php endif; ?>
-            
-            <!-- IA Prof (Agentes de IA) -->
-            <?php if (LayoutHelper::isModuleVisible('professor_ai_agents')): ?>
-            <?php $aiAgentsEnabled = $modulosProfessor['professor_ai_agents']; ?>
-            <?php $iaNameProf = LayoutHelper::getIaName() . 'Prof'; ?>
-            <a href="<?= $aiAgentsEnabled ? URL . '/professor/ai-agents' : '#' ?>"
-               onclick="<?= $aiAgentsEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'' . htmlspecialchars($iaNameProf, ENT_QUOTES) . '\'); return false;' ?>"
-               class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'ai-agents' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 <?= !$aiAgentsEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                </svg>
-                <span class="sidebar-text"><?= htmlspecialchars($iaNameProf) ?></span>
             </a>
             <?php endif; ?>
             
