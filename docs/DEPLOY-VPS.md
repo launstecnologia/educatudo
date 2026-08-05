@@ -18,25 +18,32 @@ plataforma_educatudo/
 
 1. **Instalar Docker** (Engine + Compose plugin) na VPS.
 
-2. **Configurar `.env`:**
-
-```bash
-cp backend/.env.vps.example backend/.env
-nano backend/.env   # DB_HOST, credenciais, MASTER_ENCRYPTION_KEY
-```
+2. **Clonar o repo** e **copiar o `.env` de produção** para `backend/.env` (mesma `MASTER_ENCRYPTION_KEY`). Ajuste só se necessário:
+   - `REDIS_HOST=redis`
+   - `REDIS_PORT=6379`
 
 3. **Liberar MySQL remoto** para o IP da VPS (firewall / security group).
 
 4. **Subir containers:**
 
 ```bash
-chmod +x scripts/up-vps.sh
+chmod +x scripts/up-vps.sh scripts/diagnostico-vps.sh
 ./scripts/up-vps.sh --pull --composer
 ```
 
-5. **DNS + SSL:** ver [DEPLOY-DOMINIOS.md](./DEPLOY-DOMINIOS.md).
+5. **Diagnóstico (obrigatório se o site só carrega):**
 
-6. **Migrations:** `/master/migrations` ou `docker compose -f docker-compose.vps.yml exec php php scripts/run_migrations.php`.
+```bash
+./scripts/diagnostico-vps.sh
+```
+
+6. **DNS + firewall:** `master` e `*` devem chegar na VPS; portas **80** e **443** abertas (UFW + painel Hostinger).
+
+7. **SSL:**
+   - **Rápido (teste):** Cloudflare → SSL/TLS → **Flexible** (origem HTTP na 80).
+   - **Produção:** `./scripts/setup-vps-ssl-docker.sh educatudo.com` + Cloudflare **Full (strict)**.
+
+8. **Migrations:** só pendentes — banco remoto já em produção.
 
 ## Comandos úteis
 
