@@ -909,7 +909,14 @@ class LayoutHelper
     {
         $config = self::getConfig();
         $key = 'module_' . $module;
-        $value = $config[$key] ?? '1';
+        if (!array_key_exists($key, $config)) {
+            if (!class_exists('ModuloRegistry', false)) {
+                require_once __DIR__ . '/ModuloRegistry.php';
+            }
+            $value = ModuloRegistry::featureDefault((string) $module);
+        } else {
+            $value = $config[$key];
+        }
         $v = (string) $value;
         return ($v === '2' || $v === '0') ? $v : '1';
     }

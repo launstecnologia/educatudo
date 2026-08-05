@@ -76,3 +76,4 @@ Antes de criar/alterar tela admin: ler `prompts/admin_ui_sistema.md` (índice do
 | Como pedir coisas à IA | `.claude/docs/working-with-ai.md` |
 | Backlog | `specs/tasks.md` |
 | Decisões técnicas | `specs/design.md` |
+| Modularização (piloto Arquivos) | `.claude/docs/modularizacao.md` |

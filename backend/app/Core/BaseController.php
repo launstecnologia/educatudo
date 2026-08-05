@@ -46,13 +46,41 @@ abstract class BaseController
     }
     
     /**
+     * Resolve caminho da view em Views/ legado ou em Modulos/<chave>/Views/<perfil>/.
+     * Ex.: student/arquivos/index → Modulos/arquivos/Views/student/index.php
+     */
+    protected function resolveViewPath(string $view): ?string
+    {
+        $legacy = __DIR__ . '/../Views/' . $view . '.php';
+        if (is_file($legacy)) {
+            return $legacy;
+        }
+
+        // Perfis em PT (aluno/professor) e legado EN (student/teacher)
+        if (preg_match('#^(aluno|professor|student|teacher|admin|master|parents|monitor)/([^/]+)/(.+)$#', $view, $m)) {
+            $perfilView = $m[1];
+            if ($perfilView === 'student') {
+                $perfilView = 'aluno';
+            } elseif ($perfilView === 'teacher') {
+                $perfilView = 'professor';
+            }
+            $moduloView = __DIR__ . '/../Modulos/' . $m[2] . '/Views/' . $perfilView . '/' . $m[3] . '.php';
+            if (is_file($moduloView)) {
+                return $moduloView;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Renderiza uma view
      */
     protected function view($view, $data = [])
     {
-        $viewFile = __DIR__ . '/../Views/' . $view . '.php';
-        
-        if (!file_exists($viewFile)) {
+        $viewFile = $this->resolveViewPath($view);
+
+        if ($viewFile === null) {
             throw new Exception("View não encontrada: {$view}");
         }
         
@@ -81,13 +109,13 @@ abstract class BaseController
         }
         
         $layoutFile = __DIR__ . '/../Views/layouts/' . $layout . '.php';
-        $viewFile = __DIR__ . '/../Views/' . $view . '.php';
-        
+        $viewFile = $this->resolveViewPath($view);
+
         if (!file_exists($layoutFile)) {
             throw new Exception("Layout não encontrado: {$layout}");
         }
-        
-        if (!file_exists($viewFile)) {
+
+        if ($viewFile === null) {
             throw new Exception("View não encontrada: {$view}");
         }
         

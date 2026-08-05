@@ -369,6 +369,16 @@ class Router
                         __DIR__ . "/../../app/Controllers/{$controller}.php",
                         __DIR__ . "/../../app/Controllers/{$subfolder}{$controllerName}.php"
                     ];
+
+                    // Módulos físicos: Modulos/<chave>/<Controller>
+                    if (!class_exists('ModuloRegistry', false)) {
+                        require_once __DIR__ . '/ModuloRegistry.php';
+                    }
+                    $moduloControllerPath = ModuloRegistry::resolveControllerPath($controller);
+                    if ($moduloControllerPath !== null) {
+                        array_unshift($controllerPaths, $moduloControllerPath);
+                        array_unshift($controllerClasses, $controllerName);
+                    }
                     
                     foreach ($controllerClasses as $index => $controllerClass) {
                         // Tentar carregar o arquivo primeiro

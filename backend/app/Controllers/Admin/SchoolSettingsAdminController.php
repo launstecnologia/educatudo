@@ -161,27 +161,30 @@ class SchoolSettingsAdminController extends AdminBaseController
             $validValues = ['1', '0', '2'];
 
             // Geral: uma chave do form grava em várias config_keys (aluno + professor + admin)
-            $geralToBackend = [
+            if (!class_exists('ModuloRegistry', false)) {
+                require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+            }
+            $geralToBackend = array_merge([
                 'geral_planos_aula'    => ['aluno_planos_aula', 'professor_planos_aula'],
-                'geral_arquivos'       => ['aluno_arquivos', 'professor_arquivos'],
                 'geral_jornada'        => ['jornadas', 'professor_jornadas'],
                 'geral_provas'         => ['aluno_provas', 'professor_provas'],
                 'geral_chat_professor' => ['chat_professor'],
                 'geral_redacao_orientada' => ['redacao_configuravel', 'aluno_redacao_configuravel', 'professor_redacao_configuravel'],
                 'geral_minicursos'     => ['aluno_minicursos'],
                 'geral_aulas_online'   => ['aulas_online'],
-            ];
+            ], ModuloRegistry::masterGeralMap());
 
-            // Chaves diretas (Professor + Aluno)
-            $directKeys = [
+            // Chaves diretas (Professor + Aluno) + extras do ModuloRegistry (ex.: aluno_recuperacao)
+            $directKeys = array_values(array_unique(array_merge([
                 'professor_ai_agents', 'professor_gerar_slides',
                 'educa_livros', 'educalabs', 'aluno_flashcards', 'exercicios', 'exercicios_ia',
                 'ingles', 'redacoes', 'simulados', 'chat', 'aluno_caderno_novo', 'forum', 'drive', 'jogos',
                 'educa_hits',
-            ];
+            ], array_keys(ModuloRegistry::masterAlunoExtras()))));
 
             $save = function ($configKey, $value) {
-                $value = in_array((string) $value, ['1', '0', '2'], true) ? (string) $value : '1';
+                $fallback = ModuloRegistry::featureDefault((string) $configKey);
+                $value = in_array((string) $value, ['1', '0', '2'], true) ? (string) $value : $fallback;
                 $this->db->query(
                     "INSERT INTO config_layout (config_key, config_value) VALUES (?, ?) 
                      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP",
@@ -198,7 +201,8 @@ class SchoolSettingsAdminController extends AdminBaseController
             }
 
             foreach ($directKeys as $m) {
-                $raw = isset($modules[$m]) ? (string) $modules[$m] : '1';
+                $fallback = ModuloRegistry::featureDefault((string) $m);
+                $raw = isset($modules[$m]) ? (string) $modules[$m] : $fallback;
                 $save($m, $raw);
             }
 

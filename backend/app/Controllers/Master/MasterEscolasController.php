@@ -14,7 +14,7 @@ class MasterEscolasController extends BaseController
     /** Módulos Geral: chave do form => lista de backend keys (config_layout: module_XXX) */
     private static $MODULOS_GERAL_MAP = [
         'geral_planos_aula'    => ['aluno_planos_aula', 'professor_planos_aula'],
-        'geral_arquivos'       => ['aluno_arquivos', 'professor_arquivos'],
+        // geral_arquivos: ModuloRegistry (app/Modulos/arquivos/manifest.php)
         'geral_apostilas'      => ['aluno_apostilas', 'professor_apostilas'],
         'geral_links_uteis'    => ['aluno_links_uteis', 'professor_links_uteis'],
         'geral_jornada'        => ['jornadas', 'professor_jornadas'],
@@ -26,7 +26,6 @@ class MasterEscolasController extends BaseController
 
     private static $MODULOS_GERAL_LABELS = [
         'geral_planos_aula'   => 'Plano de Aula',
-        'geral_arquivos'      => 'Arquivos',
         'geral_apostilas'     => 'Apostilas',
         'geral_links_uteis'   => 'Links Úteis',
         'geral_jornada'       => 'Jornada do Aluno',
@@ -35,6 +34,30 @@ class MasterEscolasController extends BaseController
         'geral_redacao_orientada' => 'Redação Orientada',
         'geral_minicursos'    => 'Mini Cursos',
     ];
+
+    private function getModulosGeralMap(): array
+    {
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
+        return array_merge(self::$MODULOS_GERAL_MAP, ModuloRegistry::masterGeralMap());
+    }
+
+    private function getModulosGeralLabels(): array
+    {
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
+        return array_merge(self::$MODULOS_GERAL_LABELS, ModuloRegistry::masterGeralLabels());
+    }
+
+    private function getModulosAluno(): array
+    {
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
+        return array_merge(self::$MODULOS_ALUNO, ModuloRegistry::masterAlunoExtras());
+    }
 
     /** Módulos Professor (backend key => label). Valores 1=Habilitado, 0=Desabilitado, 2=Inativo */
     private static $MODULOS_PROFESSOR = [
@@ -321,10 +344,10 @@ class MasterEscolasController extends BaseController
             'escola' => null,
             'banco' => null,
             'layout' => [],
-            'modulos_geral' => self::$MODULOS_GERAL_MAP,
-            'modulos_geral_labels' => self::$MODULOS_GERAL_LABELS,
+            'modulos_geral' => $this->getModulosGeralMap(),
+            'modulos_geral_labels' => $this->getModulosGeralLabels(),
             'modulos_professor' => self::$MODULOS_PROFESSOR,
-            'modulos_aluno' => self::$MODULOS_ALUNO,
+            'modulos_aluno' => $this->getModulosAluno(),
             'criar_banco_disponivel' => MysqlProvisioningService::isAvailable(),
             'dominio_config' => $this->getDominioViewConfig(),
             'csrf_token' => $this->generateCsrfToken(),
@@ -486,10 +509,10 @@ class MasterEscolasController extends BaseController
             'escola' => $escola,
             'banco' => $banco,
             'layout' => $layout,
-            'modulos_geral' => self::$MODULOS_GERAL_MAP,
-            'modulos_geral_labels' => self::$MODULOS_GERAL_LABELS,
+            'modulos_geral' => $this->getModulosGeralMap(),
+            'modulos_geral_labels' => $this->getModulosGeralLabels(),
             'modulos_professor' => self::$MODULOS_PROFESSOR,
-            'modulos_aluno' => self::$MODULOS_ALUNO,
+            'modulos_aluno' => $this->getModulosAluno(),
             'criar_banco_disponivel' => MysqlProvisioningService::isAvailable(),
             'dominio_config' => $this->getDominioViewConfig(),
             'csrf_token' => $this->generateCsrfToken(),
@@ -730,7 +753,7 @@ class MasterEscolasController extends BaseController
 
         // Módulos: Geral (mapeamento form -> várias backend keys)
         $modules = $_POST['modules'] ?? [];
-        foreach (self::$MODULOS_GERAL_MAP as $formKey => $backendKeys) {
+        foreach ($this->getModulosGeralMap() as $formKey => $backendKeys) {
             $raw = isset($modules[$formKey]) ? (string) $modules[$formKey] : '1';
             $value = in_array($raw, self::MODULE_VALID_VALUES, true) ? $raw : '1';
             foreach ($backendKeys as $bk) {
@@ -739,10 +762,14 @@ class MasterEscolasController extends BaseController
         }
 
         // Módulos: Professor e Aluno (chave direta)
-        $directModuleKeys = array_merge(array_keys(self::$MODULOS_PROFESSOR), array_keys(self::$MODULOS_ALUNO));
+        $directModuleKeys = array_merge(array_keys(self::$MODULOS_PROFESSOR), array_keys($this->getModulosAluno()));
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
         foreach ($directModuleKeys as $mod) {
-            $raw = isset($modules[$mod]) ? (string) $modules[$mod] : '1';
-            $config['module_' . $mod] = in_array($raw, self::MODULE_VALID_VALUES, true) ? $raw : '1';
+            $fallback = ModuloRegistry::featureDefault((string) $mod);
+            $raw = isset($modules[$mod]) ? (string) $modules[$mod] : $fallback;
+            $config['module_' . $mod] = in_array($raw, self::MODULE_VALID_VALUES, true) ? $raw : $fallback;
         }
 
         // Links no submenu (JSON)

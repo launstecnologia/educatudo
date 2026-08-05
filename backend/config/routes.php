@@ -15,4 +15,10 @@ $router->middleware('Auth', function ($router) {
     require __DIR__ . '/routes/teacher.php';
     require __DIR__ . '/routes/admin.php';
     require __DIR__ . '/routes/parents.php';
+
+    // Módulos físicos (app/Modulos/<chave>/routes.php)
+    $modulosRoutes = glob(dirname(__DIR__) . '/app/Modulos/*/routes.php') ?: [];
+    foreach ($modulosRoutes as $routesFile) {
+        require $routesFile;
+    }
 });

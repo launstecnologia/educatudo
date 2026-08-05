@@ -270,7 +270,12 @@
                 <div class="px-4 py-2.5 bg-emerald-50 border-b border-emerald-100 text-sm font-semibold text-emerald-800">Aluno</div>
                 <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <?php foreach ($modulos_aluno ?? [] as $key => $label): ?>
-                    <?php $cur = $layout['module_' . $key] ?? '1'; ?>
+                    <?php
+                        if (!class_exists('ModuloRegistry', false)) {
+                            require_once dirname(__DIR__, 3) . '/Core/ModuloRegistry.php';
+                        }
+                        $cur = $layout['module_' . $key] ?? ModuloRegistry::featureDefault((string) $key);
+                    ?>
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-sm text-slate-700"><?= htmlspecialchars($label) ?></span>
                         <select name="modules[<?= htmlspecialchars($key) ?>]" class="master-module-select rounded border-slate-300 text-sm w-36 focus:ring-blue-500 focus:border-blue-500">

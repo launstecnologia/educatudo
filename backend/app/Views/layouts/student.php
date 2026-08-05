@@ -790,9 +790,12 @@
                             </svg>
                             <span class="sidebar-text text-sm">Arquivos</span>
                         </a>
-                        <a href="<?= $arquivosColagEnabled ? URL . '/aluno/recuperacao' : '#' ?>"
-                           onclick="<?= $arquivosColagEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Recuperação\'); return false;' ?>"
-                           class="flex items-center px-4 py-2 <?= (($current_page ?? '') === 'recuperacao') || strpos($_SERVER['REQUEST_URI'] ?? '', '/aluno/recuperacao') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$arquivosColagEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                        <?php endif; ?>
+<?php if (LayoutHelper::isModuleEnabled('aluno_recuperacao')): ?>
+                        <?php $recuperacaoEnabled = LayoutHelper::isModuleEnabled('aluno_recuperacao'); ?>
+                        <a href="<?= $recuperacaoEnabled ? URL . '/aluno/recuperacao' : '#' ?>"
+                           onclick="<?= $recuperacaoEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Recuperação\'); return false;' ?>"
+                           class="flex items-center px-4 py-2 <?= (($current_page ?? '') === 'recuperacao') || strpos($_SERVER['REQUEST_URI'] ?? '', '/aluno/recuperacao') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$recuperacaoEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
                             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>

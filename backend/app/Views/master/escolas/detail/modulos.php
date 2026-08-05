@@ -63,7 +63,11 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
             <div class="px-2 divide-y divide-gray-100">
                 <?php foreach ($modulos_aluno as $key => $label): ?>
                 <?php
-                    $cur = $layout_config['module_' . $key] ?? '1';
+                    if (!class_exists('ModuloRegistry', false)) {
+                        require_once dirname(__DIR__, 4) . '/Core/ModuloRegistry.php';
+                    }
+                    $defaultMod = ModuloRegistry::featureDefault((string) $key);
+                    $cur = $layout_config['module_' . $key] ?? $defaultMod;
                     $locked = !$tudicoinsOn && isset($modulosExigemTudiCoins[$key]);
                 ?>
                 <div class="flex items-center justify-between gap-4 py-2.5">

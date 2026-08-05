@@ -267,20 +267,7 @@ $router->post('/professor/planos-aula/duplicar/{id}', 'Education/LessonPlanContr
 $router->post('/professor/planos-aula/excluir/{id}', 'Education/LessonPlanController@excluir');
 $router->get('/professor/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
 
-// Módulo de Arquivos (Professor)
-$router->get('/professor/arquivos', 'Files/TeacherFileController@index');
-$router->get('/professor/arquivos/criar', 'Files/TeacherFileController@create');
-$router->get('/professor/arquivos/alunos-por-turma', 'Files/TeacherFileController@alunosPorTurma');
-$router->post('/professor/arquivos/salvar', 'Files/TeacherFileController@store');
-$router->get('/professor/arquivos/editar/{id}', 'Files/TeacherFileController@edit');
-$router->get('/professor/arquivos/preview/{id}', 'Files/TeacherFileController@preview');
-$router->get('/professor/arquivos/ver-anexo/{id}', 'Files/TeacherFileController@verAnexo');
-$router->post('/professor/arquivos/atualizar', 'Files/TeacherFileController@update');
-$router->post('/professor/arquivos/excluir/{id}', 'Files/TeacherFileController@delete');
-$router->post('/professor/arquivos/pasta/criar', 'Files/TeacherFileController@createFolder');
-$router->post('/professor/arquivos/pasta/renomear', 'Files/TeacherFileController@renameFolder');
-$router->post('/professor/arquivos/pasta/excluir', 'Files/TeacherFileController@deleteFolder');
-$router->post('/professor/arquivos/pasta/mover', 'Files/TeacherFileController@moveToFolder');
+// Arquivos: rotas em app/Modulos/arquivos/routes.php
 $router->get('/professor/apostilas', 'Apostilas/TeacherApostilaController@index');
 $router->get('/professor/apostilas/abrir/{id}', 'Apostilas/TeacherApostilaController@abrir');
 $router->get('/professor/apostilas/visualizar/{id}', 'Apostilas/TeacherApostilaController@visualizar');

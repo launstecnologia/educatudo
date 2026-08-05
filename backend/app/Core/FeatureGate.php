@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/LayoutHelper.php';
+require_once __DIR__ . '/ModuloRegistry.php';
 
 class FeatureGate
 {
@@ -170,6 +171,7 @@ class FeatureGate
             '/professor/gerar-slides' => ['module' => 'gerar_slides', 'name' => 'Gerar Slides'],
             '/professor/ai-agents' => ['module' => 'ai_agents', 'name' => 'TudinhaProf'],
             '/professor/notifications' => ['module' => 'notifications', 'name' => 'Notificações'],
+            '/professor/arquivos' => ['module' => 'arquivos', 'name' => 'Arquivos'],
         ];
         
         // Verificar cada rota (ordem por especificidade)
@@ -186,15 +188,17 @@ class FeatureGate
 
     private static function matchModuleByUri(string $uri): ?string
     {
+        $map = array_merge(self::$routeToModule, ModuloRegistry::routeToFeatureKey());
+
         // Ordena prefixos por tamanho desc para casar o mais específico primeiro
-        $prefixes = array_keys(self::$routeToModule);
+        $prefixes = array_keys($map);
         usort($prefixes, function ($a, $b) {
             return strlen($b) <=> strlen($a);
         });
 
         foreach ($prefixes as $prefix) {
             if (strpos($uri, $prefix) === 0) {
-                return self::$routeToModule[$prefix];
+                return $map[$prefix];
             }
         }
         return null;

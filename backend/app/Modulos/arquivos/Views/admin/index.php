@@ -16,7 +16,7 @@ function adminArquivoDescricaoVazia(?string $html): bool {
     return trim(strip_tags(html_entity_decode((string)$html, ENT_QUOTES | ENT_HTML5, 'UTF-8'))) === '';
 }
 ?>
-<?php require __DIR__ . '/../../layouts/components/admin_filter_styles.php'; ?>
+<?php require __DIR__ . '/../../../../Views/layouts/components/admin_filter_styles.php'; ?>
 
 <div class="max-w-6xl mx-auto space-y-4">
 

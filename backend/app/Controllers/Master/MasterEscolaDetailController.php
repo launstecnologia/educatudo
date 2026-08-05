@@ -9,7 +9,7 @@ class MasterEscolaDetailController extends BaseController
     private static $MODULOS_GERAL_MAP = [
         'geral_planos_aula'       => ['aluno_planos_aula', 'professor_planos_aula'],
         'geral_apostilas'         => ['aluno_apostilas', 'professor_apostilas'],
-        'geral_arquivos'          => ['aluno_arquivos', 'professor_arquivos'],
+        // geral_arquivos: vem do ModuloRegistry (app/Modulos/arquivos/manifest.php)
         'geral_jornada'           => ['jornadas', 'professor_jornadas'],
         'geral_redacao_orientada' => ['redacao_configuravel', 'aluno_redacao_configuravel', 'professor_redacao_configuravel'],
         'geral_provas'            => ['aluno_provas', 'professor_provas'],
@@ -24,7 +24,6 @@ class MasterEscolaDetailController extends BaseController
     private static $MODULOS_GERAL_LABELS = [
         'geral_planos_aula'       => 'Plano de Aula',
         'geral_apostilas'         => 'Minha Apostila',
-        'geral_arquivos'          => 'Arquivos',
         'geral_jornada'           => 'Jornada do Aluno',
         'geral_redacao_orientada' => 'Jornada da Redação',
         'geral_provas'            => 'Provas',
@@ -35,6 +34,30 @@ class MasterEscolaDetailController extends BaseController
         'geral_inclusao'          => 'EducaInclui (Avaliação Adaptativa)',
         'geral_aulas_online'      => 'Aulas Online',
     ];
+
+    private function getModulosGeralMap(): array
+    {
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
+        return array_merge(self::$MODULOS_GERAL_MAP, ModuloRegistry::masterGeralMap());
+    }
+
+    private function getModulosGeralLabels(): array
+    {
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
+        return array_merge(self::$MODULOS_GERAL_LABELS, ModuloRegistry::masterGeralLabels());
+    }
+
+    private function getModulosAluno(): array
+    {
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
+        return array_merge(self::$MODULOS_ALUNO, ModuloRegistry::masterAlunoExtras());
+    }
 
     private static $MODULOS_PROFESSOR = [
         'professor_ai_agents'       => 'Agente de IA',
@@ -1018,10 +1041,10 @@ class MasterEscolaDetailController extends BaseController
         $id = (int) $id;
 
         $this->renderDetail($id, 'modulos', 'modulos', [
-            'modulos_geral'        => self::$MODULOS_GERAL_MAP,
-            'modulos_geral_labels' => self::$MODULOS_GERAL_LABELS,
+            'modulos_geral'        => $this->getModulosGeralMap(),
+            'modulos_geral_labels' => $this->getModulosGeralLabels(),
             'modulos_professor'    => self::$MODULOS_PROFESSOR,
-            'modulos_aluno'        => self::$MODULOS_ALUNO,
+            'modulos_aluno'        => $this->getModulosAluno(),
             'release_channels'     => self::$RELEASE_CHANNEL_VALUES,
             'release_catalog'      => $this->getReleaseCatalog(),
         ]);
@@ -1052,7 +1075,7 @@ class MasterEscolaDetailController extends BaseController
         $modules = $_POST['modules'] ?? [];
         $config = [];
 
-        foreach (self::$MODULOS_GERAL_MAP as $formKey => $backendKeys) {
+        foreach ($this->getModulosGeralMap() as $formKey => $backendKeys) {
             $raw = isset($modules[$formKey]) ? (string) $modules[$formKey] : '1';
             $value = in_array($raw, self::$MODULE_VALID_VALUES, true) ? $raw : '1';
             foreach ($backendKeys as $bk) {
@@ -1060,10 +1083,14 @@ class MasterEscolaDetailController extends BaseController
             }
         }
 
-        $directKeys = array_merge(array_keys(self::$MODULOS_PROFESSOR), array_keys(self::$MODULOS_ALUNO));
+        $directKeys = array_merge(array_keys(self::$MODULOS_PROFESSOR), array_keys($this->getModulosAluno()));
+        if (!class_exists('ModuloRegistry', false)) {
+            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
+        }
         foreach ($directKeys as $mod) {
-            $raw = isset($modules[$mod]) ? (string) $modules[$mod] : '1';
-            $config['module_' . $mod] = in_array($raw, self::$MODULE_VALID_VALUES, true) ? $raw : '1';
+            $fallback = ModuloRegistry::featureDefault((string) $mod);
+            $raw = isset($modules[$mod]) ? (string) $modules[$mod] : $fallback;
+            $config['module_' . $mod] = in_array($raw, self::$MODULE_VALID_VALUES, true) ? $raw : $fallback;
         }
 
         require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';

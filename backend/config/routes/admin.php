@@ -12,17 +12,7 @@ $router->get('/admin/tudicoins/aguardando/{id}', 'Admin/AdminCreditosController@
 $router->post('/admin/tudicoins/pagar/{id}', 'Admin/AdminCreditosController@pagar');
 $router->post('/admin/tudicoins/verificar/{id}', 'Admin/AdminCreditosController@verificar');
 $router->get('/admin/tudicoins/status/{id}', 'Admin/AdminCreditosController@status');
-$router->get('/admin/arquivos', 'Files/AdminFileController@index');
-$router->get('/admin/arquivos/criar', 'Files/AdminFileController@criar');
-$router->get('/admin/arquivos/editar', 'Files/AdminFileController@editar');
-$router->get('/admin/arquivos/baixar/{id}', 'Files/AdminFileController@baixarAnexo');
-$router->post('/admin/arquivos/upload', 'Files/AdminFileController@upload');
-$router->post('/admin/arquivos/editar', 'Files/AdminFileController@update');
-$router->post('/admin/arquivos/excluir', 'Files/AdminFileController@delete');
-$router->post('/admin/arquivos/pasta/criar', 'Files/AdminFileController@createFolder');
-$router->post('/admin/arquivos/pasta/renomear', 'Files/AdminFileController@renameFolder');
-$router->post('/admin/arquivos/pasta/excluir', 'Files/AdminFileController@deleteFolder');
-$router->post('/admin/arquivos/pasta/mover', 'Files/AdminFileController@moveToFolder');
+// Arquivos: rotas em app/Modulos/arquivos/routes.php
 $router->get('/admin/apostilas', 'Apostilas/AdminApostilaController@index');
 $router->post('/admin/apostilas/upload', 'Apostilas/AdminApostilaController@upload');
 $router->post('/admin/apostilas/editar', 'Apostilas/AdminApostilaController@update');

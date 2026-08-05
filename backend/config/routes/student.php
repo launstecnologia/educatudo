@@ -199,12 +199,7 @@ $router->post('/aluno/provas/voz-para-texto', 'User/StudentController@vozParaTex
 // Planos de Aula (Aluno)
 $router->get('/aluno/planos-aula', 'User/StudentController@planosAula');
 $router->get('/aluno/planos-aula/visualizar/{id}', 'User/StudentController@visualizarPlanoAula');
-// Módulo de Arquivos (Aluno - visualização na plataforma, sem download)
-$router->get('/aluno/arquivos', 'Files/StudentFileController@index');
-$router->get('/aluno/arquivos/ver/{id}', 'Files/StudentFileController@ver');
-$router->get('/aluno/arquivos/abrir/{id}', 'Files/StudentFileController@abrir');
-$router->get('/aluno/arquivos/visualizar/{id}', 'Files/StudentFileController@visualizarAnexo');
-$router->get('/aluno/recuperacao', 'Files/StudentFileController@recuperacao');
+// Arquivos/Recuperação: rotas em app/Modulos/arquivos/routes.php
 $router->get('/aluno/aulas-online', 'User/StudentOnlineClassController@index');
 $router->get('/aluno/aulas-online/mensagens', 'User/StudentOnlineClassController@mensagens');
 $router->post('/aluno/aulas-online/enviar-mensagem', 'User/StudentOnlineClassController@enviarMensagem');
