@@ -23,7 +23,7 @@ $csrf_token = $csrf_token ?? '';
             </span>
         </div>
         <div class="mt-4 rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-800">
-            Imagens acima de 1 MB, 1600 px de largura ou 900 px de altura são exibidas em WebP compactado. A original permanece armazenada para futuras utilizações.
+            Proporção recomendada: 16:9 (ex.: 1600×900). Imagens acima de 1 MB, 1600 px de largura ou 900 px de altura são exibidas em WebP compactado. A original permanece armazenada para futuras utilizações.
         </div>
     </div>
 
@@ -90,9 +90,9 @@ $csrf_token = $csrf_token ?? '';
                 </div>
                 <div class="p-4 grid grid-cols-1 xl:grid-cols-12 gap-5">
                     <div class="xl:col-span-5">
-                        <div class="sd-preview relative overflow-hidden rounded-xl bg-slate-100 border border-slate-200 aspect-[16/6]">
+                        <div class="sd-preview relative overflow-hidden rounded-xl bg-slate-100 border border-slate-200 aspect-video">
                             ${imageUrl
-                                ? `<img src="${esc(imageUrl)}" alt="Prévia do slide ${idx + 1}" class="w-full h-full object-cover">`
+                                ? `<img src="${esc(imageUrl)}" alt="Prévia do slide ${idx + 1}" class="w-full h-full object-contain object-center">`
                                 : '<div class="w-full h-full flex items-center justify-center text-xs text-slate-400">Prévia da imagem</div>'}
                         </div>
                         <div class="mt-3">
@@ -149,7 +149,7 @@ $csrf_token = $csrf_token ?? '';
                 if (!file) return;
                 const preview = row.querySelector('.sd-preview');
                 const objectUrl = URL.createObjectURL(file);
-                preview.innerHTML = `<img src="${objectUrl}" alt="Nova prévia do slide ${idx + 1}" class="w-full h-full object-cover">`;
+                preview.innerHTML = `<img src="${objectUrl}" alt="Nova prévia do slide ${idx + 1}" class="w-full h-full object-contain object-center">`;
                 row.querySelector('.sd-file-info').textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
                 const previewImage = preview.querySelector('img');
                 previewImage.addEventListener('load', () => {
@@ -164,7 +164,7 @@ $csrf_token = $csrf_token ?? '';
             row.querySelector('.sd-image').addEventListener('change', (event) => {
                 const url = event.target.value.trim();
                 if (!url) return;
-                row.querySelector('.sd-preview').innerHTML = `<img src="${esc(url)}" alt="Prévia do slide ${idx + 1}" class="w-full h-full object-cover">`;
+                row.querySelector('.sd-preview').innerHTML = `<img src="${esc(url)}" alt="Prévia do slide ${idx + 1}" class="w-full h-full object-contain object-center">`;
                 row.dataset.originalImageUrl = url;
                 row.dataset.imageOptimized = '0';
             });

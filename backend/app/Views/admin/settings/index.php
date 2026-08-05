@@ -15,7 +15,7 @@
 <div id="slider-dashboard" class="mt-8 bg-white rounded-lg shadow-sm border border-gray-200">
     <div class="p-6 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Slider do Dashboard do Aluno</h3>
-        <p class="text-sm text-gray-500 mt-1">Cadastre imagens com link clicável. Altura exibida no aluno: ~400px.</p>
+        <p class="text-sm text-gray-500 mt-1">Cadastre imagens com link clicável. Proporção recomendada: 16:9 (ex.: 1600×900). A imagem é exibida inteira, sem corte.</p>
     </div>
     <div class="p-6">
         <form method="post" action="<?= URL ?>/admin/settings/sliders-dashboard" id="form-slider-dashboard" enctype="multipart/form-data">

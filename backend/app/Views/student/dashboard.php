@@ -59,7 +59,7 @@ $sliderModuleRoutes = [
 ];
 ?>
 <div class="mb-6 md:mb-8">
-    <div id="dashboard-slider" class="dashboard-slider-loading relative overflow-hidden rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" style="aspect-ratio: 21/9; max-height: min(42vw, 320px);">
+    <div id="dashboard-slider" class="dashboard-slider-loading relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 aspect-video">
         <?php foreach ($dashboard_sliders as $idx => $slide): ?>
             <?php
             $link = trim((string) ($slide['link_url'] ?? ''));
@@ -70,7 +70,7 @@ $sliderModuleRoutes = [
             }
             $imgUrl = trim((string) ($slide['image_url'] ?? ''));
             $isFirstSlide = $idx === 0;
-            $imgAttrs = 'class="dashboard-slide-img w-full h-full object-cover object-center block opacity-0 transition-opacity duration-300" alt="' . htmlspecialchars((string) ($slide['title'] ?? 'Slide')) . '" decoding="async"';
+            $imgAttrs = 'class="dashboard-slide-img w-full h-full object-contain object-center block opacity-0 transition-opacity duration-300" alt="' . htmlspecialchars((string) ($slide['title'] ?? 'Slide')) . '" decoding="async"';
             if ($isFirstSlide) {
                 $imgAttrs .= ' fetchpriority="high" src="' . htmlspecialchars($imgUrl) . '"';
             } else {
