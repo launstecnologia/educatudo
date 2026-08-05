@@ -59,7 +59,7 @@ $sliderModuleRoutes = [
 ];
 ?>
 <div class="mb-6 md:mb-8">
-    <div id="dashboard-slider" class="dashboard-slider-loading relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 aspect-video">
+    <div id="dashboard-slider" class="dashboard-slider-loading relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" style="aspect-ratio: 21 / 9;">
         <?php foreach ($dashboard_sliders as $idx => $slide): ?>
             <?php
             $link = trim((string) ($slide['link_url'] ?? ''));
@@ -70,13 +70,13 @@ $sliderModuleRoutes = [
             }
             $imgUrl = trim((string) ($slide['image_url'] ?? ''));
             $isFirstSlide = $idx === 0;
-            $imgAttrs = 'class="dashboard-slide-img w-full h-full object-contain object-center block opacity-0 transition-opacity duration-300" alt="' . htmlspecialchars((string) ($slide['title'] ?? 'Slide')) . '" decoding="async"';
+            $imgAttrs = 'class="dashboard-slide-img w-full h-full object-cover object-center block opacity-0 transition-opacity duration-300" alt="' . htmlspecialchars((string) ($slide['title'] ?? 'Slide')) . '" decoding="async"';
             if ($isFirstSlide) {
                 $imgAttrs .= ' fetchpriority="high" src="' . htmlspecialchars($imgUrl) . '"';
             } else {
                 $imgAttrs .= ' loading="lazy" data-src="' . htmlspecialchars($imgUrl) . '" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"';
             }
-            $imgTag = '<img ' . $imgAttrs . ' onload="this.classList.add(\'opacity-100\');var s=document.getElementById(\'dashboard-slider\');if(s){s.classList.remove(\'dashboard-slider-loading\');var k=s.querySelector(\'.dashboard-slider-skeleton\');if(k){k.style.display=\'none\';}}">';
+            $imgTag = '<img ' . $imgAttrs . ' onload="this.classList.add(\'opacity-100\');var s=document.getElementById(\'dashboard-slider\');if(s){s.classList.remove(\'dashboard-slider-loading\');var k=s.querySelector(\'.dashboard-slider-skeleton\');if(k){k.style.display=\'none\';}if(this.naturalWidth&&this.naturalHeight){s.style.aspectRatio=this.naturalWidth+\' / \'+this.naturalHeight;}}">';
             ?>
             <div class="dashboard-slide transition-opacity duration-500 absolute inset-0 <?= $idx === 0 ? 'block opacity-100 z-10' : 'hidden opacity-0 z-0' ?>" data-slide-index="<?= (int) $idx ?>">
                 <?php if ($link !== ''): ?>
@@ -715,6 +715,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let idx = 0;
     let timer = null;
 
+    function syncAspect(slideEl) {
+        const img = slideEl && slideEl.querySelector('img.dashboard-slide-img');
+        if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+            slider.style.aspectRatio = img.naturalWidth + ' / ' + img.naturalHeight;
+        }
+    }
+
     function show(i) {
         idx = (i + slides.length) % slides.length;
         slides.forEach((el, n) => {
@@ -732,6 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         lazyImg.src = lazyImg.dataset.src;
                     }
                 }
+                syncAspect(el);
             }
         });
         dots.forEach((dot, n) => {
