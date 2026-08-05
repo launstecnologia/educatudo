@@ -94,12 +94,12 @@ $master_iniciais = MasterAvatarService::iniciais($master_nome);
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <p class="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-2">
                                 <span>Todos os direitos reservados</span>
-                                <img src="<?= URL ?>/public/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-4 w-auto inline-block" loading="lazy">
+                                <img src="<?= URL ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-4 w-auto inline-block" loading="lazy">
                             </p>
                             <p class="text-xs text-slate-500 flex items-center justify-center sm:justify-end gap-2">
                                 <span>Desenvolvido por</span>
                                 <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="inline-flex items-center">
-                                    <img src="<?= URL ?>/public/assets/logos/logo-launs-black.png" alt="Launs" class="h-3 w-auto inline-block" loading="lazy">
+                                    <img src="<?= URL ?>/assets/logos/logo-launs-black.png" alt="Launs" class="h-3 w-auto inline-block" loading="lazy">
                                 </a>
                             </p>
                         </div>

@@ -21,7 +21,7 @@ $iconClass = static function (bool $active): string {
     <div class="p-6 pb-2 shrink-0">
         <div class="flex items-center justify-between mb-6">
             <div class="flex-1 min-w-0 flex items-center">
-                <img src="<?= defined('URL') ? URL : '' ?>/public/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="max-h-12 w-auto object-contain">
+                <img src="<?= defined('URL') ? URL : '' ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="max-h-12 w-auto object-contain">
             </div>
             <button id="sidebarToggle" type="button" class="text-slate-500 hover:bg-slate-100 p-2 rounded-lg transition-colors md:hidden" aria-label="Menu">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

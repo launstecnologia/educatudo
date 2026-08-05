@@ -14,7 +14,7 @@
     <div class="max-w-md w-full">
         <div class="bg-white py-8 px-6 shadow-sm rounded-xl border border-slate-200">
             <div class="text-center mb-8">
-                <img src="<?= URL ?>/public/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-10 w-auto mx-auto mb-6 object-contain">
+                <img src="<?= URL ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-10 w-auto mx-auto mb-6 object-contain">
                 <h1 class="text-xl font-bold text-slate-900">Painel Admin Master</h1>
                 <p class="text-sm text-slate-500 mt-1">Crie o primeiro administrador</p>
             </div>
