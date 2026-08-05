@@ -9,7 +9,6 @@ require_once __DIR__ . '/../Models/DriveItem.php';
 require_once __DIR__ . '/../Models/DriveShare.php';
 require_once __DIR__ . '/../Services/DriveStorageService.php';
 
-if (!class_exists('DriveController')) {
 class DriveController extends BaseController
 {
     private $auth;
@@ -721,5 +720,4 @@ class DriveController extends BaseController
         }
         exit;
     }
-}
 }

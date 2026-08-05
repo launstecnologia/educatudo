@@ -5,7 +5,6 @@
  */
 require_once __DIR__ . '/../../../../vendor/autoload.php';
 
-if (!class_exists('DriveStorageService')) {
 class DriveStorageService
 {
     private $config;
@@ -240,5 +239,4 @@ class DriveStorageService
 
         return trim($key, '/');
     }
-}
 }
