@@ -60,6 +60,51 @@ if (!empty($projeto['formatos_aceitos'])) {
     $formatos = is_array($decoded) ? $decoded : [];
 }
 ?>
+<style>
+.step-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    border-radius: .75rem;
+    border: 2px solid #e5e7eb;
+    background: #fff;
+    color: #4b5563;
+    padding: .5rem .75rem;
+    text-align: left;
+    transition: background .15s, color .15s, border-color .15s;
+}
+.step-nav-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+.step-nav-btn .step-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    border: 2px solid currentColor;
+    font-size: .875rem;
+    font-weight: 700;
+}
+.step-nav-btn.is-active {
+    background-color: var(--primary-color, #2563eb) !important;
+    border-color: var(--primary-color, #2563eb) !important;
+    color: var(--primary-text-color, #fff) !important;
+}
+.wizard-actions .btn-nav {
+    display: inline-flex;
+    align-items: center;
+    padding: .625rem 1.15rem;
+    border-radius: .5rem;
+    border: 1px solid #94a3b8;
+    background: #fff;
+    color: #0f172a;
+    font-size: .875rem;
+    font-weight: 600;
+}
+.wizard-actions .btn-nav:hover:not(:disabled) { background: #f1f5f9; }
+.wizard-actions .btn-nav:disabled { opacity: .4; cursor: not-allowed; }
+</style>
 <div class="mb-6 space-y-6" id="expoWizard"
      data-projeto-id="<?= $pid ?>"
      data-url-base="<?= htmlspecialchars(URL) ?>"
@@ -83,11 +128,11 @@ if (!empty($projeto['formatos_aceitos'])) {
 
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 sm:gap-0" role="tablist">
         <?php foreach ($steps as $i => $s): ?>
-            <button type="button" data-step-target="<?= (int) $s['n'] ?>"
-                    class="step-nav-btn group flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left transition sm:flex-1
-                           border-gray-200 bg-white text-gray-600 hover:border-primary/40
-                           data-[active=true]:border-primary data-[active=true]:bg-primary data-[active=true]:text-white">
-                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold border-2 border-current"><?= (int) $s['n'] ?></span>
+            <button type="button"
+                    data-step-target="<?= (int) $s['n'] ?>"
+                    class="step-nav-btn sm:flex-1<?= (int) $s['n'] === 1 ? ' is-active' : '' ?>"
+                    aria-current="<?= (int) $s['n'] === 1 ? 'step' : 'false' ?>">
+                <span class="step-num"><?= (int) $s['n'] ?></span>
                 <span class="min-w-0 hidden md:block">
                     <span class="block text-sm font-semibold leading-tight"><?= htmlspecialchars($s['label']) ?></span>
                     <span class="block text-xs opacity-80"><?= htmlspecialchars($s['sub']) ?></span>
@@ -465,15 +510,15 @@ if (!empty($projeto['formatos_aceitos'])) {
 
         <div id="wizardMsg" class="hidden rounded-lg px-4 py-3 text-sm"></div>
 
-        <div class="flex flex-wrap items-center gap-3 sticky bottom-0 bg-gray-50/95 backdrop-blur border-t border-gray-200 py-4 -mx-4 px-4">
-            <button type="button" id="btnPrev" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">Anterior</button>
-            <button type="button" id="btnNext" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">Próximo</button>
-            <div class="flex-1"></div>
-            <button type="submit" data-acao="rascunho" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Salvar rascunho</button>
+        <div class="wizard-actions mt-8 pt-6 border-t border-gray-200 flex flex-wrap items-center gap-3 pb-24">
+            <button type="button" id="btnPrev" class="btn-nav" disabled>Anterior</button>
+            <button type="button" id="btnNext" class="btn-nav">Próximo</button>
+            <div class="flex-1 min-w-[1rem]"></div>
+            <button type="submit" data-acao="rascunho" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm">Salvar rascunho</button>
             <?php if ($pid > 0): ?>
-                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white hover:bg-gray-50">Pré-visualizar</a>
+                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="btn-nav no-underline">Pré-visualizar</a>
             <?php endif; ?>
-            <button type="submit" data-acao="publicar" class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700">Publicar</button>
+            <button type="submit" data-acao="publicar" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Publicar</button>
         </div>
     </form>
 </div>
@@ -494,7 +539,9 @@ if (!empty($projeto['formatos_aceitos'])) {
             el.classList.toggle('hidden', parseInt(el.getAttribute('data-step'), 10) !== step);
         });
         root.querySelectorAll('.step-nav-btn').forEach(function (btn) {
-            btn.setAttribute('data-active', parseInt(btn.getAttribute('data-step-target'), 10) === step ? 'true' : 'false');
+            var ativo = parseInt(btn.getAttribute('data-step-target'), 10) === step;
+            btn.classList.toggle('is-active', ativo);
+            btn.setAttribute('aria-current', ativo ? 'step' : 'false');
         });
         document.getElementById('btnPrev').disabled = step === 1;
         document.getElementById('btnNext').disabled = step === maxStep;
