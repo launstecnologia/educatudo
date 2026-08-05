@@ -3,8 +3,9 @@
  * EducaTudo - Armazenamento do Drive (local ou AWS S3)
  * Quando AWS_BUCKET e credenciais estão definidos, usa S3; senão usa app/storage/drive.
  */
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../../../vendor/autoload.php';
 
+if (!class_exists('DriveStorageService')) {
 class DriveStorageService
 {
     private $config;
@@ -18,7 +19,8 @@ class DriveStorageService
         $this->config = $config;
         $drive = $config['drive'] ?? [];
         $aws = $config['aws'] ?? [];
-        $this->localPath = rtrim($drive['local_path'] ?? __DIR__ . '/../../storage/drive', DIRECTORY_SEPARATOR);
+        // Fallback: backend/storage/drive (config/app.php normalmente define local_path)
+        $this->localPath = rtrim($drive['local_path'] ?? __DIR__ . '/../../../../storage/drive', DIRECTORY_SEPARATOR);
 
         $storage = $drive['storage'] ?? 'local';
         $bucket = trim($aws['bucket'] ?? '');
@@ -238,4 +240,5 @@ class DriveStorageService
 
         return trim($key, '/');
     }
+}
 }

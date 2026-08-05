@@ -161,20 +161,7 @@ $router->get('/professor/chat', 'Integrations/ChatController@indexProfessor');
 $router->get('/professor/chat/{aluno_id}', 'Integrations/ChatController@chatProfessor');
 $router->post('/professor/chat/enviar-mensagem', 'Integrations/ChatController@enviarMensagemProfessor');
 $router->get('/professor/chat/buscar-mensagens', 'Integrations/ChatController@buscarMensagensProfessor');
-// Drive (Professor)
-$router->get('/professor/drive', 'Drive/DriveController@index');
-$router->get('/professor/drive/folder/{id}', 'Drive/DriveController@folder');
-$router->post('/professor/drive/create-folder', 'Drive/DriveController@createFolder');
-$router->post('/professor/drive/upload', 'Drive/DriveController@upload');
-$router->post('/professor/drive/rename', 'Drive/DriveController@rename');
-$router->post('/professor/drive/delete', 'Drive/DriveController@delete');
-$router->post('/professor/drive/share', 'Drive/DriveController@share');
-$router->post('/professor/drive/unshare', 'Drive/DriveController@unshare');
-$router->get('/professor/drive/view/{id}', 'Drive/DriveController@viewFile');
-$router->get('/professor/drive/serve/{id}', 'Drive/DriveController@serve');
-$router->get('/professor/drive/download/{id}', 'Drive/DriveController@download');
-$router->get('/professor/drive/search-users', 'Drive/DriveController@searchUsers');
-$router->get('/professor/drive/share-list/{id}', 'Drive/DriveController@shareList');
+// Drive: rotas em app/Modulos/drive/routes.php
 // Rotas antigas mantidas para compatibilidade
 $router->get('/professor/alunos', 'User/TeacherController@alunos');
 $router->get('/professor/jornadas-aluno', 'User/TeacherController@jornadasAluno');

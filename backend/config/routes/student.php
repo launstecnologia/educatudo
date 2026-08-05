@@ -48,20 +48,7 @@ $router->post('/forum/moderation/alerts/mark-seen', 'Forum/ForumModerationContro
 $router->post('/forum/moderation/resolve-report', 'Forum/ForumModerationController@resolveReport');
 $router->post('/forum/moderation/delete-topic', 'Forum/ForumModerationController@deleteTopic');
 $router->post('/forum/moderation/delete-reply', 'Forum/ForumModerationController@deleteReply');
-// Drive (Aluno)
-$router->get('/drive', 'Drive/DriveController@index');
-$router->get('/drive/folder/{id}', 'Drive/DriveController@folder');
-$router->post('/drive/create-folder', 'Drive/DriveController@createFolder');
-$router->post('/drive/upload', 'Drive/DriveController@upload');
-$router->post('/drive/rename', 'Drive/DriveController@rename');
-$router->post('/drive/delete', 'Drive/DriveController@delete');
-$router->post('/drive/share', 'Drive/DriveController@share');
-$router->post('/drive/unshare', 'Drive/DriveController@unshare');
-$router->get('/drive/view/{id}', 'Drive/DriveController@viewFile');
-$router->get('/drive/serve/{id}', 'Drive/DriveController@serve');
-$router->get('/drive/download/{id}', 'Drive/DriveController@download');
-$router->get('/drive/search-users', 'Drive/DriveController@searchUsers');
-$router->get('/drive/share-list/{id}', 'Drive/DriveController@shareList');
+// Drive: rotas em app/Modulos/drive/routes.php
 // EducaLabs
 $router->get('/educalabs/access', 'EducaLabs/EducaLabsController@access');
 $router->get('/jogos/access', 'Games/GameController@access');

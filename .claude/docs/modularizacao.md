@@ -39,6 +39,15 @@ Módulo em `app/Modulos/arquivos/`.
 - Layouts globais continuam `Views/layouts/student.php` e `professor.php` (fora do módulo)
 - Controllers em PT: `ArquivosAlunoController`, `ArquivosProfessorController`, `ArquivosAdminController`
 
+## Piloto: Drive
+
+Módulo em `app/Modulos/drive/`.
+
+- Feature key: `drive` (Master bloco Aluno via `master_aluno`)
+- Rotas: `/drive*` e `/professor/drive*`
+- Models `DriveItem`/`DriveShare` + `DriveStorageService` no módulo
+- Views PT: `Views/aluno`, `Views/professor`
+
 ## Como migrar o próximo módulo
 
 1. Criar pasta `app/Modulos/<chave>/` com `manifest.php` + `routes.php`

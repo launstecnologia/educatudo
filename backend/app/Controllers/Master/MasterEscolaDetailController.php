@@ -80,7 +80,7 @@ class MasterEscolaDetailController extends BaseController
         'ingles'             => 'Ingles',
         'simulados'          => 'Simulados',
         'aluno_caderno_novo' => 'Meu Caderno',
-        'drive'              => 'Drive',
+        // drive: ModuloRegistry (app/Modulos/drive/manifest.php)
         'educa_hits'         => 'EducaHits',
         'vlibras'            => 'VLibras (Libras)',
     ];

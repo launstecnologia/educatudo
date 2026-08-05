@@ -48,9 +48,8 @@ class FeatureGate
         // Flashcards (aluno)
         '/flashcards' => 'aluno_flashcards',
 
-        // Fórum, Drive, Meu Caderno novo (aluno)
+        // Fórum, Meu Caderno novo (aluno) — Drive via ModuloRegistry
         '/forum' => 'forum',
-        '/drive' => 'drive',
         '/notes' => 'aluno_caderno_novo',
 
         // Aulas Online (aluno e admin)
@@ -172,6 +171,7 @@ class FeatureGate
             '/professor/ai-agents' => ['module' => 'ai_agents', 'name' => 'TudinhaProf'],
             '/professor/notifications' => ['module' => 'notifications', 'name' => 'Notificações'],
             '/professor/arquivos' => ['module' => 'arquivos', 'name' => 'Arquivos'],
+            // Drive usa a chave `drive` (não professor_drive) — gate via matchModuleByUri/registry.
         ];
         
         // Verificar cada rota (ordem por especificidade)

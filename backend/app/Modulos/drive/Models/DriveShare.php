@@ -2,8 +2,9 @@
 /**
  * Drive EducaTudo - Compartilhamentos
  */
-require_once __DIR__ . '/../../Core/Database.php';
+require_once __DIR__ . '/../../../Core/Database.php';
 
+if (!class_exists('DriveShare')) {
 class DriveShare
 {
     private $db;
@@ -91,4 +92,5 @@ class DriveShare
         $p = $this->getPermission($itemId, $userId, $userType);
         return $p === 'owner' || $p === 'edit';
     }
+}
 }

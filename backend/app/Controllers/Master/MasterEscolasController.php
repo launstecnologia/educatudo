@@ -86,7 +86,7 @@ class MasterEscolasController extends BaseController
         'chat'              => 'Chat IA',
         'aluno_caderno_novo'=> 'Meu Caderno (novo)',
         'forum'             => 'Fórum',
-        'drive'             => 'Drive',
+        // drive: ModuloRegistry (app/Modulos/drive/manifest.php)
         'jogos'             => 'Games',
         'educa_hits'        => 'EducaHits',
         'vlibras'           => 'VLibras (Libras)',

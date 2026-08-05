@@ -1,14 +1,15 @@
 <?php
 /**
  * Drive EducaTudo - Espaço de arquivos e pastas para aluno e professor.
- * Listar, criar pasta, upload, renomear, excluir, compartilhar, download.
+ * Controllers em app/Modulos/drive/Controllers/
  */
-require_once __DIR__ . '/../../Core/BaseController.php';
-require_once __DIR__ . '/../../Core/AuthManager.php';
-require_once __DIR__ . '/../../Models/Drive/DriveItem.php';
-require_once __DIR__ . '/../../Models/Drive/DriveShare.php';
-require_once __DIR__ . '/../../Services/DriveStorageService.php';
+require_once __DIR__ . '/../../../Core/BaseController.php';
+require_once __DIR__ . '/../../../Core/AuthManager.php';
+require_once __DIR__ . '/../Models/DriveItem.php';
+require_once __DIR__ . '/../Models/DriveShare.php';
+require_once __DIR__ . '/../Services/DriveStorageService.php';
 
+if (!class_exists('DriveController')) {
 class DriveController extends BaseController
 {
     private $auth;
@@ -24,7 +25,8 @@ class DriveController extends BaseController
         $this->auth = new AuthManager();
         $this->driveItem = new DriveItem();
         $this->driveShare = new DriveShare();
-        $baseStorage = __DIR__ . '/../../storage';
+        // backend/storage/drive (alinhado ao DriveStorageService / config)
+        $baseStorage = __DIR__ . '/../../../../storage';
         $this->storageDir = $baseStorage . DIRECTORY_SEPARATOR . 'drive';
         $this->ensureStorageDir($baseStorage, 0755);
         $this->ensureStorageDir($this->storageDir, 0755);
@@ -89,10 +91,11 @@ class DriveController extends BaseController
 
     private function layoutAndViewFolder($tipo)
     {
+        // layout global continua student/teacher; views do módulo em aluno/professor
         if ($tipo === 'professor') {
-            return ['layout' => 'teacher', 'viewFolder' => 'teacher'];
+            return ['layout' => 'teacher', 'viewFolder' => 'professor'];
         }
-        return ['layout' => 'student', 'viewFolder' => 'student'];
+        return ['layout' => 'student', 'viewFolder' => 'aluno'];
     }
 
     private function ownerType($tipo)
@@ -718,4 +721,5 @@ class DriveController extends BaseController
         }
         exit;
     }
+}
 }

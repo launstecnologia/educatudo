@@ -2,8 +2,9 @@
 /**
  * Drive EducaTudo - Item (pasta ou arquivo)
  */
-require_once __DIR__ . '/../../Core/Database.php';
+require_once __DIR__ . '/../../../Core/Database.php';
 
+if (!class_exists('DriveItem')) {
 class DriveItem
 {
     private $db;
@@ -158,4 +159,5 @@ class DriveItem
         }
         return $keys;
     }
+}
 }
