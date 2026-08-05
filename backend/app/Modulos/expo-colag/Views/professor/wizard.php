@@ -61,20 +61,24 @@ if (!empty($projeto['formatos_aceitos'])) {
 }
 ?>
 <style>
-.step-nav-btn {
+#expoWizard .step-nav-btn {
     display: flex;
     align-items: center;
     gap: .5rem;
     border-radius: .75rem;
     border: 2px solid #e5e7eb;
-    background: #fff;
-    color: #4b5563;
+    background: #ffffff;
+    color: #334155;
     padding: .5rem .75rem;
     text-align: left;
     transition: background .15s, color .15s, border-color .15s;
+    box-shadow: none;
 }
-.step-nav-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
-.step-nav-btn .step-num {
+#expoWizard .step-nav-btn:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+#expoWizard .step-nav-btn .step-num {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -82,28 +86,58 @@ if (!empty($projeto['formatos_aceitos'])) {
     height: 2rem;
     flex-shrink: 0;
     border-radius: 9999px;
-    border: 2px solid currentColor;
+    border: 2px solid #94a3b8;
+    background: #f1f5f9;
+    color: #334155;
     font-size: .875rem;
     font-weight: 700;
 }
-.step-nav-btn.is-active {
-    background-color: var(--primary-color, #2563eb) !important;
-    border-color: var(--primary-color, #2563eb) !important;
-    color: var(--primary-text-color, #fff) !important;
+/* Cores explícitas: variáveis da escola às vezes ficam claras e “somem” no fundo branco */
+#expoWizard .step-nav-btn.is-active {
+    background: #1e3a8a !important;
+    background-color: #1e3a8a !important;
+    border-color: #1e3a8a !important;
+    color: #ffffff !important;
 }
-.wizard-actions .btn-nav {
+#expoWizard .step-nav-btn.is-active .step-num {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-color: #ffffff !important;
+    color: #ffffff !important;
+}
+#expoWizard .step-nav-btn.is-active span {
+    color: #ffffff !important;
+}
+#expoWizard .wizard-actions {
+    position: static !important;
+    bottom: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    inset: auto !important;
+    z-index: auto !important;
+    margin-top: 2rem;
+    padding: 1.5rem 0 6rem;
+    border-top: 1px solid #e2e8f0;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+}
+#expoWizard .wizard-actions .btn-nav {
     display: inline-flex;
     align-items: center;
     padding: .625rem 1.15rem;
     border-radius: .5rem;
-    border: 1px solid #94a3b8;
-    background: #fff;
-    color: #0f172a;
+    border: 1px solid #64748b;
+    background: #ffffff !important;
+    color: #0f172a !important;
     font-size: .875rem;
     font-weight: 600;
 }
-.wizard-actions .btn-nav:hover:not(:disabled) { background: #f1f5f9; }
-.wizard-actions .btn-nav:disabled { opacity: .4; cursor: not-allowed; }
+#expoWizard .wizard-actions .btn-nav:hover:not(:disabled) { background: #f1f5f9 !important; }
+#expoWizard .wizard-actions .btn-nav:disabled { opacity: .4; cursor: not-allowed; }
 </style>
 <div class="mb-6 space-y-6" id="expoWizard"
      data-projeto-id="<?= $pid ?>"
@@ -509,18 +543,18 @@ if (!empty($projeto['formatos_aceitos'])) {
         </section>
 
         <div id="wizardMsg" class="hidden rounded-lg px-4 py-3 text-sm"></div>
-
-        <div class="wizard-actions mt-8 pt-6 border-t border-gray-200 flex flex-wrap items-center gap-3 pb-24">
-            <button type="button" id="btnPrev" class="btn-nav" disabled>Anterior</button>
-            <button type="button" id="btnNext" class="btn-nav">Próximo</button>
-            <div class="flex-1 min-w-[1rem]"></div>
-            <button type="submit" data-acao="rascunho" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm">Salvar rascunho</button>
-            <?php if ($pid > 0): ?>
-                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="btn-nav no-underline">Pré-visualizar</a>
-            <?php endif; ?>
-            <button type="submit" data-acao="publicar" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Publicar</button>
-        </div>
     </form>
+
+    <div class="wizard-actions" id="expoWizardActions">
+        <button type="button" id="btnPrev" class="btn-nav" disabled>Anterior</button>
+        <button type="button" id="btnNext" class="btn-nav">Próximo</button>
+        <div class="flex-1 min-w-[1rem]"></div>
+        <button type="submit" form="expoWizardForm" data-acao="rascunho" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm mr-28 sm:mr-32">Salvar rascunho</button>
+        <?php if ($pid > 0): ?>
+            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="btn-nav no-underline">Pré-visualizar</a>
+        <?php endif; ?>
+        <button type="submit" form="expoWizardForm" data-acao="publicar" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Publicar</button>
+    </div>
 </div>
 
 <script>
@@ -542,6 +576,16 @@ if (!empty($projeto['formatos_aceitos'])) {
             var ativo = parseInt(btn.getAttribute('data-step-target'), 10) === step;
             btn.classList.toggle('is-active', ativo);
             btn.setAttribute('aria-current', ativo ? 'step' : 'false');
+            // Inline como fallback se CSS da escola sobrescrever
+            if (ativo) {
+                btn.style.setProperty('background-color', '#1e3a8a', 'important');
+                btn.style.setProperty('border-color', '#1e3a8a', 'important');
+                btn.style.setProperty('color', '#ffffff', 'important');
+            } else {
+                btn.style.removeProperty('background-color');
+                btn.style.removeProperty('border-color');
+                btn.style.removeProperty('color');
+            }
         });
         document.getElementById('btnPrev').disabled = step === 1;
         document.getElementById('btnNext').disabled = step === maxStep;
@@ -770,7 +814,7 @@ if (!empty($projeto['formatos_aceitos'])) {
         document.getElementById('campoHabilidades').value = JSON.stringify(habs);
     }
 
-    form.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+    root.querySelectorAll('#expoWizardActions button[type="submit"]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             document.getElementById('campoAcao').value = btn.getAttribute('data-acao') || 'rascunho';
         });
