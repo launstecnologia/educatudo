@@ -1,7 +1,8 @@
 <?php
 /**
- * EducaTudo - Cache Redis (conexão 127.0.0.1:6379, sem senha)
+ * EducaTudo - Cache Redis
  * Singleton por request; fallback silencioso se Redis indisponível.
+ * Timeouts curtos — nunca bloquear o worker PHP-FPM.
  */
 
 class RedisCache
@@ -9,6 +10,8 @@ class RedisCache
     private const PREFIX = 'educatudo_';
     private const HOST = '127.0.0.1';
     private const PORT = 6379;
+    private const CONNECT_TIMEOUT = 1.0;
+    private const READ_TIMEOUT = 1.0;
 
     /** @var Redis|null */
     private static $redis = null;
@@ -78,11 +81,32 @@ class RedisCache
                 return null;
             }
             $redis = new Redis();
-            $redis->connect(self::redisHost(), self::redisPort(), 2.0);
+            $ok = @$redis->connect(self::redisHost(), self::redisPort(), self::CONNECT_TIMEOUT);
+            if ($ok !== true) {
+                self::$failed = true;
+                return null;
+            }
+            // Evita hang infinito em get/set se Redis travar a meio do request.
+            if (defined('Redis::OPT_READ_TIMEOUT')) {
+                $redis->setOption(Redis::OPT_READ_TIMEOUT, self::READ_TIMEOUT);
+            }
+            // Ping barato: confirma que o socket responde antes de cachear o client.
+            $pong = $redis->ping();
+            $pongOk = $pong === true || $pong === '+PONG' || $pong === 'PONG';
+            if (!$pongOk) {
+                self::$failed = true;
+                try {
+                    $redis->close();
+                } catch (Throwable $e) {
+                    // ignore
+                }
+                return null;
+            }
             self::$redis = $redis;
             return $redis;
         } catch (Throwable $e) {
             self::$failed = true;
+            self::$redis = null;
             return null;
         }
     }
@@ -98,6 +122,8 @@ class RedisCache
             $value = $redis->get($fullKey);
             return ($value !== false && $value !== null) ? (string) $value : null;
         } catch (Throwable $e) {
+            self::$failed = true;
+            self::$redis = null;
             return null;
         }
     }
@@ -111,10 +137,12 @@ class RedisCache
         try {
             $fullKey = self::PREFIX . $key;
             if ($ttl > 0) {
-                return $redis->setex($fullKey, $ttl, $value);
+                return (bool) $redis->setex($fullKey, $ttl, $value);
             }
-            return $redis->set($fullKey, $value);
+            return (bool) $redis->set($fullKey, $value);
         } catch (Throwable $e) {
+            self::$failed = true;
+            self::$redis = null;
             return false;
         }
     }
@@ -129,6 +157,8 @@ class RedisCache
         try {
             return $redis->del(self::PREFIX . $key) > 0;
         } catch (Throwable $e) {
+            self::$failed = true;
+            self::$redis = null;
             return false;
         }
     }
