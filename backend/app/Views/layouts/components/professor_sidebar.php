@@ -158,6 +158,16 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 continue;
             }
             $normalizedApp = strtolower((string) ($externalLink['app'] ?? $externalId));
+            $normalizedNome = strtolower($externalNome);
+            $isEducaHitsApp = str_contains($normalizedApp, 'educahits')
+                || str_contains($normalizedApp, 'educa-hits')
+                || str_contains($normalizedApp, 'educa_hits')
+                || str_contains($normalizedNome, 'educahits')
+                || str_contains($normalizedNome, 'educa hits')
+                || str_contains(strtolower($externalId), 'educahits');
+            if ($isEducaHitsApp) {
+                continue;
+            }
             $professorExternalApps[] = [
                 'id' => $externalId,
                 'nome' => $externalNome,
@@ -200,9 +210,6 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </a>
             <?php foreach ($professorExternalApps as $externalApp): ?>
             <?php
-                if ($externalApp['app'] === 'educahits') {
-                    continue;
-                }
                 $isEducaProf = $externalApp['app'] === 'educaprof';
                 $isCurrentExternal = ($current_page ?? '') === $externalApp['current_page'] || (($current_page ?? '') === 'educaprof' && $isEducaProf);
             ?>
