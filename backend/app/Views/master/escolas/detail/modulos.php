@@ -105,8 +105,14 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
             <div class="px-2 divide-y divide-gray-100">
                 <?php foreach ($modulos_geral as $formKey => $backendKeys): ?>
                 <?php
-                    $firstKey = $backendKeys[0] ?? '';
-                    $cur = $layout_config['module_' . $firstKey] ?? '1';
+                    $firstKey = (string) ($backendKeys[0] ?? '');
+                    // Respeita feature_defaults do módulo (ex.: expo_colag default off).
+                    // Antes: ?? '1' fazia o Master mostrar Habilitado sem nunca ter gravado a chave.
+                    if (!class_exists('ModuloRegistry', false)) {
+                        require_once dirname(__DIR__, 4) . '/Core/ModuloRegistry.php';
+                    }
+                    $defaultGeral = $firstKey !== '' ? ModuloRegistry::featureDefault($firstKey) : '1';
+                    $cur = $layout_config['module_' . $firstKey] ?? $defaultGeral;
                     $locked = !$tudicoinsOn && isset($geralExigeTudiCoins[$formKey]);
                 ?>
                 <div class="flex items-center justify-between gap-4 py-2.5">

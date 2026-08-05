@@ -238,7 +238,14 @@
                 <div class="px-4 py-2.5 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-800">Geral (aluno, professor e admin)</div>
                 <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <?php foreach ($modulos_geral ?? [] as $formKey => $backendKeys): ?>
-                    <?php $firstKey = $backendKeys[0] ?? ''; $cur = $layout['module_' . $firstKey] ?? '1'; ?>
+                    <?php
+                        $firstKey = (string) ($backendKeys[0] ?? '');
+                        if (!class_exists('ModuloRegistry', false)) {
+                            require_once dirname(__DIR__, 3) . '/Core/ModuloRegistry.php';
+                        }
+                        $defaultGeral = $firstKey !== '' ? ModuloRegistry::featureDefault($firstKey) : '1';
+                        $cur = $layout['module_' . $firstKey] ?? $defaultGeral;
+                    ?>
                     <div class="flex items-center justify-between gap-2">
                         <span class="text-sm text-slate-700"><?= htmlspecialchars($modulos_geral_labels[$formKey] ?? $formKey) ?></span>
                         <select name="modules[<?= htmlspecialchars($formKey) ?>]" class="master-module-select rounded border-slate-300 text-sm w-36 focus:ring-blue-500 focus:border-blue-500">
