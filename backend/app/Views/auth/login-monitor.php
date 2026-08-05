@@ -34,6 +34,7 @@ $system_title = LayoutHelper::getSystemTitle();
                 <?php endif; ?>
 
                 <form action="<?= URL ?>/login" method="post" class="space-y-4 bg-white p-6 rounded-xl shadow-lg border border-teal-100">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                     <input type="hidden" name="tipo" value="monitor">
                     <input type="text" name="site_url" value="" tabindex="-1" autocomplete="off" class="hidden">
                     <div>

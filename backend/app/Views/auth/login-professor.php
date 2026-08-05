@@ -86,6 +86,7 @@ $system_subtitle = LayoutHelper::getSystemSubtitle();
             <?php endif; ?>
             <!-- Formulário de Login (submit tradicional evita erro de sessão em aba anônima) -->
             <form id="loginForm" action="<?= URL ?>/login" method="post" class="space-y-4 md:space-y-6">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                 <input type="hidden" name="tipo" value="professor">
                 <!-- Honeypot: não preencher (proteção contra bots) -->
                 <input type="text" name="site_url" value="" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;">
