@@ -3,6 +3,9 @@
 #
 # Configure backend/.env com DB_HOST apontando para o MySQL externo
 # (IP/host acessível a partir do container php na rede Docker).
+#
+# Capacidade sugerida (VPS 4 vCPU / 16 GB): PHP_MEM_LIMIT=4g (default).
+# Override na raiz: echo 'PHP_MEM_LIMIT=4g' >> .env
 
 services:
 
@@ -25,7 +28,8 @@ services:
       dockerfile: docker/php/Dockerfile
     image: educatudo-php:latest
     container_name: php_app_educatudo
-    mem_limit: ${PHP_MEM_LIMIT:-512m}
+    # Default 4g — alinhado a pm.max_children=50 × memory_limit=128M na VPS 16 GB
+    mem_limit: ${PHP_MEM_LIMIT:-4g}
     volumes:
       - ./backend:/var/www/html
     env_file:
@@ -37,6 +41,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis_educatudo
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "${REDIS_PUBLISH_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-6379}:6379"
     restart: unless-stopped
