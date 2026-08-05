@@ -1,0 +1,12 @@
+{
+  "name": "educatudo-assets",
+  "private": true,
+  "description": "Assets (MathLive, etc.) para EducaTudo",
+  "scripts": {
+    "test:admin-prova": "cd .. && npm run test:admin-prova",
+    "test:e2e": "cd .. && npm run test"
+  },
+  "dependencies": {
+    "mathlive": "^0.98.2"
+  }
+}

@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS billing_message_log;
+DROP TABLE IF EXISTS billing_rule_config;
+DROP TABLE IF EXISTS finance_audit;
+DROP TABLE IF EXISTS finance_payments;
+DROP TABLE IF EXISTS finance_installments;
+DROP TABLE IF EXISTS finance_contract_discounts;
+DROP TABLE IF EXISTS finance_contracts;
+DROP TABLE IF EXISTS finance_discount_rules;
+DROP TABLE IF EXISTS finance_price_table;

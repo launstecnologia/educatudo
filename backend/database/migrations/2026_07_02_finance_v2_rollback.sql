@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS finance_receipts;
+DROP TABLE IF EXISTS finance_renegotiations;
+DROP TABLE IF EXISTS finance_ledger;
+DROP TABLE IF EXISTS finance_charges;
+DROP TABLE IF EXISTS finance_contract_items;
+DROP TABLE IF EXISTS finance_plan_items;
+DROP TABLE IF EXISTS finance_plans;
+DROP TABLE IF EXISTS finance_config;
+ALTER TABLE finance_contracts DROP COLUMN IF EXISTS plan_id;
+ALTER TABLE finance_installments DROP COLUMN IF EXISTS contract_item_id;

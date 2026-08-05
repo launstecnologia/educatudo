@@ -1,0 +1,3 @@
+# Este arquivo garante que o diretório migrations seja versionado no Git
+# Todas as migrations .sql criadas aqui estarão disponíveis automaticamente
+

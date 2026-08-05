@@ -1,0 +1,584 @@
+/* Dashboard Monitoramento - Modo dark, estilo SaaS */
+:root {
+    --mon-bg: #0f172a;
+    --mon-card: #1e293b;
+    --mon-text: #ffffff;
+    --mon-muted: #94a3b8;
+    --mon-green: #22c55e;
+    --mon-yellow: #eab308;
+    --mon-red: #ef4444;
+    --mon-radius: 12px;
+    --mon-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.15);
+}
+
+.monitoramento-dark {
+    background: var(--mon-bg);
+    color: var(--mon-text);
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    padding: 1.5rem;
+}
+
+/* Layout sem scroll: cabe na tela */
+.mon-no-scroll {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem 1rem;
+    box-sizing: border-box;
+}
+
+.mon-no-scroll .mon-header {
+    margin-bottom: 0.75rem;
+    flex-shrink: 0;
+}
+
+.mon-no-scroll .mon-header h1 {
+    font-size: 1.25rem;
+}
+
+.mon-footer {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mon-footer-logo {
+    height: 1.5rem;
+    width: auto;
+    max-width: 100px;
+    object-fit: contain;
+    opacity: 0.9;
+}
+
+.mon-main {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.5rem;
+    overflow: auto;
+    box-sizing: border-box;
+}
+
+.mon-dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    width: 100%;
+    max-width: min(1000px, 100%);
+    align-items: start;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.mon-dashboard-grid .mon-card {
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.mon-card-infra,
+.mon-card-gauges {
+    width: 100%;
+    min-width: 0;
+}
+
+.mon-card-db {
+    width: 100%;
+    min-width: 0;
+}
+
+.mon-db-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem 1.25rem;
+}
+
+.mon-db-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.mon-db-label {
+    font-size: 0.7rem;
+    color: var(--mon-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.mon-db-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+/* Responsivo: 2 colunas só quando houver espaço; 1 coluna para evitar sobreposição */
+@media (max-width: 900px) {
+    .mon-dashboard-grid {
+        grid-template-columns: 1fr;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 700px) {
+    .mon-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    .mon-db-stats {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .mon-no-scroll {
+        padding: 0.5rem 0.75rem;
+    }
+    .mon-no-scroll .mon-header {
+        margin-bottom: 0.5rem;
+    }
+    .mon-no-scroll .mon-header h1 {
+        font-size: 1.1rem;
+    }
+    .mon-header-brand {
+        gap: 0.5rem;
+    }
+    .mon-header-logo {
+        height: 28px;
+        max-width: 120px;
+    }
+    .mon-header-school {
+        font-size: 0.95rem;
+    }
+    .mon-main {
+        padding: 0 0.25rem;
+        align-items: flex-start;
+    }
+    .mon-dashboard-grid {
+        gap: 0.75rem;
+    }
+    .mon-card {
+        padding: 1rem;
+    }
+    .mon-db-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Velocímetros (gauges) */
+.mon-gauges {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    align-items: flex-end;
+}
+
+.mon-gauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.mon-gauge-label {
+    font-size: 0.75rem;
+    color: var(--mon-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mon-gauge-dial {
+    position: relative;
+    width: 120px;
+    height: 65px;
+    margin: 0 auto;
+    border: 5px solid rgba(255, 255, 255, 0.15);
+    border-bottom: none;
+    border-radius: 60px 60px 0 0;
+    box-sizing: border-box;
+}
+
+.mon-gauge-needle {
+    position: absolute;
+    left: 50%;
+    bottom: 5px;
+    width: 4px;
+    height: 48px;
+    margin-left: -2px;
+    background: var(--mon-green);
+    border-radius: 2px;
+    transform-origin: 50% 100%;
+    transform: rotate(-90deg);
+    transition: transform 0.4s ease, background-color 0.3s ease;
+}
+
+.mon-gauge-needle.status-warn {
+    background: var(--mon-yellow);
+}
+
+.mon-gauge-needle.status-critical {
+    background: var(--mon-red);
+}
+
+.mon-gauge-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.mon-access-total {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.mon-access-label {
+    font-size: 0.8rem;
+    color: var(--mon-muted);
+}
+
+.mon-access-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+@media (max-width: 500px) {
+    .mon-gauges {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .mon-gauge-dial {
+        width: 100px;
+        height: 55px;
+        border-width: 4px;
+        border-radius: 50px 50px 0 0;
+    }
+    .mon-gauge-needle {
+        height: 40px;
+    }
+}
+
+.mon-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.mon-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.mon-header-logo {
+    height: 36px;
+    width: auto;
+    max-width: 160px;
+    object-fit: contain;
+}
+
+.mon-header-school {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--mon-text);
+}
+
+.mon-header-title {
+    margin: 0 0.5rem 0 0;
+}
+
+.mon-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.mon-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.875rem;
+    color: var(--mon-green);
+}
+
+.mon-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mon-green);
+    animation: mon-pulse 1.5s ease-in-out infinite;
+}
+
+.mon-live-dot.off {
+    background: var(--mon-red);
+    animation: none;
+}
+
+.mon-live-off {
+    color: var(--mon-red);
+}
+
+.mon-live.hidden {
+    display: none;
+}
+
+@keyframes mon-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.mon-back {
+    margin-left: auto;
+    color: var(--mon-muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+.mon-back:hover {
+    color: var(--mon-text);
+}
+
+.mon-error {
+    color: var(--mon-red);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.mon-error.hidden {
+    display: none;
+}
+
+.mon-help {
+    font-size: 0.75rem;
+    color: var(--mon-muted);
+    margin-bottom: 1rem;
+}
+
+.mon-help a {
+    color: #60a5fa;
+}
+
+.mon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.mon-card {
+    background: var(--mon-card);
+    border-radius: var(--mon-radius);
+    box-shadow: var(--mon-shadow);
+    padding: 1.25rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mon-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+}
+
+.mon-card h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: var(--mon-muted);
+}
+
+.mon-card .mon-subtitle {
+    font-size: 0.8rem;
+    color: var(--mon-muted);
+    opacity: 0.9;
+    margin: 0 0 1rem 0;
+}
+
+.mon-card-wide {
+    grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+    .mon-card-wide {
+        grid-column: span 1;
+    }
+}
+
+.mon-card-full {
+    grid-column: 1 / -1;
+}
+
+.mon-metrics {
+    display: grid;
+    gap: 1rem;
+}
+
+.mon-metrics-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.mon-metrics-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 700px) {
+    .mon-metrics-3 {
+        grid-template-columns: 1fr;
+    }
+    .mon-metrics-4 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.mon-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.mon-label {
+    font-size: 0.75rem;
+    color: var(--mon-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mon-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.mon-value-big {
+    font-size: 2rem;
+}
+
+.mon-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mon-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.5s ease, background-color 0.3s ease;
+}
+
+.mon-bar-fill.status-ok {
+    background: var(--mon-green);
+}
+
+.mon-bar-fill.status-warn {
+    background: var(--mon-yellow);
+}
+
+.mon-bar-fill.status-critical {
+    background: var(--mon-red);
+}
+
+/* Usuários (quantidade por tipo, sem gráfico) */
+.mon-users-counts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+}
+
+.mon-user-type {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.mon-user-type-total .mon-value {
+    font-size: 1.75rem;
+}
+
+.mon-access-today {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mon-access-today > .mon-label {
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.mon-users-counts-inline {
+    margin-top: 0;
+}
+
+@media (max-width: 600px) {
+    .mon-users-counts {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.mon-users-row {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.mon-users-chart-wrap {
+    width: 200px;
+    height: 200px;
+}
+
+.mon-users-online {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Saúde */
+.mon-health-row {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.mon-health-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.mon-health-badge {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--mon-radius);
+    font-weight: 700;
+    font-size: 1.125rem;
+}
+
+.mon-health-badge.ok {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--mon-green);
+}
+
+.mon-health-badge.alert {
+    background: rgba(234, 179, 8, 0.2);
+    color: var(--mon-yellow);
+}
+
+.mon-health-badge.critical {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--mon-red);
+}
+
+.mon-chart-wrap {
+    height: 200px;
+    position: relative;
+}

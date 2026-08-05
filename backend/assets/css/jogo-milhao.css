@@ -1,0 +1,675 @@
+/* Layout baseado no exemplo React */
+.game-modal {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    backdrop-filter: blur(20px);
+}
+
+.game-stage {
+    width: min(95vw, 1100px);
+    max-height: 95vh;
+    background: linear-gradient(180deg, #2c5364 0%, #203a43 50%, #0f2027 100%);
+    border-radius: 20px;
+    padding: clamp(15px, 2vw, 30px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: clamp(20px, 2vw, 30px);
+    position: relative;
+    overflow-y: auto;
+}
+
+/* Área de Conteúdo */
+.game-content {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(15px, 1.5vh, 20px);
+    min-width: 0;
+}
+
+/* Header */
+.game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-logo {
+    width: clamp(45px, 5vw, 60px);
+    height: clamp(45px, 5vw, 60px);
+    background: linear-gradient(135deg, #f39c12, #f4d03f);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+}
+
+.game-title {
+    font-size: clamp(1.3rem, 2.5vw, 1.9rem);
+    color: white;
+    margin: 0;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.game-progress {
+    font-size: clamp(0.8rem, 1.2vw, 0.95rem);
+    color: #b0b0b0;
+    margin: 0;
+}
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.control-btn {
+    padding: clamp(8px, 1vh, 12px) clamp(15px, 2vw, 25px);
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.control-btn:hover {
+    transform: scale(1.05);
+}
+
+.pause-btn {
+    background: #ffc107;
+    color: #333;
+}
+
+.exit-btn {
+    background: #dc3545;
+    color: white;
+}
+
+/* Prêmio Atual */
+.prize-display {
+    background: linear-gradient(135deg, #f4d03f 0%, #f39c12 100%);
+    padding: clamp(15px, 2vh, 25px);
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+}
+
+.prize-label {
+    font-size: clamp(1rem, 1.4vw, 1.2rem);
+    color: #333;
+    margin: 0 0 8px 0;
+    font-weight: bold;
+}
+
+.prize-value {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    color: #333;
+    font-weight: bold;
+    margin: 0;
+}
+
+/* Pergunta */
+.question-bubble {
+    background: linear-gradient(135deg, #16a085 0%, #0d7a68 100%);
+    padding: clamp(18px, 2.5vh, 30px);
+    border-radius: 12px;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(22, 160, 133, 0.3);
+}
+
+.question-icon {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: clamp(40px, 4vw, 55px);
+    height: clamp(40px, 4vw, 55px);
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.3rem, 2vw, 1.8rem);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.question-title {
+    font-size: clamp(1.1rem, 1.6vw, 1.4rem);
+    color: white;
+    margin: 0 0 clamp(10px, 1.2vh, 15px) 0;
+    font-weight: bold;
+    padding-right: 60px;
+}
+
+.question-text {
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
+    color: white;
+    line-height: 1.5;
+    margin: 0;
+    padding-right: 20px;
+}
+
+/* Alternativas */
+.alternativas-container {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.2vh, 15px);
+}
+
+.alternativa-btn {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    padding: clamp(14px, 1.8vh, 20px) clamp(18px, 2.2vw, 25px);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s;
+    text-align: left;
+}
+
+.alternativa-btn:hover {
+    transform: translateX(8px);
+    border-color: #3498db;
+}
+
+.alternativa-btn.selected {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+}
+
+.alternativa-btn.wrong {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+}
+
+.letra-alt {
+    width: clamp(28px, 3.2vw, 38px);
+    height: clamp(28px, 3.2vw, 38px);
+    background: #f39c12;
+    color: #333;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: clamp(0.95rem, 1.3vw, 1.15rem);
+    flex-shrink: 0;
+}
+
+.texto-alt {
+    font-size: clamp(0.95rem, 1.3vw, 1.1rem);
+    color: white;
+    flex: 1;
+}
+
+/* Botões de Ajuda */
+.ajudas-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: clamp(10px, 1.2vh, 15px);
+    margin-top: clamp(10px, 1.2vh, 15px);
+}
+
+.ajuda-btn {
+    padding: clamp(12px, 1.5vh, 18px);
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: clamp(0.85rem, 1.1vw, 1rem);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.ajuda-btn:hover {
+    transform: scale(1.05);
+}
+
+.ajuda-btn:disabled {
+    background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
+    cursor: not-allowed;
+}
+
+/* Área da Tudinha */
+.tudinha-sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    min-width: clamp(160px, 16vw, 220px);
+}
+
+.tudinha-image {
+    width: 100%;
+    max-width: clamp(160px, 16vw, 240px);
+    height: auto;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    border: 3px solid rgba(255, 255, 255, 0.1);
+}
+
+.tudinha-info {
+    text-align: center;
+    padding: 0 10px;
+}
+
+.tudinha-name {
+    font-size: clamp(1.1rem, 1.6vw, 1.4rem);
+    color: white;
+    margin: 0 0 10px 0;
+    font-weight: bold;
+}
+
+.tudinha-desc {
+    font-size: clamp(0.85rem, 1.15vw, 1rem);
+    color: #b0b0b0;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .game-stage {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .tudinha-sidebar {
+        order: -1;
+        min-width: auto;
+    }
+    
+    .tudinha-image {
+        max-width: 200px;
+    }
+    
+    .game-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .header-controls {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .control-btn {
+        flex: 1;
+        max-width: 120px;
+    }
+    
+    .ajudas-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ====== Página inicial do jogo (fora do modal) ====== */
+.tudinha-bg {
+    background: radial-gradient(1200px 600px at 50% -10%, #eef2ff 0%, #f5f7ff 60%, #f3f4f6 100%);
+    min-height: calc(100vh - 120px);
+}
+
+.tudinha-container {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+}
+
+.tudinha-character { display: flex; align-items: center; justify-content: center; }
+.tudinha-character img {
+    max-width: 420px;
+    width: 60%;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 12px 24px rgba(0,0,0,.08));
+}
+
+.tudinha-logo {
+    font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+    color: #111827;
+    font-weight: 800;
+    letter-spacing: .2px;
+    margin-top: 10px;
+}
+
+/* Cards de estatísticas */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 20px 0 36px; }
+
+.stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px 18px; box-shadow: 0 8px 18px rgba(17,24,39,.05); }
+.stat-card:hover { box-shadow: 0 10px 22px rgba(17,24,39,.08); transform: translateY(-1px); transition: all .15s ease; }
+
+.stat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; margin-bottom: 8px; font-size: 18px; }
+
+.stat-value { font-size: 1.35rem; font-weight: 800; color: #111827; line-height: 1.25; }
+
+.stat-label { color: #6b7280; font-size: .88rem; margin-top: 2px; }
+
+/* Escada de prêmios */
+.prize-ladder .prize-item { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,.03); }
+
+.prize-ladder .prize-item + .prize-item { margin-top: 8px; }
+
+.prize-ladder .prize-item:hover { background: rgba(59,130,246,.15); }
+.prize-ladder .prize-item span { font-size: .95rem; }
+.prize-ladder .prize-item.milestone { background: linear-gradient(90deg, rgba(30,64,175,.6), rgba(15,23,42,.6)); }
+
+/* Botões iniciais */
+.start-button,
+.continue-button { display: inline-flex; align-items: center; justify-content: center; padding: 12px 20px; border-radius: 12px; font-weight: 700; color: #fff; border: none; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 8px 20px rgba(59,130,246,.18); }
+
+.start-button { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+.continue-button { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+.start-button:hover,
+.continue-button:hover { transform: translateY(-1px); }
+
+.start-button:active,
+.continue-button:active { transform: translateY(0); }
+
+/* ====== NOVOS ESTILOS DO LOBBY ====== */
+.lobby-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.lobby-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
+}
+
+.card-stat {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.card-stat:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+}
+
+.icon-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.alert-box {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+    border: 3px solid #f39c12;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(243, 156, 18, 0.3);
+}
+
+.btn-start {
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+}
+
+.btn-start:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 30px rgba(255, 152, 0, 0.6);
+}
+
+.btn-start-green {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+}
+
+.btn-start-green:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 30px rgba(46, 204, 113, 0.6);
+}
+
+/* Garantir que o botão seja clicável */
+.btn-start-green {
+    position: relative;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+.character-container {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Tudinha sem contorno - técnicas avançadas */
+.tudinha-sem-contorno {
+    /* Remover fundo branco usando blend mode */
+    mix-blend-mode: multiply;
+    background: transparent;
+    
+    /* Filtros para suavizar bordas */
+    filter: 
+        brightness(1.1) 
+        contrast(1.1) 
+        saturate(1.1)
+        drop-shadow(0 0 0 transparent);
+    
+    /* Remover bordas CSS */
+    outline: none;
+    border: none;
+    
+    /* Garantir transparência */
+    background-color: transparent !important;
+    
+    /* Posicionamento elevado */
+    position: relative;
+    z-index: 50;
+}
+
+/* Alternativa: usar clip-path para "recortar" o contorno */
+.tudinha-sem-contorno-alt {
+    clip-path: polygon(5% 5%, 95% 5%, 95% 95%, 5% 95%);
+    filter: brightness(1.05) contrast(1.05);
+    background: transparent;
+}
+
+/* Se o blend mode não funcionar, usar esta versão */
+.tudinha-sem-contorno-fallback {
+    filter: 
+        brightness(1.2) 
+        contrast(1.2) 
+        saturate(1.2)
+        hue-rotate(5deg)
+        blur(0.2px);
+    background: transparent;
+    mix-blend-mode: normal;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.logo-container {
+    filter: drop-shadow(0 8px 25px rgba(0, 0, 0, 0.3));
+}
+
+.how-to-play {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Garantir que não haja scroll */
+body {
+    overflow-x: hidden;
+}
+
+.lobby-bg {
+    max-height: 100vh;
+    max-width: 100vw;
+    overflow: hidden;
+    width: 100%;
+}
+
+.card-stat {
+    min-height: auto;
+}
+
+/* Responsividade para telas pequenas */
+@media (max-height: 600px) {
+    .how-to-play {
+        display: none;
+    }
+    
+    .character-container img {
+        max-height: 200px !important;
+    }
+}
+
+@media (max-height: 500px) {
+    .character-container {
+        display: none;
+    }
+    
+    .lobby-bg .grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ====== ESTILOS DA TELA DE JOGO ====== */
+.game-bg {
+    background: linear-gradient(180deg, #1a4d5c 0%, #0d3540 50%, #0a2a33 100%);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.game-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        linear-gradient(45deg, transparent 48%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%, transparent 52%),
+        linear-gradient(-45deg, transparent 48%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%, transparent 52%);
+    background-size: 30px 30px;
+}
+
+.question-card {
+    background: linear-gradient(135deg, #16a085 0%, #0d7a68 100%);
+    border: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.alternative-btn {
+    background: linear-gradient(135deg, #1a5c6f 0%, #134752 100%);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    font-weight: 900;
+}
+
+.alternative-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.alternative-number {
+    background: linear-gradient(135deg, #1dd3b0 0%, #17b89a 100%);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.correct-answer {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%) !important;
+    border-color: #2ecc71 !important;
+    animation: pulse 0.5s ease-in-out;
+}
+
+.wrong-answer {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+    border-color: #e74c3c !important;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+.help-btn {
+    background: linear-gradient(135deg, #0d4a57 0%, #0a3a44 100%);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.help-btn:hover:not(:disabled) {
+    transform: scale(1.08);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.help-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.character-circle {
+    border: 3px solid #1dd3b0;
+    box-shadow: 0 0 25px rgba(29, 211, 176, 0.5);
+}
+
+.score-badge {
+    background: linear-gradient(135deg, #1dd3b0 0%, #17b89a 100%);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+
+.category-badge {
+    background: linear-gradient(135deg, #16a085 0%, #0d7a68 100%);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.character-image {
+    background: linear-gradient(to-br, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    border: 3px solid rgba(29, 211, 176, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+

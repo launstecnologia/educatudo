@@ -9,7 +9,7 @@ Guia de "como pedir as coisas" pra quem é novo trabalhando com IA neste repo: @
 Cada escola é um **tenant isolado com banco de dados próprio**; um banco master guarda o cadastro de escolas, credenciais de conexão e catálogos globais.
 
 Stack: PHP 8.2 · MySQL 8 · Redis · Tailwind CSS · OpenAI API · AWS S3 (opcional).
-Neste repo: `backend/` = plataforma PHP (único diretório versionado no submódulo) · `app/` = app Flutter dos pais · Playwright na raiz.
+Neste repo: `backend/` = plataforma PHP · `familia/` = app Flutter dos pais · Playwright na raiz.
 
 ## Como rodar localmente
 

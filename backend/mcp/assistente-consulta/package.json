@@ -1,0 +1,19 @@
+{
+  "name": "educatudo-assistente-consulta-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP de consulta ampliada do Assistente — turma, bloco, jornadas professor, boletim e faltas",
+  "type": "module",
+  "bin": {
+    "educatudo-assistente-consulta-mcp": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}
