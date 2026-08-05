@@ -48,6 +48,20 @@ Módulo em `app/Modulos/drive/`.
 - Models `DriveItem`/`DriveShare` + `DriveStorageService` no módulo
 - Views PT: `Views/aluno`, `Views/professor`
 
+## Expo Colag (exclusivo COLAG)
+
+Módulo em `app/Modulos/expo-colag/`.
+
+- Feature key: `expo_colag` — default **off** (`feature_defaults`); ligar só no tenant COLAG no Master (`geral_expo_colag`)
+- Rotas: `/expo-colag*`, `/professor/expo-colag*`, `/admin/expo-colag*`
+- Menu: grupo Colag (aluno/professor) e Conteúdo (admin)
+- Tabelas tenant: prefixo `expo_colag_*` (sem `escola_id`)
+- S1: edição/config + skeleton · S2: wizard 6 blocos + autorização de imagem (`/admin/expo-colag/autorizacoes`)
+- S3: mural + inscrição (lock FOR UPDATE, lista de espera, conflitos, aprovar/recusar) — gate preparação 21/08
+- S4: tarefas/atribuições, materiais na execução, stand+QR público (`/expo-colag/s/{token}`), programação
+- Professor: `/professor/expo-colag/criar`, `/projetos/{id}/editar`, `/projetos/{id}/acompanhar`
+- Aluno aprovado: `/expo-colag/projeto/{id}/painel` · programação `/expo-colag/programacao`
+
 ## Como migrar o próximo módulo
 
 1. Criar pasta `app/Modulos/<chave>/` com `manifest.php` + `routes.php`

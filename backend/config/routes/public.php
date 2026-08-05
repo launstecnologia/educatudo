@@ -31,6 +31,9 @@ $router->get('/certificado/validar/{codigo}', 'Ava/CertificateValidationControll
 // Histórico Escolar — validação pública por hash (sem login; sem expor notas)
 $router->get('/validar/historico/{hash}', 'Public/HistoricoValidacaoController@validar');
 
+// Expo Colag — página pública do stand via QR (sem login)
+$router->get('/expo-colag/s/{token}', 'Modulos/expo-colag/ExpoColagPublicoController@stand');
+
 $router->get('/manifest-aluno.json', 'Pwa/PwaController@manifestAluno');
 $router->get('/manifest-professor.json', 'Pwa/PwaController@manifestProfessor');
 $router->get('/manifest-admin.json', 'Pwa/PwaController@manifestAdmin');

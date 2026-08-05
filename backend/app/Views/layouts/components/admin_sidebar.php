@@ -454,6 +454,12 @@
                         <i class="fa-regular fa-folder w-4 h-4 mr-3"></i>
                         <span class="sidebar-text text-sm">Arquivos</span>
                     </a>
+                    <?php if ($canViewSidebar(['expo_colag']) && class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('expo_colag')): ?>
+                    <a href="<?= URL ?>/admin/expo-colag" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'expo-colag' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-building-columns w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Expo Colag</span>
+                    </a>
+                    <?php endif; ?>
                     <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleVisible('educa_hits')): ?>
                     <?php require_once __DIR__ . '/../../../Core/EducaHitsConfig.php'; ?>
                     <a href="<?= htmlspecialchars(EducaHitsConfig::portalLoginUrl()) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-2 text-purple-100 hover:bg-white/20 hover:text-white rounded-lg transition-all duration-200">
