@@ -6,12 +6,12 @@ Repositorio de trabalho do EducaTudo. A raiz funciona como um workspace: ela jun
 
 | Pasta/arquivo | Papel |
 | --- | --- |
-| `src/` | Backend/web PHP. Contem `index.php`, `app/`, `config/`, `public/`, `cron/`, `storage/`, `uploads/` e dependencias Composer/NPM do backend. |
+| `backend/` | Backend/web PHP (submodulo `educatudo_oficial`). Codigo em `app/`, `config/`, `bootstrap/`; **docroot web = `backend/public/`** apenas. |
 | `app/` | App Flutter dos pais/responsaveis. Contem `lib/`, `android/`, `web/`, `assets/`, `test/` e `pubspec.yaml`. |
 | `services/` | Servicos auxiliares independentes, como `apostila-ai`. |
 | `ws-server/` | Servidor WebSocket/Node separado da plataforma PHP. |
 | `database/` | SQL global do workspace, principalmente migracoes e arquivos compartilhados fora do backend. |
-| `docker/` + `docker-compose.yml` | Infra local. O compose monta `./src` em `/var/www/html`. |
+| `docker/` + `docker-compose.yml` | Infra local (Nginx + PHP-FPM). Monta `./backend` em `/var/www/html`; docroot Nginx = `public/`. |
 | `docs/` | Documentacao tecnica e operacional geral. |
 | `specs/` | PRD, design e tarefas de produto. |
 | `prompts/` | Prompts e materiais de apoio para IA. |
@@ -21,14 +21,71 @@ Repositorio de trabalho do EducaTudo. A raiz funciona como um workspace: ela jun
 
 ## Regra de organizacao
 
-- Codigo de produto fica dentro da aplicacao dona: backend em `src/`, mobile em `app/`, servicos em `services/<nome>/`, WebSocket em `ws-server/`.
+- Codigo de produto fica dentro da aplicacao dona: backend em `backend/`, mobile em `app/`, servicos em `services/<nome>/`, WebSocket em `ws-server/`.
 - Arquivos de orquestracao que afetam mais de uma aplicacao ficam na raiz: `docker-compose.yml`, `package.json`, `playwright.config.ts`, `README.md`, `CLAUDE.md`.
 - Documentacao permanente fica em `docs/` ou `specs/`. Analises temporarias ficam em `tmp/`.
 - Saidas geradas nao devem competir com codigo na raiz. Use `tmp/`, `playwright-report/`, `test-results/`, `graphify-out/` ou a pasta de build da propria aplicacao.
-- Nao mover ou renomear `src/` sem planejar a migracao, porque Docker, deploy e o repositorio Git interno dependem desse caminho hoje.
+- **Seguranca:** o servidor web deve apontar **somente** para `backend/public/`. Ver `backend/STRUCTURE.md`.
+
+## Git — repositórios
+
+| Pasta | Repositório | Branch padrão |
+| --- | --- | --- |
+| **`backend/`** | [educatudo_oficial](https://github.com/launstecnologia/educatudo_oficial) | `feature/multi-tenant` |
+| Raiz (`plataforma_educatudo`) | Workspace local (Docker, Flutter, docs, Playwright) | — |
+
+O backend PHP vive em **`backend/`** — commits de código da plataforma vão sempre para **`educatudo_oficial`**, nunca para `educatudo_colag` (fork Colag separado).
+
+```bash
+cd backend
+git pull origin feature/multi-tenant
+# editar, commitar e push dentro de backend/
+git push origin feature/multi-tenant
+```
+
+## Setup local
+
+Domínios locais (padrão igual produção, com TLD `.localhost`):
+
+| Ambiente | Local | Produção |
+|----------|-------|----------|
+| Master | http://master.localhost | https://master.educatudo.com |
+| Colag | http://colag.localhost | https://colag.educatudo.com |
+
+```bash
+./scripts/init-local.sh
+```
+
+Ambiente **VPS** (MySQL remoto, sem container mysql):
+
+```bash
+cp backend/.env.vps.example backend/.env   # editar DB_HOST e credenciais
+./scripts/up-vps.sh --pull --composer
+```
+
+Ver `docs/DEPLOY-VPS.md` e `docs/DEPLOY-DOMINIOS.md`.
+
+O script configura `backend/.env`, sobe Docker na porta **80** e cria os bancos `educatudo_master` + `educatudo_colag`.
+
+**Primeiro acesso:** http://master.localhost → criar admin master.
+
+**Colag:** http://colag.localhost
+
+`*.localhost` resolve para `127.0.0.1` na maioria dos browsers. Se não funcionar:
+
+```bash
+sudo ./scripts/setup-local-hosts.sh
+```
+
+Reinit banco:
+
+```bash
+docker compose exec php php scripts/init_local_multitenant.php --force-school
+```
 
 ## Leitura recomendada
 
+- `backend/STRUCTURE.md` — layout seguro e deploy.
 - `CLAUDE.md` para contexto tecnico, arquitetura multi-tenant e padroes de codigo.
 - `specs/PRD.md` para escopo de produto.
 - `app/docs/` para arquitetura do app Flutter.

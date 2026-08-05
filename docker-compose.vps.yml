@@ -1,0 +1,42 @@
+# EducaTudo — VPS (MySQL remoto, sem container mysql)
+# Uso: ./scripts/up-vps.sh
+#
+# Configure backend/.env com DB_HOST apontando para o MySQL externo
+# (IP/host acessível a partir do container php na rede Docker).
+
+services:
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx_educatudo
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./backend:/var/www/html:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+    restart: unless-stopped
+
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    image: educatudo-php:latest
+    container_name: php_app_educatudo
+    mem_limit: ${PHP_MEM_LIMIT:-512m}
+    volumes:
+      - ./backend:/var/www/html
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_educatudo
+    ports:
+      - "${REDIS_PUBLISH_PORT:-6379}:6379"
+    restart: unless-stopped

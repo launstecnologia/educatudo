@@ -1,5 +1,5 @@
 # Raiz = workspace/orquestracao. O codigo de produto vive nas pastas donas:
-# src/ (backend PHP), app/ (Flutter), services/ e ws-server/.
+# backend/ (backend PHP), app/ (Flutter), services/ e ws-server/.
 
 # Dependências e builds
 node_modules
@@ -17,30 +17,36 @@ test-results/
 
 # Saidas geradas por analises/ferramentas
 graphify-out/
-src/graphify-out/
+backend/graphify-out/
 tmp/
 
 # Dependencias/builds especificos
-src/vendor/
-src/public/vendor/
-src/storage/logs/
+backend/vendor/
+backend/public/vendor/
+backend/storage/logs/
 app/.dart_tool/
 app/build/
 ws-server/node_modules/
 
 # Materiais locais ainda fora do fluxo principal de commit
 /docs/
+!docs/DEPLOY-VPS.md
+!docs/DEPLOY-DOMINIOS.md
 prompts/*
 !prompts/admin_ui_sistema.md
 !prompts/admin_ui_sistema/
 tests/
+!tests/
+!tests/**
 package.json
+!package.json
 package-lock.json
+!package-lock.json
 playwright.config.ts
-docker-compose.yml
+!playwright.config.ts
 
 # Conteúdo de uploads (layout, avatars) em storage/files - manter apenas .gitkeep
-src/storage/files/*/*
+backend/storage/files/*/*
 # Claude Code — overrides pessoais e worktrees não versionam
 .claude/settings.local.json
 .claude/worktrees/

@@ -28,7 +28,7 @@ bootstrap_multi_tenant.php          ← carregado ANTES de App()
          App → Router → Middleware → Controller
 ```
 
-Arquivos críticos (`src/app/Core/`):
+Arquivos críticos (`backend/app/Core/`):
 - `bootstrap_multi_tenant.php` — ponto de entrada do tenant
 - `TenantResolver.php` — resolve tenant por domínio/header
 - `DatabaseManager.php` — gerencia conexões por tenant
@@ -38,12 +38,12 @@ Arquivos críticos (`src/app/Core/`):
 - `AdminPermissionMatrix.php` — permissões por perfil de admin
 - `Logger.php` — logs JSON com TENANT_ID automático
 - `MigrationRunner.php` — execução de migrations por escola
-- Schema do master: `src/database/migrations/multi_tenant_master.sql`
+- Schema do master: `backend/database/migrations/multi_tenant_master.sql`
 
 ## Estrutura completa de diretórios
 
 ```
-src/
+backend/
 ├── index.php                        ← front controller
 ├── config/
 │   ├── app.php                      ← configuração global (lê .env)
@@ -75,7 +75,7 @@ src/
 
 ## Crons
 
-Scripts em `src/cron/`, agendados via crontab. Usar `CronMultiTenantHelper` para iterar sobre todas as escolas:
+Scripts em `backend/cron/`, agendados via crontab. Usar `CronMultiTenantHelper` para iterar sobre todas as escolas:
 
 ```php
 require_once __DIR__ . '/../app/Core/cron_multi_tenant_helper.php';

@@ -1,0 +1,4 @@
+[submodule "backend"]
+	path = backend
+	url = git@github.com:launstecnologia/educatudo_oficial.git
+	branch = feature/vps-modular-deploy

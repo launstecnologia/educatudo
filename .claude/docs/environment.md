@@ -8,6 +8,10 @@
 |---|---|---|
 | `MULTI_TENANT` | Sim | `true` = multi-escola, `false` = instância única |
 | `MASTER_DOMAIN` | Se multi-tenant | Domínio do painel master (ex: `master.educatudo.com`) |
+| `TENANT_BASE_DOMAIN` | Produção multi-tenant | Base dos subdomínios das escolas (ex: `educatudo.com` → `colag.educatudo.com`) |
+| `DOMINIO_WILDCARD_HABILITADO` | Produção | `true` quando `*.educatudo.com` já aponta para a origem na Cloudflare |
+| `SSL_CERT_PATH` | Produção (opcional) | Fullchain wildcard na origem — Master exibe expiração |
+| `DOMINIO_VERIFICAR_CRON_KEY` | Produção (opcional) | Protege cron HTTP de verificação HTTPS das escolas |
 | `DB_HOST/NAME/USER/PASS` | Sim | Banco master (ou único banco se single-tenant) |
 | `MASTER_ENCRYPTION_KEY` | Sim | Chave AES-256 para encriptar senhas de banco dos tenants — só via env, nunca no código ou banco |
 | `REDIS_URL` | Produção | Cache de tenant e sessões. Obrigatório em multi-instância |
@@ -34,4 +38,4 @@ Chamadas externas de IA que demoram mais de 2s devem ser assíncronas (job em fi
 
 ## Requisitos locais
 
-PHP 8.0+ (produção usa 8.2), MySQL 8, Redis, extensões `pdo_mysql`, `gd`, `mbstring`, `fileinfo`. Local roda via Docker (`docker-compose up -d`), então o PHP pode não existir no host.
+PHP 8.0+ (produção usa 8.2), MySQL 8, Redis, extensões `pdo_mysql`, `gd`, `mbstring`, `fileinfo`. Local roda via Docker (`docker compose up -d`), docroot `backend/public/`. PHP pode não existir no host.

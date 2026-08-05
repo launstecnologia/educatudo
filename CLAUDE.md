@@ -9,14 +9,14 @@ Guia de "como pedir as coisas" pra quem é novo trabalhando com IA neste repo: @
 Cada escola é um **tenant isolado com banco de dados próprio**; um banco master guarda o cadastro de escolas, credenciais de conexão e catálogos globais.
 
 Stack: PHP 8.2 · MySQL 8 · Redis · Tailwind CSS · OpenAI API · AWS S3 (opcional).
-Neste repo: `src/` = plataforma PHP (único diretório versionado no submódulo) · `app/` = app Flutter dos pais · Playwright na raiz.
+Neste repo: `backend/` = plataforma PHP (único diretório versionado no submódulo) · `app/` = app Flutter dos pais · Playwright na raiz.
 
 ## Como rodar localmente
 
 ```bash
-docker-compose up -d               # containers (PHP roda no Docker, não no host)
-cp src/.env.example src/.env       # editar DB_*, MULTI_TENANT, MASTER_DOMAIN
-cd src && composer install
+docker compose up -d               # Nginx + PHP-FPM (docroot backend/public/)
+cp backend/.env.example backend/.env  # editar DB_*, MULTI_TENANT, MASTER_DOMAIN
+cd backend && composer install
 # Setup inicial do banco master: http://localhost:8000/master
 ```
 
@@ -32,7 +32,7 @@ Fluxo: `bootstrap_multi_tenant.php` → `TenantResolver` (por domínio ou header
 
 Diagrama completo, arquivos do Core e pontos de atenção: @.claude/docs/architecture.md
 
-## Mapa do código (`src/`)
+## Mapa do código (`backend/`)
 
 ```
 config/routes/           rotas por perfil (master, public, student, monitor, teacher, admin, parents)
@@ -73,7 +73,7 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 
 - `NNN_descricao.sql` = tenant (roda em cada escola) · `NNN_descricao_master.sql` = banco master · recentes usam `YYYY_MM_DD_`.
 - **Sempre** criar o `_rollback.sql` correspondente.
-- Executar via painel Master (`/master/migrations`) ou `php src/scripts/run_migrations.php` — **nunca direto no banco**.
+- Executar via painel Master (`/master/migrations`) ou `php backend/scripts/run_migrations.php` — **nunca direto no banco**.
 - Use o comando `/migration` e valide com o subagent `migration-checker`.
 
 ## Segurança — regras obrigatórias
@@ -105,12 +105,12 @@ Código de referência para copiar estrutura: `.claude/examples/` (Controller, S
 | Padrões de código com exemplos | `.claude/docs/coding-standards.md` |
 | Padrão de nomenclatura (PT vs EN) e estratégia de rename incremental | `.claude/docs/nomenclatura.md` |
 | TudiCoins (créditos de IA, gate, catálogo, carteira da escola) | `.claude/docs/tudicoins.md` |
-| Rotas | `src/config/routes/*.php` (por perfil) |
-| Schema master / tenant | `src/database/migrations/` |
-| Permissões de admin · feature flags | `src/app/Core/AdminPermissionMatrix.php` · `FeatureGate.php` |
+| Rotas | `backend/config/routes/*.php` (por perfil) |
+| Schema master / tenant | `backend/database/migrations/` |
+| Permissões de admin · feature flags | `backend/app/Core/AdminPermissionMatrix.php` · `FeatureGate.php` |
 | Padrão visual de tela admin (cores, tabela, formulário, dropdown, offcanvas) | `prompts/admin_ui_sistema.md` (índice) + skill `educatudo-admin-ui` para o padrão de offcanvas em cadastro simples |
-| Documentação técnica detalhada | `src/DOCUMENTATION.md` e `src/docs/` (30+ arquivos) |
-| API de pais (JWT) | `src/docs/API_PAIS_ROTAS_E_CAMPOS.md` |
+| Documentação técnica detalhada | `backend/DOCUMENTATION.md` e `backend/docs/` (30+ arquivos) |
+| API de pais (JWT) | `backend/docs/API_PAIS_ROTAS_E_CAMPOS.md` |
 | Como pedir alteração/módulo/migration pra IA (guia pra dev novo) | `.claude/docs/working-with-ai.md` |
 
 ## Especificações e workflow com Claude Code
@@ -124,5 +124,5 @@ Fluxo spec-driven: atualizar a spec → Plan Mode → aprovar → implementar.
 Ferramentas do projeto:
 - **Subagents**: `code-reviewer` (invocar após qualquer mudança em PHP) e `migration-checker` (após criar/alterar migration)
 - **Comandos**: `/task <pedido>` (fluxo padrão para criar qualquer coisa) · `/new-module <nome>` · `/migration <descrição>` · `/fix-issue <problema>`
-- **Skill** `testing`: rodar/escrever testes Playwright (ficam na raiz, não em `src/`)
+- **Skill** `testing`: rodar/escrever testes Playwright (ficam na raiz, não em `backend/`)
 - **Hooks** (`.claude/settings.json`): `php -l` após editar `.php` (se PHP estiver no PATH) e bloqueio de edição direta de `.env`

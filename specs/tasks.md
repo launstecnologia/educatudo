@@ -7,7 +7,7 @@
 
 - [ ] Rodar a migration `2026_07_08_educainclui_pt.sql` (via painel Master ou `run_migrations.php`) em todas as escolas antes/junto do deploy do código atualizado — sem isso o módulo EducaInclui quebra (código já aponta pros nomes novos de tabela/coluna)
 - [ ] Rodar migrations TudiCoins: `2026_07_09_tudicoins_carteira_escola.sql` (tenant) + `2026_07_09_tudicoins_educainclui_itens_master.sql` (master) + `2026_07_09_tudicoins_compras_escola.sql` (tenant)
-- [ ] Agendar cron `src/cron/tudicoins_recarga_mensal.php` (dia 1 do mês) para recarga B2B automática
+- [ ] Agendar cron `backend/cron/tudicoins_recarga_mensal.php` (dia 1 do mês) para recarga B2B automática
 
 ## Próximas
 

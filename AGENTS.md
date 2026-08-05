@@ -37,10 +37,10 @@ Digite o conteúdo do arquivo correspondente como instrução, ou descreva o ped
 | Regra | Escopo |
 |---|---|
 | `educatudo-core` | Sempre ativa — arquitetura, segurança, mapa |
-| `php-padroes` | `src/**/*.php` — camadas, SQL, nomenclatura |
-| `migrations` | `src/database/migrations/**` |
-| `admin-ui` | `src/app/Views/admin/**` |
-| `form-control-safari` | `src/app/Views/**/*.php` — select/date Safari via partial global |
+| `php-padroes` | `backend/**/*.php` — camadas, SQL, nomenclatura |
+| `migrations` | `backend/database/migrations/**` |
+| `admin-ui` | `backend/app/Views/admin/**` |
+| `form-control-safari` | `backend/app/Views/**/*.php` — select/date Safari via partial global |
 | `playwright` | `tests/**`, `e2e/**` |
 
 ## Skills do projeto (`.claude/skills/`)
