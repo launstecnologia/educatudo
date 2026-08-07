@@ -84,7 +84,35 @@ class LayoutHelper
     public static function get($key, $default = '')
     {
         $config = self::getConfig();
-        return $config[$key] ?? $default;
+        $value = $config[$key] ?? $default;
+        // Logos/capas gravadas no Master apontam para master.*/media/serve?tenant=…
+        // Anônimos no master levam 403; servir sempre no Host da escola (path relativo).
+        if (is_string($value) && is_string($key) && substr($key, -4) === '_url') {
+            $value = self::toTenantRelativeMediaUrl($value);
+        }
+        return $value;
+    }
+
+    /**
+     * Converte URL absoluta de /media/serve (ex.: master.educatudo.com) em path relativo
+     * no host atual, preservando type/key/tenant.
+     */
+    private static function toTenantRelativeMediaUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '' || stripos($url, 'media/serve') === false) {
+            return $url;
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts)) {
+            return $url;
+        }
+        $query = (string) ($parts['query'] ?? '');
+        if ($query === '') {
+            return $url;
+        }
+        $folder = defined('FOLDER') ? rtrim((string) FOLDER, '/') : '';
+        return ($folder !== '' ? $folder : '') . '/media/serve?' . $query;
     }
     
     /**

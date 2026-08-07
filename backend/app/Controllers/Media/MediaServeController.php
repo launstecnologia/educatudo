@@ -3,9 +3,10 @@
  * Serve mídia (layout, essays, etc.) por type + key.
  * S3/local: streaming pelo backend com fallback de keys legadas.
  *
- * Tipos públicos (logo/capa/avatar): acessíveis sem login, sempre no tenant do Host.
+ * Tipos públicos (logo/capa/avatar): acessíveis sem login.
+ * Override anônimo de ?tenant= só para type=layout (URLs legadas gravadas no domínio Master).
  * Tipos privados (chat, redações, tickets…): exigem sessão autenticada.
- * Parâmetro ?tenant= só é aceito se coincidir com o tenant resolvido na request.
+ * Em tipos privados, ?tenant= só com sessão Master ou tenant do Host.
  */
 require_once __DIR__ . '/../../Core/BaseController.php';
 require_once __DIR__ . '/../../Services/MediaStorageService.php';
@@ -86,15 +87,17 @@ class MediaServeController extends BaseController
             ?: ($config['school']['code'] ?? '')
         )));
 
-        // Impede troca de tenant via query por anônimos/usuários de escola.
-        // Exceção: sessão Master (tickets/assets de escolas no painel master.*).
+        // Impede troca de tenant via query em tipos privados e na maioria dos públicos.
+        // Exceção anônima: type=layout (URLs legadas absolutas no domínio Master).
+        // Avatars/professores/propostas continuam restritos ao Host ou sessão Master.
+        $allowTenantOverride = $isMaster || $type === 'layout';
         if ($tenantSlug !== '') {
             $sameTenant = $resolvedTenant !== '' && hash_equals($resolvedTenant, $tenantSlug);
-            if (!$sameTenant && !$isMaster) {
+            if (!$sameTenant && !$allowTenantOverride) {
                 http_response_code(403);
                 exit;
             }
-            if (!$sameTenant && $isMaster) {
+            if (!$sameTenant && $allowTenantOverride) {
                 $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => $tenantSlug]);
                 $config['school'] = array_merge($config['school'] ?? [], ['code' => $tenantSlug]);
                 $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
@@ -103,7 +106,9 @@ class MediaServeController extends BaseController
         }
 
         // Compatibilidade legada: arquivos antigos de layout sem prefixo tenant.
-        if ($type === 'layout' && strpos($key, 'escola_') === 0 && $tenantSlug === '') {
+        // Só limpa o tenant quando não há Host nem query (evita 404 em escola_*/layout
+        // quando o arquivo está em storage/files/{slug}/layout).
+        if ($type === 'layout' && strpos($key, 'escola_') === 0 && $tenantSlug === '' && $resolvedTenant === '') {
             $config['school'] = array_merge($config['school'] ?? [], ['code' => '']);
             $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => '']);
             $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => false]);
@@ -150,6 +155,21 @@ class MediaServeController extends BaseController
             if ($candidatePath !== null && is_file($candidatePath)) {
                 $path = $candidatePath;
                 break;
+            }
+        }
+        // Legado local: layout antigo em storage/files/layout (sem slug de tenant).
+        if (($path === null || !is_file($path)) && $type === 'layout') {
+            $legacyConfig = $config;
+            $legacyConfig['media'] = array_merge($legacyConfig['media'] ?? [], ['tenant_prefix' => false]);
+            $legacyConfig['tenant'] = array_merge($legacyConfig['tenant'] ?? [], ['slug' => '']);
+            $legacyConfig['school'] = array_merge($legacyConfig['school'] ?? [], ['code' => '']);
+            $legacyMedia = new MediaStorageService($legacyConfig);
+            foreach ($candidateKeys as $candidateKey) {
+                $candidatePath = $legacyMedia->getLocalPath($type, $candidateKey);
+                if ($candidatePath !== null && is_file($candidatePath)) {
+                    $path = $candidatePath;
+                    break;
+                }
             }
         }
         if ($path === null || !is_file($path)) {

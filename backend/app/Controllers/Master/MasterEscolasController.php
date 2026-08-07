@@ -705,6 +705,20 @@ class MasterEscolasController extends BaseController
             $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => $slug]);
             $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => true]);
         }
+        // Preferir domínio da escola na URL pública (login anônimo não usa master).
+        $db = Database::getInstance();
+        $escolaRow = $db->query('SELECT dominio FROM escolas WHERE id = ? LIMIT 1', [$escolaId])->fetch(PDO::FETCH_ASSOC);
+        $dominio = trim((string) ($escolaRow['dominio'] ?? ''));
+        if ($dominio !== '') {
+            $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || ((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+                || ((string) ($_SERVER['REQUEST_SCHEME'] ?? '') === 'https');
+            $protocol = $https ? 'https' : 'http';
+            $folder = defined('FOLDER') ? (string) FOLDER : '';
+            $config['app'] = array_merge($config['app'] ?? [], [
+                'url' => rtrim($protocol . '://' . $dominio . $folder, '/'),
+            ]);
+        }
         $media = new MediaStorageService($config);
         if (!$media->put('layout', $key, $file['tmp_name'], $contentType)) {
             $this->setFlashMessage(
@@ -713,7 +727,7 @@ class MasterEscolasController extends BaseController
             );
             return null;
         }
-        $baseUrl = rtrim(defined('URL') ? URL : '', '/');
+        $baseUrl = rtrim((string) ($config['app']['url'] ?? (defined('URL') ? URL : '')), '/');
         return $media->isS3()
             ? $baseUrl . '/media/serve?type=layout&key=' . rawurlencode($key) . ($slug !== '' ? '&tenant=' . rawurlencode($slug) : '')
             : $media->getDisplayUrl('layout', $key);

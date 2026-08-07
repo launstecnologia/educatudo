@@ -557,6 +557,19 @@ class MasterEscolaDetailController extends BaseController
             $config['tenant'] = array_merge($config['tenant'] ?? [], ['slug' => '']);
             $config['media'] = array_merge($config['media'] ?? [], ['tenant_prefix' => false]);
         }
+        // URL pública no domínio da escola (não no master), para login/branding funcionarem sem sessão.
+        $escolaRow = $this->getEscolaOrFail($escolaId);
+        $dominio = trim((string) ($escolaRow['dominio'] ?? ''));
+        if ($dominio !== '') {
+            $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || ((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+                || ((string) ($_SERVER['REQUEST_SCHEME'] ?? '') === 'https');
+            $protocol = $https ? 'https' : 'http';
+            $folder = defined('FOLDER') ? (string) FOLDER : '';
+            $config['app'] = array_merge($config['app'] ?? [], [
+                'url' => rtrim($protocol . '://' . $dominio . $folder, '/'),
+            ]);
+        }
         $media = new MediaStorageService($config);
 
         if (!$media->put('layout', $key, $file['tmp_name'], $contentType)) {
