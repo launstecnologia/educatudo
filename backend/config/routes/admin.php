@@ -217,6 +217,7 @@ $router->post('/admin/jornadas/atualizar-ordem-modulos', 'Education/AdminJourney
 $router->get('/admin/jornadas/modulos/{modulo_id}/exercicios', 'Education/AdminJourneyController@gerenciarExerciciosModulo');
 $router->post('/admin/jornadas/modulos/adicionar-exercicio', 'Education/AdminJourneyController@adicionarExercicioModulo');
 $router->post('/admin/jornadas/modulos/gerar-exercicio-ia', 'Education/AdminJourneyController@gerarExercicioIAModulo');
+$router->post('/admin/jornadas/modulos/importar-exercicios-ia/{jobId}', 'Education/AdminJourneyController@importarExerciciosModuloIA');
 $router->post('/admin/jornadas/modulos/remover-exercicio', 'Education/AdminJourneyController@removerExercicioModulo');
 $router->post('/admin/jornadas/modulos/alternar-status-exercicio', 'Education/AdminJourneyController@alternarStatusExercicio');
 $router->get('/admin/jornadas/modulos/buscar-exercicio', 'Education/AdminJourneyController@buscarExercicioModulo');
