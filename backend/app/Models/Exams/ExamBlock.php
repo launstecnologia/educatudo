@@ -204,7 +204,7 @@ class ExamBlock
     
     /**
      * Busca blocos com filtros e paginação (10 por página)
-     * $filters: ['titulo' => string, 'data_prova' => date Y-m-d, 'turma_id' => int, 'status' => string, 'bloco_modelo_id' => int, 'materia_id' => int]
+     * $filters: ['titulo' => string, 'data_prova' => date Y-m-d, 'turma_id' => int, 'status' => string, 'excluir_status' => string, 'bloco_modelo_id' => int, 'materia_id' => int]
      */
     public function getAllFiltered($filters = [], $limit = 10, $offset = 0)
     {
@@ -229,9 +229,12 @@ class ExamBlock
             $where[] = '(pb.turma_id = :turma_id OR EXISTS (SELECT 1 FROM provas_blocos_turmas pbt WHERE pbt.bloco_id = pb.id AND pbt.turma_id = :turma_id) OR EXISTS (SELECT 1 FROM provas_blocos_professores pbp2 INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp2.id WHERE pbp2.bloco_id = pb.id AND pbpt.turma_id = :turma_id))';
             $params['turma_id'] = (int)$filters['turma_id'];
         }
-        if (!empty($filters['status'])) {
+        if (!empty($filters['status']) && $filters['status'] !== 'todos') {
             $where[] = 'pb.status = :status';
             $params['status'] = $filters['status'];
+        } elseif (!empty($filters['excluir_status'])) {
+            $where[] = 'pb.status <> :excluir_status';
+            $params['excluir_status'] = (string) $filters['excluir_status'];
         }
         if (!empty($filters['materia_id'])) {
             $mid = (int) $filters['materia_id'];
@@ -312,9 +315,12 @@ class ExamBlock
             $where[] = '(pb.turma_id = :turma_id OR EXISTS (SELECT 1 FROM provas_blocos_turmas pbt WHERE pbt.bloco_id = pb.id AND pbt.turma_id = :turma_id) OR EXISTS (SELECT 1 FROM provas_blocos_professores pbp2 INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp2.id WHERE pbp2.bloco_id = pb.id AND pbpt.turma_id = :turma_id))';
             $params['turma_id'] = (int)$filters['turma_id'];
         }
-        if (!empty($filters['status'])) {
+        if (!empty($filters['status']) && $filters['status'] !== 'todos') {
             $where[] = 'pb.status = :status';
             $params['status'] = $filters['status'];
+        } elseif (!empty($filters['excluir_status'])) {
+            $where[] = 'pb.status <> :excluir_status';
+            $params['excluir_status'] = (string) $filters['excluir_status'];
         }
         if (!empty($filters['materia_id'])) {
             $mid = (int) $filters['materia_id'];

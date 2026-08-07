@@ -753,6 +753,9 @@ $router->get('/admin/provas/blocos', function() {
 });
 $router->get('/admin/provas/blocos/criar', 'Exams/ExamBlockController@criar');
 $router->post('/admin/provas/blocos', 'Exams/ExamBlockController@salvar');
+// Lote (antes das rotas com {id})
+$router->post('/admin/provas/blocos/lote/marcar-concluido', 'Exams/ExamBlockController@marcarComoConcluidoLote');
+$router->post('/admin/provas/blocos/lote/excluir', 'Exams/ExamBlockController@excluirLote');
 $router->get('/admin/provas/blocos/{id}', 'Exams/ExamBlockController@visualizar');
 $router->get('/admin/provas/blocos/{id}/editar', 'Exams/ExamBlockController@editar');
 $router->post('/admin/provas/blocos/{id}', 'Exams/ExamBlockController@atualizar');

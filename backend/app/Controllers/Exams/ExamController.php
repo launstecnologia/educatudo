@@ -5498,16 +5498,27 @@ class ExamController extends BaseController
         $blocoModel = new ExamBlock();
         
         // Filtros (GET)
+        // Status: padrão = todos menos concluídos. Use status=todos para incluir concluídos;
+        // status=concluido (ou outro) para filtrar um status específico.
+        $statusRaw = isset($_GET['status']) ? trim((string) $_GET['status']) : null;
         $filters = [
             'titulo' => trim($_GET['titulo'] ?? ''),
             'data_prova' => trim($_GET['data_prova'] ?? ''),
             'bloco_modelo_id' => !empty($_GET['bloco_modelo_id']) ? (int)$_GET['bloco_modelo_id'] : 0,
             'turma_id' => !empty($_GET['turma_id']) ? (int)$_GET['turma_id'] : 0,
             'materia_id' => !empty($_GET['materia_id']) ? (int)$_GET['materia_id'] : 0,
-            'status' => trim($_GET['status'] ?? ''),
+            'status' => '',
             'bimestre' => !empty($_GET['bimestre']) ? (int)$_GET['bimestre'] : 0,
             'tipo_avaliacao_id' => !empty($_GET['tipo_avaliacao_id']) ? (int)$_GET['tipo_avaliacao_id'] : 0,
         ];
+        if ($statusRaw === null || $statusRaw === '' || $statusRaw === 'exceto_concluidos') {
+            $filters['excluir_status'] = 'concluido';
+            $filters['status'] = '';
+        } elseif ($statusRaw === 'todos') {
+            $filters['status'] = 'todos';
+        } else {
+            $filters['status'] = $statusRaw;
+        }
         if ($filters['turma_id'] === 0) {
             unset($filters['turma_id']);
         }
@@ -5524,7 +5535,10 @@ class ExamController extends BaseController
             unset($filters['tipo_avaliacao_id']);
         }
         $filters = array_filter($filters, function ($v) { return $v !== '' && $v !== null; });
-        
+        // Garante status='' na view quando o padrão é "exceto concluídos"
+        if (!isset($filters['status']) && !empty($filters['excluir_status'])) {
+            $filters['status'] = '';
+        }
         // Paginação: 10 por página
         $perPage = 10;
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -5613,7 +5627,8 @@ class ExamController extends BaseController
             'materias' => $materias,
             'blocos_para_filtro' => $blocosParaFiltro,
             'tipos_avaliacao_para_filtro' => $tiposAvaliacaoParaFiltro,
-            'pagination' => $pagination
+            'pagination' => $pagination,
+            'csrf_token' => $this->generateCsrfToken(),
         ];
         
         $this->viewWithLayout('admin', 'admin/exams/index', $data);

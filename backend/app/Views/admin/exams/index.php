@@ -13,10 +13,14 @@ $materias = $materias ?? [];
 $tiposAvaliacaoParaFiltro = $tipos_avaliacao_para_filtro ?? [];
 $blocosParaFiltro = $blocos_para_filtro ?? [];
 $filtrosAtivosCount = 0;
-foreach (['titulo', 'data_prova', 'bloco_modelo_id', 'turma_id', 'materia_id', 'status', 'bimestre', 'tipo_avaliacao_id'] as $fk) {
+foreach (['titulo', 'data_prova', 'bloco_modelo_id', 'turma_id', 'materia_id', 'bimestre', 'tipo_avaliacao_id'] as $fk) {
     if (!empty($filters[$fk])) {
         $filtrosAtivosCount++;
     }
+}
+// Conta status só quando o usuário escolheu um filtro explícito (não o padrão "exceto concluídos")
+if (!empty($filterStatus)) {
+    $filtrosAtivosCount++;
 }
 ?>
 <!-- Header Section -->
@@ -187,7 +191,8 @@ foreach (['titulo', 'data_prova', 'bloco_modelo_id', 'turma_id', 'materia_id', '
             <div>
                 <label for="filtro_status" class="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
                 <select id="filtro_status" name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Todos</option>
+                    <option value="" <?= $filterStatus === '' ? 'selected' : '' ?>>Todos (exceto concluídos)</option>
+                    <option value="todos" <?= $filterStatus === 'todos' ? 'selected' : '' ?>>Todos (inclui concluídos)</option>
                     <option value="aguardando" <?= $filterStatus === 'aguardando' ? 'selected' : '' ?>>Aguardando</option>
                     <option value="aprovado" <?= $filterStatus === 'aprovado' ? 'selected' : '' ?>>Aprovado</option>
                     <option value="liberado" <?= $filterStatus === 'liberado' ? 'selected' : '' ?>>Liberado</option>
@@ -284,14 +289,30 @@ document.addEventListener('keydown', function(e) {
 
 <!-- Blocos Table -->
 <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200">
-    <div class="p-6 border-b border-gray-200">
+    <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
         <h3 class="text-lg font-semibold text-gray-900">Evento de Provas</h3>
+        <div id="barraAcoesLote" class="hidden flex-wrap items-center gap-2">
+            <span id="contadorSelecionados" class="text-sm text-gray-600 mr-1">0 selecionado(s)</span>
+            <button type="button" onclick="marcarSelecionadosConcluidos()"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 text-white hover:bg-gray-900">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Marcar como concluído
+            </button>
+            <button type="button" onclick="excluirSelecionados()"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Excluir
+            </button>
+        </div>
     </div>
     
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
+                    <th class="px-4 py-3 text-left w-10">
+                        <input type="checkbox" id="selecionarTodosBlocos" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" title="Selecionar todos" onchange="toggleSelecionarTodos(this)">
+                    </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Horário</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
@@ -304,7 +325,7 @@ document.addEventListener('keydown', function(e) {
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($blocos)): ?>
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center">
+                        <td colspan="8" class="px-6 py-12 text-center">
                             <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
@@ -322,6 +343,12 @@ document.addEventListener('keydown', function(e) {
                 <?php else: ?>
                     <?php foreach ($blocos as $bloco): ?>
                         <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-4 whitespace-nowrap">
+                                <input type="checkbox"
+                                       class="checkbox-bloco-lote rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                       value="<?= (int) $bloco['id'] ?>"
+                                       onchange="atualizarBarraAcoesLote()">
+                            </td>
                             <td class="px-6 py-4">
                                 <?php
                                 $turmasTexto = trim($bloco['turmas_demarcadas'] ?? '');
@@ -447,6 +474,8 @@ document.addEventListener('keydown', function(e) {
 <div id="dropdown-actions-portal" class="hidden fixed z-[100] w-56 py-1 bg-white rounded-lg shadow-xl border border-gray-200"></div>
 
 <script>
+var CSRF_TOKEN_PROVAS = <?= json_encode((string) ($csrf_token ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+
 function abrirDropdownAcoes(btn) {
     var portal = document.getElementById('dropdown-actions-portal');
     if (!portal) return;
@@ -538,18 +567,112 @@ function toggleLiberado(blocoId, novoStatus) {
 }
 
 var blocoIdExcluir = null;
+var blocoIdsExcluirLote = null;
+
+function idsBlocosSelecionados() {
+    return Array.prototype.map.call(
+        document.querySelectorAll('.checkbox-bloco-lote:checked'),
+        function(cb) { return parseInt(cb.value, 10); }
+    ).filter(function(id) { return id > 0; });
+}
+
+function atualizarBarraAcoesLote() {
+    var ids = idsBlocosSelecionados();
+    var barra = document.getElementById('barraAcoesLote');
+    var contador = document.getElementById('contadorSelecionados');
+    var master = document.getElementById('selecionarTodosBlocos');
+    var todos = document.querySelectorAll('.checkbox-bloco-lote');
+    if (contador) {
+        contador.textContent = ids.length + ' selecionado(s)';
+    }
+    if (barra) {
+        if (ids.length > 0) {
+            barra.classList.remove('hidden');
+            barra.classList.add('flex');
+        } else {
+            barra.classList.add('hidden');
+            barra.classList.remove('flex');
+        }
+    }
+    if (master && todos.length) {
+        master.checked = ids.length === todos.length;
+        master.indeterminate = ids.length > 0 && ids.length < todos.length;
+    }
+}
+
+function toggleSelecionarTodos(master) {
+    document.querySelectorAll('.checkbox-bloco-lote').forEach(function(cb) {
+        cb.checked = !!master.checked;
+    });
+    atualizarBarraAcoesLote();
+}
+
+function marcarSelecionadosConcluidos() {
+    var ids = idsBlocosSelecionados();
+    if (!ids.length) {
+        alert('Selecione pelo menos um evento.');
+        return;
+    }
+    if (!confirm('Marcar ' + ids.length + ' evento(s) como concluído(s)?')) {
+        return;
+    }
+    fetch('<?= URL ?>/admin/provas/blocos/lote/marcar-concluido', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids, _token: CSRF_TOKEN_PROVAS })
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(function(error) {
+        console.error('Erro:', error);
+        alert('Erro ao marcar os eventos como concluídos');
+    });
+}
+
+function excluirSelecionados() {
+    var ids = idsBlocosSelecionados();
+    if (!ids.length) {
+        alert('Selecione pelo menos um evento.');
+        return;
+    }
+    blocoIdExcluir = null;
+    blocoIdsExcluirLote = ids;
+    var titulo = document.getElementById('tituloModalExcluir');
+    var texto = document.getElementById('textoModalExcluir');
+    if (titulo) titulo.textContent = 'Confirmar exclusão em lote';
+    if (texto) {
+        texto.textContent = 'Para desativar ' + ids.length + ' evento(s), digite sua senha. Os blocos deixarão de aparecer para alunos e professores; os dados são mantidos (LGPD).';
+    }
+    document.getElementById('modalExcluirSenha').classList.remove('hidden');
+    document.getElementById('inputSenhaExcluir').value = '';
+    document.getElementById('inputSenhaExcluir').focus();
+}
+
 function excluirBloco(blocoId) {
+    blocoIdsExcluirLote = null;
     blocoIdExcluir = blocoId;
+    var titulo = document.getElementById('tituloModalExcluir');
+    var texto = document.getElementById('textoModalExcluir');
+    if (titulo) titulo.textContent = 'Confirmar exclusão';
+    if (texto) {
+        texto.textContent = 'Para desativar este bloco, digite sua senha. O bloco deixará de aparecer para alunos e professores; os dados são mantidos (LGPD). Quem desativou ficará registrado.';
+    }
     document.getElementById('modalExcluirSenha').classList.remove('hidden');
     document.getElementById('inputSenhaExcluir').value = '';
     document.getElementById('inputSenhaExcluir').focus();
 }
 function fecharModalExcluir() {
     blocoIdExcluir = null;
+    blocoIdsExcluirLote = null;
     document.getElementById('modalExcluirSenha').classList.add('hidden');
 }
 function confirmarExcluirComSenha() {
-    if (!blocoIdExcluir) return;
     var senha = document.getElementById('inputSenhaExcluir').value.trim();
     if (!senha) {
         alert('Digite sua senha para confirmar.');
@@ -557,10 +680,24 @@ function confirmarExcluirComSenha() {
     }
     var btn = document.getElementById('btnConfirmarExcluir');
     if (btn) { btn.disabled = true; btn.textContent = 'Excluindo...'; }
-    fetch(`<?= URL ?>/admin/provas/blocos/${blocoIdExcluir}/excluir`, {
+
+    var url;
+    var payload;
+    if (blocoIdsExcluirLote && blocoIdsExcluirLote.length) {
+        url = '<?= URL ?>/admin/provas/blocos/lote/excluir';
+        payload = { senha: senha, ids: blocoIdsExcluirLote, _token: CSRF_TOKEN_PROVAS };
+    } else if (blocoIdExcluir) {
+        url = '<?= URL ?>/admin/provas/blocos/' + blocoIdExcluir + '/excluir';
+        payload = { senha: senha };
+    } else {
+        if (btn) { btn.disabled = false; btn.textContent = 'Excluir'; }
+        return;
+    }
+
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha: senha })
+        body: JSON.stringify(payload)
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -585,8 +722,8 @@ function confirmarExcluirComSenha() {
     <div class="flex min-h-full items-center justify-center p-4">
         <div class="fixed inset-0 bg-black/50" onclick="fecharModalExcluir()"></div>
         <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">Confirmar exclusão</h3>
-            <p class="text-sm text-gray-600 mb-4">Para desativar este bloco, digite sua senha. O bloco deixará de aparecer para alunos e professores; os dados são mantidos (LGPD). Quem desativou ficará registrado.</p>
+            <h3 id="tituloModalExcluir" class="text-lg font-semibold text-gray-900 mb-2">Confirmar exclusão</h3>
+            <p id="textoModalExcluir" class="text-sm text-gray-600 mb-4">Para desativar este bloco, digite sua senha. O bloco deixará de aparecer para alunos e professores; os dados são mantidos (LGPD). Quem desativou ficará registrado.</p>
             <label class="block text-sm font-medium text-gray-700 mb-1">Sua senha</label>
             <input type="password" id="inputSenhaExcluir" placeholder="Senha" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4" onkeydown="if (event.key==='Enter') confirmarExcluirComSenha();">
             <div class="flex justify-end gap-2">

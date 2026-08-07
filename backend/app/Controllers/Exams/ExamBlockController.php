@@ -768,44 +768,212 @@ class ExamBlockController extends BaseController
     public function marcarComoConcluido($id)
     {
         try {
-            $id = (int) $id;
-            if ($id <= 0) {
-                $this->json(['error' => 'Bloco inválido'], 400);
-                return;
-            }
-
-            $bloco = $this->blocoModel->findById($id);
-            if (!$bloco) {
+            $resultado = $this->aplicarConclusaoManual([(int) $id]);
+            if (($resultado['nao_encontrados'] ?? 0) > 0 && ($resultado['ok'] ?? 0) === 0) {
                 $this->json(['error' => 'Bloco não encontrado'], 404);
                 return;
             }
+            $this->json([
+                'success' => true,
+                'message' => ($resultado['ok'] ?? 0) > 0
+                    ? 'Bloco marcado como concluído'
+                    : 'Bloco já estava concluído',
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao marcar bloco como concluído: " . $e->getMessage());
+            $this->json(['error' => 'Não foi possível marcar o bloco como concluído.'], 400);
+        }
+    }
 
-            $statusAtual = (string) ($bloco['status'] ?? 'aguardando');
-            if ($statusAtual === 'concluido') {
-                $this->json(['success' => true, 'message' => 'Bloco já estava concluído']);
+    /**
+     * Marca vários blocos como concluídos (seleção em lote).
+     */
+    public function marcarComoConcluidoLote()
+    {
+        try {
+            $body = json_decode(file_get_contents('php://input') ?: '{}', true);
+            if (!is_array($body)) {
+                $body = $_POST;
+            }
+            if (!$this->verificarCsrfDeBody($body)) {
+                $this->json(['error' => 'Token inválido. Recarregue a página.'], 400);
+                return;
+            }
+            $ids = $this->normalizarIdsLote($body['ids'] ?? $body['bloco_ids'] ?? []);
+            if (empty($ids)) {
+                $this->json(['error' => 'Selecione pelo menos um evento.'], 400);
+                return;
+            }
+            if (count($ids) > 100) {
+                $this->json(['error' => 'Selecione no máximo 100 eventos por vez.'], 400);
                 return;
             }
 
-            $setExtra = '';
-            if ($this->blocoModel->columnExistsOnBloco('conclusao_manual')) {
-                $setExtra = ', conclusao_manual = 1';
+            $resultado = $this->aplicarConclusaoManual($ids);
+            if (($resultado['ok'] ?? 0) === 0 && ($resultado['nao_encontrados'] ?? 0) > 0 && ($resultado['ignorados'] ?? 0) === 0) {
+                $this->json(['error' => 'Nenhum evento válido encontrado.'], 404);
+                return;
+            }
+            $this->json([
+                'success' => true,
+                'message' => $resultado['ok'] . ' evento(s) marcado(s) como concluído(s).'
+                    . ($resultado['ignorados'] > 0 ? ' ' . $resultado['ignorados'] . ' já estavam concluídos.' : '')
+                    . ($resultado['nao_encontrados'] > 0 ? ' ' . $resultado['nao_encontrados'] . ' não encontrado(s).' : ''),
+                'ok' => $resultado['ok'],
+                'ignorados' => $resultado['ignorados'],
+                'nao_encontrados' => $resultado['nao_encontrados'],
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao marcar blocos como concluídos em lote: " . $e->getMessage());
+            $this->json(['error' => 'Não foi possível marcar os eventos como concluídos.'], 400);
+        }
+    }
+
+    /**
+     * Exclui (desativa) vários blocos. Exige senha uma vez para o lote.
+     */
+    public function excluirLote()
+    {
+        $user = $this->authManager->getUser();
+
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            $this->json(['error' => 'Não autorizado'], 403);
+            return;
+        }
+
+        $body = json_decode(file_get_contents('php://input') ?: '{}', true);
+        if (!is_array($body)) {
+            $body = [];
+        }
+        if (!$this->verificarCsrfDeBody($body)) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 400);
+            return;
+        }
+        $senha = (string) ($body['senha'] ?? '');
+        $ids = $this->normalizarIdsLote($body['ids'] ?? $body['bloco_ids'] ?? []);
+
+        if ($senha === '') {
+            $this->json(['error' => 'Digite sua senha para confirmar a exclusão.'], 400);
+            return;
+        }
+        if (empty($ids)) {
+            $this->json(['error' => 'Selecione pelo menos um evento.'], 400);
+            return;
+        }
+        if (count($ids) > 100) {
+            $this->json(['error' => 'Selecione no máximo 100 eventos por vez.'], 400);
+            return;
+        }
+
+        try {
+            $usuario = $this->db->fetch(
+                "SELECT senha_hash FROM usuarios WHERE id = :id",
+                ['id' => (int) $user['id']]
+            );
+            if (!$usuario || !password_verify($senha, $usuario['senha_hash'] ?? '')) {
+                $this->json(['error' => 'Senha incorreta. Tente novamente.'], 400);
+                return;
             }
 
+            $ok = 0;
+            $falhas = 0;
+            foreach ($ids as $id) {
+                $bloco = $this->blocoModel->findById($id);
+                if (!$bloco) {
+                    $falhas++;
+                    continue;
+                }
+                $this->blocoModel->delete($id, (int) $user['id']);
+                $ok++;
+            }
+
+            $this->json([
+                'success' => true,
+                'message' => $ok . ' evento(s) desativado(s).'
+                    . ($falhas > 0 ? ' ' . $falhas . ' não encontrado(s).' : ''),
+                'ok' => $ok,
+                'falhas' => $falhas,
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao excluir blocos em lote: " . $e->getMessage());
+            $this->json(['error' => 'Não foi possível excluir os eventos selecionados.'], 400);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function verificarCsrfDeBody(array $body): bool
+    {
+        $token = (string) ($body['_token'] ?? $body['csrf_token'] ?? '');
+        if ($token === '' && isset($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+            $token = (string) $_SERVER['HTTP_X_CSRF_TOKEN'];
+        }
+        return $token !== '' && $this->verifyCsrfToken($token);
+    }
+
+    /**
+     * @param array<int, mixed> $ids
+     * @return array<int, int>
+     */
+    private function normalizarIdsLote($ids): array
+    {
+        if (!is_array($ids)) {
+            return [];
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            $idInt = (int) $id;
+            if ($idInt > 0) {
+                $out[$idInt] = $idInt;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @param array<int, int> $ids
+     * @return array{ok:int,ignorados:int,nao_encontrados:int}
+     */
+    private function aplicarConclusaoManual(array $ids): array
+    {
+        $ok = 0;
+        $ignorados = 0;
+        $naoEncontrados = 0;
+        $setExtra = $this->blocoModel->columnExistsOnBloco('conclusao_manual')
+            ? ', conclusao_manual = 1'
+            : '';
+
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if ($id <= 0) {
+                $naoEncontrados++;
+                continue;
+            }
+            $bloco = $this->blocoModel->findById($id);
+            if (!$bloco) {
+                $naoEncontrados++;
+                continue;
+            }
+            $statusAtual = (string) ($bloco['status'] ?? 'aguardando');
+            if ($statusAtual === 'concluido') {
+                $ignorados++;
+                continue;
+            }
             $this->db->query(
                 "UPDATE provas_blocos
                  SET status = 'concluido', liberado = 0{$setExtra}
                  WHERE id = :id AND deleted_at IS NULL",
                 ['id' => $id]
             );
-
-            $this->json([
-                'success' => true,
-                'message' => 'Bloco marcado como concluído',
-            ]);
-        } catch (Exception $e) {
-            error_log("Erro ao marcar bloco como concluído: " . $e->getMessage());
-            $this->json(['error' => 'Não foi possível marcar o bloco como concluído.'], 400);
+            $ok++;
         }
+
+        return [
+            'ok' => $ok,
+            'ignorados' => $ignorados,
+            'nao_encontrados' => $naoEncontrados,
+        ];
     }
 
     /**
