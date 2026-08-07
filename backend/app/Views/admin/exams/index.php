@@ -395,6 +395,7 @@ document.addEventListener('keydown', function(e) {
                                         style="background-color: <?= htmlspecialchars($primary_color ?? '#3b82f6') ?>; color: <?= htmlspecialchars($primary_text_color ?? '#ffffff') ?>; border-color: <?= htmlspecialchars($primary_color ?? '#3b82f6') ?>"
                                         title="Ações"
                                         data-bloco-id="<?= (int)$bloco['id'] ?>"
+                                        data-status="<?= htmlspecialchars($st) ?>"
                                         data-gerenciar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/gerenciar') ?>"
                                         data-editar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/editar') ?>"
                                         data-duplicar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/duplicar') ?>"
@@ -443,13 +444,14 @@ document.addEventListener('keydown', function(e) {
 </div>
 
 <!-- Portal do dropdown (fora do card/table para não ser cortado) -->
-<div id="dropdown-actions-portal" class="hidden fixed z-[100] w-48 py-1 bg-white rounded-lg shadow-xl border border-gray-200"></div>
+<div id="dropdown-actions-portal" class="hidden fixed z-[100] w-56 py-1 bg-white rounded-lg shadow-xl border border-gray-200"></div>
 
 <script>
 function abrirDropdownAcoes(btn) {
     var portal = document.getElementById('dropdown-actions-portal');
     if (!portal) return;
     var blocoId = btn.getAttribute('data-bloco-id');
+    var status = btn.getAttribute('data-status') || '';
     var gerenciar = btn.getAttribute('data-gerenciar') || '';
     var editar = btn.getAttribute('data-editar') || '';
     var duplicar = btn.getAttribute('data-duplicar') || '';
@@ -457,17 +459,46 @@ function abrirDropdownAcoes(btn) {
     portal.style.left = '';
     portal.style.right = (window.innerWidth - rect.right) + 'px';
     portal.style.top = (rect.bottom + 4) + 'px';
-    portal.innerHTML = 
+    var html =
         '<a href="' + gerenciar + '" class="flex items-center gap-2 px-4 py-2 text-sm text-green-700 hover:bg-green-50 rounded-t-lg">' +
         '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg> Gerenciar</a>' +
         '<a href="' + editar + '" class="flex items-center gap-2 px-4 py-2 text-sm text-amber-700 hover:bg-amber-50">' +
         '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> Editar</a>' +
         '<form action="' + duplicar + '" method="post" class="block" onsubmit="return confirm(\'Duplicar este bloco? Serão copiados o evento e todas as provas com as questões já cadastradas. O novo bloco ficará como Não liberado.\');">' +
         '<button type="submit" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-blue-700 hover:bg-blue-50">' +
-        '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Duplicar</button></form>' +
+        '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Duplicar</button></form>';
+    if (status !== 'concluido') {
+        html +=
+            '<button type="button" onclick="fecharDropdownActions(); marcarBlocoConcluido(' + blocoId + ');" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50">' +
+            '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Marcar como concluído</button>';
+    }
+    html +=
         '<button type="button" onclick="fecharDropdownActions(); excluirBloco(' + blocoId + ');" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-red-700 hover:bg-red-50 rounded-b-lg">' +
         '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Excluir</button>';
+    portal.innerHTML = html;
     portal.classList.remove('hidden');
+}
+
+function marcarBlocoConcluido(blocoId) {
+    if (!confirm('Marcar este evento como concluído?')) {
+        return;
+    }
+    fetch('<?= URL ?>/admin/provas/blocos/' + blocoId + '/marcar-concluido', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(function(error) {
+        console.error('Erro:', error);
+        alert('Erro ao marcar o bloco como concluído');
+    });
 }
 function fecharDropdownActions() {
     var portal = document.getElementById('dropdown-actions-portal');

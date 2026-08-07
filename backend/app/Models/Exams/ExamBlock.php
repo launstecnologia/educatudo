@@ -116,9 +116,12 @@ class ExamBlock
      */
     public function marcarConcluidos()
     {
+        $setExtra = $this->hasProvasBlocosColumn('conclusao_manual')
+            ? ', conclusao_manual = 0'
+            : '';
         $this->db->query(
             "UPDATE provas_blocos 
-             SET status = 'concluido', liberado = 0 
+             SET status = 'concluido', liberado = 0{$setExtra}
              WHERE deleted_at IS NULL AND status = 'liberado' 
              AND CONCAT(data_prova, ' ', hora_fim) < NOW()"
         );
@@ -127,14 +130,18 @@ class ExamBlock
     /**
      * Reabre blocos que estavam concluídos mas tiveram o horário final estendido pela coordenação.
      * Quando data_prova + hora_fim volta a ser >= NOW(), o bloco fica liberado novamente.
+     * Não reabre conclusão manual da coordenação.
      */
     public function reabrirSePrazoEstendido()
     {
+        $excluirManual = $this->hasProvasBlocosColumn('conclusao_manual')
+            ? ' AND COALESCE(conclusao_manual, 0) = 0'
+            : '';
         $this->db->query(
             "UPDATE provas_blocos 
              SET status = 'liberado', liberado = 1, ativo = 1, gabarito_liberado = 0
              WHERE deleted_at IS NULL AND status = 'concluido' 
-             AND CONCAT(data_prova, ' ', hora_fim) >= NOW()"
+             AND CONCAT(data_prova, ' ', hora_fim) >= NOW(){$excluirManual}"
         );
     }
 

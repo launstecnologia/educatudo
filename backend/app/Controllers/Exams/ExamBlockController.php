@@ -763,6 +763,52 @@ class ExamBlockController extends BaseController
     }
 
     /**
+     * Marca o bloco/evento como concluído manualmente (coordenação).
+     */
+    public function marcarComoConcluido($id)
+    {
+        try {
+            $id = (int) $id;
+            if ($id <= 0) {
+                $this->json(['error' => 'Bloco inválido'], 400);
+                return;
+            }
+
+            $bloco = $this->blocoModel->findById($id);
+            if (!$bloco) {
+                $this->json(['error' => 'Bloco não encontrado'], 404);
+                return;
+            }
+
+            $statusAtual = (string) ($bloco['status'] ?? 'aguardando');
+            if ($statusAtual === 'concluido') {
+                $this->json(['success' => true, 'message' => 'Bloco já estava concluído']);
+                return;
+            }
+
+            $setExtra = '';
+            if ($this->blocoModel->columnExistsOnBloco('conclusao_manual')) {
+                $setExtra = ', conclusao_manual = 1';
+            }
+
+            $this->db->query(
+                "UPDATE provas_blocos
+                 SET status = 'concluido', liberado = 0{$setExtra}
+                 WHERE id = :id AND deleted_at IS NULL",
+                ['id' => $id]
+            );
+
+            $this->json([
+                'success' => true,
+                'message' => 'Bloco marcado como concluído',
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao marcar bloco como concluído: " . $e->getMessage());
+            $this->json(['error' => 'Não foi possível marcar o bloco como concluído.'], 400);
+        }
+    }
+
+    /**
      * Define se o evento aparece no portal do aluno (Minhas provas / links do bloco).
      */
     public function definirVisivelPortalAluno($id)

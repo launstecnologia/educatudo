@@ -759,6 +759,7 @@ $router->post('/admin/provas/blocos/{id}/duplicar', 'Exams/ExamBlockController@d
 $router->delete('/admin/provas/blocos/{id}', 'Exams/ExamBlockController@excluir');
 $router->post('/admin/provas/blocos/{id}/excluir', 'Exams/ExamBlockController@excluir');
 $router->post('/admin/provas/blocos/{id}/toggle-liberado', 'Exams/ExamBlockController@toggleLiberado');
+$router->post('/admin/provas/blocos/{id}/marcar-concluido', 'Exams/ExamBlockController@marcarComoConcluido');
 $router->post('/admin/provas/blocos/{id}/visivel-portal-aluno', 'Exams/ExamBlockController@definirVisivelPortalAluno');
 $router->get('/admin/provas/blocos/{id}/gerenciar', 'Teacher/TeacherExamController@gerenciar');
 $router->get('/admin/provas/blocos/{id}/notas-lancadas', 'Teacher/TeacherExamController@notasLancadasAdmin');
