@@ -97,6 +97,7 @@
     <div id="form-ia" class="exercicio-form hidden">
         <form id="gerarExercicioIAForm" class="space-y-4">
             <input type="hidden" name="modulo_id" value="<?= $modulo['id'] ?>">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>">
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -209,7 +210,9 @@
     </div>
 </div>
 
+<?php include dirname(__DIR__, 2) . '/components/ai-job-poller.php'; ?>
 <script>
+const csrfTokenModuloExerciciosAdmin = <?= json_encode($csrf_token ?? '') ?>;
 let opcoesCount = 0;
 const letras = ['A', 'B', 'C', 'D', 'E'];
 
@@ -351,37 +354,89 @@ document.getElementById('adicionarExercicioForm').addEventListener('submit', fun
 document.getElementById('gerarExercicioIAForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
-    
-    if (!confirm('Deseja gerar exercícios com IA? Pode levar até 1-2 minutos. Aguarde e não feche a página.')) {
+
+    if (!confirm('Deseja gerar exercícios com IA? O processamento ocorre em segundo plano.')) {
         return;
     }
-    
-    var controller = new AbortController();
-    var timeoutId = setTimeout(function() { controller.abort(); }, 120000);
+
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay-ia-admin';
+    loadingOverlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;';
+    loadingOverlay.innerHTML = `
+        <div style="background: white; padding: 24px; border-radius: 12px; text-align: center; max-width: 360px; width: calc(100% - 32px);">
+            <p id="loading-ia-titulo-admin" style="font-size: 18px; color: #1f2937; margin: 0; font-weight: 600;">Enfileirando na Tudinha...</p>
+            <p id="loading-ia-subtitulo-admin" style="font-size: 14px; color: #6b7280; margin-top: 8px;">Aguarde sem fechar a página.</p>
+        </div>
+    `;
+    document.body.appendChild(loadingOverlay);
+
+    function removerLoading() {
+        if (loadingOverlay.parentNode) loadingOverlay.parentNode.removeChild(loadingOverlay);
+    }
+    function falhar(msg) {
+        removerLoading();
+        alert('Erro ao gerar exercícios com IA.' + (msg ? ('\nDetalhe: ' + msg) : ''));
+    }
+
     fetch('<?= URL ?>/admin/jornadas/modulos/gerar-exercicio-ia', {
         method: 'POST',
         body: formData,
-        signal: controller.signal
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
     })
     .then(function(response) {
-        clearTimeout(timeoutId);
-        return response.json();
+        return response.json().then(function(body) {
+            return { ok: response.ok, body: body };
+        });
     })
-    .then(function(data) {
-        if (data.success) {
-            alert(data.message || 'Exercícios gerados com sucesso!');
-            location.reload();
-        } else {
-            alert('Erro: ' + (data.error || 'Erro desconhecido'));
+    .then(function(res) {
+        if (!res.ok || !res.body.success || !res.body.job_id) {
+            throw new Error((res.body && res.body.error) ? res.body.error : 'Não foi possível iniciar a geração');
         }
+
+        var tituloEl = document.getElementById('loading-ia-titulo-admin');
+        var subEl = document.getElementById('loading-ia-subtitulo-admin');
+        if (tituloEl) tituloEl.textContent = 'A Tudinha está criando os exercícios...';
+
+        new AIJobPoller(res.body.job_id, {
+            onProgress: function(status) {
+                if (tituloEl) {
+                    tituloEl.textContent = status === 'pending'
+                        ? 'Na fila da Tudinha...'
+                        : 'A Tudinha está criando os exercícios...';
+                }
+            },
+            onDone: function() {
+                if (tituloEl) tituloEl.textContent = 'Salvando exercícios...';
+                if (subEl) subEl.textContent = 'Quase lá.';
+                var fd = new FormData();
+                fd.append('_token', csrfTokenModuloExerciciosAdmin);
+                fetch('<?= URL ?>/admin/jornadas/modulos/importar-exercicios-ia/' + res.body.job_id, {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin'
+                })
+                .then(function(r) { return r.json().then(function(body) { return { ok: r.ok, body: body }; }); })
+                .then(function(imp) {
+                    removerLoading();
+                    if (!imp.ok || !imp.body.success) {
+                        falhar((imp.body && imp.body.error) ? imp.body.error : 'Exercícios gerados, mas falha ao salvar.');
+                        return;
+                    }
+                    alert((imp.body.exercicios_ids ? imp.body.exercicios_ids.length : 0) + ' exercício(s) gerado(s) com sucesso!');
+                    location.reload();
+                })
+                .catch(function(err) {
+                    falhar(err && err.message ? err.message : 'Falha ao salvar os exercícios gerados.');
+                });
+            },
+            onFailed: function(err) {
+                falhar(err || 'Falha no processamento da IA.');
+            }
+        });
     })
     .catch(function(error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-            alert('A requisição demorou muito. A IA pode levar até 2 minutos. Tente novamente ou recarregue a página.');
-        } else {
-            alert('Erro de conexão ou timeout. A geração por IA pode levar até 2 minutos. Se persistir, recarregue a página e tente novamente.');
-        }
+        falhar(error && error.message ? error.message : '');
         console.error(error);
     });
 });

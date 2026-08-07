@@ -127,6 +127,7 @@ $router->get('/professor/jornadas/modulos/banco-questoes/listar', 'Teacher/Teach
 $router->post('/professor/jornadas/modulos/banco-questoes/importar', 'Teacher/TeacherJourneyController@apiBancoQuestoesImportarModulo');
 $router->post('/professor/jornadas/modulos/upload-imagem-exercicio', 'Teacher/TeacherJourneyController@uploadImagemExercicio');
 $router->post('/professor/jornadas/modulos/gerar-exercicio-ia', 'Teacher/TeacherJourneyController@gerarExercicioIAModulo');
+$router->post('/professor/jornadas/modulos/importar-exercicios-ia/{jobId}', 'Teacher/TeacherJourneyController@importarExerciciosModuloIA');
 $router->post('/professor/jornadas/modulos/ler-imagem-exercicio/{modulo_id}', 'Teacher/TeacherJourneyController@lerImagemExercicio');
 $router->post('/professor/jornadas/modulos/remover-exercicio', 'Teacher/TeacherJourneyController@removerExercicioModulo');
 $router->post('/professor/jornadas/modulos/alternar-status-exercicio', 'Teacher/TeacherJourneyController@alternarStatusExercicio');

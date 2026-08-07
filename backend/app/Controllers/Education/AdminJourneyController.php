@@ -2333,6 +2333,7 @@ class AdminJourneyController extends BaseController
             'modulo' => $modulo,
             'jornada' => $jornada,
             'exercicios' => $exercicios,
+            'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'journeys'
         ];
         
@@ -2634,25 +2635,31 @@ class AdminJourneyController extends BaseController
     }
     
     /**
-     * Gera exercício por IA para o módulo (assíncrono)
+     * Enfileira geração de exercícios do módulo (gerar_questao_ia).
+     * Frontend faz polling e chama importarExerciciosModuloIA ao concluir.
      */
     public function gerarExercicioIAModulo()
     {
         try {
+            if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+                $this->json(['error' => 'Token inválido'], 400);
+                return;
+            }
+
             $modulo_id = $_POST['modulo_id'] ?? null;
-            $tipo      = $_POST['tipo']      ?? 'alternativas';
-            $quantidade = (int) ($_POST['quantidade'] ?? 5);
-            $contexto  = $_POST['contexto']  ?? '';
+            $tipo = $_POST['tipo'] ?? 'alternativas';
+            $quantidade = max(1, min(20, (int) ($_POST['quantidade'] ?? 5)));
+            $contexto = $_POST['contexto'] ?? '';
 
             if (!$modulo_id) {
                 throw new Exception('Módulo é obrigatório');
             }
 
             $modulo = $this->db->fetch(
-                "SELECT m.*, j.titulo as jornada_titulo, j.descricao as jornada_descricao, jm.nome as materia_nome
+                "SELECT m.*, j.titulo as jornada_titulo, j.descricao as jornada_descricao, mat.nome as materia_nome
                  FROM jornadas_modulos m
                  JOIN jornadas j ON m.jornada_id = j.id
-                 LEFT JOIN jornadas_materias jm ON j.materia_id = jm.id
+                 LEFT JOIN materias mat ON j.materia_id = mat.id
                  WHERE m.id = :modulo_id",
                 ['modulo_id' => $modulo_id]
             );
@@ -2661,34 +2668,191 @@ class AdminJourneyController extends BaseController
                 throw new Exception('Módulo não encontrado');
             }
 
-            $contextoCompleto  = "Matéria: " . ($modulo['materia_nome'] ?? 'Geral') . "\n";
+            $contextoCompleto = "Matéria: " . ($modulo['materia_nome'] ?? 'Geral') . "\n";
             $contextoCompleto .= "Jornada: {$modulo['jornada_titulo']}\n";
-            if ($modulo['jornada_descricao']) {
+            if (!empty($modulo['jornada_descricao'])) {
                 $contextoCompleto .= "Descrição: {$modulo['jornada_descricao']}\n";
             }
             if ($contexto) {
                 $contextoCompleto .= "Contexto adicional: {$contexto}\n";
             }
+            $contextoCompleto .= "Tipo de exercício: {$tipo}\n";
+            $contextoCompleto .= "Quantidade: {$quantidade} exercícios\n";
 
+            $tipoQuestaoBlueprint = [
+                'alternativas' => 'multipla_escolha',
+                'verdadeiro_falso' => 'verdadeiro_falso',
+                'dissertativa' => 'dissertativa',
+            ][$tipo] ?? 'multipla_escolha';
+
+            $user = $this->authManager->getUser();
             require_once __DIR__ . '/../../Services/AIJobService.php';
-            $user  = $this->auth->getUser();
+
+            // Admin não cobra TudiCoins neste fluxo (comportamento anterior).
             $jobId = \App\Services\AIJobService::enqueue(
-                'gerar_exercicios_jornada',
+                'gerar_questao_ia',
                 [
-                    'jornada_id' => (int) $modulo['jornada_id'],
-                    'aula_id'    => null,
-                    'contexto'   => $contextoCompleto,
-                    'tipo'       => $tipo,
+                    'disciplina' => $modulo['materia_nome'] ?? 'Geral',
+                    'assunto' => mb_substr($modulo['jornada_titulo'] . '. ' . $contexto, 0, 200, 'UTF-8'),
+                    'serie' => '',
+                    'dificuldade' => 'medio',
+                    'tipo_questao' => $tipoQuestaoBlueprint,
                     'quantidade' => $quantidade,
-                    'materia'    => $modulo['materia_nome'] ?? 'Geral',
+                    'quantidade_alternativas' => 5,
+                    'com_recurso_visual' => false,
+                    'contexto_adicional' => $contextoCompleto,
+                    'origem' => 'jornada',
+                    'usuario_id' => (int) ($user['id'] ?? 0),
+                    'papel' => 'admin',
+                    'modulo_id' => (int) $modulo_id,
+                    'tipo' => $tipo,
                 ],
-                $user['id'] ?? null,
-                $user['tipo'] ?? 'admin'
+                (int) ($user['id'] ?? 0),
+                $user['tipo'] ?? 'admin',
+                false
             );
 
-            $this->json(['job_id' => $jobId]);
-
+            $this->json(['success' => true, 'job_id' => $jobId]);
         } catch (Exception $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Persiste em jornadas_modulos_exercicios o resultado canônico do job gerar_questao_ia.
+     */
+    public function importarExerciciosModuloIA($jobId)
+    {
+        try {
+            $user = $this->authManager->getUser();
+
+            if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+                $this->json(['error' => 'Token inválido'], 400);
+                return;
+            }
+
+            require_once __DIR__ . '/../../Services/AIJobService.php';
+            $job = \App\Services\AIJobService::getJob((int) $jobId);
+            if (!$job || $job['status'] !== 'done') {
+                $this->json(['error' => 'Job não concluído ou não encontrado'], 404);
+                return;
+            }
+
+            if (($job['job_type'] ?? '') !== 'gerar_questao_ia') {
+                $this->json(['error' => 'Tipo de job inválido para importação'], 422);
+                return;
+            }
+
+            if ((int) ($job['user_id'] ?? 0) !== (int) $user['id']) {
+                $this->json(['error' => 'Não autorizado'], 403);
+                return;
+            }
+
+            $payload = json_decode($job['payload'], true) ?: [];
+            $moduloId = (int) ($payload['modulo_id'] ?? 0);
+            $tipo = $payload['tipo'] ?? 'alternativas';
+
+            if ($moduloId <= 0 || ($payload['origem'] ?? '') !== 'jornada') {
+                $this->json(['error' => 'Payload do job inválido para módulo de jornada'], 422);
+                return;
+            }
+
+            $result = json_decode($job['result'], true) ?: [];
+            if (!empty($result['imported_at'])) {
+                $this->json([
+                    'success' => true,
+                    'exercicios_ids' => $result['exercicios_ids'] ?? [],
+                    'already_imported' => true,
+                ]);
+                return;
+            }
+
+            $modulo = $this->db->fetch(
+                "SELECT m.id FROM jornadas_modulos m WHERE m.id = :modulo_id",
+                ['modulo_id' => $moduloId]
+            );
+            if (!$modulo) {
+                $this->json(['error' => 'Módulo não encontrado'], 404);
+                return;
+            }
+
+            $questoesCanonicas = $result['questoes'] ?? [];
+            if (empty($questoesCanonicas)) {
+                $this->json(['error' => 'Nenhuma questão gerada'], 422);
+                return;
+            }
+
+            $ultimaOrdem = $this->db->fetch(
+                "SELECT MAX(ordem) as max_ordem
+                 FROM jornadas_modulos_exercicios
+                 WHERE modulo_id = :modulo_id",
+                ['modulo_id' => $moduloId]
+            );
+            $ordemBase = (int) ($ultimaOrdem['max_ordem'] ?? 0);
+            $letrasMaiusculas = ['A', 'B', 'C', 'D', 'E'];
+            $exerciciosIds = [];
+
+            $this->db->beginTransaction();
+            try {
+                foreach ($questoesCanonicas as $index => $questao) {
+                    $ordem = $ordemBase + $index + 1;
+                    $enunciado = $questao['enunciado'] ?? '';
+                    $respostaCorreta = null;
+
+                    if ($tipo === 'alternativas') {
+                        $opcoes = [];
+                        foreach (array_slice($questao['alternativas'] ?? [], 0, 5) as $i => $alt) {
+                            $letra = $letrasMaiusculas[$i];
+                            $correta = !empty($alt['correta']);
+                            $opcoes[] = [
+                                'letra' => $letra,
+                                'texto' => $alt['texto'] ?? '',
+                                'correta' => $correta,
+                            ];
+                            if ($correta) {
+                                $respostaCorreta = $letra;
+                            }
+                        }
+                        $questoesJson = ['opcoes' => $opcoes];
+                    } else {
+                        $questoesJson = $questao;
+                    }
+
+                    $exercicioId = $this->db->insert(
+                        "INSERT INTO jornadas_modulos_exercicios
+                         (modulo_id, tipo, titulo, enunciado, imagem_url, questoes_json, resposta_correta, pontuacao, ordem, gerado_ia, status)
+                         VALUES (:modulo_id, :tipo, :titulo, :enunciado, :imagem_url, :questoes_json, :resposta_correta, :pontuacao, :ordem, 1, 'publicado')",
+                        [
+                            'modulo_id' => $moduloId,
+                            'tipo' => $tipo,
+                            'titulo' => 'Questão ' . ($index + 1),
+                            'enunciado' => $enunciado,
+                            'imagem_url' => $questao['imagem']['url'] ?? null,
+                            'questoes_json' => json_encode($questoesJson),
+                            'resposta_correta' => $respostaCorreta,
+                            'pontuacao' => 1.00,
+                            'ordem' => $ordem,
+                        ]
+                    );
+                    $exerciciosIds[] = $exercicioId;
+                }
+
+                $result['imported_at'] = date('c');
+                $result['exercicios_ids'] = $exerciciosIds;
+                $this->db->query(
+                    "UPDATE ai_jobs SET result = ? WHERE id = ?",
+                    [json_encode($result, JSON_UNESCAPED_UNICODE), (int) $jobId]
+                );
+                $this->db->commit();
+            } catch (Exception $e) {
+                $this->db->rollBack();
+                throw $e;
+            }
+
+            $_SESSION['success_message'] = count($exerciciosIds) . ' exercício(s) gerado(s) com sucesso!';
+            $this->json(['success' => true, 'exercicios_ids' => $exerciciosIds]);
+        } catch (Exception $e) {
+            error_log('Erro ao importar exercícios IA (módulo admin): ' . $e->getMessage());
             $this->json(['error' => $e->getMessage()], 400);
         }
     }

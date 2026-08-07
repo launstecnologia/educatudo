@@ -4671,12 +4671,13 @@ class TeacherJourneyController extends BaseController
     }
     
     /**
-     * Gera exercício por IA para o módulo (Professor)
+     * Enfileira geração de exercícios do módulo via motor único (gerar_questao_ia).
+     * A request responde rápido com job_id; o frontend faz polling e chama
+     * importarExerciciosModuloIA ao concluir — evita timeout da Cloudflare (~100s)
+     * que ocorria no fluxo síncrono anterior.
      */
     public function gerarExercicioIAModulo()
     {
-        set_time_limit(240);
-        @ini_set('max_execution_time', '240');
         $traceId = 'ia_jornada_' . date('Ymd_His') . '_' . substr(md5((string) microtime(true)), 0, 8);
         $userId = null;
         $modulo_id = null;
@@ -4690,20 +4691,26 @@ class TeacherJourneyController extends BaseController
         try {
             $user = $this->authManager->getUser();
             $userId = $user['id'] ?? null;
-            
-            // Lê dados do JSON se vier como JSON, senão lê do POST
+
             $input = file_get_contents('php://input');
             $data = json_decode($input, true);
-            
+
+            $tokenCsrf = $data['_token'] ?? ($_POST['_token'] ?? '');
+            if (!$this->verifyCsrfToken($tokenCsrf)) {
+                $this->json(['error' => 'Token inválido'], 400);
+                return;
+            }
+
             if ($data) {
                 $modulo_id = $data['modulo_id'] ?? null;
                 $tipo = $data['tipo'] ?? 'alternativas';
-                $quantidade = (int)($data['quantidade'] ?? 5);
+                $quantidade = (int) ($data['quantidade'] ?? 5);
                 $contexto = $data['contexto'] ?? '';
                 $planosAulaIds = $data['planos_aula_id'] ?? [];
                 $niveis = $data['niveis'] ?? [];
                 $serie = trim((string) ($data['serie'] ?? ''));
                 $comImagens = !empty($data['com_imagens']) && $data['com_imagens'] !== '0';
+                $csrfToken = (string) ($data['_token'] ?? '');
                 $quantidadesPorNivel = [
                     'facil' => (int) ($data['quantidade_facil'] ?? 0),
                     'medio' => (int) ($data['quantidade_medio'] ?? 0),
@@ -4713,12 +4720,13 @@ class TeacherJourneyController extends BaseController
             } else {
                 $modulo_id = $_POST['modulo_id'] ?? null;
                 $tipo = $_POST['tipo'] ?? 'alternativas';
-                $quantidade = (int)($_POST['quantidade'] ?? 5);
+                $quantidade = (int) ($_POST['quantidade'] ?? 5);
                 $contexto = $_POST['contexto'] ?? '';
                 $planosAulaIds = $_POST['planos_aula_id'] ?? [];
                 $niveis = $_POST['niveis'] ?? [];
                 $serie = trim((string) ($_POST['serie'] ?? ''));
                 $comImagens = !empty($_POST['com_imagens']) && $_POST['com_imagens'] !== '0';
+                $csrfToken = (string) ($_POST['_token'] ?? '');
                 $quantidadesPorNivel = [
                     'facil' => (int) ($_POST['quantidade_facil'] ?? 0),
                     'medio' => (int) ($_POST['quantidade_medio'] ?? 0),
@@ -4726,12 +4734,18 @@ class TeacherJourneyController extends BaseController
                     'desafio' => (int) ($_POST['quantidade_desafio'] ?? 0),
                 ];
             }
-            
+
+            if (!$this->verifyCsrfToken($csrfToken)) {
+                $this->json(['error' => 'Token inválido'], 400);
+                return;
+            }
+
             if (!$modulo_id) {
                 throw new Exception('Módulo é obrigatório');
             }
 
-            // Verifica se o módulo pertence a uma jornada do professor
+            $quantidade = max(1, min(20, $quantidade));
+
             $modulo = $this->db->fetch(
                 "SELECT m.*, j.titulo as jornada_titulo, j.descricao as jornada_descricao, j.professor_id, mat.nome as materia_nome
                  FROM jornadas_modulos m
@@ -4740,18 +4754,16 @@ class TeacherJourneyController extends BaseController
                  WHERE m.id = :modulo_id AND j.professor_id = :prof_id",
                 ['modulo_id' => $modulo_id, 'prof_id' => $user['id']]
             );
-            
+
             if (!$modulo) {
                 throw new Exception('Módulo não encontrado ou não autorizado');
             }
-            
-            // Processa planos de aula selecionados
+
             if (is_string($planosAulaIds)) {
                 $planosAulaIds = [$planosAulaIds];
             }
             $planosAulaIds = array_map('intval', array_filter($planosAulaIds));
-            
-            // Busca objetivos dos planos de aula selecionados
+
             $objetivosPlanos = [];
             if (!empty($planosAulaIds)) {
                 foreach ($planosAulaIds as $planoId) {
@@ -4769,8 +4781,7 @@ class TeacherJourneyController extends BaseController
                     }
                 }
             }
-            
-            // Prepara contexto para IA
+
             $contextoCompleto = "Matéria: " . ($modulo['materia_nome'] ?? 'Geral') . "\n";
             $contextoCompleto .= "Jornada: {$modulo['jornada_titulo']}\n";
             if ($modulo['jornada_descricao']) {
@@ -4785,29 +4796,14 @@ class TeacherJourneyController extends BaseController
             $contextoCompleto .= "Tipo de exercício: {$tipo}\n";
             $contextoCompleto .= "Quantidade: {$quantidade} exercícios\n";
             if (!empty($niveis)) {
-            $contextoCompleto .= "Níveis de dificuldade: " . implode(', ', $niveis) . "\n";
+                $contextoCompleto .= "Níveis de dificuldade: " . implode(', ', $niveis) . "\n";
             }
-            
-            // Consumir crédito antes de gerar exercícios por IA (módulo)
-            require_once __DIR__ . '/../../Services/CreditosService.php';
-            $creditosServiceModulo = new \App\Services\CreditosService();
-            try {
-                $creditosServiceModulo->consumir('professor', (int) $user['id'], 'gerar_exercicio_ia_professor', (string) $modulo_id);
-            } catch (Exception $e) {
-                if (stripos($e->getMessage(), 'TudiCoins') !== false || stripos($e->getMessage(), 'insuficientes') !== false || stripos($e->getMessage(), 'Créditos') !== false) {
-                    $this->json(['error' => $e->getMessage()], 400);
-                    return;
-                }
-                throw $e;
-            }
-            // Motor único de geração de questão por IA (app/AI/) — chamado
-            // aqui de forma SÍNCRONA (mesmo espírito de hoje: modal abre,
-            // espera, aplica os exercícios direto), sem passar pela fila.
-            // Mapeia tipo do modal pro enum do Blueprint e monta a
-            // distribuição por nível pedida (Fácil/Médio/Difícil/Desafio,
-            // cada um com sua quantidade) como instrução de texto — o
-            // Blueprint só aceita 1 dificuldade "base" por chamada.
-            $tipoQuestaoBlueprint = ['alternativas' => 'multipla_escolha', 'verdadeiro_falso' => 'verdadeiro_falso', 'dissertativa' => 'dissertativa'][$tipo] ?? 'multipla_escolha';
+
+            $tipoQuestaoBlueprint = [
+                'alternativas' => 'multipla_escolha',
+                'verdadeiro_falso' => 'verdadeiro_falso',
+                'dissertativa' => 'dissertativa',
+            ][$tipo] ?? 'multipla_escolha';
 
             $niveisComQtd = array_filter($quantidadesPorNivel);
             $dificuldadeBase = count($niveisComQtd) === 1 ? array_key_first($niveisComQtd) : 'medio';
@@ -4818,130 +4814,37 @@ class TeacherJourneyController extends BaseController
                 foreach ($niveisComQtd as $nivelChave => $qtd) {
                     $partes[] = "{$labelsNivel[$nivelChave]}: {$qtd}";
                 }
-                $distribuicaoTexto = "Distribuição por dificuldade solicitada: " . implode(', ', $partes) . ". ";
+                $distribuicaoTexto = 'Distribuição por dificuldade solicitada: ' . implode(', ', $partes) . '. ';
             }
 
-            require_once __DIR__ . '/../../AI/ContextoExecucao.php';
-            require_once __DIR__ . '/../../AI/ExecutorPipeline.php';
-            require_once __DIR__ . '/../../AI/Agentes/Questoes/PlanejadorQuestaoAgent.php';
-            require_once __DIR__ . '/../../AI/Agentes/Questoes/BuscadorReferenciaAgent.php';
-            require_once __DIR__ . '/../../AI/Agentes/Questoes/GeradorQuestaoAgent.php';
-            require_once __DIR__ . '/../../AI/Agentes/Questoes/ValidadorQuestaoAgent.php';
-            require_once __DIR__ . '/../../AI/Agentes/Questoes/RevisorQuestaoAgent.php';
-            require_once __DIR__ . '/../../AI/Agentes/Questoes/GeradorRecursoVisualAgent.php';
+            require_once __DIR__ . '/../../AI/GeradorQuestaoService.php';
 
-            $execContextoModulo = (new \App\AI\ContextoExecucao())
-                ->set('disciplina', $modulo['materia_nome'] ?? 'Geral')
-                ->set('assunto', mb_substr($modulo['jornada_titulo'] . '. ' . $contexto, 0, 200, 'UTF-8'))
-                ->set('serie', $serie)
-                ->set('dificuldade', $dificuldadeBase)
-                ->set('tipo_questao', $tipoQuestaoBlueprint)
-                ->set('quantidade', $quantidade)
-                ->set('quantidade_alternativas', 5)
-                ->set('com_recurso_visual', $comImagens ? 'auto' : false)
-                ->set('contexto_adicional', $distribuicaoTexto . $contextoCompleto)
-                ->set('config', $this->config);
+            $jobId = \App\AI\GeradorQuestaoService::solicitar([
+                'disciplina' => $modulo['materia_nome'] ?? 'Geral',
+                'assunto' => mb_substr($modulo['jornada_titulo'] . '. ' . $contexto, 0, 200, 'UTF-8'),
+                'serie' => $serie,
+                'dificuldade' => $dificuldadeBase,
+                'tipo_questao' => $tipoQuestaoBlueprint,
+                'quantidade' => $quantidade,
+                'quantidade_alternativas' => 5,
+                'com_recurso_visual' => $comImagens ? 'auto' : false,
+                'contexto_adicional' => $distribuicaoTexto . $contextoCompleto,
+                'origem' => 'jornada',
+                'usuario_id' => (int) $user['id'],
+                'papel' => 'professor',
+                'config' => $this->config,
+                'modulo_id' => (int) $modulo_id,
+                'tipo' => $tipo,
+            ]);
 
-            // RevisorCriticoAgent (gpt-5.6-sol) fica de fora aqui de propósito: esse
-            // endpoint já roda IA de forma síncrona dentro da request HTTP (dívida
-            // técnica pré-existente, registrada, ainda não migrada pra fila) — pra
-            // nível "desafio" o RevisorCritico dispara SEMPRE (incondicional), o que
-            // somado ao Gerador+RevisorQuestao já em série deixaria essa request
-            // ainda mais exposta a estourar timeout. A segunda opinião mais rigorosa
-            // continua rodando no fluxo assíncrono (AIJobService::dispatchGerarQuestaoIA,
-            // usado por Prova/Exercício IA/Jornada por aula) — só falta aqui até esta
-            // tela também migrar pra fila.
-            $agentesQuestao = [
-                new \App\AI\Agentes\Questoes\PlanejadorQuestaoAgent(),
-                new \App\AI\Agentes\Questoes\BuscadorReferenciaAgent(),
-                new \App\AI\Agentes\Questoes\GeradorQuestaoAgent(),
-                new \App\AI\Agentes\Questoes\ValidadorQuestaoAgent(),
-                new \App\AI\Agentes\Questoes\RevisorQuestaoAgent(),
-            ];
-            if ($comImagens) {
-                $agentesQuestao[] = new \App\AI\Agentes\Questoes\GeradorRecursoVisualAgent();
-            }
-            $execContextoModulo = \App\AI\ExecutorPipeline::executar($agentesQuestao, $execContextoModulo);
-            $questoesCanonicas = $execContextoModulo->get('questoes_validadas', []);
-
-            // Salva cada exercício gerado
-            $exerciciosIds = [];
-
-            error_log("Total de exercícios recebidos da IA: " . count($questoesCanonicas));
-
-            // Busca a última ordem uma vez
-            $ultimaOrdem = $this->db->fetch(
-                "SELECT MAX(ordem) as max_ordem
-                 FROM jornadas_modulos_exercicios
-                 WHERE modulo_id = :modulo_id",
-                ['modulo_id' => $modulo_id]
-            );
-            $ordemBase = ($ultimaOrdem['max_ordem'] ?? 0);
-
-            $letrasMaiusculas = ['A', 'B', 'C', 'D', 'E'];
-            foreach ($questoesCanonicas as $index => $questao) {
-                $ordem = $ordemBase + $index + 1;
-                $enunciado = $questao['enunciado'] ?? '';
-                $respostaCorreta = null;
-
-                if ($tipo === 'alternativas') {
-                    $opcoes = [];
-                    foreach (array_slice($questao['alternativas'] ?? [], 0, 5) as $i => $alt) {
-                        $letra = $letrasMaiusculas[$i];
-                        $correta = !empty($alt['correta']);
-                        $opcoes[] = [
-                            'letra' => $letra,
-                            'texto' => $alt['texto'] ?? '',
-                            'correta' => $correta,
-                        ];
-                        if ($correta) {
-                            $respostaCorreta = $letra;
-                        }
-                    }
-                    $questoesJson = ['opcoes' => $opcoes];
-                } else {
-                    $questoesJson = $questao;
-                }
-
-                $titulo = 'Questão ' . ($index + 1);
-                $imagemUrl = $questao['imagem']['url'] ?? null;
-
-                $exercicioId = $this->db->insert(
-                    "INSERT INTO jornadas_modulos_exercicios
-                     (modulo_id, tipo, titulo, enunciado, imagem_url, questoes_json, resposta_correta, pontuacao, ordem, gerado_ia, status)
-                     VALUES (:modulo_id, :tipo, :titulo, :enunciado, :imagem_url, :questoes_json, :resposta_correta, :pontuacao, :ordem, 1, 'publicado')",
-                    [
-                        'modulo_id' => $modulo_id,
-                        'tipo' => $tipo,
-                        'titulo' => $titulo,
-                        'enunciado' => $enunciado,
-                        'imagem_url' => $imagemUrl,
-                        'questoes_json' => json_encode($questoesJson),
-                        'resposta_correta' => $respostaCorreta,
-                        'pontuacao' => 1.00,
-                        'ordem' => $ordem
-                    ]
-                );
-                $exerciciosIds[] = $exercicioId;
-            }
-
-            $_SESSION['success_message'] = count($exerciciosIds) . ' exercício(s) gerado(s) com sucesso!';
-            $this->json(['success' => true, 'exercicios_ids' => $exerciciosIds, 'exercicios' => $questoesCanonicas]);
-            
+            $this->json(['success' => true, 'job_id' => $jobId]);
         } catch (Exception $e) {
-            if (isset($creditosServiceModulo, $modulo_id)) {
-                try {
-                    $creditosServiceModulo->estornarPorReferencia('gerar_exercicio_ia_professor', (string) $modulo_id);
-                } catch (Exception $e2) {
-                    error_log("Estorno gerar_exercicio_ia_professor (módulo): " . $e2->getMessage());
-                }
-            }
-            error_log("Erro ao gerar exercício por IA: " . $e->getMessage());
+            error_log('Erro ao enfileirar exercício por IA (módulo): ' . $e->getMessage());
             if (!class_exists('Logger')) {
                 require_once __DIR__ . '/../../Core/Logger.php';
             }
             Logger::error(
-                'Falha na geração de exercícios com IA (módulo)',
+                'Falha ao enfileirar geração de exercícios com IA (módulo)',
                 [
                     'trace_id' => $traceId,
                     'exception' => $e,
@@ -4958,34 +4861,165 @@ class TeacherJourneyController extends BaseController
             );
             $this->json(['error' => $e->getMessage()], 400);
         } catch (Throwable $e) {
-            if (isset($creditosServiceModulo, $modulo_id)) {
-                try {
-                    $creditosServiceModulo->estornarPorReferencia('gerar_exercicio_ia_professor', (string) $modulo_id);
-                } catch (Exception $e2) {
-                    error_log("Estorno gerar_exercicio_ia_professor (módulo): " . $e2->getMessage());
-                }
-            }
-            error_log("Erro fatal ao gerar exercício por IA: " . $e->getMessage());
+            error_log('Erro fatal ao enfileirar exercício por IA (módulo): ' . $e->getMessage());
             if (!class_exists('Logger')) {
                 require_once __DIR__ . '/../../Core/Logger.php';
             }
             Logger::error(
-                'Erro fatal na geração de exercícios com IA (módulo)',
+                'Erro fatal ao enfileirar geração de exercícios com IA (módulo)',
                 [
                     'trace_id' => $traceId,
                     'exception' => $e,
                     'user_id' => $userId,
                     'modulo_id' => $modulo_id,
-                    'tipo' => $tipo,
-                    'quantidade' => $quantidade,
-                    'niveis' => $niveis,
-                    'planos_aula_ids' => $planosAulaIds,
-                    'contexto_len' => mb_strlen((string) $contexto),
-                    'payload_excerpt' => mb_substr((string) $input, 0, 1200),
                 ],
                 'jornadas'
             );
             $this->json(['error' => 'Falha interna ao gerar exercícios por IA. Ref: ' . $traceId], 500);
+        }
+    }
+
+    /**
+     * Persiste em jornadas_modulos_exercicios o resultado canônico do job
+     * gerar_questao_ia (chamado pelo frontend após AIJobPoller.onDone).
+     */
+    public function importarExerciciosModuloIA($jobId)
+    {
+        try {
+            $user = $this->authManager->getUser();
+
+            if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+                $this->json(['error' => 'Token inválido'], 400);
+                return;
+            }
+
+            require_once __DIR__ . '/../../Services/AIJobService.php';
+            $job = \App\Services\AIJobService::getJob((int) $jobId);
+            if (!$job || $job['status'] !== 'done') {
+                $this->json(['error' => 'Job não concluído ou não encontrado'], 404);
+                return;
+            }
+
+            if (($job['job_type'] ?? '') !== 'gerar_questao_ia') {
+                $this->json(['error' => 'Tipo de job inválido para importação'], 422);
+                return;
+            }
+
+            if ((int) ($job['user_id'] ?? 0) !== (int) $user['id']) {
+                $this->json(['error' => 'Não autorizado'], 403);
+                return;
+            }
+
+            $payload = json_decode($job['payload'], true) ?: [];
+            $moduloId = (int) ($payload['modulo_id'] ?? 0);
+            $tipo = $payload['tipo'] ?? 'alternativas';
+
+            if ($moduloId <= 0 || ($payload['origem'] ?? '') !== 'jornada') {
+                $this->json(['error' => 'Payload do job inválido para módulo de jornada'], 422);
+                return;
+            }
+
+            $result = json_decode($job['result'], true) ?: [];
+            if (!empty($result['imported_at'])) {
+                $this->json([
+                    'success' => true,
+                    'exercicios_ids' => $result['exercicios_ids'] ?? [],
+                    'already_imported' => true,
+                ]);
+                return;
+            }
+
+            $modulo = $this->db->fetch(
+                "SELECT m.id
+                 FROM jornadas_modulos m
+                 JOIN jornadas j ON m.jornada_id = j.id
+                 WHERE m.id = :modulo_id AND j.professor_id = :prof_id",
+                ['modulo_id' => $moduloId, 'prof_id' => $user['id']]
+            );
+            if (!$modulo) {
+                $this->json(['error' => 'Módulo não encontrado ou não autorizado'], 403);
+                return;
+            }
+
+            $questoesCanonicas = $result['questoes'] ?? [];
+            if (empty($questoesCanonicas)) {
+                $this->json(['error' => 'Nenhuma questão gerada'], 422);
+                return;
+            }
+
+            $ultimaOrdem = $this->db->fetch(
+                "SELECT MAX(ordem) as max_ordem
+                 FROM jornadas_modulos_exercicios
+                 WHERE modulo_id = :modulo_id",
+                ['modulo_id' => $moduloId]
+            );
+            $ordemBase = (int) ($ultimaOrdem['max_ordem'] ?? 0);
+
+            $letrasMaiusculas = ['A', 'B', 'C', 'D', 'E'];
+            $exerciciosIds = [];
+
+            $this->db->beginTransaction();
+            try {
+                foreach ($questoesCanonicas as $index => $questao) {
+                    $ordem = $ordemBase + $index + 1;
+                    $enunciado = $questao['enunciado'] ?? '';
+                    $respostaCorreta = null;
+
+                    if ($tipo === 'alternativas') {
+                        $opcoes = [];
+                        foreach (array_slice($questao['alternativas'] ?? [], 0, 5) as $i => $alt) {
+                            $letra = $letrasMaiusculas[$i];
+                            $correta = !empty($alt['correta']);
+                            $opcoes[] = [
+                                'letra' => $letra,
+                                'texto' => $alt['texto'] ?? '',
+                                'correta' => $correta,
+                            ];
+                            if ($correta) {
+                                $respostaCorreta = $letra;
+                            }
+                        }
+                        $questoesJson = ['opcoes' => $opcoes];
+                    } else {
+                        $questoesJson = $questao;
+                    }
+
+                    $exercicioId = $this->db->insert(
+                        "INSERT INTO jornadas_modulos_exercicios
+                         (modulo_id, tipo, titulo, enunciado, imagem_url, questoes_json, resposta_correta, pontuacao, ordem, gerado_ia, status)
+                         VALUES (:modulo_id, :tipo, :titulo, :enunciado, :imagem_url, :questoes_json, :resposta_correta, :pontuacao, :ordem, 1, 'publicado')",
+                        [
+                            'modulo_id' => $moduloId,
+                            'tipo' => $tipo,
+                            'titulo' => 'Questão ' . ($index + 1),
+                            'enunciado' => $enunciado,
+                            'imagem_url' => $questao['imagem']['url'] ?? null,
+                            'questoes_json' => json_encode($questoesJson),
+                            'resposta_correta' => $respostaCorreta,
+                            'pontuacao' => 1.00,
+                            'ordem' => $ordem,
+                        ]
+                    );
+                    $exerciciosIds[] = $exercicioId;
+                }
+
+                $result['imported_at'] = date('c');
+                $result['exercicios_ids'] = $exerciciosIds;
+                $this->db->query(
+                    "UPDATE ai_jobs SET result = ? WHERE id = ?",
+                    [json_encode($result, JSON_UNESCAPED_UNICODE), (int) $jobId]
+                );
+                $this->db->commit();
+            } catch (Exception $e) {
+                $this->db->rollBack();
+                throw $e;
+            }
+
+            $_SESSION['success_message'] = count($exerciciosIds) . ' exercício(s) gerado(s) com sucesso!';
+            $this->json(['success' => true, 'exercicios_ids' => $exerciciosIds]);
+        } catch (Exception $e) {
+            error_log('Erro ao importar exercícios IA (módulo): ' . $e->getMessage());
+            $this->json(['error' => $e->getMessage()], 400);
         }
     }
     
