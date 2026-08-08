@@ -10,6 +10,7 @@ $router->get('/master/escolas/criar', 'Master/MasterEscolasController@create');
 $router->post('/master/escolas/salvar', 'Master/MasterEscolasController@store');
 $router->get('/master/escolas/editar', 'Master/MasterEscolasController@edit');
 $router->post('/master/escolas/atualizar', 'Master/MasterEscolasController@update');
+$router->post('/master/escolas/manutencao', 'Master/MasterEscolasController@toggleManutencao');
 $router->post('/master/escolas/verificar-dominio', 'Master/MasterEscolasController@verificarDominio');
 $router->get('/master/escolas/verificar-dominios-cron', 'Master/MasterEscolasController@verificarDominiosCron');
 $router->get('/master/migrations', 'Master/MasterMigrationsController@index');

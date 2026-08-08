@@ -35,6 +35,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach ($escolas as $e): ?>
+                    <?php $emManutencao = (string) ($e['maintenance_mode'] ?? '0') === '1'; ?>
                     <tr class="hover:bg-slate-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700"><?= (int) $e['id'] ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900"><?= htmlspecialchars($e['nome']) ?></td>
@@ -62,7 +63,9 @@
                             <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <?php if (!empty($e['ativo'])): ?>
+                            <?php if ($emManutencao): ?>
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Manutenção</span>
+                            <?php elseif (!empty($e['ativo'])): ?>
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>
                             <?php else: ?>
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Inativo</span>
@@ -76,6 +79,23 @@
                             <a href="<?= URL ?>/master/escolas/editar?id=<?= (int) $e['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                                 <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                             </a>
+                            <?php if (empty($e['tem_banco'])): ?>
+                            <span class="flex items-center gap-2 px-4 py-2 text-sm text-slate-400 cursor-not-allowed" title="Configure o banco da escola antes de alterar a manutenção.">
+                                <i class="fa-solid fa-screwdriver-wrench text-slate-300 w-4 text-center"></i> Manutenção indisponível
+                            </span>
+                            <?php else: ?>
+                            <form method="POST" action="<?= URL ?>/master/escolas/manutencao">
+                                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+                                <input type="hidden" name="id" value="<?= (int) $e['id'] ?>">
+                                <input type="hidden" name="enabled" value="<?= $emManutencao ? '0' : '1' ?>">
+                                <button type="submit"
+                                        class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm <?= $emManutencao ? 'text-emerald-700 hover:bg-emerald-50' : 'text-amber-700 hover:bg-amber-50' ?>"
+                                        onclick="return confirm('<?= $emManutencao ? 'Retirar esta escola da manutenção?' : 'Colocar esta escola em manutenção?' ?>')">
+                                    <i class="fa-solid <?= $emManutencao ? 'fa-circle-play text-emerald-500' : 'fa-screwdriver-wrench text-amber-500' ?> w-4 text-center"></i>
+                                    <?= $emManutencao ? 'Sair da manutenção' : 'Entrar em manutenção' ?>
+                                </button>
+                            </form>
+                            <?php endif; ?>
                             <?php $row_actions_dropdown_items = ob_get_clean(); ?>
                             <?php $row_actions_dropdown_id = 'row-actions-escola-' . (int) $e['id']; ?>
                             <?php include __DIR__ . '/../../admin/_partials/row_actions_dropdown.php'; ?>

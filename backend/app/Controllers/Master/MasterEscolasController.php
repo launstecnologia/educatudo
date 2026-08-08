@@ -293,6 +293,100 @@ class MasterEscolasController extends BaseController
         RedisCache::delete('config_layout');
     }
 
+    private function setMaintenanceMode(int $escolaId, bool $enabled): void
+    {
+        require_once __DIR__ . '/../../Core/MasterTenantConnection.php';
+        $tenant = MasterTenantConnection::getPdoAndEscola($escolaId);
+        if (!$tenant || empty($tenant['pdo']) || !$tenant['pdo'] instanceof PDO) {
+            throw new Exception('Não foi possível conectar ao banco da escola para alterar a manutenção.');
+        }
+
+        $value = $enabled ? '1' : '0';
+        $pdo = $tenant['pdo'];
+        $pdo->prepare(
+            "INSERT INTO config_layout (config_key, config_value, config_type, description, created_at, updated_at)
+             VALUES ('maintenance_mode', ?, 'text', 'Modo manutenção da escola', NOW(), NOW())
+             ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = NOW()"
+        )->execute([$value]);
+
+        $this->setLayoutConfig($escolaId, ['maintenance_mode' => $value]);
+
+        require_once __DIR__ . '/../../Core/RedisCache.php';
+        RedisCache::delete('config_layout_' . $escolaId);
+        RedisCache::delete('config_layout');
+    }
+
+    private function getTenantMaintenanceMode(int $escolaId): ?string
+    {
+        require_once __DIR__ . '/../../Core/MasterTenantConnection.php';
+        $tenant = MasterTenantConnection::getPdoAndEscola($escolaId);
+        if (!$tenant || empty($tenant['pdo']) || !$tenant['pdo'] instanceof PDO) {
+            return null;
+        }
+
+        $stmt = $tenant['pdo']->prepare(
+            "SELECT config_value FROM config_layout WHERE config_key = 'maintenance_mode' LIMIT 1"
+        );
+        $stmt->execute();
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? '0' : (string) $value;
+    }
+
+    private function syncMaintenanceStatusFromTenants(array $escolas): array
+    {
+        foreach ($escolas as &$escola) {
+            if (empty($escola['tem_banco'])) {
+                continue;
+            }
+
+            $tenantValue = $this->getTenantMaintenanceMode((int) $escola['id']);
+            if ($tenantValue === null) {
+                continue;
+            }
+
+            $normalized = $tenantValue === '1' ? '1' : '0';
+            if ((string) ($escola['maintenance_mode'] ?? '0') !== $normalized) {
+                $this->setLayoutConfig((int) $escola['id'], ['maintenance_mode' => $normalized]);
+            }
+            $escola['maintenance_mode'] = $normalized;
+        }
+        unset($escola);
+
+        return $escolas;
+    }
+
+    public function toggleManutencao(): void
+    {
+        $this->requireMaster();
+        $id = (int) ($_POST['id'] ?? 0);
+        $enabled = (string) ($_POST['enabled'] ?? '') === '1';
+
+        if ($id <= 0) {
+            $this->setFlashMessage('Escola inválida.', 'error');
+            header('Location: ' . URL . '/master/escolas');
+            exit;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Recarregue a página e tente novamente.', 'error');
+            header('Location: ' . URL . '/master/escolas');
+            exit;
+        }
+
+        try {
+            $this->setMaintenanceMode($id, $enabled);
+            $this->setFlashMessage(
+                $enabled ? 'Escola colocada em manutenção.' : 'Escola retirada da manutenção.',
+                'success'
+            );
+        } catch (Exception $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+        }
+
+        header('Location: ' . URL . '/master/escolas');
+        exit;
+    }
+
     public function index()
     {
         $this->requireMaster();
@@ -310,10 +404,15 @@ class MasterEscolasController extends BaseController
         $escolas = $db->query(
             "SELECT e.id, e.nome, e.slug, e.dominio, e.ativo, e.created_at,
                     e.dns_status, e.ssl_status, e.ssl_expira_em,
+                    COALESCE(ml.config_value, '0') AS maintenance_mode,
                     (SELECT COUNT(*) FROM config_escolas_banco c WHERE c.escola_id = e.id) AS tem_banco
-             FROM escolas e ORDER BY e.nome
+             FROM escolas e
+             LEFT JOIN config_escolas_layout ml
+               ON ml.escola_id = e.id AND ml.config_key = 'maintenance_mode'
+             ORDER BY e.nome
              LIMIT {$perPage} OFFSET {$offset}"
         )->fetchAll(PDO::FETCH_ASSOC);
+        $escolas = $this->syncMaintenanceStatusFromTenants($escolas);
 
         $this->viewWithLayout('master', 'master/escolas/index', [
             'title' => 'Escolas - Painel Master',
@@ -321,6 +420,7 @@ class MasterEscolasController extends BaseController
             'current_page' => 'escolas',
             'master_nome' => $_SESSION['master_user_nome'] ?? 'Admin',
             'escolas' => $escolas,
+            'csrf_token' => $this->generateCsrfToken(),
             'dominio_config' => $this->getDominioViewConfig(),
             'pagination' => [
                 'page' => $page,
