@@ -88,7 +88,7 @@ fi
 echo "==> Subindo containers com SSL Origin"
 docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml pull nginx redis || true
 docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml build php
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml up -d --remove-orphans
+docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml up -d
 
 echo "==> Ajustando permissoes de storage/uploads"
 if command -v sudo >/dev/null 2>&1; then
@@ -99,14 +99,27 @@ else
 fi
 
 echo "==> Health check local"
-status="$(curl -k -s -o /tmp/educatudo-deploy-health.html -w "%{http_code}" -H "Host: $HOST_HEADER" "https://127.0.0.1$HEALTH_PATH" || true)"
+status="000"
+for attempt in 1 2 3 4 5 6; do
+  status="$(curl -k -s -o /tmp/educatudo-deploy-health.html -w "%{http_code}" -H "Host: $HOST_HEADER" "https://127.0.0.1$HEALTH_PATH" || true)"
+  case "$status" in
+    200|302)
+      echo "    OK: $HEALTH_PATH retornou $status"
+      break
+      ;;
+    *)
+      echo "    Tentativa $attempt/6 retornou $status; aguardando PHP/Nginx estabilizar..."
+      sleep 5
+      ;;
+  esac
+done
+
 case "$status" in
-  200|302)
-    echo "    OK: $HEALTH_PATH retornou $status"
-    ;;
+  200|302) ;;
   *)
     echo "ERRO: health check retornou $status" >&2
     docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml logs --tail=120 php >&2 || true
+    docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml logs --tail=80 nginx >&2 || true
     exit 1
     ;;
 esac
