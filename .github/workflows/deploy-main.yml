@@ -13,16 +13,9 @@ concurrency:
 jobs:
   deploy:
     name: Deploy Oracle
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.ORACLE_HOST }}
-          username: ${{ secrets.ORACLE_USER }}
-          key: ${{ secrets.ORACLE_SSH_KEY }}
-          port: ${{ secrets.ORACLE_PORT }}
-          script_stop: true
-          script: |
-            cd "${{ secrets.ORACLE_DEPLOY_PATH }}"
-            bash scripts/deploy-main.sh
+      - name: Deploy no servidor
+        run: |
+          cd /opt/educatudo
+          bash scripts/deploy-main.sh
