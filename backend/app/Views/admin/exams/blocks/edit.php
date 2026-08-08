@@ -423,6 +423,9 @@ function adicionarProfessor(professorData = null) {
     const matId = professorData ? (professorData.materia_id ?? '') : '';
     const materiaNome = professorData ? (professorData.materia_nome || '') : '';
     const quantidadeQuestoes = professorData ? (parseInt(professorData.quantidade_questoes, 10) || 5) : 5;
+    const turmasProfessorSelecionadas = professorData && Array.isArray(professorData.turmas)
+        ? professorData.turmas.map(t => parseInt((typeof t === 'object' && t !== null) ? (t.id || 0) : t, 10)).filter(id => id > 0)
+        : [];
     
     professorDiv.innerHTML = `
         <div class="flex items-center justify-between mb-4">
@@ -474,6 +477,23 @@ function adicionarProfessor(professorData = null) {
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                        placeholder="Ex: 5">
             </div>
+        </div>
+
+        <div>
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    Turmas deste professor <span class="text-red-500">*</span>
+                </label>
+                <button type="button"
+                        onclick="marcarTurmasProfessor(${professorCounter})"
+                        class="text-xs font-medium text-purple-700 hover:text-purple-900">
+                    Marcar turmas do evento
+                </button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border border-gray-200 rounded-lg bg-white p-3">
+                ${turmasProfessorHtml(professorCounter, turmasProfessorSelecionadas)}
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Selecione apenas as turmas em que este professor deve criar prova ou lançar nota.</p>
         </div>
     `;
     
@@ -629,6 +649,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     manterAgendaNoFinalDoFormulario();
     ajustarOpcoesConfiguracaoNotaPorFormato();
+    document.querySelectorAll('input[name="turmas[]"]').forEach(el => {
+        el.addEventListener('change', sincronizarTurmasProfessoresComBloco);
+    });
     document.querySelectorAll('input[name="formato_evento"]').forEach(el => {
         el.addEventListener('change', ajustarOpcoesConfiguracaoNotaPorFormato);
     });
@@ -637,6 +660,77 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     garantirPrazoProfessorPreenchido();
 });
+
+function getTurmasBlocoSelecionadas() {
+    return Array.from(document.querySelectorAll('input[name="turmas[]"]:checked'))
+        .map(cb => parseInt(cb.value, 10))
+        .filter(id => id > 0);
+}
+
+function turmasProfessorHtml(professorIndex, selecionadas = null) {
+    const turmasBloco = getTurmasBlocoSelecionadas();
+    const turmasSelecionadas = Array.isArray(selecionadas) && selecionadas.length > 0
+        ? selecionadas.map(id => parseInt(id, 10))
+        : turmasBloco;
+    const selecionadasSet = new Set(turmasSelecionadas);
+    const turmasBlocoSet = new Set(turmasBloco);
+
+    if (!Array.isArray(turmas) || turmas.length === 0) {
+        return '<p class="text-sm text-gray-500">Nenhuma turma disponível</p>';
+    }
+
+    return turmas.map(t => {
+        const turmaId = parseInt(t.id, 10);
+        const checked = selecionadasSet.has(turmaId) ? 'checked' : '';
+        const disabled = turmasBlocoSet.size > 0 && !turmasBlocoSet.has(turmaId) ? 'disabled' : '';
+        const mutedClass = disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
+        const serie = t.serie ? `<span class="block text-xs text-gray-500">Série: ${t.serie}</span>` : '';
+        return `
+            <label class="flex items-start gap-2 p-2 rounded border border-gray-100 hover:bg-gray-50 ${mutedClass}">
+                <input type="checkbox"
+                       name="professores[${professorIndex}][turmas][]"
+                       value="${turmaId}"
+                       data-turma-id="${turmaId}"
+                       ${disabled}
+                       class="turma-professor-checkbox mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                <span class="min-w-0">
+                    <span class="block text-sm font-medium text-gray-800">${t.nome}</span>
+                    ${serie}
+                </span>
+            </label>
+        `.replace('value="' + turmaId + '"', 'value="' + turmaId + '" ' + checked);
+    }).join('');
+}
+
+function marcarTurmasProfessor(professorIndex) {
+    const selecionadas = new Set(getTurmasBlocoSelecionadas());
+    document.querySelectorAll(`#professor_${professorIndex} .turma-professor-checkbox`).forEach(cb => {
+        const turmaId = parseInt(cb.dataset.turmaId || cb.value, 10);
+        cb.checked = selecionadas.has(turmaId);
+    });
+}
+
+function sincronizarTurmasProfessoresComBloco() {
+    const selecionadas = new Set(getTurmasBlocoSelecionadas());
+    document.querySelectorAll('[id^="professor_"]').forEach(div => {
+        const checks = Array.from(div.querySelectorAll('.turma-professor-checkbox'));
+        checks.forEach(cb => {
+            const turmaId = parseInt(cb.dataset.turmaId || cb.value, 10);
+            cb.disabled = selecionadas.size > 0 && !selecionadas.has(turmaId);
+            if (!selecionadas.has(turmaId)) {
+                cb.checked = false;
+            }
+        });
+
+        const algumMarcado = checks.some(cb => cb.checked);
+        if (!algumMarcado) {
+            checks.forEach(cb => {
+                const turmaId = parseInt(cb.dataset.turmaId || cb.value, 10);
+                cb.checked = selecionadas.has(turmaId);
+            });
+        }
+    });
+}
 
 function manterAgendaNoFinalDoFormulario() {
     const form = document.getElementById('formBloco');
@@ -678,11 +772,13 @@ function atualizarBloco(event, blocoId) {
         alert('Selecione pelo menos uma turma para o bloco');
         return;
     }
+    const turmasBlocoSet = new Set(turmasIds);
 
     // Coleta professores com suas matérias
     const professores = [];
     const professorDivs = document.querySelectorAll('[id^="professor_"]');
     let professoresInvalidos = false;
+    let turmasProfessorInvalidas = false;
     
     if (professorDivs.length === 0) {
         alert('Adicione pelo menos um professor');
@@ -698,15 +794,31 @@ function atualizarBloco(event, blocoId) {
         }
         const qtdQuestoesInput = div.querySelector('input[name*="[quantidade_questoes]"]');
         const quantidadeQuestoes = qtdQuestoesInput ? (parseInt(qtdQuestoesInput.value, 10) || 5) : 5;
+        const turmasProfessor = Array.from(div.querySelectorAll('.turma-professor-checkbox:checked'))
+            .map(cb => parseInt(cb.value, 10))
+            .filter(id => id > 0);
+        if (turmasProfessor.length === 0) {
+            turmasProfessorInvalidas = true;
+            return;
+        }
         
         professores.push({
             professor_id: parseInt(professorId),
             materia_id: parseInt(materiaId),
-            quantidade_questoes: Math.max(1, quantidadeQuestoes)
+            quantidade_questoes: Math.max(1, quantidadeQuestoes),
+            turmas: turmasProfessor
         });
     });
     if (professoresInvalidos) {
         alert('Preencha professor e matéria para todos os professores adicionados');
+        return;
+    }
+    if (turmasProfessorInvalidas) {
+        alert('Selecione pelo menos uma turma para cada professor');
+        return;
+    }
+    if (professores.some(prof => prof.turmas.some(turmaId => !turmasBlocoSet.has(turmaId)))) {
+        alert('As turmas de cada professor precisam estar dentro das turmas selecionadas para o evento');
         return;
     }
     

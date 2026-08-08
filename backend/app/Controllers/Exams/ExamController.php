@@ -168,11 +168,28 @@ class ExamController extends BaseController
             }
             $vistos[$chave] = true;
             $turmasEvento = $this->db->fetchAll(
-                "SELECT DISTINCT t.id, t.nome FROM turmas t
-                 INNER JOIN provas_blocos_turmas pbt ON t.id = pbt.turma_id
-                 WHERE pbt.bloco_id = :bloco_id ORDER BY t.nome ASC",
-                ['bloco_id' => $ev['id']]
+                "SELECT DISTINCT t.id, t.nome
+                 FROM provas_blocos_professores pbp_rel
+                 INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp_rel.id
+                 INNER JOIN turmas t ON t.id = pbpt.turma_id
+                 WHERE pbp_rel.bloco_id = :bloco_id
+                   AND pbp_rel.professor_id = :professor_id
+                   AND pbp_rel.materia_id = :materia_id
+                 ORDER BY t.nome ASC",
+                [
+                    'bloco_id' => $ev['id'],
+                    'professor_id' => $professor['id'],
+                    'materia_id' => $ev['materia_id'],
+                ]
             );
+            if (empty($turmasEvento)) {
+                $turmasEvento = $this->db->fetchAll(
+                    "SELECT DISTINCT t.id, t.nome FROM turmas t
+                     INNER JOIN provas_blocos_turmas pbt ON t.id = pbt.turma_id
+                     WHERE pbt.bloco_id = :bloco_id ORDER BY t.nome ASC",
+                    ['bloco_id' => $ev['id']]
+                );
+            }
             $provaExistente = $this->db->fetch(
                 "SELECT p.id, p.titulo, p.status FROM provas p
                  INNER JOIN provas_blocos_vinculo pbp ON p.id = pbp.prova_id

@@ -20,6 +20,7 @@
 ## Feito
 
 <!-- mover itens concluídos para cá com a data -->
+- [x] Avaliações/Notas: permitir selecionar turmas por professor dentro do mesmo evento de prova/lançamento, preservando vínculo `professor + matéria + turmas` e exibindo ao professor apenas suas turmas — 2026-08-08
 - [x] Expo Colag S1: módulo `app/Modulos/expo-colag/` (manifest, rotas, Models/Service/Controllers/Views), migration `2026_08_05_expo_colag_s1`, FeatureGate + Master `geral_expo_colag` (default off), menus Colag/admin, config da edição + rascunho de projeto — 2026-08-05
 - [x] Expo Colag S2: wizard 6 blocos (criar/editar/publicar/preview), migration `2026_08_05_expo_colag_s2` (relações + autorização imagem), painel admin de autorizações — 2026-08-05
 - [x] Expo Colag S3: mural com filtros/seções, inscrição com lock FOR UPDATE + lista de espera, conflitos de agenda, aprovar/recusar professor, CTA aluno — 2026-08-05
