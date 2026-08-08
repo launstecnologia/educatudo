@@ -490,7 +490,7 @@ function adicionarProfessor(professorData = null) {
                     Marcar turmas do evento
                 </button>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border border-gray-200 rounded-lg bg-white p-3">
+            <div class="turmas-professor-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border border-gray-200 rounded-lg bg-white p-3">
                 ${turmasProfessorHtml(professorCounter, turmasProfessorSelecionadas)}
             </div>
             <p class="text-xs text-gray-500 mt-2">Selecione apenas as turmas em que este professor deve criar prova ou lançar nota.</p>
@@ -669,29 +669,31 @@ function getTurmasBlocoSelecionadas() {
 
 function turmasProfessorHtml(professorIndex, selecionadas = null) {
     const turmasBloco = getTurmasBlocoSelecionadas();
-    const turmasSelecionadas = Array.isArray(selecionadas) && selecionadas.length > 0
+    const turmasSelecionadas = Array.isArray(selecionadas)
         ? selecionadas.map(id => parseInt(id, 10))
         : turmasBloco;
     const selecionadasSet = new Set(turmasSelecionadas);
-    const turmasBlocoSet = new Set(turmasBloco);
 
     if (!Array.isArray(turmas) || turmas.length === 0) {
         return '<p class="text-sm text-gray-500">Nenhuma turma disponível</p>';
     }
 
-    return turmas.map(t => {
+    const turmasDoEvento = turmas.filter(t => turmasBloco.includes(parseInt(t.id, 10)));
+
+    if (turmasDoEvento.length === 0) {
+        return '<p class="text-sm text-gray-500 col-span-full">Selecione as turmas do evento para liberar as turmas deste professor.</p>';
+    }
+
+    return turmasDoEvento.map(t => {
         const turmaId = parseInt(t.id, 10);
         const checked = selecionadasSet.has(turmaId) ? 'checked' : '';
-        const disabled = turmasBlocoSet.size > 0 && !turmasBlocoSet.has(turmaId) ? 'disabled' : '';
-        const mutedClass = disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
         const serie = t.serie ? `<span class="block text-xs text-gray-500">Série: ${t.serie}</span>` : '';
         return `
-            <label class="flex items-start gap-2 p-2 rounded border border-gray-100 hover:bg-gray-50 ${mutedClass}">
+            <label class="flex items-start gap-2 p-2 rounded border border-gray-100 hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox"
                        name="professores[${professorIndex}][turmas][]"
                        value="${turmaId}"
                        data-turma-id="${turmaId}"
-                       ${disabled}
                        class="turma-professor-checkbox mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
                 <span class="min-w-0">
                     <span class="block text-sm font-medium text-gray-800">${t.nome}</span>
@@ -713,21 +715,23 @@ function marcarTurmasProfessor(professorIndex) {
 function sincronizarTurmasProfessoresComBloco() {
     const selecionadas = new Set(getTurmasBlocoSelecionadas());
     document.querySelectorAll('[id^="professor_"]').forEach(div => {
+        const professorIndex = parseInt(div.id.replace('professor_', ''), 10);
         const checks = Array.from(div.querySelectorAll('.turma-professor-checkbox'));
-        checks.forEach(cb => {
-            const turmaId = parseInt(cb.dataset.turmaId || cb.value, 10);
-            cb.disabled = selecionadas.size > 0 && !selecionadas.has(turmaId);
-            if (!selecionadas.has(turmaId)) {
-                cb.checked = false;
+        const turmasVisiveisAntes = new Set(checks.map(cb => parseInt(cb.dataset.turmaId || cb.value, 10)));
+        const turmasMarcadas = checks
+            .filter(cb => cb.checked)
+            .map(cb => parseInt(cb.dataset.turmaId || cb.value, 10))
+            .filter(id => selecionadas.has(id));
+
+        selecionadas.forEach(id => {
+            if (!turmasVisiveisAntes.has(id)) {
+                turmasMarcadas.push(id);
             }
         });
 
-        const algumMarcado = checks.some(cb => cb.checked);
-        if (!algumMarcado) {
-            checks.forEach(cb => {
-                const turmaId = parseInt(cb.dataset.turmaId || cb.value, 10);
-                cb.checked = selecionadas.has(turmaId);
-            });
+        const grid = div.querySelector('.turmas-professor-grid');
+        if (grid && professorIndex > 0) {
+            grid.innerHTML = turmasProfessorHtml(professorIndex, checks.length > 0 ? turmasMarcadas : null);
         }
     });
 }
