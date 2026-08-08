@@ -14,11 +14,17 @@ test-results/
 # Sistema e IDE
 .DS_Store
 .cursor/
+.claude/
 
 # Saidas geradas por analises/ferramentas
 graphify-out/
 backend/graphify-out/
 tmp/
+temp/
+playwright-report/
+test-results/
+image.png
+imagem.png
 
 # Dependencias/builds especificos
 backend/vendor/
@@ -32,12 +38,14 @@ ws-server/node_modules/
 /docs/
 !docs/DEPLOY-VPS.md
 !docs/DEPLOY-DOMINIOS.md
-prompts/*
-!prompts/admin_ui_sistema.md
-!prompts/admin_ui_sistema/
+prompts/
+specs/
 tests/
-!tests/
-!tests/**
+testes/
+loadtests/
+familia/
+AGENTS.md
+CLAUDE.md
 package.json
 !package.json
 package-lock.json
