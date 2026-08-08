@@ -19,6 +19,8 @@ test-results/
 # Saidas geradas por analises/ferramentas
 graphify-out/
 backend/graphify-out/
+backend/doc_sistema/
+backend/STRUCTURE.md
 tmp/
 temp/
 playwright-report/
