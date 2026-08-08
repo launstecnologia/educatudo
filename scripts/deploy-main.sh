@@ -89,9 +89,11 @@ echo "==> Subindo containers com SSL Origin"
 docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml pull nginx redis || true
 docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml build php
 docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml up -d
-# O Nginx resolve o upstream php:9000 ao iniciar. Quando o PHP e recriado,
-# reiniciamos o Nginx para evitar 502 apontando para IP antigo do container.
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml restart nginx
+# O PHP roda com opcache.validate_timestamps=0 em producao; apos git pull,
+# reiniciamos o FPM para limpar opcache e carregar os arquivos novos.
+# O Nginx resolve o upstream php:9000 ao iniciar; reiniciar depois do PHP evita
+# 502 apontando para IP antigo do container.
+docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml restart php nginx
 
 echo "==> Ajustando permissoes de storage/uploads"
 if command -v sudo >/dev/null 2>&1; then
