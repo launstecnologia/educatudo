@@ -368,68 +368,6 @@
                 </div>
             </div>
             
-            <!-- Configurações (Menu Expansível) -->
-            <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('configuracoes')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                        <span class="sidebar-text">Configurações</span>
-                    </div>
-                    <svg id="configuracoes-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
-                <div id="configuracoes-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-                    <a href="<?= URL ?>/admin/boletim" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'boletim_config' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m3 8H6a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Notas e Boletim</span>
-                    </a>
-                    <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
-                    <a href="<?= URL ?>/admin/dev" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'dev' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Dev Settings</span>
-                    </a>
-                    <?php endif; ?>
-                    <a href="<?= URL ?>/admin/boletim-guia" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'boletim_guia' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Guia do Boletim</span>
-                    </a>
-                    <a href="<?= URL ?>/admin/maintenance/painel" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'maintenance_panel' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Modo Manutenção</span>
-                    </a>
-                    <a href="<?= URL ?>/admin/settings#slider-dashboard" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'settings' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Slider Dashboard</span>
-                    </a>
-                    <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
-                    <a href="<?= URL ?>/admin/dev/tickets" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'dev_tickets' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16h6m2 4H7a2 2 0 01-2-2V7a2 2 0 012-2h6l4 4v9a2 2 0 01-2 2z"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Tickets</span>
-                        <?php if ($openTicketsCount > 0): ?>
-                            <span class="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full sidebar-text"><?= (int) $openTicketsCount ?></span>
-                        <?php endif; ?>
-                    </a>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
             <!-- Conteúdo (Menu Expansível) -->
             <div class="menu-group">
                 <button type="button" onclick="toggleMenuGroup('conteudo')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -483,10 +421,12 @@
                     </svg>
                 </button>
                 <div id="gestao-escolar-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+                    <?php if (LayoutHelper::isModuleEnabled('processo_matricula')): ?>
                     <a href="<?= URL ?>/admin/enrollment" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'enrollment' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-file-signature w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Matrículas</span>
                     </a>
+                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/faltas" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'faltas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Faltas</span>
@@ -511,6 +451,12 @@
                         <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Documentos Institucionais</span>
                     </a>
+                    <?php if ($canViewSidebar(['modelos_documentos'])): ?>
+                    <a href="<?= URL ?>/admin/modelos-documentos" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'modelos_documentos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-file-contract w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Modelos de documentos</span>
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/grade-horaria" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'grade_horaria' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Grade Horária</span>
@@ -741,7 +687,80 @@
                 </div>
             </div>
             <?php endif; ?>
-            
+
+            <!-- Z-Configuração (final do menu) -->
+            <?php
+            $zConfigPages = [
+                'boletim_config', 'boletim_guia', 'dev', 'dev_tickets', 'maintenance_panel',
+                'settings', 'enrollment_config', 'assinatura_digital', 'ui_modelos',
+            ];
+            $zConfigOpen = in_array(($current_page ?? ''), $zConfigPages, true);
+            ?>
+            <div class="menu-group">
+                <button type="button" onclick="toggleMenuGroup('z-configuracao')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <span class="sidebar-text">Z-Configuração</span>
+                    </div>
+                    <svg id="z-configuracao-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="z-configuracao-submenu" class="<?= $zConfigOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+                    <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
+                    <a href="<?= URL ?>/admin/enrollment/config" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'enrollment_config' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-graduation-cap w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Configuração de Matrícula</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
+                    <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'assinatura_digital' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-pen-nib w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Assinatura Digital</span>
+                    </a>
+                    <?php endif; ?>
+                    <a href="<?= URL ?>/admin/boletim" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'boletim_config' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m3 8H6a2 2 0 01-2-2V5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span class="sidebar-text text-sm">Notas e Boletim</span>
+                    </a>
+                    <a href="<?= URL ?>/admin/boletim-guia" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'boletim_guia' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                        <span class="sidebar-text text-sm">Guia do Boletim</span>
+                    </a>
+                    <a href="<?= URL ?>/admin/maintenance/painel" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'maintenance_panel' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-screwdriver-wrench w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Modo Manutenção</span>
+                    </a>
+                    <a href="<?= URL ?>/admin/settings#slider-dashboard" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'settings' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-images w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Slider Dashboard</span>
+                    </a>
+                    <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+                    <a href="<?= URL ?>/admin/configuracao/ui-modelos" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'ui_modelos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-palette w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">UI Modelos</span>
+                    </a>
+                    <a href="<?= URL ?>/admin/dev" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'dev' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-code w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Dev Settings</span>
+                    </a>
+                    <a href="<?= URL ?>/admin/dev/tickets" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'dev_tickets' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-ticket w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Tickets</span>
+                        <?php if ($openTicketsCount > 0): ?>
+                            <span class="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full sidebar-text"><?= (int) $openTicketsCount ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <?php endif; ?>
+                </div>
+            </div>
             
             <!-- Logout Button -->
             <a href="<?= URL ?>/logout?portal=admin" class="flex items-center px-4 py-3 text-red-200 hover:bg-red-500/20 hover:text-red-100 rounded-xl transition-all duration-200 mt-4">
@@ -1056,7 +1075,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure compact mode always starts with closed groups (visual cleanliness)
     function closeAllMenuGroupsWhenCollapsed() {
         if (!sidebar.classList.contains('collapsed')) return;
-        const menuGroups = ['usuarios', 'academico', 'gestao-escolar', 'conteudo', 'avaliacoes', 'comunicacao', 'sistema', 'relatorios', 'monitoramento', 'configuracoes', 'financeiro'];
+        const menuGroups = ['usuarios', 'academico', 'gestao-escolar', 'conteudo', 'avaliacoes', 'comunicacao', 'sistema', 'relatorios', 'monitoramento', 'z-configuracao', 'financeiro'];
         menuGroups.forEach(group => {
             const submenu = document.getElementById(`${group}-submenu`);
             const arrow = document.getElementById(`${group}-arrow`);
@@ -1101,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Menu groups functionality
-    const menuGroups = ['usuarios', 'academico', 'gestao-escolar', 'conteudo', 'avaliacoes', 'comunicacao', 'sistema', 'relatorios', 'monitoramento', 'configuracoes', 'financeiro', 'financeiro-escolar'];
+    const menuGroups = ['usuarios', 'academico', 'gestao-escolar', 'conteudo', 'avaliacoes', 'comunicacao', 'sistema', 'relatorios', 'monitoramento', 'z-configuracao', 'financeiro', 'financeiro-escolar'];
 
     // Auto-open menu group if current page is inside it
     const currentPage = '<?= addslashes($current_page ?? '') ?>';
@@ -1116,6 +1135,15 @@ document.addEventListener('DOMContentLoaded', function() {
         'ocorrencias': 'gestao-escolar',
         'reunioes': 'gestao-escolar',
         'saude_academica': 'gestao-escolar',
+        'enrollment_config': 'z-configuracao',
+        'assinatura_digital': 'z-configuracao',
+        'boletim_config': 'z-configuracao',
+        'boletim_guia': 'z-configuracao',
+        'maintenance_panel': 'z-configuracao',
+        'settings': 'z-configuracao',
+        'ui_modelos': 'z-configuracao',
+        'dev': 'z-configuracao',
+        'dev_tickets': 'z-configuracao',
     };
     if (autoOpenMap[currentPage]) {
         localStorage.setItem(`menu-${autoOpenMap[currentPage]}-expanded`, 'true');

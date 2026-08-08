@@ -435,6 +435,17 @@ $router->post('/admin/teachers-documentos/salvar', 'Admin/TeacherDocsController@
 // Saúde Acadêmica (Secretaria / Coordenação — read-only)
 $router->get('/admin/saude-academica', 'Admin/SaudeAcademicaController@index');
 
+// UI Modelos (design system demo — perfil dev)
+$router->get('/admin/configuracao/ui-modelos', 'Admin/UiModelosController@index');
+$router->get('/admin/configuracao/ui-modelos/botoes', 'Admin/UiModelosController@botoes');
+$router->get('/admin/configuracao/ui-modelos/tabela', 'Admin/UiModelosController@tabela');
+$router->get('/admin/configuracao/ui-modelos/formulario', 'Admin/UiModelosController@formulario');
+$router->post('/admin/configuracao/ui-modelos/formulario', 'Admin/UiModelosController@formularioEnviar');
+$router->get('/admin/configuracao/ui-modelos/offcanvas', 'Admin/UiModelosController@offcanvas');
+$router->get('/admin/configuracao/ui-modelos/badges', 'Admin/UiModelosController@badges');
+$router->get('/admin/configuracao/ui-modelos/wizard', 'Admin/UiModelosController@wizard');
+$router->post('/admin/configuracao/ui-modelos/wizard', 'Admin/UiModelosController@wizardEnviar');
+
 // Configurações Avançadas (Dev)
 $router->get('/admin/dev', 'Admin/DevAdminController@dev');
 $router->get('/admin/dev/integracoes', 'Admin/DevAdminController@devIntegracoes');

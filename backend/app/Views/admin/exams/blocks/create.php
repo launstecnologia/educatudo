@@ -20,6 +20,17 @@
     outline: none;
 }
 </style>
+<?php
+$ui = __DIR__ . '/../../_partials/ui';
+$ui_wizard_steps = [
+    ['label' => 'Dados', 'sub' => 'Identificação'],
+    ['label' => 'Turmas', 'sub' => 'Participantes'],
+    ['label' => 'Professores', 'sub' => 'Matérias'],
+    ['label' => 'Configuração', 'sub' => 'Formato e prazos'],
+    ['label' => 'Revisão', 'sub' => 'Confirmar'],
+];
+$ui_wizard_current = 1;
+?>
 <div class="mb-8">
     <div class="flex justify-between items-center">
         <div>
@@ -39,8 +50,22 @@
 </div>
 
 <!-- Form -->
+<div id="provaEventoWizard" class="space-y-6">
+    <?php include $ui . '/wizard_steps.php'; ?>
+
+    <div id="wizardAlert" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3"></div>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm">
+        <span id="draftStatus" class="text-gray-500">Rascunho automático ativo.</span>
+        <button type="button"
+                id="btnLimparRascunho"
+                class="self-start sm:self-auto text-xs font-medium text-red-600 hover:text-red-800">
+            Limpar rascunho
+        </button>
+    </div>
+
 <div class="bg-white rounded-xl shadow-lg p-6">
-    <form id="formBloco" onsubmit="salvarBloco(event)">
+    <form id="formBloco" onsubmit="salvarBloco(event)" novalidate>
+        <section class="step-panel" data-step-panel="1">
         <!-- Título -->
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -117,6 +142,16 @@
             </select>
         </div>
 
+        <div class="flex justify-end pt-2">
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Próximo
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="2">
         <!-- Bloco Professores (opcional) -->
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -168,6 +203,19 @@
             </div>
         </div>
 
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="1">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Próximo
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="3">
         <!-- Professores e Matérias (Múltiplos) -->
         <div class="mb-6">
             <div class="flex items-center justify-between mb-4">
@@ -187,6 +235,19 @@
             </div>
         </div>
 
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="2">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Próximo
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="4">
         <!-- Visível no portal do aluno -->
         <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <label class="flex items-start cursor-pointer">
@@ -353,8 +414,32 @@
             </div>
         </div>
 
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="3">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Revisar
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="5">
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Revisão do evento</h3>
+            <p class="text-sm text-gray-500">Confira os dados principais antes de criar o evento.</p>
+        </div>
+
+        <div id="wizardResumoEvento" class="rounded-lg border border-gray-200 bg-gray-50/50 p-5 text-sm text-gray-700 mb-6"></div>
+
         <!-- Botões -->
-        <div class="flex justify-end space-x-4">
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="4">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <div class="flex justify-end space-x-4">
             <a href="<?= URL ?>/admin/provas" 
                class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                 Cancelar
@@ -363,8 +448,11 @@
                     class="btn-primary-custom px-6 py-2 rounded-lg hover:opacity-90">
                 Criar Evento
             </button>
+            </div>
         </div>
+        </section>
     </form>
+</div>
 </div>
 
 <script>
@@ -372,6 +460,360 @@ const professores = <?= json_encode($professores ?? []) ?>;
 const materias = <?= json_encode($materias ?? []) ?>;
 const turmas = <?= json_encode($turmas ?? []) ?>;
 let professorCounter = 0;
+const draftStorageKey = `educatudo:prova-evento:create:${window.location.host}:${window.location.pathname}`;
+let draftSaveTimer = null;
+let restoringDraft = false;
+let wizardCurrentStep = 1;
+const wizardTotalSteps = 5;
+const wizardCompletedSteps = {};
+const wizardErrorSteps = {};
+const wizardClassMap = {
+    ativo: ['border-accent', 'bg-primary', 'text-primary', 'shadow-md'],
+    completo: ['border-green-500', 'bg-green-50', 'text-green-700'],
+    erro: ['border-red-400', 'bg-red-50', 'text-red-700'],
+    pendente: ['border-gray-200', 'bg-white', 'text-gray-600', 'hover:border-gray-300', 'hover:bg-gray-50']
+};
+const wizardAllStateClasses = Object.keys(wizardClassMap).reduce((acc, key) => acc.concat(wizardClassMap[key]), []);
+
+function wizardStepState(step) {
+    if (wizardErrorSteps[step]) return 'erro';
+    if (step === wizardCurrentStep) return 'ativo';
+    if (wizardCompletedSteps[step]) return 'completo';
+    return 'pendente';
+}
+
+function renderWizardBadge(btn, state) {
+    const circle = btn.querySelector('.wizard-step-circle');
+    if (!circle) return;
+    const oldBadge = circle.querySelector('.wizard-step-corner');
+    if (oldBadge) oldBadge.remove();
+    const badge = state === 'completo'
+        ? ['bg-green-500', 'fa-solid fa-check']
+        : (state === 'erro' ? ['bg-red-500', 'fa-solid fa-exclamation'] : null);
+    if (!badge) return;
+    const span = document.createElement('span');
+    span.className = `wizard-step-corner absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-white text-[9px] ${badge[0]}`;
+    span.innerHTML = `<i class="${badge[1]}"></i>`;
+    circle.appendChild(span);
+}
+
+function renderWizardSteps() {
+    document.querySelectorAll('#wizardStepsNav .step-nav-btn').forEach(btn => {
+        const step = parseInt(btn.dataset.stepTarget || '0', 10);
+        const state = wizardStepState(step);
+        btn.classList.remove(...wizardAllStateClasses);
+        btn.classList.add(...wizardClassMap[state]);
+        btn.dataset.stepState = state;
+        btn.dataset.active = state === 'ativo' ? 'true' : 'false';
+        renderWizardBadge(btn, state);
+    });
+    document.querySelectorAll('#wizardStepsNav [data-connector-after]').forEach(el => {
+        const step = parseInt(el.dataset.connectorAfter || '0', 10);
+        const ok = !!wizardCompletedSteps[step] && !wizardErrorSteps[step];
+        el.classList.toggle('bg-green-400', ok);
+        el.classList.toggle('bg-gray-200', !ok);
+    });
+}
+
+function showWizardAlert(message) {
+    const box = document.getElementById('wizardAlert');
+    if (!box) return;
+    box.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>${message}`;
+    box.classList.remove('hidden');
+}
+
+function clearWizardAlert() {
+    const box = document.getElementById('wizardAlert');
+    if (box) box.classList.add('hidden');
+}
+
+function setWizardStep(step) {
+    wizardCurrentStep = Math.max(1, Math.min(wizardTotalSteps, step));
+    document.querySelectorAll('.step-panel').forEach(panel => {
+        panel.classList.toggle('hidden', parseInt(panel.dataset.stepPanel || '0', 10) !== wizardCurrentStep);
+    });
+    if (wizardCurrentStep === 5) {
+        atualizarResumoWizard();
+    }
+    clearWizardAlert();
+    renderWizardSteps();
+    const wizard = document.getElementById('provaEventoWizard');
+    if (wizard) {
+        window.scrollTo({ top: wizard.offsetTop - 16, behavior: 'smooth' });
+    }
+}
+
+function validateWizardStep(step) {
+    let ok = true;
+    let message = '';
+
+    if (step === 1) {
+        const required = ['titulo', 'ano_letivo', 'bimestre', 'tipo_avaliacao_id'];
+        ok = required.every(id => {
+            const el = document.getElementById(id);
+            return el && String(el.value || '').trim() !== '';
+        });
+        message = 'Preencha os dados obrigatórios do evento antes de avançar.';
+    } else if (step === 2) {
+        ok = getTurmasBlocoSelecionadas().length > 0;
+        message = 'Selecione pelo menos uma turma para o evento.';
+    } else if (step === 3) {
+        const professorDivs = Array.from(document.querySelectorAll('[id^="professor_"]'));
+        ok = professorDivs.length > 0 && professorDivs.every(div => {
+            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
+            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
+            const numeroQuestoes = parseInt(div.querySelector('input[name*="[numero_questoes]"]')?.value || '0', 10);
+            const turmasProfessor = div.querySelectorAll('.turma-professor-checkbox:checked').length;
+            return professorId && materiaId && numeroQuestoes > 0 && turmasProfessor > 0;
+        });
+        message = 'Informe professor, matéria, quantidade de questões e turmas para cada professor.';
+    } else if (step === 4) {
+        const formato = document.querySelector('input[name="formato_evento"]:checked')?.value || '';
+        const configuracao = inputConfiguracaoNotaNoFormatoAtual()?.value || '';
+        const dataHoraVisible = !document.getElementById('agendamentoDataHoraContainer')?.classList.contains('hidden');
+        const prazoVisible = !document.getElementById('prazoProfessorContainer')?.classList.contains('hidden');
+        ok = !!formato && !!configuracao;
+        if (ok && dataHoraVisible) {
+            ok = ['data_prova', 'hora_inicio', 'hora_fim'].every(id => String(document.getElementById(id)?.value || '').trim() !== '');
+        }
+        if (ok && prazoVisible) {
+            ok = String(document.getElementById('prazo_entrega_professor')?.value || '').trim() !== '';
+        }
+        message = 'Complete formato, responsável pelas notas e prazos necessários.';
+    }
+
+    wizardErrorSteps[step] = !ok;
+    if (ok) {
+        wizardCompletedSteps[step] = true;
+        clearWizardAlert();
+    } else {
+        showWizardAlert(message);
+    }
+    renderWizardSteps();
+    return ok;
+}
+
+function goWizardStep(targetStep) {
+    const target = Math.max(1, Math.min(wizardTotalSteps, parseInt(targetStep, 10) || 1));
+    if (target <= wizardCurrentStep) {
+        setWizardStep(target);
+        return;
+    }
+
+    while (wizardCurrentStep < target) {
+        if (!validateWizardStep(wizardCurrentStep)) {
+            return;
+        }
+        setWizardStep(wizardCurrentStep + 1);
+    }
+}
+
+function escapeResumo(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function selectedText(selector) {
+    const el = document.querySelector(selector);
+    if (!el || el.selectedIndex < 0) return '';
+    return el.options[el.selectedIndex]?.textContent?.trim() || '';
+}
+
+function atualizarResumoWizard() {
+    const out = document.getElementById('wizardResumoEvento');
+    if (!out) return;
+
+    const professoresResumo = Array.from(document.querySelectorAll('[id^="professor_"]')).map(div => {
+        const professor = div.querySelector('select[name*="[professor_id]"] option:checked')?.textContent?.trim() || 'Professor não selecionado';
+        const materia = div.querySelector('select[name*="[materia_id]"] option:checked')?.textContent?.trim() || 'Matéria não selecionada';
+        const qtd = div.querySelector('input[name*="[numero_questoes]"]')?.value || '0';
+        const turmasQtd = div.querySelectorAll('.turma-professor-checkbox:checked').length;
+        return `<li>${escapeResumo(professor)} · ${escapeResumo(materia)} · ${escapeResumo(qtd)} questão(ões) · ${turmasQtd} turma(s)</li>`;
+    }).join('');
+
+    out.innerHTML = `
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Título</dt><dd class="font-semibold text-gray-900">${escapeResumo(document.getElementById('titulo')?.value)}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Ano/Bimestre</dt><dd>${escapeResumo(document.getElementById('ano_letivo')?.value)} · ${escapeResumo(selectedText('#bimestre'))}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de avaliação</dt><dd>${escapeResumo(selectedText('#tipo_avaliacao_id'))}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Turmas do evento</dt><dd>${getTurmasBlocoSelecionadas().length} turma(s)</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Formato</dt><dd>${escapeResumo(document.querySelector('input[name="formato_evento"]:checked')?.parentElement?.textContent?.trim() || '')}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Portal do aluno</dt><dd>${document.getElementById('visivel_no_portal_aluno')?.checked ? 'Visível' : 'Oculto'}</dd></div>
+        </dl>
+        <div class="mt-5">
+            <p class="text-xs font-medium text-gray-500 uppercase mb-2">Professores</p>
+            <ul class="list-disc pl-5 space-y-1">${professoresResumo || '<li>Nenhum professor configurado</li>'}</ul>
+        </div>
+    `;
+}
+
+function getRadioValue(name) {
+    return document.querySelector(`input[name="${name}"]:checked`)?.value || '';
+}
+
+function setRadioValue(name, value) {
+    if (!value) return;
+    const el = Array.from(document.querySelectorAll(`input[name="${name}"]`))
+        .find(input => input.value === String(value));
+    if (el) el.checked = true;
+}
+
+function coletarRascunhoEvento() {
+    return {
+        saved_at: new Date().toISOString(),
+        step: wizardCurrentStep,
+        campos: {
+            titulo: document.getElementById('titulo')?.value || '',
+            descricao: document.getElementById('descricao')?.value || '',
+            ano_letivo: document.getElementById('ano_letivo')?.value || '',
+            bimestre: document.getElementById('bimestre')?.value || '',
+            tipo_avaliacao_id: document.getElementById('tipo_avaliacao_id')?.value || '',
+            bloco_modelo_id: document.getElementById('bloco_modelo_id')?.value || '',
+            tipo_prova: getRadioValue('tipo_prova'),
+            formato_evento: getRadioValue('formato_evento'),
+            configuracao_nota: getRadioValue('configuracao_nota'),
+            data_prova: document.getElementById('data_prova')?.value || '',
+            hora_inicio: document.getElementById('hora_inicio')?.value || '',
+            hora_fim: document.getElementById('hora_fim')?.value || '',
+            prazo_entrega_professor: document.getElementById('prazo_entrega_professor')?.value || '',
+            visivel_no_portal_aluno: !!document.getElementById('visivel_no_portal_aluno')?.checked,
+            nota_unica_todas_materias: !!document.getElementById('nota_unica_todas_materias')?.checked
+        },
+        turmas: getTurmasBlocoSelecionadas(),
+        professores: Array.from(document.querySelectorAll('[id^="professor_"]')).map(div => ({
+            professor_id: div.querySelector('select[name*="[professor_id]"]')?.value || '',
+            materia_id: div.querySelector('select[name*="[materia_id]"]')?.value || '',
+            numero_questoes: div.querySelector('input[name*="[numero_questoes]"]')?.value || '',
+            turmas: Array.from(div.querySelectorAll('.turma-professor-checkbox:checked')).map(cb => parseInt(cb.value, 10)).filter(id => id > 0)
+        }))
+    };
+}
+
+function atualizarStatusRascunho(savedAt = null) {
+    const el = document.getElementById('draftStatus');
+    if (!el) return;
+    if (!savedAt) {
+        el.textContent = 'Rascunho automático ativo.';
+        return;
+    }
+    const dt = new Date(savedAt);
+    const hora = Number.isNaN(dt.getTime()) ? '' : dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    el.textContent = hora ? `Rascunho salvo às ${hora}.` : 'Rascunho salvo.';
+}
+
+function salvarRascunhoEvento() {
+    if (restoringDraft) return;
+    try {
+        const draft = coletarRascunhoEvento();
+        localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+        atualizarStatusRascunho(draft.saved_at);
+    } catch (e) {
+        console.warn('Não foi possível salvar o rascunho do evento:', e);
+    }
+}
+
+function agendarSalvarRascunho() {
+    if (restoringDraft) return;
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(salvarRascunhoEvento, 350);
+}
+
+function limparRascunhoEvento(confirmar = true) {
+    if (confirmar && !confirm('Limpar o rascunho salvo deste evento?')) {
+        return;
+    }
+    localStorage.removeItem(draftStorageKey);
+    atualizarStatusRascunho(null);
+}
+
+function preencherCampo(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value ?? '';
+}
+
+function restaurarRascunhoEvento() {
+    let draft = null;
+    try {
+        draft = JSON.parse(localStorage.getItem(draftStorageKey) || 'null');
+    } catch (e) {
+        draft = null;
+    }
+    if (!draft || typeof draft !== 'object') {
+        return;
+    }
+
+    restoringDraft = true;
+    const campos = draft.campos || {};
+    preencherCampo('titulo', campos.titulo);
+    preencherCampo('descricao', campos.descricao);
+    preencherCampo('ano_letivo', campos.ano_letivo);
+    preencherCampo('bimestre', campos.bimestre);
+    preencherCampo('tipo_avaliacao_id', campos.tipo_avaliacao_id);
+    preencherCampo('bloco_modelo_id', campos.bloco_modelo_id);
+    preencherCampo('data_prova', campos.data_prova);
+    preencherCampo('hora_inicio', campos.hora_inicio);
+    preencherCampo('hora_fim', campos.hora_fim);
+    preencherCampo('prazo_entrega_professor', campos.prazo_entrega_professor);
+    setRadioValue('tipo_prova', campos.tipo_prova);
+    setRadioValue('formato_evento', campos.formato_evento);
+    setRadioValue('configuracao_nota', campos.configuracao_nota);
+    const portal = document.getElementById('visivel_no_portal_aluno');
+    if (portal) portal.checked = !!campos.visivel_no_portal_aluno;
+    const notaUnica = document.getElementById('nota_unica_todas_materias');
+    if (notaUnica) notaUnica.checked = !!campos.nota_unica_todas_materias;
+
+    const turmasDraft = new Set((draft.turmas || []).map(id => parseInt(id, 10)).filter(id => id > 0));
+    document.querySelectorAll('input[name="turmas[]"]').forEach(cb => {
+        cb.checked = turmasDraft.has(parseInt(cb.value, 10));
+    });
+
+    const professoresDraft = Array.isArray(draft.professores) && draft.professores.length > 0
+        ? draft.professores
+        : [];
+    if (professoresDraft.length > 0) {
+        document.getElementById('professoresContainer').innerHTML = '';
+        professorCounter = 0;
+        professoresDraft.forEach(profDraft => {
+            adicionarProfessor();
+            const div = document.getElementById(`professor_${professorCounter}`);
+            if (!div) return;
+            const professorSelect = div.querySelector('select[name*="[professor_id]"]');
+            if (professorSelect) {
+                professorSelect.value = profDraft.professor_id || '';
+                carregarMateriasProfessor(professorCounter);
+            }
+            const materiaSelect = div.querySelector('select[name*="[materia_id]"]');
+            if (materiaSelect) materiaSelect.value = profDraft.materia_id || '';
+            const qtd = div.querySelector('input[name*="[numero_questoes]"]');
+            if (qtd) qtd.value = profDraft.numero_questoes || '5';
+            const grid = div.querySelector('.turmas-professor-grid');
+            if (grid) grid.innerHTML = turmasProfessorHtml(professorCounter, profDraft.turmas || []);
+        });
+    } else {
+        sincronizarTurmasProfessoresComBloco();
+    }
+
+    ajustarOpcoesConfiguracaoNotaPorFormato();
+    atualizarStatusRascunho(draft.saved_at);
+    restoringDraft = false;
+    setWizardStep(Math.min(Math.max(parseInt(draft.step || '1', 10), 1), wizardTotalSteps));
+}
+
+function inicializarRascunhoEvento() {
+    const form = document.getElementById('formBloco');
+    if (!form) return;
+    form.addEventListener('input', agendarSalvarRascunho);
+    form.addEventListener('change', agendarSalvarRascunho);
+    const btnLimpar = document.getElementById('btnLimparRascunho');
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', () => limparRascunhoEvento(true));
+    }
+    restaurarRascunhoEvento();
+}
 
 function adicionarProfessor() {
     professorCounter++;
@@ -458,6 +900,7 @@ function removerProfessor(id) {
     const professorDiv = document.getElementById(`professor_${id}`);
     if (professorDiv) {
         professorDiv.remove();
+        agendarSalvarRascunho();
     }
 }
 
@@ -516,6 +959,7 @@ function carregarModelo(modeloId) {
         // Limpa os professores se não houver modelo selecionado
         document.getElementById('professoresContainer').innerHTML = '';
         professorCounter = 0;
+        agendarSalvarRascunho();
         return;
     }
     
@@ -532,6 +976,7 @@ function carregarModelo(modeloId) {
                 data.modelo.professores.forEach(profModelo => {
                     adicionarProfessorDoModelo(profModelo);
                 });
+                agendarSalvarRascunho();
             } else {
                 alert('Erro ao carregar modelo: ' + (data.error || 'Modelo não encontrado'));
             }
@@ -649,8 +1094,8 @@ function adicionarProfessorDoModelo(profModelo) {
 // Adiciona o primeiro professor automaticamente ao carregar
 document.addEventListener('DOMContentLoaded', function() {
     adicionarProfessor();
-    manterAgendaNoFinalDoFormulario();
     esconderAgendaAteEscolhaInicial();
+    inicializarWizardEventoProva();
     document.querySelectorAll('input[name="turmas[]"]').forEach(el => {
         el.addEventListener('change', sincronizarTurmasProfessoresComBloco);
     });
@@ -660,7 +1105,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name="configuracao_nota"]').forEach(el => {
         el.addEventListener('change', ajustarOpcoesConfiguracaoNotaPorFormato);
     });
+    inicializarRascunhoEvento();
 });
+
+function inicializarWizardEventoProva() {
+    document.querySelectorAll('#wizardStepsNav .step-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => goWizardStep(btn.dataset.stepTarget));
+    });
+    document.querySelectorAll('.wizard-step-next').forEach(btn => {
+        btn.addEventListener('click', () => goWizardStep(wizardCurrentStep + 1));
+    });
+    document.querySelectorAll('.wizard-step-back').forEach(btn => {
+        btn.addEventListener('click', () => goWizardStep(btn.dataset.goStep || (wizardCurrentStep - 1)));
+    });
+    renderWizardSteps();
+}
 
 function getTurmasBlocoSelecionadas() {
     return Array.from(document.querySelectorAll('input[name="turmas[]"]:checked'))
@@ -711,6 +1170,7 @@ function marcarTurmasProfessor(professorIndex) {
         const turmaId = parseInt(cb.dataset.turmaId || cb.value, 10);
         cb.checked = selecionadas.has(turmaId);
     });
+    agendarSalvarRascunho();
 }
 
 function sincronizarTurmasProfessoresComBloco() {
@@ -735,17 +1195,11 @@ function sincronizarTurmasProfessoresComBloco() {
             grid.innerHTML = turmasProfessorHtml(professorIndex, checks.length > 0 ? turmasMarcadas : null);
         }
     });
+    agendarSalvarRascunho();
 }
 
 function manterAgendaNoFinalDoFormulario() {
-    const form = document.getElementById('formBloco');
-    if (!form) return;
-    const botoes = form.querySelector('.flex.justify-end.space-x-4');
-    const dataHoraBox = document.getElementById('agendamentoDataHoraContainer');
-    const prazoBox = document.getElementById('prazoProfessorContainer');
-    if (!botoes || !dataHoraBox || !prazoBox) return;
-    form.insertBefore(dataHoraBox, botoes);
-    form.insertBefore(prazoBox, botoes);
+    return;
 }
 
 function esconderAgendaAteEscolhaInicial() {
@@ -951,6 +1405,7 @@ function salvarBloco(event) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            limparRascunhoEvento(false);
             window.location.href = '<?= URL ?>/admin/provas';
         } else {
             let msg = data.error || 'Erro desconhecido';
