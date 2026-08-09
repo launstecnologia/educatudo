@@ -595,8 +595,15 @@ function atualizarRevisao() {
     }).filter(Boolean).join(', ') || '-';
     let datas = [];
     try { datas = JSON.parse(document.getElementById('data_aula').value || '[]'); } catch (e) { datas = []; }
-    document.getElementById('reviewDatas').textContent = datas.join(', ') || '-';
+    document.getElementById('reviewDatas').textContent = datas.map(formatarDataPtBr).filter(Boolean).join(', ') || '-';
     document.getElementById('reviewTitulo').textContent = document.getElementById('titulo').value.trim() || '-';
+}
+
+function formatarDataPtBr(value) {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return raw;
+    return `${match[3]}/${match[2]}/${match[1]}`;
 }
 
 function salvarPlano(statusPlano) {
@@ -710,6 +717,72 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+function decodeHtmlEntities(value) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = String(value || '');
+    return textarea.value;
+}
+
+function containsHtml(value) {
+    return /<\/?[a-z][\s\S]*>/i.test(String(value || ''));
+}
+
+function sanitizeCopilotoHtml(value) {
+    let html = decodeHtmlEntities(value)
+        .replace(/^\s*[•\-*]\s*(?=<(?:ul|ol|li|p|div|strong|b|em|i|br)\b)/i, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/\son\w+="[^"]*"/gi, '')
+        .replace(/\son\w+='[^']*'/gi, '')
+        .replace(/\shref=(["'])\s*javascript:[\s\S]*?\1/gi, '');
+
+    const allowed = ['UL', 'OL', 'LI', 'P', 'BR', 'STRONG', 'B', 'EM', 'I'];
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('*').forEach(node => {
+        if (!allowed.includes(node.tagName)) {
+            node.replaceWith(...Array.from(node.childNodes));
+            return;
+        }
+        Array.from(node.attributes).forEach(attr => node.removeAttribute(attr.name));
+    });
+
+    return template.innerHTML.trim();
+}
+
+function htmlToPlainText(value) {
+    const div = document.createElement('div');
+    div.innerHTML = sanitizeCopilotoHtml(value);
+    return div.textContent.trim();
+}
+
+function normalizarHtmlListaCopiloto(value) {
+    const html = sanitizeCopilotoHtml(value);
+    if (!html) return '';
+
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const leafItems = Array.from(template.content.querySelectorAll('li'))
+        .filter(li => !li.querySelector('li'))
+        .map(li => li.innerHTML.trim())
+        .filter(Boolean);
+
+    if (leafItems.length > 0) {
+        return '<ul>' + leafItems.map(item => '<li>' + item + '</li>').join('') + '</ul>';
+    }
+
+    if (containsHtml(html)) return html;
+
+    const lines = html
+        .split(/\r?\n+/)
+        .map(line => line.replace(/^\s*[•\-*]\s*/, '').trim())
+        .filter(Boolean);
+
+    return lines.length > 1
+        ? '<ul>' + lines.map(line => '<li>' + escapeHtml(line) + '</li>').join('') + '</ul>'
+        : (lines[0] ? '<p>' + escapeHtml(lines[0]) + '</p>' : '');
 }
 
 function extrairArquivosClipboard(clipboardData) {
@@ -841,11 +914,31 @@ function aplicarRascunhoCopiloto(result) {
         if (value === undefined || value === null) return '';
         if (Array.isArray(value)) {
             const items = value
-                .map(item => normalizarValorCopiloto(item, false))
+                .map(item => normalizarValorCopiloto(item, asHtmlList))
                 .filter(item => item.trim() !== '');
-            return asHtmlList
-                ? '<ul>' + items.map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>'
-                : items.map(item => '- ' + item).join('\n');
+            if (!asHtmlList) return items.join('\n');
+
+            const listItems = [];
+            items.forEach(item => {
+                const template = document.createElement('template');
+                template.innerHTML = item;
+                const lis = Array.from(template.content.querySelectorAll('li'))
+                    .filter(li => !li.querySelector('li'))
+                    .map(li => li.innerHTML.trim())
+                    .filter(Boolean);
+
+                if (lis.length > 0) {
+                    listItems.push(...lis);
+                    return;
+                }
+
+                const text = htmlToPlainText(item) || String(item).trim();
+                if (text) listItems.push(escapeHtml(text));
+            });
+
+            return listItems.length > 0
+                ? '<ul>' + listItems.map(item => '<li>' + item + '</li>').join('') + '</ul>'
+                : '';
         }
         if (typeof value === 'object') {
             return Object.entries(value)
@@ -856,7 +949,11 @@ function aplicarRascunhoCopiloto(result) {
                 .filter(Boolean)
                 .join('\n');
         }
-        return String(value);
+        const normalized = String(value);
+        if (!asHtmlList) {
+            return containsHtml(normalized) ? htmlToPlainText(normalized) : decodeHtmlEntities(normalized).trim();
+        }
+        return normalizarHtmlListaCopiloto(normalized);
     };
 
     const setValue = (id, value) => {

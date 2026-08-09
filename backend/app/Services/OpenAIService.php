@@ -3716,7 +3716,11 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         }
 
         if (is_scalar($value)) {
-            return trim((string) $value);
+            $text = trim((string) $value);
+            if ($htmlList && $this->contemHtmlCopiloto($text)) {
+                return $this->sanitizarHtmlCopiloto($text);
+            }
+            return $htmlList ? $text : trim(strip_tags($text));
         }
 
         if (!is_array($value)) {
@@ -3734,10 +3738,29 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
             }
 
             if ($htmlList) {
-                $lis = array_map(
-                    static fn($item) => '<li>' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '</li>',
-                    $items
-                );
+                $lis = [];
+                foreach ($items as $item) {
+                    $itemTemHtml = false;
+                    if ($this->contemHtmlCopiloto($item)) {
+                        $itemTemHtml = true;
+                        $html = $this->sanitizarHtmlCopiloto($item);
+                        if (preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $html, $matches)) {
+                            foreach ($matches[1] as $li) {
+                                $li = trim($li);
+                                if ($li !== '') {
+                                    $lis[] = '<li>' . $li . '</li>';
+                                }
+                            }
+                            continue;
+                        }
+
+                        $item = trim(strip_tags($html, '<strong><b><em><i><br>'));
+                    }
+
+                    if ($item !== '') {
+                        $lis[] = '<li>' . ($itemTemHtml ? $item : htmlspecialchars($item, ENT_QUOTES, 'UTF-8')) . '</li>';
+                    }
+                }
                 return $lis ? '<ul>' . implode('', $lis) . '</ul>' : '';
             }
 
@@ -3753,6 +3776,26 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         }
 
         return implode("\n", $lines);
+    }
+
+    private function contemHtmlCopiloto(string $value): bool
+    {
+        return preg_match('/<\/?[a-z][\s\S]*>/i', $value) === 1
+            || preg_match('/&lt;\/?[a-z][\s\S]*?&gt;/i', $value) === 1;
+    }
+
+    private function sanitizarHtmlCopiloto(string $value): string
+    {
+        $html = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $html = preg_replace('/^\s*[•\-*]\s*(?=<(?:ul|ol|li|p|div|strong|b|em|i|br)\b)/i', '', $html);
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
+        $html = preg_replace('/\s+on\w+=(["\']).*?\1/is', '', $html);
+        $html = preg_replace('/\s+href=(["\'])\s*javascript:.*?\1/is', '', $html);
+        $html = strip_tags((string) $html, '<ul><ol><li><p><br><strong><b><em><i>');
+        $html = preg_replace('/<([a-z][a-z0-9]*)\b[^>]*>/i', '<$1>', (string) $html);
+
+        return trim((string) $html);
     }
 
 }
