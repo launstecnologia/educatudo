@@ -1004,6 +1004,40 @@ class LessonPlanController extends BaseController
             $this->json(['error' => $e->getMessage()], 400);
         }
     }
+
+    /**
+     * Aprova todos os planos em rascunho do professor logado.
+     */
+    public function aprovarTodosRascunhos()
+    {
+        $user = $this->auth->getUser();
+
+        if (($user['tipo'] ?? '') !== 'professor') {
+            $this->json(['error' => 'Não autorizado'], 403);
+            return;
+        }
+
+        try {
+            $professor = $this->teacherModel->findById($user['id']);
+            if (!$professor) {
+                throw new Exception('Professor não encontrado');
+            }
+
+            $total = (int) $this->planoAulaModel->approveDraftsByProfessor((int) $professor['id']);
+            $mensagem = $total === 1
+                ? '1 plano de aula foi aprovado.'
+                : $total . ' planos de aula foram aprovados.';
+
+            $this->json([
+                'success' => true,
+                'total' => $total,
+                'message' => $total > 0 ? $mensagem : 'Nenhum rascunho encontrado para aprovar.',
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao aprovar rascunhos de planos de aula: " . $e->getMessage());
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
     
     /**
      * Exclui plano de aula (soft delete)
@@ -1202,6 +1236,35 @@ class LessonPlanController extends BaseController
             
         } catch (Exception $e) {
             error_log("Erro ao aprovar/rejeitar plano: " . $e->getMessage());
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Aprova todos os rascunhos de planos de aula da escola atual.
+     */
+    public function aprovarTodosRascunhosAdmin()
+    {
+        $user = $this->auth->getUser();
+
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'])) {
+            $this->json(['error' => 'Não autorizado'], 403);
+            return;
+        }
+
+        try {
+            $total = (int) $this->planoAulaModel->approveAllDrafts();
+            $mensagem = $total === 1
+                ? '1 plano de aula foi aprovado.'
+                : $total . ' planos de aula foram aprovados.';
+
+            $this->json([
+                'success' => true,
+                'total' => $total,
+                'message' => $total > 0 ? $mensagem : 'Nenhum rascunho encontrado para aprovar.',
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao aprovar todos os rascunhos de planos de aula: " . $e->getMessage());
             $this->json(['error' => $e->getMessage()], 400);
         }
     }

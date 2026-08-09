@@ -736,6 +736,7 @@ $router->get('/admin/planos-aula/visualizar/{id}', 'Education/LessonPlanControll
 $router->get('/admin/planos-aula/editar/{id}', 'Education/LessonPlanController@editar');
 $router->post('/admin/planos-aula/atualizar/{id}', 'Education/LessonPlanController@atualizar');
 $router->post('/admin/planos-aula/aprovar-rejeitar/{id}', 'Education/LessonPlanController@aprovarRejeitar');
+$router->post('/admin/planos-aula/aprovar-rascunhos', 'Education/LessonPlanController@aprovarTodosRascunhosAdmin');
 $router->get('/admin/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
 
 // Provas Online (Admin)

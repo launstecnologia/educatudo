@@ -103,6 +103,7 @@ $resumoPlanos = [
         'iconClass' => 'bg-green-50 text-green-600',
     ],
 ];
+$totalRascunhos = (int) ($stats['rascunho'] ?? 0);
 ?>
 
 <div class="mb-6">
@@ -112,6 +113,16 @@ $resumoPlanos = [
             <p class="text-gray-600 text-sm">Gerencie seus planos de aula.</p>
         </div>
         <div class="flex items-center gap-3 flex-shrink-0">
+            <?php if ($totalRascunhos > 0): ?>
+            <button type="button"
+                    onclick="aprovarTodosRascunhos(<?= (int) $totalRascunhos ?>)"
+                    class="inline-flex items-center px-4 py-2.5 border border-green-200 rounded-lg text-sm font-semibold text-green-700 bg-green-50 hover:bg-green-100 transition-colors">
+                <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5"></path>
+                </svg>
+                Aprovar rascunhos
+            </button>
+            <?php endif; ?>
             <button type="button"
                     onclick="abrirFiltroPlanos()"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -392,6 +403,33 @@ function duplicarPlano(id) {
     .catch(error => {
         console.error('Erro:', error);
         alert('Erro ao duplicar plano de aula');
+    });
+}
+
+function aprovarTodosRascunhos(total) {
+    const totalTexto = total === 1 ? '1 rascunho' : total + ' rascunhos';
+    if (!confirm('Aprovar todos os ' + totalTexto + ' de planos de aula? Esta ação irá liberar os planos para consulta.')) {
+        return;
+    }
+
+    fetch('<?= URL ?>/professor/planos-aula/aprovar-rascunhos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message || 'Planos aprovados com sucesso.');
+            location.reload();
+            return;
+        }
+        alert('Erro: ' + (data.error || 'Erro ao aprovar rascunhos'));
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao aprovar rascunhos');
     });
 }
 </script>

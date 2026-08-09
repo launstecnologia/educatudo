@@ -271,6 +271,34 @@ class LessonPlan
             ['status' => $status, 'id' => $id]
         );
     }
+
+    /**
+     * Aprova todos os rascunhos de um professor.
+     */
+    public function approveDraftsByProfessor($professorId)
+    {
+        return $this->db->update(
+            "UPDATE planos_aula
+             SET status = 'aprovado', updated_at = NOW()
+             WHERE professor_id = :professor_id
+               AND status = 'rascunho'
+               AND deleted_at IS NULL",
+            ['professor_id' => $professorId]
+        );
+    }
+
+    /**
+     * Aprova todos os planos em rascunho da escola/tenant atual.
+     */
+    public function approveAllDrafts()
+    {
+        return $this->db->update(
+            "UPDATE planos_aula
+             SET status = 'aprovado', updated_at = NOW()
+             WHERE status = 'rascunho'
+               AND deleted_at IS NULL"
+        );
+    }
     
     /**
      * Soft delete - marca como excluído
