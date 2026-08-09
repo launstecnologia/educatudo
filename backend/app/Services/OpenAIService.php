@@ -2520,6 +2520,59 @@ Revise: você inventou alguma palavra? Se sim, substitua por [Não Entendi].
         }
     }
 
+    public function extrairGradeHorariaImagemOpenAI($imageData, string $mimeType = 'image/png')
+    {
+        try {
+            $systemPrompt = 'Você é um extrator OCR de grades horárias escolares. Leia a imagem com cuidado, preserve dias, horários, turmas e células, e retorne somente JSON válido.';
+            $prompt = "Extraia TODAS as aulas desta grade horária escolar.\n\n"
+                . "A imagem normalmente é uma tabela onde as colunas são TURMAS e as linhas combinam DIA DA SEMANA + HORÁRIO. Cada célula contém MATÉRIA - PROFESSOR.\n"
+                . "Retorne APENAS JSON válido no formato: {\"aulas\":[{\"dia_semana\":1,\"horario_de\":\"07:10\",\"horario_ate\":\"08:00\",\"turma\":\"1º A\",\"professor\":\"PETERSON\",\"materia\":\"FÍSICA\",\"periodo\":\"manha\"}]}\n"
+                . "Regras obrigatórias:\n"
+                . "- Crie uma aula para cada célula útil da grade.\n"
+                . "- dia_semana: 1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta, 6=Sábado, 7=Domingo.\n"
+                . "- Converta horários como 07:10/08:00 para horario_de=07:10 e horario_ate=08:00.\n"
+                . "- Se o título/cabeçalho indicar MANHÃ, use periodo=manha; se indicar TARDE, use periodo=tarde.\n"
+                . "- Ignore cabeçalhos, intervalos, células vazias e títulos gerais.\n"
+                . "- Preserve nomes de matérias, professores e turmas como aparecem, sem inventar.";
+
+            $response = $this->fazerRequisicao([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $systemPrompt,
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => $prompt,
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => 'data:' . $mimeType . ';base64,' . $imageData,
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'max_tokens' => 12000,
+                'temperature' => 0.0,
+            ]);
+
+            if (!isset($response['choices'][0]['message']['content'])) {
+                throw new \Exception('Resposta inválida da OpenAI');
+            }
+
+            return $response['choices'][0]['message']['content'];
+        } catch (\Exception $e) {
+            error_log("ERRO em OpenAIService::extrairGradeHorariaImagemOpenAI: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     private function usarGPT4VisionDireto($imageData, $prompt)
     {
         return $this->extrairTextoImagemOpenAI($imageData, $prompt, 'image/jpeg');

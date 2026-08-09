@@ -442,6 +442,9 @@ class AIJobService
             case 'gerar_plano_aula_copiloto':
                 return self::dispatchGerarPlanoAulaCopiloto($payload);
 
+            case 'grade_horaria_importar_imagem':
+                return self::dispatchGradeHorariaImportarImagem($payload);
+
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");
         }
@@ -449,6 +452,34 @@ class AIJobService
 
     // -------------------------------------------------------------------------
     // Handlers específicos que fazem AI + persistência no banco
+
+    private static function dispatchGradeHorariaImportarImagem(array $payload): array
+    {
+        $path = (string) ($payload['arquivo']['path'] ?? '');
+        $mime = (string) ($payload['arquivo']['mime'] ?? 'image/png');
+        if ($path === '' || !is_file($path)) {
+            throw new \RuntimeException('Arquivo da grade horária não encontrado.');
+        }
+
+        $bytes = file_get_contents($path);
+        if ($bytes === false || $bytes === '') {
+            throw new \RuntimeException('Não foi possível ler a imagem da grade horária.');
+        }
+
+        $openai = new OpenAIService();
+        try {
+            $resposta = trim((string) $openai->extrairGradeHorariaImagemOpenAI(base64_encode($bytes), $mime));
+        } finally {
+            @unlink($path);
+        }
+
+        $itens = self::extrairItensGradeDaResposta($resposta);
+        if (!is_array($itens) || empty($itens)) {
+            throw new \RuntimeException('A IA não conseguiu extrair aulas em formato esperado. Tente outra imagem ou cadastre manualmente.');
+        }
+
+        return self::montarPreviewGradeHoraria($itens);
+    }
 
     private static function dispatchGerarPlanoAulaCopiloto(array $payload): array
     {
@@ -503,6 +534,165 @@ class AIJobService
         }
 
         return $resultado;
+    }
+
+    private static function montarPreviewGradeHoraria(array $itens): array
+    {
+        $db = \Database::getInstance();
+        $turmasLista = $db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome") ?: [];
+        $profLista = $db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
+        $matLista = $db->fetchAll("SELECT id, nome FROM materias ORDER BY nome") ?: [];
+
+        $turmasMap = [];
+        foreach ($turmasLista as $t) {
+            $turmasMap[self::normalizarGradeBusca($t['nome'] ?? '')] = (int) ($t['id'] ?? 0);
+        }
+        $profMap = [];
+        foreach ($profLista as $p) {
+            $profMap[self::normalizarGradeBusca($p['nome'] ?? '')] = (int) ($p['id'] ?? 0);
+        }
+        $matMap = [];
+        foreach ($matLista as $m) {
+            $matMap[self::normalizarGradeBusca($m['nome'] ?? '')] = (int) ($m['id'] ?? 0);
+        }
+
+        $preview = [];
+        foreach ($itens as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $diaSemana = (int) ($row['dia_semana'] ?? $row['dia'] ?? 0);
+            if ($diaSemana < 1 || $diaSemana > 7) {
+                continue;
+            }
+
+            $horarioDe = self::normalizarHorarioGrade((string) ($row['horario_de'] ?? $row['horario_inicio'] ?? $row['horarioDe'] ?? ''));
+            $horarioAte = self::normalizarHorarioGrade((string) ($row['horario_ate'] ?? $row['horario_fim'] ?? $row['horarioAte'] ?? ''));
+            if ($horarioDe === '' || $horarioAte === '') {
+                $horarioDe = '07:00';
+                $horarioAte = '08:00';
+            }
+
+            $turmaNome = trim((string) ($row['turma'] ?? $row['turma_nome'] ?? ''));
+            $profNome = trim((string) ($row['professor'] ?? $row['professor_nome'] ?? ''));
+            $matNome = trim((string) ($row['materia'] ?? $row['materia_nome'] ?? $row['disciplina'] ?? ''));
+            $periodoRaw = strtolower(trim((string) ($row['periodo'] ?? 'manha')));
+            $periodo = in_array($periodoRaw, ['manha', 'tarde'], true) ? $periodoRaw : 'manha';
+
+            $turmaId = self::buscarMelhorMatchGrade(self::normalizarGradeBusca($turmaNome), $turmasMap);
+            $professorId = self::buscarMelhorMatchGrade(self::normalizarGradeBusca($profNome), $profMap);
+            $materiaId = self::buscarMelhorMatchGrade(self::normalizarGradeBusca($matNome), $matMap);
+            $podeInserir = $turmaId && $professorId && $materiaId;
+            $motivo = '';
+            if (!$podeInserir) {
+                $partes = [];
+                if (!$turmaId) {
+                    $partes[] = 'turma';
+                }
+                if (!$professorId) {
+                    $partes[] = 'professor';
+                }
+                if (!$materiaId) {
+                    $partes[] = 'matéria';
+                }
+                $motivo = implode(', ', $partes) . ' não encontrado(s)';
+            }
+
+            $preview[] = [
+                'dia_semana' => $diaSemana,
+                'horario_de' => $horarioDe,
+                'horario_ate' => $horarioAte,
+                'turma_nome' => $turmaNome,
+                'professor_nome' => $profNome,
+                'materia_nome' => $matNome,
+                'periodo' => $periodo,
+                'turma_id' => $turmaId,
+                'professor_id' => $professorId,
+                'materia_id' => $materiaId,
+                'pode_inserir' => $podeInserir,
+                'motivo' => $motivo,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'itens' => $preview,
+            'dias_semana' => [
+                1 => 'Segunda-feira',
+                2 => 'Terça-feira',
+                3 => 'Quarta-feira',
+                4 => 'Quinta-feira',
+                5 => 'Sexta-feira',
+                6 => 'Sábado',
+                7 => 'Domingo',
+            ],
+            'turmas' => $turmasLista,
+            'professores' => $profLista,
+            'materias' => $matLista,
+        ];
+    }
+
+    private static function normalizarGradeBusca($valor): string
+    {
+        $valor = str_replace(['°', 'º', 'ª'], ' ', (string) $valor);
+        $valor = mb_strtolower(trim($valor), 'UTF-8');
+        $valor = preg_replace('/\s+/', ' ', $valor);
+        $map = ['á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'é' => 'e', 'ê' => 'e', 'í' => 'i', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ü' => 'u', 'ç' => 'c'];
+        return strtr($valor, $map);
+    }
+
+    private static function buscarMelhorMatchGrade(string $valorNormalizado, array $map): ?int
+    {
+        if ($valorNormalizado === '') {
+            return null;
+        }
+        if (isset($map[$valorNormalizado])) {
+            return (int) $map[$valorNormalizado];
+        }
+        foreach ($map as $chave => $id) {
+            if ($chave !== '' && (strpos($chave, $valorNormalizado) !== false || strpos($valorNormalizado, $chave) !== false)) {
+                return (int) $id;
+            }
+        }
+        return null;
+    }
+
+    private static function normalizarHorarioGrade(string $valor): string
+    {
+        $valor = trim($valor);
+        if (preg_match('/(\d{1,2})\D+(\d{2})/', $valor, $m)) {
+            return str_pad($m[1], 2, '0', STR_PAD_LEFT) . ':' . $m[2];
+        }
+        return '';
+    }
+
+    private static function extrairItensGradeDaResposta($resposta): ?array
+    {
+        $resposta = trim((string) $resposta);
+        if ($resposta === '') {
+            return null;
+        }
+        $resposta = preg_replace('/^```(?:json)?\s*/i', '', $resposta);
+        $resposta = preg_replace('/\s*```\s*$/i', '', $resposta);
+        $decoded = json_decode(trim($resposta), true);
+        if (is_array($decoded)) {
+            if (isset($decoded['aulas']) && is_array($decoded['aulas'])) {
+                return $decoded['aulas'];
+            }
+            if (isset($decoded['itens']) && is_array($decoded['itens'])) {
+                return $decoded['itens'];
+            }
+            if (isset($decoded[0]) && is_array($decoded[0])) {
+                return $decoded;
+            }
+        }
+        if (preg_match('/\[[\s\S]*\]/', $resposta, $m)) {
+            $json = preg_replace('/,\s*]/', ']', $m[0]);
+            $json = preg_replace('/,\s*}/', '}', $json);
+            $itens = json_decode($json, true);
+            return is_array($itens) ? $itens : null;
+        }
+        return null;
     }
 
     private static function dispatchCorrigirEssay(array $payload): array

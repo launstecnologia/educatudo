@@ -364,118 +364,48 @@ class GradeHorariaController extends BaseController
         }
 
         $file = $_FILES['imagem'];
-        $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!in_array($file['type'], $allowed) || $file['size'] > 10 * 1024 * 1024) {
-            echo json_encode(['success' => false, 'error' => 'Arquivo inválido ou muito grande. Use JPG, PNG, GIF ou WEBP (máx. 10MB).']);
+        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? (string) finfo_file($finfo, (string) $file['tmp_name']) : (string) ($file['type'] ?? '');
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+
+        if (!isset($allowed[$mime]) || (int) $file['size'] > 12 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'error' => 'Arquivo inválido ou muito grande. Use JPG, PNG ou WEBP (máx. 12MB).']);
             return;
         }
 
         try {
-            $imageData = base64_encode(file_get_contents($file['tmp_name']));
-
-            $openaiService = new \App\Services\OpenAIService();
-            $textoBruto = $openaiService->transcreverComGoogleVision($imageData);
-
-            if (empty(trim($textoBruto))) {
-                echo json_encode(['success' => false, 'error' => 'Não foi possível ler texto na imagem.']);
-                return;
+            $dir = realpath(__DIR__ . '/../../../storage') ?: (__DIR__ . '/../../../storage');
+            $dir .= '/tmp/grade_horaria_ia';
+            if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
+                throw new Exception('Não foi possível preparar o envio da imagem.');
             }
 
-            $promptEstrutura = "A partir do texto abaixo (transcrição de uma grade horária de aula), extraia TODAS as aulas e retorne APENAS um JSON válido, sem comentários.\n\n"
-                . "IMPORTANTE: A grade pode estar em formato de TABELA/GRID onde:\n"
-                . "- As COLUNAS são as TURMAS (ex: 1º A, 1º B, 2º A, 2º B, 3º A).\n"
-                . "- As linhas são dias da semana e horários (ex: SEGUNDA 07:10/08:00, TERÇA 08:00/08:50).\n"
-                . "- Cada CÉLULA da tabela tem \"MATÉRIA - PROFESSOR\" para aquela turma, naquele dia e horário.\n"
-                . "Você DEVE extrair UMA entrada (um objeto JSON) para CADA CÉLULA da grade. Ou seja: para CADA turma (coluna), em CADA dia e CADA horário, crie um item com essa turma, esse dia, esse horário e a matéria e professor da célula. NÃO extraia só uma turma: extraia 1º A, 1º B, 2º A, 2º B, 3º A (e todas as outras que aparecerem) separadamente.\n\n"
-                . "Formato de cada item no JSON:\n"
-                . "{\"dia_semana\": 1 a 7 (1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta, 6=Sábado, 7=Domingo), \"horario_de\": \"HH:MM\", \"horario_ate\": \"HH:MM\", \"turma\": \"nome da turma (ex: 1º A, 1º B)\", \"professor\": \"nome do professor\", \"materia\": \"nome da matéria\", \"periodo\": \"manha\" ou \"tarde\"}\n"
-                . "Se não identificar horário, use 07:00 e 08:00. Se não identificar período, use \"manha\".\n\nTexto transcrito da imagem:\n" . $textoBruto;
-
-            $resposta = $openaiService->generateText($promptEstrutura, ['max_tokens' => 8000, 'temperature' => 0.2]);
-            $itens = self::extrairItensGradeDaResposta($resposta);
-
-            if (!is_array($itens) || empty($itens)) {
-                error_log("Grade horária IA: resposta OpenAI (primeiros 800 chars): " . substr($resposta, 0, 800));
-                echo json_encode(['success' => false, 'error' => 'A IA não conseguiu extrair aulas em formato esperado. Tente outra imagem ou cadastre manualmente.']);
-                return;
+            $nomeSeguro = preg_replace('/[^a-zA-Z0-9_.-]+/', '-', basename((string) ($file['name'] ?? 'grade')));
+            $filename = 'grade-' . (int) ($this->auth->getUser()['id'] ?? 0) . '-' . bin2hex(random_bytes(8)) . '-' . $nomeSeguro;
+            $path = $dir . '/' . $filename;
+            if (!move_uploaded_file((string) $file['tmp_name'], $path)) {
+                throw new Exception('Não foi possível salvar a imagem para processamento.');
             }
+            @chmod($path, 0600);
 
-            $turmasLista = $this->db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome");
-            $profLista = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome");
-            $matLista = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome");
-
-            $turmasMap = [];
-            foreach ($turmasLista as $t) {
-                $key = self::normalizarParaBusca($t['nome']);
-                $turmasMap[$key] = (int) $t['id'];
-            }
-            $profMap = [];
-            foreach ($profLista as $p) {
-                $key = self::normalizarParaBusca($p['nome']);
-                $profMap[$key] = (int) $p['id'];
-            }
-            $matMap = [];
-            foreach ($matLista as $m) {
-                $key = self::normalizarParaBusca($m['nome']);
-                $matMap[$key] = (int) $m['id'];
-            }
-
-            $preview = [];
-            foreach ($itens as $row) {
-                $dia_semana = (int) ($row['dia_semana'] ?? $row['dia'] ?? 0);
-                if ($dia_semana < 1 || $dia_semana > 7) continue;
-
-                $horarioDeRaw = $row['horario_de'] ?? $row['horario_inicio'] ?? $row['horarioDe'] ?? '';
-                $horarioAteRaw = $row['horario_ate'] ?? $row['horario_fim'] ?? $row['horarioAte'] ?? '';
-                $horario_de = $horarioDeRaw !== '' ? preg_replace('/[^\d:]/', '', (string) $horarioDeRaw) : '07:00';
-                $horario_ate = $horarioAteRaw !== '' ? preg_replace('/[^\d:]/', '', (string) $horarioAteRaw) : '08:00';
-                if (strlen($horario_de) !== 5 || strlen($horario_ate) !== 5) {
-                    $horario_de = '07:00';
-                    $horario_ate = '08:00';
-                }
-
-                $turmaNome = trim((string) ($row['turma'] ?? $row['turma_nome'] ?? ''));
-                $profNome = trim((string) ($row['professor'] ?? $row['professor_nome'] ?? ''));
-                $matNome = trim((string) ($row['materia'] ?? $row['materia_nome'] ?? $row['disciplina'] ?? ''));
-                $periodo = isset($row['periodo']) && in_array(strtolower($row['periodo']), ['manha', 'tarde']) ? strtolower($row['periodo']) : 'manha';
-
-                $turma_id = self::buscarMelhorMatch(self::normalizarParaBusca($turmaNome), $turmasMap);
-                $professor_id = self::buscarMelhorMatch(self::normalizarParaBusca($profNome), $profMap);
-                $materia_id = self::buscarMelhorMatch(self::normalizarParaBusca($matNome), $matMap);
-
-                $pode_inserir = $turma_id && $professor_id && $materia_id;
-                $motivo = '';
-                if (!$pode_inserir) {
-                    $partes = [];
-                    if (!$turma_id) $partes[] = 'turma';
-                    if (!$professor_id) $partes[] = 'professor';
-                    if (!$materia_id) $partes[] = 'matéria';
-                    $motivo = implode(', ', $partes) . ' não encontrado(s)';
-                }
-
-                $preview[] = [
-                    'dia_semana' => $dia_semana,
-                    'horario_de' => $horario_de,
-                    'horario_ate' => $horario_ate,
-                    'turma_nome' => $turmaNome,
-                    'professor_nome' => $profNome,
-                    'materia_nome' => $matNome,
-                    'periodo' => $periodo,
-                    'turma_id' => $turma_id,
-                    'professor_id' => $professor_id,
-                    'materia_id' => $materia_id,
-                    'pode_inserir' => $pode_inserir,
-                    'motivo' => $motivo,
-                ];
-            }
+            require_once __DIR__ . '/../../Services/AIJobService.php';
+            $user = $this->auth->getUser();
+            $jobId = \App\Services\AIJobService::enqueue('grade_horaria_importar_imagem', [
+                'arquivo' => [
+                    'path' => $path,
+                    'nome' => substr((string) ($file['name'] ?? 'grade'), 0, 180),
+                    'mime' => $mime,
+                    'tamanho' => (int) ($file['size'] ?? 0),
+                ],
+            ], (int) ($user['id'] ?? 0), 'admin');
 
             echo json_encode([
                 'success' => true,
-                'itens' => $preview,
-                'dias_semana' => self::$DIAS_SEMANA,
-                'turmas' => $turmasLista,
-                'professores' => $profLista,
-                'materias' => $matLista,
+                'job_id' => $jobId,
+                'message' => 'Imagem enviada. A IA está lendo a grade em segundo plano.',
             ]);
         } catch (Exception $e) {
             error_log("Grade horária IA: " . $e->getMessage());

@@ -148,13 +148,31 @@ include __DIR__ . '/../_partials/page_header_list.php';
             <!-- Passo 1: Upload -->
             <div id="painel-upload-ia" class="p-6">
                 <h3 class="text-lg font-semibold text-gray-900 mb-2">Importar grade por imagem (IA)</h3>
-                <p class="text-sm text-gray-600 mb-4">Envie uma foto ou scan da grade horária. A IA extrairá os dados e você poderá conferir antes de salvar.</p>
+                <p class="text-sm text-gray-600 mb-4">Envie, arraste ou cole um print da grade horária. A IA extrairá os dados em segundo plano e você poderá conferir antes de salvar.</p>
                 <form id="form-imagem-ia" enctype="multipart/form-data" class="space-y-4">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Imagem (JPG, PNG, WEBP)</label>
-                        <input type="file" name="imagem" accept="image/jpeg,image/png,image/gif,image/webp" required
-                               class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        <div id="dropzone-grade-ia" tabindex="0"
+                             class="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/40 px-4 py-6 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300">
+                            <input id="input-imagem-ia" type="file" name="imagem" accept="image/jpeg,image/png,image/webp" required class="hidden">
+                            <div id="estado-vazio-imagem-ia">
+                                <svg class="mx-auto h-9 w-9 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <path d="M17 8 12 3 7 8"></path>
+                                    <path d="M12 3v12"></path>
+                                </svg>
+                                <p class="mt-3 text-sm font-semibold text-gray-900">Clique, arraste ou cole um print aqui</p>
+                                <p class="mt-1 text-xs text-gray-500">Use Ctrl/Cmd+V para colar uma imagem copiada.</p>
+                            </div>
+                            <div id="preview-imagem-ia" class="hidden">
+                                <img id="thumb-imagem-ia" src="" alt="Prévia da imagem enviada" class="mx-auto max-h-40 rounded-lg border border-gray-200 bg-white object-contain shadow-sm">
+                                <div class="mt-3 flex items-center justify-center gap-3 text-sm">
+                                    <span id="nome-imagem-ia" class="font-medium text-gray-700"></span>
+                                    <button type="button" onclick="event.stopPropagation(); limparImagemIA()" class="text-red-600 hover:text-red-700">Remover</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div id="resultado-ia" class="hidden text-sm rounded-lg p-3"></div>
                     <div class="flex justify-end gap-2">
@@ -210,8 +228,14 @@ var professoresIA = [];
 var materiasIA = [];
 var csrfTokenIA = '<?= htmlspecialchars($csrf_token) ?>';
 var urlBase = '<?= URL ?>';
+var pollingGradeIA = null;
 
 function fecharModalImportacao() {
+    if (pollingGradeIA) {
+        clearTimeout(pollingGradeIA);
+        pollingGradeIA = null;
+    }
+    esconderLoadingIA();
     document.getElementById('modal-imagem-ia').classList.add('hidden');
 }
 
@@ -219,7 +243,34 @@ function voltarUploadIA() {
     document.getElementById('painel-preview-ia').classList.add('hidden');
     document.getElementById('painel-upload-ia').classList.remove('hidden');
     document.getElementById('resultado-salvar-ia').classList.add('hidden');
-    document.querySelector('input[name="imagem"]').value = '';
+    limparImagemIA();
+}
+
+function setArquivoImagemIA(file) {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+        return;
+    }
+    var input = document.getElementById('input-imagem-ia');
+    var dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    document.getElementById('estado-vazio-imagem-ia').classList.add('hidden');
+    document.getElementById('preview-imagem-ia').classList.remove('hidden');
+    document.getElementById('nome-imagem-ia').textContent = file.name || 'imagem-colada.png';
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        document.getElementById('thumb-imagem-ia').src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function limparImagemIA() {
+    var input = document.getElementById('input-imagem-ia');
+    input.value = '';
+    document.getElementById('thumb-imagem-ia').src = '';
+    document.getElementById('nome-imagem-ia').textContent = '';
+    document.getElementById('preview-imagem-ia').classList.add('hidden');
+    document.getElementById('estado-vazio-imagem-ia').classList.remove('hidden');
 }
 
 function optsSelect(lista, valorAtual) {
@@ -404,11 +455,100 @@ function esconderLoadingIA() {
     if (el) el.classList.add('hidden');
 }
 
+function finalizarProcessamentoGradeIA(data, btn, resultado) {
+    esconderLoadingIA();
+    btn.disabled = false;
+    btn.textContent = 'Processar';
+    if (data.success && data.itens && data.itens.length > 0) {
+        document.getElementById('painel-upload-ia').classList.add('hidden');
+        document.getElementById('painel-preview-ia').classList.remove('hidden');
+        renderPreview(data.itens, data.dias_semana, data.turmas, data.professores, data.materias);
+    } else if (data.success && (!data.itens || data.itens.length === 0)) {
+        resultado.classList.remove('hidden');
+        resultado.className = 'text-sm rounded-lg p-3 bg-amber-100 text-amber-800';
+        resultado.textContent = 'Nenhuma aula extraída da imagem. Tente outra imagem.';
+    } else {
+        resultado.classList.remove('hidden');
+        resultado.className = 'text-sm rounded-lg p-3 bg-red-100 text-red-800';
+        resultado.textContent = data.error || 'Erro ao processar.';
+    }
+}
+
+function consultarJobGradeIA(jobId, btn, resultado, tentativa) {
+    tentativa = tentativa || 1;
+    mostrarLoadingIA(tentativa < 4 ? 'Lendo imagem com OpenAI...' : 'Estruturando grade e conferindo cadastros...');
+    fetch(urlBase + '/admin/ai-job/' + jobId + '/status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.status === 'done') {
+                finalizarProcessamentoGradeIA(data.result || {}, btn, resultado);
+                return;
+            }
+            if (data.status === 'failed' || data.status === 'error' || data.status === 'not_found') {
+                finalizarProcessamentoGradeIA({ success: false, error: data.error || 'Falha ao processar imagem.' }, btn, resultado);
+                return;
+            }
+            pollingGradeIA = setTimeout(function() {
+                consultarJobGradeIA(jobId, btn, resultado, tentativa + 1);
+            }, 2000);
+        })
+        .catch(function() {
+            pollingGradeIA = setTimeout(function() {
+                consultarJobGradeIA(jobId, btn, resultado, tentativa + 1);
+            }, 2500);
+        });
+}
+
+var dropzoneGradeIA = document.getElementById('dropzone-grade-ia');
+var inputImagemIA = document.getElementById('input-imagem-ia');
+dropzoneGradeIA.addEventListener('click', function() { inputImagemIA.click(); });
+dropzoneGradeIA.addEventListener('dragover', function(ev) {
+    ev.preventDefault();
+    dropzoneGradeIA.classList.add('border-blue-500', 'bg-blue-50');
+});
+dropzoneGradeIA.addEventListener('dragleave', function() {
+    dropzoneGradeIA.classList.remove('border-blue-500', 'bg-blue-50');
+});
+dropzoneGradeIA.addEventListener('drop', function(ev) {
+    ev.preventDefault();
+    dropzoneGradeIA.classList.remove('border-blue-500', 'bg-blue-50');
+    if (ev.dataTransfer.files && ev.dataTransfer.files[0]) {
+        setArquivoImagemIA(ev.dataTransfer.files[0]);
+    }
+});
+inputImagemIA.addEventListener('change', function() {
+    if (inputImagemIA.files && inputImagemIA.files[0]) {
+        setArquivoImagemIA(inputImagemIA.files[0]);
+    }
+});
+document.addEventListener('paste', function(ev) {
+    if (document.getElementById('modal-imagem-ia').classList.contains('hidden')) {
+        return;
+    }
+    var items = ev.clipboardData && ev.clipboardData.items ? Array.from(ev.clipboardData.items) : [];
+    for (var i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image/') === 0) {
+            var file = items[i].getAsFile();
+            if (file) {
+                setArquivoImagemIA(new File([file], 'print-grade-horaria.png', { type: file.type || 'image/png' }));
+                ev.preventDefault();
+                break;
+            }
+        }
+    }
+});
+
 document.getElementById('form-imagem-ia').addEventListener('submit', function(e) {
     e.preventDefault();
     var btn = document.getElementById('btn-processar');
     var resultado = document.getElementById('resultado-ia');
     resultado.classList.add('hidden');
+    if (!inputImagemIA.files || !inputImagemIA.files[0]) {
+        resultado.classList.remove('hidden');
+        resultado.className = 'text-sm rounded-lg p-3 bg-amber-100 text-amber-800';
+        resultado.textContent = 'Selecione, arraste ou cole uma imagem da grade horária.';
+        return;
+    }
     btn.disabled = true;
     btn.textContent = 'Processando...';
     mostrarLoadingIA('Processando imagem...');
@@ -419,27 +559,17 @@ document.getElementById('form-imagem-ia').addEventListener('submit', function(e)
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.success && data.itens && data.itens.length > 0) {
-            document.getElementById('painel-upload-ia').classList.add('hidden');
-            document.getElementById('painel-preview-ia').classList.remove('hidden');
-            renderPreview(data.itens, data.dias_semana, data.turmas, data.professores, data.materias);
-        } else if (data.success && (!data.itens || data.itens.length === 0)) {
-            resultado.classList.remove('hidden');
-            resultado.className = 'text-sm rounded-lg p-3 bg-amber-100 text-amber-800';
-            resultado.textContent = 'Nenhuma aula extraída da imagem. Tente outra imagem.';
+        if (data.success && data.job_id) {
+            consultarJobGradeIA(data.job_id, btn, resultado, 1);
         } else {
-            resultado.classList.remove('hidden');
-            resultado.className = 'text-sm rounded-lg p-3 bg-red-100 text-red-800';
-            resultado.textContent = data.error || 'Erro ao processar.';
+            finalizarProcessamentoGradeIA(data, btn, resultado);
         }
     })
     .catch(function() {
+        esconderLoadingIA();
         resultado.classList.remove('hidden');
         resultado.className = 'text-sm rounded-lg p-3 bg-red-100 text-red-800';
         resultado.textContent = 'Erro de conexão. Tente novamente.';
-    })
-    .finally(function() {
-        esconderLoadingIA();
         btn.disabled = false;
         btn.textContent = 'Processar';
     });
