@@ -141,11 +141,11 @@ class LessonPlanController extends BaseController
                 }));
             }
 
-            $perPage = (int) ($_GET['per_page'] ?? 20);
+            $perPage = (int) ($_GET['per_page'] ?? 10);
             $page = (int) ($_GET['page'] ?? 1);
             $allowedPerPage = [10, 20, 50, 100];
             if (!in_array($perPage, $allowedPerPage, true)) {
-                $perPage = 20;
+                $perPage = 10;
             }
             if ($page < 1) {
                 $page = 1;
@@ -479,6 +479,152 @@ class LessonPlanController extends BaseController
             error_log("Erro ao salvar plano de aula: " . $e->getMessage());
             $this->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Enfileira geração assíncrona do rascunho do plano pelo Meu Copiloto.
+     */
+    public function gerarComCopiloto()
+    {
+        $user = $this->auth->getUser();
+
+        if ($user['tipo'] !== 'professor') {
+            $this->json(['error' => 'Não autorizado'], 403);
+            return;
+        }
+
+        try {
+            $professor = $this->teacherModel->findById($user['id']);
+            if (!$professor) {
+                throw new Exception('Professor não encontrado');
+            }
+
+            $prompt = trim((string) ($_POST['prompt'] ?? ''));
+            $arquivos = $this->salvarArquivosCopiloto($_FILES['copiloto_arquivos'] ?? null, (int) $professor['id']);
+
+            if ($prompt === '' && empty($arquivos)) {
+                $this->json(['error' => 'Descreva a aula ou envie ao menos um PDF/imagem.'], 400);
+                return;
+            }
+
+            $materia = null;
+            if (!empty($_POST['materia_id'])) {
+                $materia = $this->db->fetch(
+                    "SELECT id, nome FROM materias WHERE id = :id",
+                    ['id' => (int) $_POST['materia_id']]
+                );
+            }
+
+            $turmas = [];
+            $turmasIds = $_POST['turmas_id'] ?? [];
+            if (!is_array($turmasIds)) {
+                $turmasIds = [$turmasIds];
+            }
+            $turmasIds = array_values(array_filter(array_map('intval', $turmasIds)));
+            if (!empty($turmasIds)) {
+                $placeholders = str_repeat('?,', count($turmasIds) - 1) . '?';
+                $turmas = $this->db->fetchAll(
+                    "SELECT id, nome FROM turmas WHERE id IN ($placeholders)",
+                    $turmasIds
+                ) ?: [];
+            }
+
+            require_once __DIR__ . '/../../Services/AIJobService.php';
+            $jobId = \App\Services\AIJobService::enqueue('gerar_plano_aula_copiloto', [
+                'prompt' => $prompt,
+                'professor_nome' => (string) ($professor['nome'] ?? $user['nome'] ?? ''),
+                'materia' => $materia,
+                'turmas' => $turmas,
+                'datas_aula' => (string) ($_POST['data_aula'] ?? ''),
+                'titulo_atual' => trim((string) ($_POST['titulo'] ?? '')),
+                'arquivos' => $arquivos,
+            ], (int) $user['id'], 'professor');
+
+            $this->json([
+                'success' => true,
+                'job_id' => $jobId,
+                'message' => 'Copiloto acionado. O rascunho será preenchido quando a geração terminar.'
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao acionar Copiloto do plano de aula: " . $e->getMessage());
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    private function salvarArquivosCopiloto($files, int $professorId): array
+    {
+        if (empty($files) || empty($files['name'])) {
+            return [];
+        }
+
+        $normalizados = [];
+        if (is_array($files['name'])) {
+            foreach ($files['name'] as $i => $name) {
+                $normalizados[] = [
+                    'name' => $name,
+                    'type' => $files['type'][$i] ?? '',
+                    'tmp_name' => $files['tmp_name'][$i] ?? '',
+                    'error' => $files['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $files['size'][$i] ?? 0,
+                ];
+            }
+        } else {
+            $normalizados[] = $files;
+        }
+
+        $dir = realpath(__DIR__ . '/../../../storage') ?: (__DIR__ . '/../../../storage');
+        $dir .= '/tmp/planos_aula_copiloto';
+        if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
+            throw new Exception('Não foi possível preparar o envio dos arquivos.');
+        }
+
+        $permitidos = [
+            'application/pdf' => 'pdf',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        ];
+        $salvos = [];
+
+        foreach ($normalizados as $file) {
+            if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            if ((int) ($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($file['tmp_name'] ?? ''))) {
+                throw new Exception('Falha no envio de um dos arquivos.');
+            }
+            if ((int) ($file['size'] ?? 0) <= 0 || (int) $file['size'] > 12 * 1024 * 1024) {
+                throw new Exception('Cada arquivo do Copiloto deve ter até 12MB.');
+            }
+            if (count($salvos) >= 8) {
+                throw new Exception('Envie no máximo 8 arquivos por geração.');
+            }
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = $finfo ? (string) finfo_file($finfo, (string) $file['tmp_name']) : (string) ($file['type'] ?? '');
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+            if (!isset($permitidos[$mime])) {
+                throw new Exception('Tipo de arquivo não permitido. Envie PDF, PNG, JPG ou WEBP.');
+            }
+
+            $nomeSeguro = preg_replace('/[^a-zA-Z0-9_.-]+/', '-', basename((string) ($file['name'] ?? 'arquivo')));
+            $filename = 'prof-' . $professorId . '-' . bin2hex(random_bytes(8)) . '-' . $nomeSeguro;
+            $path = $dir . '/' . $filename;
+            if (!move_uploaded_file((string) $file['tmp_name'], $path)) {
+                throw new Exception('Não foi possível salvar um dos arquivos.');
+            }
+            @chmod($path, 0600);
+            $salvos[] = [
+                'path' => $path,
+                'nome' => substr((string) ($file['name'] ?? 'arquivo'), 0, 180),
+                'mime' => $mime,
+                'tamanho' => (int) ($file['size'] ?? 0),
+            ];
+        }
+
+        return $salvos;
     }
     
     /**

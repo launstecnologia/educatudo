@@ -1,6 +1,6 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
 <?php
-$primaryColor = $primary_color ?? '#3b82f6';
-$primaryTextColor = $primary_text_color ?? '#ffffff';
 $filtroDescricao = trim((string) ($filtros['descricao'] ?? ''));
 $filtroTurmaId = (string) ($filtros['turma_id'] ?? '');
 $filtroMateriaId = (string) ($filtros['materia_id'] ?? '');
@@ -10,7 +10,7 @@ $pagination = $pagination ?? [
     'current_page' => 1,
     'total_pages' => 1,
     'total_items' => (int) ($stats['total'] ?? 0),
-    'per_page' => 20,
+    'per_page' => 10,
     'has_prev' => false,
     'has_next' => false,
     'prev_page' => 1,
@@ -22,28 +22,78 @@ foreach ([$filtroDescricao, $filtroTurmaId, $filtroMateriaId, $filtroDataInicio,
         $filtrosAtivosCount++;
     }
 }
+
+$pagTotal = (int) ($pagination['total_items'] ?? 0);
+$pagPerPage = (int) ($pagination['per_page'] ?? 10);
+$pagPage = (int) ($pagination['current_page'] ?? 1);
+$pagTotalPages = (int) ($pagination['total_pages'] ?? 1);
+$itensLabel = $pagTotal === 1 ? 'item' : 'itens';
+$queryParams = array_filter([
+    'descricao' => $filtroDescricao,
+    'turma_id' => $filtroTurmaId,
+    'materia_id' => $filtroMateriaId,
+    'data_inicio' => $filtroDataInicio,
+    'data_fim' => $filtroDataFim,
+], static fn($v) => $v !== '' && $v !== null);
+$baseQuery = empty($queryParams) ? '' : ('?' . http_build_query($queryParams));
+$sep = $baseQuery === '' ? '?' : '&';
+
+$formatarDatasPlano = static function ($dataAula): string {
+    $datas = [];
+    if (!empty($dataAula)) {
+        $datasJson = json_decode((string) $dataAula, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($datasJson)) {
+            $datas = $datasJson;
+        } else {
+            $datas = [(string) $dataAula];
+        }
+    }
+
+    $datasFormatadas = [];
+    foreach ($datas as $dataItem) {
+        $tsData = strtotime((string) $dataItem);
+        if ($tsData !== false) {
+            $datasFormatadas[] = date('d/m/Y', $tsData);
+        }
+    }
+
+    return !empty($datasFormatadas) ? implode(', ', $datasFormatadas) : 'N/A';
+};
+
+$statusPlano = static function ($status): array {
+    $status = (string) ($status ?? 'rascunho');
+    $map = [
+        'rascunho' => ['Rascunho', 'bg-slate-100 text-slate-700'],
+        'pendente' => ['Pendente', 'bg-amber-100 text-amber-800'],
+        'enviado' => ['Enviado', 'bg-blue-100 text-blue-800'],
+        'aprovado' => ['Aprovado', 'bg-green-100 text-green-800'],
+        'rejeitado' => ['Rejeitado', 'bg-red-100 text-red-800'],
+    ];
+
+    return $map[$status] ?? [ucfirst(str_replace('_', ' ', $status)), 'bg-slate-100 text-slate-700'];
+};
 ?>
 
 <div class="mb-6">
-    <div class="flex flex-wrap justify-between items-start gap-3">
+    <div class="flex flex-wrap justify-between items-start gap-4">
         <div>
             <h2 class="text-2xl font-bold text-gray-900 mb-1">Meus Planos de Aula</h2>
             <p class="text-gray-600 text-sm">Gerencie seus planos de aula.</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-3 flex-shrink-0">
             <button type="button"
                     onclick="abrirFiltroPlanos()"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2l-6 7v6l-4-2v-4L3 6V4z"></path></svg>
+                <i class="fa-solid fa-filter text-gray-500 mr-2"></i>
                 Filtros
                 <?php if ($filtrosAtivosCount > 0): ?>
-                    <span class="ml-2 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold inline-flex items-center justify-center"><?= $filtrosAtivosCount ?></span>
+                    <span class="ml-2 min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold inline-flex items-center justify-center"><?= (int) $filtrosAtivosCount ?></span>
                 <?php endif; ?>
             </button>
 
             <a href="<?= URL ?>/professor/planos-aula/criar"
-               class="inline-flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm">
-                <span class="mr-2">+</span>
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors hover:opacity-90 shadow-sm">
+                <i class="fa-solid fa-plus mr-2"></i>
                 Novo Plano
             </a>
         </div>
@@ -51,147 +101,131 @@ foreach ([$filtroDescricao, $filtroTurmaId, $filtroMateriaId, $filtroDataInicio,
 </div>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-    <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-2">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
         <h3 class="text-lg font-semibold text-gray-900">Planos de Aula</h3>
-        <span class="text-sm text-gray-500"><?= (int) ($stats['total'] ?? 0) ?> itens</span>
+        <span class="text-sm text-gray-500"><?= (int) $pagTotal ?> <?= $itensLabel ?></span>
     </div>
 
-    <div class="p-0">
-        <?php if (empty($planos)): ?>
-            <div class="text-center py-12 px-5">
-                <div class="text-gray-400 mb-3">Nenhum plano encontrado para os filtros aplicados.</div>
-                <a href="<?= URL ?>/professor/planos-aula" class="text-blue-600 hover:text-blue-700 text-sm font-medium">Limpar filtros</a>
-            </div>
-        <?php else: ?>
-            <table class="w-full table-fixed divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plano</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matéria</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <?php if (empty($planos)): ?>
                     <tr>
-                        <th class="w-[38%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
-                        <th class="w-[18%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matéria</th>
-                        <th class="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
-                        <th class="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                        <th class="w-[16%] px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                            <i class="fa-regular fa-calendar-days text-4xl text-gray-300 mb-4"></i>
+                            <p>Nenhum plano encontrado para os filtros aplicados.</p>
+                            <?php if ($filtrosAtivosCount > 0): ?>
+                                <a href="<?= URL ?>/professor/planos-aula" class="inline-flex mt-3 text-blue-600 hover:text-blue-700 text-sm font-medium">Limpar filtros</a>
+                            <?php endif; ?>
+                        </td>
                     </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <?php else: ?>
                     <?php foreach ($planos as $plano): ?>
                         <?php
-                        $datas = [];
-                        if (!empty($plano['data_aula'])) {
-                            $datasJson = json_decode((string) $plano['data_aula'], true);
-                            if (json_last_error() === JSON_ERROR_NONE && is_array($datasJson)) {
-                                $datas = $datasJson;
-                            } else {
-                                $datas = [(string) $plano['data_aula']];
-                            }
-                        }
-                        $datasFormatadas = [];
-                        foreach ($datas as $dataItem) {
-                            $tsData = strtotime((string) $dataItem);
-                            if ($tsData !== false) {
-                                $datasFormatadas[] = date('d/m/Y', $tsData);
-                            }
-                        }
+                        $planoId = (int) ($plano['id'] ?? 0);
+                        $tituloPlano = (string) ($plano['titulo'] ?? 'Sem título');
+                        $datasPlano = $formatarDatasPlano($plano['data_aula'] ?? null);
+                        [$statusLabel, $statusClasses] = $statusPlano($plano['status'] ?? 'rascunho');
                         ?>
                         <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-3 text-sm font-medium text-gray-900">
-                                <div class="truncate" title="<?= htmlspecialchars((string) ($plano['titulo'] ?? 'Sem título')) ?>">
-                                    <?= htmlspecialchars((string) ($plano['titulo'] ?? 'Sem título')) ?>
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900 max-w-md truncate" title="<?= htmlspecialchars($tituloPlano) ?>">
+                                    <?= htmlspecialchars($tituloPlano) ?>
                                 </div>
+                                <?php if (!empty($plano['descricao'])): ?>
+                                    <div class="text-xs text-gray-500 mt-1 max-w-md truncate">
+                                        <?= htmlspecialchars((string) $plano['descricao']) ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-600">
-                                <div class="truncate" title="<?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?>">
-                                    <?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?>
-                                </div>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                <?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                 <?= htmlspecialchars((string) ($plano['turma_nome'] ?? '-')) ?>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-600">
-                                <div class="truncate" title="<?= !empty($datasFormatadas) ? htmlspecialchars(implode(', ', $datasFormatadas)) : 'N/A' ?>">
-                                    <?= !empty($datasFormatadas) ? htmlspecialchars(implode(', ', $datasFormatadas)) : 'N/A' ?>
-                                </div>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                <?= htmlspecialchars($datasPlano) ?>
                             </td>
-                            <td class="px-4 py-3 text-right whitespace-nowrap">
-                                <button type="button"
-                                        class="btn-acoes-dropdown inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors hover:opacity-90"
-                                        style="background-color: <?= htmlspecialchars($primaryColor) ?>; color: <?= htmlspecialchars($primaryTextColor) ?>; border-color: <?= htmlspecialchars($primaryColor) ?>;"
-                                        data-id="<?= (int) ($plano['id'] ?? 0) ?>"
-                                        data-visualizar="<?= htmlspecialchars(URL . '/professor/planos-aula/visualizar/' . (int) ($plano['id'] ?? 0)) ?>"
-                                        data-editar="<?= htmlspecialchars(URL . '/professor/planos-aula/editar/' . (int) ($plano['id'] ?? 0)) ?>"
-                                        data-pdf="<?= htmlspecialchars(URL . '/professor/planos-aula/pdf/' . (int) ($plano['id'] ?? 0)) ?>"
-                                        onclick="abrirDropdownAcoes(this)">
-                                    <span>Ações</span>
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= htmlspecialchars($statusClasses) ?>">
+                                    <?= htmlspecialchars($statusLabel) ?>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <?php ob_start(); ?>
+                                <a href="<?= URL ?>/professor/planos-aula/visualizar/<?= $planoId ?>"
+                                   class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-eye text-gray-400 w-4 text-center"></i> Ver
+                                </a>
+                                <a href="<?= URL ?>/professor/planos-aula/editar/<?= $planoId ?>"
+                                   class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
+                                </a>
+                                <a href="<?= URL ?>/professor/planos-aula/pdf/<?= $planoId ?>" target="_blank"
+                                   class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-file-pdf text-gray-400 w-4 text-center"></i> Exportar PDF
+                                </a>
+                                <button type="button" onclick="duplicarPlano(<?= $planoId ?>)"
+                                        class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-copy text-gray-400 w-4 text-center"></i> Duplicar
                                 </button>
+                                <div class="border-t border-gray-100 my-1"></div>
+                                <button type="button" onclick="excluirPlano(<?= $planoId ?>)"
+                                        class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                    <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
+                                </button>
+                                <?php
+                                $row_actions_dropdown_items = ob_get_clean();
+                                $row_actions_dropdown_id = 'row-actions-plano-' . $planoId;
+                                include __DIR__ . '/../../admin/_partials/row_actions_dropdown.php';
+                                ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 
-    <div class="px-5 py-4 border-t border-gray-200">
-        <div class="text-center text-sm text-gray-500 mb-3">
-            Total de planos de aula: <span class="font-semibold text-gray-700"><?= (int) ($pagination['total_items'] ?? $stats['total'] ?? 0) ?></span>
+    <?php if ($pagTotal > 0): ?>
+        <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-gray-600">
+                Exibindo <?= min(($pagPage - 1) * $pagPerPage + 1, $pagTotal) ?>-<?= min($pagPage * $pagPerPage, $pagTotal) ?> de <?= $pagTotal ?> registro(s)
+            </p>
+            <?php if ($pagTotalPages > 1): ?>
+                <div class="flex items-center gap-1">
+                    <?php if (!empty($pagination['has_prev'])): ?>
+                        <a href="<?= URL ?>/professor/planos-aula<?= $baseQuery . $sep ?>page=<?= (int) $pagination['prev_page'] ?>" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Anterior</a>
+                    <?php endif; ?>
+                    <?php for ($i = max(1, $pagPage - 2); $i <= min($pagTotalPages, $pagPage + 2); $i++): ?>
+                        <a href="<?= URL ?>/professor/planos-aula<?= $baseQuery . $sep ?>page=<?= $i ?>" class="px-3 py-1.5 text-sm font-medium rounded-lg <?= $i === $pagPage ? 'btn-primary-custom' : 'text-gray-700 bg-gray-100 hover:bg-gray-200' ?>"><?= $i ?></a>
+                    <?php endfor; ?>
+                    <?php if (!empty($pagination['has_next'])): ?>
+                        <a href="<?= URL ?>/professor/planos-aula<?= $baseQuery . $sep ?>page=<?= (int) $pagination['next_page'] ?>" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Próxima</a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
-
-        <?php if (($pagination['total_pages'] ?? 1) > 1): ?>
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="text-sm text-gray-700 text-center sm:text-left">
-                Mostrando <?= count($planos) ?> de <?= (int) ($pagination['total_items'] ?? 0) ?> planos
-            </div>
-            <div class="flex items-center justify-center flex-wrap gap-2">
-                <?php
-                $queryParams = array_filter([
-                    'descricao' => $filtroDescricao,
-                    'turma_id' => $filtroTurmaId,
-                    'materia_id' => $filtroMateriaId,
-                    'data_inicio' => $filtroDataInicio,
-                    'data_fim' => $filtroDataFim,
-                    'per_page' => ($pagination['per_page'] ?? 20) != 20 ? ($pagination['per_page'] ?? 20) : '',
-                ], static fn($v) => $v !== '' && $v !== null);
-                $queryString = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
-                ?>
-
-                <?php if (!empty($pagination['has_prev'])): ?>
-                <a href="<?= URL ?>/professor/planos-aula?page=<?= (int) $pagination['prev_page'] ?><?= $queryString ?>"
-                   class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    Anterior
-                </a>
-                <?php endif; ?>
-
-                <?php
-                $startPage = max(1, (int) $pagination['current_page'] - 2);
-                $endPage = min((int) $pagination['total_pages'], (int) $pagination['current_page'] + 2);
-                ?>
-
-                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                <a href="<?= URL ?>/professor/planos-aula?page=<?= $i ?><?= $queryString ?>"
-                   class="px-3 py-2 border rounded-lg text-sm transition-colors <?= $i === (int) $pagination['current_page'] ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50' ?>">
-                    <?= $i ?>
-                </a>
-                <?php endfor; ?>
-
-                <?php if (!empty($pagination['has_next'])): ?>
-                <a href="<?= URL ?>/professor/planos-aula?page=<?= (int) $pagination['next_page'] ?><?= $queryString ?>"
-                   class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm">
-                    Próxima
-                </a>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
+    <?php endif; ?>
 </div>
 
 <div id="planos-filter-backdrop" class="hidden fixed inset-0 bg-black/40 z-40" onclick="fecharFiltroPlanos()"></div>
 <aside id="planos-filter-drawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 translate-x-full transition-transform duration-200">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-base font-semibold text-gray-900">Filtrar planos de aula</h3>
-        <button type="button" class="text-gray-500 hover:text-gray-700" onclick="fecharFiltroPlanos()">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        <button type="button" class="text-gray-500 hover:text-gray-700" onclick="fecharFiltroPlanos()" aria-label="Fechar filtros">
+            <i class="fa-solid fa-xmark"></i>
         </button>
     </div>
     <form method="get" action="<?= URL ?>/professor/planos-aula" class="h-[calc(100%-65px)] flex flex-col">
@@ -235,12 +269,12 @@ foreach ([$filtroDescricao, $filtroTurmaId, $filtroMateriaId, $filtroDataInicio,
         </div>
         <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center gap-3">
             <a href="<?= URL ?>/professor/planos-aula" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 text-center hover:bg-gray-100 transition-colors">Limpar</a>
-            <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">Aplicar</button>
+            <button type="submit" class="btn-primary-custom flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors">Aplicar</button>
         </div>
     </form>
 </aside>
 
-<div id="dropdown-actions-portal" class="hidden fixed z-[100] w-44 py-1 bg-white rounded-lg shadow-xl border border-gray-200"></div>
+<?php include __DIR__ . '/../../layouts/components/row_actions_dropdown_js.php'; ?>
 
 <script>
 function abrirFiltroPlanos() {
@@ -253,41 +287,8 @@ function fecharFiltroPlanos() {
     document.getElementById('planos-filter-drawer').classList.add('translate-x-full');
 }
 
-function abrirDropdownAcoes(btn) {
-    const portal = document.getElementById('dropdown-actions-portal');
-    const id = Number(btn.dataset.id || 0);
-    const visualizar = btn.dataset.visualizar || '#';
-    const editar = btn.dataset.editar || '#';
-    const pdf = btn.dataset.pdf || '#';
-    const rect = btn.getBoundingClientRect();
-
-    portal.style.right = (window.innerWidth - rect.right) + 'px';
-    portal.style.top = (rect.bottom + 4) + 'px';
-    portal.innerHTML = `
-        <a href="${visualizar}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Ver</a>
-        <a href="${editar}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Editar</a>
-        <a href="${pdf}" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Exportar PDF</a>
-        <button type="button" onclick="duplicarPlano(${id}); fecharDropdownActions();" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Duplicar</button>
-        <button type="button" onclick="excluirPlano(${id}); fecharDropdownActions();" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Excluir</button>
-    `;
-    portal.classList.remove('hidden');
-}
-
-function fecharDropdownActions() {
-    document.getElementById('dropdown-actions-portal').classList.add('hidden');
-}
-
-document.addEventListener('click', function (event) {
-    const portal = document.getElementById('dropdown-actions-portal');
-    const isBtn = event.target.closest('.btn-acoes-dropdown');
-    if (!portal.classList.contains('hidden') && !portal.contains(event.target) && !isBtn) {
-        fecharDropdownActions();
-    }
-});
-
 document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') {
-        fecharDropdownActions();
         fecharFiltroPlanos();
     }
 });
@@ -296,7 +297,7 @@ function excluirPlano(id) {
     if (!confirm('Tem certeza que deseja excluir este plano de aula?')) {
         return;
     }
-    
+
     fetch('<?= URL ?>/professor/planos-aula/excluir/' + id, {
         method: 'POST',
         headers: {
@@ -346,5 +347,4 @@ function duplicarPlano(id) {
         alert('Erro ao duplicar plano de aula');
     });
 }
-
 </script>

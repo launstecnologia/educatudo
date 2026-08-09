@@ -3572,4 +3572,70 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         return self::calculateCostEstimate($model, $promptTokens, $completionTokens);
     }
 
+    public function gerarPlanoAulaCopiloto(string $promptProfessor, string $referencias, array $contexto = []): array
+    {
+        $materiaNome = '';
+        if (!empty($contexto['materia']) && is_array($contexto['materia'])) {
+            $materiaNome = (string) ($contexto['materia']['nome'] ?? '');
+        }
+        $turmas = [];
+        foreach (($contexto['turmas'] ?? []) as $turma) {
+            if (is_array($turma) && !empty($turma['nome'])) {
+                $turmas[] = (string) $turma['nome'];
+            }
+        }
+
+        $system = 'Você é um copiloto pedagógico da EducaTudo. Gere um rascunho de plano de aula claro, prático e editável para professores. Retorne somente JSON válido.';
+        $userPrompt = "Monte um rascunho de plano de aula em português do Brasil.\n\n"
+            . "CONTEXTO:\n"
+            . "- Professor: " . (string) ($contexto['professor_nome'] ?? '') . "\n"
+            . "- Matéria: {$materiaNome}\n"
+            . "- Turmas: " . implode(', ', $turmas) . "\n"
+            . "- Datas: " . (string) ($contexto['datas_aula'] ?? '') . "\n"
+            . "- Título já digitado: " . (string) ($contexto['titulo_atual'] ?? '') . "\n\n"
+            . "PEDIDO DO PROFESSOR:\n{$promptProfessor}\n\n"
+            . "MATERIAL ENVIADO:\n{$referencias}\n\n"
+            . "Responda com as chaves: titulo, modulo, aula_num, paginas, conteudo, objetivos, recursos, recursos_lista, observacoes. "
+            . "Use HTML simples nos campos conteudo, objetivos e recursos (<p>, <ul>, <li>, <strong>). recursos_lista deve ser array com itens entre: Quadro, Projetor, Computador, Livro, Apostila, Vídeo, Áudio, EducaColag.";
+
+        $response = $this->fazerRequisicao([
+            'model' => 'gpt-4o-mini',
+            'messages' => [
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => $userPrompt],
+            ],
+            'temperature' => 0.4,
+            'response_format' => ['type' => 'json_object'],
+        ], 3, 0, 'plano_aula_copiloto');
+
+        $content = (string) ($response['choices'][0]['message']['content'] ?? '');
+        $decoded = json_decode($content, true);
+        if (!is_array($decoded)) {
+            $content = trim(preg_replace('/^```(?:json)?|```$/m', '', $content));
+            $decoded = json_decode($content, true);
+        }
+        if (!is_array($decoded)) {
+            throw new \Exception('O Copiloto não retornou um rascunho válido.');
+        }
+
+        $permitidos = ['Quadro', 'Projetor', 'Computador', 'Livro', 'Apostila', 'Vídeo', 'Áudio', 'EducaColag'];
+        $recursosLista = $decoded['recursos_lista'] ?? [];
+        if (!is_array($recursosLista)) {
+            $recursosLista = [];
+        }
+        $recursosLista = array_values(array_intersect($permitidos, array_map('strval', $recursosLista)));
+
+        return [
+            'titulo' => trim((string) ($decoded['titulo'] ?? '')),
+            'modulo' => trim((string) ($decoded['modulo'] ?? '')),
+            'aula_num' => trim((string) ($decoded['aula_num'] ?? '')),
+            'paginas' => trim((string) ($decoded['paginas'] ?? '')),
+            'conteudo' => (string) ($decoded['conteudo'] ?? ''),
+            'objetivos' => (string) ($decoded['objetivos'] ?? ''),
+            'recursos' => (string) ($decoded['recursos'] ?? ''),
+            'recursos_lista' => $recursosLista,
+            'observacoes' => trim((string) ($decoded['observacoes'] ?? '')),
+        ];
+    }
+
 }

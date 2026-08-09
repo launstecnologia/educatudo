@@ -248,6 +248,7 @@ $router->post('/professor/diario/salvar', 'Teacher/ClassDiaryController@salvar')
 $router->get('/professor/planos-aula', 'Education/LessonPlanController@index');
 $router->get('/professor/planos-aula/criar', 'Education/LessonPlanController@criar');
 $router->post('/professor/planos-aula/salvar', 'Education/LessonPlanController@salvar');
+$router->post('/professor/planos-aula/copiloto', 'Education/LessonPlanController@gerarComCopiloto');
 $router->get('/professor/planos-aula/visualizar/{id}', 'Education/LessonPlanController@visualizar');
 $router->get('/professor/planos-aula/editar/{id}', 'Education/LessonPlanController@editar');
 $router->post('/professor/planos-aula/atualizar/{id}', 'Education/LessonPlanController@atualizar');

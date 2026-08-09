@@ -439,6 +439,9 @@ class AIJobService
             case 'gerar_questao_ia':
                 return self::dispatchGerarQuestaoIA($payload);
 
+            case 'gerar_plano_aula_copiloto':
+                return self::dispatchGerarPlanoAulaCopiloto($payload);
+
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");
         }
@@ -446,6 +449,61 @@ class AIJobService
 
     // -------------------------------------------------------------------------
     // Handlers específicos que fazem AI + persistência no banco
+
+    private static function dispatchGerarPlanoAulaCopiloto(array $payload): array
+    {
+        $openai = new OpenAIService();
+        $referencias = [];
+        $arquivosProcessados = [];
+        $ocrPrompt = 'Transcreva literalmente o material pedagógico desta imagem para apoiar a criação de um plano de aula.';
+
+        foreach (($payload['arquivos'] ?? []) as $arquivo) {
+            $path = (string) ($arquivo['path'] ?? '');
+            if ($path === '' || !is_file($path)) {
+                continue;
+            }
+
+            $mime = (string) ($arquivo['mime'] ?? '');
+            $nome = (string) ($arquivo['nome'] ?? basename($path));
+            $bytes = file_get_contents($path);
+            if ($bytes === false) {
+                continue;
+            }
+
+            $texto = '';
+            if ($mime === 'application/pdf') {
+                $texto = self::extractPdfTextNaive($bytes);
+                if (mb_strlen(trim($texto)) < 80) {
+                    $texto = self::ocrPdfViaImagick($bytes, $openai, $ocrPrompt);
+                }
+            } elseif (str_starts_with($mime, 'image/')) {
+                $texto = trim((string) $openai->analyzeImage(base64_encode($bytes), $ocrPrompt));
+            }
+
+            if (trim($texto) !== '') {
+                $referencias[] = "Arquivo: {$nome}\n" . mb_substr(trim($texto), 0, 8000);
+            }
+            $arquivosProcessados[] = $path;
+        }
+
+        $resultado = $openai->gerarPlanoAulaCopiloto(
+            (string) ($payload['prompt'] ?? ''),
+            implode("\n\n---\n\n", $referencias),
+            [
+                'professor_nome' => (string) ($payload['professor_nome'] ?? ''),
+                'materia' => $payload['materia'] ?? null,
+                'turmas' => $payload['turmas'] ?? [],
+                'datas_aula' => (string) ($payload['datas_aula'] ?? ''),
+                'titulo_atual' => (string) ($payload['titulo_atual'] ?? ''),
+            ]
+        );
+
+        foreach ($arquivosProcessados as $path) {
+            @unlink($path);
+        }
+
+        return $resultado;
+    }
 
     private static function dispatchCorrigirEssay(array $payload): array
     {
