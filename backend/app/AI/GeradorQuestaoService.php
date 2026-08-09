@@ -19,11 +19,9 @@ require_once __DIR__ . '/../Services/AIJobService.php';
  * módulo de cobrança já existente — não unifica cobrança entre telas, é
  * decisão de produto, não técnica).
  *
- * Não dispara processamento imediato (spawnBackgroundWorker/inline): job
- * de geração de questão é de alto volume potencial (muitos alunos/professores
- * simultâneos), e o disparo imediato hoje spawna um processo CLI que itera
- * TODAS as escolas ativas por enqueue() — só o cron (até 1 min) processa
- * este job_type. Ver AIJobService::enqueue() para detalhe do porquê.
+ * Por padrão não dispara processamento imediato (spawnBackgroundWorker/inline):
+ * job de geração de questão pode ser de alto volume. Fluxos pontuais podem
+ * passar disparar_imediatamente=true no blueprint para reduzir a latência.
  */
 class GeradorQuestaoService
 {
@@ -68,7 +66,9 @@ class GeradorQuestaoService
         $creditosService = new \App\Services\CreditosService();
         $creditosService->consumir($papel, $usuarioId, $modulo, $refCredito);
 
+        $dispararImediatamente = !empty($blueprint['disparar_imediatamente']);
         $payload = $blueprint;
+        unset($payload['disparar_imediatamente']);
         $payload['credits_ref'] = $refCredito;
         $payload['credits_modulo'] = $modulo;
 
@@ -77,7 +77,7 @@ class GeradorQuestaoService
             $payload,
             $usuarioId,
             $papel,
-            false // não dispara worker imediato — ver docblock da classe
+            $dispararImediatamente
         );
     }
 }

@@ -227,6 +227,7 @@ $page = max(1, (int) ($page ?? 1));
                         <th class="px-3 py-2 text-left">ID externo</th>
                         <th class="px-3 py-2 text-left">Matéria</th>
                         <th class="px-3 py-2 text-left">Tipo</th>
+                        <th class="px-3 py-2 text-left">Nível</th>
                         <th class="px-3 py-2 text-left">Enunciado</th>
                         <th class="px-3 py-2 text-left">Gabarito</th>
                         <th class="px-3 py-2 text-left">Ações</th>
@@ -234,9 +235,14 @@ $page = max(1, (int) ($page ?? 1));
                 </thead>
                 <tbody>
                     <?php if (empty($questoes)): ?>
-                        <tr><td colspan="7" class="px-3 py-8 text-center text-gray-500">Nenhuma questão encontrada.</td></tr>
+                        <tr><td colspan="8" class="px-3 py-8 text-center text-gray-500">Nenhuma questão encontrada.</td></tr>
                     <?php else: ?>
                         <?php foreach ($questoes as $q): ?>
+                            <?php
+                            $nivel = (string)($q['nivel_dificuldade'] ?? '');
+                            $nivelLabel = ['facil' => 'Fácil', 'medio' => 'Médio', 'dificil' => 'Difícil'][$nivel] ?? $nivel;
+                            $nivelClass = ['facil' => 'bg-emerald-100 text-emerald-800', 'medio' => 'bg-amber-100 text-amber-800', 'dificil' => 'bg-red-100 text-red-800'][$nivel] ?? 'bg-gray-100 text-gray-700';
+                            ?>
                             <tr class="border-b border-gray-100 align-top">
                                 <td class="px-3 py-2">
                                     <input type="checkbox" name="questao_ids[]" value="<?= (int) $q['id'] ?>" class="checkbox-questao w-4 h-4">
@@ -244,7 +250,25 @@ $page = max(1, (int) ($page ?? 1));
                                 <td class="px-3 py-2 text-gray-700"><?= htmlspecialchars((string) ($q['external_id'] ?? '')) ?></td>
                                 <td class="px-3 py-2 text-gray-700"><?= htmlspecialchars((string) ($q['materia'] ?? '')) ?></td>
                                 <td class="px-3 py-2 text-gray-700"><?= htmlspecialchars((string) ($q['tipo'] ?? '')) ?></td>
+                                <td class="px-3 py-2">
+                                    <?php if ($nivelLabel !== ''): ?>
+                                        <span class="inline-flex rounded px-2 py-1 text-xs font-medium <?= $nivelClass ?>"><?= htmlspecialchars($nivelLabel) ?></span>
+                                    <?php else: ?>
+                                        <span class="text-gray-400">-</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="px-3 py-2 text-gray-800">
+                                    <?php if (!empty($q['titulo']) || !empty($q['assunto']) || !empty($q['origem'])): ?>
+                                        <div class="mb-2 space-y-1">
+                                            <?php if (!empty($q['titulo'])): ?>
+                                                <div class="font-semibold text-gray-900"><?= htmlspecialchars((string)$q['titulo']) ?></div>
+                                            <?php endif; ?>
+                                            <div class="flex flex-wrap gap-2 text-xs text-gray-500">
+                                                <?php if (!empty($q['assunto'])): ?><span>Assunto: <?= htmlspecialchars((string)$q['assunto']) ?></span><?php endif; ?>
+                                                <?php if (!empty($q['origem'])): ?><span>Origem: <?= htmlspecialchars((string)$q['origem']) ?></span><?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
                                     <div class="max-h-24 overflow-auto prose prose-sm max-w-none">
                                         <?= (string) ($q['enunciado_html'] ?? '') ?>
                                     </div>

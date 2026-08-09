@@ -42,8 +42,8 @@ class TeacherQuestionController extends BaseController
         $limit = 30;
         $offset = ($page - 1) * $limit;
 
-        $where = ['1=1'];
-        $params = [];
+        $where = ['(professor_id IS NULL OR professor_id = :professor_id)'];
+        $params = ['professor_id' => $professorId];
 
         if ($materia !== '') {
             $where[] = 'materia = :materia';
@@ -53,8 +53,14 @@ class TeacherQuestionController extends BaseController
             $where[] = 'tipo = :tipo';
             $params['tipo'] = $tipo;
         }
+        if ($dificuldade !== '') {
+            $nivelNormalizado = $this->normalizarNivelDificuldadeBancoProfessor($dificuldade);
+            $where[] = '(nivel_dificuldade = :dificuldade OR JSON_UNQUOTE(JSON_EXTRACT(source_payload, "$.dificuldade")) = :dificuldade_original)';
+            $params['dificuldade'] = $nivelNormalizado ?: $dificuldade;
+            $params['dificuldade_original'] = $dificuldade;
+        }
         if ($q !== '') {
-            $where[] = '(enunciado_html LIKE :q OR external_id LIKE :q)';
+            $where[] = '(titulo LIKE :q OR assunto LIKE :q OR enunciado_html LIKE :q OR external_id LIKE :q)';
             $params['q'] = '%' . $q . '%';
         }
 
@@ -368,6 +374,21 @@ class TeacherQuestionController extends BaseController
         $slugTitulo = trim((string) $slugTitulo, '-');
         $filename = ($slugTitulo !== '' ? $slugTitulo : 'lista') . '-' . date('Ymd_His') . '.pdf';
         $this->streamPdfQuestoes($questoes, $filename);
+    }
+
+    private function normalizarNivelDificuldadeBancoProfessor(string $nivel): ?string
+    {
+        $value = strtolower(trim($nivel));
+        $value = strtr($value, [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
+
+        return ['facil' => 'facil', 'medio' => 'medio', 'dificil' => 'dificil', 'desafio' => 'dificil'][$value] ?? null;
     }
 
     private function streamPdfQuestoes(array $questoes, string $filename): void

@@ -4660,6 +4660,20 @@ class TeacherJourneyController extends BaseController
                     'nivel_dificuldade' => $nivel_dificuldade
                 ]
             );
+
+            $this->salvarQuestaoNoBancoProfessor([
+                'professor_id' => (int)$user['id'],
+                'modulo_id' => (int)$modulo_id,
+                'exercicio_id' => (int)$exercicioId,
+                'titulo' => $titulo,
+                'tipo' => $tipo,
+                'enunciado' => $enunciado,
+                'questoes_json' => $questoesJsonParaBanco,
+                'resposta_correta' => $resposta_correta,
+                'gabarito' => $gabarito,
+                'nivel_dificuldade' => $nivel_dificuldade,
+                'origem' => $gerado_ia ? 'jornada_ia' : 'jornada_manual',
+            ]);
             
             $_SESSION['success_message'] = 'Exercício adicionado com sucesso!';
             $this->json(['success' => true, 'exercicio_id' => $exercicioId]);
@@ -4835,6 +4849,7 @@ class TeacherJourneyController extends BaseController
                 'config' => $this->config,
                 'modulo_id' => (int) $modulo_id,
                 'tipo' => $tipo,
+                'disparar_imediatamente' => true,
             ]);
 
             $this->json(['success' => true, 'job_id' => $jobId]);
@@ -4964,6 +4979,21 @@ class TeacherJourneyController extends BaseController
                     $ordem = $ordemBase + $index + 1;
                     $enunciado = $questao['enunciado'] ?? '';
                     $respostaCorreta = null;
+                    $nivelDificuldade = strtolower(trim((string) ($questao['nivel_dificuldade'] ?? $questao['dificuldade'] ?? '')));
+                    $nivelDificuldade = strtr($nivelDificuldade, [
+                        'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+                        'é' => 'e', 'ê' => 'e',
+                        'í' => 'i',
+                        'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+                        'ú' => 'u',
+                        'ç' => 'c',
+                    ]);
+                    $nivelDificuldade = [
+                        'facil' => 'facil',
+                        'medio' => 'medio',
+                        'dificil' => 'dificil',
+                        'desafio' => 'dificil',
+                    ][$nivelDificuldade] ?? null;
 
                     if ($tipo === 'alternativas') {
                         $opcoes = [];
@@ -4986,8 +5016,8 @@ class TeacherJourneyController extends BaseController
 
                     $exercicioId = $this->db->insert(
                         "INSERT INTO jornadas_modulos_exercicios
-                         (modulo_id, tipo, titulo, enunciado, imagem_url, questoes_json, resposta_correta, pontuacao, ordem, gerado_ia, status)
-                         VALUES (:modulo_id, :tipo, :titulo, :enunciado, :imagem_url, :questoes_json, :resposta_correta, :pontuacao, :ordem, 1, 'publicado')",
+                         (modulo_id, tipo, titulo, enunciado, imagem_url, questoes_json, resposta_correta, pontuacao, ordem, gerado_ia, status, nivel_dificuldade)
+                         VALUES (:modulo_id, :tipo, :titulo, :enunciado, :imagem_url, :questoes_json, :resposta_correta, :pontuacao, :ordem, 1, 'publicado', :nivel_dificuldade)",
                         [
                             'modulo_id' => $moduloId,
                             'tipo' => $tipo,
@@ -4998,9 +5028,23 @@ class TeacherJourneyController extends BaseController
                             'resposta_correta' => $respostaCorreta,
                             'pontuacao' => 1.00,
                             'ordem' => $ordem,
+                            'nivel_dificuldade' => $nivelDificuldade,
                         ]
                     );
                     $exerciciosIds[] = $exercicioId;
+
+                    $this->salvarQuestaoNoBancoProfessor([
+                        'professor_id' => (int)$user['id'],
+                        'modulo_id' => $moduloId,
+                        'exercicio_id' => (int)$exercicioId,
+                        'titulo' => 'Questão ' . ($index + 1),
+                        'tipo' => $tipo,
+                        'enunciado' => $enunciado,
+                        'questoes_json' => json_encode($questoesJson, JSON_UNESCAPED_UNICODE),
+                        'resposta_correta' => $respostaCorreta,
+                        'nivel_dificuldade' => $nivelDificuldade,
+                        'origem' => 'jornada_ia',
+                    ]);
                 }
 
                 $result['imported_at'] = date('c');
@@ -5489,6 +5533,20 @@ Retorne APENAS um JSON válido no seguinte formato:
                     'exercicio_id' => $exercicio_id
                 ]
             );
+
+            $this->salvarQuestaoNoBancoProfessor([
+                'professor_id' => (int)$user['id'],
+                'modulo_id' => (int)($exercicio['modulo_id'] ?? 0),
+                'exercicio_id' => (int)$exercicio_id,
+                'titulo' => $titulo,
+                'tipo' => (string)($exercicio['tipo'] ?? 'alternativas'),
+                'enunciado' => $enunciado,
+                'questoes_json' => $questoes_json ? json_encode($questoes_json, JSON_UNESCAPED_UNICODE) : null,
+                'resposta_correta' => $resposta_correta,
+                'gabarito' => $gabarito,
+                'nivel_dificuldade' => $nivel_dificuldade,
+                'origem' => !empty($exercicio['gerado_ia']) ? 'jornada_ia' : 'jornada_manual',
+            ]);
             
             $_SESSION['success_message'] = 'Exercício atualizado com sucesso!';
             $this->json(['success' => true]);
@@ -8122,7 +8180,7 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                             $respostaCorreta = (string)($ex['resposta_correta'] ?? '');
                             $statusEx = in_array((string)($ex['status'] ?? ''), ['publicado', 'rascunho', 'arquivado'], true) ? (string)$ex['status'] : 'publicado';
 
-                            $this->db->insert(
+                            $exercicioId = (int)$this->db->insert(
                                 "INSERT INTO jornadas_modulos_exercicios
                                  (modulo_id, tipo, titulo, enunciado, questoes_json, resposta_correta, gabarito, pontuacao, ordem, gerado_ia, status, imagem_url, nivel_dificuldade, created_at, updated_at)
                                  VALUES (:modulo_id, :tipo, :titulo, :enunciado, :questoes_json, :resposta_correta, NULL, :pontuacao, :ordem, 0, :status, NULL, NULL, NOW(), NOW())",
@@ -8138,6 +8196,17 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                                     'status' => $statusEx
                                 ]
                             );
+                            $this->salvarQuestaoNoBancoProfessor([
+                                'professor_id' => (int)$user['id'],
+                                'modulo_id' => $moduloId,
+                                'exercicio_id' => $exercicioId,
+                                'titulo' => $tituloEx !== '' ? $tituloEx : 'Exercício',
+                                'tipo' => $tipoEx,
+                                'enunciado' => \App\Utils\HtmlSanitizer::clean((string)$enunciado),
+                                'questoes_json' => $questoesJson,
+                                'resposta_correta' => $respostaCorreta,
+                                'origem' => 'jornada_importacao',
+                            ]);
                             $exerciciosCriados++;
                         }
                     }
@@ -8167,7 +8236,14 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
     public function apiBancoQuestoesFacetsModulo()
     {
         try {
-            $this->assertProfessorLogado();
+            $user = $this->assertProfessorLogado();
+            $fonte = strtolower(trim((string)($_GET['fonte'] ?? 'todos')));
+            if ($fonte === 'professor') {
+                $this->json(['success' => true, 'data' => [
+                    'facets' => $this->listarFacetsBancoQuestoesProfessorModulo((int)$user['id'], $_GET)
+                ]]);
+                return;
+            }
             $query = $this->buildBancoQuestoesQueryFromRequest($_GET);
             $payload = $this->bancoQuestoesApiGet('/api/facets', $query);
             $this->json(['success' => true, 'data' => $payload]);
@@ -8182,7 +8258,8 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
     public function apiBancoQuestoesListarModulo()
     {
         try {
-            $this->assertProfessorLogado();
+            $user = $this->assertProfessorLogado();
+            $fonte = strtolower(trim((string)($_GET['fonte'] ?? 'todos')));
             $query = $this->buildBancoQuestoesQueryFromRequest($_GET);
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
             $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
@@ -8192,7 +8269,32 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
             $query['limit'] = $limit;
             $query['offset'] = $offset;
 
-            $payload = $this->bancoQuestoesApiGet('/api/questoes', $query);
+            $payload = ['questoes' => [], 'total' => 0, 'limit' => $limit, 'offset' => $offset];
+            if ($fonte !== 'professor') {
+                try {
+                    $payload = $this->bancoQuestoesApiGet('/api/questoes', $query);
+                } catch (\Throwable $apiError) {
+                    $payload = ['questoes' => [], 'total' => 0, 'limit' => $limit, 'offset' => $offset, 'warning' => $apiError->getMessage()];
+                }
+            }
+
+            if ($fonte !== 'educatudo') {
+                $locais = $this->listarBancoQuestoesProfessorModulo((int)$user['id'], $_GET, $limit, $offset);
+                if ($fonte === 'professor') {
+                    $payload = [
+                        'questoes' => $locais['questoes'],
+                        'total' => (int)$locais['total'],
+                        'limit' => $limit,
+                        'offset' => $offset,
+                    ];
+                } elseif (!empty($locais['questoes'])) {
+                    $externas = is_array($payload['questoes'] ?? null) ? $payload['questoes'] : [];
+                    $payload['questoes'] = array_values(array_merge($locais['questoes'], $externas));
+                    $payload['total'] = (int)($payload['total'] ?? count($externas)) + (int)$locais['total'];
+                    $payload['limit'] = $limit;
+                    $payload['offset'] = $offset;
+                }
+            }
             $this->json(['success' => true, 'data' => $payload]);
         } catch (Exception $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 400);
@@ -8253,18 +8355,30 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
             foreach ($ids as $idx => $questaoId) {
                 $creditoReferencia = null;
                 try {
-                    $payload = $this->bancoQuestoesApiGet('/api/questoes', ['id' => $questaoId, 'limit' => 1, 'offset' => 0]);
-                    $questoes = is_array($payload['questoes'] ?? null) ? $payload['questoes'] : [];
-                    if (empty($questoes[0]) || !is_array($questoes[0])) {
-                        throw new Exception('Questão não encontrada na API');
+                    $isQuestaoLocal = str_starts_with((string)$questaoId, 'local:');
+                    if ($isQuestaoLocal) {
+                        $questaoLocalId = (int)substr((string)$questaoId, 6);
+                        $questaoLocal = $this->buscarQuestaoBancoProfessor((int)$user['id'], $questaoLocalId);
+                        if (!$questaoLocal) {
+                            throw new Exception('Questão não encontrada no banco do professor');
+                        }
+                        $map = $this->mapBancoQuestaoToJornadaExercicio($questaoLocal, (int)$user['id']);
+                    } else {
+                        $payload = $this->bancoQuestoesApiGet('/api/questoes', ['id' => $questaoId, 'limit' => 1, 'offset' => 0]);
+                        $questoes = is_array($payload['questoes'] ?? null) ? $payload['questoes'] : [];
+                        if (empty($questoes[0]) || !is_array($questoes[0])) {
+                            throw new Exception('Questão não encontrada na API');
+                        }
+                        $map = $this->mapBancoQuestaoToJornadaExercicio($questoes[0], (int)$user['id']);
                     }
-                    $map = $this->mapBancoQuestaoToJornadaExercicio($questoes[0], (int)$user['id']);
 
-                    // 1 crédito por nova questão importada do banco.
-                    $creditoReferencia = 'bancoq:' . $moduloId . ':' . $questaoId . ':' . uniqid();
-                    $creditosService->consumir('professor', (int)$user['id'], $moduloCredito, $creditoReferencia);
+                    if (!$isQuestaoLocal) {
+                        // 1 crédito por nova questão importada do banco externo.
+                        $creditoReferencia = 'bancoq:' . $moduloId . ':' . $questaoId . ':' . uniqid();
+                        $creditosService->consumir('professor', (int)$user['id'], $moduloCredito, $creditoReferencia);
+                    }
 
-                    $this->db->insert(
+                    $exercicioId = (int)$this->db->insert(
                         "INSERT INTO jornadas_modulos_exercicios
                          (modulo_id, tipo, titulo, enunciado, questoes_json, resposta_correta, gabarito, pontuacao, ordem, gerado_ia, status, imagem_url, nivel_dificuldade, created_at, updated_at)
                          VALUES
@@ -8281,8 +8395,23 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                             'nivel_dificuldade' => $map['nivel_dificuldade']
                         ]
                     );
+
+                    $this->salvarQuestaoNoBancoProfessor([
+                        'professor_id' => (int)$user['id'],
+                        'modulo_id' => $moduloId,
+                        'exercicio_id' => $exercicioId,
+                        'titulo' => $map['titulo'],
+                        'tipo' => $map['tipo'],
+                        'enunciado' => $map['enunciado'],
+                        'questoes_json' => $map['questoes_json'],
+                        'resposta_correta' => $map['resposta_correta'],
+                        'nivel_dificuldade' => $map['nivel_dificuldade'],
+                        'origem' => $isQuestaoLocal ? 'jornada_reuso' : 'banco_questoes',
+                    ]);
                     $inseridos++;
-                    $creditosConsumidos++;
+                    if (!$isQuestaoLocal) {
+                        $creditosConsumidos++;
+                    }
                 } catch (\Throwable $qe) {
                     if ($creditoReferencia !== null) {
                         try {
@@ -8313,6 +8442,303 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
             throw new Exception('Não autorizado');
         }
         return $user;
+    }
+
+    private function bancoQuestoesProfessorDisponivel(): bool
+    {
+        static $disponivel = null;
+        if ($disponivel !== null) {
+            return $disponivel;
+        }
+
+        try {
+            $row = $this->db->fetch(
+                "SELECT COUNT(*) AS total
+                   FROM INFORMATION_SCHEMA.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'professor_questoes_api'
+                    AND COLUMN_NAME IN ('professor_id', 'titulo', 'assunto', 'nivel_dificuldade', 'origem', 'origem_referencia')"
+            );
+            $disponivel = ((int)($row['total'] ?? 0)) >= 6;
+        } catch (\Throwable $e) {
+            $disponivel = false;
+        }
+
+        return $disponivel;
+    }
+
+    private function salvarQuestaoNoBancoProfessor(array $dados): void
+    {
+        if (!$this->bancoQuestoesProfessorDisponivel()) {
+            return;
+        }
+
+        try {
+            $professorId = (int)($dados['professor_id'] ?? 0);
+            $moduloId = (int)($dados['modulo_id'] ?? 0);
+            $exercicioId = (int)($dados['exercicio_id'] ?? 0);
+            if ($professorId <= 0 || $moduloId <= 0 || $exercicioId <= 0) {
+                return;
+            }
+
+            $contexto = $this->buscarContextoQuestaoProfessor($moduloId);
+            $titulo = trim((string)($dados['titulo'] ?? ''));
+            $enunciado = (string)($dados['enunciado'] ?? '');
+            if ($titulo === '') {
+                $titulo = mb_substr(trim(strip_tags($enunciado)), 0, 100, 'UTF-8');
+            }
+            if ($titulo === '') {
+                $titulo = 'Questão';
+            }
+
+            [$alternativas, $gabarito] = $this->normalizarAlternativasBancoProfessor(
+                $dados['questoes_json'] ?? null,
+                $dados['resposta_correta'] ?? null,
+                $dados['gabarito'] ?? null
+            );
+
+            $payload = [
+                'origem' => $dados['origem'] ?? 'jornada',
+                'modulo_id' => $moduloId,
+                'exercicio_id' => $exercicioId,
+                'jornada_id' => $contexto['jornada_id'] ?? null,
+                'jornada_titulo' => $contexto['jornada_titulo'] ?? '',
+                'modulo_titulo' => $contexto['modulo_titulo'] ?? '',
+            ];
+
+            $row = [
+                'professor_id' => $professorId,
+                'external_id' => 'jornada_modulo_exercicio:' . $exercicioId,
+                'titulo' => mb_substr($titulo, 0, 180, 'UTF-8'),
+                'materia' => mb_substr((string)($contexto['materia_nome'] ?? ''), 0, 120, 'UTF-8'),
+                'assunto' => mb_substr((string)($contexto['modulo_titulo'] ?? $contexto['jornada_titulo'] ?? ''), 0, 180, 'UTF-8'),
+                'tipo' => mb_substr((string)($dados['tipo'] ?? 'alternativas'), 0, 120, 'UTF-8'),
+                'nivel_dificuldade' => $this->normalizarNivelBancoProfessor($dados['nivel_dificuldade'] ?? null),
+                'origem' => mb_substr((string)($dados['origem'] ?? 'jornada'), 0, 40, 'UTF-8'),
+                'origem_referencia' => 'modulo:' . $moduloId . ';exercicio:' . $exercicioId,
+                'enunciado_html' => $enunciado,
+                'alternativas_json' => !empty($alternativas) ? json_encode($alternativas, JSON_UNESCAPED_UNICODE) : null,
+                'gabarito' => mb_substr((string)$gabarito, 0, 20, 'UTF-8'),
+                'resolucao_html' => (string)($dados['resolucao_html'] ?? ''),
+                'bncc' => '',
+                'tags' => '',
+                'topicos' => (string)($contexto['modulo_titulo'] ?? ''),
+                'source_payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            ];
+
+            $this->db->update(
+                "INSERT INTO professor_questoes_api
+                    (professor_id, external_id, titulo, materia, assunto, tipo, nivel_dificuldade, origem, origem_referencia,
+                     enunciado_html, alternativas_json, gabarito, resolucao_html, bncc, tags, topicos, source_payload, created_at, updated_at)
+                 VALUES
+                    (:professor_id, :external_id, :titulo, :materia, :assunto, :tipo, :nivel_dificuldade, :origem, :origem_referencia,
+                     :enunciado_html, :alternativas_json, :gabarito, :resolucao_html, :bncc, :tags, :topicos, :source_payload, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                    professor_id = VALUES(professor_id),
+                    titulo = VALUES(titulo),
+                    materia = VALUES(materia),
+                    assunto = VALUES(assunto),
+                    tipo = VALUES(tipo),
+                    nivel_dificuldade = VALUES(nivel_dificuldade),
+                    origem = VALUES(origem),
+                    origem_referencia = VALUES(origem_referencia),
+                    enunciado_html = VALUES(enunciado_html),
+                    alternativas_json = VALUES(alternativas_json),
+                    gabarito = VALUES(gabarito),
+                    resolucao_html = VALUES(resolucao_html),
+                    topicos = VALUES(topicos),
+                    source_payload = VALUES(source_payload),
+                    updated_at = NOW()",
+                $row
+            );
+        } catch (\Throwable $e) {
+            error_log('Falha ao salvar questão no banco do professor: ' . $e->getMessage());
+        }
+    }
+
+    private function buscarContextoQuestaoProfessor(int $moduloId): array
+    {
+        if ($moduloId <= 0) {
+            return [];
+        }
+
+        try {
+            return $this->db->fetch(
+                "SELECT m.id AS modulo_id, m.titulo AS modulo_titulo, j.id AS jornada_id, j.titulo AS jornada_titulo, mat.nome AS materia_nome
+                   FROM jornadas_modulos m
+                   JOIN jornadas j ON j.id = m.jornada_id
+              LEFT JOIN materias mat ON mat.id = j.materia_id
+                  WHERE m.id = :modulo_id",
+                ['modulo_id' => $moduloId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    private function normalizarAlternativasBancoProfessor($questoesJson, $respostaCorreta = null, $gabarito = null): array
+    {
+        if (is_string($questoesJson) && trim($questoesJson) !== '') {
+            $decoded = json_decode($questoesJson, true);
+            $questoesJson = is_array($decoded) ? $decoded : null;
+        }
+
+        $alternativas = [];
+        $gabaritoFinal = strtoupper(trim((string)($gabarito ?: $respostaCorreta)));
+        $opcoes = is_array($questoesJson) && is_array($questoesJson['opcoes'] ?? null) ? $questoesJson['opcoes'] : [];
+        $letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+        foreach ($opcoes as $idx => $opcao) {
+            $letra = $letras[$idx] ?? chr(65 + (int)$idx);
+            if (is_array($opcao)) {
+                $alternativas[$letra] = (string)($opcao['texto'] ?? '');
+                if (!empty($opcao['correta'])) {
+                    $gabaritoFinal = $letra;
+                }
+            } else {
+                $alternativas[$letra] = (string)$opcao;
+            }
+        }
+
+        return [$alternativas, $gabaritoFinal];
+    }
+
+    private function normalizarNivelBancoProfessor($nivel): ?string
+    {
+        $value = strtolower(trim((string)$nivel));
+        $value = strtr($value, [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
+        return ['facil' => 'facil', 'medio' => 'medio', 'dificil' => 'dificil', 'desafio' => 'dificil'][$value] ?? null;
+    }
+
+    private function listarBancoQuestoesProfessorModulo(int $professorId, array $src, int $limit, int $offset): array
+    {
+        if ($professorId <= 0 || !$this->bancoQuestoesProfessorDisponivel()) {
+            return ['questoes' => [], 'total' => 0];
+        }
+
+        $where = ['professor_id = :professor_id'];
+        $params = ['professor_id' => $professorId];
+        foreach (['materia' => 'materia', 'tipo' => 'tipo', 'nivel_dificuldade' => 'dificuldade'] as $col => $input) {
+            $value = trim((string)($src[$input] ?? ''));
+            if ($value !== '') {
+                if ($col === 'nivel_dificuldade') {
+                    $value = $this->normalizarNivelBancoProfessor($value) ?: $value;
+                }
+                $where[] = "{$col} = :{$col}";
+                $params[$col] = $value;
+            }
+        }
+        $q = trim((string)($src['q'] ?? ''));
+        if ($q !== '') {
+            $where[] = '(titulo LIKE :q OR assunto LIKE :q OR enunciado_html LIKE :q OR external_id LIKE :q)';
+            $params['q'] = '%' . $q . '%';
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $totalRow = $this->db->fetch("SELECT COUNT(*) AS total FROM professor_questoes_api WHERE {$whereSql}", $params);
+        $total = (int)($totalRow['total'] ?? 0);
+        $rows = $this->db->fetchAll(
+            "SELECT *
+               FROM professor_questoes_api
+              WHERE {$whereSql}
+              ORDER BY updated_at DESC, id DESC
+              LIMIT {$limit} OFFSET {$offset}",
+            $params
+        );
+
+        $questoes = [];
+        foreach ($rows as $row) {
+            $nivel = $row['nivel_dificuldade'] ?? '';
+            $questoes[] = [
+                'id' => 'local:' . (int)$row['id'],
+                'external_id' => $row['external_id'] ?? '',
+                'materia' => $row['materia'] ?? '',
+                'tipo' => $row['tipo'] ?? '',
+                'dificuldade' => ['facil' => 'Fácil', 'medio' => 'Médio', 'dificil' => 'Difícil'][$nivel] ?? $nivel,
+                'enunciado_html' => $row['enunciado_html'] ?? '',
+                'gabarito' => $row['gabarito'] ?? '',
+                'alternativas' => json_decode((string)($row['alternativas_json'] ?? ''), true) ?: [],
+                'origem' => ['raw' => 'Banco do professor' . (!empty($row['assunto']) ? ' • ' . $row['assunto'] : '')],
+            ];
+        }
+
+        return ['questoes' => $questoes, 'total' => $total];
+    }
+
+    private function listarFacetsBancoQuestoesProfessorModulo(int $professorId, array $src): array
+    {
+        if ($professorId <= 0 || !$this->bancoQuestoesProfessorDisponivel()) {
+            return [
+                'materias' => [],
+                'tipos' => [],
+                'dificuldades' => [],
+                'topicos' => [],
+                'tags' => [],
+                'origens_titulo' => [],
+            ];
+        }
+
+        $buildFacet = function (string $column) use ($professorId): array {
+            $rows = $this->db->fetchAll(
+                "SELECT {$column} AS valor, COUNT(*) AS total
+                   FROM professor_questoes_api
+                  WHERE professor_id = :professor_id
+                    AND {$column} IS NOT NULL
+                    AND {$column} <> ''
+                  GROUP BY {$column}
+                  ORDER BY {$column} ASC",
+                ['professor_id' => $professorId]
+            );
+
+            return array_map(function ($row) {
+                $valor = (string)($row['valor'] ?? '');
+                if ($valor === 'facil') $valor = 'Fácil';
+                if ($valor === 'medio') $valor = 'Médio';
+                if ($valor === 'dificil') $valor = 'Difícil';
+                return [
+                    'valor' => $valor,
+                    'total' => (int)($row['total'] ?? 0),
+                ];
+            }, $rows);
+        };
+
+        return [
+            'materias' => $buildFacet('materia'),
+            'tipos' => $buildFacet('tipo'),
+            'dificuldades' => $buildFacet('nivel_dificuldade'),
+            'topicos' => $buildFacet('assunto'),
+            'tags' => [],
+            'origens_titulo' => [['valor' => 'Banco do professor']],
+        ];
+    }
+
+    private function buscarQuestaoBancoProfessor(int $professorId, int $questaoId): ?array
+    {
+        if ($professorId <= 0 || $questaoId <= 0 || !$this->bancoQuestoesProfessorDisponivel()) {
+            return null;
+        }
+
+        $row = $this->db->fetch(
+            "SELECT *
+               FROM professor_questoes_api
+              WHERE id = :id AND professor_id = :professor_id
+              LIMIT 1",
+            ['id' => $questaoId, 'professor_id' => $professorId]
+        );
+        if (!$row) {
+            return null;
+        }
+
+        $alternativas = json_decode((string)($row['alternativas_json'] ?? ''), true);
+        $row['alternativas'] = is_array($alternativas) ? $alternativas : [];
+        $row['dificuldade'] = $row['nivel_dificuldade'] ?? '';
+        return $row;
     }
 
     private function buildBancoQuestoesQueryFromRequest(array $src): array
@@ -8396,6 +8822,10 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
         }
 
         $alternativas = isset($q['alternativas']) && is_array($q['alternativas']) ? $q['alternativas'] : [];
+        if (empty($alternativas) && !empty($q['alternativas_json'])) {
+            $decodedAlternativas = json_decode((string)$q['alternativas_json'], true);
+            $alternativas = is_array($decodedAlternativas) ? $decodedAlternativas : [];
+        }
         $gabarito = strtoupper(trim((string)($q['gabarito'] ?? '')));
 
         $isAlternativa = !empty($alternativas);
@@ -8410,11 +8840,15 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                 if (!array_key_exists($letra, $alternativas)) {
                     continue;
                 }
-                $textoAltRaw = $this->persistInlineBase64ImagesInHtml((string)$alternativas[$letra], $professorId);
+                $alternativaValor = $alternativas[$letra];
+                $textoAltRaw = is_array($alternativaValor)
+                    ? (string)($alternativaValor['texto'] ?? '')
+                    : (string)$alternativaValor;
+                $textoAltRaw = $this->persistInlineBase64ImagesInHtml($textoAltRaw, $professorId);
                 $textoAlt = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoAltRaw);
                 $opcoes[] = [
                     'texto' => $textoAlt,
-                    'correta' => ($gabarito !== '' && strtoupper($letra) === $gabarito)
+                    'correta' => ((is_array($alternativaValor) && !empty($alternativaValor['correta'])) || ($gabarito !== '' && strtoupper($letra) === $gabarito))
                 ];
             }
             if (count($opcoes) < 2) {
@@ -8432,11 +8866,7 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
         }
         $titulo = mb_substr($tituloBase, 0, 100);
 
-        $dif = strtolower(trim((string)($q['dificuldade'] ?? '')));
-        $nivel = null;
-        if (in_array($dif, ['fácil', 'facil'], true)) $nivel = 'facil';
-        if ($dif === 'médio' || $dif === 'medio') $nivel = 'medio';
-        if ($dif === 'difícil' || $dif === 'dificil') $nivel = 'dificil';
+        $nivel = $this->normalizarNivelBancoProfessor($q['nivel_dificuldade'] ?? $q['dificuldade'] ?? null);
 
         return [
             'tipo' => $tipo,

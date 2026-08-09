@@ -9,15 +9,75 @@
                 Jornada: <?= htmlspecialchars($jornada['titulo']) ?> • <?= htmlspecialchars($jornada['materia_nome'] ?? 'Sem matéria') ?>
             </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-3">
             <a href="<?= URL ?>/professor/jornadas/modulos/<?= (int)$modulo['id'] ?>/exercicios/criar"
-               class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
-                Criar novo exercício
+               class="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-700 bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cyan-800">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"></path>
+                </svg>
+                Novo Exercício
             </a>
+            <button type="button" onclick="abrirModalBancoQuestoes('educatudo')"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"></path>
+                </svg>
+                Questões do EducaTudo
+            </button>
+            <button type="button" onclick="abrirModalBancoQuestoes('professor')"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                Questões do Professor
+            </button>
             <a href="<?= URL ?>/professor/jornadas/<?= (int)$modulo['jornada_id'] ?>/modulos"
-               class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors shadow-sm">
-                Voltar para módulos
+               class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 17l5-5-5-5"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12H9"></path>
+                </svg>
+                Voltar
             </a>
+        </div>
+    </div>
+</div>
+
+<div id="ia-geracao-status-card"
+     class="hidden mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm"
+     data-status="idle">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-start gap-3">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                <svg id="ia-geracao-status-spinner" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <svg id="ia-geracao-status-check" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+            </div>
+            <div>
+                <p id="ia-geracao-status-titulo" class="text-sm font-semibold text-blue-950">A Tudinha está gerando exercícios</p>
+                <p id="ia-geracao-status-texto" class="mt-1 text-sm text-blue-800">A geração está em segundo plano. Você pode continuar usando a lista normalmente.</p>
+                <p id="ia-geracao-status-meta" class="mt-2 text-xs font-medium text-blue-700"></p>
+            </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap gap-2">
+            <button type="button" id="ia-geracao-status-atualizar"
+                    class="hidden rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Atualizar lista
+            </button>
+            <button type="button" id="ia-geracao-status-ocultar"
+                    class="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                Ocultar
+            </button>
         </div>
     </div>
 </div>
@@ -28,6 +88,14 @@
         <?php
         $totalPublicados = 0;
         $totalRascunhos = 0;
+        $nivelBadges = [
+            'facil' => ['label' => 'Fácil', 'class' => 'bg-emerald-100 text-emerald-800'],
+            'fácil' => ['label' => 'Fácil', 'class' => 'bg-emerald-100 text-emerald-800'],
+            'medio' => ['label' => 'Médio', 'class' => 'bg-amber-100 text-amber-800'],
+            'médio' => ['label' => 'Médio', 'class' => 'bg-amber-100 text-amber-800'],
+            'dificil' => ['label' => 'Difícil', 'class' => 'bg-red-100 text-red-800'],
+            'difícil' => ['label' => 'Difícil', 'class' => 'bg-red-100 text-red-800'],
+        ];
         foreach ($exercicios as $ex) {
             if (($ex['status'] ?? '') === 'publicado') $totalPublicados++;
             else $totalRascunhos++;
@@ -53,12 +121,17 @@
                 <?php
                 $enunciadoResumo = trim(preg_replace('/\s+/', ' ', strip_tags((string)($exercicio['enunciado'] ?? ''))));
                 $enunciadoResumo = mb_substr($enunciadoResumo, 0, 220) . (mb_strlen($enunciadoResumo) > 220 ? '...' : '');
+                $nivelKey = mb_strtolower(trim((string)($exercicio['nivel_dificuldade'] ?? '')), 'UTF-8');
+                $nivelBadge = $nivelBadges[$nivelKey] ?? null;
                 ?>
                 <div class="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
                     <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-2">
                                 <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"><?= ucfirst(str_replace('_', ' ', (string)$exercicio['tipo'])) ?></span>
+                                <?php if ($nivelBadge): ?>
+                                    <span class="px-2 py-1 text-xs rounded <?= $nivelBadge['class'] ?>"><?= htmlspecialchars($nivelBadge['label']) ?></span>
+                                <?php endif; ?>
                                 <?php if (!empty($exercicio['gerado_ia'])): ?>
                                     <span class="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded">IA</span>
                                 <?php endif; ?>
@@ -83,7 +156,541 @@
     </div>
 </div>
 
+<div id="modal-banco-questoes" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" style="display: none;">
+    <div class="mx-4 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
+        <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+                <h3 id="bq-modal-titulo" class="text-xl font-bold text-gray-900">Banco de Questões</h3>
+                <p id="bq-modal-descricao" class="mt-1 text-sm text-gray-600">Selecione questões para importar neste módulo.</p>
+            </div>
+            <button type="button" onclick="fecharModalBancoQuestoes()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <input id="bq-q" type="text" placeholder="Buscar por título, assunto ou enunciado"
+                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select id="bq-materia" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+            <select id="bq-tipo" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+            <select id="bq-dificuldade" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+            <select id="bq-topico" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+            <select id="bq-tag" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+            <select id="bq-origem" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
+            <input id="bq-ano" type="text" placeholder="Ano"
+                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+            <button type="button" onclick="buscarBancoQuestoes(true)"
+                    class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+                Buscar
+            </button>
+            <button type="button" onclick="limparFiltrosBancoQuestoes()"
+                    class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50">
+                Limpar filtros
+            </button>
+            <span id="bq-total-info" class="text-sm text-gray-600"></span>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div class="min-w-0 lg:col-span-2">
+                <div id="bq-loading" class="hidden mb-2 text-sm font-medium text-indigo-700">Carregando questões...</div>
+                <div id="bq-lista" class="max-h-[48vh] space-y-3 overflow-y-auto pr-1"></div>
+            </div>
+            <aside class="rounded-lg border border-gray-200 bg-gray-50 p-3 lg:col-span-1">
+                <div class="mb-2 flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-gray-800">Selecionadas</h4>
+                    <span id="bq-selecionadas" class="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-700">0</span>
+                </div>
+                <div id="bq-selecionadas-lista" class="max-h-[42vh] space-y-2 overflow-y-auto pr-1 text-sm text-gray-700">
+                    <p class="text-xs text-gray-500">Nenhuma questão selecionada.</p>
+                </div>
+            </aside>
+        </div>
+
+        <div class="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-2">
+                <button type="button" id="bq-prev" onclick="mudarPaginaBancoQuestoes(-1)"
+                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Anterior
+                </button>
+                <button type="button" id="bq-next" onclick="mudarPaginaBancoQuestoes(1)"
+                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Próxima
+                </button>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button type="button" onclick="fecharModalBancoQuestoes()"
+                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    Fechar
+                </button>
+                <button type="button" onclick="importarSelecionadasBancoQuestoes()"
+                        class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                    Importar selecionadas
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php include dirname(__DIR__, 2) . '/components/ai-job-poller.php'; ?>
 <script>
+const iaGeracaoModuloId = <?= (int)$modulo['id'] ?>;
+const iaGeracaoStorageKey = 'educatudo:jornada:exercicios-ia:' + iaGeracaoModuloId;
+const csrfTokenModuloExercicios = <?= json_encode($csrf_token ?? '') ?>;
+const bancoQuestoesBaseUrl = '<?= rtrim(URL, "/") ?>';
+let bqSelecionadas = new Set();
+let bqSelecionadasMeta = {};
+let bqTotal = 0;
+let bqLimit = 20;
+let bqOffset = 0;
+let bqFonteAtual = 'educatudo';
+
+function getIaGeracaoCard() {
+    return document.getElementById('ia-geracao-status-card');
+}
+
+function setIaGeracaoCardState(state, titulo, texto, meta) {
+    const card = getIaGeracaoCard();
+    if (!card) return;
+    const tituloEl = document.getElementById('ia-geracao-status-titulo');
+    const textoEl = document.getElementById('ia-geracao-status-texto');
+    const metaEl = document.getElementById('ia-geracao-status-meta');
+    const spinner = document.getElementById('ia-geracao-status-spinner');
+    const check = document.getElementById('ia-geracao-status-check');
+    const atualizar = document.getElementById('ia-geracao-status-atualizar');
+
+    card.dataset.status = state || 'processing';
+    card.classList.remove('hidden', 'border-blue-200', 'bg-blue-50', 'border-green-200', 'bg-green-50', 'border-red-200', 'bg-red-50');
+    card.classList.add(
+        state === 'done' ? 'border-green-200' : (state === 'failed' ? 'border-red-200' : 'border-blue-200'),
+        state === 'done' ? 'bg-green-50' : (state === 'failed' ? 'bg-red-50' : 'bg-blue-50')
+    );
+
+    if (tituloEl) {
+        tituloEl.textContent = titulo || 'A Tudinha está gerando exercícios';
+        tituloEl.className = 'text-sm font-semibold ' + (state === 'done' ? 'text-green-950' : (state === 'failed' ? 'text-red-950' : 'text-blue-950'));
+    }
+    if (textoEl) {
+        textoEl.textContent = texto || 'A geração está em segundo plano. Você pode continuar usando a lista normalmente.';
+        textoEl.className = 'mt-1 text-sm ' + (state === 'done' ? 'text-green-800' : (state === 'failed' ? 'text-red-800' : 'text-blue-800'));
+    }
+    if (metaEl) {
+        metaEl.textContent = meta || '';
+        metaEl.className = 'mt-2 text-xs font-medium ' + (state === 'done' ? 'text-green-700' : (state === 'failed' ? 'text-red-700' : 'text-blue-700'));
+    }
+    if (spinner) spinner.classList.toggle('hidden', state === 'done' || state === 'failed');
+    if (check) check.classList.toggle('hidden', state !== 'done');
+    if (atualizar) atualizar.classList.toggle('hidden', state !== 'done');
+}
+
+function obterGeracaoIAPendente() {
+    try {
+        const raw = localStorage.getItem(iaGeracaoStorageKey);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function limparGeracaoIAPendente() {
+    try {
+        localStorage.removeItem(iaGeracaoStorageKey);
+    } catch (e) {}
+}
+
+function finalizarImportacaoExerciciosIA(jobId, meta) {
+    setIaGeracaoCardState('processing', 'Salvando exercícios...', 'A geração terminou. Agora estamos vinculando os exercícios a este módulo.', meta || 'Quase pronto.');
+    const fd = new FormData();
+    fd.append('_token', csrfTokenModuloExercicios);
+
+    return fetch('<?= URL ?>/professor/jornadas/modulos/importar-exercicios-ia/' + jobId, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+    })
+    .then(function(r) {
+        return r.json().then(function(body) { return { ok: r.ok, body: body }; });
+    })
+    .then(function(res) {
+        if (!res.ok || !res.body.success) {
+            throw new Error((res.body && res.body.error) ? res.body.error : 'Exercícios gerados, mas falha ao salvar.');
+        }
+        const qtd = res.body.exercicios_ids ? res.body.exercicios_ids.length : 0;
+        limparGeracaoIAPendente();
+        setIaGeracaoCardState(
+            'done',
+            'Exercícios prontos',
+            qtd + ' exercício(s) gerado(s) e salvos neste módulo.',
+            'Atualize a lista para visualizar os novos exercícios.'
+        );
+    });
+}
+
+function acompanharGeracaoExerciciosIA(jobId, totalQuestoes) {
+    let importStarted = false;
+    const totalMeta = totalQuestoes ? (totalQuestoes + (totalQuestoes === 1 ? ' questão solicitada.' : ' questões solicitadas.')) : '';
+    setIaGeracaoCardState('processing', 'Na fila da Tudinha...', 'A geração está em segundo plano. Você pode continuar usando a lista normalmente.', totalMeta);
+
+    new AIJobPoller(jobId, {
+        onProgress: function(status) {
+            setIaGeracaoCardState(
+                'processing',
+                status === 'pending' ? 'Na fila da Tudinha...' : 'A Tudinha está criando os exercícios...',
+                'Processando em segundo plano. Esta lista será atualizada quando você clicar em atualizar.',
+                totalMeta
+            );
+        },
+        onDone: function() {
+            if (importStarted) return;
+            importStarted = true;
+            finalizarImportacaoExerciciosIA(jobId, totalMeta).catch(function(err) {
+                setIaGeracaoCardState('failed', 'Não foi possível salvar os exercícios', err && err.message ? err.message : 'Falha ao salvar os exercícios gerados.', 'Tente abrir novamente a tela de criação ou gerar outra vez.');
+            });
+        },
+        onFailed: function(err) {
+            limparGeracaoIAPendente();
+            setIaGeracaoCardState('failed', 'Falha na geração pela Tudinha', err || 'Falha no processamento da IA.', 'Tente gerar novamente.');
+        }
+    });
+}
+
+document.getElementById('ia-geracao-status-ocultar')?.addEventListener('click', function() {
+    const card = getIaGeracaoCard();
+    if (!card) return;
+    if (card.dataset.status !== 'processing') {
+        limparGeracaoIAPendente();
+    }
+    card.classList.add('hidden');
+});
+
+document.getElementById('ia-geracao-status-atualizar')?.addEventListener('click', function() {
+    window.location.reload();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const pendente = obterGeracaoIAPendente();
+    if (pendente && pendente.job_id) {
+        acompanharGeracaoExerciciosIA(pendente.job_id, Number(pendente.quantidade || 0));
+    }
+});
+
+function abrirModalBancoQuestoes(fonte) {
+    bqFonteAtual = fonte === 'professor' ? 'professor' : 'educatudo';
+    bqOffset = 0;
+    bqSelecionadas = new Set();
+    bqSelecionadasMeta = {};
+    atualizarTextoModalBancoQuestoes();
+    atualizarTotalSelecionadasBancoQuestoes();
+
+    const modal = document.getElementById('modal-banco-questoes');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    }
+    inicializarBancoQuestoes();
+}
+
+function atualizarTextoModalBancoQuestoes() {
+    const titulo = document.getElementById('bq-modal-titulo');
+    const descricao = document.getElementById('bq-modal-descricao');
+    if (bqFonteAtual === 'professor') {
+        if (titulo) titulo.textContent = 'Questões do Professor';
+        if (descricao) descricao.textContent = 'Questões que este professor já criou, gerou por IA ou reutilizou nas jornadas.';
+        return;
+    }
+    if (titulo) titulo.textContent = 'Questões do EducaTudo';
+    if (descricao) descricao.textContent = 'Banco geral de questões do EducaTudo para compor os exercícios deste módulo.';
+}
+
+function fecharModalBancoQuestoes() {
+    const modal = document.getElementById('modal-banco-questoes');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
+
+function parseBancoQuestoesJson(response) {
+    return response.json().then(function(body) {
+        if (!response.ok) {
+            throw new Error((body && body.error) ? body.error : 'Erro na requisição');
+        }
+        return body;
+    });
+}
+
+function filtroBancoQuestoesAtual() {
+    const getVal = function(id) {
+        const el = document.getElementById(id);
+        return el ? String(el.value || '').trim() : '';
+    };
+    const filtro = {
+        fonte: bqFonteAtual,
+        q: getVal('bq-q'),
+        materia: getVal('bq-materia'),
+        tipo: getVal('bq-tipo'),
+        ano: getVal('bq-ano'),
+        dificuldade: getVal('bq-dificuldade'),
+        topico: getVal('bq-topico'),
+        tag: getVal('bq-tag'),
+        origem_titulo: getVal('bq-origem')
+    };
+    Object.keys(filtro).forEach(function(key) {
+        if (!filtro[key]) delete filtro[key];
+    });
+    return filtro;
+}
+
+function preencherSelectBancoQuestoes(id, itens, placeholder) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const atual = el.value;
+    const options = ['<option value="">' + escapeHtmlBancoQuestoes(placeholder) + '</option>'];
+    (itens || []).forEach(function(item) {
+        let valor = '';
+        let total = null;
+        if (typeof item === 'string') {
+            valor = item;
+        } else if (item && typeof item === 'object') {
+            valor = String(item.valor || item.materia || item.tipo || '').trim();
+            total = Number(item.total);
+        }
+        if (!valor) return;
+        const label = (Number.isFinite(total) && total >= 0) ? valor + ' (' + total + ')' : valor;
+        options.push('<option value="' + escapeHtmlBancoQuestoes(valor) + '">' + escapeHtmlBancoQuestoes(label) + '</option>');
+    });
+    el.innerHTML = options.join('');
+    el.value = atual || '';
+}
+
+function inicializarBancoQuestoes() {
+    const loading = document.getElementById('bq-loading');
+    if (loading) loading.classList.remove('hidden');
+    const filtro = filtroBancoQuestoesAtual();
+    const query = new URLSearchParams(filtro).toString();
+    fetch(bancoQuestoesBaseUrl + '/professor/jornadas/modulos/banco-questoes/facets' + (query ? '?' + query : ''), {
+        headers: { 'Accept': 'application/json' }
+    })
+        .then(parseBancoQuestoesJson)
+        .then(function(data) {
+            if (!data.success) throw new Error(data.error || 'Erro ao carregar filtros');
+            const facets = (data.data && data.data.facets) ? data.data.facets : {};
+            preencherSelectBancoQuestoes('bq-materia', facets.materias || [], 'Todas as matérias');
+            preencherSelectBancoQuestoes('bq-tipo', facets.tipos || [], 'Todos os tipos');
+            preencherSelectBancoQuestoes('bq-origem', facets.origens_titulo || [], 'Todas as origens');
+            preencherSelectBancoQuestoes('bq-dificuldade', facets.dificuldades || [], 'Todas as dificuldades');
+            preencherSelectBancoQuestoes('bq-topico', facets.topicos || [], 'Todos os tópicos');
+            preencherSelectBancoQuestoes('bq-tag', facets.tags || [], 'Todas as tags');
+            buscarBancoQuestoes(true);
+        })
+        .catch(function(err) {
+            if (loading) loading.classList.add('hidden');
+            alert('Erro ao carregar banco de questões: ' + (err.message || err));
+        });
+}
+
+function limparFiltrosBancoQuestoes() {
+    ['bq-q', 'bq-materia', 'bq-tipo', 'bq-ano', 'bq-dificuldade', 'bq-topico', 'bq-tag', 'bq-origem'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    bqOffset = 0;
+    bqSelecionadas = new Set();
+    bqSelecionadasMeta = {};
+    atualizarTotalSelecionadasBancoQuestoes();
+    inicializarBancoQuestoes();
+}
+
+function buscarBancoQuestoes(resetOffset) {
+    if (resetOffset) bqOffset = 0;
+    const loading = document.getElementById('bq-loading');
+    const lista = document.getElementById('bq-lista');
+    if (loading) loading.classList.remove('hidden');
+    if (lista) lista.innerHTML = '';
+    const params = new URLSearchParams({
+        ...filtroBancoQuestoesAtual(),
+        limit: String(bqLimit),
+        offset: String(bqOffset)
+    });
+    fetch(bancoQuestoesBaseUrl + '/professor/jornadas/modulos/banco-questoes/listar?' + params.toString(), {
+        headers: { 'Accept': 'application/json' }
+    })
+        .then(parseBancoQuestoesJson)
+        .then(function(data) {
+            if (!data.success) throw new Error(data.error || 'Erro ao listar questões');
+            renderBancoQuestoes(data.data || {});
+        })
+        .catch(function(err) {
+            alert('Erro ao buscar questões: ' + (err.message || err));
+        })
+        .finally(function() {
+            if (loading) loading.classList.add('hidden');
+        });
+}
+
+function renderBancoQuestoes(payload) {
+    const lista = document.getElementById('bq-lista');
+    if (!lista) return;
+    const questoes = Array.isArray(payload.questoes) ? payload.questoes : [];
+    bqTotal = parseInt(payload.total || 0, 10) || 0;
+    bqLimit = parseInt(payload.limit || bqLimit, 10) || bqLimit;
+    bqOffset = parseInt(payload.offset || bqOffset, 10) || bqOffset;
+
+    if (!questoes.length) {
+        lista.innerHTML = '<div class="rounded-lg border border-gray-200 p-4 text-sm text-gray-600">Nenhuma questão encontrada com os filtros atuais.</div>';
+    } else {
+        lista.innerHTML = questoes.map(function(q) {
+            const id = String(q.id || '');
+            const checked = bqSelecionadas.has(id) ? 'checked' : '';
+            const enunciadoTexto = ((q.enunciado_html || q.enunciado || '') + '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (checked) {
+                bqSelecionadasMeta[id] = {
+                    id: id,
+                    materia: String(q.materia || ''),
+                    tipo: String(q.tipo || ''),
+                    enunciado: enunciadoTexto
+                };
+            }
+            const materia = q.materia ? '<span class="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">' + escapeHtmlBancoQuestoes(String(q.materia)) + '</span>' : '';
+            const dif = q.dificuldade ? '<span class="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">' + escapeHtmlBancoQuestoes(String(q.dificuldade)) + '</span>' : '';
+            const tipo = q.tipo ? '<span class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">' + escapeHtmlBancoQuestoes(String(q.tipo)) + '</span>' : '';
+            const origem = q.origem && q.origem.raw ? escapeHtmlBancoQuestoes(String(q.origem.raw)) : '';
+            const enunciado = q.enunciado_html || q.enunciado || '';
+            return '' +
+                '<label class="block cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-indigo-300">' +
+                    '<div class="flex items-start gap-3">' +
+                        '<input type="checkbox" class="mt-1" data-bq-id="' + escapeHtmlBancoQuestoes(id) + '" ' + checked + ' onchange="toggleSelecionadaBancoQuestoes(this)">' +
+                        '<div class="min-w-0 w-full">' +
+                            '<div class="mb-2 flex flex-wrap gap-2">' +
+                                '<span class="rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-700">ID ' + escapeHtmlBancoQuestoes(id) + '</span>' +
+                                materia + tipo + dif +
+                            '</div>' +
+                            '<div class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-800">' + enunciado + '</div>' +
+                            (origem ? '<div class="mt-2 text-xs text-gray-500">' + origem + '</div>' : '') +
+                        '</div>' +
+                    '</div>' +
+                '</label>';
+        }).join('');
+    }
+
+    const info = document.getElementById('bq-total-info');
+    if (info) {
+        const ate = Math.min(bqOffset + bqLimit, bqTotal);
+        info.textContent = bqTotal > 0 ? 'Mostrando ' + (bqOffset + 1) + '-' + ate + ' de ' + bqTotal : '0 resultados';
+    }
+
+    const btnPrev = document.getElementById('bq-prev');
+    const btnNext = document.getElementById('bq-next');
+    if (btnPrev) btnPrev.disabled = bqOffset <= 0;
+    if (btnNext) btnNext.disabled = (bqOffset + bqLimit) >= bqTotal;
+    renderSelecionadasLateralBancoQuestoes();
+}
+
+function toggleSelecionadaBancoQuestoes(el) {
+    const id = String(el.getAttribute('data-bq-id') || '').trim();
+    if (!id) return;
+    if (el.checked) {
+        bqSelecionadas.add(id);
+    } else {
+        bqSelecionadas.delete(id);
+        delete bqSelecionadasMeta[id];
+    }
+    atualizarTotalSelecionadasBancoQuestoes();
+}
+
+function atualizarTotalSelecionadasBancoQuestoes() {
+    const el = document.getElementById('bq-selecionadas');
+    if (el) el.textContent = String(bqSelecionadas.size);
+    renderSelecionadasLateralBancoQuestoes();
+}
+
+function renderSelecionadasLateralBancoQuestoes() {
+    const box = document.getElementById('bq-selecionadas-lista');
+    if (!box) return;
+    const ids = Array.from(bqSelecionadas);
+    if (!ids.length) {
+        box.innerHTML = '<p class="text-xs text-gray-500">Nenhuma questão selecionada.</p>';
+        return;
+    }
+    box.innerHTML = ids.map(function(id) {
+        const meta = bqSelecionadasMeta[id] || { id: id, materia: '', tipo: '', enunciado: '' };
+        const texto = meta.enunciado ? meta.enunciado.slice(0, 120) + (meta.enunciado.length > 120 ? '...' : '') : 'Questão selecionada';
+        return '' +
+            '<div class="rounded-lg border border-gray-200 bg-white p-2">' +
+                '<div class="flex items-start justify-between gap-2">' +
+                    '<div class="min-w-0">' +
+                        '<div class="text-xs font-semibold text-indigo-700">ID ' + escapeHtmlBancoQuestoes(meta.id) + '</div>' +
+                        '<div class="text-xs text-gray-500">' + escapeHtmlBancoQuestoes([meta.materia, meta.tipo].filter(Boolean).join(' • ')) + '</div>' +
+                    '</div>' +
+                    '<button type="button" class="text-xs text-red-600 hover:text-red-700" onclick="removerSelecionadaBancoQuestoes(&quot;' + escapeHtmlBancoQuestoes(meta.id) + '&quot;)">Remover</button>' +
+                '</div>' +
+                '<p class="mt-1 text-xs leading-snug text-gray-700">' + escapeHtmlBancoQuestoes(texto) + '</p>' +
+            '</div>';
+    }).join('');
+}
+
+function removerSelecionadaBancoQuestoes(id) {
+    const key = String(id || '').trim();
+    if (!key) return;
+    bqSelecionadas.delete(key);
+    delete bqSelecionadasMeta[key];
+    document.querySelectorAll('input[data-bq-id]').forEach(function(el) {
+        if (String(el.getAttribute('data-bq-id') || '') === key) el.checked = false;
+    });
+    atualizarTotalSelecionadasBancoQuestoes();
+}
+
+function mudarPaginaBancoQuestoes(direction) {
+    const novoOffset = bqOffset + (direction * bqLimit);
+    if (novoOffset < 0) return;
+    if (direction > 0 && novoOffset >= bqTotal) return;
+    bqOffset = novoOffset;
+    buscarBancoQuestoes(false);
+}
+
+function importarSelecionadasBancoQuestoes() {
+    if (bqSelecionadas.size === 0) {
+        alert('Selecione ao menos uma questão para importar.');
+        return;
+    }
+    if (!confirm('Importar as questões selecionadas para esta jornada?')) {
+        return;
+    }
+    fetch(bancoQuestoesBaseUrl + '/professor/jornadas/modulos/banco-questoes/importar', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            modulo_id: <?= (int)$modulo['id'] ?>,
+            questao_ids: Array.from(bqSelecionadas)
+        })
+    })
+        .then(parseBancoQuestoesJson)
+        .then(function(data) {
+            if (!data.success) throw new Error(data.error || 'Erro ao importar');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            alert('Erro ao importar questões: ' + (err.message || err));
+        });
+}
+
+function escapeHtmlBancoQuestoes(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function removerExercicio(id) {
     if (!confirm('Tem certeza que deseja remover este exercício?')) {
         return;
