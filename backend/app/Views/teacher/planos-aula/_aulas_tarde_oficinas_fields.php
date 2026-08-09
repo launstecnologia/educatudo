@@ -42,6 +42,43 @@ $aulasTardeTipos = LessonPlanAfternoonHelper::tipos();
 <script>
 const AULAS_TARDE_TIPOS = <?= json_encode($aulasTardeTipos, JSON_UNESCAPED_UNICODE) ?>;
 
+function limparErroCampoObrigatorio(el) {
+    if (!el) return;
+    el.classList.remove('border-red-500', 'bg-red-50', 'focus:ring-red-500', 'focus:border-red-500');
+    el.classList.add('border-gray-300', 'focus:ring-blue-500');
+    el.removeAttribute('aria-invalid');
+    const wrapper = el.closest('div');
+    const msg = wrapper?.querySelector('[data-field-error]');
+    if (msg) {
+        msg.remove();
+    }
+}
+
+function marcarErroCampoObrigatorio(el, mensagem) {
+    if (!el) return;
+    el.classList.remove('border-gray-300', 'focus:ring-blue-500');
+    el.classList.add('border-red-500', 'bg-red-50', 'focus:ring-red-500', 'focus:border-red-500');
+    el.setAttribute('aria-invalid', 'true');
+
+    const wrapper = el.closest('div');
+    if (wrapper && !wrapper.querySelector('[data-field-error]')) {
+        const msg = document.createElement('p');
+        msg.setAttribute('data-field-error', '1');
+        msg.className = 'mt-1 text-xs font-medium text-red-600';
+        msg.textContent = mensagem || 'Campo obrigatório.';
+        wrapper.appendChild(msg);
+    }
+}
+
+function focarPrimeiroCampoComErro(scope) {
+    const campo = (scope || document).querySelector('[aria-invalid="true"]');
+    if (!campo) return;
+    campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function () {
+        campo.focus({ preventScroll: true });
+    }, 250);
+}
+
 function atualizarNumeracaoAulasTarde() {
     document.querySelectorAll('#aulas-tarde-atividades-list .aulas-tarde-atividade-item').forEach(function (item, idx) {
         const titulo = item.querySelector('.aulas-tarde-atividade-titulo');
@@ -60,6 +97,7 @@ function toggleAulasTardeCamposItem(selectEl) {
     if (!item) return;
 
     const tipo = selectEl.value || '';
+    limparErroCampoObrigatorio(selectEl);
     const blocoExercicios = item.querySelector('.aulas-tarde-campos-exercicios');
     const blocoJornadas = item.querySelector('.aulas-tarde-campos-jornadas');
     const blocoOutros = item.querySelector('.aulas-tarde-campos-outros');
@@ -149,40 +187,61 @@ function validarAulasTardeOficinas() {
         return false;
     }
 
+    items.forEach(function (item) {
+        item.querySelectorAll('.aulas-tarde-tipo, [data-aulas-tarde-required]').forEach(limparErroCampoObrigatorio);
+    });
+    let primeiroErro = null;
+
+    function marcar(el, mensagem) {
+        if (!primeiroErro) {
+            primeiroErro = el;
+        }
+        marcarErroCampoObrigatorio(el, mensagem);
+    }
+
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const numero = i + 1;
-        const tipo = item.querySelector('.aulas-tarde-tipo')?.value || '';
+        const tipoEl = item.querySelector('.aulas-tarde-tipo');
+        const tipo = tipoEl?.value || '';
         if (!tipo) {
-            alert('Atividade ' + numero + ': selecione o tipo.');
-            return false;
+            marcar(tipoEl, 'Selecione o tipo da atividade ' + numero + '.');
+            continue;
         }
 
         if (tipo === 'exercicios_adicionais') {
-            const pagina = item.querySelector('.aulas-tarde-pagina')?.value.trim() || '';
-            const apostila = item.querySelector('.aulas-tarde-apostila')?.value.trim() || '';
-            const exercicios = item.querySelector('.aulas-tarde-exercicios')?.value.trim() || '';
-            if (!pagina || !apostila || !exercicios) {
-                alert('Atividade ' + numero + ': preencha página, apostila e exercícios.');
-                return false;
+            const paginaEl = item.querySelector('.aulas-tarde-pagina');
+            const apostilaEl = item.querySelector('.aulas-tarde-apostila');
+            const exerciciosEl = item.querySelector('.aulas-tarde-exercicios');
+            if (!(paginaEl?.value || '').trim()) {
+                marcar(paginaEl, 'Informe a página.');
+            }
+            if (!(apostilaEl?.value || '').trim()) {
+                marcar(apostilaEl, 'Informe a apostila.');
+            }
+            if (!(exerciciosEl?.value || '').trim()) {
+                marcar(exerciciosEl, 'Informe quais exercícios.');
             }
         }
 
         if (tipo === 'jornadas') {
-            const jornada = item.querySelector('.aulas-tarde-jornada-nome')?.value.trim() || '';
-            if (!jornada) {
-                alert('Atividade ' + numero + ': informe o nome da jornada.');
-                return false;
+            const jornadaEl = item.querySelector('.aulas-tarde-jornada-nome');
+            if (!(jornadaEl?.value || '').trim()) {
+                marcar(jornadaEl, 'Informe o nome da jornada.');
             }
         }
 
         if (tipo === 'outros') {
-            const descricao = item.querySelector('.aulas-tarde-descricao')?.value.trim() || '';
-            if (!descricao) {
-                alert('Atividade ' + numero + ': descreva a atividade.');
-                return false;
+            const descricaoEl = item.querySelector('.aulas-tarde-descricao');
+            if (!(descricaoEl?.value || '').trim()) {
+                marcar(descricaoEl, 'Descreva a atividade.');
             }
         }
+    }
+
+    if (primeiroErro) {
+        focarPrimeiroCampoComErro(document.getElementById('aulas-tarde-atividades-list'));
+        return false;
     }
 
     return true;
@@ -193,5 +252,15 @@ document.addEventListener('DOMContentLoaded', function () {
         toggleAulasTardeCamposItem(select);
     });
     atualizarNumeracaoAulasTarde();
+    document.getElementById('aulas-tarde-atividades-list')?.addEventListener('input', function (e) {
+        if (e.target.matches('.aulas-tarde-tipo, [data-aulas-tarde-required]')) {
+            limparErroCampoObrigatorio(e.target);
+        }
+    });
+    document.getElementById('aulas-tarde-atividades-list')?.addEventListener('change', function (e) {
+        if (e.target.matches('.aulas-tarde-tipo, [data-aulas-tarde-required]')) {
+            limparErroCampoObrigatorio(e.target);
+        }
+    });
 });
 </script>

@@ -1,20 +1,31 @@
+<?php $contextoIa = trim((string) ($plano['contexto_llm'] ?? '')); ?>
 <!-- Header Section -->
 <div class="mb-8">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Visualizar Plano de Aula 📚</h1>
+            <h1 class="text-3xl font-bold text-gray-900">Visualizar Plano de Aula</h1>
             <p class="text-gray-600 mt-2">Detalhes completos do plano de aula</p>
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex flex-wrap items-center gap-3">
+            <?php if ($contextoIa !== ''): ?>
+            <button type="button"
+                    onclick="abrirContextoIaModal()"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+                Texto IA
+            </button>
+            <?php endif; ?>
             <a href="<?= URL ?>/admin/planos-aula/pdf/<?= $plano['id'] ?>" target="_blank"
-               class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+                <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
                 Exportar PDF
             </a>
             <a href="<?= URL ?>/admin/planos-aula"
-               class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+               class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 Voltar
             </a>
         </div>
@@ -252,3 +263,54 @@
     </div>
 </div>
 
+<?php if ($contextoIa !== ''): ?>
+<div id="contextoIaModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/50 p-4">
+    <div class="flex max-h-[88vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl">
+        <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">Texto gerado pela IA</h3>
+                <p class="mt-1 text-sm text-gray-500">Contexto completo para jornadas, atividades e exercícios.</p>
+            </div>
+            <button type="button" onclick="fecharContextoIaModal()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" aria-label="Fechar">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="overflow-y-auto px-5 py-4">
+            <pre id="contextoIaTexto" class="whitespace-pre-wrap rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800"><?= htmlspecialchars($contextoIa) ?></pre>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
+            <button type="button" onclick="copiarContextoIa()" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
+                Copiar texto
+            </button>
+            <button type="button" onclick="fecharContextoIaModal()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirContextoIaModal() {
+    const modal = document.getElementById('contextoIaModal');
+    if (modal) modal.classList.remove('hidden');
+    if (modal) modal.classList.add('flex');
+}
+
+function fecharContextoIaModal() {
+    const modal = document.getElementById('contextoIaModal');
+    if (modal) modal.classList.add('hidden');
+    if (modal) modal.classList.remove('flex');
+}
+
+function copiarContextoIa() {
+    const texto = document.getElementById('contextoIaTexto')?.innerText || '';
+    navigator.clipboard?.writeText(texto);
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') fecharContextoIaModal();
+});
+</script>
+<?php endif; ?>

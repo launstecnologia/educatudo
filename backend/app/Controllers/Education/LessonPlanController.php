@@ -9,10 +9,13 @@ require_once __DIR__ . '/../../Models/Education/Subject.php';
 require_once __DIR__ . '/../../Models/Education/ClassRoom.php';
 require_once __DIR__ . '/../../Models/User/Teacher.php';
 require_once __DIR__ . '/../../Helpers/LessonPlanAfternoonHelper.php';
+require_once __DIR__ . '/../../Services/CreditosService.php';
 
 if (!class_exists('LessonPlanController')) {
 class LessonPlanController extends BaseController
 {
+    private const MODULO_CREDITOS_COPILOTO = 'planos_aula_copiloto';
+
     private $auth;
     private $db;
     private $planoAulaModel;
@@ -152,6 +155,20 @@ class LessonPlanController extends BaseController
             }
 
             $totalItems = count($planos);
+            $statusCounts = [
+                'rascunho' => 0,
+                'pendente' => 0,
+                'enviado' => 0,
+                'aprovado' => 0,
+                'rejeitado' => 0,
+            ];
+            foreach ($planos as $planoStatusItem) {
+                $statusKey = (string) ($planoStatusItem['status'] ?? 'rascunho');
+                if (!array_key_exists($statusKey, $statusCounts)) {
+                    $statusCounts[$statusKey] = 0;
+                }
+                $statusCounts[$statusKey]++;
+            }
             $totalPages = max(1, (int) ceil($totalItems / max(1, $perPage)));
             if ($page > $totalPages) {
                 $page = $totalPages;
@@ -181,7 +198,10 @@ class LessonPlanController extends BaseController
                 'title' => 'Meus Planos de Aula - EducaTudo',
                 'user' => $user,
                 'planos' => $planos,
-                'stats' => ['total' => $totalItems],
+                'stats' => array_merge([
+                    'total' => $totalItems,
+                    'exibindo' => count($planos),
+                ], $statusCounts),
                 'pagination' => [
                     'current_page' => $page,
                     'total_pages' => $totalPages,
@@ -445,6 +465,7 @@ class LessonPlanController extends BaseController
                         'avaliacao_conteudo' => $postData['avaliacao_conteudo'] ?? null,
                         'avaliacao_paginas' => $postData['avaliacao_paginas'] ?? null,
                         'observacoes' => $postData['observacoes'] ?? null,
+                        'contexto_llm' => $postData['contexto_llm'] ?? null,
                         'status' => $postData['status'] ?? 'rascunho'
                     ];
                     
@@ -487,6 +508,9 @@ class LessonPlanController extends BaseController
     public function gerarComCopiloto()
     {
         $user = $this->auth->getUser();
+        $arquivos = [];
+        $refCredito = null;
+        $creditosDebitados = false;
 
         if ($user['tipo'] !== 'professor') {
             $this->json(['error' => 'Não autorizado'], 403);
@@ -506,6 +530,15 @@ class LessonPlanController extends BaseController
                 $this->json(['error' => 'Descreva a aula ou envie ao menos um PDF/imagem.'], 400);
                 return;
             }
+
+            $refCredito = 'plano_aula_copiloto_' . (int) $professor['id'] . '_' . str_replace('.', '', uniqid('', true));
+            (new \App\Services\CreditosService())->consumir(
+                'professor',
+                (int) $professor['id'],
+                self::MODULO_CREDITOS_COPILOTO,
+                $refCredito
+            );
+            $creditosDebitados = true;
 
             $materia = null;
             if (!empty($_POST['materia_id'])) {
@@ -538,6 +571,8 @@ class LessonPlanController extends BaseController
                 'datas_aula' => (string) ($_POST['data_aula'] ?? ''),
                 'titulo_atual' => trim((string) ($_POST['titulo'] ?? '')),
                 'arquivos' => $arquivos,
+                'credits_ref' => $refCredito,
+                'credits_modulo' => self::MODULO_CREDITOS_COPILOTO,
             ], (int) $user['id'], 'professor');
 
             $this->json([
@@ -546,6 +581,18 @@ class LessonPlanController extends BaseController
                 'message' => 'Copiloto acionado. O rascunho será preenchido quando a geração terminar.'
             ]);
         } catch (Exception $e) {
+            foreach ($arquivos as $arquivo) {
+                if (is_array($arquivo) && !empty($arquivo['path'])) {
+                    @unlink((string) $arquivo['path']);
+                }
+            }
+            if ($creditosDebitados && $refCredito) {
+                try {
+                    (new \App\Services\CreditosService())->estornarPorReferencia(self::MODULO_CREDITOS_COPILOTO, $refCredito);
+                } catch (Throwable $refundError) {
+                    error_log("Erro ao estornar TudiCoins do Copiloto do plano de aula: " . $refundError->getMessage());
+                }
+            }
             error_log("Erro ao acionar Copiloto do plano de aula: " . $e->getMessage());
             $this->json(['error' => $e->getMessage()], 400);
         }
@@ -872,6 +919,7 @@ class LessonPlanController extends BaseController
                 'avaliacao_conteudo' => $postData['avaliacao_conteudo'] ?? null,
                 'avaliacao_paginas' => $postData['avaliacao_paginas'] ?? null,
                 'observacoes' => $postData['observacoes'] ?? null,
+                'contexto_llm' => $postData['contexto_llm'] ?? null,
                 'status' => $postData['status'] ?? 'rascunho'
             ];
             
@@ -941,6 +989,7 @@ class LessonPlanController extends BaseController
                 'avaliacao_conteudo' => $plano['avaliacao_conteudo'] ?? null,
                 'avaliacao_paginas' => $plano['avaliacao_paginas'] ?? null,
                 'observacoes' => $plano['observacoes'] ?? null,
+                'contexto_llm' => $plano['contexto_llm'] ?? null,
                 'status' => 'rascunho',
             ]);
 

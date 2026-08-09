@@ -37,7 +37,12 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                 <tr>
                     <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Módulo</th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Nome exibição</th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Cobra</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">
+                        <label class="inline-flex cursor-pointer items-center gap-2">
+                            <input type="checkbox" id="selecionarTodasCobra" class="rounded border-slate-300">
+                            <span>Cobra</span>
+                        </label>
+                    </th>
                     <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">TudiCoins</th>
                 </tr>
             </thead>
@@ -62,7 +67,7 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                         <input type="text" name="nome_exibicao[<?= htmlspecialchars($moduloKey) ?>]" value="<?= htmlspecialchars($nomeEx) ?>" class="w-full max-w-xs px-2 py-1 border border-slate-300 rounded text-sm">
                     </td>
                     <td class="px-4 py-2">
-                        <input type="checkbox" name="cobra[<?= htmlspecialchars($moduloKey) ?>]" value="1" <?= $cobra ? 'checked' : '' ?> class="rounded border-slate-300">
+                        <input type="checkbox" name="cobra[<?= htmlspecialchars($moduloKey) ?>]" value="1" <?= $cobra ? 'checked' : '' ?> class="cobra-checkbox rounded border-slate-300">
                     </td>
                     <td class="px-4 py-2">
                         <input type="number" name="creditos[<?= htmlspecialchars($moduloKey) ?>]" value="<?= htmlspecialchars(\CreditosDecimalHelper::formatInput($creditos)) ?>" min="0" step="0.0001" class="w-28 px-2 py-1 border border-slate-300 rounded text-sm">
@@ -73,3 +78,31 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
         </table>
     </div>
 </form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selecionarTodas = document.getElementById('selecionarTodasCobra');
+    const checkboxes = Array.from(document.querySelectorAll('.cobra-checkbox'));
+
+    function atualizarSelecionarTodas() {
+        if (!selecionarTodas || checkboxes.length === 0) return;
+
+        const totalMarcados = checkboxes.filter(checkbox => checkbox.checked).length;
+        selecionarTodas.checked = totalMarcados === checkboxes.length;
+        selecionarTodas.indeterminate = totalMarcados > 0 && totalMarcados < checkboxes.length;
+    }
+
+    selecionarTodas?.addEventListener('change', function() {
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selecionarTodas.checked;
+        });
+        atualizarSelecionarTodas();
+    });
+
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', atualizarSelecionarTodas);
+    });
+
+    atualizarSelecionarTodas();
+});
+</script>

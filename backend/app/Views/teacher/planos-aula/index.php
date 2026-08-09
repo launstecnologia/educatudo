@@ -72,6 +72,37 @@ $statusPlano = static function ($status): array {
 
     return $map[$status] ?? [ucfirst(str_replace('_', ' ', $status)), 'bg-slate-100 text-slate-700'];
 };
+
+$resumoPlanos = [
+    [
+        'label' => 'Resultados',
+        'value' => $pagTotal,
+        'icon' => 'fa-list-check',
+        'valueClass' => 'text-gray-900',
+        'iconClass' => 'bg-slate-100 text-slate-600',
+    ],
+    [
+        'label' => 'Exibindo',
+        'value' => (int) ($stats['exibindo'] ?? count($planos ?? [])),
+        'icon' => 'fa-eye',
+        'valueClass' => 'text-blue-700',
+        'iconClass' => 'bg-blue-50 text-blue-600',
+    ],
+    [
+        'label' => 'Rascunhos',
+        'value' => (int) ($stats['rascunho'] ?? 0),
+        'icon' => 'fa-pen-to-square',
+        'valueClass' => 'text-slate-800',
+        'iconClass' => 'bg-slate-100 text-slate-600',
+    ],
+    [
+        'label' => 'Aprovados',
+        'value' => (int) ($stats['aprovado'] ?? 0),
+        'icon' => 'fa-circle-check',
+        'valueClass' => 'text-green-700',
+        'iconClass' => 'bg-green-50 text-green-600',
+    ],
+];
 ?>
 
 <div class="mb-6">
@@ -98,6 +129,22 @@ $statusPlano = static function ($status): array {
             </a>
         </div>
     </div>
+</div>
+
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+    <?php foreach ($resumoPlanos as $card): ?>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500"><?= htmlspecialchars($card['label']) ?></p>
+                    <p class="mt-1 text-2xl font-bold leading-none <?= htmlspecialchars($card['valueClass']) ?>"><?= (int) $card['value'] ?></p>
+                </div>
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl <?= htmlspecialchars($card['iconClass']) ?>">
+                    <i class="fa-solid <?= htmlspecialchars($card['icon']) ?> text-sm"></i>
+                </div>
+            </div>
+        </div>
+    <?php endforeach; ?>
 </div>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">

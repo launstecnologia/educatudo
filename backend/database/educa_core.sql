@@ -4496,6 +4496,7 @@ CREATE TABLE `planos_aula` (
   `avaliacao_conteudo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Conteúdo da avaliação bimestral',
   `avaliacao_paginas` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Páginas da avaliação bimestral',
   `observacoes` text COLLATE utf8mb4_unicode_ci,
+  `contexto_llm` longtext COLLATE utf8mb4_unicode_ci,
   `status` enum('rascunho','aprovado','rejeitado') COLLATE utf8mb4_unicode_ci DEFAULT 'rascunho',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

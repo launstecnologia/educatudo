@@ -133,6 +133,13 @@ class CreditosModuleRegistry
             'feature_modules' => ['professor_gerar_slides'],
             'pagador' => 'usuario',
         ],
+        'planos_aula_copiloto' => [
+            'label' => 'Meu Copiloto - Plano de Aula',
+            'grupo' => 'Professor',
+            'escopo_ui' => 'acao',
+            'feature_modules' => ['professor_planos_aula'],
+            'pagador' => 'usuario',
+        ],
         'ai_agents' => [
             'label' => 'Agentes de IA (TudinhaProf)',
             'grupo' => 'Professor',

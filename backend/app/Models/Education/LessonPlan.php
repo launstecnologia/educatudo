@@ -157,14 +157,14 @@ class LessonPlan
                     conteudo, conteudo_lista, objetivos, objetivos_lista,
                     metodologia, periodo_tarde_tema, periodo_tarde_exercicios,
                     recursos, recursos_lista, aulas_tarde_oficinas, avaliacao, avaliacao_apostila,
-                    avaliacao_conteudo, avaliacao_paginas, observacoes, status
+                    avaliacao_conteudo, avaliacao_paginas, observacoes, contexto_llm, status
                 ) VALUES (
                     :professor_id, :materia_id, :turma_id, :data_aula,
                     :titulo, :ano_disciplina, :modulo, :aula_num, :paginas,
                     :conteudo, :conteudo_lista, :objetivos, :objetivos_lista,
                     :metodologia, :periodo_tarde_tema, :periodo_tarde_exercicios,
                     :recursos, :recursos_lista, :aulas_tarde_oficinas, :avaliacao, :avaliacao_apostila,
-                    :avaliacao_conteudo, :avaliacao_paginas, :observacoes, :status
+                    :avaliacao_conteudo, :avaliacao_paginas, :observacoes, :contexto_llm, :status
                 )";
         
         return $this->db->insert($sql, [
@@ -192,6 +192,7 @@ class LessonPlan
             'avaliacao_conteudo' => $data['avaliacao_conteudo'] ?? null,
             'avaliacao_paginas' => $data['avaliacao_paginas'] ?? null,
             'observacoes' => $data['observacoes'] ?? null,
+            'contexto_llm' => $data['contexto_llm'] ?? null,
             'status' => $data['status'] ?? 'rascunho'
         ]);
     }
@@ -225,6 +226,7 @@ class LessonPlan
                     avaliacao_conteudo = :avaliacao_conteudo,
                     avaliacao_paginas = :avaliacao_paginas,
                     observacoes = :observacoes,
+                    contexto_llm = :contexto_llm,
                     status = :status
                 WHERE id = :id 
                 AND deleted_at IS NULL";
@@ -253,6 +255,7 @@ class LessonPlan
             'avaliacao_conteudo' => $data['avaliacao_conteudo'] ?? null,
             'avaliacao_paginas' => $data['avaliacao_paginas'] ?? null,
             'observacoes' => $data['observacoes'] ?? null,
+            'contexto_llm' => $data['contexto_llm'] ?? null,
             'status' => $data['status'] ?? 'rascunho',
             'id' => $id
         ]);
@@ -352,4 +355,3 @@ class LessonPlan
         return $result['total'];
     }
 }
-

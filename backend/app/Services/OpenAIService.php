@@ -2443,10 +2443,10 @@ Adapte a estrutura da questão estritamente ao nível de dificuldade exigido:
     /**
      * MÉTODO TEMPORÁRIO: Usa GPT-4o Vision quando Google Vision está desabilitado
      */
-    private function usarGPT4VisionDireto($imageData, $prompt)
+    public function extrairTextoImagemOpenAI($imageData, $prompt, string $mimeType = 'image/jpeg')
     {
         try {
-            error_log("=== Usando GPT-4o Vision direto (Google Vision desabilitado) ===");
+            error_log("=== Usando OpenAI Vision direto para extracao de texto ===");
             
             $systemPromptV3 = $this->getPromptConfig('prompt_ocr_vision_system');
             if ($systemPromptV3 === '') {
@@ -2493,7 +2493,7 @@ Revise: você inventou alguma palavra? Se sim, substitua por [Não Entendi].
                             [
                                 'type' => 'image_url',
                                 'image_url' => [
-                                    'url' => 'data:image/jpeg;base64,' . $imageData
+                                    'url' => 'data:' . $mimeType . ';base64,' . $imageData
                                 ]
                             ]
                         ]
@@ -2507,17 +2507,22 @@ Revise: você inventou alguma palavra? Se sim, substitua por [Não Entendi].
                 throw new \Exception('Resposta inválida da OpenAI');
             }
             
-            error_log("GPT-4o Vision retornou texto com sucesso (" . strlen($response['choices'][0]['message']['content']) . " caracteres)");
+            error_log("OpenAI Vision retornou texto com sucesso (" . strlen($response['choices'][0]['message']['content']) . " caracteres)");
             
             return $response['choices'][0]['message']['content'];
             
         } catch (\Exception $e) {
-            error_log("ERRO em OpenAIService::analyzeImage: " . $e->getMessage());
+            error_log("ERRO em OpenAIService::extrairTextoImagemOpenAI: " . $e->getMessage());
             if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
                 error_log("Stack trace: " . $e->getTraceAsString());
             }
             throw $e; 
         }
+    }
+
+    private function usarGPT4VisionDireto($imageData, $prompt)
+    {
+        return $this->extrairTextoImagemOpenAI($imageData, $prompt, 'image/jpeg');
     }
     
     /**
@@ -3595,8 +3600,20 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
             . "- Título já digitado: " . (string) ($contexto['titulo_atual'] ?? '') . "\n\n"
             . "PEDIDO DO PROFESSOR:\n{$promptProfessor}\n\n"
             . "MATERIAL ENVIADO:\n{$referencias}\n\n"
-            . "Responda com as chaves: titulo, modulo, aula_num, paginas, conteudo, objetivos, recursos, recursos_lista, observacoes. "
-            . "Use HTML simples nos campos conteudo, objetivos e recursos (<p>, <ul>, <li>, <strong>). recursos_lista deve ser array com itens entre: Quadro, Projetor, Computador, Livro, Apostila, Vídeo, Áudio, EducaColag.";
+            . "PADRÃO DE PREENCHIMENTO:\n"
+            . "- Tente reconhecer nos materiais os campos modulo, aula_num e paginas. Procure termos como \"Módulo\", \"Modulo\", \"Aula\", \"Aula Nº\", \"Aulas\", \"Páginas\", \"Paginas\", \"p.\" ou intervalos numéricos próximos desses rótulos.\n"
+            . "- Se não encontrar modulo, aula_num ou paginas com segurança, deixe a chave correspondente como string vazia. Não invente números.\n"
+            . "- O campo conteudo deve ser uma lista curta dos conteúdos/temas que serão ministrados, como nos exemplos: \"Plantas: briófitas e pteridófitas\", \"Ciclo celular\", \"Divisão celular (I): mitose\".\n"
+            . "- O campo objetivos deve começar por capacidades do aluno, preferencialmente com verbos como Reconhecer, Identificar, Comparar, Classificar, Caracterizar, Relacionar, Compreender, Resolver, Interpretar ou Aplicar.\n"
+            . "- Não coloque textos longos no conteúdo. Conteúdo é tópico; objetivos explicam o que o aluno deverá ser capaz de fazer.\n"
+            . "- O campo contexto_llm deve ser um texto bem completo, em Markdown, criado a partir do material enviado. Ele será usado depois por outra LLM para gerar jornadas, atividades e exercícios.\n"
+            . "- Em contexto_llm, escreva com bastante detalhe e organize exatamente nestas seções quando houver informação suficiente: Visão geral da aula; Conteúdo estruturado; Conceitos essenciais; Explicação detalhada; Relações entre os temas; Vocabulário importante; Objetivos pedagógicos ampliados; Possíveis atividades; Pontos de atenção para o professor; Dados reconhecidos do material.\n"
+            . "- Em Dados reconhecidos do material, cite modulo, aula_num e paginas somente quando reconhecidos com segurança. Se não houver segurança, escreva que não foi identificado.\n"
+            . "- Não invente trechos que não estejam no material ou no pedido. Quando precisar completar pedagogicamente, deixe claro que é uma sugestão didática.\n"
+            . "- Use HTML simples em conteudo, objetivos e recursos. Preferencialmente retorne conteudo e objetivos como <ul><li>...</li></ul>. Use <strong> apenas para destacar termos centrais dentro do item.\n"
+            . "- O título deve ser objetivo e compatível com a matéria/turma/material, mas não precisa repetir todos os tópicos.\n\n"
+            . "Responda com as chaves: titulo, modulo, aula_num, paginas, conteudo, objetivos, recursos, recursos_lista, observacoes, contexto_llm. "
+            . "recursos_lista deve ser array com itens entre: Quadro, Projetor, Computador, Livro, Apostila, Vídeo, Áudio, EducaColag.";
 
         $response = $this->fazerRequisicao([
             'model' => 'gpt-4o-mini',
@@ -3626,16 +3643,63 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         $recursosLista = array_values(array_intersect($permitidos, array_map('strval', $recursosLista)));
 
         return [
-            'titulo' => trim((string) ($decoded['titulo'] ?? '')),
-            'modulo' => trim((string) ($decoded['modulo'] ?? '')),
-            'aula_num' => trim((string) ($decoded['aula_num'] ?? '')),
-            'paginas' => trim((string) ($decoded['paginas'] ?? '')),
-            'conteudo' => (string) ($decoded['conteudo'] ?? ''),
-            'objetivos' => (string) ($decoded['objetivos'] ?? ''),
-            'recursos' => (string) ($decoded['recursos'] ?? ''),
+            'titulo' => $this->normalizarCampoTextoCopiloto($decoded['titulo'] ?? '', false),
+            'modulo' => $this->normalizarCampoTextoCopiloto($decoded['modulo'] ?? '', false),
+            'aula_num' => $this->normalizarCampoTextoCopiloto($decoded['aula_num'] ?? '', false),
+            'paginas' => $this->normalizarCampoTextoCopiloto($decoded['paginas'] ?? '', false),
+            'conteudo' => $this->normalizarCampoTextoCopiloto($decoded['conteudo'] ?? '', true),
+            'objetivos' => $this->normalizarCampoTextoCopiloto($decoded['objetivos'] ?? '', true),
+            'recursos' => $this->normalizarCampoTextoCopiloto($decoded['recursos'] ?? '', true),
             'recursos_lista' => $recursosLista,
-            'observacoes' => trim((string) ($decoded['observacoes'] ?? '')),
+            'observacoes' => $this->normalizarCampoTextoCopiloto($decoded['observacoes'] ?? '', false),
+            'contexto_llm' => $this->normalizarCampoTextoCopiloto($decoded['contexto_llm'] ?? '', false),
         ];
+    }
+
+    private function normalizarCampoTextoCopiloto($value, bool $htmlList = false): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        if (!is_array($value)) {
+            return '';
+        }
+
+        $isList = array_keys($value) === range(0, count($value) - 1);
+        if ($isList) {
+            $items = [];
+            foreach ($value as $item) {
+                $text = $this->normalizarCampoTextoCopiloto($item, false);
+                if ($text !== '') {
+                    $items[] = $text;
+                }
+            }
+
+            if ($htmlList) {
+                $lis = array_map(
+                    static fn($item) => '<li>' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '</li>',
+                    $items
+                );
+                return $lis ? '<ul>' . implode('', $lis) . '</ul>' : '';
+            }
+
+            return implode("\n", array_map(static fn($item) => '- ' . $item, $items));
+        }
+
+        $lines = [];
+        foreach ($value as $key => $item) {
+            $text = $this->normalizarCampoTextoCopiloto($item, false);
+            if ($text !== '') {
+                $lines[] = trim((string) $key) . ': ' . $text;
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
 }

@@ -455,7 +455,7 @@ class AIJobService
         $openai = new OpenAIService();
         $referencias = [];
         $arquivosProcessados = [];
-        $ocrPrompt = 'Transcreva literalmente o material pedagógico desta imagem para apoiar a criação de um plano de aula.';
+        $ocrPrompt = 'Transcreva literalmente o material pedagógico desta imagem para apoiar a criação de um plano de aula. Preserve pistas de estrutura como Módulo, Aula Nº, Páginas, títulos, subtítulos, listas e tópicos. Não resuma.';
 
         foreach (($payload['arquivos'] ?? []) as $arquivo) {
             $path = (string) ($arquivo['path'] ?? '');
@@ -474,10 +474,10 @@ class AIJobService
             if ($mime === 'application/pdf') {
                 $texto = self::extractPdfTextNaive($bytes);
                 if (mb_strlen(trim($texto)) < 80) {
-                    $texto = self::ocrPdfViaImagick($bytes, $openai, $ocrPrompt);
+                    $texto = self::ocrPdfViaImagick($bytes, $openai, $ocrPrompt, true);
                 }
             } elseif (str_starts_with($mime, 'image/')) {
-                $texto = trim((string) $openai->analyzeImage(base64_encode($bytes), $ocrPrompt));
+                $texto = trim((string) $openai->extrairTextoImagemOpenAI(base64_encode($bytes), $ocrPrompt, $mime));
             }
 
             if (trim($texto) !== '') {
@@ -1790,7 +1790,7 @@ PROMPT;
      * Rasteriza o PDF (1ª/2ª páginas) com Imagick + Ghostscript e roda OCR por imagem.
      * Retorna '' se Imagick/Ghostscript não estiverem disponíveis.
      */
-    private static function ocrPdfViaImagick(string $bytes, OpenAIService $openai, string $prompt): string
+    private static function ocrPdfViaImagick(string $bytes, OpenAIService $openai, string $prompt, bool $usarOpenAIDireto = false): string
     {
         if (!class_exists('Imagick')) {
             return '';
@@ -1810,7 +1810,9 @@ PROMPT;
                 $page->setImageFormat('png');
                 $page->setImageBackgroundColor('white');
                 $png = $page->getImageBlob();
-                $parcial = trim((string) $openai->analyzeImage(base64_encode($png), $prompt));
+                $parcial = $usarOpenAIDireto
+                    ? trim((string) $openai->extrairTextoImagemOpenAI(base64_encode($png), $prompt, 'image/png'))
+                    : trim((string) $openai->analyzeImage(base64_encode($png), $prompt));
                 if ($parcial !== '') {
                     $ocr .= $parcial . "\n";
                 }

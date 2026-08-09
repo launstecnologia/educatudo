@@ -27,6 +27,7 @@ $redirect_url = $redirect_url ?? $back_url;
 <!-- Form Section -->
 <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-blue-200">
     <form id="planoForm" class="p-6 space-y-6">
+        <input type="hidden" id="contexto_llm" name="contexto_llm" value="<?= htmlspecialchars($plano['contexto_llm'] ?? '') ?>">
         <!-- Informações Básicas -->
         <div class="border-b border-gray-200 pb-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Informações Básicas</h3>
@@ -549,4 +550,3 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-

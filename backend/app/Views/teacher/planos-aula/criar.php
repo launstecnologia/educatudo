@@ -1,4 +1,13 @@
 <?php
+require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
+require_once __DIR__ . '/../../../Core/LayoutHelper.php';
+
+$copilotoDisponivel = CreditosModuleRegistry::acaoIaDisponivel('planos_aula_copiloto');
+$copilotoCusto = LayoutHelper::get('credito_custo_planos_aula_copiloto', '1');
+if (!is_numeric($copilotoCusto)) {
+    $copilotoCusto = '1';
+}
+
 $wizardSteps = [
     ['label' => 'Dados', 'hint' => 'Matéria, turma e datas'],
     ['label' => 'Conteúdo', 'hint' => 'Manual ou Copiloto'],
@@ -47,6 +56,7 @@ $wizardSteps = [
         <input type="hidden" id="data_aula" name="data_aula">
         <input type="hidden" id="turma_id" name="turma_id">
         <input type="hidden" id="status" name="status" value="rascunho">
+        <input type="hidden" id="contexto_llm" name="contexto_llm">
 
         <section class="wizard-panel space-y-6" data-step="0">
             <div>
@@ -138,9 +148,12 @@ $wizardSteps = [
 
             <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
                 <button type="button" class="modo-conteudo-btn rounded-md px-4 py-2 text-sm font-semibold" data-mode="manual">Manual</button>
+                <?php if ($copilotoDisponivel): ?>
                 <button type="button" class="modo-conteudo-btn rounded-md px-4 py-2 text-sm font-semibold" data-mode="copiloto">Meu Copiloto</button>
+                <?php endif; ?>
             </div>
 
+            <?php if ($copilotoDisponivel): ?>
             <div id="copilotoPanel" class="hidden rounded-lg border border-blue-200 bg-blue-50/60 p-4">
                 <div class="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.2fr]">
                     <div>
@@ -153,20 +166,23 @@ $wizardSteps = [
                         <label class="mb-2 block text-sm font-semibold text-gray-700">Materiais de apoio</label>
                         <div id="copilotoDropzone"
                              tabindex="0"
-                             class="flex min-h-[172px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-blue-300 bg-white px-4 py-6 text-center hover:border-blue-500">
+                             aria-label="Área para selecionar, arrastar ou colar materiais do Copiloto"
+                             class="flex min-h-[172px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-blue-300 bg-white px-4 py-6 text-center hover:border-blue-500 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100">
                             <svg class="mb-2 h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01.88-7.9A5 5 0 1118.9 10H19a3 3 0 010 6h-3m-4-3v8m0 0l-3-3m3 3l3-3"></path>
                             </svg>
                             <p class="text-sm font-semibold text-gray-800">PDF, imagens ou prints colados</p>
-                            <p class="mt-1 text-xs text-gray-500">Clique, arraste ou cole uma imagem nesta área.</p>
+                            <p class="mt-1 text-xs text-gray-500">Clique para selecionar, arraste ou pressione Ctrl/Cmd+V.</p>
                             <input id="copilotoArquivos" name="copiloto_arquivos[]" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" class="hidden">
                         </div>
-                        <ul id="copilotoListaArquivos" class="mt-3 space-y-1 text-xs text-gray-600"></ul>
+                        <div id="copilotoListaArquivos" class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
                     </div>
                 </div>
 
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p id="copilotoStatus" class="text-sm text-blue-800">O resultado preencherá os campos do plano quando terminar.</p>
+                    <div id="copilotoStatus" class="flex items-center gap-2 text-sm text-blue-800">
+                        <span>O resultado preencherá os campos do plano quando terminar. Custo: <?= htmlspecialchars((string) $copilotoCusto) ?> TudiCoin(s).</span>
+                    </div>
                     <button type="button" id="gerarCopilotoBtn"
                             class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -176,6 +192,7 @@ $wizardSteps = [
                     </button>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div id="manualPanel" class="space-y-5">
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
@@ -352,6 +369,7 @@ $wizardSteps = [
 var quillConteudo, quillObjetivos, quillRecursos;
 var currentStep = 0;
 var copilotoFiles = [];
+var copilotoPreviewUrls = [];
 
 function obterDiaSemana(dataString) {
     if (!dataString) return '';
@@ -450,31 +468,119 @@ function setStep(step) {
     });
     document.getElementById('prevStepBtn').disabled = currentStep === 0;
     document.getElementById('prevStepBtn').classList.toggle('opacity-50', currentStep === 0);
-    document.getElementById('nextStepBtn').textContent = currentStep === 3 ? 'Salvar rascunho' : 'Próxima etapa';
+    document.getElementById('nextStepBtn').textContent = currentStep === 3 ? 'Finalizar plano' : 'Próxima etapa';
     if (currentStep === 3) atualizarRevisao();
+}
+
+function limparErroCampoWizard(el) {
+    if (!el) return;
+    if (typeof limparErroCampoObrigatorio === 'function') {
+        limparErroCampoObrigatorio(el);
+        return;
+    }
+    el.classList.remove('border-red-500', 'bg-red-50', 'focus:ring-red-500', 'focus:border-red-500');
+    el.classList.add('border-gray-300', 'focus:ring-blue-500');
+    el.removeAttribute('aria-invalid');
+}
+
+function marcarErroCampoWizard(el, mensagem) {
+    if (!el) return;
+    if (typeof marcarErroCampoObrigatorio === 'function') {
+        marcarErroCampoObrigatorio(el, mensagem);
+        return;
+    }
+    el.classList.remove('border-gray-300', 'focus:ring-blue-500');
+    el.classList.add('border-red-500', 'bg-red-50', 'focus:ring-red-500', 'focus:border-red-500');
+    el.setAttribute('aria-invalid', 'true');
+}
+
+function marcarErroGrupoWizard(el, mensagem) {
+    if (!el) return;
+    el.classList.remove('border-gray-300');
+    el.classList.add('border-red-500', 'bg-red-50');
+    el.setAttribute('aria-invalid', 'true');
+    const wrapper = el.parentElement;
+    if (wrapper && !wrapper.querySelector('[data-field-error]')) {
+        const msg = document.createElement('p');
+        msg.setAttribute('data-field-error', '1');
+        msg.className = 'mt-1 text-xs font-medium text-red-600';
+        msg.textContent = mensagem || 'Campo obrigatório.';
+        wrapper.appendChild(msg);
+    }
+}
+
+function limparErroGrupoWizard(el) {
+    if (!el) return;
+    el.classList.remove('border-red-500', 'bg-red-50');
+    el.classList.add('border-gray-300');
+    el.removeAttribute('aria-invalid');
+    const wrapper = el.parentElement;
+    const msg = wrapper?.querySelector('[data-field-error]');
+    if (msg) msg.remove();
 }
 
 function validarBasico() {
     atualizarDataAula();
-    if (!document.getElementById('materia_id').value) {
-        alert('Selecione uma matéria.');
-        setStep(0);
-        return false;
+    const materia = document.getElementById('materia_id');
+    const turmasBox = document.querySelector('.turma-checkbox')?.closest('.border');
+    const dataInputs = Array.from(document.querySelectorAll('input[name="datas_aula[]"]'));
+    const titulo = document.getElementById('titulo');
+    let primeiroErro = null;
+
+    [materia, titulo, ...dataInputs].forEach(limparErroCampoWizard);
+    limparErroGrupoWizard(turmasBox);
+
+    function marcar(el, mensagem, isGroup) {
+        if (!primeiroErro) primeiroErro = el;
+        if (isGroup) {
+            marcarErroGrupoWizard(el, mensagem);
+        } else {
+            marcarErroCampoWizard(el, mensagem);
+        }
     }
-    if (document.querySelectorAll('.turma-checkbox:checked').length === 0) {
-        alert('Selecione pelo menos uma turma.');
-        setStep(0);
-        return false;
+
+    if (!materia.value) {
+        marcar(materia, 'Selecione uma matéria.');
     }
     if (!document.getElementById('data_aula').value || document.getElementById('data_aula').value === '[]') {
-        alert('Informe pelo menos uma data da aula.');
+        marcar(dataInputs[0], 'Informe pelo menos uma data da aula.');
+    }
+    if (document.querySelectorAll('.turma-checkbox:checked').length === 0) {
+        marcar(turmasBox, 'Selecione pelo menos uma turma.', true);
+    }
+    if (!titulo.value.trim()) {
+        marcar(titulo, 'Informe o título do plano.');
+    }
+
+    if (primeiroErro) {
         setStep(0);
+        setTimeout(function () {
+            primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (typeof primeiroErro.focus === 'function') {
+                primeiroErro.focus({ preventScroll: true });
+            }
+        }, 100);
         return false;
     }
-    if (!document.getElementById('titulo').value.trim()) {
-        alert('Informe o título do plano.');
-        setStep(0);
-        return false;
+
+    return true;
+}
+
+function validarEtapaAtual() {
+    if (currentStep === 0) {
+        return validarBasico();
+    }
+    if (currentStep === 2 && typeof validarAulasTardeOficinas === 'function') {
+        return validarAulasTardeOficinas();
+    }
+    return true;
+}
+
+function podeIrParaEtapa(targetStep) {
+    if (targetStep <= currentStep) return true;
+    while (currentStep < targetStep) {
+        if (!validarEtapaAtual()) return false;
+        setStep(currentStep + 1);
     }
     return true;
 }
@@ -493,7 +599,8 @@ function atualizarRevisao() {
     document.getElementById('reviewTitulo').textContent = document.getElementById('titulo').value.trim() || '-';
 }
 
-function salvarRascunho() {
+function salvarPlano(statusPlano) {
+    statusPlano = statusPlano || 'rascunho';
     if (!validarBasico()) return;
     if (typeof validarAulasTardeOficinas === 'function' && !validarAulasTardeOficinas()) return;
 
@@ -503,7 +610,7 @@ function salvarRascunho() {
 
     const formData = new FormData(document.getElementById('planoForm'));
     const data = Object.fromEntries(formData);
-    data.status = 'rascunho';
+    data.status = statusPlano;
     data.turmas_id = Array.from(document.querySelectorAll('.turma-checkbox:checked')).map(cb => cb.value);
     data.recursos_lista = Array.from(document.querySelectorAll('input[name="recursos_lista[]"]:checked')).map(cb => cb.value);
     data.aulas_tarde_atividades = typeof coletarAulasTardeAtividades === 'function' ? coletarAulasTardeAtividades() : [];
@@ -512,7 +619,7 @@ function salvarRascunho() {
     const nextBtn = document.getElementById('nextStepBtn');
     btn.disabled = true;
     nextBtn.disabled = true;
-    btn.textContent = 'Salvando...';
+    btn.textContent = statusPlano === 'rascunho' ? 'Salvando...' : 'Finalizando...';
 
     fetch('<?= URL ?>/professor/planos-aula/salvar', {
         method: 'POST',
@@ -528,6 +635,9 @@ function salvarRascunho() {
             }
             if (data.erros && data.erros.length) {
                 mensagem += '\n\nAvisos: ' + data.erros.join('\n');
+            }
+            if (statusPlano === 'aprovado') {
+                mensagem += '\n\nStatus: Plano finalizado.';
             }
             alert(mensagem);
             window.location.href = '<?= URL ?>/professor/planos-aula';
@@ -547,6 +657,14 @@ function salvarRascunho() {
     });
 }
 
+function salvarRascunho() {
+    salvarPlano('rascunho');
+}
+
+function finalizarPlano() {
+    salvarPlano('aprovado');
+}
+
 function setModoConteudo(mode) {
     document.querySelectorAll('.modo-conteudo-btn').forEach(btn => {
         btn.classList.toggle('is-active', btn.dataset.mode === mode);
@@ -557,21 +675,110 @@ function setModoConteudo(mode) {
 function atualizarListaArquivos() {
     const lista = document.getElementById('copilotoListaArquivos');
     lista.innerHTML = '';
+
+    copilotoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    copilotoPreviewUrls = [];
+
     copilotoFiles.forEach((file, index) => {
-        const li = document.createElement('li');
-        li.className = 'flex items-center justify-between rounded-md bg-white px-2 py-1';
-        li.innerHTML = '<span class="truncate">' + file.name + '</span><button type="button" class="ml-2 text-red-600" data-remove-file="' + index + '">Remover</button>';
-        lista.appendChild(li);
+        const item = document.createElement('div');
+        item.className = 'overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm';
+
+        let preview = '';
+        if (file.type && file.type.indexOf('image/') === 0) {
+            const url = URL.createObjectURL(file);
+            copilotoPreviewUrls.push(url);
+            preview = '<img src="' + url + '" alt="" class="h-20 w-full object-cover bg-gray-50">';
+        } else {
+            preview = '<div class="flex h-20 w-full items-center justify-center bg-red-50 text-red-600"><i class="fa-solid fa-file-pdf text-2xl"></i></div>';
+        }
+
+        item.innerHTML = `
+            ${preview}
+            <div class="flex items-center justify-between gap-2 px-2 py-1.5">
+                <span class="truncate text-xs text-gray-700" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+                <button type="button" class="shrink-0 text-xs font-medium text-red-600 hover:text-red-700" data-remove-file="${index}">Remover</button>
+            </div>
+        `;
+        lista.appendChild(item);
+    });
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function extrairArquivosClipboard(clipboardData) {
+    const arquivos = [];
+    if (!clipboardData) return arquivos;
+
+    Array.from(clipboardData.files || []).forEach(file => arquivos.push(file));
+    Array.from(clipboardData.items || []).forEach(item => {
+        if (!item || item.kind !== 'file') return;
+        const file = item.getAsFile();
+        if (file) arquivos.push(file);
+    });
+
+    const vistos = new Set();
+    return arquivos.filter(file => {
+        const key = [file.name, file.type, file.size, file.lastModified].join(':');
+        if (vistos.has(key)) return false;
+        vistos.add(key);
+        return true;
     });
 }
 
 function adicionarArquivos(files) {
+    let adicionados = 0;
     Array.from(files || []).forEach(file => {
         if (!['application/pdf', 'image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return;
         if (file.size > 12 * 1024 * 1024) return;
-        if (copilotoFiles.length < 8) copilotoFiles.push(file);
+        if (copilotoFiles.length < 8) {
+            copilotoFiles.push(file);
+            adicionados++;
+        }
     });
     atualizarListaArquivos();
+    return adicionados;
+}
+
+function setCopilotoStatus(message, loading) {
+    const status = document.getElementById('copilotoStatus');
+    if (!status) return;
+
+    const spinner = loading
+        ? '<span class="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-700" aria-hidden="true"></span>'
+        : '';
+    status.innerHTML = spinner + '<span>' + escapeHtml(message) + '</span>';
+}
+
+function setCopilotoButtonLoading(loading, label) {
+    const btn = document.getElementById('gerarCopilotoBtn');
+    if (!btn) return;
+
+    btn.disabled = loading;
+    btn.innerHTML = loading
+        ? '<span class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true"></span><span>' + escapeHtml(label || 'Gerando...') + '</span>'
+        : '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg><span>' + escapeHtml(label || 'Gerar rascunho') + '</span>';
+}
+
+function receberPasteCopiloto(e) {
+    const panel = document.getElementById('copilotoPanel');
+    if (!panel || panel.classList.contains('hidden')) return;
+
+    const arquivos = extrairArquivosClipboard(e.clipboardData);
+    if (!arquivos.length) return;
+
+    e.preventDefault();
+    const adicionados = adicionarArquivos(arquivos);
+    setCopilotoStatus(
+        adicionados > 0 ? adicionados + ' arquivo(s) colado(s).' : 'O item colado não é PDF ou imagem aceita.',
+        false
+    );
 }
 
 function gerarComCopiloto() {
@@ -590,11 +797,8 @@ function gerarComCopiloto() {
     document.querySelectorAll('.turma-checkbox:checked').forEach(cb => data.append('turmas_id[]', cb.value));
     copilotoFiles.forEach(file => data.append('copiloto_arquivos[]', file, file.name));
 
-    const btn = document.getElementById('gerarCopilotoBtn');
-    const status = document.getElementById('copilotoStatus');
-    btn.disabled = true;
-    btn.textContent = 'Enviando...';
-    status.textContent = 'Preparando materiais e iniciando geração...';
+    setCopilotoButtonLoading(true, 'Enviando...');
+    setCopilotoStatus('Preparando materiais e iniciando geração...', true);
 
     fetch('<?= URL ?>/professor/planos-aula/copiloto', {
         method: 'POST',
@@ -607,48 +811,73 @@ function gerarComCopiloto() {
         if (!data.success || !data.job_id) {
             throw new Error(data.error || 'Não foi possível iniciar o Copiloto.');
         }
-        btn.textContent = 'Gerando...';
-        status.textContent = 'Copiloto trabalhando no rascunho...';
+        setCopilotoButtonLoading(true, 'Gerando...');
+        setCopilotoStatus('Copiloto trabalhando no rascunho...', true);
         new AIJobPoller(data.job_id, {
             statusUrl: '<?= URL ?>/ai-job/{id}/status',
             interval: 2000,
             onProgress: function() {
-                status.textContent = 'Copiloto trabalhando no rascunho...';
+                setCopilotoStatus('Copiloto trabalhando no rascunho...', true);
             },
             onDone: function(result) {
                 aplicarRascunhoCopiloto(result);
-                status.textContent = 'Rascunho preenchido. Revise e salve quando estiver pronto.';
-                btn.disabled = false;
-                btn.textContent = 'Gerar novamente';
+                setCopilotoStatus('Rascunho preenchido. Revise e salve quando estiver pronto.', false);
+                setCopilotoButtonLoading(false, 'Gerar novamente');
             },
             onFailed: function(message) {
-                status.textContent = message || 'Falha ao gerar o rascunho.';
-                btn.disabled = false;
-                btn.textContent = 'Gerar rascunho';
+                setCopilotoStatus(message || 'Falha ao gerar o rascunho.', false);
+                setCopilotoButtonLoading(false, 'Gerar rascunho');
             }
         });
     })
     .catch(error => {
-        status.textContent = error.message || 'Falha ao acionar o Copiloto.';
-        btn.disabled = false;
-        btn.textContent = 'Gerar rascunho';
+        setCopilotoStatus(error.message || 'Falha ao acionar o Copiloto.', false);
+        setCopilotoButtonLoading(false, 'Gerar rascunho');
     });
 }
 
 function aplicarRascunhoCopiloto(result) {
+    const normalizarValorCopiloto = (value, asHtmlList) => {
+        if (value === undefined || value === null) return '';
+        if (Array.isArray(value)) {
+            const items = value
+                .map(item => normalizarValorCopiloto(item, false))
+                .filter(item => item.trim() !== '');
+            return asHtmlList
+                ? '<ul>' + items.map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>'
+                : items.map(item => '- ' + item).join('\n');
+        }
+        if (typeof value === 'object') {
+            return Object.entries(value)
+                .map(([key, item]) => {
+                    const text = normalizarValorCopiloto(item, false);
+                    return text.trim() === '' ? '' : key + ': ' + text;
+                })
+                .filter(Boolean)
+                .join('\n');
+        }
+        return String(value);
+    };
+
     const setValue = (id, value) => {
         const el = document.getElementById(id);
-        if (el && value !== undefined && value !== null && String(value).trim() !== '') el.value = value;
+        const normalized = normalizarValorCopiloto(value, false);
+        if (el && normalized.trim() !== '') el.value = normalized;
     };
     setValue('titulo', result.titulo);
     setValue('modulo', result.modulo);
     setValue('aula_num', result.aula_num);
     setValue('paginas', result.paginas);
     setValue('observacoes', result.observacoes);
+    setValue('contexto_llm', result.contexto_llm);
 
-    if (result.conteudo && typeof quillConteudo !== 'undefined') quillConteudo.clipboard.dangerouslyPasteHTML(result.conteudo);
-    if (result.objetivos && typeof quillObjetivos !== 'undefined') quillObjetivos.clipboard.dangerouslyPasteHTML(result.objetivos);
-    if (result.recursos && typeof quillRecursos !== 'undefined') quillRecursos.clipboard.dangerouslyPasteHTML(result.recursos);
+    const conteudo = normalizarValorCopiloto(result.conteudo, true);
+    const objetivos = normalizarValorCopiloto(result.objetivos, true);
+    const recursos = normalizarValorCopiloto(result.recursos, true);
+
+    if (conteudo && typeof quillConteudo !== 'undefined') quillConteudo.clipboard.dangerouslyPasteHTML(conteudo);
+    if (objetivos && typeof quillObjetivos !== 'undefined') quillObjetivos.clipboard.dangerouslyPasteHTML(objetivos);
+    if (recursos && typeof quillRecursos !== 'undefined') quillRecursos.clipboard.dangerouslyPasteHTML(recursos);
     if (Array.isArray(result.recursos_lista)) {
         document.querySelectorAll('input[name="recursos_lista[]"]').forEach(cb => {
             cb.checked = result.recursos_lista.includes(cb.value);
@@ -674,14 +903,21 @@ document.addEventListener('DOMContentLoaded', function() {
             atualizarDataAula();
         });
     });
-    document.querySelectorAll('.wizard-step-btn').forEach(btn => btn.addEventListener('click', () => setStep(Number(btn.dataset.stepTarget))));
+    document.querySelectorAll('.wizard-step-btn').forEach(btn => btn.addEventListener('click', () => {
+        const targetStep = Number(btn.dataset.stepTarget);
+        if (targetStep <= currentStep) {
+            setStep(targetStep);
+            return;
+        }
+        podeIrParaEtapa(targetStep);
+    }));
     document.getElementById('prevStepBtn').addEventListener('click', () => setStep(currentStep - 1));
     document.getElementById('nextStepBtn').addEventListener('click', function() {
         if (currentStep === 3) {
-            salvarRascunho();
+            finalizarPlano();
             return;
         }
-        if (currentStep === 0 && !validarBasico()) return;
+        if (!validarEtapaAtual()) return;
         setStep(currentStep + 1);
     });
     document.getElementById('saveDraftBtn').addEventListener('click', salvarRascunho);
@@ -690,32 +926,49 @@ document.addEventListener('DOMContentLoaded', function() {
         salvarRascunho();
     });
     document.querySelectorAll('.modo-conteudo-btn').forEach(btn => btn.addEventListener('click', () => setModoConteudo(btn.dataset.mode)));
+    document.getElementById('planoForm').addEventListener('input', function(e) {
+        if (e.target.matches('input, select, textarea')) {
+            limparErroCampoWizard(e.target);
+        }
+    });
+    document.getElementById('planoForm').addEventListener('change', function(e) {
+        if (e.target.matches('input, select, textarea')) {
+            limparErroCampoWizard(e.target);
+        }
+        if (e.target.matches('.turma-checkbox')) {
+            limparErroGrupoWizard(document.querySelector('.turma-checkbox')?.closest('.border'));
+        }
+    });
 
     const dropzone = document.getElementById('copilotoDropzone');
     const inputArquivos = document.getElementById('copilotoArquivos');
-    dropzone.addEventListener('click', () => inputArquivos.click());
-    inputArquivos.addEventListener('change', () => adicionarArquivos(inputArquivos.files));
-    dropzone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        dropzone.classList.add('border-blue-600');
-    });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-blue-600'));
-    dropzone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        dropzone.classList.remove('border-blue-600');
-        adicionarArquivos(e.dataTransfer.files);
-    });
-    dropzone.addEventListener('paste', function(e) {
-        adicionarArquivos(e.clipboardData.files);
-    });
-    document.getElementById('copilotoListaArquivos').addEventListener('click', function(e) {
+    if (dropzone && inputArquivos) {
+        dropzone.addEventListener('click', function() {
+            dropzone.focus();
+            inputArquivos.click();
+        });
+        inputArquivos.addEventListener('change', () => adicionarArquivos(inputArquivos.files));
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropzone.classList.add('border-blue-600');
+        });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-blue-600'));
+        dropzone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropzone.classList.remove('border-blue-600');
+            adicionarArquivos(e.dataTransfer.files);
+        });
+        dropzone.addEventListener('paste', receberPasteCopiloto);
+        document.addEventListener('paste', receberPasteCopiloto);
+    }
+    document.getElementById('copilotoListaArquivos')?.addEventListener('click', function(e) {
         const index = e.target.getAttribute('data-remove-file');
         if (index !== null) {
             copilotoFiles.splice(Number(index), 1);
             atualizarListaArquivos();
         }
     });
-    document.getElementById('gerarCopilotoBtn').addEventListener('click', gerarComCopiloto);
+    document.getElementById('gerarCopilotoBtn')?.addEventListener('click', gerarComCopiloto);
 
     atualizarDataAula();
     atualizarTurmaHidden();
