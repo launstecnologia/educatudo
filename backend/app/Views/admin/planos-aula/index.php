@@ -33,6 +33,14 @@ $statusPlano = static function ($status): array {
 
     return $map[$status] ?? [ucfirst(str_replace('_', ' ', $status)), 'bg-slate-100 text-slate-700'];
 };
+$limitarTitulo = static function ($titulo, int $limite = 68): string {
+    $titulo = trim((string) ($titulo ?: 'Sem título'));
+    if (mb_strlen($titulo, 'UTF-8') <= $limite) {
+        return $titulo;
+    }
+
+    return rtrim(mb_substr($titulo, 0, max(1, $limite - 3), 'UTF-8')) . '...';
+};
 $resumoPlanos = [
     [
         'label' => 'Resultados',
@@ -222,10 +230,14 @@ $resumoPlanos = [
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($planos as $plano): ?>
+                            <?php
+                            $tituloCompleto = (string) ($plano['titulo'] ?? 'Sem título');
+                            $tituloExibicao = $limitarTitulo($tituloCompleto);
+                            ?>
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4">
-                                    <div class="max-w-3xl truncate text-[13px] font-semibold leading-5 text-gray-900" title="<?= htmlspecialchars((string) ($plano['titulo'] ?? '')) ?>">
-                                        <?= htmlspecialchars((string) ($plano['titulo'] ?? 'Sem título')) ?>
+                                    <div class="max-w-2xl text-[12px] font-semibold leading-5 text-gray-900" title="<?= htmlspecialchars($tituloCompleto) ?>">
+                                        <?= htmlspecialchars($tituloExibicao) ?>
                                     </div>
                                     <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                                         <span class="font-medium text-gray-700"><?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?></span>
