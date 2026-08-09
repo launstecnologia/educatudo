@@ -1,11 +1,26 @@
 <?php
 $filtrosAtivosCount = 0;
-foreach ([$filtro_professor ?? '', $filtro_turma ?? '', $filtro_materia ?? '', $filtro_tipo_ensino ?? ''] as $fv) {
+foreach ([$filtro_status ?? '', $filtro_professor ?? '', $filtro_turma ?? '', $filtro_materia ?? '', $filtro_tipo_ensino ?? ''] as $fv) {
     if (!empty($fv)) {
         $filtrosAtivosCount++;
     }
 }
 $totalRascunhos = (int) ($stats['rascunho'] ?? 0);
+$pag = $pagination ?? [];
+$pagTotal = (int)($pag['total_items'] ?? 0);
+$pagPerPage = (int)($pag['per_page'] ?? 10);
+$pagPage = (int)($pag['current_page'] ?? 1);
+$pagTotalPages = (int)($pag['total_pages'] ?? 1);
+$itensLabel = $pagTotal === 1 ? 'item' : 'itens';
+$pagQueryParams = array_filter([
+    'status' => $filtro_status ?? '',
+    'professor_id' => $filtro_professor ?? '',
+    'turma_id' => $filtro_turma ?? '',
+    'materia_id' => $filtro_materia ?? '',
+    'tipo_ensino' => $filtro_tipo_ensino ?? '',
+], static function ($v) { return $v !== '' && $v !== null; });
+$pagBaseQuery = empty($pagQueryParams) ? '' : ('?' . http_build_query($pagQueryParams));
+$pagSep = $pagBaseQuery === '' ? '?' : '&';
 $statusPlano = static function ($status): array {
     $status = (string) ($status ?? 'rascunho');
     $map = [
@@ -18,13 +33,43 @@ $statusPlano = static function ($status): array {
 
     return $map[$status] ?? [ucfirst(str_replace('_', ' ', $status)), 'bg-slate-100 text-slate-700'];
 };
+$resumoPlanos = [
+    [
+        'label' => 'Resultados',
+        'value' => $pagTotal,
+        'icon' => 'fa-list-check',
+        'valueClass' => 'text-gray-900',
+        'iconClass' => 'bg-slate-100 text-slate-600',
+    ],
+    [
+        'label' => 'Exibindo',
+        'value' => count($planos ?? []),
+        'icon' => 'fa-eye',
+        'valueClass' => 'text-blue-700',
+        'iconClass' => 'bg-blue-50 text-blue-600',
+    ],
+    [
+        'label' => 'Rascunhos',
+        'value' => $totalRascunhos,
+        'icon' => 'fa-pen-to-square',
+        'valueClass' => 'text-slate-800',
+        'iconClass' => 'bg-slate-100 text-slate-600',
+    ],
+    [
+        'label' => 'Aprovados',
+        'value' => (int) ($stats['aprovado'] ?? 0),
+        'icon' => 'fa-circle-check',
+        'valueClass' => 'text-green-700',
+        'iconClass' => 'bg-green-50 text-green-600',
+    ],
+];
 ?>
 <!-- Header Section -->
-<div class="mb-8">
+<div class="mb-6">
     <div class="flex items-center justify-between flex-wrap gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Planos de Aula</h1>
-            <p class="text-gray-600 mt-1">Gerencie os planos de aula dos professores</p>
+            <p class="text-gray-600 mt-1">Gerencie os planos de aula dos professores.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <?php if ($totalRascunhos > 0): ?>
@@ -49,6 +94,22 @@ $statusPlano = static function ($status): array {
     </div>
 </div>
 
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+    <?php foreach ($resumoPlanos as $card): ?>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500"><?= htmlspecialchars($card['label']) ?></p>
+                    <p class="mt-1 text-2xl font-bold leading-none <?= htmlspecialchars($card['valueClass']) ?>"><?= (int) $card['value'] ?></p>
+                </div>
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl <?= htmlspecialchars($card['iconClass']) ?>">
+                    <i class="fa-solid <?= htmlspecialchars($card['icon']) ?> text-sm"></i>
+                </div>
+            </div>
+        </div>
+    <?php endforeach; ?>
+</div>
+
 <!-- Filtro em drawer lateral -->
 <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
 <aside id="filterDrawer"
@@ -62,6 +123,17 @@ $statusPlano = static function ($status): array {
     </div>
     <form method="GET" action="<?= URL ?>/admin/planos-aula" class="flex flex-col flex-1 overflow-hidden">
         <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                <select id="status" name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Todos</option>
+                    <?php foreach (['rascunho' => 'Rascunho', 'aprovado' => 'Aprovado', 'rejeitado' => 'Rejeitado', 'pendente' => 'Pendente', 'enviado' => 'Enviado'] as $statusKey => $statusNome): ?>
+                        <option value="<?= htmlspecialchars($statusKey) ?>" <?= ($filtro_status ?? '') === $statusKey ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($statusNome) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
             <div>
                 <label for="professor_id" class="block text-sm font-medium text-gray-700 mb-1.5">Professor</label>
                 <select id="professor_id" name="professor_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -124,10 +196,11 @@ $statusPlano = static function ($status): array {
 
 <!-- Planos de Aula List -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-    <div class="p-6 border-b border-gray-200">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
         <h2 class="text-lg font-semibold text-gray-900">Planos de Aula</h2>
+        <span class="text-sm text-gray-500"><?= (int) $pagTotal ?> <?= $itensLabel ?></span>
     </div>
-    <div class="p-6">
+    <div>
         <?php if (empty($planos)): ?>
             <div class="text-center py-12">
                 <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,21 +219,21 @@ $statusPlano = static function ($status): array {
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php foreach ($planos as $plano): ?>
                             <tr class="hover:bg-gray-50">
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($plano['titulo']) ?></div>
+                                <td class="px-6 py-4">
+                                    <div class="text-sm font-medium text-gray-900 max-w-2xl truncate" title="<?= htmlspecialchars((string) ($plano['titulo'] ?? '')) ?>"><?= htmlspecialchars((string) ($plano['titulo'] ?? 'Sem título')) ?></div>
                                     <div class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($plano['professor_nome'] ?? 'N/A') ?></div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($plano['materia_nome']) ?></div>
+                                    <div class="text-sm text-gray-500"><?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?></div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-500"><?= htmlspecialchars($plano['turma_nome']) ?></div>
+                                    <div class="text-sm text-gray-500"><?= htmlspecialchars((string) ($plano['turma_nome'] ?? '-')) ?></div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <?php
@@ -192,7 +265,7 @@ $statusPlano = static function ($status): array {
                                         <?= htmlspecialchars($statusLabel) ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <?php ob_start(); ?>
                                     <a href="<?= URL ?>/admin/planos-aula/visualizar/<?= $plano['id'] ?>"
                                        class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
@@ -215,21 +288,6 @@ $statusPlano = static function ($status): array {
             </div>
         <?php endif; ?>
     </div>
-    <?php
-    $pag = $pagination ?? [];
-    $pagTotal = (int)($pag['total_items'] ?? 0);
-    $pagPerPage = (int)($pag['per_page'] ?? 10);
-    $pagPage = (int)($pag['current_page'] ?? 1);
-    $pagTotalPages = (int)($pag['total_pages'] ?? 1);
-    $pagQueryParams = array_filter([
-        'professor_id' => $filtro_professor ?? '',
-        'turma_id' => $filtro_turma ?? '',
-        'materia_id' => $filtro_materia ?? '',
-        'tipo_ensino' => $filtro_tipo_ensino ?? '',
-    ], static function ($v) { return $v !== '' && $v !== null; });
-    $pagBaseQuery = empty($pagQueryParams) ? '' : ('?' . http_build_query($pagQueryParams));
-    $pagSep = $pagBaseQuery === '' ? '?' : '&';
-    ?>
     <?php if ($pagTotal > 0): ?>
     <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
         <p class="text-sm text-gray-600">
