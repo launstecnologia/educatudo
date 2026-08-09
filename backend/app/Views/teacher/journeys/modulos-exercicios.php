@@ -42,6 +42,40 @@
     </div>
 </div>
 
+<div id="ia-geracao-status-card"
+     class="hidden mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm"
+     data-status="idle">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-start gap-3">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                <svg id="ia-geracao-status-spinner" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <svg id="ia-geracao-status-check" class="hidden h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                    <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+            </div>
+            <div>
+                <p id="ia-geracao-status-titulo" class="text-sm font-semibold text-blue-950">A Tudinha está gerando exercícios</p>
+                <p id="ia-geracao-status-texto" class="mt-1 text-sm text-blue-800">Você pode continuar usando a tela. Quando terminar, os exercícios serão salvos automaticamente.</p>
+                <p id="ia-geracao-status-meta" class="mt-2 text-xs font-medium text-blue-700"></p>
+            </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap gap-2">
+            <a id="ia-geracao-status-ver-lista"
+               href="<?= URL ?>/professor/jornadas/modulos/<?= (int)$modulo['id'] ?>/exercicios"
+               class="hidden rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                Ver lista
+            </a>
+            <button type="button" id="ia-geracao-status-ocultar"
+                    class="rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                Ocultar
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
 .select-safari {
     -webkit-appearance: none;
@@ -531,6 +565,8 @@ const letras = ['A', 'B', 'C', 'D', 'E'];
 const baseUrl = '<?= rtrim(URL, "/") ?>';
 const urlListaExerciciosModulo = '<?= URL ?>/professor/jornadas/modulos/<?= (int)$modulo['id'] ?>/exercicios';
 const csrfTokenModuloExercicios = <?= json_encode($csrf_token ?? '') ?>;
+const iaGeracaoModuloId = <?= (int)$modulo['id'] ?>;
+const iaGeracaoStorageKey = 'educatudo:jornada:exercicios-ia:' + iaGeracaoModuloId;
 let modoEdicaoPagina = false;
 
 async function parseJsonResponse(response) {
@@ -2411,6 +2447,139 @@ document.getElementById('quantidade-dificil').addEventListener('input', atualiza
 document.getElementById('quantidade-desafio').addEventListener('input', atualizarTotalQuestoesIA);
 atualizarTotalQuestoesIA();
 
+function getIaGeracaoCard() {
+    return document.getElementById('ia-geracao-status-card');
+}
+
+function setIaGeracaoCardState(state, titulo, texto, meta) {
+    const card = getIaGeracaoCard();
+    if (!card) return;
+    const tituloEl = document.getElementById('ia-geracao-status-titulo');
+    const textoEl = document.getElementById('ia-geracao-status-texto');
+    const metaEl = document.getElementById('ia-geracao-status-meta');
+    const spinner = document.getElementById('ia-geracao-status-spinner');
+    const check = document.getElementById('ia-geracao-status-check');
+    const lista = document.getElementById('ia-geracao-status-ver-lista');
+
+    card.dataset.status = state || 'processing';
+    card.classList.remove('hidden', 'border-blue-200', 'bg-blue-50', 'border-green-200', 'bg-green-50', 'border-red-200', 'bg-red-50');
+    card.classList.add(
+        state === 'done' ? 'border-green-200' : (state === 'failed' ? 'border-red-200' : 'border-blue-200'),
+        state === 'done' ? 'bg-green-50' : (state === 'failed' ? 'bg-red-50' : 'bg-blue-50')
+    );
+
+    if (tituloEl) {
+        tituloEl.textContent = titulo || 'A Tudinha está gerando exercícios';
+        tituloEl.className = 'text-sm font-semibold ' + (state === 'done' ? 'text-green-950' : (state === 'failed' ? 'text-red-950' : 'text-blue-950'));
+    }
+    if (textoEl) {
+        textoEl.textContent = texto || 'Você pode continuar usando a tela. Quando terminar, os exercícios serão salvos automaticamente.';
+        textoEl.className = 'mt-1 text-sm ' + (state === 'done' ? 'text-green-800' : (state === 'failed' ? 'text-red-800' : 'text-blue-800'));
+    }
+    if (metaEl) {
+        metaEl.textContent = meta || '';
+        metaEl.className = 'mt-2 text-xs font-medium ' + (state === 'done' ? 'text-green-700' : (state === 'failed' ? 'text-red-700' : 'text-blue-700'));
+    }
+    if (spinner) spinner.classList.toggle('hidden', state === 'done' || state === 'failed');
+    if (check) check.classList.toggle('hidden', state !== 'done');
+    if (lista) lista.classList.toggle('hidden', state !== 'done');
+}
+
+function salvarGeracaoIAPendente(payload) {
+    try {
+        localStorage.setItem(iaGeracaoStorageKey, JSON.stringify(payload));
+    } catch (e) {}
+}
+
+function obterGeracaoIAPendente() {
+    try {
+        const raw = localStorage.getItem(iaGeracaoStorageKey);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function limparGeracaoIAPendente() {
+    try {
+        localStorage.removeItem(iaGeracaoStorageKey);
+    } catch (e) {}
+}
+
+function finalizarImportacaoExerciciosIA(jobId, meta) {
+    setIaGeracaoCardState('processing', 'Salvando exercícios...', 'A geração terminou. Agora estamos vinculando os exercícios a este módulo.', meta || 'Quase pronto.');
+    var fd = new FormData();
+    fd.append('_token', csrfTokenModuloExercicios);
+
+    return fetch('<?= URL ?>/professor/jornadas/modulos/importar-exercicios-ia/' + jobId, {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+    })
+    .then(function(r) {
+        return r.json().then(function(body) { return { ok: r.ok, body: body }; });
+    })
+    .then(function(res) {
+        if (!res.ok || !res.body.success) {
+            throw new Error((res.body && res.body.error) ? res.body.error : 'Exercícios gerados, mas falha ao salvar.');
+        }
+        const qtd = res.body.exercicios_ids ? res.body.exercicios_ids.length : 0;
+        limparGeracaoIAPendente();
+        setIaGeracaoCardState(
+            'done',
+            'Exercícios prontos',
+            qtd + ' exercício(s) gerado(s) e salvos neste módulo.',
+            'Você pode abrir a lista quando quiser revisar e publicar os ajustes.'
+        );
+    });
+}
+
+function acompanharGeracaoExerciciosIA(jobId, totalQuestoes) {
+    let importStarted = false;
+    const totalMeta = totalQuestoes ? (totalQuestoes + (totalQuestoes === 1 ? ' questão solicitada.' : ' questões solicitadas.')) : '';
+    setIaGeracaoCardState('processing', 'Na fila da Tudinha...', 'A geração foi iniciada. Você pode continuar trabalhando e voltar nesta tela depois.', totalMeta);
+
+    new AIJobPoller(jobId, {
+        onProgress: function(status) {
+            setIaGeracaoCardState(
+                'processing',
+                status === 'pending' ? 'Na fila da Tudinha...' : 'A Tudinha está criando os exercícios...',
+                'Processando em segundo plano. Pode navegar pela plataforma e retornar a este módulo para acompanhar.',
+                totalMeta
+            );
+        },
+        onDone: function() {
+            if (importStarted) return;
+            importStarted = true;
+            finalizarImportacaoExerciciosIA(jobId, totalMeta).catch(function(err) {
+                setIaGeracaoCardState('failed', 'Não foi possível salvar os exercícios', err && err.message ? err.message : 'Falha ao salvar os exercícios gerados.', 'Tente gerar novamente ou atualize a página.');
+            });
+        },
+        onFailed: function(err) {
+            limparGeracaoIAPendente();
+            setIaGeracaoCardState('failed', 'Falha na geração pela Tudinha', err || 'Falha no processamento da IA.', 'Tente gerar novamente.');
+        }
+    });
+}
+
+document.getElementById('ia-geracao-status-ocultar')?.addEventListener('click', function() {
+    const card = getIaGeracaoCard();
+    if (!card) return;
+    if (card.dataset.status === 'processing') {
+        card.classList.add('hidden');
+        return;
+    }
+    limparGeracaoIAPendente();
+    card.classList.add('hidden');
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const pendente = obterGeracaoIAPendente();
+    if (pendente && pendente.job_id) {
+        acompanharGeracaoExerciciosIA(pendente.job_id, Number(pendente.quantidade || 0));
+    }
+});
+
 document.getElementById('gerarExercicioIAForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
@@ -2436,21 +2605,13 @@ document.getElementById('gerarExercicioIAForm').addEventListener('submit', funct
         return;
     }
     
-    // Fechar modal
     fecharModalGerarIA();
-    
-    // Mostrar loading
-    const loadingOverlay = document.createElement('div');
-    loadingOverlay.id = 'loading-overlay';
-    loadingOverlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;';
-    loadingOverlay.innerHTML = `
-        <div style="background: white; padding: 24px; border-radius: 12px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-width: 360px; width: calc(100% - 32px);">
-            <img src="<?= URL ?>/public/static/images/animacao-tuidnha.gif" alt="Tudinha carregando" style="width: 140px; height: 140px; object-fit: contain; margin: 0 auto 12px; border-radius: 10px; animation: tudinha-bounce 1.4s ease-in-out infinite;" />
-            <p id="loading-ia-titulo" style="font-size: 18px; color: #1f2937; margin: 0; font-weight: 600;">Enfileirando na Tudinha...</p>
-            <p id="loading-ia-subtitulo" style="font-size: 14px; color: #6b7280; margin-top: 8px;">Aguarde sem fechar a página.</p>
-        </div>
-    `;
-    document.body.appendChild(loadingOverlay);
+    setIaGeracaoCardState(
+        'processing',
+        'Enfileirando na Tudinha...',
+        'A geração será feita em segundo plano. Você pode continuar usando a plataforma.',
+        quantidade + (quantidade === 1 ? ' questão solicitada.' : ' questões solicitadas.')
+    );
 
     const contexto = (document.getElementById('contexto-adicional-ia') && document.getElementById('contexto-adicional-ia').value) ? document.getElementById('contexto-adicional-ia').value.trim() : '';
     const data = {
@@ -2470,15 +2631,14 @@ document.getElementById('gerarExercicioIAForm').addEventListener('submit', funct
         _token: csrfTokenModuloExercicios
     };
 
-    function removerLoadingIA() {
-        if (loadingOverlay.parentNode) {
-            loadingOverlay.parentNode.removeChild(loadingOverlay);
-        }
-    }
-
     function falharGeracaoIA(msg) {
-        removerLoadingIA();
-        alert('Erro ao gerar exercícios com IA.' + (msg ? ('\nDetalhe: ' + msg) : ''));
+        limparGeracaoIAPendente();
+        setIaGeracaoCardState(
+            'failed',
+            'Erro ao gerar exercícios com IA',
+            msg || 'Não foi possível iniciar ou concluir a geração.',
+            'Tente novamente em instantes.'
+        );
     }
 
     fetch('<?= URL ?>/professor/jornadas/modulos/gerar-exercicio-ia', {
@@ -2518,54 +2678,12 @@ document.getElementById('gerarExercicioIAForm').addEventListener('submit', funct
             throw new Error(resp.error || 'Não foi possível iniciar a geração');
         }
 
-        var tituloEl = document.getElementById('loading-ia-titulo');
-        var subEl = document.getElementById('loading-ia-subtitulo');
-        if (tituloEl) tituloEl.textContent = 'A Tudinha está criando os exercícios...';
-        if (subEl) subEl.textContent = 'Processando em segundo plano. Aguarde sem fechar a página.';
-
-        var importStarted = false;
-        new AIJobPoller(resp.job_id, {
-            onProgress: function(status) {
-                if (tituloEl) {
-                    tituloEl.textContent = status === 'pending'
-                        ? 'Na fila da Tudinha...'
-                        : 'A Tudinha está criando os exercícios...';
-                }
-            },
-            onDone: function() {
-                if (importStarted) {
-                    return;
-                }
-                importStarted = true;
-                if (tituloEl) tituloEl.textContent = 'Salvando exercícios...';
-                if (subEl) subEl.textContent = 'Quase lá.';
-                var fd = new FormData();
-                fd.append('_token', csrfTokenModuloExercicios);
-                fetch('<?= URL ?>/professor/jornadas/modulos/importar-exercicios-ia/' + resp.job_id, {
-                    method: 'POST',
-                    body: fd,
-                    credentials: 'same-origin'
-                })
-                .then(function(r) { return r.json().then(function(body) { return { ok: r.ok, body: body }; }); })
-                .then(function(res) {
-                    removerLoadingIA();
-                    if (!res.ok || !res.body.success) {
-                        falharGeracaoIA((res.body && res.body.error) ? res.body.error : 'Exercícios gerados, mas falha ao salvar.');
-                        return;
-                    }
-                    var qtd = res.body.exercicios_ids ? res.body.exercicios_ids.length : 0;
-                    mostrarModalOk(qtd + ' exercício(s) gerado(s) com sucesso!', function() {
-                        window.location.href = urlListaExerciciosModulo;
-                    });
-                })
-                .catch(function(err) {
-                    falharGeracaoIA(err && err.message ? err.message : 'Falha ao salvar os exercícios gerados.');
-                });
-            },
-            onFailed: function(err) {
-                falharGeracaoIA(err || 'Falha no processamento da IA.');
-            }
+        salvarGeracaoIAPendente({
+            job_id: resp.job_id,
+            quantidade: quantidade,
+            started_at: new Date().toISOString()
         });
+        acompanharGeracaoExerciciosIA(resp.job_id, quantidade);
     })
     .catch(function(error) {
         falharGeracaoIA(error && error.message ? error.message : '');
