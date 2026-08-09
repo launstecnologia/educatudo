@@ -214,9 +214,7 @@ $resumoPlanos = [
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matéria</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plano</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
@@ -226,16 +224,18 @@ $resumoPlanos = [
                         <?php foreach ($planos as $plano): ?>
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4">
-                                    <div class="text-sm font-medium text-gray-900 max-w-2xl truncate" title="<?= htmlspecialchars((string) ($plano['titulo'] ?? '')) ?>"><?= htmlspecialchars((string) ($plano['titulo'] ?? 'Sem título')) ?></div>
-                                    <div class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($plano['professor_nome'] ?? 'N/A') ?></div>
+                                    <div class="max-w-3xl truncate text-[13px] font-semibold leading-5 text-gray-900" title="<?= htmlspecialchars((string) ($plano['titulo'] ?? '')) ?>">
+                                        <?= htmlspecialchars((string) ($plano['titulo'] ?? 'Sem título')) ?>
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                                        <span class="font-medium text-gray-700"><?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?></span>
+                                        <span class="text-gray-300">•</span>
+                                        <span><?= htmlspecialchars($plano['professor_nome'] ?? 'N/A') ?></span>
+                                        <span class="text-gray-300">•</span>
+                                        <span>Turma <?= htmlspecialchars((string) ($plano['turma_nome'] ?? '-')) ?></span>
+                                    </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-500"><?= htmlspecialchars((string) ($plano['materia_nome'] ?? '-')) ?></div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-500"><?= htmlspecialchars((string) ($plano['turma_nome'] ?? '-')) ?></div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap align-middle">
                                     <?php
                                     [$statusLabel, $statusClasses] = $statusPlano($plano['status'] ?? 'rascunho');
                                     // Tenta decodificar as datas se estiverem em JSON
@@ -260,12 +260,12 @@ $resumoPlanos = [
                                         <?php endif; ?>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-6 py-4 whitespace-nowrap align-middle">
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= htmlspecialchars($statusClasses) ?>">
                                         <?= htmlspecialchars($statusLabel) ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium align-middle">
                                     <?php ob_start(); ?>
                                     <a href="<?= URL ?>/admin/planos-aula/visualizar/<?= $plano['id'] ?>"
                                        class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
