@@ -298,6 +298,117 @@ class MasterFilaIaService
     }
 
     /**
+     * Destrava jobs em processing há mais de N minutos (reenfileira ou marca failed).
+     *
+     * @return array{reenfileirados:int,falhos:int,erros:list<string>}
+     */
+    public static function destravarTravados(int $escolaIdFiltro = 0, int $minutos = 0): array
+    {
+        $minutos = $minutos > 0 ? $minutos : self::STUCK_PROCESSING_MINUTES;
+        $minutos = max(1, min(120, $minutos));
+        $out = ['reenfileirados' => 0, 'falhos' => 0, 'erros' => []];
+
+        foreach (self::listarEscolasAtivas() as $escola) {
+            $eid = (int) ($escola['id'] ?? 0);
+            if ($escolaIdFiltro > 0 && $eid !== $escolaIdFiltro) {
+                continue;
+            }
+            $conn = \MasterTenantConnection::getPdoAndEscola($eid);
+            if ($conn === null || empty($conn['pdo'])) {
+                $out['erros'][] = 'Sem conexão: ' . ($escola['nome'] ?? (string) $eid);
+                continue;
+            }
+            /** @var \PDO $pdo */
+            $pdo = $conn['pdo'];
+            if (!self::tabelaExiste($pdo, 'ai_jobs')) {
+                continue;
+            }
+            try {
+                $st = $pdo->prepare(
+                    "UPDATE ai_jobs
+                     SET status = 'pending',
+                         error_message = COALESCE(error_message, 'Destravado manualmente no Master; reenfileirado.')
+                     WHERE status = 'processing'
+                       AND started_at IS NOT NULL
+                       AND started_at < (NOW() - INTERVAL {$minutos} MINUTE)
+                       AND attempts < 3"
+                );
+                $st->execute();
+                $out['reenfileirados'] += $st->rowCount();
+
+                $stF = $pdo->prepare(
+                    "UPDATE ai_jobs
+                     SET status = 'failed',
+                         completed_at = NOW(),
+                         error_message = COALESCE(error_message, 'Destravado no Master: esgotou tentativas em processing.')
+                     WHERE status = 'processing'
+                       AND started_at IS NOT NULL
+                       AND started_at < (NOW() - INTERVAL {$minutos} MINUTE)
+                       AND attempts >= 3"
+                );
+                $stF->execute();
+                $out['falhos'] += $stF->rowCount();
+            } catch (\Throwable $e) {
+                error_log('[MasterFilaIa] destravar escola=' . $eid . ' ' . $e->getMessage());
+                $out['erros'][] = 'Falha ao destravar: ' . ($escola['nome'] ?? (string) $eid);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Reenfileira um job específico (processing/failed → pending) para nova tentativa.
+     *
+     * @return array{ok:bool,mensagem:string}
+     */
+    public static function reenfileirarJob(int $escolaId, int $jobId): array
+    {
+        if ($escolaId < 1 || $jobId < 1) {
+            return ['ok' => false, 'mensagem' => 'Parâmetros inválidos.'];
+        }
+        $conn = \MasterTenantConnection::getPdoAndEscola($escolaId);
+        if ($conn === null || empty($conn['pdo'])) {
+            return ['ok' => false, 'mensagem' => 'Sem conexão com a escola.'];
+        }
+        /** @var \PDO $pdo */
+        $pdo = $conn['pdo'];
+        if (!self::tabelaExiste($pdo, 'ai_jobs')) {
+            return ['ok' => false, 'mensagem' => 'Tabela ai_jobs ausente nesta escola.'];
+        }
+        try {
+            $st = $pdo->prepare('SELECT id, status, attempts FROM ai_jobs WHERE id = ? LIMIT 1');
+            $st->execute([$jobId]);
+            $job = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$job) {
+                return ['ok' => false, 'mensagem' => 'Job não encontrado.'];
+            }
+            $status = (string) ($job['status'] ?? '');
+            if (!in_array($status, ['processing', 'failed', 'pending'], true)) {
+                return ['ok' => false, 'mensagem' => 'Só é possível reenfileirar pending/processing/failed.'];
+            }
+            $up = $pdo->prepare(
+                "UPDATE ai_jobs
+                 SET status = 'pending',
+                     started_at = NULL,
+                     completed_at = NULL,
+                     attempts = LEAST(attempts, 2),
+                     error_message = CONCAT(
+                         COALESCE(error_message, ''),
+                         CASE WHEN COALESCE(error_message, '') = '' THEN '' ELSE ' | ' END,
+                         'Reenfileirado manualmente no Master em ', NOW()
+                     )
+                 WHERE id = ?"
+            );
+            $up->execute([$jobId]);
+            return ['ok' => true, 'mensagem' => 'Job #' . $jobId . ' reenfileirado (pending). O cron deve processá-lo em até ~1 min.'];
+        } catch (\Throwable $e) {
+            error_log('[MasterFilaIa] reenfileirarJob: ' . $e->getMessage());
+            return ['ok' => false, 'mensagem' => 'Falha ao reenfileirar: ' . $e->getMessage()];
+        }
+    }
+
+    /**
      * Última execução do script (para KPI no topo).
      * @return array<string,mixed>|null
      */

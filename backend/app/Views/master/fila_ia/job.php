@@ -1,5 +1,6 @@
 <?php
 $job = $job ?? [];
+$csrf_token = $csrf_token ?? ($_SESSION['csrf_token'] ?? '');
 $fmtDt = static function ($dt) {
     $dt = trim((string) $dt);
     if ($dt === '') {
@@ -31,13 +32,35 @@ $resultJson = json_encode($job['result_decoded'] ?? [], JSON_PRETTY_PRINT | JSON
             <?php endif; ?>
         </p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?= $statusCls ?>"><?= htmlspecialchars($status) ?></span>
         <?php if (!empty($job['travado'])): ?>
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">travado</span>
         <?php endif; ?>
+        <?php if (in_array($status, ['processing', 'failed', 'pending'], true)): ?>
+        <form method="post" action="<?= URL ?>/master/fila-ia/reenfileirar"
+              onsubmit="return confirm('Reenfileirar este job para o cron processar de novo?');">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
+            <input type="hidden" name="escola_id" value="<?= (int) ($job['escola_id'] ?? 0) ?>">
+            <input type="hidden" name="job_id" value="<?= (int) ($job['id'] ?? 0) ?>">
+            <button type="submit" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-orange-600 hover:bg-orange-700">
+                Reenfileirar
+            </button>
+        </form>
+        <?php endif; ?>
     </div>
 </div>
+
+<?php if (!empty($_SESSION['flash_success'])): ?>
+<div class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm">
+    <?= htmlspecialchars((string) $_SESSION['flash_success']) ?>
+</div>
+<?php unset($_SESSION['flash_success']); endif; ?>
+<?php if (!empty($_SESSION['flash_error'])): ?>
+<div class="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+    <?= htmlspecialchars((string) $_SESSION['flash_error']) ?>
+</div>
+<?php unset($_SESSION['flash_error']); endif; ?>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 lg:col-span-2">

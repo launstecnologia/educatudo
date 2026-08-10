@@ -5,9 +5,12 @@ $filtros = $filtros ?? [];
 $lista_jobs = $lista_jobs ?? [];
 $lista_cron = $lista_cron ?? [];
 $ultima_cron = $ultima_cron ?? null;
+$cron_tabela_ok = $cron_tabela_ok ?? false;
+$csrf_token = $csrf_token ?? ($_SESSION['csrf_token'] ?? '');
 $kpis = $lista_jobs['kpis'] ?? [];
 $jobs = $lista_jobs['jobs'] ?? [];
 $erros = $lista_jobs['erros'] ?? [];
+$travadosCount = (int) ($kpis['travados'] ?? 0);
 $totalJobs = (int) ($lista_jobs['total'] ?? 0);
 $page = (int) ($lista_jobs['page'] ?? 1);
 $perPage = (int) ($lista_jobs['per_page'] ?? 20);
@@ -87,23 +90,56 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
             </p>
         </div>
         <?php if ($aba === 'fila'): ?>
-        <button type="button" onclick="openFilterDrawer()"
-                class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors flex-shrink-0">
-            <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
-            Filtros
-            <?php if ($filtrosAtivos > 0): ?>
-            <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivos ?></span>
+        <div class="flex items-center gap-2 flex-shrink-0">
+            <?php if ($travadosCount > 0): ?>
+            <form method="post" action="<?= URL ?>/master/fila-ia/destravar"
+                  onsubmit="return confirm('Reenfileirar jobs travados em processing (>10 min)?');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
+                <input type="hidden" name="escola_id" value="<?= (int) ($filtros['escola_id'] ?? 0) ?>">
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-orange-600 hover:bg-orange-700">
+                    <i class="fa-solid fa-unlock mr-2"></i>
+                    Destravar (<?= $travadosCount ?>)
+                </button>
+            </form>
             <?php endif; ?>
-        </button>
+            <button type="button" onclick="openFilterDrawer()"
+                    class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors">
+                <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
+                Filtros
+                <?php if ($filtrosAtivos > 0): ?>
+                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivos ?></span>
+                <?php endif; ?>
+            </button>
+        </div>
         <?php endif; ?>
     </div>
 </div>
+
+<?php if (!empty($_SESSION['flash_success'])): ?>
+<div class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm">
+    <?= htmlspecialchars((string) $_SESSION['flash_success']) ?>
+</div>
+<?php unset($_SESSION['flash_success']); endif; ?>
 
 <?php if (!empty($_SESSION['flash_error'])): ?>
 <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
     <?= htmlspecialchars((string) $_SESSION['flash_error']) ?>
 </div>
 <?php unset($_SESSION['flash_error']); endif; ?>
+
+<?php if (empty($ultima_cron) || !$cron_tabela_ok): ?>
+<div class="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-950 text-sm">
+    <p class="font-medium mb-1">Cron sem registro — isso explica jobs travados em <code class="bg-amber-100 px-1 rounded">processing</code>.</p>
+    <ol class="list-decimal list-inside text-xs space-y-0.5">
+        <?php if (!$cron_tabela_ok): ?>
+        <li>Rode a migration master <code class="bg-amber-100 px-1 rounded">2026_08_10_cron_execucoes_master.sql</code>.</li>
+        <?php endif; ?>
+        <li>Confirme o crontab a cada minuto: <code class="bg-amber-100 px-1 rounded">php …/cron/process_ai_jobs.php</code>.</li>
+        <li>Use <strong>Destravar</strong> para reenfileirar os processing antigos; o cron precisa estar ativo para processar de novo.</li>
+    </ol>
+</div>
+<?php endif; ?>
 
 <?php if ($aba === 'fila'): ?>
 <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">

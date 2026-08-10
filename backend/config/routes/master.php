@@ -52,6 +52,8 @@ $router->get('/master/llm-custos', 'Master/MasterLlmCustosController@index');
 $router->get('/master/fila-ia', 'Master/MasterFilaIaController@index');
 $router->get('/master/fila-ia/job', 'Master/MasterFilaIaController@job');
 $router->get('/master/fila-ia/cron', 'Master/MasterFilaIaController@cron');
+$router->post('/master/fila-ia/destravar', 'Master/MasterFilaIaController@destravar');
+$router->post('/master/fila-ia/reenfileirar', 'Master/MasterFilaIaController@reenfileirar');
 $router->get('/master/creditos/asaas/checkout', 'Master/MasterCreditosCheckoutController@iniciar');
 $router->post('/master/creditos/asaas/checkout', 'Master/MasterCreditosCheckoutController@iniciar');
 $router->post('/master/webhooks/asaas', 'Master/MasterAsaasWebhookController@handle');

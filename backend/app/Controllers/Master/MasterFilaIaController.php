@@ -77,6 +77,8 @@ class MasterFilaIaController extends BaseController
             $listaJobs = \App\Services\MasterFilaIaService::listarJobs($filtros);
         }
 
+        $cronTabelaOk = \App\Services\CronExecucaoService::tabelasDisponiveis();
+
         $this->viewWithLayout('master', 'master/fila_ia/index', [
             'title' => 'Fila IA - Painel Master',
             'page_title' => 'Fila IA',
@@ -88,7 +90,59 @@ class MasterFilaIaController extends BaseController
             'lista_jobs' => $listaJobs,
             'lista_cron' => $listaCron,
             'ultima_cron' => $ultimaCron,
+            'cron_tabela_ok' => $cronTabelaOk,
+            'csrf_token' => $this->generateCsrfToken(),
         ]);
+    }
+
+    public function destravar()
+    {
+        $this->requireMaster();
+        require_once __DIR__ . '/../../Services/MasterFilaIaService.php';
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $_SESSION['flash_error'] = 'Sessão expirada, tente novamente.';
+            header('Location: ' . URL . '/master/fila-ia');
+            exit;
+        }
+
+        $escolaId = (int) ($_POST['escola_id'] ?? 0);
+        $resultado = \App\Services\MasterFilaIaService::destravarTravados($escolaId);
+        $msg = 'Destravados: '
+            . (int) $resultado['reenfileirados'] . ' reenfileirado(s), '
+            . (int) $resultado['falhos'] . ' marcado(s) failed.';
+        if (!empty($resultado['erros'])) {
+            $msg .= ' Avisos: ' . implode('; ', array_slice($resultado['erros'], 0, 3));
+        }
+        $_SESSION['flash_success'] = $msg;
+
+        $qs = $escolaId > 0 ? ('?escola_id=' . $escolaId . '&so_travados=1') : '?so_travados=1';
+        header('Location: ' . URL . '/master/fila-ia' . $qs);
+        exit;
+    }
+
+    public function reenfileirar()
+    {
+        $this->requireMaster();
+        require_once __DIR__ . '/../../Services/MasterFilaIaService.php';
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $_SESSION['flash_error'] = 'Sessão expirada, tente novamente.';
+            header('Location: ' . URL . '/master/fila-ia');
+            exit;
+        }
+
+        $escolaId = (int) ($_POST['escola_id'] ?? 0);
+        $jobId = (int) ($_POST['job_id'] ?? 0);
+        $resultado = \App\Services\MasterFilaIaService::reenfileirarJob($escolaId, $jobId);
+        if (!empty($resultado['ok'])) {
+            $_SESSION['flash_success'] = (string) $resultado['mensagem'];
+        } else {
+            $_SESSION['flash_error'] = (string) ($resultado['mensagem'] ?? 'Falha ao reenfileirar.');
+        }
+
+        header('Location: ' . URL . '/master/fila-ia/job?escola_id=' . $escolaId . '&job_id=' . $jobId);
+        exit;
     }
 
     public function job()
@@ -112,6 +166,7 @@ class MasterFilaIaController extends BaseController
             'current_page' => 'fila_ia',
             'master_nome' => $_SESSION['master_user_nome'] ?? 'Admin',
             'job' => $job,
+            'csrf_token' => $this->generateCsrfToken(),
         ]);
     }
 

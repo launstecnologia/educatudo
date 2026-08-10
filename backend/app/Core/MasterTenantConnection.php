@@ -49,6 +49,8 @@ class MasterTenantConnection
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
             $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+            // Alinha NOW() do MySQL com o fuso da aplicação (evita falso "travado" na Fila IA).
+            $pdo->exec("SET time_zone = '-03:00'");
             return ['pdo' => $pdo, 'escola' => $escola];
         } catch (PDOException $e) {
             error_log('[MasterTenantConnection] ' . $e->getMessage());

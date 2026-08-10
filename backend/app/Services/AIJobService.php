@@ -339,12 +339,28 @@ class AIJobService
 
     private static function releaseStaleJobs(\Database $db): void
     {
+        // Worker morreu no meio: volta pra fila se ainda há tentativas.
         $db->query(
             "UPDATE ai_jobs
-             SET status = 'pending'
+             SET status = 'pending',
+                 error_message = COALESCE(error_message, 'Worker interrompido; reenfileirado automaticamente.')
              WHERE status = 'processing'
+               AND started_at IS NOT NULL
                AND started_at < NOW() - INTERVAL ? MINUTE
                AND attempts < ?",
+            [self::STALE_MINUTES, self::MAX_ATTEMPTS]
+        );
+
+        // Sem tentativas restantes: marca failed (antes ficava processing para sempre).
+        $db->query(
+            "UPDATE ai_jobs
+             SET status = 'failed',
+                 completed_at = NOW(),
+                 error_message = COALESCE(error_message, 'Worker interrompido após esgotar tentativas.')
+             WHERE status = 'processing'
+               AND started_at IS NOT NULL
+               AND started_at < NOW() - INTERVAL ? MINUTE
+               AND attempts >= ?",
             [self::STALE_MINUTES, self::MAX_ATTEMPTS]
         );
     }
