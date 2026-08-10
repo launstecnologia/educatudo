@@ -92,11 +92,7 @@
                     <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3"><?= htmlspecialchars((string) $escola['dominio_ultimo_erro']) ?></p>
                     <?php endif; ?>
                     <p class="text-xs text-slate-500 mb-3">DNS wildcard (<code>* .<?= htmlspecialchars($tenantBaseDomain === 'localhost' ? 'localhost' : $tenantBaseDomain) ?></code>) e certificado Let's Encrypt na origem são configurados no servidor. Ver <code>docs/DEPLOY-DOMINIOS.md</code>.</p>
-                    <form method="post" action="<?= URL ?>/master/escolas/verificar-dominio" class="inline">
-                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
-                        <input type="hidden" name="id" value="<?= (int) $escola['id'] ?>">
-                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Verificar HTTPS agora</button>
-                    </form>
+                    <button type="submit" form="form-verificar-dominio-escola" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Verificar HTTPS agora</button>
                 </div>
                 <?php endif; ?>
                 <div class="md:col-span-2">
@@ -426,6 +422,12 @@
             <a href="<?= URL ?>/master/escolas" class="px-6 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancelar</a>
         </div>
     </form>
+    <?php if (!empty($escola['id'])): ?>
+    <form id="form-verificar-dominio-escola" method="post" action="<?= URL ?>/master/escolas/verificar-dominio" class="hidden">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+        <input type="hidden" name="id" value="<?= (int) $escola['id'] ?>">
+    </form>
+    <?php endif; ?>
 </div>
 <script>
 (function() {
