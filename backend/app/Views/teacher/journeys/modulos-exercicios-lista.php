@@ -415,11 +415,22 @@ function fecharModalBancoQuestoes() {
 }
 
 function parseBancoQuestoesJson(response) {
-    return response.json().then(function(body) {
-        if (!response.ok) {
-            throw new Error((body && body.error) ? body.error : 'Erro na requisição');
+    return response.text().then(function(text) {
+        var body = null;
+        var raw = String(text || '').trim();
+        try {
+            body = raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            var trecho = raw.replace(/\s+/g, ' ').slice(0, 180);
+            throw new Error(
+                'Resposta inválida do servidor (HTTP ' + response.status + ')'
+                + (trecho ? ': ' + trecho : '. Verifique login/sessão e tente novamente.')
+            );
         }
-        return body;
+        if (!response.ok) {
+            throw new Error((body && body.error) ? body.error : ('Erro na requisição (HTTP ' + response.status + ')'));
+        }
+        return body || {};
     });
 }
 
@@ -669,12 +680,28 @@ function importarSelecionadasBancoQuestoes() {
         },
         body: JSON.stringify({
             modulo_id: <?= (int)$modulo['id'] ?>,
-            questao_ids: Array.from(bqSelecionadas)
+            questao_ids: Array.from(bqSelecionadas),
+            _token: <?= json_encode($csrf_token ?? ($_SESSION['csrf_token'] ?? '')) ?>
         })
     })
         .then(parseBancoQuestoesJson)
         .then(function(data) {
             if (!data.success) throw new Error(data.error || 'Erro ao importar');
+            var falhas = Array.isArray(data.falhas) ? data.falhas : [];
+            var importados = Number(data.importados || 0);
+            var creditos = Number(data.creditos_consumidos || 0);
+            if (falhas.length > 0) {
+                var detalhe = (falhas[0] && falhas[0].erro) ? String(falhas[0].erro) : 'erro não informado';
+                alert(
+                    importados + ' questão(ões) importada(s), ' + falhas.length + ' falha(s).'
+                    + ' Créditos: ' + creditos + '.\nDetalhe: ' + detalhe
+                );
+                if (importados > 0) {
+                    window.location.reload();
+                }
+                return;
+            }
+            alert(importados + ' questão(ões) importada(s) com sucesso. Créditos: ' + creditos + '.');
             window.location.reload();
         })
         .catch(function(err) {

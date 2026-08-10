@@ -133,7 +133,13 @@ class HtmlSanitizer
         }
         $purifier = self::getPurifierWithImages();
         if ($purifier !== null) {
-            $cleaned = $purifier->purify($html);
+            try {
+                $cleaned = $purifier->purify($html);
+            } catch (\Throwable $e) {
+                // Fallback: não derruba a importação por HTML “sujo” do banco externo.
+                $allowed = '<p><strong><em><ul><ol><li><span><br><img><table><thead><tbody><tr><th><td>';
+                $cleaned = strip_tags($html, $allowed);
+            }
         } else {
             $allowed = '<p><strong><em><ul><ol><li><span><br><img>';
             $cleaned = strip_tags($html, $allowed);

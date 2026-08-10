@@ -8308,6 +8308,12 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
     {
         try {
             @set_time_limit(120);
+            // Evita notice/warning HTML quebrar o JSON no frontend (Safari: "did not match the expected pattern").
+            while (ob_get_level() > 0) {
+                @ob_end_clean();
+            }
+            ob_start();
+
             $user = $this->assertProfessorLogado();
             require_once __DIR__ . '/../../Services/CreditosService.php';
             $creditosService = new \App\Services\CreditosService();
@@ -8424,6 +8430,9 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                 }
             }
 
+            if (ob_get_level() > 0) {
+                @ob_end_clean();
+            }
             $this->json([
                 'success' => true,
                 'importados' => $inseridos,
@@ -8431,6 +8440,10 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                 'falhas' => $falhas
             ]);
         } catch (\Throwable $e) {
+            if (ob_get_level() > 0) {
+                @ob_end_clean();
+            }
+            error_log('apiBancoQuestoesImportarModulo: ' . $e->getMessage());
             $this->json(['success' => false, 'error' => $e->getMessage()], 400);
         }
     }
@@ -8574,6 +8587,90 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
         } catch (\Throwable $e) {
             return [];
         }
+    }
+
+    /**
+     * Normaliza alternativas vindas da API do banco EducaTudo / banco do professor.
+     * Aceita: {A:"...",B:"..."}, [{texto,correta}], [{letra,texto}], lista de strings.
+     *
+     * @param array<mixed> $alternativasRaw
+     * @return array{0: array<string,string>, 1: string} [mapa letra=>texto, gabarito]
+     */
+    private function normalizarAlternativasDaApiBanco(array $alternativasRaw, string $gabarito = ''): array
+    {
+        $gabarito = strtoupper(trim($gabarito));
+        $mapa = [];
+        $letras = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+        if ($alternativasRaw === []) {
+            return [[], $gabarito];
+        }
+
+        // Formato associativo A/B/C...
+        $temLetra = false;
+        foreach ($letras as $letra) {
+            if (array_key_exists($letra, $alternativasRaw) || array_key_exists(strtolower($letra), $alternativasRaw)) {
+                $temLetra = true;
+                break;
+            }
+        }
+
+        if ($temLetra) {
+            foreach ($letras as $letra) {
+                $valor = $alternativasRaw[$letra] ?? $alternativasRaw[strtolower($letra)] ?? null;
+                if ($valor === null) {
+                    continue;
+                }
+                if (is_array($valor)) {
+                    $texto = (string)($valor['texto'] ?? $valor['text'] ?? $valor['enunciado'] ?? '');
+                    if (!empty($valor['correta']) || !empty($valor['correct']) || !empty($valor['is_correct'])) {
+                        $gabarito = $letra;
+                    }
+                } else {
+                    $texto = (string)$valor;
+                }
+                $texto = trim($texto);
+                if ($texto !== '') {
+                    $mapa[$letra] = $texto;
+                }
+            }
+            return [$mapa, $gabarito];
+        }
+
+        // Lista sequencial (0..n) ou objetos com letra/texto
+        $idx = 0;
+        foreach ($alternativasRaw as $key => $valor) {
+            if ($idx >= count($letras)) {
+                break;
+            }
+            $letra = $letras[$idx];
+            if (is_string($key) && preg_match('/^[A-Fa-f]$/', $key)) {
+                $letra = strtoupper($key);
+            } elseif (is_array($valor)) {
+                $letraRaw = strtoupper(trim((string)($valor['letra'] ?? $valor['letter'] ?? $valor['label'] ?? '')));
+                if (preg_match('/^[A-F]$/', $letraRaw)) {
+                    $letra = $letraRaw;
+                }
+            }
+
+            if (is_array($valor)) {
+                $texto = (string)($valor['texto'] ?? $valor['text'] ?? $valor['enunciado'] ?? $valor['alternativa'] ?? '');
+                if (!empty($valor['correta']) || !empty($valor['correct']) || !empty($valor['is_correct'])) {
+                    $gabarito = $letra;
+                }
+            } else {
+                $texto = (string)$valor;
+            }
+            $texto = trim($texto);
+            if ($texto === '') {
+                $idx++;
+                continue;
+            }
+            $mapa[$letra] = $texto;
+            $idx++;
+        }
+
+        return [$mapa, $gabarito];
     }
 
     private function normalizarAlternativasBancoProfessor($questoesJson, $respostaCorreta = null, $gabarito = null): array
@@ -8816,17 +8913,22 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
     {
         $enunciadoRaw = (string)($q['enunciado_html'] ?? $q['enunciado'] ?? '');
         $enunciadoRaw = $this->persistInlineBase64ImagesInHtml($enunciadoRaw, $professorId);
-        $enunciado = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($enunciadoRaw);
+        try {
+            $enunciado = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($enunciadoRaw);
+        } catch (\Throwable $e) {
+            throw new Exception('Falha ao sanitizar enunciado: ' . $e->getMessage());
+        }
         if (trim(strip_tags($enunciado)) === '' && trim($enunciado) === '') {
             throw new Exception('Enunciado vazio');
         }
 
-        $alternativas = isset($q['alternativas']) && is_array($q['alternativas']) ? $q['alternativas'] : [];
-        if (empty($alternativas) && !empty($q['alternativas_json'])) {
+        $alternativasRaw = isset($q['alternativas']) && is_array($q['alternativas']) ? $q['alternativas'] : [];
+        if (empty($alternativasRaw) && !empty($q['alternativas_json'])) {
             $decodedAlternativas = json_decode((string)$q['alternativas_json'], true);
-            $alternativas = is_array($decodedAlternativas) ? $decodedAlternativas : [];
+            $alternativasRaw = is_array($decodedAlternativas) ? $decodedAlternativas : [];
         }
         $gabarito = strtoupper(trim((string)($q['gabarito'] ?? '')));
+        [$alternativas, $gabarito] = $this->normalizarAlternativasDaApiBanco($alternativasRaw, $gabarito);
 
         $isAlternativa = !empty($alternativas);
         $tipo = $isAlternativa ? 'alternativas' : 'dissertativa';
@@ -8840,22 +8942,28 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                 if (!array_key_exists($letra, $alternativas)) {
                     continue;
                 }
-                $alternativaValor = $alternativas[$letra];
-                $textoAltRaw = is_array($alternativaValor)
-                    ? (string)($alternativaValor['texto'] ?? '')
-                    : (string)$alternativaValor;
+                $textoAltRaw = (string)$alternativas[$letra];
                 $textoAltRaw = $this->persistInlineBase64ImagesInHtml($textoAltRaw, $professorId);
-                $textoAlt = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoAltRaw);
+                try {
+                    $textoAlt = \App\Utils\HtmlSanitizer::cleanEnunciadoWithImages($textoAltRaw);
+                } catch (\Throwable $e) {
+                    throw new Exception('Falha ao sanitizar alternativa ' . $letra . ': ' . $e->getMessage());
+                }
                 $opcoes[] = [
                     'texto' => $textoAlt,
-                    'correta' => ((is_array($alternativaValor) && !empty($alternativaValor['correta'])) || ($gabarito !== '' && strtoupper($letra) === $gabarito))
+                    'correta' => ($gabarito !== '' && strtoupper($letra) === $gabarito),
                 ];
             }
             if (count($opcoes) < 2) {
-                throw new Exception('Questão sem alternativas suficientes');
+                throw new Exception('Questão sem alternativas suficientes (formato da API não reconhecido)');
+            }
+            // Se a API não trouxe gabarito, marca a primeira como correta para o professor ajustar.
+            if ($gabarito === '') {
+                $opcoes[0]['correta'] = true;
+                $gabarito = 'A';
             }
             $questoesJson = json_encode(['opcoes' => $opcoes], JSON_UNESCAPED_UNICODE);
-            $respostaCorreta = $gabarito !== '' ? $gabarito : '';
+            $respostaCorreta = $gabarito;
         } else {
             $respostaCorreta = trim((string)($q['resolucao_html'] ?? ''));
         }
