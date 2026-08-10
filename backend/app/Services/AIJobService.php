@@ -486,7 +486,7 @@ class AIJobService
         $openai = new OpenAIService();
         $referencias = [];
         $arquivosProcessados = [];
-        $ocrPrompt = 'Transcreva literalmente o material pedagógico desta imagem para apoiar a criação de um plano de aula. Preserve pistas de estrutura como Módulo, Aula Nº, Páginas, títulos, subtítulos, listas e tópicos. Não resuma.';
+        $ocrPrompt = 'Transcreva literalmente o material pedagógico desta imagem para apoiar a criação de um plano de aula. Preserve pistas de estrutura como Apostila, Módulo, Capítulo, Aula Nº, Aulas, Páginas, títulos, subtítulos, listas e tópicos. Em sumários, mantenha cada linha com o número da aula, o título e a página final. Não resuma.';
 
         foreach (($payload['arquivos'] ?? []) as $arquivo) {
             $path = (string) ($arquivo['path'] ?? '');
@@ -517,23 +517,161 @@ class AIJobService
             $arquivosProcessados[] = $path;
         }
 
+        $promptProfessor = (string) ($payload['prompt'] ?? '');
+        $referenciasTexto = implode("\n\n---\n\n", $referencias);
+
         $resultado = $openai->gerarPlanoAulaCopiloto(
-            (string) ($payload['prompt'] ?? ''),
-            implode("\n\n---\n\n", $referencias),
+            $promptProfessor,
+            $referenciasTexto,
             [
                 'professor_nome' => (string) ($payload['professor_nome'] ?? ''),
                 'materia' => $payload['materia'] ?? null,
                 'turmas' => $payload['turmas'] ?? [],
                 'datas_aula' => (string) ($payload['datas_aula'] ?? ''),
                 'titulo_atual' => (string) ($payload['titulo_atual'] ?? ''),
+                'modulo_atual' => (string) ($payload['modulo_atual'] ?? ''),
+                'aula_num_atual' => (string) ($payload['aula_num_atual'] ?? ''),
+                'paginas_atual' => (string) ($payload['paginas_atual'] ?? ''),
             ]
         );
+        $resultado = self::aplicarReconhecimentoEstruturaPlanoCopiloto($resultado, $referenciasTexto, $promptProfessor, [
+            'modulo_atual' => (string) ($payload['modulo_atual'] ?? ''),
+        ]);
 
         foreach ($arquivosProcessados as $path) {
             @unlink($path);
         }
 
         return $resultado;
+    }
+
+    private static function aplicarReconhecimentoEstruturaPlanoCopiloto(array $resultado, string $referencias, string $promptProfessor, array $contexto = []): array
+    {
+        $aulas = self::extrairAulasPlanoCopiloto($referencias);
+        if (!empty($aulas)) {
+            $resultado['aula_num'] = self::formatarValoresPlanoCopiloto(array_column($aulas, 'numero'));
+            $resultado['paginas'] = self::formatarValoresPlanoCopiloto(array_column($aulas, 'pagina'));
+
+            $conteudos = [];
+            foreach ($aulas as $aula) {
+                $titulo = trim((string) ($aula['titulo'] ?? ''));
+                if ($titulo !== '') {
+                    $conteudos[] = $titulo;
+                }
+            }
+            if (!empty($conteudos)) {
+                $resultado['conteudo'] = '<ul>' . implode('', array_map(
+                    static fn($item) => '<li>' . htmlspecialchars($item, ENT_QUOTES, 'UTF-8') . '</li>',
+                    array_values(array_unique($conteudos))
+                )) . '</ul>';
+            }
+        }
+
+        $moduloAtual = trim((string) ($contexto['modulo_atual'] ?? ''));
+        $modulo = self::normalizarModuloApostilaPlanoCopiloto($moduloAtual);
+        if ($modulo === '') {
+            $modulo = self::extrairModuloApostilaPlanoCopiloto($promptProfessor);
+        }
+        if ($modulo === '') {
+            $modulo = self::extrairModuloApostilaPlanoCopiloto($referencias);
+        }
+
+        if ($modulo !== '') {
+            $resultado['modulo'] = $modulo;
+        } elseif (preg_match('/^\s*cap[ií]tulo\b/iu', (string) ($resultado['modulo'] ?? ''))) {
+            $resultado['modulo'] = '';
+        }
+
+        if (!empty($aulas)) {
+            $dados = [
+                'Aulas reconhecidas: ' . (string) $resultado['aula_num'],
+                'Páginas das aulas: ' . (string) $resultado['paginas'],
+            ];
+            if ((string) ($resultado['modulo'] ?? '') !== '') {
+                $dados[] = 'Módulo/Apostila: ' . (string) $resultado['modulo'];
+            }
+
+            $contexto = trim((string) ($resultado['contexto_llm'] ?? ''));
+            $resultado['contexto_llm'] = trim($contexto . "\n\n## Dados reconhecidos automaticamente\n" . implode("\n", array_map(
+                static fn($item) => '- ' . $item,
+                $dados
+            )));
+        }
+
+        return $resultado;
+    }
+
+    private static function extrairAulasPlanoCopiloto(string $texto): array
+    {
+        $linhas = preg_split('/\R/u', $texto) ?: [];
+        $aulas = [];
+
+        foreach ($linhas as $linha) {
+            $linha = trim(preg_replace('/\s+/u', ' ', (string) $linha));
+            if ($linha === '' || stripos($linha, 'aula') === false) {
+                continue;
+            }
+
+            if (!preg_match('/\bAula\s*(?:N[ºo.]?\s*)?(\d{1,4})\s*[-–—:]?\s*(.+?)\s*(?:\.{2,}|…|\s{2,}|\s+)(\d{1,4})\s*$/iu', $linha, $match)) {
+                continue;
+            }
+
+            $titulo = trim((string) $match[2]);
+            $titulo = preg_replace('/\s*(?:\.{2,}|…).*/u', '', $titulo);
+            $titulo = trim((string) $titulo, " \t\n\r\0\x0B-–—:");
+
+            if ($titulo === '') {
+                continue;
+            }
+
+            $aulas[] = [
+                'numero' => (string) $match[1],
+                'titulo' => $titulo,
+                'pagina' => (string) $match[3],
+            ];
+        }
+
+        return $aulas;
+    }
+
+    private static function extrairModuloApostilaPlanoCopiloto(string $texto): string
+    {
+        if (preg_match('/\b(?:apostila|m[oó]dulo|modulo|volume)\s*(?:n[ºo.]?\s*)?(?:da\s+)?(?:apostila\s*)?([1-8])\b/iu', $texto, $match)) {
+            return (string) $match[1];
+        }
+
+        if (preg_match('/\b(?:estou|estamos|seguindo|usando|trabalhando)\s+(?:na|no|a|o)?\s*(?:apostila|m[oó]dulo|modulo|volume)?\s*([1-8])\b/iu', $texto, $match)) {
+            return (string) $match[1];
+        }
+
+        return '';
+    }
+
+    private static function normalizarModuloApostilaPlanoCopiloto(string $valor): string
+    {
+        $valor = trim($valor);
+        if (preg_match('/^[1-8]$/', $valor) === 1) {
+            return $valor;
+        }
+
+        return self::extrairModuloApostilaPlanoCopiloto($valor);
+    }
+
+    private static function formatarValoresPlanoCopiloto(array $valores): string
+    {
+        $valores = array_values(array_unique(array_filter(array_map('strval', $valores), static fn($valor) => trim($valor) !== '')));
+        $total = count($valores);
+        if ($total === 0) {
+            return '';
+        }
+        if ($total === 1) {
+            return $valores[0];
+        }
+        if ($total === 2) {
+            return $valores[0] . ' e ' . $valores[1];
+        }
+
+        return implode(', ', array_slice($valores, 0, -1)) . ' e ' . $valores[$total - 1];
     }
 
     private static function montarPreviewGradeHoraria(array $itens): array

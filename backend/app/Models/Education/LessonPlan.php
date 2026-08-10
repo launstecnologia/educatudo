@@ -344,8 +344,7 @@ class LessonPlan
             return false;
         }
         
-        // Só pode editar se for o dono e estiver em rascunho
-        return $plano['professor_id'] == $professorId && $plano['status'] == 'rascunho';
+        return $plano['professor_id'] == $professorId;
     }
     
     /**

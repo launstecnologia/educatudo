@@ -68,7 +68,7 @@ class LessonPlanController extends BaseController
         $professor = $this->teacherModel->findById($user['id']);
         if (!$professor) {
             $this->setFlashMessage('Professor não encontrado', 'error');
-            $this->redirect('/teacher/dashboard');
+            $this->redirect('/professor/dashboard');
             return;
         }
         
@@ -230,7 +230,7 @@ class LessonPlanController extends BaseController
         } catch (Exception $e) {
             error_log("Erro em PlanoAulaController::index: " . $e->getMessage());
             $this->setFlashMessage('Erro ao carregar planos de aula', 'error');
-            $this->redirect('/teacher/dashboard');
+            $this->redirect('/professor/dashboard');
         }
     }
     
@@ -250,7 +250,7 @@ class LessonPlanController extends BaseController
         $professor = $this->teacherModel->findById($user['id']);
         if (!$professor) {
             $this->setFlashMessage('Professor não encontrado', 'error');
-            $this->redirect('/teacher/dashboard');
+            $this->redirect('/professor/dashboard');
             return;
         }
         
@@ -570,6 +570,9 @@ class LessonPlanController extends BaseController
                 'turmas' => $turmas,
                 'datas_aula' => (string) ($_POST['data_aula'] ?? ''),
                 'titulo_atual' => trim((string) ($_POST['titulo'] ?? '')),
+                'modulo_atual' => trim((string) ($_POST['modulo'] ?? '')),
+                'aula_num_atual' => trim((string) ($_POST['aula_num'] ?? '')),
+                'paginas_atual' => trim((string) ($_POST['paginas'] ?? '')),
                 'arquivos' => $arquivos,
                 'credits_ref' => $refCredito,
                 'credits_modulo' => self::MODULO_CREDITOS_COPILOTO,
@@ -685,7 +688,7 @@ class LessonPlanController extends BaseController
         if (!$plano) {
             $this->setFlashMessage('Plano de aula não encontrado', 'error');
             if ($user['tipo'] === 'professor') {
-                $this->redirect('/teacher/planos-aula');
+                $this->redirect('/professor/planos-aula');
             } else {
                 $this->redirect('/admin/planos-aula');
             }
@@ -695,7 +698,7 @@ class LessonPlanController extends BaseController
         // Verifica permissão
         if ($user['tipo'] === 'professor' && $plano['professor_id'] != $user['id']) {
             $this->setFlashMessage('Você não tem permissão para visualizar este plano', 'error');
-            $this->redirect('/teacher/planos-aula');
+            $this->redirect('/professor/planos-aula');
             return;
         }
         
@@ -733,15 +736,14 @@ class LessonPlanController extends BaseController
         $plano = $this->planoAulaModel->findById($id);
         if (!$plano) {
             $this->setFlashMessage('Plano de aula não encontrado', 'error');
-            $this->redirect('/teacher/planos-aula');
+            $this->redirect('/professor/planos-aula');
             return;
         }
         
         if ($user['tipo'] === 'professor') {
-            // Verifica se pode editar (só se for o dono e estiver em rascunho)
             if (!$this->planoAulaModel->canEdit($id, $user['id'])) {
-                $this->setFlashMessage('Você só pode editar planos em rascunho', 'error');
-                $this->redirect('/teacher/planos-aula');
+                $this->setFlashMessage('Você não tem permissão para editar este plano', 'error');
+                $this->redirect('/professor/planos-aula');
                 return;
             }
             
@@ -749,7 +751,7 @@ class LessonPlanController extends BaseController
             $professor = $this->teacherModel->findById($user['id']);
             if (!$professor) {
                 $this->setFlashMessage('Professor não encontrado', 'error');
-                $this->redirect('/teacher/dashboard');
+                $this->redirect('/professor/dashboard');
                 return;
             }
             
@@ -819,9 +821,14 @@ class LessonPlanController extends BaseController
         }
         
         try {
+            $planoAtual = $this->planoAulaModel->findById($id);
+            if (!$planoAtual) {
+                throw new Exception('Plano de aula não encontrado');
+            }
+
             // Verifica se pode editar
             if ($user['tipo'] === 'professor' && !$this->planoAulaModel->canEdit($id, $user['id'])) {
-                throw new Exception('Você só pode editar planos em rascunho');
+                throw new Exception('Você não tem permissão para editar este plano');
             }
             
             // Lê dados JSON do body
@@ -920,7 +927,7 @@ class LessonPlanController extends BaseController
                 'avaliacao_paginas' => $postData['avaliacao_paginas'] ?? null,
                 'observacoes' => $postData['observacoes'] ?? null,
                 'contexto_llm' => $postData['contexto_llm'] ?? null,
-                'status' => $postData['status'] ?? 'rascunho'
+                'status' => $postData['status'] ?? ($planoAtual['status'] ?? 'rascunho')
             ];
             
             $this->planoAulaModel->update($id, $data);
@@ -1089,7 +1096,7 @@ class LessonPlanController extends BaseController
         $user = $this->auth->getUser();
         
         if (!in_array($user['tipo'], ['admin', 'admin_escola'])) {
-            $this->redirect('/teacher/planos-aula');
+            $this->redirect('/professor/planos-aula');
             return;
         }
         
@@ -1282,7 +1289,7 @@ class LessonPlanController extends BaseController
             if (in_array($user['tipo'], ['admin', 'admin_escola'])) {
                 $this->redirect('/admin/planos-aula');
             } else {
-                $this->redirect('/teacher/planos-aula');
+                $this->redirect('/professor/planos-aula');
             }
             return;
         }
@@ -1328,7 +1335,7 @@ class LessonPlanController extends BaseController
                 $this->redirect('/dashboard');
                 break;
             case 'professor':
-                $this->redirect('/teacher/dashboard');
+                $this->redirect('/professor/dashboard');
                 break;
             case 'admin_escola':
             case 'admin':

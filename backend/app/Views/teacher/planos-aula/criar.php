@@ -287,8 +287,10 @@ $wizardSteps = [
                 </div>
             </div>
             <div class="rounded-lg border border-gray-200 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Título</p>
-                <p id="reviewTitulo" class="mt-1 text-sm font-semibold text-gray-900">-</p>
+                <label for="reviewTituloInput" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Título</label>
+                <input type="text" id="reviewTituloInput"
+                       class="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Informe o título do plano">
             </div>
         </section>
 
@@ -596,7 +598,10 @@ function atualizarRevisao() {
     let datas = [];
     try { datas = JSON.parse(document.getElementById('data_aula').value || '[]'); } catch (e) { datas = []; }
     document.getElementById('reviewDatas').textContent = datas.map(formatarDataPtBr).filter(Boolean).join(', ') || '-';
-    document.getElementById('reviewTitulo').textContent = document.getElementById('titulo').value.trim() || '-';
+    const reviewTituloInput = document.getElementById('reviewTituloInput');
+    if (reviewTituloInput && document.activeElement !== reviewTituloInput) {
+        reviewTituloInput.value = document.getElementById('titulo').value.trim();
+    }
 }
 
 function formatarDataPtBr(value) {
@@ -866,6 +871,9 @@ function gerarComCopiloto() {
     data.append('prompt', prompt);
     data.append('materia_id', document.getElementById('materia_id').value || '');
     data.append('titulo', document.getElementById('titulo').value || '');
+    data.append('modulo', document.getElementById('modulo').value || '');
+    data.append('aula_num', document.getElementById('aula_num').value || '');
+    data.append('paginas', document.getElementById('paginas').value || '');
     data.append('data_aula', document.getElementById('data_aula').value || '');
     document.querySelectorAll('.turma-checkbox:checked').forEach(cb => data.append('turmas_id[]', cb.value));
     copilotoFiles.forEach(file => data.append('copiloto_arquivos[]', file, file.name));
@@ -1021,6 +1029,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('planoForm').addEventListener('submit', function(e) {
         e.preventDefault();
         salvarRascunho();
+    });
+    document.getElementById('reviewTituloInput')?.addEventListener('input', function() {
+        const titulo = document.getElementById('titulo');
+        titulo.value = this.value;
+        limparErroCampoWizard(titulo);
     });
     document.querySelectorAll('.modo-conteudo-btn').forEach(btn => btn.addEventListener('click', () => setModoConteudo(btn.dataset.mode)));
     document.getElementById('planoForm').addEventListener('input', function(e) {
