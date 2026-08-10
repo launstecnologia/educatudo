@@ -497,10 +497,8 @@ class MasterFilaIaService
                 OR
                 (status = 'pending' AND created_at < (NOW() - INTERVAL {$pend} MINUTE) AND attempts < 3)
             )";
-        } elseif ($statusFiltro === '') {
-            // Na listagem geral prioriza fila ativa; done só se filtrar explicitamente
-            $where[] = "status IN ('pending','processing','failed')";
         }
+        // statusFiltro vazio = todos (pending/processing/failed/done), últimos por created_at
 
         $limit = max(1, min(200, $limit));
         $sql = 'SELECT * FROM ai_jobs WHERE ' . implode(' AND ', $where)

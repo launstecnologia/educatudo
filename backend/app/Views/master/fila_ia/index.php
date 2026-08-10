@@ -142,7 +142,7 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
 <?php endif; ?>
 
 <?php if ($aba === 'fila'): ?>
-<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+<div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Pending</p>
         <p class="text-2xl font-bold text-amber-600 mt-1"><?= $fmtInt($kpis['pending'] ?? 0) ?></p>
@@ -150,6 +150,10 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Processing</p>
         <p class="text-2xl font-bold text-blue-600 mt-1"><?= $fmtInt($kpis['processing'] ?? 0) ?></p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Done</p>
+        <p class="text-2xl font-bold text-emerald-600 mt-1"><?= $fmtInt($kpis['done'] ?? 0) ?></p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Failed</p>
@@ -173,6 +177,29 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($aba === 'fila'):
+    $statusAtual = (string) ($filtros['status'] ?? '');
+    $soTravadosAtual = !empty($filtros['so_travados']);
+    $pillCls = static function (bool $active): string {
+        return $active
+            ? 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-600 text-white border-blue-600'
+            : 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border bg-white text-slate-700 border-slate-300 hover:bg-slate-50';
+    };
+?>
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="<?= htmlspecialchars($queryBase(['page' => 1, 'status' => '', 'so_travados' => ''])) ?>"
+       class="<?= $pillCls($statusAtual === '' && !$soTravadosAtual) ?>">Todos</a>
+    <a href="<?= htmlspecialchars($queryBase(['page' => 1, 'status' => 'done', 'so_travados' => ''])) ?>"
+       class="<?= $pillCls($statusAtual === 'done' && !$soTravadosAtual) ?>">Done (sucesso)</a>
+    <a href="<?= htmlspecialchars($queryBase(['page' => 1, 'status' => 'processing', 'so_travados' => ''])) ?>"
+       class="<?= $pillCls($statusAtual === 'processing' && !$soTravadosAtual) ?>">Processing</a>
+    <a href="<?= htmlspecialchars($queryBase(['page' => 1, 'status' => 'failed', 'so_travados' => ''])) ?>"
+       class="<?= $pillCls($statusAtual === 'failed' && !$soTravadosAtual) ?>">Failed</a>
+    <a href="<?= htmlspecialchars($queryBase(['page' => 1, 'status' => '', 'so_travados' => '1'])) ?>"
+       class="<?= $pillCls($soTravadosAtual) ?>">Travados</a>
+</div>
+<?php endif; ?>
 <?php else: ?>
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -345,7 +372,7 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
                     <select name="status" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-sm">
-                        <option value="">Ativos (pending/processing/failed)</option>
+                        <option value="">Todos (inclui done)</option>
                         <?php foreach (['pending', 'processing', 'failed', 'done'] as $st): ?>
                         <option value="<?= $st ?>" <?= ($filtros['status'] ?? '') === $st ? 'selected' : '' ?>><?= $st ?></option>
                         <?php endforeach; ?>

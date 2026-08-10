@@ -17,8 +17,18 @@ $statusCls = [
     'failed' => 'bg-red-100 text-red-800',
 ][$status] ?? 'bg-slate-100 text-slate-700';
 
-$payloadJson = json_encode($job['payload_decoded'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-$resultJson = json_encode($job['result_decoded'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$result = is_array($job['result_decoded'] ?? null) ? $job['result_decoded'] : [];
+$payload = is_array($job['payload_decoded'] ?? null) ? $job['payload_decoded'] : [];
+$payloadJson = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$resultJson = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$temResultado = $result !== [];
+
+$questoes = [];
+if (!empty($result['questoes']) && is_array($result['questoes'])) {
+    $questoes = $result['questoes'];
+} elseif (!empty($result['questions']) && is_array($result['questions'])) {
+    $questoes = $result['questions'];
+}
 ?>
 
 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -141,17 +151,97 @@ $resultJson = json_encode($job['result_decoded'] ?? [], JSON_PRETTY_PRINT | JSON
     </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-slate-200">
-            <h3 class="text-sm font-semibold text-slate-900">Payload</h3>
+<!-- Retorno da IA (destaque) -->
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+    <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
+        <div>
+            <h3 class="text-sm font-semibold text-slate-900">Retorno da IA</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Conteúdo salvo em <code class="bg-slate-100 px-1 rounded">ai_jobs.result</code></p>
         </div>
-        <pre class="p-5 text-xs text-slate-700 overflow-x-auto max-h-[480px] overflow-y-auto bg-slate-50"><?= htmlspecialchars((string) $payloadJson) ?></pre>
+        <?php if ($temResultado): ?>
+        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('result-json-raw').textContent)"
+                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            Copiar JSON
+        </button>
+        <?php endif; ?>
     </div>
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-5 py-3 border-b border-slate-200">
-            <h3 class="text-sm font-semibold text-slate-900">Result</h3>
+
+    <?php if (!$temResultado): ?>
+    <div class="px-5 py-8 text-sm text-slate-500 text-center">
+        <?php if ($status === 'done'): ?>
+        Job marcado como done, mas sem <code>result</code> gravado.
+        <?php elseif ($status === 'failed'): ?>
+        Sem retorno — o job falhou. Veja a mensagem de erro acima.
+        <?php else: ?>
+        Ainda sem retorno (job não concluído).
+        <?php endif; ?>
+    </div>
+    <?php else: ?>
+
+    <?php if (!empty($questoes)): ?>
+    <div class="px-5 py-4 border-b border-slate-100 space-y-4">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">
+            Questões geradas (<?= count($questoes) ?>)
+            <?php if (isset($result['questoes_descartadas'])): ?>
+            · descartadas: <?= (int) $result['questoes_descartadas'] ?>
+            <?php endif; ?>
+        </p>
+        <?php foreach ($questoes as $i => $q): ?>
+        <?php
+            $q = is_array($q) ? $q : ['enunciado' => (string) $q];
+            $enunciado = (string) ($q['enunciado'] ?? $q['pergunta'] ?? $q['question'] ?? $q['texto'] ?? '');
+            $alternativas = $q['alternativas'] ?? $q['options'] ?? $q['opcoes'] ?? null;
+            $resposta = $q['resposta_correta'] ?? $q['gabarito'] ?? $q['correct'] ?? $q['resposta'] ?? null;
+            $nivel = $q['dificuldade'] ?? $q['nivel'] ?? null;
+        ?>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <p class="text-xs font-semibold text-slate-500">Questão <?= $i + 1 ?></p>
+                <?php if ($nivel): ?>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600"><?= htmlspecialchars((string) $nivel) ?></span>
+                <?php endif; ?>
+            </div>
+            <?php if ($enunciado !== ''): ?>
+            <p class="text-sm text-slate-900 whitespace-pre-wrap"><?= htmlspecialchars($enunciado) ?></p>
+            <?php else: ?>
+            <pre class="text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap"><?= htmlspecialchars(json_encode($q, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) ?></pre>
+            <?php endif; ?>
+            <?php if (is_array($alternativas) && $alternativas !== []): ?>
+            <ul class="mt-3 space-y-1 text-sm text-slate-700">
+                <?php foreach ($alternativas as $altKey => $altVal): ?>
+                <li class="flex gap-2">
+                    <span class="font-medium text-slate-500 shrink-0"><?= htmlspecialchars(is_string($altKey) ? $altKey : chr(65 + (int) $altKey)) ?>)</span>
+                    <span><?= htmlspecialchars(is_scalar($altVal) ? (string) $altVal : json_encode($altVal, JSON_UNESCAPED_UNICODE)) ?></span>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+            <?php if ($resposta !== null && $resposta !== ''): ?>
+            <p class="mt-2 text-xs text-emerald-700 font-medium">
+                Gabarito: <?= htmlspecialchars(is_scalar($resposta) ? (string) $resposta : json_encode($resposta, JSON_UNESCAPED_UNICODE)) ?>
+            </p>
+            <?php endif; ?>
         </div>
-        <pre class="p-5 text-xs text-slate-700 overflow-x-auto max-h-[480px] overflow-y-auto bg-slate-50"><?= htmlspecialchars((string) $resultJson) ?></pre>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
+    <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/80">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">JSON completo do retorno</p>
+        <pre id="result-json-raw" class="text-xs text-slate-700 overflow-x-auto max-h-[520px] overflow-y-auto whitespace-pre-wrap"><?= htmlspecialchars((string) $resultJson) ?></pre>
+    </div>
+    <?php endif; ?>
+</div>
+
+<div class="grid grid-cols-1 gap-4">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-900">Payload (entrada)</h3>
+            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('payload-json-raw').textContent)"
+                    class="inline-flex items-center px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                Copiar JSON
+            </button>
+        </div>
+        <pre id="payload-json-raw" class="p-5 text-xs text-slate-700 overflow-x-auto max-h-[400px] overflow-y-auto bg-slate-50 whitespace-pre-wrap"><?= htmlspecialchars((string) $payloadJson) ?></pre>
     </div>
 </div>
