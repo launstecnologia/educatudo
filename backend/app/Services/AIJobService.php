@@ -231,7 +231,12 @@ class AIJobService
             $result  = self::dispatch($job['job_type'], $payload);
 
             $db->query(
-                "UPDATE ai_jobs SET status = 'done', result = ?, completed_at = NOW() WHERE id = ?",
+                "UPDATE ai_jobs
+                 SET status = 'done',
+                     result = ?,
+                     error_message = NULL,
+                     completed_at = NOW()
+                 WHERE id = ?",
                 [json_encode($result, JSON_UNESCAPED_UNICODE), $job['id']]
             );
         } catch (\Throwable $e) {

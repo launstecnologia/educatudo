@@ -33,9 +33,22 @@ require_once __DIR__ . '/../../ModeloIA.php';
  *   - referencias_reais (array, opcional, escrito pelo BuscadorReferenciaAgent)
  * Contexto produzido (saída):
  *   - questoes_geradas (array, formato canônico acima)
+ *
+ * Lotes: gera no máximo LOTE_MAX questões por chamada OpenAI. Pedidos grandes
+ * (ex.: 10) eram truncados por orçamento de tokens (JSON verbose + modelos com
+ * raciocínio), e o agent aceitava JSON com menos itens — professora pedia 10 e
+ * recebia ~3. Agora completa em lotes e exige a quantidade solicitada.
  */
 class GeradorQuestaoAgent implements AgenteIAInterface
 {
+    /** Máximo por chamada — cabe no orçamento mesmo com explicação longa + raciocínio. */
+    private const LOTE_MAX = 4;
+
+    /** Estimativa conservadora por questão (enunciado + alternativas + explicação). */
+    private const TOKENS_POR_QUESTAO = 1100;
+
+    private const RETRIES_POR_LOTE = 2;
+
     public function nome(): string
     {
         return 'GeradorQuestaoAgent';
@@ -69,42 +82,150 @@ class GeradorQuestaoAgent implements AgenteIAInterface
             throw new Exception('GeradorQuestaoAgent: prompt.md não encontrado');
         }
 
-        $blocoReferencias = '';
-        if (!empty($referenciasReais)) {
-            $linhas = [];
-            foreach ($referenciasReais as $ref) {
-                $titulo = $ref['titulo'] ?? '';
-                $snippet = $ref['snippet'] ?? '';
-                $link = $ref['link'] ?? '';
-                if ($titulo === '') {
-                    continue;
+        $blocoReferencias = $this->montarBlocoReferencias($referenciasReais);
+        $todas = [];
+        $restante = $quantidade;
+        $loteNum = 0;
+
+        while ($restante > 0) {
+            $loteNum++;
+            $tamanhoLote = min(self::LOTE_MAX, $restante);
+            $geradas = $this->gerarLoteComRetry(
+                $openAIService,
+                trim($promptSistema),
+                $disciplina,
+                $assunto,
+                $serie,
+                $dificuldade,
+                $tipoQuestao,
+                $tamanhoLote,
+                $qtdAlternativas,
+                $tipoRecursoVisual,
+                $blocoReferencias,
+                $contextoAdicional,
+                $loteNum,
+                $quantidade,
+                count($todas)
+            );
+
+            foreach ($geradas as $q) {
+                if (count($todas) >= $quantidade) {
+                    break;
                 }
-                $linhas[] = "- {$titulo}: {$snippet} ({$link})";
+                $todas[] = $q;
             }
-            if (!empty($linhas)) {
-                $blocoReferencias = "Fontes reais disponíveis pra contextualizar (use se fizer sentido pro assunto, não invente dados além delas):\n"
-                    . implode("\n", $linhas) . "\n";
+            $restante = $quantidade - count($todas);
+        }
+
+        if (count($todas) < $quantidade) {
+            throw new Exception(
+                'GeradorQuestaoAgent: gerou apenas ' . count($todas)
+                . " de {$quantidade} questões solicitadas"
+            );
+        }
+
+        return $contexto->set('questoes_geradas', array_slice($todas, 0, $quantidade));
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function gerarLoteComRetry(
+        \App\Services\OpenAIService $openAIService,
+        string $promptSistema,
+        string $disciplina,
+        string $assunto,
+        string $serie,
+        string $dificuldade,
+        string $tipoQuestao,
+        int $tamanhoLote,
+        int $qtdAlternativas,
+        mixed $tipoRecursoVisual,
+        string $blocoReferencias,
+        string $contextoAdicional,
+        int $loteNum,
+        int $quantidadeTotal,
+        int $jaGeradas
+    ): array {
+        $ultimoErro = '';
+        for ($tentativa = 1; $tentativa <= self::RETRIES_POR_LOTE; $tentativa++) {
+            try {
+                $geradas = $this->gerarLote(
+                    $openAIService,
+                    $promptSistema,
+                    $disciplina,
+                    $assunto,
+                    $serie,
+                    $dificuldade,
+                    $tipoQuestao,
+                    $tamanhoLote,
+                    $qtdAlternativas,
+                    $tipoRecursoVisual,
+                    $blocoReferencias,
+                    $contextoAdicional,
+                    $loteNum,
+                    $quantidadeTotal,
+                    $jaGeradas
+                );
+                if (count($geradas) >= $tamanhoLote) {
+                    return array_slice($geradas, 0, $tamanhoLote);
+                }
+                // Aceita parcial só se for a última tentativa — o loop externo pede o resto.
+                if ($tentativa === self::RETRIES_POR_LOTE && count($geradas) > 0) {
+                    return $geradas;
+                }
+                $ultimoErro = 'lote devolveu ' . count($geradas) . " de {$tamanhoLote}";
+            } catch (Exception $e) {
+                $ultimoErro = $e->getMessage();
+                if ($tentativa === self::RETRIES_POR_LOTE) {
+                    throw $e;
+                }
             }
         }
 
+        throw new Exception(
+            'GeradorQuestaoAgent: falha ao gerar lote ' . $loteNum . ' (' . $ultimoErro . ')'
+        );
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function gerarLote(
+        \App\Services\OpenAIService $openAIService,
+        string $promptSistema,
+        string $disciplina,
+        string $assunto,
+        string $serie,
+        string $dificuldade,
+        string $tipoQuestao,
+        int $tamanhoLote,
+        int $qtdAlternativas,
+        mixed $tipoRecursoVisual,
+        string $blocoReferencias,
+        string $contextoAdicional,
+        int $loteNum,
+        int $quantidadeTotal,
+        int $jaGeradas
+    ): array {
         $mensagemUsuario = "Disciplina: {$disciplina}\n"
             . "Assunto: {$assunto}\n"
             . ($serie !== '' ? "Série: {$serie}\n" : '')
             . "Dificuldade: {$dificuldade}\n"
             . "Tipo de questão: {$tipoQuestao}\n"
-            . "Quantidade de questões: {$quantidade}\n"
+            . "Quantidade de questões NESTE LOTE: {$tamanhoLote}\n"
+            . "Pedido total do professor: {$quantidadeTotal} (já geradas em lotes anteriores: {$jaGeradas}; este é o lote {$loteNum}).\n"
+            . "IMPORTANTE: devolva EXATAMENTE {$tamanhoLote} questões neste JSON, completas e válidas.\n"
             . ($tipoQuestao === 'multipla_escolha' ? "Quantidade de alternativas por questão: {$qtdAlternativas}\n" : '')
-            . "tipo_recurso_visual_decidido: " . ($tipoRecursoVisual ?: 'null') . "\n"
+            . 'tipo_recurso_visual_decidido: ' . ($tipoRecursoVisual ?: 'null') . "\n"
             . $blocoReferencias
             . ($contextoAdicional !== '' ? "Contexto adicional do professor: {$contextoAdicional}\n" : '');
 
-        // JSON de uma questão com alternativas + explicação gira em ~450 tokens;
-        // com limite fixo de 4000 um lote grande saía truncado.
-        $tokensResposta = max(4000, $quantidade * 450);
+        $tokensResposta = max(4000, $tamanhoLote * self::TOKENS_POR_QUESTAO);
 
         $resultado = $openAIService->chatCompletion(
             [['role' => 'user', 'content' => $mensagemUsuario]],
-            trim($promptSistema),
+            $promptSistema,
             \App\AI\ModeloIA::porDificuldade($dificuldade),
             0.6,
             $tokensResposta
@@ -129,6 +250,41 @@ class GeradorQuestaoAgent implements AgenteIAInterface
             throw new Exception('GeradorQuestaoAgent: JSON de questões inválido ou vazio');
         }
 
-        return $contexto->set('questoes_geradas', $dados['questoes']);
+        $questoes = [];
+        foreach ($dados['questoes'] as $q) {
+            if (is_array($q)) {
+                $questoes[] = $q;
+            }
+        }
+        if ($questoes === []) {
+            throw new Exception('GeradorQuestaoAgent: JSON de questões inválido ou vazio');
+        }
+
+        return $questoes;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $referenciasReais
+     */
+    private function montarBlocoReferencias(array $referenciasReais): string
+    {
+        if ($referenciasReais === []) {
+            return '';
+        }
+        $linhas = [];
+        foreach ($referenciasReais as $ref) {
+            $titulo = $ref['titulo'] ?? '';
+            $snippet = $ref['snippet'] ?? '';
+            $link = $ref['link'] ?? '';
+            if ($titulo === '') {
+                continue;
+            }
+            $linhas[] = "- {$titulo}: {$snippet} ({$link})";
+        }
+        if ($linhas === []) {
+            return '';
+        }
+        return "Fontes reais disponíveis pra contextualizar (use se fizer sentido pro assunto, não invente dados além delas):\n"
+            . implode("\n", $linhas) . "\n";
     }
 }
