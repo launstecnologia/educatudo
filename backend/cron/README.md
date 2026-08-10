@@ -93,6 +93,27 @@ GET /master/asaas/cancelar-pendentes-cron?key=ASAAS_RECONCILE_KEY&minutos=60
 
 **Logs:** `storage/logs/cron_asaas_cancelar_pendentes.log`
 
+### 2d. `process_ai_jobs.php`
+
+Processa a fila `ai_jobs` de cada escola (até 5 jobs por tenant por execução) e grava histórico no banco master (`cron_execucoes` / `cron_execucoes_escolas`).
+
+**O que faz:**
+- Itera escolas ativas via `CronMultiTenantHelper::runWithReport`
+- Chama `AIJobService::processNext()` e `cleanup()`
+- Registra início/fim, escolas OK/erro/puladas e jobs processados
+
+**Frequência recomendada:** a cada minuto
+
+```
+* * * * * /usr/bin/php /caminho/projeto/backend/cron/process_ai_jobs.php >> /caminho/projeto/backend/storage/logs/ai_jobs_cron.log 2>&1
+```
+
+**Pré-requisito:** migration master `2026_08_10_cron_execucoes_master.sql`
+
+**Painel:** Master → **Fila IA** (`/master/fila-ia`) — fila multi-escola + detalhe do job (aluno/professor) + histórico do cron.
+
+**Logs:** `storage/logs/ai_jobs_cron.log` + tabelas `cron_execucoes*`
+
 ## ⚙️ Como Configurar o Cron Job
 
 ### Opção 1: Via cPanel

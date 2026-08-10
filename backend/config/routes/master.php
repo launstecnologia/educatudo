@@ -49,6 +49,9 @@ $router->get('/master/asaas/cancelar-pendentes-cron', 'Master/MasterAsaasConfigC
 $router->get('/master/faturamento', 'Master/MasterFaturamentoController@index');
 $router->get('/master/creditos/extrato', 'Master/MasterCreditosExtratoController@index');
 $router->get('/master/llm-custos', 'Master/MasterLlmCustosController@index');
+$router->get('/master/fila-ia', 'Master/MasterFilaIaController@index');
+$router->get('/master/fila-ia/job', 'Master/MasterFilaIaController@job');
+$router->get('/master/fila-ia/cron', 'Master/MasterFilaIaController@cron');
 $router->get('/master/creditos/asaas/checkout', 'Master/MasterCreditosCheckoutController@iniciar');
 $router->post('/master/creditos/asaas/checkout', 'Master/MasterCreditosCheckoutController@iniciar');
 $router->post('/master/webhooks/asaas', 'Master/MasterAsaasWebhookController@handle');
