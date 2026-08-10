@@ -156,75 +156,93 @@
     </div>
 </div>
 
-<div id="modal-banco-questoes" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" style="display: none;">
-    <div class="mx-4 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
-        <div class="mb-4 flex items-start justify-between gap-4">
-            <div>
-                <h3 id="bq-modal-titulo" class="text-xl font-bold text-gray-900">Banco de Questões</h3>
-                <p id="bq-modal-descricao" class="mt-1 text-sm text-gray-600">Selecione questões para importar neste módulo.</p>
+<style>
+/* Modal banco de questões — enunciado isolado para HTML externo não quebrar o layout */
+#modal-banco-questoes .bq-card { border: 1px solid #e5e7eb; border-radius: 0.75rem; background: #fff; }
+#modal-banco-questoes .bq-card:hover { border-color: #a5b4fc; }
+#modal-banco-questoes .bq-card.is-selected { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,.15); background: #f8fafc; }
+#modal-banco-questoes .bq-enunciado {
+    font-size: 15px; line-height: 1.65; color: #1f2937;
+    max-height: min(55vh, 560px); overflow: auto; padding: 0.25rem 0.15rem;
+}
+#modal-banco-questoes .bq-enunciado img,
+#modal-banco-questoes .bq-enunciado svg {
+    max-width: 100% !important; height: auto !important; display: block; margin: 0.75rem auto;
+}
+#modal-banco-questoes .bq-enunciado table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+#modal-banco-questoes .bq-enunciado p { margin: 0.5rem 0; }
+#modal-banco-questoes .bq-enunciado figure { margin: 0.75rem 0; }
+</style>
+<div id="modal-banco-questoes" class="fixed inset-0 z-50 hidden items-stretch justify-center bg-slate-900/55 p-2 sm:p-4" style="display: none;">
+    <div class="flex h-[96vh] w-full max-w-7xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div class="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div class="min-w-0">
+                <h3 id="bq-modal-titulo" class="text-xl font-bold text-slate-900">Banco de Questões</h3>
+                <p id="bq-modal-descricao" class="mt-1 text-sm text-slate-600">Selecione questões para importar neste módulo.</p>
             </div>
-            <button type="button" onclick="fecharModalBancoQuestoes()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <button type="button" onclick="fecharModalBancoQuestoes()" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
         </div>
 
-        <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <input id="bq-q" type="text" placeholder="Buscar por título, assunto ou enunciado"
-                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <select id="bq-materia" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-            <select id="bq-tipo" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-            <select id="bq-dificuldade" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-            <select id="bq-topico" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-            <select id="bq-tag" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-            <select id="bq-origem" class="select-safari w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"></select>
-            <input id="bq-ano" type="text" placeholder="Ano"
-                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
-
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-            <button type="button" onclick="buscarBancoQuestoes(true)"
-                    class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
-                Buscar
-            </button>
-            <button type="button" onclick="limparFiltrosBancoQuestoes()"
-                    class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50">
-                Limpar filtros
-            </button>
-            <span id="bq-total-info" class="text-sm text-gray-600"></span>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div class="min-w-0 lg:col-span-2">
-                <div id="bq-loading" class="hidden mb-2 text-sm font-medium text-indigo-700">Carregando questões...</div>
-                <div id="bq-lista" class="max-h-[48vh] space-y-3 overflow-y-auto pr-1"></div>
+        <div class="shrink-0 space-y-3 border-b border-slate-100 px-5 py-3">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <input id="bq-q" type="text" placeholder="Buscar por título, assunto ou enunciado"
+                       class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:col-span-2">
+                <select id="bq-materia" class="select-safari w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+                <select id="bq-tipo" class="select-safari w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+                <select id="bq-dificuldade" class="select-safari w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+                <select id="bq-topico" class="select-safari w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+                <select id="bq-tag" class="select-safari w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+                <select id="bq-origem" class="select-safari w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+                <input id="bq-ano" type="text" placeholder="Ano"
+                       class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
             </div>
-            <aside class="rounded-lg border border-gray-200 bg-gray-50 p-3 lg:col-span-1">
-                <div class="mb-2 flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-gray-800">Selecionadas</h4>
-                    <span id="bq-selecionadas" class="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-700">0</span>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="buscarBancoQuestoes(true)"
+                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+                    Buscar
+                </button>
+                <button type="button" onclick="limparFiltrosBancoQuestoes()"
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                    Limpar filtros
+                </button>
+                <span id="bq-total-info" class="text-sm text-slate-600"></span>
+            </div>
+        </div>
+
+        <div class="flex min-h-0 flex-1 flex-col gap-0 lg:flex-row">
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col px-5 py-3">
+                <div id="bq-loading" class="mb-2 hidden text-sm font-medium text-indigo-700">Carregando questões...</div>
+                <div id="bq-lista" class="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"></div>
+            </div>
+            <aside class="flex max-h-[28vh] w-full shrink-0 flex-col border-t border-slate-200 bg-slate-50 lg:max-h-none lg:w-72 lg:border-l lg:border-t-0">
+                <div class="flex items-center justify-between px-4 py-3">
+                    <h4 class="text-sm font-semibold text-slate-800">Selecionadas</h4>
+                    <span id="bq-selecionadas" class="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">0</span>
                 </div>
-                <div id="bq-selecionadas-lista" class="max-h-[42vh] space-y-2 overflow-y-auto pr-1 text-sm text-gray-700">
-                    <p class="text-xs text-gray-500">Nenhuma questão selecionada.</p>
+                <div id="bq-selecionadas-lista" class="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 text-sm text-slate-700">
+                    <p class="text-xs text-slate-500">Nenhuma questão selecionada.</p>
                 </div>
             </aside>
         </div>
 
-        <div class="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex shrink-0 flex-col gap-3 border-t border-slate-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-2">
                 <button type="button" id="bq-prev" onclick="mudarPaginaBancoQuestoes(-1)"
-                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40">
                     Anterior
                 </button>
                 <button type="button" id="bq-next" onclick="mudarPaginaBancoQuestoes(1)"
-                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40">
                     Próxima
                 </button>
             </div>
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="fecharModalBancoQuestoes()"
-                        class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                        class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Fechar
                 </button>
                 <button type="button" onclick="importarSelecionadasBancoQuestoes()"
@@ -245,7 +263,7 @@ const bancoQuestoesBaseUrl = '<?= rtrim(URL, "/") ?>';
 let bqSelecionadas = new Set();
 let bqSelecionadasMeta = {};
 let bqTotal = 0;
-let bqLimit = 20;
+let bqLimit = 10;
 let bqOffset = 0;
 let bqFonteAtual = 'educatudo';
 
@@ -428,7 +446,13 @@ function parseBancoQuestoesJson(response) {
             );
         }
         if (!response.ok) {
-            throw new Error((body && body.error) ? body.error : ('Erro na requisição (HTTP ' + response.status + ')'));
+            var msgErro = body && body.error != null ? String(body.error).trim() : '';
+            if (msgErro) throw new Error(msgErro);
+            var trechoVazio = raw.replace(/\s+/g, ' ').slice(0, 180);
+            throw new Error(
+                'Erro na requisição (HTTP ' + response.status + ')'
+                + (trechoVazio ? ': ' + trechoVazio : ' — sem detalhe do servidor. Tente novamente.')
+            );
         }
         return body || {};
     });
@@ -543,6 +567,20 @@ function buscarBancoQuestoes(resetOffset) {
         });
 }
 
+function cssEscapeBancoQuestoes(value) {
+    var s = String(value || '');
+    if (window.CSS && typeof CSS.escape === 'function') return CSS.escape(s);
+    return s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+}
+
+function isolarHtmlEnunciadoBancoQuestoes(html) {
+    // Remove tags que quebram o card (HTML externo do banco às vezes vem malformado).
+    return String(html || '')
+        .replace(/<\/?(script|iframe|object|embed|form|label)[^>]*>/gi, '')
+        .replace(/on\w+\s*=\s*(['"]).*?\1/gi, '')
+        .replace(/on\w+\s*=\s*[^\s>]+/gi, '');
+}
+
 function renderBancoQuestoes(payload) {
     const lista = document.getElementById('bq-lista');
     if (!lista) return;
@@ -552,39 +590,39 @@ function renderBancoQuestoes(payload) {
     bqOffset = parseInt(payload.offset || bqOffset, 10) || bqOffset;
 
     if (!questoes.length) {
-        lista.innerHTML = '<div class="rounded-lg border border-gray-200 p-4 text-sm text-gray-600">Nenhuma questão encontrada com os filtros atuais.</div>';
+        lista.innerHTML = '<div class="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600">Nenhuma questão encontrada com os filtros atuais.</div>';
     } else {
         lista.innerHTML = questoes.map(function(q) {
             const id = String(q.id || '');
-            const checked = bqSelecionadas.has(id) ? 'checked' : '';
+            const selected = bqSelecionadas.has(id);
+            const checked = selected ? 'checked' : '';
             const enunciadoTexto = ((q.enunciado_html || q.enunciado || '') + '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            if (checked) {
-                bqSelecionadasMeta[id] = {
-                    id: id,
-                    materia: String(q.materia || ''),
-                    tipo: String(q.tipo || ''),
-                    enunciado: enunciadoTexto
-                };
-            }
-            const materia = q.materia ? '<span class="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">' + escapeHtmlBancoQuestoes(String(q.materia)) + '</span>' : '';
-            const dif = q.dificuldade ? '<span class="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">' + escapeHtmlBancoQuestoes(String(q.dificuldade)) + '</span>' : '';
-            const tipo = q.tipo ? '<span class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">' + escapeHtmlBancoQuestoes(String(q.tipo)) + '</span>' : '';
+            bqSelecionadasMeta[id] = {
+                id: id,
+                materia: String(q.materia || ''),
+                tipo: String(q.tipo || ''),
+                enunciado: enunciadoTexto
+            };
+            const materia = q.materia ? '<span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">' + escapeHtmlBancoQuestoes(String(q.materia)) + '</span>' : '';
+            const dif = q.dificuldade ? '<span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">' + escapeHtmlBancoQuestoes(String(q.dificuldade)) + '</span>' : '';
+            const tipo = q.tipo ? '<span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">' + escapeHtmlBancoQuestoes(String(q.tipo)) + '</span>' : '';
             const origem = q.origem && q.origem.raw ? escapeHtmlBancoQuestoes(String(q.origem.raw)) : '';
-            const enunciado = q.enunciado_html || q.enunciado || '';
+            const enunciado = isolarHtmlEnunciadoBancoQuestoes(q.enunciado_html || q.enunciado || '');
             return '' +
-                '<label class="block cursor-pointer rounded-lg border border-gray-200 p-3 hover:border-indigo-300">' +
-                    '<div class="flex items-start gap-3">' +
-                        '<input type="checkbox" class="mt-1" data-bq-id="' + escapeHtmlBancoQuestoes(id) + '" ' + checked + ' onchange="toggleSelecionadaBancoQuestoes(this)">' +
-                        '<div class="min-w-0 w-full">' +
-                            '<div class="mb-2 flex flex-wrap gap-2">' +
-                                '<span class="rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-700">ID ' + escapeHtmlBancoQuestoes(id) + '</span>' +
-                                materia + tipo + dif +
-                            '</div>' +
-                            '<div class="prose prose-sm max-w-none text-sm leading-relaxed text-gray-800">' + enunciado + '</div>' +
-                            (origem ? '<div class="mt-2 text-xs text-gray-500">' + origem + '</div>' : '') +
+                '<article class="bq-card ' + (selected ? 'is-selected' : '') + '" data-bq-card="' + escapeHtmlBancoQuestoes(id) + '">' +
+                    '<div class="flex items-center gap-3 border-b border-slate-100 px-4 py-3">' +
+                        '<input type="checkbox" class="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" data-bq-id="' + escapeHtmlBancoQuestoes(id) + '" ' + checked + ' onchange="toggleSelecionadaBancoQuestoes(this)">' +
+                        '<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">' +
+                            '<span class="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">ID ' + escapeHtmlBancoQuestoes(id) + '</span>' +
+                            materia + tipo + dif +
                         '</div>' +
+                        '<button type="button" class="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800" data-bq-toggle="' + escapeHtmlBancoQuestoes(id) + '" onclick="toggleSelecionadaBancoQuestoesById(this.getAttribute(\'data-bq-toggle\'))">' +
+                            (selected ? 'Remover' : 'Selecionar') +
+                        '</button>' +
                     '</div>' +
-                '</label>';
+                    '<div class="bq-enunciado px-4 py-3">' + enunciado + '</div>' +
+                    (origem ? '<div class="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">' + origem + '</div>' : '') +
+                '</article>';
         }).join('');
     }
 
@@ -601,6 +639,34 @@ function renderBancoQuestoes(payload) {
     renderSelecionadasLateralBancoQuestoes();
 }
 
+function syncCardSelecaoBancoQuestoes(id, selecionada) {
+    const card = document.querySelector('[data-bq-card="' + cssEscapeBancoQuestoes(id) + '"]');
+    if (!card) return;
+    card.classList.toggle('is-selected', !!selecionada);
+    const btn = card.querySelector('[data-bq-toggle]');
+    if (btn) btn.textContent = selecionada ? 'Remover' : 'Selecionar';
+    const cb = card.querySelector('input[data-bq-id]');
+    if (cb) cb.checked = !!selecionada;
+}
+
+function toggleSelecionadaBancoQuestoesById(id) {
+    id = String(id || '').trim();
+    if (!id) return;
+    const cb = document.querySelector('input[data-bq-id="' + cssEscapeBancoQuestoes(id) + '"]');
+    if (cb) {
+        cb.checked = !cb.checked;
+        toggleSelecionadaBancoQuestoes(cb);
+        return;
+    }
+    if (bqSelecionadas.has(id)) {
+        bqSelecionadas.delete(id);
+    } else {
+        bqSelecionadas.add(id);
+    }
+    syncCardSelecaoBancoQuestoes(id, bqSelecionadas.has(id));
+    atualizarTotalSelecionadasBancoQuestoes();
+}
+
 function toggleSelecionadaBancoQuestoes(el) {
     const id = String(el.getAttribute('data-bq-id') || '').trim();
     if (!id) return;
@@ -608,8 +674,8 @@ function toggleSelecionadaBancoQuestoes(el) {
         bqSelecionadas.add(id);
     } else {
         bqSelecionadas.delete(id);
-        delete bqSelecionadasMeta[id];
     }
+    syncCardSelecaoBancoQuestoes(id, el.checked);
     atualizarTotalSelecionadasBancoQuestoes();
 }
 
@@ -648,10 +714,7 @@ function removerSelecionadaBancoQuestoes(id) {
     const key = String(id || '').trim();
     if (!key) return;
     bqSelecionadas.delete(key);
-    delete bqSelecionadasMeta[key];
-    document.querySelectorAll('input[data-bq-id]').forEach(function(el) {
-        if (String(el.getAttribute('data-bq-id') || '') === key) el.checked = false;
-    });
+    syncCardSelecaoBancoQuestoes(key, false);
     atualizarTotalSelecionadasBancoQuestoes();
 }
 
@@ -676,7 +739,8 @@ function importarSelecionadasBancoQuestoes() {
         credentials: 'same-origin',
         headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({
             modulo_id: <?= (int)$modulo['id'] ?>,

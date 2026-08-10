@@ -70,8 +70,8 @@ class HtmlSanitizer
         }
         $config->set('HTML.Allowed', 'p,strong,em,ul,ol,li,span,br,table,thead,tbody,tfoot,tr,th,td,colgroup,col,img[src|alt|class|style|width|height]');
         $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'data' => true]);
-        $config->set('URI.SafeDataURI', true);
         // data:image;base64 pode ser grande; sem isso o Purifier remove o src no aluno.
+        // Obs.: URI.SafeDataURI não existe no HTMLPurifier 4.19 (gera Warning).
         $config->set('URI.MaxLength', 5 * 1024 * 1024);
         $config->set('CSS.AllowedProperties', [
             'width', 'height', 'max-width', 'min-width',
@@ -131,7 +131,12 @@ class HtmlSanitizer
         if ($html === null || $html === '') {
             return '';
         }
-        $purifier = self::getPurifierWithImages();
+        $purifier = null;
+        try {
+            $purifier = self::getPurifierWithImages();
+        } catch (\Throwable $e) {
+            $purifier = null;
+        }
         if ($purifier !== null) {
             try {
                 $cleaned = $purifier->purify($html);
@@ -141,25 +146,32 @@ class HtmlSanitizer
                 $cleaned = strip_tags($html, $allowed);
             }
         } else {
-            $allowed = '<p><strong><em><ul><ol><li><span><br><img>';
+            $allowed = '<p><strong><em><ul><ol><li><span><br><img><table><thead><tbody><tr><th><td>';
             $cleaned = strip_tags($html, $allowed);
         }
-        $cleaned = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $cleaned);
-        $cleaned = preg_replace('/\s+on\w+\s*=\s*[^\s>]+/i', '', $cleaned);
-        $cleaned = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $cleaned);
-        $cleaned = preg_replace('/<iframe\b[^>]*>.*?<\/iframe>/is', '', $cleaned);
+        if (!is_string($cleaned)) {
+            $cleaned = '';
+        }
+        $cleaned = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $cleaned) ?? $cleaned;
+        $cleaned = preg_replace('/\s+on\w+\s*=\s*[^\s>]+/i', '', $cleaned) ?? $cleaned;
+        $cleaned = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $cleaned) ?? $cleaned;
+        $cleaned = preg_replace('/<iframe\b[^>]*>.*?<\/iframe>/is', '', $cleaned) ?? $cleaned;
         // Compatibilidade: caminho legado de uploads em alguns enunciados
         $cleaned = str_replace('/public/uploads/', '/uploads/', $cleaned);
         // Segurança extra: se usar data URI em <img>, aceita apenas formatos raster base64
-        $cleaned = preg_replace_callback('/<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>/i', function ($m) {
+        $filtered = preg_replace_callback('/<img\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>/i', function ($m) {
             $src = html_entity_decode((string)($m[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             if (stripos($src, 'data:') === 0) {
-                if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\r\n]+$#i', $src)) {
+                // Evita regex catastrófica em data URI gigante: valida só o prefixo/mime.
+                if (!preg_match('#^data:image/(png|jpe?g|webp|gif);base64,#i', $src)) {
                     return '';
                 }
             }
             return $m[0];
         }, $cleaned);
+        if (is_string($filtered)) {
+            $cleaned = $filtered;
+        }
         return trim($cleaned);
     }
 

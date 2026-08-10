@@ -4497,54 +4497,62 @@ class TeacherJourneyController extends BaseController
             return $html;
         }
 
-        require_once __DIR__ . '/../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($this->config);
-        $baseUrl = rtrim((string) (defined('URL') ? URL : ''), '/');
+        try {
+            require_once __DIR__ . '/../../Services/MediaStorageService.php';
+            $media = new MediaStorageService($this->config);
 
-        $result = preg_replace_callback('/<img\b([^>]*)\bsrc=["\']([^"\']+)["\']([^>]*)>/i', function ($m) use ($media, $professorId, $baseUrl) {
-            $before = $m[1] ?? '';
-            $srcRaw = html_entity_decode((string)($m[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $after = $m[3] ?? '';
-            $src = trim($srcRaw);
+            $result = preg_replace_callback('/<img\b([^>]*)\bsrc=["\']([^"\']+)["\']([^>]*)>/i', function ($m) use ($media, $professorId) {
+                $before = $m[1] ?? '';
+                $srcRaw = html_entity_decode((string)($m[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $after = $m[3] ?? '';
+                $src = trim($srcRaw);
 
-            if (stripos($src, 'data:image/') !== 0) {
-                return $m[0];
-            }
+                if (stripos($src, 'data:image/') !== 0) {
+                    return $m[0];
+                }
 
-            if (!preg_match('/^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/is', $src, $mm)) {
-                return $m[0];
-            }
+                if (!preg_match('/^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/is', $src, $mm)) {
+                    // Data URI inválida/não suportada: remove para não estourar coluna TEXT.
+                    return '';
+                }
 
-            $ext = strtolower($mm[1]);
-            if ($ext === 'jpeg') {
-                $ext = 'jpg';
-            }
-            $payload = preg_replace('/\s+/', '', (string)$mm[2]);
-            $bin = base64_decode($payload, true);
-            if ($bin === false || $bin === '' || strlen($bin) > 10 * 1024 * 1024) {
-                return $m[0];
-            }
+                $ext = strtolower($mm[1]);
+                if ($ext === 'jpeg') {
+                    $ext = 'jpg';
+                }
+                $payload = preg_replace('/\s+/', '', (string)$mm[2]);
+                $bin = base64_decode($payload, true);
+                if ($bin === false || $bin === '' || strlen($bin) > 10 * 1024 * 1024) {
+                    return '';
+                }
 
-            $filename = 'exercicio_inline_' . $professorId . '_' . time() . '_' . uniqid('', true) . '.' . $ext;
-            $key = \App\Services\MediaStorageService::userKey('teacher', $professorId, $filename);
-            $tmpPath = sys_get_temp_dir() . '/' . $filename;
-            $mime = 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext);
+                $filename = 'exercicio_inline_' . $professorId . '_' . time() . '_' . uniqid('', true) . '.' . $ext;
+                $key = MediaStorageService::userKey('teacher', $professorId, $filename);
+                $tmpPath = sys_get_temp_dir() . '/' . $filename;
+                $mime = 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext);
 
-            $ok = false;
-            if (@file_put_contents($tmpPath, $bin) !== false) {
-                $ok = $media->put('jornadas_exercicios', $key, $tmpPath, $mime);
-            }
-            @unlink($tmpPath);
+                $ok = false;
+                if (@file_put_contents($tmpPath, $bin) !== false) {
+                    $ok = $media->put('jornadas_exercicios', $key, $tmpPath, $mime);
+                }
+                @unlink($tmpPath);
 
-            if (!$ok) {
-                return $m[0];
-            }
+                if (!$ok) {
+                    // Sem storage: remove base64 para evitar HTTP 500 / estouro de TEXT no insert.
+                    return '';
+                }
 
-            $url = $this->buildStableJourneyExerciseMediaUrl($key);
-            return '<img' . $before . 'src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '"' . $after . '>';
-        }, $html);
+                $url = $this->buildStableJourneyExerciseMediaUrl($key);
+                return '<img' . $before . 'src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '"' . $after . '>';
+            }, $html);
 
-        return is_string($result) ? $result : $html;
+            return is_string($result) ? $result : $html;
+        } catch (\Throwable $e) {
+            error_log('persistInlineBase64ImagesInHtml: ' . $e->getMessage());
+            // Último recurso: tira data URIs para a importação continuar.
+            $stripped = preg_replace('/<img\b[^>]*\bsrc=["\']data:image\/[^"\']+["\'][^>]*>/i', '', $html);
+            return is_string($stripped) ? $stripped : $html;
+        }
     }
 
     private function buildStableJourneyExerciseMediaUrl(string $key): string
@@ -8306,8 +8314,37 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
      */
     public function apiBancoQuestoesImportarModulo()
     {
+        // Garante JSON mesmo em fatal (OOM/timeout) — evita "HTTP 500" sem mensagem no frontend.
+        $jsonFatalEnviado = false;
+        register_shutdown_function(static function () use (&$jsonFatalEnviado) {
+            if ($jsonFatalEnviado || headers_sent()) {
+                return;
+            }
+            $err = error_get_last();
+            if (!is_array($err)) {
+                return;
+            }
+            $tipo = (int)($err['type'] ?? 0);
+            if (!in_array($tipo, [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+                return;
+            }
+            while (ob_get_level() > 0) {
+                @ob_end_clean();
+            }
+            error_log('apiBancoQuestoesImportarModulo fatal: ' . (string)($err['message'] ?? ''));
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro interno ao importar questões. Tente novamente ou contate o suporte.',
+            ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            $jsonFatalEnviado = true;
+        });
+
         try {
             @set_time_limit(120);
+            @ini_set('memory_limit', '512M');
+            @ini_set('display_errors', '0');
             // Evita notice/warning HTML quebrar o JSON no frontend (Safari: "did not match the expected pattern").
             while (ob_get_level() > 0) {
                 @ob_end_clean();
@@ -8378,8 +8415,17 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                         $map = $this->mapBancoQuestaoToJornadaExercicio($questoes[0], (int)$user['id']);
                     }
 
+                    // Defesa: enunciado ainda enorme (ex.: base64 que não foi persistido).
+                    $enunciadoLen = strlen((string)($map['enunciado'] ?? ''));
+                    if ($enunciadoLen > 60000) {
+                        throw new Exception(
+                            'Enunciado muito grande para salvar (' . $enunciadoLen . ' bytes). '
+                            . 'Tente novamente ou importe sem a imagem embutida.'
+                        );
+                    }
+
                     if (!$isQuestaoLocal) {
-                        // 1 crédito por nova questão importada do banco externo.
+                        // 1 crédito por nova questão importada do banco externo (antes do insert).
                         $creditoReferencia = 'bancoq:' . $moduloId . ':' . $questaoId . ':' . uniqid();
                         $creditosService->consumir('professor', (int)$user['id'], $moduloCredito, $creditoReferencia);
                     }
@@ -8426,25 +8472,37 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                             error_log('Falha no estorno de crédito (banco questões): ' . $e2->getMessage());
                         }
                     }
-                    $falhas[] = ['id' => $questaoId, 'erro' => $qe->getMessage()];
+                    $msg = trim((string)$qe->getMessage());
+                    $falhas[] = [
+                        'id' => $questaoId,
+                        'erro' => $msg !== '' ? $msg : (get_class($qe) . ' sem mensagem'),
+                    ];
+                    error_log('apiBancoQuestoesImportarModulo item ' . $questaoId . ': ' . $msg);
                 }
             }
 
             if (ob_get_level() > 0) {
                 @ob_end_clean();
             }
-            $this->json([
+            $payloadOk = [
                 'success' => true,
                 'importados' => $inseridos,
                 'creditos_consumidos' => $creditosConsumidos,
                 'falhas' => $falhas
-            ]);
+            ];
+            $jsonFatalEnviado = true;
+            $this->json($payloadOk);
         } catch (\Throwable $e) {
             if (ob_get_level() > 0) {
                 @ob_end_clean();
             }
-            error_log('apiBancoQuestoesImportarModulo: ' . $e->getMessage());
-            $this->json(['success' => false, 'error' => $e->getMessage()], 400);
+            $msg = trim((string)$e->getMessage());
+            if ($msg === '') {
+                $msg = 'Falha inesperada ao importar questões';
+            }
+            error_log('apiBancoQuestoesImportarModulo: ' . $msg . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $jsonFatalEnviado = true;
+            $this->json(['success' => false, 'error' => $msg], 400);
         }
     }
 
