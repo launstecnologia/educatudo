@@ -1,0 +1,42 @@
+{
+  "name": "EducaTudo Professor",
+  "short_name": "EducaTudo",
+  "description": "Plataforma educacional para professores",
+  "start_url": "/professor/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#9333ea",
+  "orientation": "portrait-primary",
+  "scope": "/professor/",
+  "icons": [
+    {
+      "src": "/public/uploads/layout/logo-1x1_1761250311.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/public/uploads/layout/logo-1x1_1761250311.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Acessar o dashboard",
+      "url": "/professor/dashboard",
+      "icons": [
+        {
+          "src": "/public/uploads/layout/logo-1x1_1761250311.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}
+

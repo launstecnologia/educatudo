@@ -1,0 +1,11 @@
+# Override — HTTPS com certificado Origin Cloudflare (sem API token)
+# Uso após colocar os arquivos em ssl/cloudflare-origin.pem e ssl/cloudflare-origin.key:
+#   docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml up -d nginx
+
+services:
+  nginx:
+    ports:
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./ssl:/etc/ssl/educatudo:ro
+      - ./docker/nginx/vps-prod-ssl-origin.conf:/etc/nginx/conf.d/ssl.conf:ro

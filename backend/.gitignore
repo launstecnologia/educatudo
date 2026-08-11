@@ -1,0 +1,55 @@
+# Ignorar arquivos de configuração sensíveis (credenciais só no .env, nunca versionar)
+.env
+.env.example
+
+# Pastas de cache e logs
+/vendor/
+/node_modules/
+/storage/
+/bootstrap/cache/
+/public/uploads/
+app/public/uploads/
+/_pycache_/
+/.idea/
+/.vscode/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+.htaccess
+
+# Logs e backups
+*.log
+*.bak
+*.zip
+*.rar
+*.tar.gz
+
+# Arquivos temporários
+*.tmp
+*.cache
+
+# Sistema Educatudo específico
+# Arquivos de teste e debug
+test_*.php
+debug_*.php
+
+# Documentação (não versionar)
+documents/
+graphify-out/
+docs/
+
+# Instaladores (não versionar)
+install.php
+update.php
+
+# Documentação de instalação (não versionar)
+INSTALACAO_E_ATUALIZACAO.md
+GUIA_PRATICO_INSTALACAO.md
+config_exemplo.php
+README_INSTALADORES.md
+
+
+# Storage (logs, cache, uploads, etc)
+storage/
+storage/**

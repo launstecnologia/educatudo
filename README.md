@@ -6,8 +6,8 @@ Repositorio de trabalho do EducaTudo. A raiz funciona como um workspace: ela jun
 
 | Pasta/arquivo | Papel |
 | --- | --- |
-| `backend/` | Backend/web PHP (submodulo `educatudo_oficial`). Codigo em `app/`, `config/`, `bootstrap/`; **docroot web = `backend/public/`** apenas. |
-| `app/` | App Flutter dos pais/responsaveis. Contem `lib/`, `android/`, `web/`, `assets/`, `test/` e `pubspec.yaml`. |
+| `backend/` | Backend/web PHP. Codigo em `app/`, `config/`, `bootstrap/`; **docroot web = `backend/public/`** apenas. |
+| `familia/` | App Flutter dos pais/responsaveis. Contem `lib/`, `android/`, `web/`, `assets/`, `test/` e `pubspec.yaml`. |
 | `services/` | Servicos auxiliares independentes, como `apostila-ai`. |
 | `ws-server/` | Servidor WebSocket/Node separado da plataforma PHP. |
 | `database/` | SQL global do workspace, principalmente migracoes e arquivos compartilhados fora do backend. |
@@ -21,26 +21,22 @@ Repositorio de trabalho do EducaTudo. A raiz funciona como um workspace: ela jun
 
 ## Regra de organizacao
 
-- Codigo de produto fica dentro da aplicacao dona: backend em `backend/`, mobile em `app/`, servicos em `services/<nome>/`, WebSocket em `ws-server/`.
+- Codigo de produto fica dentro da aplicacao dona: backend em `backend/`, mobile em `familia/`, servicos em `services/<nome>/`, WebSocket em `ws-server/`.
 - Arquivos de orquestracao que afetam mais de uma aplicacao ficam na raiz: `docker-compose.yml`, `package.json`, `playwright.config.ts`, `README.md`, `CLAUDE.md`.
 - Documentacao permanente fica em `docs/` ou `specs/`. Analises temporarias ficam em `tmp/`.
 - Saidas geradas nao devem competir com codigo na raiz. Use `tmp/`, `playwright-report/`, `test-results/`, `graphify-out/` ou a pasta de build da propria aplicacao.
 - **Seguranca:** o servidor web deve apontar **somente** para `backend/public/`. Ver `backend/STRUCTURE.md`.
 
-## Git — repositórios
+## Git
 
-| Pasta | Repositório | Branch padrão |
-| --- | --- | --- |
-| **`backend/`** | [educatudo_oficial](https://github.com/launstecnologia/educatudo_oficial) | `feature/multi-tenant` |
-| Raiz (`plataforma_educatudo`) | Workspace local (Docker, Flutter, docs, Playwright) | — |
+Todo o codigo (backend PHP, app Flutter, infra, testes) vive neste repositorio:
 
-O backend PHP vive em **`backend/`** — commits de código da plataforma vão sempre para **`educatudo_oficial`**, nunca para `educatudo_colag` (fork Colag separado).
+**https://github.com/launstecnologia/educatudo**
 
 ```bash
-cd backend
-git pull origin feature/multi-tenant
-# editar, commitar e push dentro de backend/
-git push origin feature/multi-tenant
+git clone git@github.com:launstecnologia/educatudo.git
+cd educatudo
+./scripts/init-local.sh
 ```
 
 ## Setup local
@@ -88,5 +84,5 @@ docker compose exec php php scripts/init_local_multitenant.php --force-school
 - `backend/STRUCTURE.md` — layout seguro e deploy.
 - `CLAUDE.md` para contexto tecnico, arquitetura multi-tenant e padroes de codigo.
 - `specs/PRD.md` para escopo de produto.
-- `app/docs/` para arquitetura do app Flutter.
+- `familia/docs/` para arquitetura do app Flutter.
 - `services/apostila-ai/README.md` para o servico de apostilas com IA.

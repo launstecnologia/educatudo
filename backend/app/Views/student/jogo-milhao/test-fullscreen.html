@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste Fullscreen</title>
+</head>
+<body>
+    <h1>Teste de Fullscreen</h1>
+    
+    <button onclick="ativarFullscreen()">Ativar Fullscreen</button>
+    
+    <script>
+        function ativarFullscreen() {
+            const elem = document.documentElement;
+            
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen()
+                    .then(() => {
+                        console.log('✅ Fullscreen ativado com sucesso!');
+                        alert('✅ Fullscreen ativado!');
+                    })
+                    .catch(err => {
+                        console.error('❌ Erro:', err);
+                        alert('❌ Erro: ' + err.message);
+                    });
+            } else {
+                alert('❌ Fullscreen não suportado neste navegador');
+            }
+        }
+        
+        // Tentar ativar automaticamente após 1 segundo
+        setTimeout(() => {
+            console.log('Tentando ativar fullscreen...');
+            ativarFullscreen();
+        }, 1000);
+        
+        // Monitorar mudanças
+        document.addEventListener('fullscreenchange', () => {
+            console.log('Fullscreen mudou!', document.fullscreenElement ? 'ATIVO' : 'INATIVO');
+        });
+    </script>
+</body>
+</html>
+

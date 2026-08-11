@@ -1,0 +1,13 @@
+# Override — habilita HTTPS no Nginx Docker (porta 443 + cert Let's Encrypt no host)
+# Uso: docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl.yml up -d
+#
+# Pré-requisito: cert em /etc/letsencrypt/live/educatudo.com/
+# Emitir: ./scripts/setup-vps-ssl-docker.sh educatudo.com
+
+services:
+  nginx:
+    ports:
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./docker/nginx/vps-prod-ssl.conf:/etc/nginx/conf.d/ssl.conf:ro

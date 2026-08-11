@@ -1,0 +1,19 @@
+{
+  "name": "educatudo-boletim-assistente-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP do Assistente de Boletim do EducaTudo — tools de grounding + propor regra em NL",
+  "type": "module",
+  "bin": {
+    "educatudo-boletim-mcp": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

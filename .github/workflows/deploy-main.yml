@@ -1,0 +1,23 @@
+name: Deploy main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Oracle
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Deploy no servidor
+        run: |
+          cd /opt/educatudo
+          git fetch origin main
+          git pull --ff-only origin main
+          bash scripts/deploy-main.sh

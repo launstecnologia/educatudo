@@ -1,0 +1,19 @@
+{
+  "name": "educatudo-provas-professor-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP de consulta de provas/saúde na visão do professor — EducaTudo",
+  "type": "module",
+  "bin": {
+    "educatudo-provas-professor-mcp": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

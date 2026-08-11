@@ -1,0 +1,322 @@
+/* Layout baseado no exemplo React */
+.game-modal {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    backdrop-filter: blur(20px);
+}
+
+.game-stage {
+    width: min(95vw, 1100px);
+    max-height: 95vh;
+    background: linear-gradient(180deg, #2c5364 0%, #203a43 50%, #0f2027 100%);
+    border-radius: 20px;
+    padding: clamp(15px, 2vw, 30px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: clamp(20px, 2vw, 30px);
+    position: relative;
+    overflow-y: auto;
+}
+
+/* Área de Conteúdo */
+.game-content {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(15px, 1.5vh, 20px);
+    min-width: 0;
+}
+
+/* Header */
+.game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-logo {
+    width: clamp(45px, 5vw, 60px);
+    height: clamp(45px, 5vw, 60px);
+    background: linear-gradient(135deg, #f39c12, #f4d03f);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+}
+
+.game-title {
+    font-size: clamp(1.3rem, 2.5vw, 1.9rem);
+    color: white;
+    margin: 0;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.game-progress {
+    font-size: clamp(0.8rem, 1.2vw, 0.95rem);
+    color: #b0b0b0;
+    margin: 0;
+}
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.control-btn {
+    padding: clamp(8px, 1vh, 12px) clamp(15px, 2vw, 25px);
+    font-size: clamp(0.85rem, 1.2vw, 1rem);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.control-btn:hover {
+    transform: scale(1.05);
+}
+
+.pause-btn {
+    background: #ffc107;
+    color: #333;
+}
+
+.exit-btn {
+    background: #dc3545;
+    color: white;
+}
+
+/* Prêmio Atual */
+.prize-display {
+    background: linear-gradient(135deg, #f4d03f 0%, #f39c12 100%);
+    padding: clamp(15px, 2vh, 25px);
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+}
+
+.prize-label {
+    font-size: clamp(1rem, 1.4vw, 1.2rem);
+    color: #333;
+    margin: 0 0 8px 0;
+    font-weight: bold;
+}
+
+.prize-value {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    color: #333;
+    font-weight: bold;
+    margin: 0;
+}
+
+/* Pergunta */
+.question-bubble {
+    background: linear-gradient(135deg, #16a085 0%, #0d7a68 100%);
+    padding: clamp(18px, 2.5vh, 30px);
+    border-radius: 12px;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(22, 160, 133, 0.3);
+}
+
+.question-icon {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: clamp(40px, 4vw, 55px);
+    height: clamp(40px, 4vw, 55px);
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.3rem, 2vw, 1.8rem);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.question-title {
+    font-size: clamp(1.1rem, 1.6vw, 1.4rem);
+    color: white;
+    margin: 0 0 clamp(10px, 1.2vh, 15px) 0;
+    font-weight: bold;
+    padding-right: 60px;
+}
+
+.question-text {
+    font-size: clamp(1rem, 1.4vw, 1.15rem);
+    color: white;
+    line-height: 1.5;
+    margin: 0;
+    padding-right: 20px;
+}
+
+/* Alternativas */
+.alternativas-container {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.2vh, 15px);
+}
+
+.alternativa-btn {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    padding: clamp(14px, 1.8vh, 20px) clamp(18px, 2.2vw, 25px);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s;
+    text-align: left;
+}
+
+.alternativa-btn:hover {
+    transform: translateX(8px);
+    border-color: #3498db;
+}
+
+.alternativa-btn.selected {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+}
+
+.alternativa-btn.wrong {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+}
+
+.letra-alt {
+    width: clamp(28px, 3.2vw, 38px);
+    height: clamp(28px, 3.2vw, 38px);
+    background: #f39c12;
+    color: #333;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: clamp(0.95rem, 1.3vw, 1.15rem);
+    flex-shrink: 0;
+}
+
+.texto-alt {
+    font-size: clamp(0.95rem, 1.3vw, 1.1rem);
+    color: white;
+    flex: 1;
+}
+
+/* Botões de Ajuda */
+.ajudas-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: clamp(10px, 1.2vh, 15px);
+    margin-top: clamp(10px, 1.2vh, 15px);
+}
+
+.ajuda-btn {
+    padding: clamp(12px, 1.5vh, 18px);
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: clamp(0.85rem, 1.1vw, 1rem);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.ajuda-btn:hover {
+    transform: scale(1.05);
+}
+
+.ajuda-btn:disabled {
+    background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
+    cursor: not-allowed;
+}
+
+/* Área da Tudinha */
+.tudinha-sidebar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    min-width: clamp(160px, 16vw, 220px);
+}
+
+.tudinha-image {
+    width: 100%;
+    max-width: clamp(160px, 16vw, 240px);
+    height: auto;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    border: 3px solid rgba(255, 255, 255, 0.1);
+}
+
+.tudinha-info {
+    text-align: center;
+    padding: 0 10px;
+}
+
+.tudinha-name {
+    font-size: clamp(1.1rem, 1.6vw, 1.4rem);
+    color: white;
+    margin: 0 0 10px 0;
+    font-weight: bold;
+}
+
+.tudinha-desc {
+    font-size: clamp(0.85rem, 1.15vw, 1rem);
+    color: #b0b0b0;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .game-stage {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .tudinha-sidebar {
+        order: -1;
+        min-width: auto;
+    }
+    
+    .tudinha-image {
+        max-width: 200px;
+    }
+    
+    .game-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .header-controls {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .control-btn {
+        flex: 1;
+        max-width: 120px;
+    }
+    
+    .ajudas-container {
+        grid-template-columns: 1fr;
+    }
+}

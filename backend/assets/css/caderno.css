@@ -1,0 +1,69 @@
+/* Meu Caderno - visual de caderno (papel pautado, margem) */
+.caderno-wrapper {
+  background: linear-gradient(to bottom, #faf8f3 0%, #f5f0e6 2px, #faf8f3 2px);
+  background-size: 100% 28px;
+  background-color: #faf8f3;
+  min-height: 60vh;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,0,0,0.04);
+  position: relative;
+  padding: 2rem 2rem 2rem 3.5rem;
+}
+.caderno-wrapper::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, #c41e3a 0%, #c41e3a 3px, transparent 3px);
+  border-radius: 8px 0 0 8px;
+}
+.caderno-page-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #2c1810;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.caderno-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.caderno-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed rgba(0,0,0,0.06);
+}
+.caderno-list li:last-child {
+  border-bottom: none;
+}
+.caderno-folder {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.caderno-folder-header {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #2c1810;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.caderno-folder-body {
+  padding: 0 1rem 1rem;
+}
+.caderno-prose {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #2c1810;
+  line-height: 1.6;
+}
+.caderno-prose p { margin-bottom: 0.75rem; }
+.caderno-prose ul, .caderno-prose ol { margin: 0.5rem 0 0.75rem 1.5rem; }
+.caderno-prose strong { font-weight: 700; }
+.caderno-prose em { font-style: italic; }

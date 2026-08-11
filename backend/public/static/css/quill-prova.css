@@ -1,0 +1,90 @@
+/* Ajustes do Quill na tela de provas */
+.quill-enunciado-container,
+.ql-container {
+    min-height: 200px;
+    font-size: 1rem;
+}
+.ql-editor {
+    min-height: 200px;
+}
+/* Imagens não estouram e podem ser redimensionadas pelo controle da toolbar */
+.ql-editor img {
+    max-width: 100%;
+    height: auto;
+    cursor: pointer;
+    display: block;
+}
+
+/* Equação inserida no enunciado (Blot mathEmbed) — mantém alinhada com o texto */
+.ql-editor .math-embed {
+    display: inline;
+    vertical-align: middle;
+}
+.ql-editor .math-embed-inner {
+    display: inline-block;
+    vertical-align: middle;
+}
+#quill-formula-preview .katex {
+    font-size: 1.1rem;
+}
+
+/* Lista de alternativas (criar questão) com Quill */
+.alt-list .alt-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.alt-list .alt-letter {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2563eb;
+    color: #fff;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+.quill-alt-container {
+    min-height: 60px;
+}
+.quill-alt-container .ql-editor {
+    min-height: 60px;
+}
+.quill-edit-alt-wrapper .ql-editor {
+    min-height: 60px;
+}
+
+/* Dropdown de tamanho da imagem (quando selecionada) */
+.quill-image-size-dropdown {
+    position: fixed;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.quill-image-size-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-right: 4px;
+}
+.quill-image-size-dropdown button {
+    padding: 4px 10px;
+    font-size: 13px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #f9fafb;
+    cursor: pointer;
+}
+.quill-image-size-dropdown button:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+}

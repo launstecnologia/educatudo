@@ -1,0 +1,11 @@
+services:
+  apostila-ai:
+    build: .
+    container_name: educatudo-apostila-ai
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    env_file:
+      - .env
+    volumes:
+      - ./app/storage:/app/app/storage

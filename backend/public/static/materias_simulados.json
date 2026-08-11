@@ -1,0 +1,6454 @@
+{
+  "Artes": [
+    {
+      "nome": "Arte Contemporânea",
+      "subtopicos": [
+        {
+          "nome": "Arte Conceitual",
+          "subtopicos": []
+        },
+        {
+          "nome": "Arte Urbana",
+          "subtopicos": []
+        },
+        {
+          "nome": "Body Art",
+          "subtopicos": []
+        },
+        {
+          "nome": "Construtivismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Digital Art",
+          "subtopicos": []
+        },
+        {
+          "nome": "Happening",
+          "subtopicos": []
+        },
+        {
+          "nome": "Hiper-realismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Instalação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Internet Art",
+          "subtopicos": []
+        },
+        {
+          "nome": "Land Art",
+          "subtopicos": []
+        },
+        {
+          "nome": "Minimalismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Multiculturalismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Neoconcretismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Participativa",
+          "subtopicos": []
+        },
+        {
+          "nome": "Videoart",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Arte do Brasil",
+      "subtopicos": [
+        {
+          "nome": "Arte e Colonização",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cinema Novo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modernismo no Brasil",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tropicalismo",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Conceitos",
+      "subtopicos": []
+    },
+    {
+      "nome": "Expressões da Arte",
+      "subtopicos": [
+        {
+          "nome": "Arquitetura",
+          "subtopicos": []
+        },
+        {
+          "nome": "Artes Plásticas e Visuais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cinema",
+          "subtopicos": []
+        },
+        {
+          "nome": "Dança",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fotografia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Inteligência Artificial (IA) e suas aplicações na Arte",
+          "subtopicos": []
+        },
+        {
+          "nome": "Música",
+          "subtopicos": []
+        },
+        {
+          "nome": "Teatro",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "História da Arte",
+      "subtopicos": [
+        {
+          "nome": "Antiguidade",
+          "subtopicos": [
+            {
+              "nome": "Grécia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mesopotâmia e Egito",
+              "subtopicos": []
+            },
+            {
+              "nome": "Roma",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Arte Bizantina",
+          "subtopicos": []
+        },
+        {
+          "nome": "Arte no Século XIX",
+          "subtopicos": [
+            {
+              "nome": "Art Nouveau",
+              "subtopicos": []
+            },
+            {
+              "nome": "Impressionismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Neoclassicismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pós-impressionismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Realismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Romantismo",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Arte no Século XX",
+          "subtopicos": [
+            {
+              "nome": "Abstracionismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Concretismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Cubismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Dadaísmo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Expressionismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fauvismo (Fovismo)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Futurismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Modernismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Neodadaísmo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Neorrealismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Op Art",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pop Art",
+              "subtopicos": []
+            },
+            {
+              "nome": "Surrealismo",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Arte Renascentista",
+          "subtopicos": []
+        },
+        {
+          "nome": "Barroco e Rococó",
+          "subtopicos": []
+        },
+        {
+          "nome": "Idade Média",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pré-história",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Matrizes Culturais",
+      "subtopicos": [
+        {
+          "nome": "Culturas Africanas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Culturas Indígenas",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "Biologia": [
+    {
+      "nome": "Citologia",
+      "subtopicos": [
+        {
+          "nome": "Bioquímica Celular",
+          "subtopicos": [
+            {
+              "nome": "Ácidos Nucleicos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Água",
+              "subtopicos": []
+            },
+            {
+              "nome": "Carboidratos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lipídios",
+              "subtopicos": []
+            },
+            {
+              "nome": "Proteínas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sais Minerais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Vitaminas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Divisões Celulares",
+          "subtopicos": [
+            {
+              "nome": "Ciclos Vitais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gametogênese",
+              "subtopicos": []
+            },
+            {
+              "nome": "Meiose",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mitose",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Fisiologia Celular",
+          "subtopicos": [
+            {
+              "nome": "Lisossomos / Peroxissomos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Microtúbulos / Citoesqueleto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mitocôndrias / Cloroplastos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Movimentos Celulares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ribossomos / REG / REL / Sistema Golgiense",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Membrana Plasmática",
+          "subtopicos": [
+            {
+              "nome": "Composição Química e Arquitetura Molecular",
+              "subtopicos": []
+            },
+            {
+              "nome": "Especializações",
+              "subtopicos": []
+            },
+            {
+              "nome": "Permeabilidade",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Microscopia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Níveis de Organização em Citologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Núcleo e Cromossomos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Organização Estrutural dos Seres Vivos",
+          "subtopicos": [
+            {
+              "nome": "Acelulares (Vírus)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Eucariontes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Procariontes",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Ecologia",
+      "subtopicos": [
+        {
+          "nome": "Biociclos",
+          "subtopicos": [
+            {
+              "nome": "Dulciaquícola (Limnociclo)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Marinho (Talassociclo)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Terrestre (Epinociclo)",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Ciclos Biogeoquímicos",
+          "subtopicos": [
+            {
+              "nome": "Água",
+              "subtopicos": []
+            },
+            {
+              "nome": "Carbono",
+              "subtopicos": []
+            },
+            {
+              "nome": "Nitrogênio",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oxigênio",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Controle Biológico",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fatores Ecológicos Abióticos",
+          "subtopicos": [
+            {
+              "nome": "Água",
+              "subtopicos": []
+            },
+            {
+              "nome": "Intemperismos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Luminosidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pressão Atmosférica / Hidrostática",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ressurgência",
+              "subtopicos": []
+            },
+            {
+              "nome": "Salinidade / pH",
+              "subtopicos": []
+            },
+            {
+              "nome": "Solo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Temperatura",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Fitogeografia e Biomas Brasileiros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fluxos de Energia e Matéria",
+          "subtopicos": [
+            {
+              "nome": "Cadeias Alimentares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pirâmides Ecológicas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Teias Alimentares",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Nichos Ecológicos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Níveis de Organização em Ecologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Poluição",
+          "subtopicos": [
+            {
+              "nome": "Aquática",
+              "subtopicos": []
+            },
+            {
+              "nome": "Atmosférica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Edáfica (Solo)",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Populações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Preservação Ambiental",
+          "subtopicos": []
+        },
+        {
+          "nome": "Relações Ecológicas",
+          "subtopicos": [
+            {
+              "nome": "Desarmônicas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Harmônicas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Sucessões Ecológicas",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Educação Sexual",
+      "subtopicos": []
+    },
+    {
+      "nome": "Embriologia",
+      "subtopicos": [
+        {
+          "nome": "Anexos Embrionários",
+          "subtopicos": []
+        },
+        {
+          "nome": "Classificação Embriológica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Desenvolvimento embrionário animal",
+          "subtopicos": [
+            {
+              "nome": "Gastrulação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Organogênese",
+              "subtopicos": []
+            },
+            {
+              "nome": "Segmentação",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Embriologia Experimental",
+          "subtopicos": []
+        },
+        {
+          "nome": "Evolução dos Folhetos Embrionários",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tipos de Ovos e Segmentação",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Evolução Biológica",
+      "subtopicos": [
+        {
+          "nome": "Evidências da Evolução Biológica",
+          "subtopicos": [
+            {
+              "nome": "Adaptações ao Meio Ambiente",
+              "subtopicos": []
+            },
+            {
+              "nome": "Anatomia Comparada",
+              "subtopicos": []
+            },
+            {
+              "nome": "Bioquímica Comparada",
+              "subtopicos": []
+            },
+            {
+              "nome": "Embriologia Comparada",
+              "subtopicos": []
+            },
+            {
+              "nome": "Evolução Humana",
+              "subtopicos": []
+            },
+            {
+              "nome": "Genética Populacional",
+              "subtopicos": []
+            },
+            {
+              "nome": "Melanismo Industrial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Paleontologia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Resistência a Inseticidas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Resistência a Medicamentos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Teoria endossimbiótica",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Teorias",
+          "subtopicos": [
+            {
+              "nome": "Darwinismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Especiação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lamarckismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Neodarwinismo (Teoria Sintética da Evolução)",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Fisiologia Animal e Humana",
+      "subtopicos": [
+        {
+          "nome": "Coordenação Endócrina",
+          "subtopicos": [
+            {
+              "nome": "Adenoipófise",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adrenais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Anabolizantes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Anticoncepcionais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ciclo Menstrual e Gravidez",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fatores Cardíacos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Glândula Pineal (Epífise)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Glândula Tireoidea",
+              "subtopicos": []
+            },
+            {
+              "nome": "Glândulas Paratireoideas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Neuroipófise",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ovários",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pâncreas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Regulação Hormonal / Feed-back",
+              "subtopicos": []
+            },
+            {
+              "nome": "Testículos",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Coordenação Nervosa",
+          "subtopicos": [
+            {
+              "nome": "Animal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Humana",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Excreção",
+          "subtopicos": [
+            {
+              "nome": "Animal / Protoctistas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Humana",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Glândulas Anexas ao Tubo Digestório",
+          "subtopicos": [
+            {
+              "nome": "Fígado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Glândulas Salivares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pâncreas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Homeostase",
+          "subtopicos": []
+        },
+        {
+          "nome": "Locomoção / Músculos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Nutrição e Digestão",
+          "subtopicos": [
+            {
+              "nome": "Absorção e Utilização dos Nutrientes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Alimentos e Nutrientes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Aparelho Digestório",
+              "subtopicos": []
+            },
+            {
+              "nome": "Regulação Nervosa e Hormonal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sucos Digestórios e Hidrólise Enzimática",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Reprodução Animal",
+          "subtopicos": [
+            {
+              "nome": "Assexuada",
+              "subtopicos": []
+            },
+            {
+              "nome": "Metagênese",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sexuada",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Reprodução Humana",
+          "subtopicos": []
+        },
+        {
+          "nome": "Respiração",
+          "subtopicos": [
+            {
+              "nome": "Aeróbica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Facultativa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fermentação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Órgãos Respiratórios",
+              "subtopicos": []
+            },
+            {
+              "nome": "Regulação Respiratória",
+              "subtopicos": []
+            },
+            {
+              "nome": "Trocas Gasosas e Transporte de Gases",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Revestimento / Regulação Térmica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sangue e Linfa",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sentidos",
+          "subtopicos": [
+            {
+              "nome": "Audição",
+              "subtopicos": []
+            },
+            {
+              "nome": "Olfato",
+              "subtopicos": []
+            },
+            {
+              "nome": "Paladar",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tato",
+              "subtopicos": []
+            },
+            {
+              "nome": "Visão",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Sistemas cardiovasculares",
+          "subtopicos": [
+            {
+              "nome": "Animal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Humana",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Sustentação / Equilíbrio",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Genética",
+      "subtopicos": [
+        {
+          "nome": "Alelos Múltiplos (Polialelia)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cromossomos Sexuais",
+          "subtopicos": [
+            {
+              "nome": "Determinação Sexual",
+              "subtopicos": []
+            },
+            {
+              "nome": "Herança Holândrica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Herança Ligada ao Sexo",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Engenharia Genética",
+          "subtopicos": [
+            {
+              "nome": "Células-tronco",
+              "subtopicos": []
+            },
+            {
+              "nome": "Clonagem",
+              "subtopicos": []
+            },
+            {
+              "nome": "Exames do DNA",
+              "subtopicos": []
+            },
+            {
+              "nome": "Seqüenciamento do DNA",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecnologia do DNA-recombinante",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transgênicos",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Genética de Populações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Grupos Sanguíneos",
+          "subtopicos": [
+            {
+              "nome": "Identificação dos Grupos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sistema ABO",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sistemas Rh e MN",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transfusões",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Herança Quantitativa",
+          "subtopicos": []
+        },
+        {
+          "nome": "Imunologia e Imunização",
+          "subtopicos": []
+        },
+        {
+          "nome": "Interações Gênicas",
+          "subtopicos": [
+            {
+              "nome": "Epistasia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Herança Complementar",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Lei da Segregação",
+          "subtopicos": [
+            {
+              "nome": "Análise de Genealogias",
+              "subtopicos": []
+            },
+            {
+              "nome": "Codominância e Dominância Incompleta",
+              "subtopicos": []
+            },
+            {
+              "nome": "Herança",
+              "subtopicos": []
+            },
+            {
+              "nome": "Letalidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pleiotropia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Probabilidades",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Lei da Segregação Independente",
+          "subtopicos": [
+            {
+              "nome": "Dihibridismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Letalidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Polihibridismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Probabilidades",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Ligação Fatorial (Linkage)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Mapas Cromossômicos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Molecular",
+          "subtopicos": [
+            {
+              "nome": "Código Genético",
+              "subtopicos": []
+            },
+            {
+              "nome": "DNA",
+              "subtopicos": []
+            },
+            {
+              "nome": "DNA mitocondrial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Identificação do Material Genético",
+              "subtopicos": []
+            },
+            {
+              "nome": "RNA",
+              "subtopicos": []
+            },
+            {
+              "nome": "Síntese de Proteínas / Regulação Gênica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transcrição",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Mutações",
+          "subtopicos": [
+            {
+              "nome": "Agentes Mutagênicos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Cromossômicas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gênicas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Permutação (Crossing-over)",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Histologia",
+      "subtopicos": [
+        {
+          "nome": "Tecido Conjuntivo Adiposo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Conjuntivo Ósseo e Cartilaginoso",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Conjuntivo Propriamente Dito",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Epitelial de Revestimento",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Epitelial de Secreção",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Muscular",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Nervoso",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tecido Sanguíneo e Linfático",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Origem da Vida",
+      "subtopicos": [
+        {
+          "nome": "Teorias",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Parasitologia",
+      "subtopicos": [
+        {
+          "nome": "Infecções Bacterianas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Micoses",
+          "subtopicos": []
+        },
+        {
+          "nome": "Protozoonoses",
+          "subtopicos": []
+        },
+        {
+          "nome": "Verminoses",
+          "subtopicos": []
+        },
+        {
+          "nome": "Viroses",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Programas de Saúde",
+      "subtopicos": []
+    },
+    {
+      "nome": "Reino Animal / Protoctistas",
+      "subtopicos": [
+        {
+          "nome": "Anelídeos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Artrópodes",
+          "subtopicos": [
+            {
+              "nome": "Aracnídeos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Características Gerais e Classificação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Crustáceos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Insetos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Miriápodes",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Árvores Filogenéticas / Cladística",
+          "subtopicos": []
+        },
+        {
+          "nome": "Asquelmintes (Nematelmintos)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Celenterados (Cnidários)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cordados",
+          "subtopicos": [
+            {
+              "nome": "Anfíbios",
+              "subtopicos": []
+            },
+            {
+              "nome": "Aves",
+              "subtopicos": []
+            },
+            {
+              "nome": "Características Gerais e Classificação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ciclostomados",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mamíferos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Peixes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Protocordados",
+              "subtopicos": []
+            },
+            {
+              "nome": "Répteis",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Equinodermos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Moluscos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Nomenclatura Científica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Platelmintes",
+          "subtopicos": []
+        },
+        {
+          "nome": "Poríferos (Espongiários)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Protozoários",
+          "subtopicos": []
+        },
+        {
+          "nome": "Taxonomia",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Reino Vegetal / Fungos / Protoctistas / Monera",
+      "subtopicos": [
+        {
+          "nome": "Anatomia e Histologia Vegetal",
+          "subtopicos": [
+            {
+              "nome": "Caules",
+              "subtopicos": []
+            },
+            {
+              "nome": "Flores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Folhas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Frutos e Pseudofrutos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Parênquimas Clorofilianos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Raízes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sementes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos Condutores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos de Preenchimento",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos de Reserva",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos de Revestimento",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos de Sustentação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos Meristemáticos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tecidos Secretores",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Ciclos Vitais / Classificação / Evolução",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fisiologia Geral",
+          "subtopicos": [
+            {
+              "nome": "Absorção",
+              "subtopicos": []
+            },
+            {
+              "nome": "Célula Vegetal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Germinação e Crescimento",
+              "subtopicos": []
+            },
+            {
+              "nome": "Hormônios Vegetais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Movimentos Vegetais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Quimiossíntese",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reprodução - Algas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reprodução - Angiospermas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reprodução - Briófitas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reprodução - Fungos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reprodução - Gimnospermas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reprodução - Pteridófitas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Respiração",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transpiração",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transporte",
+              "subtopicos": []
+            },
+            {
+              "nome": "Trocas Gasosas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Fotossíntese",
+          "subtopicos": [
+            {
+              "nome": "Cloroplastos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Equações e Etapas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Experimentos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fatores Limitantes Externos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fatores Limitantes Internos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Importância Ecológica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pigmentos Fotossintéticos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ponto de Compensação Fótico",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Grupos",
+          "subtopicos": [
+            {
+              "nome": "Algas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Angiospermas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Bactérias / Cianobactérias",
+              "subtopicos": []
+            },
+            {
+              "nome": "Briófitas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fungos e Liquens",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gimnospermas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pteridófitas",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Temática",
+      "subtopicos": []
+    }
+  ],
+  "Espanhol": [
+    {
+      "nome": "Fonética",
+      "subtopicos": [
+        {
+          "nome": "División Silábica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Encuentros Consonantales",
+          "subtopicos": []
+        },
+        {
+          "nome": "Encuentros Vocálicos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Eufonia / Cacofonia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fonema y Letra",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Gramática",
+      "subtopicos": [
+        {
+          "nome": "Acentuación",
+          "subtopicos": [
+            {
+              "nome": "Acento en Interrogativos y Exclamativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "El Acento Diacrítico",
+              "subtopicos": []
+            },
+            {
+              "nome": "Palabras Agudas u Oxítonas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Palabras Esdrújulas o Proparoxítonas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Palabras Heterotónicas o Heteroprosódicas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Palabras Ilanas, Graves o Paroxítonas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Morfología",
+          "subtopicos": [
+            {
+              "nome": "Adjetivos Demostrativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adverbios de Afirmación y Negación",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adverbios de Cantidad",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adverbios de Duda",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adverbios de Modo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adverbios de Tiempo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Adverbios Terminados en '-mente'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Apócope Delante de Sustantivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Clases de Palabras",
+              "subtopicos": []
+            },
+            {
+              "nome": "Clasificación General de los Sustantivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Colectivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Complemento Directo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Complemento Directo con Preposición",
+              "subtopicos": []
+            },
+            {
+              "nome": "Complemento Indirecto + Complemento Directo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Conjunciones Coordinantes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Conjunciones Subordinantes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Contracción de Preposición con Artículo",
+              "subtopicos": []
+            },
+            {
+              "nome": "El Artículo Neutro 'lo'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Expresiones con Demostrativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Formas Apocopadas de Adjetivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Género de los Adjetivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gentilicios",
+              "subtopicos": []
+            },
+            {
+              "nome": "Grado de los Adjetivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Grado de los Sustantivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "La posición del Adjetivo en la Frase",
+              "subtopicos": []
+            },
+            {
+              "nome": "Las Conjuciones. Usos de 'que'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Las Interjecciones",
+              "subtopicos": []
+            },
+            {
+              "nome": "Las Preposiciones",
+              "subtopicos": []
+            },
+            {
+              "nome": "Locución Conjuntiva",
+              "subtopicos": []
+            },
+            {
+              "nome": "Locuciones Adjetivas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Locuciones Prepositivas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los adjetivos. Sufijos de Formación",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Adverbios",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Artículos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Cardinales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Demostrativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Fraccionarios",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Heterogenéricos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Indefinidos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Multiplicativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Numerales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Ordinales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Posesivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Pronombres Personales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Sustantivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Número de los Adjetivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Número de los Sustantivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombre \"se\" Impersonal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombre \"se\" Reflexivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Demostrativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Interrogativos y Exclamativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Personales complemento",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Personales Sujeto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Personales: formas átonas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Personales: formas tónicas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pronombres Relativos.",
+              "subtopicos": []
+            },
+            {
+              "nome": "Régimen Preposicional",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sufijos de Formación de los Nombres",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tratamiento Formal. Uso de 'usted'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tratamiento Informal. Uso de 'tú' y 'vos'",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Ortografía",
+          "subtopicos": [
+            {
+              "nome": "Abreviaturas",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Sintaxis",
+          "subtopicos": [
+            {
+              "nome": "Colocación Pronominal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Concordancia Verbal y Nominal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Estilo Directo, Estilo Indirecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Frase, Oración y Período",
+              "subtopicos": []
+            },
+            {
+              "nome": "Las Perífrasis Verbales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Concesivas.",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Condicionales. Uso del 'si'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Consecutivas y Comparativas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Coordinadas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones de Relativo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Exclamativas Indirectas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Finales. Uso de 'para que'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Interrogativas Indirectas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oraciones Subordinadas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Partes de la Oración",
+              "subtopicos": []
+            },
+            {
+              "nome": "Puntuación",
+              "subtopicos": []
+            },
+            {
+              "nome": "Uso de 'ello', Demostrativos Neutros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Verbos",
+          "subtopicos": [
+            {
+              "nome": "Condicional Imperfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Condicional Perfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Conjugación",
+              "subtopicos": []
+            },
+            {
+              "nome": "Formas no Personales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Futuro Imperfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Futuro Perfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gerundio",
+              "subtopicos": []
+            },
+            {
+              "nome": "Imperativo Afirmativo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Imperativo Negativo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Infinitivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los modos Verbales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Los Tiempos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Modo Imperativo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Modo Subjuntivo. Regulares e Irregulares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Participio",
+              "subtopicos": []
+            },
+            {
+              "nome": "Particularidades del 'Futuro de Subjuntivo'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Particularidades del 'Infinitivo Personal'",
+              "subtopicos": []
+            },
+            {
+              "nome": "Perífrasis Verbales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Presente",
+              "subtopicos": []
+            },
+            {
+              "nome": "Presente de Subjuntivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Imperfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Imperfecto de Subjuntivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Indefinido",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Perfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Perfecto de Subjuntivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Pluscuamperfecto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pretérito Pluscuamperfecto de Subjuntivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Usos de Presente del Indicativo y Subjuntivo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbo Gustar / Parecer",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos Auxiliares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos de Cambio",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos Defectivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos Irregulares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos Modales",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos Reflexivos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Verbos Regulares",
+              "subtopicos": []
+            },
+            {
+              "nome": "Voces del Verbo",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Interpretación de Figuras",
+      "subtopicos": []
+    },
+    {
+      "nome": "Interpretación de Textos",
+      "subtopicos": [
+        {
+          "nome": "Historietas. Cómics",
+          "subtopicos": [
+            {
+              "nome": "Fuente: Brasil",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fuente: España",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fuente: Hispanoamérica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Adaptado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Sin Fuente Bibliográfica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Traducido",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Letras de Canciones",
+          "subtopicos": [
+            {
+              "nome": "Compositores Españoles",
+              "subtopicos": []
+            },
+            {
+              "nome": "Compositores Hispanoamericanos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Adaptado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Sin Fuente Bibliográfica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Traducido",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Textos Literarios",
+          "subtopicos": [
+            {
+              "nome": "Autores Españoles",
+              "subtopicos": []
+            },
+            {
+              "nome": "Autores Hispanoamericanos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Adaptado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Sin Fuente Bibliográfica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Traducido",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Textos Periodísticos",
+          "subtopicos": [
+            {
+              "nome": "Fuente: Brasil",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fuente: España",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fuente: Hispanoamérica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Adaptado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Sin Fuente Bibliográfica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Traducido",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Textos Publicitarios",
+          "subtopicos": [
+            {
+              "nome": "Fuente: Brasil",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fuente: España",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fuente: Hispanoamérica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Adaptado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Sin Fuente Bibliográfica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Texto Traducido",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Lenguaje Coloquial y Familiar",
+      "subtopicos": [
+        {
+          "nome": "Expresiones Idiomáticas y Frases Hechas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Extranjerismos y Nuevos Términos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Falsos Cognatos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Usos de 'El voseo' y 'El tuteo'",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Redacción",
+      "subtopicos": [
+        {
+          "nome": "Carta Argumentativa",
+          "subtopicos": []
+        },
+        {
+          "nome": "Descripción",
+          "subtopicos": []
+        },
+        {
+          "nome": "Disertación",
+          "subtopicos": []
+        },
+        {
+          "nome": "Narración",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tipos de Discurso",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Vocabulario",
+      "subtopicos": [
+        {
+          "nome": "Antonimia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equivalencia en Portugués (traducción)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sinonimia",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "Filosofia": [
+    {
+      "nome": "Filosofia Antiga",
+      "subtopicos": [
+        {
+          "nome": "Aristóteles",
+          "subtopicos": []
+        },
+        {
+          "nome": "Helenismo, Estoicismo, Pirronismo, Cetismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Mitologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Outros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Passagem do Mito ao logos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Platão",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pólis e Razão",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pré-socráticos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Questões Transversais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sócrates",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sofismo",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Filosofia Contemporânea",
+      "subtopicos": [
+        {
+          "nome": "Escola de Frankfurt",
+          "subtopicos": [
+            {
+              "nome": "Herbert Marcuse",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jürgen Habermas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Max Horkheimer",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Theodor W. Adorno",
+              "subtopicos": []
+            },
+            {
+              "nome": "Walter Benjamin",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Estruturalismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fenomenologia e Existencialismo",
+          "subtopicos": [
+            {
+              "nome": "Edmund Husserl",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jean-Paul Sartre",
+              "subtopicos": []
+            },
+            {
+              "nome": "Martin Heidegger",
+              "subtopicos": []
+            },
+            {
+              "nome": "Maurice Merleau-Ponty",
+              "subtopicos": []
+            },
+            {
+              "nome": "Max Scheler",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Filosofia Analítica",
+          "subtopicos": [
+            {
+              "nome": "Bertrand Russell",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ludwig Wittgenstein",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Marxismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pós-estruturalismo",
+          "subtopicos": [
+            {
+              "nome": "Jacques Derrida",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jean Baudrillard",
+              "subtopicos": []
+            },
+            {
+              "nome": "Michel Foucault",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Questões Transversais",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Filosofia Medieval",
+      "subtopicos": [
+        {
+          "nome": "Cristianismo Primitivo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Escolástica",
+          "subtopicos": [
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tomás de Aquino",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Patrística",
+          "subtopicos": [
+            {
+              "nome": "Agostinho de Hipona",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Questões Transversais",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Filosofia Moderna",
+      "subtopicos": [
+        {
+          "nome": "Empirismo Britânico",
+          "subtopicos": [
+            {
+              "nome": "David Hume",
+              "subtopicos": []
+            },
+            {
+              "nome": "George Berkeley",
+              "subtopicos": []
+            },
+            {
+              "nome": "John Locke",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Thomas Hobbes",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Filosofia Alemã",
+          "subtopicos": [
+            {
+              "nome": "Hegel",
+              "subtopicos": []
+            },
+            {
+              "nome": "Kant",
+              "subtopicos": []
+            },
+            {
+              "nome": "Marx",
+              "subtopicos": []
+            },
+            {
+              "nome": "Nietzsche",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Schelling",
+              "subtopicos": []
+            },
+            {
+              "nome": "Schopenhauer",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Iluminismo Francês",
+          "subtopicos": [
+            {
+              "nome": "D'Alembert",
+              "subtopicos": []
+            },
+            {
+              "nome": "Denis Diderot",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jean-Jacques Rousseau",
+              "subtopicos": []
+            },
+            {
+              "nome": "Montesquieu",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Voltaire",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Positivismo / Auguste Comte",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pragmatismo",
+          "subtopicos": [
+            {
+              "nome": "Charles Peirce",
+              "subtopicos": []
+            },
+            {
+              "nome": "John Dewey",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "William James",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Questões Transversais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Renascimento, Ciência moderna e Racionalismo",
+          "subtopicos": [
+            {
+              "nome": "Bento de Espinosa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Blaise Pascal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Francis Bacon",
+              "subtopicos": []
+            },
+            {
+              "nome": "Galileu Galilei",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gottfried Leibniz",
+              "subtopicos": []
+            },
+            {
+              "nome": "Isaac Newton",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "René Descartes",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Utilitarismo",
+          "subtopicos": [
+            {
+              "nome": "Jeremy Bentham",
+              "subtopicos": []
+            },
+            {
+              "nome": "John Stuart Mill",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Temática",
+      "subtopicos": [
+        {
+          "nome": "Antropologia Filosófica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Conhecimentos Gerais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Definições de Filosofia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Estética",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ética",
+          "subtopicos": []
+        },
+        {
+          "nome": "Filosofia da Educação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Filosofia da Linguagem",
+          "subtopicos": []
+        },
+        {
+          "nome": "Filosofia da Religião",
+          "subtopicos": []
+        },
+        {
+          "nome": "Filosofia das Ciências",
+          "subtopicos": []
+        },
+        {
+          "nome": "Filosofia Política",
+          "subtopicos": [
+            {
+              "nome": "Contrato Social",
+              "subtopicos": []
+            },
+            {
+              "nome": "Grécia Antiga",
+              "subtopicos": []
+            },
+            {
+              "nome": "Nicolau Maquiavel",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Lógica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Metafísica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Questões e Temas Transversais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Senso Comum e Ideologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Teoria das Ciências Humanas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Teoria do Conhecimento",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "Física": [
+    {
+      "nome": "Análise Dimensional / Sistemas de Unidades",
+      "subtopicos": []
+    },
+    {
+      "nome": "Eletricidade",
+      "subtopicos": [
+        {
+          "nome": "Eletrodinâmica",
+          "subtopicos": [
+            {
+              "nome": "Associação de Resistores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Circuitos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Geradores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Instrumentos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Kirchoff",
+              "subtopicos": []
+            },
+            {
+              "nome": "Potência",
+              "subtopicos": []
+            },
+            {
+              "nome": "Primeira Lei de Ohm",
+              "subtopicos": []
+            },
+            {
+              "nome": "Receptores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Segunda Lei de Ohm",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tensão e Corrente",
+              "subtopicos": []
+            },
+            {
+              "nome": "Trabalho e Energia",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Eletrostática",
+          "subtopicos": [
+            {
+              "nome": "Campo Elétrico",
+              "subtopicos": []
+            },
+            {
+              "nome": "Campo Elétrico Uniforme",
+              "subtopicos": []
+            },
+            {
+              "nome": "Capacitores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Carga elétrica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Condutor Eletrizado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Eletrização",
+              "subtopicos": []
+            },
+            {
+              "nome": "Força Elétrica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Potencial Elétrico",
+              "subtopicos": []
+            },
+            {
+              "nome": "Trabalho da Força Elétrica",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Experimental",
+      "subtopicos": []
+    },
+    {
+      "nome": "Gráficos - Leitura e Interpretação",
+      "subtopicos": []
+    },
+    {
+      "nome": "Magnetismo",
+      "subtopicos": [
+        {
+          "nome": "Fontes de Campo Magnético",
+          "subtopicos": [
+            {
+              "nome": "Espiras",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fio Retilíneo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Solenóides",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Força Eletromotriz Induzida",
+          "subtopicos": []
+        },
+        {
+          "nome": "Força Magnética",
+          "subtopicos": [
+            {
+              "nome": "Entre Condutores",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sobre Condutor",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sobre Partícula",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Imãs",
+          "subtopicos": []
+        },
+        {
+          "nome": "Indução Eletromagnética",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimento de Carga em Campo Magnético",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Mecânica",
+      "subtopicos": [
+        {
+          "nome": "Cinemática",
+          "subtopicos": [
+            {
+              "nome": "Fundamentos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gráficos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lançamento Horizontal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lançamento Oblíquo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Movimento Circular Uniforme",
+              "subtopicos": []
+            },
+            {
+              "nome": "Movimento Circular Uniformemente Variado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Movimento Uniforme",
+              "subtopicos": []
+            },
+            {
+              "nome": "Movimento Uniformemente Variado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Queda Livre e Lançamento Vertical",
+              "subtopicos": []
+            },
+            {
+              "nome": "Velocidade Média",
+              "subtopicos": []
+            },
+            {
+              "nome": "Vetorial / Componente da Aceleração",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Dinâmica",
+          "subtopicos": [
+            {
+              "nome": "Ação e Reação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Atrito",
+              "subtopicos": []
+            },
+            {
+              "nome": "Blocos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Componentes da Resultante",
+              "subtopicos": []
+            },
+            {
+              "nome": "Dinâmica do Movimento Circular",
+              "subtopicos": []
+            },
+            {
+              "nome": "Força Elástica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fundamentos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lei da Inércia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Máquinas Simples",
+              "subtopicos": []
+            },
+            {
+              "nome": "Plano Inclinado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Princípio Fundamental",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Estática",
+          "subtopicos": [
+            {
+              "nome": "Corpo Extenso",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ponto Material",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Gravitação",
+          "subtopicos": [
+            {
+              "nome": "Astronomia / Astrofísica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Kepler",
+              "subtopicos": []
+            },
+            {
+              "nome": "Newton",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Hidrodinâmica",
+          "subtopicos": [
+            {
+              "nome": "Efeito Venturi",
+              "subtopicos": []
+            },
+            {
+              "nome": "Equação de Bernoulli",
+              "subtopicos": []
+            },
+            {
+              "nome": "Equação de Continuidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Vazão",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Hidrostática",
+          "subtopicos": [
+            {
+              "nome": "Arquimedes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Densidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pascal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pressão",
+              "subtopicos": []
+            },
+            {
+              "nome": "Stevin",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Impulso e Quantidade de Movimento.",
+          "subtopicos": [
+            {
+              "nome": "Centro de Massa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Colisões",
+              "subtopicos": []
+            },
+            {
+              "nome": "Impulso",
+              "subtopicos": []
+            },
+            {
+              "nome": "Quantidade de Movimento",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sistemas Isolados",
+              "subtopicos": []
+            },
+            {
+              "nome": "Teorema do Impulso",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Movimento Harmônico Simples",
+          "subtopicos": [
+            {
+              "nome": "Cinemática",
+              "subtopicos": []
+            },
+            {
+              "nome": "Dinâmica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Energia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Osciladores",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Trabalho e Energia",
+          "subtopicos": [
+            {
+              "nome": "Energia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Potência",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sistemas Conservativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sistemas Não-Conservativos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Teorema da Energia",
+              "subtopicos": [
+                {
+                  "nome": "Cinética",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Mecânica",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Potencial",
+                  "subtopicos": []
+                }
+              ]
+            },
+            {
+              "nome": "Trabalho",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Moderna",
+      "subtopicos": [
+        {
+          "nome": "Corpo Negro",
+          "subtopicos": []
+        },
+        {
+          "nome": "Efeito Fotoelétrico",
+          "subtopicos": []
+        },
+        {
+          "nome": "Física de Partículas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fusão e Fissão Nuclear",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lei de Stefan-Boltzmann",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lei de Wien",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modelos Atômicos",
+          "subtopicos": [
+            {
+              "nome": "Modelo Atômico de Bohr",
+              "subtopicos": []
+            },
+            {
+              "nome": "Modelo Atômico de Dalton",
+              "subtopicos": []
+            },
+            {
+              "nome": "Modelo Atômico de Rutherford",
+              "subtopicos": []
+            },
+            {
+              "nome": "Modelo Atômico de Thomson",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Quântica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Radioatividade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Teoria da Relatividade",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Ondulatória",
+      "subtopicos": [
+        {
+          "nome": "Estudo Matemático",
+          "subtopicos": [
+            {
+              "nome": "Equação de Onda",
+              "subtopicos": []
+            },
+            {
+              "nome": "Equação Fundamental",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Fenômenos",
+          "subtopicos": [
+            {
+              "nome": "Difração",
+              "subtopicos": []
+            },
+            {
+              "nome": "Efeito Doppler",
+              "subtopicos": []
+            },
+            {
+              "nome": "Interferência",
+              "subtopicos": []
+            },
+            {
+              "nome": "Polarização",
+              "subtopicos": []
+            },
+            {
+              "nome": "Qualidades Fisiológicas do Som",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reflexão",
+              "subtopicos": []
+            },
+            {
+              "nome": "Refração",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ressonância",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Fundamentos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ondas Estacionárias",
+          "subtopicos": [
+            {
+              "nome": "Cordas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tubos",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Óptica",
+      "subtopicos": [
+        {
+          "nome": "Espelhos Esféricos",
+          "subtopicos": [
+            {
+              "nome": "Construções",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gauss",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Espelhos Planos",
+          "subtopicos": [
+            {
+              "nome": "Construções",
+              "subtopicos": []
+            },
+            {
+              "nome": "Rotação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Translação",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Fundamentos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Instrumentos Ópticos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lentes",
+          "subtopicos": [
+            {
+              "nome": "Construções",
+              "subtopicos": []
+            },
+            {
+              "nome": "Gauss",
+              "subtopicos": []
+            },
+            {
+              "nome": "Halley",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Óptica da Visão",
+          "subtopicos": []
+        },
+        {
+          "nome": "Prismas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Refração",
+          "subtopicos": [
+            {
+              "nome": "Dióptro Plano",
+              "subtopicos": []
+            },
+            {
+              "nome": "Índice de Refração",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reflexão Total",
+              "subtopicos": []
+            },
+            {
+              "nome": "Snell",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Temática",
+      "subtopicos": []
+    },
+    {
+      "nome": "Termologia",
+      "subtopicos": [
+        {
+          "nome": "Calorimetria",
+          "subtopicos": [
+            {
+              "nome": "Calor Latente",
+              "subtopicos": []
+            },
+            {
+              "nome": "Calor Sensível",
+              "subtopicos": []
+            },
+            {
+              "nome": "Equilíbrio térmico",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mudanças de Estado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transmissão de Calor",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Dilatação",
+          "subtopicos": [
+            {
+              "nome": "dos Líquidos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Linear",
+              "subtopicos": []
+            },
+            {
+              "nome": "Superficial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Volumétrica",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Gases",
+          "subtopicos": [
+            {
+              "nome": "Clapeyron",
+              "subtopicos": []
+            },
+            {
+              "nome": "Equação Geral",
+              "subtopicos": []
+            },
+            {
+              "nome": "Propriedades",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Termodinâmica",
+          "subtopicos": [
+            {
+              "nome": "Energia Interna",
+              "subtopicos": []
+            },
+            {
+              "nome": "Máquinas Térmicas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Primeira Lei",
+              "subtopicos": []
+            },
+            {
+              "nome": "Segunda Lei",
+              "subtopicos": []
+            },
+            {
+              "nome": "Trabalho",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transformações (gráficos)",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Termometria",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "Geografia": [
+    {
+      "nome": "Brasil",
+      "subtopicos": [
+        {
+          "nome": "Econômica",
+          "subtopicos": [
+            {
+              "nome": "Agropecuária",
+              "subtopicos": []
+            },
+            {
+              "nome": "Blocos Econômicos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Comércio Exterior",
+              "subtopicos": []
+            },
+            {
+              "nome": "Extrativismo Mineral",
+              "subtopicos": []
+            },
+            {
+              "nome": "Extrativismo Vegetal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fontes de Energia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Globalização",
+              "subtopicos": []
+            },
+            {
+              "nome": "Indústria",
+              "subtopicos": []
+            },
+            {
+              "nome": "Política Econômica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transportes / Comunicações",
+              "subtopicos": []
+            },
+            {
+              "nome": "Turismo / Lazer / Entretenimento",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Física",
+          "subtopicos": [
+            {
+              "nome": "Astronomia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Cartografia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Clima",
+              "subtopicos": []
+            },
+            {
+              "nome": "Espaço Geográfico",
+              "subtopicos": []
+            },
+            {
+              "nome": "Hidrografia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Relevo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Vegetação",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Geopolítica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Humana",
+          "subtopicos": [
+            {
+              "nome": "População",
+              "subtopicos": []
+            },
+            {
+              "nome": "Urbanização",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Questões Ambientais",
+          "subtopicos": [
+            {
+              "nome": "Atmosfera",
+              "subtopicos": []
+            },
+            {
+              "nome": "Preservação / Biodiversidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Recursos Hídricos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Solos",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Regional",
+          "subtopicos": [
+            {
+              "nome": "Região Centro-Oeste",
+              "subtopicos": []
+            },
+            {
+              "nome": "Região Nordeste",
+              "subtopicos": []
+            },
+            {
+              "nome": "Região Norte",
+              "subtopicos": []
+            },
+            {
+              "nome": "Região Sudeste",
+              "subtopicos": []
+            },
+            {
+              "nome": "Região Sul",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Geral",
+      "subtopicos": [
+        {
+          "nome": "Econômica",
+          "subtopicos": [
+            {
+              "nome": "Agropecuária",
+              "subtopicos": []
+            },
+            {
+              "nome": "Comércio Exterior e Blocos Econômicos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Extrativismo Mineral",
+              "subtopicos": []
+            },
+            {
+              "nome": "Extrativismo Vegetal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fontes de Energia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Globalização",
+              "subtopicos": []
+            },
+            {
+              "nome": "Indústria",
+              "subtopicos": []
+            },
+            {
+              "nome": "Política Econômica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Transportes / Comunicações",
+              "subtopicos": []
+            },
+            {
+              "nome": "Turismo / Lazer / Entretenimento",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Física",
+          "subtopicos": [
+            {
+              "nome": "Astronomia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Cartografia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Clima",
+              "subtopicos": []
+            },
+            {
+              "nome": "Espaço Geográfico",
+              "subtopicos": []
+            },
+            {
+              "nome": "Hidrografia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Relevo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Vegetação",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Geopolítica",
+          "subtopicos": [
+            {
+              "nome": "África",
+              "subtopicos": []
+            },
+            {
+              "nome": "América Central",
+              "subtopicos": []
+            },
+            {
+              "nome": "América do Norte",
+              "subtopicos": []
+            },
+            {
+              "nome": "América do Sul",
+              "subtopicos": []
+            },
+            {
+              "nome": "Antártida",
+              "subtopicos": []
+            },
+            {
+              "nome": "CEI",
+              "subtopicos": []
+            },
+            {
+              "nome": "China",
+              "subtopicos": []
+            },
+            {
+              "nome": "Economias Emergentes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Europa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Japão",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mundial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oceania",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oriente Médio",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sudeste Asiático",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Humana",
+          "subtopicos": [
+            {
+              "nome": "População",
+              "subtopicos": []
+            },
+            {
+              "nome": "Urbanização",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Questões Ambientais",
+          "subtopicos": [
+            {
+              "nome": "Atmosfera",
+              "subtopicos": []
+            },
+            {
+              "nome": "Preservação / Biodiversidade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Recursos Hídricos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Solos",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Temática",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "História": [
+    {
+      "nome": "América",
+      "subtopicos": [
+        {
+          "nome": "Civilizações Pré-colombianas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Contemporânea",
+          "subtopicos": []
+        },
+        {
+          "nome": "Independente",
+          "subtopicos": []
+        },
+        {
+          "nome": "Período Colonial",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Brasil",
+      "subtopicos": [
+        {
+          "nome": "Crise do Sistema Colonial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Descobrimento",
+          "subtopicos": []
+        },
+        {
+          "nome": "Era Vargas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Escravidão",
+          "subtopicos": []
+        },
+        {
+          "nome": "Nova República",
+          "subtopicos": []
+        },
+        {
+          "nome": "Período Pré-colonial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Período Regencial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Povos indígenas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Primeiro Reinado",
+          "subtopicos": []
+        },
+        {
+          "nome": "Regime Militar (64-85)",
+          "subtopicos": []
+        },
+        {
+          "nome": "República da Espada",
+          "subtopicos": []
+        },
+        {
+          "nome": "República Liberal (46-64)",
+          "subtopicos": []
+        },
+        {
+          "nome": "República Oligárquica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Segundo Reinado",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sistema Colonial",
+          "subtopicos": [
+            {
+              "nome": "Brasil Holandês",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ciclo do Açúcar",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ciclo do Ouro",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ciclo do Pau-Brasil (Pré-Colonial)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Colonização Efetiva (Capitanias Hereditárias e Governo-Geral)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Corte Joanina no Brasil",
+              "subtopicos": []
+            },
+            {
+              "nome": "Expansão Territorial, Entradas e Bandeiras",
+              "subtopicos": []
+            },
+            {
+              "nome": "Relações Socioeconômicas e Culturais",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revoltas Nativistas e Conjurações Coloniais",
+              "subtopicos": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nome": "Geral",
+      "subtopicos": [
+        {
+          "nome": "Alta Idade Média",
+          "subtopicos": []
+        },
+        {
+          "nome": "Antiguidade Clássica",
+          "subtopicos": [
+            {
+              "nome": "Grécia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Roma",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Antiguidade Oriental",
+          "subtopicos": [
+            {
+              "nome": "China",
+              "subtopicos": []
+            },
+            {
+              "nome": "Egito",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fenícia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Índia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mesopotâmia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pérsia",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Atualidades",
+          "subtopicos": []
+        },
+        {
+          "nome": "Baixa Idade Média",
+          "subtopicos": []
+        },
+        {
+          "nome": "Mundo Contemporâneo",
+          "subtopicos": [
+            {
+              "nome": "Capitalismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Comuna de Paris",
+              "subtopicos": []
+            },
+            {
+              "nome": "Conflitos no Oriente Médio",
+              "subtopicos": []
+            },
+            {
+              "nome": "Congresso de Viena",
+              "subtopicos": []
+            },
+            {
+              "nome": "Crise de 1929",
+              "subtopicos": []
+            },
+            {
+              "nome": "Descolonização Afro-asiática",
+              "subtopicos": []
+            },
+            {
+              "nome": "E.U.A. no séc. XIX",
+              "subtopicos": []
+            },
+            {
+              "nome": "Era Napoleônica",
+              "subtopicos": []
+            },
+            {
+              "nome": "Guerra de Secessão",
+              "subtopicos": []
+            },
+            {
+              "nome": "Guerra Fria",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ideias Sociais e Políticas do séc. XIX",
+              "subtopicos": []
+            },
+            {
+              "nome": "Imperialismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Nazi - Fascismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Nova Ordem Mundial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Primeira Guerra Mundial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revolução Industrial (fase 2)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revolução Russa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revoluções de 1830 e 1848",
+              "subtopicos": []
+            },
+            {
+              "nome": "Segunda Guerra Mundial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Unificação Alemã e Italiana",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Mundo Moderno",
+          "subtopicos": [
+            {
+              "nome": "Absolutismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Crise do Sistema Feudal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Expansão Marítimo - Comercial",
+              "subtopicos": []
+            },
+            {
+              "nome": "Iluminismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Independência dos E.U.A.",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mercantilismo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reforma Religiosa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Renascimento",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revolução Francesa",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revolução Industrial (fase 1)",
+              "subtopicos": []
+            },
+            {
+              "nome": "Revoluções Inglesas do séc. XVII",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sacro Império Romano-Germânico",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Pré-história",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Temática",
+      "subtopicos": [
+        {
+          "nome": "Arte",
+          "subtopicos": []
+        },
+        {
+          "nome": "Conhecimentos Gerais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Constituições",
+          "subtopicos": []
+        },
+        {
+          "nome": "História da África",
+          "subtopicos": []
+        },
+        {
+          "nome": "História da Ciência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Historiografia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Política",
+          "subtopicos": []
+        },
+        {
+          "nome": "Problemas Sociais",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "Inglês": [
+    {
+      "nome": "Adjectives",
+      "subtopicos": [
+        {
+          "nome": "Agreement",
+          "subtopicos": []
+        },
+        {
+          "nome": "Degrees of Comparison",
+          "subtopicos": []
+        },
+        {
+          "nome": "Kinds",
+          "subtopicos": []
+        },
+        {
+          "nome": "Position",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Adjectives and Pronouns",
+      "subtopicos": [
+        {
+          "nome": "Demonstratives",
+          "subtopicos": []
+        },
+        {
+          "nome": "Indefinites",
+          "subtopicos": []
+        },
+        {
+          "nome": "Interrogatives",
+          "subtopicos": []
+        },
+        {
+          "nome": "Personal Pronouns",
+          "subtopicos": []
+        },
+        {
+          "nome": "Possessive",
+          "subtopicos": []
+        },
+        {
+          "nome": "Quantifiers",
+          "subtopicos": []
+        },
+        {
+          "nome": "Reflexive and Emphasizing Pronouns",
+          "subtopicos": []
+        },
+        {
+          "nome": "Relatives",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Adverbs",
+      "subtopicos": [
+        {
+          "nome": "Comparison",
+          "subtopicos": []
+        },
+        {
+          "nome": "Inversion",
+          "subtopicos": []
+        },
+        {
+          "nome": "Kinds",
+          "subtopicos": [
+            {
+              "nome": "Degree or Intensity",
+              "subtopicos": []
+            },
+            {
+              "nome": "Doubt",
+              "subtopicos": []
+            },
+            {
+              "nome": "Frequency",
+              "subtopicos": []
+            },
+            {
+              "nome": "Manner",
+              "subtopicos": []
+            },
+            {
+              "nome": "Place",
+              "subtopicos": []
+            },
+            {
+              "nome": "Time",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Phrasal Adverbs",
+          "subtopicos": []
+        },
+        {
+          "nome": "Position in the Sentence",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Agreement",
+      "subtopicos": [
+        {
+          "nome": "Verb and Subject",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Articles",
+      "subtopicos": [
+        {
+          "nome": "Definite",
+          "subtopicos": []
+        },
+        {
+          "nome": "Indefinite",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Conjunction",
+      "subtopicos": []
+    },
+    {
+      "nome": "False Cognates",
+      "subtopicos": []
+    },
+    {
+      "nome": "Idiomatic expressions",
+      "subtopicos": []
+    },
+    {
+      "nome": "Interjections and Exclamations",
+      "subtopicos": [
+        {
+          "nome": "Some Common Exclamations",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Nouns",
+      "subtopicos": [
+        {
+          "nome": "Gender",
+          "subtopicos": []
+        },
+        {
+          "nome": "Kinds",
+          "subtopicos": []
+        },
+        {
+          "nome": "Plurals",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Genitive (Possessive) Case",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Numerals",
+      "subtopicos": [
+        {
+          "nome": "Cardinals",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ordinals",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Prepositions",
+      "subtopicos": [
+        {
+          "nome": "Adjectives and Prepositions",
+          "subtopicos": []
+        },
+        {
+          "nome": "Gerunds after Prepositions",
+          "subtopicos": []
+        },
+        {
+          "nome": "Nouns and Prepositions",
+          "subtopicos": []
+        },
+        {
+          "nome": "Omission of To and For before Indirect Object",
+          "subtopicos": []
+        },
+        {
+          "nome": "Phrasal Verbs",
+          "subtopicos": []
+        },
+        {
+          "nome": "Some Useful Prepositions",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Question Tag",
+      "subtopicos": []
+    },
+    {
+      "nome": "Text Comprehension",
+      "subtopicos": [
+        {
+          "nome": "Advertisements and Commercial Texts",
+          "subtopicos": []
+        },
+        {
+          "nome": "Charges, Comic Strips and Cartoons",
+          "subtopicos": [
+            {
+              "nome": "Bill Watterson",
+              "subtopicos": []
+            },
+            {
+              "nome": "Charles Schulz",
+              "subtopicos": []
+            },
+            {
+              "nome": "Dik Browne",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jim Davis",
+              "subtopicos": []
+            },
+            {
+              "nome": "Others",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Charts",
+          "subtopicos": []
+        },
+        {
+          "nome": "Epistolary Texts",
+          "subtopicos": []
+        },
+        {
+          "nome": "From Web - Internet",
+          "subtopicos": []
+        },
+        {
+          "nome": "Humorous Texts",
+          "subtopicos": []
+        },
+        {
+          "nome": "Images",
+          "subtopicos": []
+        },
+        {
+          "nome": "Informative Texts - Journalistic",
+          "subtopicos": [
+            {
+              "nome": "Business Week",
+              "subtopicos": []
+            },
+            {
+              "nome": "Chicago Tribune",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ícaro",
+              "subtopicos": []
+            },
+            {
+              "nome": "International Herald Tribune",
+              "subtopicos": []
+            },
+            {
+              "nome": "National Geographic",
+              "subtopicos": []
+            },
+            {
+              "nome": "New Scientist",
+              "subtopicos": []
+            },
+            {
+              "nome": "Newsweek",
+              "subtopicos": []
+            },
+            {
+              "nome": "Others",
+              "subtopicos": []
+            },
+            {
+              "nome": "Popular Science",
+              "subtopicos": []
+            },
+            {
+              "nome": "Reader's Digest",
+              "subtopicos": []
+            },
+            {
+              "nome": "Scientific American",
+              "subtopicos": []
+            },
+            {
+              "nome": "Speak Up",
+              "subtopicos": []
+            },
+            {
+              "nome": "The Economist",
+              "subtopicos": []
+            },
+            {
+              "nome": "The Guardian",
+              "subtopicos": []
+            },
+            {
+              "nome": "The Lancet",
+              "subtopicos": []
+            },
+            {
+              "nome": "The Miami Herald",
+              "subtopicos": []
+            },
+            {
+              "nome": "The New York Times",
+              "subtopicos": []
+            },
+            {
+              "nome": "The New Yorker",
+              "subtopicos": []
+            },
+            {
+              "nome": "The Times",
+              "subtopicos": []
+            },
+            {
+              "nome": "Time",
+              "subtopicos": []
+            },
+            {
+              "nome": "USA Today",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Informative Texts - Scientific",
+          "subtopicos": []
+        },
+        {
+          "nome": "Informative Texts - Technical",
+          "subtopicos": []
+        },
+        {
+          "nome": "Instructional Texts",
+          "subtopicos": [
+            {
+              "nome": "Deborah Morris",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ernest Hemingway",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lewis Caroll",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mary Shelley",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oscar Wilde",
+              "subtopicos": []
+            },
+            {
+              "nome": "Others",
+              "subtopicos": []
+            },
+            {
+              "nome": "Sheldon Kelly",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Literary Texts",
+          "subtopicos": [
+            {
+              "nome": "Others",
+              "subtopicos": []
+            },
+            {
+              "nome": "Play",
+              "subtopicos": []
+            },
+            {
+              "nome": "Poetry",
+              "subtopicos": [
+                {
+                  "nome": "D. H. Lawrence",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Emily Dickinson",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Others",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "William Blake",
+                  "subtopicos": []
+                }
+              ]
+            },
+            {
+              "nome": "Prose",
+              "subtopicos": [
+                {
+                  "nome": "Deborah Morris",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Ernest Hemingway",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Lewis Carroll",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Oscar Wilde",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Others",
+                  "subtopicos": []
+                },
+                {
+                  "nome": "Sheldon Kelly",
+                  "subtopicos": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nome": "Lyrics",
+          "subtopicos": []
+        },
+        {
+          "nome": "Quotes",
+          "subtopicos": []
+        },
+        {
+          "nome": "Texts without source",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "The Passive Voice",
+      "subtopicos": []
+    },
+    {
+      "nome": "Verbs",
+      "subtopicos": [
+        {
+          "nome": "Additions to Remarks",
+          "subtopicos": []
+        },
+        {
+          "nome": "Conditional Sentences",
+          "subtopicos": []
+        },
+        {
+          "nome": "Direct and Indirect Speech",
+          "subtopicos": []
+        },
+        {
+          "nome": "Future Tense",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modals",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Auxiliaries \"be\", \"have\", \"do\", \"shall\"",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Gerund and the Present Participle",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Imperative",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Infinitive",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Past Continuous",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Past Perfect",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Present Continuous",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Present Perfect",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Present Perfect Continuous",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Simple Past",
+          "subtopicos": []
+        },
+        {
+          "nome": "The Simple Present Tense",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Vocabulary",
+      "subtopicos": []
+    },
+    {
+      "nome": "Word Building",
+      "subtopicos": []
+    },
+    {
+      "nome": "Word Order",
+      "subtopicos": []
+    }
+  ],
+  "Matemática": [
+    {
+      "nome": "Análise Combinatória",
+      "subtopicos": [
+        {
+          "nome": "Arranjo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Combinação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Permutação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Princípio Aditivo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Princípio das Gavetas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Princípio Multiplicativo",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Aritmética",
+      "subtopicos": [
+        {
+          "nome": "Múltiplos e Divisores",
+          "subtopicos": []
+        },
+        {
+          "nome": "Problemas sobre as 4 Operações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sistema de Numeração e Métrico Decimal",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Binômio de Newton",
+      "subtopicos": [
+        {
+          "nome": "Fatorial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Outros",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Complexos",
+      "subtopicos": []
+    },
+    {
+      "nome": "Conjuntos",
+      "subtopicos": []
+    },
+    {
+      "nome": "Conjuntos Numéricos",
+      "subtopicos": []
+    },
+    {
+      "nome": "Construções Geométricas",
+      "subtopicos": []
+    },
+    {
+      "nome": "Derivadas e Integrais",
+      "subtopicos": []
+    },
+    {
+      "nome": "Determinantes",
+      "subtopicos": []
+    },
+    {
+      "nome": "Equações",
+      "subtopicos": [
+        {
+          "nome": "Equação do Primeiro Grau",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equação do Segundo Grau",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equação do Terceiro Grau",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equações Redutíveis ao Segundo Grau",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modular",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Equações polinomiais",
+      "subtopicos": []
+    },
+    {
+      "nome": "Estatística",
+      "subtopicos": []
+    },
+    {
+      "nome": "Exponenciais",
+      "subtopicos": []
+    },
+    {
+      "nome": "Expressões e Frações Algébricas",
+      "subtopicos": []
+    },
+    {
+      "nome": "Expressões Numéricas",
+      "subtopicos": []
+    },
+    {
+      "nome": "Fatoração e Produtos Notáveis",
+      "subtopicos": []
+    },
+    {
+      "nome": "Funções",
+      "subtopicos": [
+        {
+          "nome": "Função Afim",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Composta",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Exponencial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Injetora, Sobrejetora ou Bijetora",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Inversa",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Logarítmica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Modular",
+          "subtopicos": []
+        },
+        {
+          "nome": "Função Quadrática",
+          "subtopicos": []
+        },
+        {
+          "nome": "Funções Definidas por Várias Sentenças",
+          "subtopicos": []
+        },
+        {
+          "nome": "Gráficos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Miscelânea",
+          "subtopicos": []
+        },
+        {
+          "nome": "Paridade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Polinomial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Relações Binárias",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Geometria Analítica",
+      "subtopicos": [
+        {
+          "nome": "Circunferência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cônicas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fundamentos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lugar Geométrico",
+          "subtopicos": []
+        },
+        {
+          "nome": "Reta",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Geometria Espacial",
+      "subtopicos": [
+        {
+          "nome": "Cilindros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cones",
+          "subtopicos": []
+        },
+        {
+          "nome": "Diedros e Triedros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Esfera",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pirâmides",
+          "subtopicos": []
+        },
+        {
+          "nome": "Prismas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Retas e Planos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sólidos Inscritos e Circunscritos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Superfície Poliédrica e Poliedros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Troncos",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Geometria Plana",
+      "subtopicos": [
+        {
+          "nome": "Arcos na Circunferência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Área das Figuras Planas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Circunferência e Círculo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Congruência de Triângulos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fundamentos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Polígonos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Polígonos Regulares",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pontos Notáveis do Triângulo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Potência de Ponto",
+          "subtopicos": []
+        },
+        {
+          "nome": "Quadriláteros Notáveis",
+          "subtopicos": []
+        },
+        {
+          "nome": "Relações Métricas em Triângulos Quaisquer",
+          "subtopicos": []
+        },
+        {
+          "nome": "Relações Métricas no Triângulo Retângulo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Segmentos Proporcionais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Semelhança de Triângulos",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Grandezas Proporcionais",
+      "subtopicos": [
+        {
+          "nome": "Porcentagem",
+          "subtopicos": []
+        },
+        {
+          "nome": "Razões e Proporções",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Indução finita",
+      "subtopicos": []
+    },
+    {
+      "nome": "Inequações",
+      "subtopicos": [
+        {
+          "nome": "Exponencial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Inequação do Primeiro Grau",
+          "subtopicos": []
+        },
+        {
+          "nome": "Inequação do Segundo Grau",
+          "subtopicos": []
+        },
+        {
+          "nome": "Logarítmica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modular",
+          "subtopicos": []
+        },
+        {
+          "nome": "Produto/Quociente",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Limites",
+      "subtopicos": []
+    },
+    {
+      "nome": "Logarítmos",
+      "subtopicos": []
+    },
+    {
+      "nome": "Matemática Financeira",
+      "subtopicos": []
+    },
+    {
+      "nome": "Matrizes",
+      "subtopicos": []
+    },
+    {
+      "nome": "Médias",
+      "subtopicos": [
+        {
+          "nome": "Aritmética",
+          "subtopicos": []
+        },
+        {
+          "nome": "Geométrica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Harmônica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ponderada",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Noções de Lógica Matemática",
+      "subtopicos": []
+    },
+    {
+      "nome": "Polinômios",
+      "subtopicos": []
+    },
+    {
+      "nome": "Potenciação",
+      "subtopicos": []
+    },
+    {
+      "nome": "Probabilidades",
+      "subtopicos": []
+    },
+    {
+      "nome": "Progressão Aritmética",
+      "subtopicos": []
+    },
+    {
+      "nome": "Progressão Geométrica",
+      "subtopicos": []
+    },
+    {
+      "nome": "Radiciação",
+      "subtopicos": []
+    },
+    {
+      "nome": "Sistemas Lineares",
+      "subtopicos": []
+    },
+    {
+      "nome": "Trigonometria",
+      "subtopicos": [
+        {
+          "nome": "Arco Duplo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Arcos na Circunferência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Funções Trigonométricas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Funções Trigonométricas Inversas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Inequações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lei dos Cossenos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lei dos Senos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Outras Relações Trigonométricas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Razões Trigonométricas no Triângulo Retângulo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Redução ao Primeiro Quadrante",
+          "subtopicos": []
+        },
+        {
+          "nome": "Soma de Arcos",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Vetores",
+      "subtopicos": []
+    }
+  ],
+  "Português": [
+    {
+      "nome": "Estilística",
+      "subtopicos": [
+        {
+          "nome": "Figuras de Linguagem",
+          "subtopicos": []
+        },
+        {
+          "nome": "Versificação",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Fonética",
+      "subtopicos": [
+        {
+          "nome": "Divisão Silábica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Encontros Consonantais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Encontros Vocálicos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fonema e Letra",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tonicidade",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Gramática",
+      "subtopicos": [
+        {
+          "nome": "Acentuação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Morfologia",
+          "subtopicos": [
+            {
+              "nome": "Classes de Palavras",
+              "subtopicos": []
+            },
+            {
+              "nome": "Formação de Palavras",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Ortografia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sintaxe",
+          "subtopicos": [
+            {
+              "nome": "Colocação Pronominal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Concordância Verbal e Nominal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Crase",
+              "subtopicos": []
+            },
+            {
+              "nome": "Frase, Oração , Período",
+              "subtopicos": []
+            },
+            {
+              "nome": "Orações Coordenadas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Orações Subordinadas",
+              "subtopicos": []
+            },
+            {
+              "nome": "Pontuação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Regência Nominal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Regência Verbal",
+              "subtopicos": []
+            },
+            {
+              "nome": "Termos da Oração",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Verbos",
+          "subtopicos": [
+            {
+              "nome": "Conjugação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Predicação",
+              "subtopicos": []
+            },
+            {
+              "nome": "Tempo e Modo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Vozes",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Vocabulário",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Interpretação de Textos",
+      "subtopicos": [
+        {
+          "nome": "Ambiguidade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Charges e Quadrinhos",
+          "subtopicos": [
+            {
+              "nome": "Adão Iturrusgarai",
+              "subtopicos": []
+            },
+            {
+              "nome": "Angeli",
+              "subtopicos": []
+            },
+            {
+              "nome": "Bill Watterson / Calvin",
+              "subtopicos": []
+            },
+            {
+              "nome": "Bob Thaves / Frank & Ernest",
+              "subtopicos": []
+            },
+            {
+              "nome": "Caco Galhardo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Caulos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Chico Caruso",
+              "subtopicos": []
+            },
+            {
+              "nome": "Dálcio Machado",
+              "subtopicos": []
+            },
+            {
+              "nome": "Dik & Chris Browne / Hagar",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fernando Gonsales / Níquel Náusea",
+              "subtopicos": []
+            },
+            {
+              "nome": "Frank",
+              "subtopicos": []
+            },
+            {
+              "nome": "Glauco",
+              "subtopicos": []
+            },
+            {
+              "nome": "Henfil",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jaguar",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jean",
+              "subtopicos": []
+            },
+            {
+              "nome": "Jim Davis / Garfield",
+              "subtopicos": []
+            },
+            {
+              "nome": "Laerte",
+              "subtopicos": []
+            },
+            {
+              "nome": "Luís Fernando Veríssimo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Maurício de Souza",
+              "subtopicos": []
+            },
+            {
+              "nome": "Miguel Paiva / Radical Chique",
+              "subtopicos": []
+            },
+            {
+              "nome": "Millôr Fernandes",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mort Walker / Recruta Zero",
+              "subtopicos": []
+            },
+            {
+              "nome": "Nani",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Quino / Mafalda",
+              "subtopicos": []
+            },
+            {
+              "nome": "Scott Adams / Dilbert",
+              "subtopicos": []
+            },
+            {
+              "nome": "Walt Disney",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ziraldo",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Crônicas",
+          "subtopicos": [
+            {
+              "nome": "Fernando Sabino",
+              "subtopicos": []
+            },
+            {
+              "nome": "Luís Fernando Veríssimo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Rubem Alves",
+              "subtopicos": []
+            },
+            {
+              "nome": "Rubem Braga",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Imagens",
+          "subtopicos": []
+        },
+        {
+          "nome": "Músicas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Textos Científicos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Textos Jornalísticos",
+          "subtopicos": [
+            {
+              "nome": "Ciência Hoje",
+              "subtopicos": []
+            },
+            {
+              "nome": "Época",
+              "subtopicos": []
+            },
+            {
+              "nome": "Folha de São Paulo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Isto É",
+              "subtopicos": []
+            },
+            {
+              "nome": "O Estado de São Paulo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Superinteressante",
+              "subtopicos": []
+            },
+            {
+              "nome": "Veja",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Textos Literários em Prosa",
+          "subtopicos": [
+            {
+              "nome": "Carlos Drummond de Andrade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Cecília Meireles",
+              "subtopicos": []
+            },
+            {
+              "nome": "Clarice Lispector",
+              "subtopicos": []
+            },
+            {
+              "nome": "Eça de Queirós",
+              "subtopicos": []
+            },
+            {
+              "nome": "Graciliano Ramos",
+              "subtopicos": []
+            },
+            {
+              "nome": "João Guimarães Rosa",
+              "subtopicos": []
+            },
+            {
+              "nome": "José de Alencar",
+              "subtopicos": []
+            },
+            {
+              "nome": "José Lins do Rego",
+              "subtopicos": []
+            },
+            {
+              "nome": "Lima Barreto",
+              "subtopicos": []
+            },
+            {
+              "nome": "Machado de Assis",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mário de Andrade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oswald de Andrade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            },
+            {
+              "nome": "Raul Pompéia",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Textos Literários em Verso",
+          "subtopicos": [
+            {
+              "nome": "Álvares de Azevedo",
+              "subtopicos": []
+            },
+            {
+              "nome": "Carlos Drummond de Andrade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Casimiro de Abreu",
+              "subtopicos": []
+            },
+            {
+              "nome": "Castro Alves",
+              "subtopicos": []
+            },
+            {
+              "nome": "Cecília Meireles",
+              "subtopicos": []
+            },
+            {
+              "nome": "Fernando Pessoa e Heterônimos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ferreira Gullar",
+              "subtopicos": []
+            },
+            {
+              "nome": "Luís Vaz de Camões",
+              "subtopicos": []
+            },
+            {
+              "nome": "Manuel Bandeira",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mário Quintana",
+              "subtopicos": []
+            },
+            {
+              "nome": "Oswald de Andrade",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Textos Publicitários",
+          "subtopicos": []
+        },
+        {
+          "nome": "Textos Sem Fonte",
+          "subtopicos": []
+        },
+        {
+          "nome": "Textos Técnicos",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Literatura",
+      "subtopicos": [
+        {
+          "nome": "Arcadismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Barroco",
+          "subtopicos": []
+        },
+        {
+          "nome": "Classicismo / Quinhentismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Contemporânea",
+          "subtopicos": []
+        },
+        {
+          "nome": "Humanismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modernismo",
+          "subtopicos": [
+            {
+              "nome": "Primeira fase",
+              "subtopicos": []
+            },
+            {
+              "nome": "Segunda fase",
+              "subtopicos": []
+            },
+            {
+              "nome": "Terceira fase",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Pré-modernismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Realismo / Naturalismo / Parnasianismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Romantismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Simbolismo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Teoria Literária",
+          "subtopicos": []
+        },
+        {
+          "nome": "Trovadorismo",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Redação",
+      "subtopicos": [
+        {
+          "nome": "Carta Argumentativa",
+          "subtopicos": []
+        },
+        {
+          "nome": "Descrição",
+          "subtopicos": []
+        },
+        {
+          "nome": "Dissertação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Narração",
+          "subtopicos": []
+        },
+        {
+          "nome": "Outros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Tipos de Discurso",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Teoria da Comunicação",
+      "subtopicos": []
+    },
+    {
+      "nome": "Variações Linguísticas",
+      "subtopicos": []
+    }
+  ],
+  "Química": [
+    {
+      "nome": "Atomística",
+      "subtopicos": [
+        {
+          "nome": "Compostos Iônicos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Compostos Moleculares",
+          "subtopicos": []
+        },
+        {
+          "nome": "Estrutura do Átomo, Modelos Atômicos e Distribuição Eletrônica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Forças Intermoleculares",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ligação Metálica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ligações Químicas, Hibridização e Geometria Molecular",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Bioquímica",
+      "subtopicos": [
+        {
+          "nome": "Aminoácidos",
+          "subtopicos": []
+        },
+        {
+          "nome": "DNA, RNA e Bases Nitrogenadas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Enzimas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Hidratos de Carbono",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lipídios",
+          "subtopicos": []
+        },
+        {
+          "nome": "Neurotransmissores",
+          "subtopicos": []
+        },
+        {
+          "nome": "Pigmentos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Proteínas",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Físico - Química",
+      "subtopicos": [
+        {
+          "nome": "Cinética Química",
+          "subtopicos": []
+        },
+        {
+          "nome": "Colóides",
+          "subtopicos": []
+        },
+        {
+          "nome": "Conceitos de Ácidos e Bases",
+          "subtopicos": []
+        },
+        {
+          "nome": "Concentrações das Soluções",
+          "subtopicos": []
+        },
+        {
+          "nome": "Densidade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Diluição, Misturas de Soluções com ou sem Reações Químicas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Eletroquímica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equilíbrio Químico ou Iônico",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equivalente-grama",
+          "subtopicos": []
+        },
+        {
+          "nome": "Hidrólise de Sais, Grau e Constante de Hidrólise e pKh",
+          "subtopicos": []
+        },
+        {
+          "nome": "pH, pOH, pKa, pKb e pKw",
+          "subtopicos": []
+        },
+        {
+          "nome": "Produto de Solubilidade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Propriedades Coligativas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Radioatividade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Solubilidade, Curvas e Coeficientes de Solubilidade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Soluções",
+          "subtopicos": []
+        },
+        {
+          "nome": "Soluções-tampão",
+          "subtopicos": []
+        },
+        {
+          "nome": "Termoquímica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Titulometria",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Geral",
+      "subtopicos": [
+        {
+          "nome": "Alotropia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cálculo Estequiométrico",
+          "subtopicos": []
+        },
+        {
+          "nome": "Classificação das Reações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Classificação Periódica e Propriedades Periódicas e Aperiódicas dos Elementos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Descritiva",
+          "subtopicos": []
+        },
+        {
+          "nome": "Eletrólitos e não Eletrólitos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Equacionamento e Balanceamento de Reações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fenômenos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Fórmulas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Funções Inorgânicas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Gases",
+          "subtopicos": []
+        },
+        {
+          "nome": "Indicadores",
+          "subtopicos": []
+        },
+        {
+          "nome": "Lei das Combinações",
+          "subtopicos": []
+        },
+        {
+          "nome": "Massa atômica, Massa Molecular, mol e Suas Aplicações Fora da Estequiometria",
+          "subtopicos": []
+        },
+        {
+          "nome": "Mudanças de Estado, Gráficos de Aquecimento e Resfriamento",
+          "subtopicos": []
+        },
+        {
+          "nome": "Óxido-redução",
+          "subtopicos": []
+        },
+        {
+          "nome": "Práticas de Laboratório",
+          "subtopicos": []
+        },
+        {
+          "nome": "Propriedades da Matéria",
+          "subtopicos": []
+        },
+        {
+          "nome": "Separação de Misturas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Símbolos",
+          "subtopicos": []
+        },
+        {
+          "nome": "Substância e Mistura",
+          "subtopicos": []
+        },
+        {
+          "nome": "Substâncias, Sistemas e Materiais Homogêneos e Heterogêneos",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Meio Ambiente",
+      "subtopicos": [
+        {
+          "nome": "Desenvolvimento Tecnológico",
+          "subtopicos": []
+        },
+        {
+          "nome": "Poluição",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Orgânica",
+      "subtopicos": [
+        {
+          "nome": "Cadeias Carbônicas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Funções",
+          "subtopicos": []
+        },
+        {
+          "nome": "Isomeria Espacial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Isomeria Plana",
+          "subtopicos": []
+        },
+        {
+          "nome": "Petróleo",
+          "subtopicos": []
+        },
+        {
+          "nome": "Polímeros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Propriedades Físico-Químicas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Reações Orgânicas",
+          "subtopicos": []
+        }
+      ]
+    }
+  ],
+  "Sociologia": [
+    {
+      "nome": "Diversidade Cultural e Estratificação Social",
+      "subtopicos": [
+        {
+          "nome": "Classes Sociais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Cultura Popular e Erudita",
+          "subtopicos": []
+        },
+        {
+          "nome": "Desigualdades Sociais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Diversidade Cultural",
+          "subtopicos": []
+        },
+        {
+          "nome": "Geração (Crianças, Jovens, Adultos e Idosos)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Identidade",
+          "subtopicos": []
+        },
+        {
+          "nome": "Mídia e Indústria Cultural",
+          "subtopicos": []
+        },
+        {
+          "nome": "Questão Indígena",
+          "subtopicos": []
+        },
+        {
+          "nome": "Questão Racial",
+          "subtopicos": []
+        },
+        {
+          "nome": "Questões de Gênero",
+          "subtopicos": []
+        },
+        {
+          "nome": "Teorias de Estratificação Social",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Movimentos Sociais",
+      "subtopicos": [
+        {
+          "nome": "Aspectos Gerais",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimento Ambientalista",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimento Feminista",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimento LGBT",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimento Negro",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimento Operário e Sindical",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimentos Agrários",
+          "subtopicos": []
+        },
+        {
+          "nome": "Movimentos Urbanos",
+          "subtopicos": []
+        },
+        {
+          "nome": "ONG´S",
+          "subtopicos": []
+        },
+        {
+          "nome": "Outros Movimentos Sociais",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Poder, Estado e Política",
+      "subtopicos": [
+        {
+          "nome": "Cidadania e Direito (Humanos, Civis, Políticos e Sociais)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Criminalidade e Violência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Democracia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Ética e Corrupção",
+          "subtopicos": []
+        },
+        {
+          "nome": "Formação e Desenvolvimento do Estado Moderno",
+          "subtopicos": []
+        },
+        {
+          "nome": "Organização dos Poderes (Executivo, Legislativo e Judiciário)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Participação Política",
+          "subtopicos": []
+        },
+        {
+          "nome": "Política Brasileira",
+          "subtopicos": []
+        },
+        {
+          "nome": "Política e Ideologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Política Internacional",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sistemas de Governo",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Socialização e Instituições Sociais",
+      "subtopicos": [
+        {
+          "nome": "Educação e Instituição Escolar",
+          "subtopicos": []
+        },
+        {
+          "nome": "Família",
+          "subtopicos": []
+        },
+        {
+          "nome": "Instituições Religiosas",
+          "subtopicos": []
+        },
+        {
+          "nome": "Instituições Totais (Prisões, Manicômios, Asilos, Educandários etc)",
+          "subtopicos": []
+        },
+        {
+          "nome": "Processo de Socialização",
+          "subtopicos": []
+        },
+        {
+          "nome": "Questões conceituais",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Temática",
+      "subtopicos": [
+        {
+          "nome": "Outras Ciências Sociais",
+          "subtopicos": [
+            {
+              "nome": "Antropologia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Ciência Política",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outras",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Sociologia Brasileira",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia da Ciência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia da Cultura",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia da Educação",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia da Religião",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia da Violência",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia do Conhecimento",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia do Trabalho",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia Econômica",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia Política",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia Urbana",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Teoria Sociológica",
+      "subtopicos": [
+        {
+          "nome": "Aspectos Gerais e Comparativos entre Autores",
+          "subtopicos": []
+        },
+        {
+          "nome": "Conceitos Gerais",
+          "subtopicos": [
+            {
+              "nome": "Ideologia",
+              "subtopicos": []
+            },
+            {
+              "nome": "Mudança Social",
+              "subtopicos": []
+            },
+            {
+              "nome": "Outros Conceitos",
+              "subtopicos": []
+            },
+            {
+              "nome": "Senso Comum",
+              "subtopicos": []
+            }
+          ]
+        },
+        {
+          "nome": "Émile Durkheim",
+          "subtopicos": []
+        },
+        {
+          "nome": "Karl Marx",
+          "subtopicos": []
+        },
+        {
+          "nome": "Max Weber",
+          "subtopicos": []
+        },
+        {
+          "nome": "Metodologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Nascimento da Sociologia",
+          "subtopicos": []
+        },
+        {
+          "nome": "Outros",
+          "subtopicos": []
+        },
+        {
+          "nome": "Positivismo e Auguste Comte",
+          "subtopicos": []
+        },
+        {
+          "nome": "Sociologia Contemporânea",
+          "subtopicos": []
+        }
+      ]
+    },
+    {
+      "nome": "Trabalho e Produção",
+      "subtopicos": [
+        {
+          "nome": "Capitalismo e Globalização",
+          "subtopicos": []
+        },
+        {
+          "nome": "Divisão Social do Trabalho",
+          "subtopicos": []
+        },
+        {
+          "nome": "Emprego e Desemprego",
+          "subtopicos": []
+        },
+        {
+          "nome": "Modelos de Produção",
+          "subtopicos": []
+        }
+      ]
+    }
+  ]
+}

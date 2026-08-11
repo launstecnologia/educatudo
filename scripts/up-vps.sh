@@ -49,6 +49,10 @@ fi
 echo "==> EducaTudo — deploy VPS (MySQL remoto)"
 echo "    Raiz: $ROOT"
 echo "    Compose: docker-compose.vps.yml"
+echo "    PHP mem_limit: ${PHP_MEM_LIMIT:-4g} (override com PHP_MEM_LIMIT no .env da raiz)"
+
+# OPcache com validate_timestamps=0: após git pull sem rebuild, reinicie o PHP-FPM
+# para carregar código novo: docker compose -f docker-compose.vps.yml restart php
 
 if [[ ! -d "$BACKEND" ]]; then
   echo "ERRO: pasta backend/ não encontrada. Clone o repo plataforma_educatudo completo." >&2
@@ -103,9 +107,19 @@ echo "==> Stack no ar"
 echo "    Nginx :${NGINX_HTTP_PORT:-80} → backend/public/"
 echo "    Redis :${REDIS_PUBLISH_PORT:-6379}"
 echo "    MySQL : remoto (backend/.env DB_HOST)"
+echo "    PHP   : mem_limit=${PHP_MEM_LIMIT:-4g}, FPM max_children=50, OPcache+Redis"
+
+if docker exec php_app_educatudo php -m 2>/dev/null | grep -qi '^redis$'; then
+  echo "    Redis PHP: OK (extensão carregada)"
+else
+  echo "    AVISO: extensão redis ausente no PHP — rode com build: ./scripts/up-vps.sh (sem --no-build)"
+fi
+
 echo ""
 echo "Próximos passos:"
-echo "  1. Aponte DNS (*.educatudo.com, master) para esta VPS"
-echo "  2. Nginx host + cert wildcard: docs/DEPLOY-DOMINIOS.md"
-echo "  3. Migrations master: painel /master/migrations ou php backend/scripts/run_migrations.php"
-echo "  4. Teste: curl -H 'Host: master.SEUDOMINIO' http://127.0.0.1/master/"
+echo "  1. Diagnóstico: ./scripts/diagnostico-vps.sh"
+echo "  2. DNS (*.educatudo.com, master) → IP desta VPS; firewall 80/443 aberto"
+echo "  3. Cloudflare sem cert ainda: SSL/TLS → Flexible"
+echo "  4. Cert wildcard + HTTPS: ./scripts/setup-vps-ssl-docker.sh educatudo.com"
+echo "  5. Teste: curl -H 'Host: master.educatudo.com' http://127.0.0.1/master/"
+echo "  6. Após git pull (código): docker compose -f docker-compose.vps.yml restart php"

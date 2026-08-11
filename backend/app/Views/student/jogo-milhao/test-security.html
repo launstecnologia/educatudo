@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Segurança - Jogo do Milhão</title>
+    <script src="game-security.js"></script>
+</head>
+<body>
+    <h1>Teste de Segurança Ativo</h1>
+    <p>Tente:</p>
+    <ul>
+        <li>Abrir DevTools (F12)</li>
+        <li>Clicar com botão direito</li>
+        <li>Atualizar a página (F5)</li>
+        <li>Abrir múltiplas abas</li>
+    </ul>
+    
+    <p id="status">Aguardando testes...</p>
+    
+    <script>
+        // Verificar se o script foi carregado
+        if (typeof window.gameSecurity !== 'undefined') {
+            document.getElementById('status').innerHTML = 
+                '✅ Script de segurança carregado!';
+        } else {
+            document.getElementById('status').innerHTML = 
+                '❌ Script de segurança NÃO carregado!';
+        }
+    </script>
+</body>
+</html>
+
