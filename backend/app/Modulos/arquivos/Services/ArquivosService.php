@@ -484,7 +484,7 @@ class ArquivosService
      */
     public function resolverTurmasPublicacaoProfessor(array $professor, array $post): array
     {
-        $turmasPermitidas = json_decode($professor['turmas'] ?? '[]', true) ?: [];
+        $turmasPermitidas = array_map('intval', json_decode($professor['turmas'] ?? '[]', true) ?: []);
         $alunoId = isset($post['aluno_id']) && (int) $post['aluno_id'] > 0 ? (int) $post['aluno_id'] : null;
 
         if ($alunoId) {
@@ -696,7 +696,7 @@ class ArquivosService
         if ($turmaId <= 0) {
             return [];
         }
-        $turmasPermitidas = json_decode($professor['turmas'] ?? '[]', true) ?: [];
+        $turmasPermitidas = array_map('intval', json_decode($professor['turmas'] ?? '[]', true) ?: []);
         if (!in_array($turmaId, $turmasPermitidas, true)) {
             return [];
         }
