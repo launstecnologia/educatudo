@@ -1,23 +1,52 @@
 <?php
 
 require_once 'app/Core/BaseController.php';
+require_once __DIR__ . '/../../Models/Essays/EssayProposal.php';
 
 if (!class_exists('AdminEssayAnalyticsController')) {
 class AdminEssayAnalyticsController extends BaseController
 {
     private $db;
     private $authManager;
+    private $proposalModel;
 
     public function __construct()
     {
         parent::__construct();
         $this->db = Database::getInstance();
         $this->authManager = new AuthManager();
+        $this->proposalModel = new EssayProposal();
 
         $user = $this->authManager->getUser();
         if (!$user || !in_array($user['tipo'] ?? '', ['admin', 'dev'], true)) {
             $this->redirect('/admin/dashboard');
         }
+    }
+
+    /**
+     * Renderiza a view de analytics em estado vazio + flash de erro, em vez
+     * de deixar a exceção subir e derrubar a página inteira com "Erro Interno".
+     * A causa real fica registrada no log (Database::query()/Logger já loga
+     * a query e a mensagem original antes de chegar aqui).
+     */
+    private function falharComEstadoVazio(Throwable $e, string $view, array $dadosBase): void
+    {
+        if (!class_exists('Logger')) {
+            require_once 'app/Core/Logger.php';
+        }
+        Logger::error('Falha ao carregar Analytics de Redação: ' . $e->getMessage(), [
+            'exception' => $e,
+            'uri' => $_SERVER['REQUEST_URI'] ?? 'N/A',
+        ], 'general');
+
+        $this->setFlashMessage(
+            'Não foi possível carregar os dados de analytics agora. Tente novamente em instantes.',
+            'error'
+        );
+
+        $this->viewWithLayout('admin', $view, array_merge($dadosBase, [
+            'user' => $this->authManager->getUser(),
+        ]));
     }
 
     // -------------------------------------------------------------------------
@@ -28,6 +57,27 @@ class AdminEssayAnalyticsController extends BaseController
         $filtroTurma  = isset($_GET['turma_id'])    ? (int)$_GET['turma_id']       : null;
         $filtroFrom   = trim((string)($_GET['de']   ?? ''));
         $filtroTo     = trim((string)($_GET['ate']  ?? ''));
+
+        try {
+            $this->renderIndex($filtroTurma, $filtroFrom, $filtroTo);
+        } catch (Throwable $e) {
+            $this->falharComEstadoVazio($e, 'admin/essays-analytics/index', [
+                'title'            => 'Analytics — Jornada da Redação',
+                'kpis'             => [],
+                'envios_por_mes'   => [],
+                'distribuicao_notas' => [],
+                'top_propostas'    => [],
+                'turmas'           => [],
+                'filtro_turma'     => $filtroTurma,
+                'filtro_from'      => $filtroFrom,
+                'filtro_to'        => $filtroTo,
+            ]);
+        }
+    }
+
+    private function renderIndex(?int $filtroTurma, string $filtroFrom, string $filtroTo): void
+    {
+        $filtroAtivo = $this->proposalModel->sqlFiltroPropostaAtiva('p');
 
         $params = [];
         $where  = ['1=1'];
@@ -104,7 +154,7 @@ class AdminEssayAnalyticsController extends BaseController
              INNER JOIN alunos a ON a.id = e.student_id
              INNER JOIN redacoes_orientadas_propostas p ON p.id = e.proposal_id
              LEFT  JOIN redacoes_orientadas_correcoes c ON c.submission_id = e.id
-             WHERE {$whereSql} AND p.ativo = 1
+             WHERE {$whereSql}{$filtroAtivo}
              GROUP BY p.id, p.title ORDER BY total_envios DESC LIMIT 10",
             $params
         );
@@ -139,6 +189,27 @@ class AdminEssayAnalyticsController extends BaseController
         $alunoId    = isset($_GET['aluno_id']) ? (int)$_GET['aluno_id'] : null;
         $filtroFrom = trim((string)($_GET['de']  ?? ''));
         $filtroTo   = trim((string)($_GET['ate'] ?? ''));
+
+        try {
+            $this->renderByStudent($alunoId, $filtroFrom, $filtroTo);
+        } catch (Throwable $e) {
+            $this->falharComEstadoVazio($e, 'admin/essays-analytics/by-student', [
+                'title'        => 'Analytics por Aluno — Redação',
+                'alunos'       => [],
+                'aluno'        => null,
+                'aluno_id'     => $alunoId,
+                'kpis'         => null,
+                'evolucao'     => [],
+                'por_proposta' => [],
+                'filtro_from'  => $filtroFrom,
+                'filtro_to'    => $filtroTo,
+            ]);
+        }
+    }
+
+    private function renderByStudent(?int $alunoId, string $filtroFrom, string $filtroTo): void
+    {
+        $filtroAtivo = $this->proposalModel->sqlFiltroPropostaAtiva('p');
 
         // Lista de alunos que já enviaram pelo menos uma redação
         $alunos = $this->db->fetchAll(
@@ -190,7 +261,7 @@ class AdminEssayAnalyticsController extends BaseController
                  FROM redacoes_orientadas_entregas e
                  INNER JOIN redacoes_orientadas_propostas p ON p.id = e.proposal_id
                  LEFT  JOIN redacoes_orientadas_correcoes c ON c.submission_id = e.id
-                 WHERE e.student_id = :aluno_id {$dateWhere} AND c.id IS NOT NULL AND p.ativo = 1
+                 WHERE e.student_id = :aluno_id {$dateWhere} AND c.id IS NOT NULL{$filtroAtivo}
                  ORDER BY e.submitted_at ASC",
                 $dateParams
             );
@@ -208,7 +279,7 @@ class AdminEssayAnalyticsController extends BaseController
                  LEFT JOIN redacoes_orientadas_quadros q ON q.id = p.board_id
                  LEFT JOIN redacoes_orientadas_entregas e ON e.proposal_id = p.id AND e.student_id = :aluno_id {$dateWhere}
                  LEFT JOIN redacoes_orientadas_correcoes c ON c.submission_id = e.id
-                 WHERE p.ativo = 1
+                 WHERE 1=1{$filtroAtivo}
                  ORDER BY e.submitted_at DESC",
                 $dateParams
             );
@@ -251,11 +322,32 @@ class AdminEssayAnalyticsController extends BaseController
         $filtroFrom = trim((string)($_GET['de']  ?? ''));
         $filtroTo   = trim((string)($_GET['ate'] ?? ''));
 
+        try {
+            $this->renderByProposal($proposalId, $filtroFrom, $filtroTo);
+        } catch (Throwable $e) {
+            $this->falharComEstadoVazio($e, 'admin/essays-analytics/by-proposal', [
+                'title'        => 'Analytics por Proposta — Redação',
+                'propostas'    => [],
+                'proposta'     => null,
+                'proposta_id'  => $proposalId,
+                'kpis'         => null,
+                'distribuicao' => [],
+                'alunos'       => [],
+                'filtro_from'  => $filtroFrom,
+                'filtro_to'    => $filtroTo,
+            ]);
+        }
+    }
+
+    private function renderByProposal(?int $proposalId, string $filtroFrom, string $filtroTo): void
+    {
+        $filtroAtivo = $this->proposalModel->sqlFiltroPropostaAtiva('p');
+
         $propostas = $this->db->fetchAll(
             "SELECT p.id, p.title AS titulo, q.name AS banca
              FROM redacoes_orientadas_propostas p
              LEFT JOIN redacoes_orientadas_quadros q ON q.id = p.board_id
-             WHERE p.ativo = 1
+             WHERE 1=1{$filtroAtivo}
              ORDER BY p.title"
         );
 
@@ -266,7 +358,7 @@ class AdminEssayAnalyticsController extends BaseController
 
         if ($proposalId) {
             $proposalInfo = $this->db->fetch(
-                "SELECT p.*, p.title AS titulo, q.name AS banca FROM redacoes_orientadas_propostas p LEFT JOIN redacoes_orientadas_quadros q ON q.id = p.board_id WHERE p.id = :id AND p.ativo = 1",
+                "SELECT p.*, p.title AS titulo, q.name AS banca FROM redacoes_orientadas_propostas p LEFT JOIN redacoes_orientadas_quadros q ON q.id = p.board_id WHERE p.id = :id{$filtroAtivo}",
                 ['id' => $proposalId]
             );
 
@@ -363,6 +455,26 @@ class AdminEssayAnalyticsController extends BaseController
     // -------------------------------------------------------------------------
     public function exportExcel(): void
     {
+        try {
+            $this->renderExportExcel();
+        } catch (Throwable $e) {
+            if (!class_exists('Logger')) {
+                require_once 'app/Core/Logger.php';
+            }
+            Logger::error('Falha ao exportar Analytics de Redação: ' . $e->getMessage(), [
+                'exception' => $e,
+                'uri' => $_SERVER['REQUEST_URI'] ?? 'N/A',
+            ], 'general');
+
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Não foi possível gerar a exportação agora. Tente novamente em instantes.';
+        }
+    }
+
+    private function renderExportExcel(): void
+    {
+        $filtroAtivo = $this->proposalModel->sqlFiltroPropostaAtiva('p');
         $tipo       = trim((string)($_GET['tipo']       ?? 'geral'));
         $alunoId    = isset($_GET['aluno_id'])    ? (int)$_GET['aluno_id']    : null;
         $proposalId = isset($_GET['proposta_id']) ? (int)$_GET['proposta_id'] : null;
@@ -385,7 +497,7 @@ class AdminEssayAnalyticsController extends BaseController
                  INNER JOIN redacoes_orientadas_propostas p ON p.id = e.proposal_id
                  LEFT  JOIN redacoes_orientadas_quadros q ON q.id = p.board_id
                  LEFT  JOIN redacoes_orientadas_correcoes c ON c.submission_id = e.id
-                 WHERE e.student_id = :aluno_id {$dateWhere} AND p.ativo = 1
+                 WHERE e.student_id = :aluno_id {$dateWhere}{$filtroAtivo}
                  ORDER BY e.submitted_at DESC",
                 $dateParams
             );
@@ -408,7 +520,7 @@ class AdminEssayAnalyticsController extends BaseController
                  INNER JOIN redacoes_orientadas_propostas p ON p.id = e.proposal_id
                  LEFT  JOIN turmas t ON t.id = a.turma_id
                  LEFT  JOIN redacoes_orientadas_correcoes c ON c.submission_id = e.id
-                 WHERE e.proposal_id = :proposal_id {$dateWhere} AND p.ativo = 1
+                 WHERE e.proposal_id = :proposal_id {$dateWhere}{$filtroAtivo}
                  ORDER BY nota DESC, a.nome ASC",
                 $dateParams
             );
@@ -430,7 +542,7 @@ class AdminEssayAnalyticsController extends BaseController
                  INNER JOIN redacoes_orientadas_propostas p ON p.id = e.proposal_id
                  LEFT  JOIN turmas t ON t.id = a.turma_id
                  LEFT  JOIN redacoes_orientadas_correcoes c ON c.submission_id = e.id
-                 WHERE " . implode(' AND ', $where) . " AND p.ativo = 1
+                 WHERE " . implode(' AND ', $where) . " {$filtroAtivo}
                  ORDER BY e.submitted_at DESC LIMIT 5000",
                 $params
             );
