@@ -1,6 +1,6 @@
 <?php
 
-require_once 'app/Core/BaseController.php';
+require_once __DIR__ . '/../../Core/BaseController.php';
 require_once __DIR__ . '/../../Models/Essays/EssayProposal.php';
 
 if (!class_exists('AdminEssayAnalyticsController')) {
@@ -32,7 +32,7 @@ class AdminEssayAnalyticsController extends BaseController
     private function falharComEstadoVazio(Throwable $e, string $view, array $dadosBase): void
     {
         if (!class_exists('Logger')) {
-            require_once 'app/Core/Logger.php';
+            require_once __DIR__ . '/../../Core/Logger.php';
         }
         Logger::error('Falha ao carregar Analytics de Redação: ' . $e->getMessage(), [
             'exception' => $e,
@@ -459,7 +459,7 @@ class AdminEssayAnalyticsController extends BaseController
             $this->renderExportExcel();
         } catch (Throwable $e) {
             if (!class_exists('Logger')) {
-                require_once 'app/Core/Logger.php';
+                require_once __DIR__ . '/../../Core/Logger.php';
             }
             Logger::error('Falha ao exportar Analytics de Redação: ' . $e->getMessage(), [
                 'exception' => $e,

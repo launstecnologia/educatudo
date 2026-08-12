@@ -27,7 +27,7 @@
                     <div class="space-y-2">
                         <?php 
                         // Calcular estatísticas de cada sessão no controller e passar para a view
-                        require_once 'app/Core/Database.php';
+                        // (Database já está carregado globalmente por App.php)
                         $db = Database::getInstance();
                         
                         foreach ($sessoes as $sessao_item): 

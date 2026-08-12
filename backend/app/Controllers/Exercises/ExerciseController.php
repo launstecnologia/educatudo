@@ -3,8 +3,8 @@
  * Controller para gerenciar exercícios com histórico e restrições
  */
 
-require_once 'app/Core/BaseController.php';
-require_once 'app/Core/AuthManager.php';
+require_once __DIR__ . '/../../Core/BaseController.php';
+require_once __DIR__ . '/../../Core/AuthManager.php';
 
 if (!class_exists('ExerciseController')) {
 class ExerciseController extends BaseController

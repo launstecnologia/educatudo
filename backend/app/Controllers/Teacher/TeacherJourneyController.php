@@ -2040,7 +2040,7 @@ class TeacherJourneyController extends BaseController
             }
             
             // Gera explicação usando IA
-            require_once 'app/Services/OpenAIService.php';
+            require_once __DIR__ . '/../../Services/OpenAIService.php';
             $openAI = new OpenAIService();
             
             $explicacao = $openAI->gerarExplicacaoComplementar(
@@ -2061,7 +2061,7 @@ class TeacherJourneyController extends BaseController
     public function testarOpenAI()
     {
         try {
-            require_once 'app/Services/OpenAIService.php';
+            require_once __DIR__ . '/../../Services/OpenAIService.php';
             $openAI = new OpenAIService();
             
             $resultado = $openAI->testarConexao();
