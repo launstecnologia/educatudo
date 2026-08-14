@@ -45,6 +45,7 @@ $cards = [
         <div>
             <h3 class="text-lg font-semibold text-slate-900">Provas ao vivo</h3>
             <p class="text-sm text-slate-500 mt-1">Somente leitura. Atualiza sozinho a cada 20 segundos, sem alterar o acesso do aluno.</p>
+            <a href="<?= URL ?>/master/escolas/<?= $escolaId ?>/detalhes" class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mt-2">Voltar à ficha da escola</a>
         </div>
         <p class="text-sm text-slate-500 shrink-0">Atualizado às <?= htmlspecialchars($atualizado_em) ?></p>
     </div>

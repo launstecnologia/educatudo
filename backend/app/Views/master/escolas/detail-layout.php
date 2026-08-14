@@ -60,6 +60,7 @@ $backUrl = URL . '/master/escolas/' . $escola['id'] . '/detalhes';
 $escolaBasePath = '/master/escolas/' . $escola['id'] . '/';
 $paginasCheias = ['visao-geral', 'provas-ao-vivo'];
 $hasOffcanvasContent = !in_array($current_section, $paginasCheias, true);
+$esconderGradeCards = ($current_section === 'provas-ao-vivo');
 $currentLabel = 'Visão Geral';
 foreach ($sections as $s) {
     if ($s['id'] === $current_section) {
@@ -69,6 +70,7 @@ foreach ($sections as $s) {
 }
 ?>
 
+<?php if (!$esconderGradeCards): ?>
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
     <?php foreach ($sections as $s):
         $active = ($current_section === $s['id']);
@@ -95,6 +97,7 @@ foreach ($sections as $s) {
     </a>
     <?php endforeach; ?>
 </div>
+<?php endif; ?>
 
 <?php if (in_array($current_section, $paginasCheias, true)): ?>
 <?php include __DIR__ . '/detail/' . $section_view . '.php'; ?>
@@ -187,7 +190,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll('[data-section-card]').forEach(function(card) {
         card.addEventListener('click', function(e) {
-            if (card.getAttribute('data-pagina-cheia') === '1') return;
+            if (card.getAttribute('data-pagina-cheia') === '1') {
+                e.preventDefault();
+                window.location.assign(card.getAttribute('href'));
+                return;
+            }
             e.preventDefault();
             loadSection(card.getAttribute('href'), card.getAttribute('data-section-label'), card.getAttribute('data-section-id'));
         });
