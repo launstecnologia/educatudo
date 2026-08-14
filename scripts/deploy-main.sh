@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Deploy de produção a partir da branch main.
+# Deploy de código (main): git pull + composer se necessário + restart do PHP.
+# Não recria Nginx/Redis nem aplica compose da VPS — infra fica no servidor.
 #
 # Uso no servidor:
 #   cd /opt/educatudo
@@ -17,6 +18,13 @@ BRANCH="${DEPLOY_BRANCH:-main}"
 REMOTE="${DEPLOY_REMOTE:-origin}"
 HOST_HEADER="${DEPLOY_HEALTH_HOST:-master.educatudo.com}"
 HEALTH_PATH="${DEPLOY_HEALTH_PATH:-/master}"
+PHP_CONTAINER="${DEPLOY_PHP_CONTAINER:-php_app_educatudo}"
+PRESERVE_FILES=(
+  docker-compose.yml
+  docker-compose.vps.yml
+  docker-compose.vps.ssl-origin.yml
+  docker-compose.vps.ssl.yml
+)
 
 cd "$ROOT"
 
@@ -35,11 +43,6 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "ERRO: docker compose v2 nao encontrado." >&2
-  exit 1
-fi
-
 if [[ ! -f backend/.env ]]; then
   echo "ERRO: backend/.env ausente no servidor." >&2
   exit 1
@@ -51,11 +54,13 @@ if [[ ! -f ssl/cloudflare-origin.pem || ! -f ssl/cloudflare-origin.key ]]; then
   exit 1
 fi
 
-# Arquivos locais do servidor: nao bloqueiam deploy e nao sao sobrescritos.
-# docker-compose.yml e o compose de desenvolvimento; producao usa docker-compose.vps.yml.
+# Compose/.env do servidor nao bloqueiam e nao sao sobrescritos pelo deploy de codigo.
 GIT_IGNORE_LOCAL=(
   ':!backend/.env'
   ':!docker-compose.yml'
+  ':!docker-compose.vps.yml'
+  ':!docker-compose.vps.ssl-origin.yml'
+  ':!docker-compose.vps.ssl.yml'
 )
 
 if ! git diff --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
@@ -70,21 +75,29 @@ if ! git diff --cached --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
   exit 1
 fi
 
-compose_backup=""
-restore_compose_local() {
-  if [[ -n "${compose_backup:-}" && -f "$compose_backup" ]]; then
-    cp "$compose_backup" "$ROOT/docker-compose.yml"
-    rm -f "$compose_backup"
-    compose_backup=""
+preserve_dir=""
+restore_server_config() {
+  if [[ -z "${preserve_dir:-}" || ! -d "$preserve_dir" ]]; then
+    return
   fi
+  local f
+  for f in "${PRESERVE_FILES[@]}"; do
+    if [[ -f "$preserve_dir/$f" ]]; then
+      cp "$preserve_dir/$f" "$ROOT/$f"
+    fi
+  done
+  rm -rf "$preserve_dir"
+  preserve_dir=""
 }
-trap restore_compose_local EXIT
+trap restore_server_config EXIT
 
-if [[ -f docker-compose.yml ]] && ! git diff --quiet -- docker-compose.yml; then
-  compose_backup="$(mktemp)"
-  cp docker-compose.yml "$compose_backup"
-  git checkout -- docker-compose.yml
-fi
+preserve_dir="$(mktemp -d)"
+for f in "${PRESERVE_FILES[@]}"; do
+  if [[ -f "$f" ]]; then
+    cp "$f" "$preserve_dir/$f"
+    git checkout -- "$f" 2>/dev/null || true
+  fi
+done
 
 echo "==> Atualizando codigo"
 git fetch "$REMOTE" "$BRANCH"
@@ -96,7 +109,7 @@ if [[ "$current_branch" != "$BRANCH" ]]; then
 fi
 
 git pull --ff-only "$REMOTE" "$BRANCH"
-restore_compose_local
+restore_server_config
 
 mkdir -p backend/storage/logs backend/storage/cache backend/storage/sessions backend/uploads
 
@@ -109,15 +122,13 @@ if [[ ! -f backend/vendor/autoload.php || backend/composer.lock -nt backend/vend
     composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 fi
 
-echo "==> Subindo containers com SSL Origin"
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml pull nginx redis || true
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml build php
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml up -d
-# O PHP roda com opcache.validate_timestamps=0 em producao; apos git pull,
-# reiniciamos o FPM para limpar opcache e carregar os arquivos novos.
-# O Nginx resolve o upstream php:9000 ao iniciar; reiniciar depois do PHP evita
-# 502 apontando para IP antigo do container.
-docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml restart php nginx
+if ! docker inspect "$PHP_CONTAINER" >/dev/null 2>&1; then
+  echo "ERRO: container PHP $PHP_CONTAINER nao encontrado. Infra da VPS nao e recriada neste deploy." >&2
+  exit 1
+fi
+
+echo "==> Reiniciando PHP para limpar opcache (sem recriar Nginx/infra)"
+docker restart "$PHP_CONTAINER"
 
 echo "==> Ajustando permissoes de storage/uploads"
 if command -v sudo >/dev/null 2>&1; then
@@ -147,8 +158,7 @@ case "$status" in
   200|302) ;;
   *)
     echo "ERRO: health check retornou $status" >&2
-    docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml logs --tail=120 php >&2 || true
-    docker compose -f docker-compose.vps.yml -f docker-compose.vps.ssl-origin.yml logs --tail=80 nginx >&2 || true
+    docker logs --tail=120 "$PHP_CONTAINER" >&2 || true
     exit 1
     ;;
 esac

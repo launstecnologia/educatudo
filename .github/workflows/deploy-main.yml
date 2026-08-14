@@ -18,15 +18,6 @@ jobs:
       - name: Deploy no servidor
         run: |
           cd /opt/educatudo
-          # docker-compose.yml local da VPS nao faz parte do deploy (usa docker-compose.vps.yml).
-          if [[ -f docker-compose.yml ]] && ! git diff --quiet -- docker-compose.yml; then
-            cp docker-compose.yml /tmp/educatudo-docker-compose.yml.bak
-            git checkout -- docker-compose.yml
-          fi
           git fetch origin main
           git pull --ff-only origin main
-          if [[ -f /tmp/educatudo-docker-compose.yml.bak ]]; then
-            cp /tmp/educatudo-docker-compose.yml.bak docker-compose.yml
-            rm -f /tmp/educatudo-docker-compose.yml.bak
-          fi
           bash scripts/deploy-main.sh
