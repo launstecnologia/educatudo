@@ -444,6 +444,9 @@ window.finalizarProva = function() {
     }
     
     window._finalizandoProva = true;
+    try {
+        window.parent.postMessage({ tipo: 'finalizando_materia' }, '*');
+    } catch (e) {}
     continuarFinalizarProva(null);
 };
 
@@ -579,12 +582,12 @@ function continuarFinalizarProva(comprovanteBase64) {
                 } catch (e) {}
                 return;
                 <?php else: ?>
-                window._finalizandoProva = false;
+                window._finalizandoProva = true;
                 mostrarModal('Prova finalizada', 'Escolha a próxima matéria.');
                 document.getElementById('modal-aviso-realizar-ok').onclick = function() {
                     document.getElementById('modal-aviso-realizar').style.display = 'none';
                     document.getElementById('modal-aviso-realizar').classList.add('hidden');
-                    window.location.href = '<?= URL ?>/aluno/provas/bloco/' + data.bloco_id + '/iniciar-seguro';
+                    window.location.href = '<?= URL ?>/aluno/provas/bloco/' + data.bloco_id + '/iniciar-seguro?materia_ok=1';
                 };
                 return;
                 <?php endif; ?>
@@ -919,14 +922,15 @@ function aplicarBloqueiosSeguranca() {
     
     // Bloquear saída da página
     window.addEventListener('beforeunload', function(e) {
-        if (!window._finalizandoProva && !window._provaCancelada) {
-            <?php if (empty($modo_embed)): ?>
-            var urlParamsUnload = new URLSearchParams(window.location.search);
-            if (urlParamsUnload.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
-                cancelarBlocoModoSeguroNoServidor();
-            }
-            <?php endif; ?>
+        if (window._finalizandoProva || window._provaCancelada) {
+            return;
         }
+        <?php if (empty($modo_embed)): ?>
+        var urlParamsUnload = new URLSearchParams(window.location.search);
+        if (urlParamsUnload.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
+            cancelarBlocoModoSeguroNoServidor();
+        }
+        <?php endif; ?>
         return bloquearSaida(e);
     });
     
