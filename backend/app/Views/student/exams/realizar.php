@@ -444,10 +444,10 @@ window.finalizarProva = function() {
     }
     
     window._finalizandoProva = true;
+    continuarFinalizarProva(null);
     try {
         window.parent.postMessage({ tipo: 'finalizando_materia' }, '*');
     } catch (e) {}
-    continuarFinalizarProva(null);
 };
 
 function abrirModalRevisao() {
@@ -535,7 +535,8 @@ function continuarFinalizarProva(comprovanteBase64) {
             'X-Requested-With': 'XMLHttpRequest'
         },
         body: body,
-        credentials: 'same-origin'
+        credentials: 'same-origin',
+        keepalive: true
     };
     function parseRespostaFinalizar(texto) {
         var trimmed = (texto || '').trim();

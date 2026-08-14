@@ -614,7 +614,8 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
                 transicaoMateria = true;
                 aguardandoProximaMateria = true;
                 ignorarVisibilityAte = Date.now() + 120000;
-                try { window.focus(); } catch (err) {}
+                // Não chamar window.focus() aqui: no Edge/Chromium isso tira o foco
+                // do iframe e aborta o POST de finalizar (Failed to fetch).
                 return;
             }
             if (e.data.tipo === 'prova_finalizada' && e.data.bloco_id) {
