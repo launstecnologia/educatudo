@@ -19,6 +19,9 @@ class MasterEscolaDetailController extends BaseController
         'geral_ead'               => ['ead'],
         'geral_inclusao'          => ['inclusao'],
         'geral_aulas_online'      => ['aulas_online'],
+        // Cadastro simples de aluno (sem processo de matrícula) — escolas só com IA
+        'geral_cadastro_aluno_simples' => ['cadastro_aluno_simples'],
+        // geral_processo_matricula: ModuloRegistry (app/Modulos/matricula/manifest.php)
     ];
 
     private static $MODULOS_GERAL_LABELS = [
@@ -33,6 +36,7 @@ class MasterEscolaDetailController extends BaseController
         'geral_ead'               => 'EAD / AVA (Minicursos)',
         'geral_inclusao'          => 'EducaInclui (Avaliação Adaptativa)',
         'geral_aulas_online'      => 'Aulas Online',
+        'geral_cadastro_aluno_simples' => 'Cadastro simples de aluno (sem processo de matrícula)',
     ];
 
     private function getModulosGeralMap(): array

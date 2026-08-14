@@ -100,6 +100,11 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
             </div>
         </div>
 
+        <div class="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            <strong>Cadastro de alunos:</strong> use <em>Cadastro simples de aluno</em> para escolas que só precisam liberar acesso (ex.: só recursos de IA).
+            Ative <em>Processo de Matrícula</em> quando a secretaria for operar contrato, assinatura e enturmação.
+        </div>
+
         <div class="border border-slate-200 rounded-lg overflow-hidden mb-6">
             <div class="px-4 py-2.5 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-800">Geral (aluno, professor e admin)</div>
             <div class="px-2 divide-y divide-gray-100">

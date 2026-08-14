@@ -125,6 +125,12 @@ $router->get('/consent', 'Auth/AuthController@consent');
 $router->post('/consent/accept', 'Auth/AuthController@acceptConsent');
 
 
-// Contrato público de matrícula (para responsável assinar)
-$router->get('/matricula/contrato/{token}',         'Public/EnrollmentPublicController@verContrato');
-$router->post('/matricula/contrato/{token}/assinar', 'Public/EnrollmentPublicController@assinar');
+// Captação pública de interesse + trilha do responsável (contrato)
+$router->get('/matricula/interesse',                    'Modulos/matricula/MatriculaPublicoController@captacaoForm');
+$router->post('/matricula/interesse',                   'Modulos/matricula/MatriculaPublicoController@captacaoStore');
+$router->get('/matricula/contrato/{token}',              'Modulos/matricula/MatriculaPublicoController@verContrato');
+$router->post('/matricula/contrato/{token}/dados',       'Modulos/matricula/MatriculaPublicoController@confirmarDados');
+$router->post('/matricula/contrato/{token}/assinar',     'Modulos/matricula/MatriculaPublicoController@assinar');
+$router->get('/matricula/contrato/{token}/pdf',          'Modulos/matricula/MatriculaPublicoController@downloadPdf');
+$router->post('/webhooks/zapsign/{tenant_slug}',         'Modulos/matricula/ZapSignWebhookController@handle');
+$router->post('/webhooks/zapsign',                       'Modulos/matricula/ZapSignWebhookController@handle');

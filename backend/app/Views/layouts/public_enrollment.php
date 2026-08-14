@@ -6,6 +6,7 @@
 <title><?= htmlspecialchars($nomeEscola ?? 'EducaTudo') ?> — Matrícula</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<?php include __DIR__ . '/components/form_control_safari.php'; ?>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
 
@@ -22,18 +23,15 @@
             <p class="font-medium text-lg"><?= htmlspecialchars($error) ?></p>
             <p class="text-sm mt-2 text-red-500">Em caso de dúvidas, entre em contato com a secretaria.</p>
         </div>
-        <?php else: ?>
+        <?php elseif (isset($content)): ?>
+        <?= $content ?>
+        <?php elseif (isset($enrollment)): ?>
         <?php
-        $viewPath = isset($view) ? __DIR__ . '/../' . $view . '.php' : null;
-        // o conteúdo já foi incluído pelo controller via extract + include
-        // então o conteúdo da view específica estará disponível aqui:
-        if (isset($enrollment)) {
-            // renderizar a view correta baseado no que está no contexto
-            if (isset($assinado) || ($enrollment['status'] ?? '') === 'confirmada') {
-                include __DIR__ . '/../public/enrollment/contrato_assinado.php';
-            } elseif (!isset($error)) {
-                include __DIR__ . '/../public/enrollment/contrato.php';
-            }
+        // Fallback legado (views antigas em Views/public/enrollment/)
+        if (isset($assinado) || ($enrollment['status'] ?? '') === 'confirmada') {
+            include __DIR__ . '/../public/enrollment/contrato_assinado.php';
+        } else {
+            include __DIR__ . '/../public/enrollment/contrato.php';
         }
         ?>
         <?php endif; ?>
