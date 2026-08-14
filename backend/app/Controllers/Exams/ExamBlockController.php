@@ -730,21 +730,36 @@ class ExamBlockController extends BaseController
             }
             $novoStatus = $bloco['liberado'] ? 0 : 1;
             $novoStatusBloco = $novoStatus ? 'liberado' : 'aprovado';
+            $params = [
+                'id' => (int) $id,
+                'status' => $novoStatusBloco,
+                'liberado' => $novoStatus,
+                'ativo' => $novoStatus ? 1 : (int) ($bloco['ativo'] ?? 1),
+            ];
+            $setVisivel = '';
+            if ($this->blocoModel->columnExistsOnBloco('visivel_no_portal_aluno')) {
+                $setVisivel = ', visivel_no_portal_aluno = :visivel';
+                $params['visivel'] = $novoStatus ? 1 : 0;
+            }
             $this->db->query(
-                "UPDATE provas_blocos SET status = :status, liberado = :liberado, ativo = :ativo WHERE id = :id",
-                ['id' => $id, 'status' => $novoStatusBloco, 'liberado' => $novoStatus, 'ativo' => $novoStatus ? 1 : ($bloco['ativo'] ?? 1)]
+                "UPDATE provas_blocos SET status = :status, liberado = :liberado, ativo = :ativo{$setVisivel} WHERE id = :id",
+                $params
             );
-            if ($novoStatus == 1) {
-                // Todas as provas do bloco ficam liberada e ativa para o aluno
-                $vinculos = $this->db->fetchAll(
-                    "SELECT prova_id FROM provas_blocos_vinculo WHERE bloco_id = :bloco_id",
-                    ['bloco_id' => $id]
-                );
-                $provasIds = array_column($vinculos, 'prova_id');
-                if (!empty($provasIds)) {
-                    $placeholders = implode(',', array_fill(0, count($provasIds), '?'));
+            $vinculos = $this->db->fetchAll(
+                "SELECT prova_id FROM provas_blocos_vinculo WHERE bloco_id = :bloco_id",
+                ['bloco_id' => $id]
+            );
+            $provasIds = array_column($vinculos, 'prova_id');
+            if (!empty($provasIds)) {
+                $placeholders = implode(',', array_fill(0, count($provasIds), '?'));
+                if ($novoStatus == 1) {
                     $this->db->query(
                         "UPDATE provas SET liberada = 1, ativo = 1 WHERE id IN ($placeholders) AND deleted_at IS NULL",
+                        $provasIds
+                    );
+                } else {
+                    $this->db->query(
+                        "UPDATE provas SET liberada = 0 WHERE id IN ($placeholders) AND deleted_at IS NULL",
                         $provasIds
                     );
                 }
@@ -752,7 +767,7 @@ class ExamBlockController extends BaseController
             
             $this->json([
                 'success' => true,
-                'message' => $novoStatus ? 'Bloco liberado' : 'Bloco bloqueado',
+                'message' => $novoStatus ? 'Bloco liberado' : 'Evento retirado da visão do aluno',
                 'liberado' => $novoStatus
             ]);
             

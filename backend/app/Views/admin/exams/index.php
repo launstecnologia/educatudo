@@ -496,6 +496,11 @@ function abrirDropdownAcoes(btn) {
         '<form action="' + duplicar + '" method="post" class="block" onsubmit="return confirm(\'Duplicar este bloco? Serão copiados o evento e todas as provas com as questões já cadastradas. O novo bloco ficará como Não liberado.\');">' +
         '<button type="submit" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-blue-700 hover:bg-blue-50">' +
         '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Duplicar</button></form>';
+    if (status === 'liberado') {
+        html +=
+            '<button type="button" onclick="fecharDropdownActions(); toggleLiberado(' + blocoId + ', 0);" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-amber-800 hover:bg-amber-50">' +
+            '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg> Retirar da visão do aluno</button>';
+    }
     if (status !== 'concluido') {
         html +=
             '<button type="button" onclick="fecharDropdownActions(); marcarBlocoConcluido(' + blocoId + ');" class="flex items-center gap-2 w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50">' +
@@ -542,7 +547,9 @@ document.addEventListener('click', function(e) {
 });
 
 function toggleLiberado(blocoId, novoStatus) {
-    if (!confirm('Tem certeza que deseja ' + (novoStatus ? 'liberar' : 'bloquear') + ' este bloco?')) {
+    if (!confirm(novoStatus
+        ? 'Tem certeza que deseja liberar este bloco para os alunos?'
+        : 'Retirar este evento da visão dos alunos? O status deixa de ser Liberado e a prova some do portal do aluno.')) {
         return;
     }
     
