@@ -38,13 +38,15 @@ $cards = [
     ['key' => 'canceladas', 'label' => 'Canceladas', 'value' => (int) ($resumo['canceladas'] ?? 0), 'class' => 'border-red-200', 'num' => 'text-red-700'],
     ['key' => 'nao_comecou', 'label' => 'Ainda não começou', 'value' => (int) ($resumo['nao_comecou'] ?? 0), 'class' => 'border-slate-200', 'num' => 'text-slate-700'],
 ];
+$ehFragmento = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fragment');
 ?>
 
+<div id="provas-ao-vivo-painel">
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-6">
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
             <h3 class="text-lg font-semibold text-slate-900">Provas ao vivo</h3>
-            <p class="text-sm text-slate-500 mt-1">Somente leitura. Atualiza sozinho a cada 20 segundos, sem alterar o acesso do aluno.</p>
+            <p class="text-sm text-slate-500 mt-1">Somente leitura. Atualiza sozinho a cada 20 segundos, sem recarregar a página.</p>
             <a href="<?= URL ?>/master/escolas/<?= $escolaId ?>/detalhes" class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mt-2">Voltar à ficha da escola</a>
         </div>
         <p class="text-sm text-slate-500 shrink-0">Atualizado às <?= htmlspecialchars($atualizado_em) ?></p>
@@ -110,7 +112,7 @@ $cards = [
     <?php if ($alunosFiltrados === []): ?>
     <p class="px-6 py-10 text-sm text-slate-500 text-center">Nenhum aluno neste recorte.</p>
     <?php else: ?>
-    <div class="overflow-x-auto">
+    <div id="provas-ao-vivo-tabela" class="overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead class="bg-slate-50 text-slate-600">
                 <tr>
@@ -160,9 +162,60 @@ $cards = [
     <?php endif; ?>
 </div>
 <?php endif; ?>
+</div>
 
+<?php if (!$ehFragmento): ?>
 <script>
 (function() {
-    setTimeout(function() { window.location.reload(); }, 20000);
+    if (window.__provasAoVivoPoller) {
+        return;
+    }
+    window.__provasAoVivoPoller = true;
+
+    function atualizarPainel() {
+        if (document.hidden) {
+            return;
+        }
+        var atual = document.getElementById('provas-ao-vivo-painel');
+        if (!atual) {
+            return;
+        }
+        var scrollY = window.scrollY;
+        var tabela = document.getElementById('provas-ao-vivo-tabela');
+        var scrollX = tabela ? tabela.scrollLeft : 0;
+        fetch(window.location.pathname + window.location.search, {
+            headers: { 'X-Requested-With': 'fragment' },
+            cache: 'no-store',
+            credentials: 'same-origin'
+        })
+            .then(function(res) {
+                if (!res.ok) {
+                    throw new Error('refresh failed');
+                }
+                return res.text();
+            })
+            .then(function(html) {
+                var wrap = document.getElementById('provas-ao-vivo-painel');
+                if (!wrap) {
+                    return;
+                }
+                var tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                var novo = tmp.querySelector('#provas-ao-vivo-painel');
+                if (!novo) {
+                    return;
+                }
+                wrap.replaceWith(novo);
+                window.scrollTo(0, scrollY);
+                var tabelaNova = document.getElementById('provas-ao-vivo-tabela');
+                if (tabelaNova) {
+                    tabelaNova.scrollLeft = scrollX;
+                }
+            })
+            .catch(function() {});
+    }
+
+    setInterval(atualizarPainel, 20000);
 })();
 </script>
+<?php endif; ?>
