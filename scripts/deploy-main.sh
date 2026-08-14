@@ -51,16 +51,39 @@ if [[ ! -f ssl/cloudflare-origin.pem || ! -f ssl/cloudflare-origin.key ]]; then
   exit 1
 fi
 
-if ! git diff --quiet -- . ':!backend/.env'; then
+# Arquivos locais do servidor: nao bloqueiam deploy e nao sao sobrescritos.
+# docker-compose.yml e o compose de desenvolvimento; producao usa docker-compose.vps.yml.
+GIT_IGNORE_LOCAL=(
+  ':!backend/.env'
+  ':!docker-compose.yml'
+)
+
+if ! git diff --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
   echo "ERRO: existem mudancas rastreadas nao commitadas no servidor." >&2
   git status --short
   exit 1
 fi
 
-if ! git diff --cached --quiet -- . ':!backend/.env'; then
+if ! git diff --cached --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
   echo "ERRO: existem mudancas staged no servidor." >&2
   git status --short
   exit 1
+fi
+
+compose_backup=""
+restore_compose_local() {
+  if [[ -n "${compose_backup:-}" && -f "$compose_backup" ]]; then
+    cp "$compose_backup" "$ROOT/docker-compose.yml"
+    rm -f "$compose_backup"
+    compose_backup=""
+  fi
+}
+trap restore_compose_local EXIT
+
+if [[ -f docker-compose.yml ]] && ! git diff --quiet -- docker-compose.yml; then
+  compose_backup="$(mktemp)"
+  cp docker-compose.yml "$compose_backup"
+  git checkout -- docker-compose.yml
 fi
 
 echo "==> Atualizando codigo"
@@ -73,6 +96,7 @@ if [[ "$current_branch" != "$BRANCH" ]]; then
 fi
 
 git pull --ff-only "$REMOTE" "$BRANCH"
+restore_compose_local
 
 mkdir -p backend/storage/logs backend/storage/cache backend/storage/sessions backend/uploads
 
