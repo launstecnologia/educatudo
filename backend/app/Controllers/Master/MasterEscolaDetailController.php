@@ -2029,6 +2029,37 @@ class MasterEscolaDetailController extends BaseController
             'connection_error'     => $connectionError,
         ]);
     }
+
+    /**
+     * Painel somente leitura: andamento das provas no banco da escola.
+     * Não altera realização, bloco nem acesso do aluno.
+     */
+    public function provasAoVivo($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $escola = $this->getEscolaOrFail($id);
+        header('Cache-Control: no-store');
+
+        require_once __DIR__ . '/../../Services/MasterProvasAoVivoService.php';
+
+        $pdo = $this->connectTenant($escola);
+        if (!$pdo) {
+            $this->renderDetail($id, 'provas-ao-vivo', 'provas-ao-vivo', [
+                'tenant_ok' => false,
+                'atualizado_em' => date('H:i:s'),
+            ]);
+            return;
+        }
+
+        $servico = new MasterProvasAoVivoService();
+        $painel = $servico->montarPainel($pdo, (int) ($_GET['bloco_id'] ?? 0));
+
+        $this->renderDetail($id, 'provas-ao-vivo', 'provas-ao-vivo', array_merge($painel, [
+            'tenant_ok' => true,
+            'atualizado_em' => date('H:i:s'),
+        ]));
+    }
 }
 
 }

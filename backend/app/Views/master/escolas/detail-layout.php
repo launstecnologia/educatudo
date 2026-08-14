@@ -4,6 +4,7 @@ $current_section = $current_section ?? 'visao-geral';
 $section_view = $section_view ?? 'visao-geral';
 
 $sections = [
+    ['id' => 'provas-ao-vivo', 'url' => 'provas-ao-vivo', 'label' => 'Provas ao vivo', 'desc' => 'Quem está fazendo, quem já fez e matérias concluídas.', 'pagina_cheia' => true, 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>'],
     ['id' => 'usuarios', 'url' => 'usuarios', 'label' => 'Usuários', 'desc' => 'Gerenciar administradores da escola.', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>'],
     ['id' => 'professores', 'url' => 'professores', 'label' => 'Professores', 'desc' => 'Listar professores e acessar como usuário.', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>'],
     ['id' => 'alunos', 'url' => 'alunos', 'label' => 'Alunos', 'desc' => 'Consultar alunos, turmas e créditos.', 'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>'],
@@ -57,7 +58,8 @@ $sections = [
 <?php
 $backUrl = URL . '/master/escolas/' . $escola['id'] . '/detalhes';
 $escolaBasePath = '/master/escolas/' . $escola['id'] . '/';
-$hasOffcanvasContent = ($current_section !== 'visao-geral');
+$paginasCheias = ['visao-geral', 'provas-ao-vivo'];
+$hasOffcanvasContent = !in_array($current_section, $paginasCheias, true);
 $currentLabel = 'Visão Geral';
 foreach ($sections as $s) {
     if ($s['id'] === $current_section) {
@@ -76,6 +78,7 @@ foreach ($sections as $s) {
     ?>
     <a href="<?= URL ?>/master/escolas/<?= $escola['id'] ?>/<?= $s['url'] ?>"
        data-section-card data-section-id="<?= $s['id'] ?>" data-section-label="<?= htmlspecialchars($s['label']) ?>"
+       <?= !empty($s['pagina_cheia']) ? 'data-pagina-cheia="1"' : '' ?>
        class="group block bg-white rounded-xl border shadow-sm transition-all duration-200 p-6 <?= $cardClass ?>">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
@@ -93,7 +96,7 @@ foreach ($sections as $s) {
     <?php endforeach; ?>
 </div>
 
-<?php if ($current_section === 'visao-geral'): ?>
+<?php if (in_array($current_section, $paginasCheias, true)): ?>
 <?php include __DIR__ . '/detail/' . $section_view . '.php'; ?>
 <?php endif; ?>
 
@@ -184,6 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll('[data-section-card]').forEach(function(card) {
         card.addEventListener('click', function(e) {
+            if (card.getAttribute('data-pagina-cheia') === '1') return;
             e.preventDefault();
             loadSection(card.getAttribute('href'), card.getAttribute('data-section-label'), card.getAttribute('data-section-id'));
         });

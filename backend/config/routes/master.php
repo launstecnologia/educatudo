@@ -82,6 +82,7 @@ $router->post('/master/migrations/executar-escola', 'Master/MasterMigrationsCont
 
 // Detalhes da escola (Master)
 $router->get('/master/escolas/{id}/detalhes', 'Master/MasterEscolaDetailController@visaoGeral');
+$router->get('/master/escolas/{id}/provas-ao-vivo', 'Master/MasterEscolaDetailController@provasAoVivo');
 $router->get('/master/escolas/{id}/usuarios', 'Master/MasterEscolaDetailController@usuarios');
 $router->get('/master/escolas/{id}/professores', 'Master/MasterEscolaDetailController@professores');
 $router->get('/master/escolas/{id}/alunos', 'Master/MasterEscolaDetailController@alunos');
