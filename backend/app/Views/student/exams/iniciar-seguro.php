@@ -110,6 +110,11 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
 <!-- Iframe: prova abre aqui na mesma tela (sem sair da tela cheia) -->
 <div id="tela-iframe-prova" class="fixed inset-0 z-[8000] bg-white" style="display: none;">
     <iframe id="iframe-prova" src="about:blank" class="w-full h-full border-0" title="Prova"></iframe>
+    <div id="overlay-carregando-materia" class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white" style="display: none;" aria-live="polite">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div>
+        <p class="text-gray-700 font-medium">Carregando matéria...</p>
+        <p class="text-sm text-gray-500 mt-1">Aguarde um momento.</p>
+    </div>
 </div>
 
 <script>
@@ -122,6 +127,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
     var ignorarVisibilityAte = 0;
     var transicaoMateria = false;
     var aguardandoProximaMateria = false;
+    var cargaIframeSeq = 0;
     var blocoIdCancelar = <?= (int)$blocoId ?>;
     // EducaInclui: acomodações do aluno (resolvidas no controller)
     var ocultarCronometro = <?= !empty($acessibilidade_hide_timer) ? 'true' : 'false' ?>;
@@ -141,6 +147,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             tela.style.display = 'none';
             tela.style.pointerEvents = 'none';
         }
+        esconderOverlayCarregandoMateria();
         var conteudo = document.getElementById('conteudo-prova-segura');
         if (conteudo) conteudo.style.display = 'flex';
     }
@@ -379,6 +386,19 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         }, ms || 2000);
     }
 
+    function mostrarOverlayCarregandoMateria() {
+        var el = document.getElementById('overlay-carregando-materia');
+        if (el) el.style.display = 'flex';
+        var iframe = document.getElementById('iframe-prova');
+        if (iframe) iframe.style.visibility = 'hidden';
+    }
+    function esconderOverlayCarregandoMateria() {
+        var iframe = document.getElementById('iframe-prova');
+        if (iframe) iframe.style.visibility = 'visible';
+        var el = document.getElementById('overlay-carregando-materia');
+        if (el) el.style.display = 'none';
+    }
+
     function mostrarListaSobreIframe() {
         aguardandoProximaMateria = true;
         transicaoMateria = true;
@@ -397,6 +417,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             tela.style.pointerEvents = 'none';
             tela.style.display = 'block';
         }
+        mostrarOverlayCarregandoMateria();
         try { window.focus(); } catch (e) {}
         if (!estaEmFullscreen()) {
             mostrarOverlayTelaCheia();
@@ -407,9 +428,16 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         aguardandoProximaMateria = false;
         transicaoMateria = true;
         ignorarVisibilityAte = Date.now() + 2000;
+        var seq = ++cargaIframeSeq;
         var conteudo = document.getElementById('conteudo-prova-segura');
         var tela = document.getElementById('tela-iframe-prova');
         var iframe = document.getElementById('iframe-prova');
+        mostrarOverlayCarregandoMateria();
+        if (tela) {
+            tela.style.display = 'block';
+            tela.style.visibility = 'visible';
+            tela.style.pointerEvents = 'auto';
+        }
         if (conteudo) {
             conteudo.style.display = 'none';
             conteudo.style.position = '';
@@ -418,18 +446,29 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             conteudo.style.background = '';
             conteudo.style.overflow = '';
         }
-        if (tela) {
-            tela.style.display = 'block';
-            tela.style.visibility = 'visible';
-            tela.style.pointerEvents = 'auto';
-        }
         if (!estaEmFullscreen()) {
             entrarFullscreen();
         }
-        if (iframe) iframe.src = url;
+        if (iframe) {
+            iframe.onload = function() {
+                if (seq !== cargaIframeSeq) return;
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        if (seq !== cargaIframeSeq) return;
+                        esconderOverlayCarregandoMateria();
+                    });
+                });
+            };
+            iframe.src = url;
+        }
         setTimeout(function() {
             if (!aguardandoProximaMateria) transicaoMateria = false;
         }, 2000);
+        setTimeout(function() {
+            if (seq === cargaIframeSeq) {
+                esconderOverlayCarregandoMateria();
+            }
+        }, 8000);
     }
 
     function tratarSaidaFullscreen() {
