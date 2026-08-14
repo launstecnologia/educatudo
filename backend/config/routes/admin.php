@@ -792,6 +792,7 @@ $router->get('/admin/provas/blocos/{id}/prova-aluno-pdf', 'Exams/ExamController@
 $router->get('/admin/provas/blocos/{id}/resultados', 'Teacher/TeacherExamController@resultadosBlocoAdmin');
 $router->get('/admin/provas/blocos/{id}/resultados-novos', 'Teacher/TeacherExamController@resultadosBlocoAdminNovo');
 $router->get('/admin/provas/blocos/{id}/canceladas', 'Teacher/TeacherExamController@canceladasBlocoAdmin');
+$router->post('/admin/provas/blocos/{id}/liberar-tentativas', 'Teacher/TeacherExamController@liberarTentativasBlocoAdmin');
 $router->get('/admin/provas/blocos/{id}/relatorio-acertos', 'Teacher/TeacherExamController@relatorioAcertosBloco');
 $router->get('/admin/provas/blocos/{id}/aluno/{alunoId}/resultado', 'Teacher/TeacherExamController@resultadoAlunoBloco');
 $router->post('/admin/provas/blocos/{id}/aluno/{alunoId}/reabrir', 'Teacher/TeacherExamController@reabrirBlocoAluno');

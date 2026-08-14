@@ -569,6 +569,48 @@ class Exam
         );
         return true;
     }
+
+    /**
+     * Libera nova tentativa para todas as realizações canceladas das provas do bloco.
+     * Retorna a quantidade de tentativas liberadas.
+     */
+    public function liberarNovaTentativaBloco($blocoId)
+    {
+        $blocoId = (int) $blocoId;
+        if ($blocoId <= 0) {
+            return 0;
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT pr.prova_id, pr.aluno_id
+             FROM provas_realizacoes pr
+             INNER JOIN provas_blocos_vinculo pbp ON pbp.prova_id = pr.prova_id AND pbp.bloco_id = :bloco_id
+             INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
+             WHERE pr.status = 'cancelada'",
+            ['bloco_id' => $blocoId]
+        );
+        if (empty($rows)) {
+            return 0;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $liberadas = 0;
+            foreach ($rows as $row) {
+                if ($this->liberarNovaTentativa((int) $row['prova_id'], (int) $row['aluno_id'])) {
+                    $liberadas++;
+                }
+            }
+            $this->db->commit();
+            return $liberadas;
+        } catch (Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            error_log('liberarNovaTentativaBloco: ' . $e->getMessage());
+            throw $e;
+        }
+    }
     
     /**
      * Cria nova prova

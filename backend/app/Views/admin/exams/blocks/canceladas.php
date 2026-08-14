@@ -3,6 +3,8 @@
  * Provas canceladas no bloco: lista de alunos que precisam de liberação para refazer
  */
 $canceladas = $canceladas ?? [];
+$totalCanceladas = count($canceladas);
+$csrfToken = (string) ($csrf_token ?? '');
 ?>
 
 <div class="mb-8">
@@ -36,7 +38,21 @@ $canceladas = $canceladas ?? [];
 <?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-lg p-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">Provas canceladas que precisam de liberação</h3>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">Provas canceladas que precisam de liberação</h3>
+        <?php if ($totalCanceladas > 0): ?>
+        <form method="post"
+              action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/liberar-tentativas"
+              onsubmit="return confirm('Liberar nova tentativa para todos desta lista (<?= (int)$totalCanceladas ?> prova<?= $totalCanceladas === 1 ? '' : 's' ?>)? As respostas atuais serão apagadas e cada aluno precisará refazer a prova.');">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <button type="submit"
+                    class="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                <i class="fa-solid fa-unlock" aria-hidden="true"></i>
+                Liberar todos (<?= (int)$totalCanceladas ?>)
+            </button>
+        </form>
+        <?php endif; ?>
+    </div>
     <?php if (!empty($canceladas)): ?>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">

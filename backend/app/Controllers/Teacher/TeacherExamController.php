@@ -1035,9 +1035,56 @@ class TeacherExamController extends BaseController
             'historico_validacoes' => $historicoValidacoes,
             'current_page' => 'provas_blocos',
             'flash_message' => $flash['message'] ?? null,
-            'flash_type' => $flash['type'] ?? 'info'
+            'flash_type' => $flash['type'] ?? 'info',
+            'csrf_token' => $this->generateCsrfToken(),
         ];
         $this->viewWithLayout('admin', 'admin/exams/blocks/canceladas', $data);
+    }
+
+    /**
+     * Libera nova tentativa para todas as provas canceladas do bloco.
+     */
+    public function liberarTentativasBlocoAdmin($blocoId)
+    {
+        $user = $this->authManager->getUser();
+        if (!in_array($user['tipo'], ['admin', 'admin_escola'])) {
+            $this->redirectToCorrectDashboard($user['tipo']);
+            return;
+        }
+
+        $blocoId = (int) $blocoId;
+        $redirect = '/admin/provas/blocos/' . $blocoId . '/canceladas';
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Recarregue a página e tente novamente.', 'error');
+            $this->redirect($redirect);
+            return;
+        }
+
+        $bloco = $this->blocoModel->findById($blocoId);
+        if (!$bloco) {
+            $this->setFlashMessage('Bloco não encontrado', 'error');
+            $this->redirect('/admin/provas');
+            return;
+        }
+
+        try {
+            $liberadas = $this->provaModel->liberarNovaTentativaBloco($blocoId);
+        } catch (Exception $e) {
+            $this->setFlashMessage('Não foi possível liberar as tentativas. Tente novamente.', 'error');
+            $this->redirect($redirect);
+            return;
+        }
+
+        if ($liberadas > 0) {
+            $msg = $liberadas === 1
+                ? 'Nova tentativa liberada para 1 prova cancelada. O aluno poderá realizá-la novamente.'
+                : 'Nova tentativa liberada para ' . $liberadas . ' provas canceladas. Os alunos poderão realizá-las novamente.';
+            $this->setFlashMessage($msg, 'success');
+        } else {
+            $this->setFlashMessage('Não havia provas canceladas para liberar.', 'error');
+        }
+        $this->redirect($redirect);
     }
     
     /**
