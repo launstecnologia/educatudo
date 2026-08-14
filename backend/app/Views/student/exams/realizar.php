@@ -200,7 +200,7 @@ if (!class_exists('LayoutHelper')) {
 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
     <p class="text-sm text-blue-800">
         <strong>Instruções:</strong> Responda todas as questões. Suas respostas são salvas automaticamente. 
-        Ao finalizar, clique no botão "Finalizar Prova".
+        Ao finalizar, clique no botão "<?= (!empty($modo_bloco) || !empty($modo_seguro)) ? 'Finalizar Matéria' : 'Finalizar Prova' ?>".
     </p>
 </div>
 
@@ -326,6 +326,7 @@ if (!class_exists('LayoutHelper')) {
             </button>
         </div>
         <button type="button" 
+                id="btn-finalizar-prova"
                 onclick="finalizarProva()"
                 class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold">
             <?= (!empty($modo_bloco) || !empty($modo_seguro)) ? 'Finalizar Matéria' : 'Finalizar Prova' ?>
@@ -566,18 +567,19 @@ function continuarFinalizarProva(comprovanteBase64) {
         fecharModalRevisao();
         if (!data) { window._finalizandoProva = false; mostrarModal('Erro', 'Erro ao finalizar prova'); return; }
         if (data.success) {
-            window._finalizandoProva = false;
             if (typeof window.removeEventListener === 'function') {
                 window.removeEventListener('beforeunload', bloquearSaida);
                 window.removeEventListener('keydown', bloquearTeclas);
             }
             if (data.voltar_escolher_materia && data.bloco_id) {
                 <?php if (!empty($modo_embed)): ?>
+                window._finalizandoProva = true;
                 try {
                     window.parent.postMessage({ tipo: 'prova_finalizada', bloco_id: data.bloco_id }, '*');
                 } catch (e) {}
                 return;
                 <?php else: ?>
+                window._finalizandoProva = false;
                 mostrarModal('Prova finalizada', 'Escolha a próxima matéria.');
                 document.getElementById('modal-aviso-realizar-ok').onclick = function() {
                     document.getElementById('modal-aviso-realizar').style.display = 'none';
@@ -587,6 +589,7 @@ function continuarFinalizarProva(comprovanteBase64) {
                 return;
                 <?php endif; ?>
             }
+            window._finalizandoProva = false;
             if (data.modo_bloco && data.bloco_id) {
                 mostrarModal('Sucesso', 'Bloco de provas finalizado com sucesso. Aguarde a coordenação liberar o gabarito.');
                 document.getElementById('modal-aviso-realizar-ok').onclick = function() {
@@ -898,6 +901,7 @@ function aplicarBloqueiosSeguranca() {
             var id = el.id || '';
             var onclick = el.getAttribute('onclick') || '';
             if (id.indexOf('btn-questao-') !== -1 || id === 'btn-anterior' || id === 'btn-proximo' ||
+                id === 'btn-finalizar-prova' ||
                 id === 'modal-confirm-realizar-ok' || id === 'modal-confirm-realizar-cancel' || id === 'modal-aviso-realizar-ok' ||
                 (el.closest && (el.closest('#modal-confirm-realizar') || el.closest('#modal-aviso-realizar'))) ||
                 (onclick.indexOf('irParaQuestao') !== -1 || onclick.indexOf('questaoAnterior') !== -1 || onclick.indexOf('questaoProxima') !== -1 || onclick.indexOf('finalizarProva') !== -1)) {
@@ -916,10 +920,12 @@ function aplicarBloqueiosSeguranca() {
     // Bloquear saída da página
     window.addEventListener('beforeunload', function(e) {
         if (!window._finalizandoProva && !window._provaCancelada) {
+            <?php if (empty($modo_embed)): ?>
             var urlParamsUnload = new URLSearchParams(window.location.search);
             if (urlParamsUnload.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
                 cancelarBlocoModoSeguroNoServidor();
             }
+            <?php endif; ?>
         }
         return bloquearSaida(e);
     });
@@ -984,6 +990,7 @@ function aplicarBloqueiosSeguranca() {
             if (id.includes('btn-questao-') || 
                 id === 'btn-anterior' || 
                 id === 'btn-proximo' ||
+                id === 'btn-finalizar-prova' ||
                 id === 'modal-confirm-realizar-ok' ||
                 id === 'modal-confirm-realizar-cancel' ||
                 id === 'modal-aviso-realizar-ok' ||
@@ -1021,6 +1028,9 @@ function aplicarBloqueiosSeguranca() {
     document.addEventListener('visibilitychange', function() {
         if (window._finalizandoProva || window._provaCancelada) return;
         if (document.hidden) {
+            <?php if (!empty($modo_embed)): ?>
+            return;
+            <?php endif; ?>
             var urlParamsVis = new URLSearchParams(window.location.search);
             if (urlParamsVis.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
                 cancelarBlocoModoSeguroNoServidor();

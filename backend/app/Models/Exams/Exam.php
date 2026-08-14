@@ -375,7 +375,62 @@ class Exam
     }
 
     /**
-     * Cancela todas as realizações não finalizadas do aluno no bloco (modo prova segura: saída da tela cheia).
+     * Prova avulsa/bloco: turma principal, matrículas ativas ou prova sem turma (todas).
+     */
+    public function alunoPodeAcessarProva(int $provaId, int $alunoId): bool
+    {
+        $provaId = (int) $provaId;
+        $alunoId = (int) $alunoId;
+        if ($provaId <= 0 || $alunoId <= 0) {
+            return false;
+        }
+        $prova = $this->db->fetch(
+            'SELECT id, turma_id FROM provas WHERE id = :id AND deleted_at IS NULL',
+            ['id' => $provaId]
+        );
+        if (!$prova) {
+            return false;
+        }
+        return $this->provaCombinaComTurmasDoAluno($prova, $alunoId);
+    }
+
+    /**
+     * @param array{id?:int,turma_id?:mixed} $prova
+     */
+    private function provaCombinaComTurmasDoAluno(array $prova, int $alunoId): bool
+    {
+        if (!class_exists('AlunoTurmaHelper')) {
+            require_once __DIR__ . '/../../Core/AlunoTurmaHelper.php';
+        }
+        $turmaIdsAluno = AlunoTurmaHelper::getTurmaIds($this->db, $alunoId);
+        $provaTurmaId = isset($prova['turma_id']) ? (int) $prova['turma_id'] : 0;
+        if ($provaTurmaId > 0 && in_array($provaTurmaId, $turmaIdsAluno, true)) {
+            return true;
+        }
+        $vinculos = $this->db->fetchAll(
+            'SELECT turma_id FROM provas_turmas WHERE prova_id = :pid',
+            ['pid' => (int) ($prova['id'] ?? 0)]
+        ) ?: [];
+        $turmasProva = [];
+        foreach ($vinculos as $row) {
+            $tid = (int) ($row['turma_id'] ?? 0);
+            if ($tid > 0) {
+                $turmasProva[] = $tid;
+            }
+        }
+        if ($turmasProva === []) {
+            return $provaTurmaId === 0;
+        }
+        foreach ($turmasProva as $tid) {
+            if (in_array($tid, $turmaIdsAluno, true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Cancela realizações não finalizadas do aluno nas provas da turma dele no bloco.
      * Só o coordenador poderá liberar nova tentativa.
      */
     public function cancelarRealizacoesBlocoSeguro($blocoId, $alunoId)
@@ -389,7 +444,7 @@ class Exam
         $this->garantirStatusCanceladaSuportado();
 
         $provas = $this->db->fetchAll(
-            "SELECT p.id
+            "SELECT p.id, p.turma_id
              FROM provas p
              INNER JOIN provas_blocos_vinculo pbp ON pbp.prova_id = p.id
              WHERE pbp.bloco_id = :bloco_id AND p.deleted_at IS NULL",
@@ -400,22 +455,36 @@ class Exam
             return 0;
         }
 
-        // Atualiza realizações existentes (iniciado, cancelada, etc.) — não mexe em finalizado
+        $idsDoAluno = [];
+        foreach ($provas as $prova) {
+            $provaId = (int) ($prova['id'] ?? 0);
+            if ($provaId > 0 && $this->provaCombinaComTurmasDoAluno($prova, $alunoId)) {
+                $idsDoAluno[] = $provaId;
+            }
+        }
+        $idsDoAluno = array_values(array_unique($idsDoAluno));
+        if ($idsDoAluno === []) {
+            return 0;
+        }
+
+        $inParts = [];
+        $paramsUpdate = ['aluno_id' => $alunoId];
+        foreach ($idsDoAluno as $i => $provaId) {
+            $key = 'pid_' . $i;
+            $inParts[] = ':' . $key;
+            $paramsUpdate[$key] = $provaId;
+        }
         $this->db->query(
-            "UPDATE provas_realizacoes pr
-             INNER JOIN provas_blocos_vinculo pbp ON pbp.prova_id = pr.prova_id AND pbp.bloco_id = :bloco_id
-             INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
-             SET pr.status = 'cancelada'
-             WHERE pr.aluno_id = :aluno_id AND pr.status != 'finalizado'",
-            ['bloco_id' => $blocoId, 'aluno_id' => $alunoId]
+            'UPDATE provas_realizacoes
+             SET status = \'cancelada\'
+             WHERE prova_id IN (' . implode(', ', $inParts) . ')
+               AND aluno_id = :aluno_id
+               AND status != \'finalizado\'',
+            $paramsUpdate
         );
 
         $afetadas = 0;
-        foreach ($provas as $prova) {
-            $provaId = (int) ($prova['id'] ?? 0);
-            if ($provaId <= 0) {
-                continue;
-            }
+        foreach ($idsDoAluno as $provaId) {
             $existente = $this->getRealizacao($provaId, $alunoId);
             if ($existente) {
                 if (($existente['status'] ?? '') !== 'finalizado') {

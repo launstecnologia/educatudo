@@ -2418,15 +2418,7 @@ class ExamController extends BaseController
 
             // Se o bloco está liberado, garante que as provas vinculadas também estejam liberadas
             if ($bloco['liberado'] == 1) {
-                $this->db->query(
-                    "UPDATE provas p
-                     INNER JOIN provas_blocos_vinculo pbp ON p.id = pbp.prova_id
-                     SET p.liberada = 1, p.ativo = 1
-                     WHERE pbp.bloco_id = :bloco_id
-                     AND p.deleted_at IS NULL
-                     AND (p.liberada = 0 OR p.ativo = 0)",
-                    ['bloco_id' => $bloco['id']]
-                );
+                $blocoModel->garantirProvasLiberadas((int) $bloco['id']);
             }
             
             $provasDoBloco = $blocoModel->getProvas($bloco['id'], $aluno['id']);
@@ -3165,100 +3157,28 @@ class ExamController extends BaseController
                 return;
             }
             
-            // Valida se o aluno pertence à turma do bloco
+            // Valida se o aluno pertence à turma do bloco (principal + matrículas)
             $aluno = $this->studentModel->findById($user['id']);
             if ($aluno) {
-                $turmaAluno = $aluno['turma_id'];
-                
-                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                
-                    if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                
-                        error_log("DEBUG realizar(): Validando acesso - Turma do Aluno: {$turmaAluno}, Turma do Bloco: " . ($blocoProva['turma_id'] ?? 'NULL'));
-                
-                    }
-                
-                }
-                
-                // Verifica se o bloco está vinculado à turma do aluno na tabela provas_blocos_turmas
-                $blocoTurma = $this->db->fetch(
-                    "SELECT * FROM provas_blocos_turmas 
-                     WHERE bloco_id = :bloco_id AND turma_id = :turma_id",
-                    [
+                require_once __DIR__ . '/../../Models/Exams/ExamBlock.php';
+                $blocoAcessoModel = new ExamBlock();
+                if (!$blocoAcessoModel->alunoTemAcessoAoBloco($blocoProva, (int) $aluno['id'])) {
+                    $this->logProvas('[REALIZAR] REDIRECIONANDO: aluno sem acesso ao bloco (turma não vinculada)', [
                         'bloco_id' => $blocoProva['id'],
-                        'turma_id' => $turmaAluno
-                    ]
-                );
-                
-                // Verifica se há turmas vinculadas ao bloco
-                $temTurmasVinculadas = $this->db->fetch(
-                    "SELECT COUNT(*) as total FROM provas_blocos_turmas WHERE bloco_id = :bloco_id",
-                    ['bloco_id' => $blocoProva['id']]
-                );
-                $totalTurmasVinculadas = $temTurmasVinculadas['total'] ?? 0;
-                
-                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                
-                    if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                
-                        error_log("DEBUG realizar(): Bloco vinculado à turma do aluno: " . ($blocoTurma ? 'SIM' : 'NÃO') . ", Total turmas vinculadas: {$totalTurmasVinculadas}");
-                
-                    }
-                
-                }
-                
-                $temAcesso = false;
-                
-                // Se o bloco tem turma_id definido diretamente
-                if ($blocoProva['turma_id'] !== null) {
-                    // Verifica se corresponde à turma do aluno OU se está na tabela provas_blocos_turmas
-                    if ($blocoProva['turma_id'] == $turmaAluno || $blocoTurma) {
-                        $temAcesso = true;
-                    }
-                } else {
-                    // Se bloco não tem turma_id (NULL)
-                    if ($totalTurmasVinculadas == 0) {
-                        // Não tem turmas vinculadas = bloco aberto para todos
-                        $temAcesso = true;
-                        if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                                error_log("DEBUG realizar(): Bloco sem turma_id e sem turmas vinculadas - ACESSO PERMITIDO");
-                            }
-                        }
-                    } else {
-                        // Tem turmas vinculadas, verifica se o aluno está em uma delas
-                        if ($blocoTurma) {
-                            $temAcesso = true;
-                            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                                    error_log("DEBUG realizar(): Aluno está em uma das turmas vinculadas - ACESSO PERMITIDO");
-                                }
-                            }
-                        } else {
-                            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                                    error_log("DEBUG realizar(): Aluno NÃO está em nenhuma turma vinculada - ACESSO NEGADO");
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                if (!$temAcesso) {
-                    $this->logProvas('[REALIZAR] REDIRECIONANDO: aluno sem acesso ao bloco (turma não vinculada)', ['bloco_id' => $blocoProva['id'], 'turma_aluno' => $turmaAluno ?? null]);
+                        'aluno_id' => (int) $aluno['id'],
+                    ]);
                     $this->setFlashMessage('Você não tem acesso a este bloco de provas', 'error');
                     $this->redirect('/aluno/provas');
                     return;
                 }
-                
-                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                
-                    if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                
-                        error_log("DEBUG realizar(): ACESSO PERMITIDO - Continuando...");
-                
-                    }
-                
+                if (!$this->provaModel->alunoPodeAcessarProva((int) $id, (int) $aluno['id'])) {
+                    $this->logProvas('[REALIZAR] REDIRECIONANDO: prova não é da turma do aluno', [
+                        'prova_id' => (int) $id,
+                        'aluno_id' => (int) $aluno['id'],
+                    ]);
+                    $this->setFlashMessage('Não há prova disponível para a sua turma neste bloco.', 'error');
+                    $this->redirect('/aluno/provas');
+                    return;
                 }
             }
         }
@@ -6668,26 +6588,21 @@ Retorne APENAS um JSON válido no seguinte formato:
             $this->redirect('/aluno/provas');
             return;
         }
+        if (!$blocoModel->alunoTemAcessoAoBloco($bloco, (int) $user['id'])) {
+            $this->setFlashMessage('Você não tem acesso a este bloco de provas', 'error');
+            $this->redirect('/aluno/provas');
+            return;
+        }
         
-        // Busca todas as provas do bloco ordenadas por ordem
-        $provas = $this->db->fetchAll(
-            "SELECT p.*, m.nome as materia_nome, pbp.ordem,
-                    prof.nome as professor_nome
-             FROM provas_blocos_vinculo pbp
-             INNER JOIN provas p ON pbp.prova_id = p.id
-             LEFT JOIN materias m ON p.materia_id = m.id
-             LEFT JOIN professores prof ON p.professor_id = prof.id
-             WHERE pbp.bloco_id = :bloco_id
-             AND p.liberada = 1
-             AND p.ativo = 1
-             AND p.deleted_at IS NULL
-             ORDER BY pbp.ordem ASC, m.nome ASC",
-            ['bloco_id' => $blocoId]
-        );
+        if (!empty($bloco['liberado'])) {
+            $blocoModel->garantirProvasLiberadas((int) $blocoId);
+        }
+
+        $provas = $blocoModel->getProvas($blocoId, (int) $user['id']);
         
         if (empty($provas)) {
-            $this->logProvas('[INICIAR_BLOCO] REDIRECIONANDO: nenhuma prova no bloco', ['bloco_id' => $blocoId]);
-            $this->setFlashMessage('Nenhuma prova disponível neste bloco', 'error');
+            $this->logProvas('[INICIAR_BLOCO] REDIRECIONANDO: nenhuma prova no bloco para o aluno', ['bloco_id' => $blocoId, 'aluno_id' => (int) $user['id']]);
+            $this->setFlashMessage('Não há prova disponível para a sua turma neste bloco.', 'error');
             $this->redirect('/aluno/provas');
             return;
         }
@@ -6774,6 +6689,20 @@ Retorne APENAS um JSON válido no seguinte formato:
         }
 
         $aluno = $this->studentModel->findById($user['id']);
+        $alunoIniciar = $aluno;
+        if (!$alunoIniciar) {
+            $this->setFlashMessage('Aluno não encontrado', 'error');
+            $this->redirect('/aluno/provas');
+            return;
+        }
+        $alunoIniciarId = (int) $alunoIniciar['id'];
+
+        if (!$blocoModel->alunoTemAcessoAoBloco($bloco, $alunoIniciarId)) {
+            $this->setFlashMessage('Você não tem acesso a este bloco de provas', 'error');
+            $this->redirect('/aluno/provas');
+            return;
+        }
+
         if ($aluno && isset($_GET['encerrado']) && $_GET['encerrado'] === '1') {
             $this->provaModel->cancelarRealizacoesBlocoSeguro($blocoId, (int) $aluno['id']);
             $this->logProvas('Cancelamento modo seguro (encerrado=1)', [
@@ -6782,34 +6711,17 @@ Retorne APENAS um JSON válido no seguinte formato:
             ]);
         }
         
-        $provas = $this->db->fetchAll(
-            "SELECT p.*, m.nome as materia_nome, pbp.ordem,
-                    prof.nome as professor_nome
-             FROM provas_blocos_vinculo pbp
-             INNER JOIN provas p ON pbp.prova_id = p.id
-             LEFT JOIN materias m ON p.materia_id = m.id
-             LEFT JOIN professores prof ON p.professor_id = prof.id
-             WHERE pbp.bloco_id = :bloco_id
-             AND p.liberada = 1
-             AND p.ativo = 1
-             AND p.deleted_at IS NULL
-             ORDER BY pbp.ordem ASC, m.nome ASC",
-            ['bloco_id' => $blocoId]
-        );
-        
-        if (empty($provas)) {
-            $this->setFlashMessage('Nenhuma prova disponível neste bloco', 'error');
-            $this->redirect('/aluno/provas');
-            return;
+        if (!empty($bloco['liberado'])) {
+            $blocoModel->garantirProvasLiberadas($blocoId);
         }
 
-        $alunoIniciar = $this->studentModel->findById($user['id']);
-        if (!$alunoIniciar) {
-            $this->setFlashMessage('Aluno não encontrado', 'error');
+        $provas = $blocoModel->getProvas($blocoId, $alunoIniciarId);
+        
+        if (empty($provas)) {
+            $this->setFlashMessage('Não há prova disponível para a sua turma neste bloco.', 'error');
             $this->redirect('/aluno/provas');
             return;
         }
-        $alunoIniciarId = (int) $alunoIniciar['id'];
 
         $resumoIniciar = $blocoModel->getResumoRealizacaoAlunoNoBloco($blocoId, $alunoIniciarId);
         if (!empty($resumoIniciar['alguma_cancelada'])) {

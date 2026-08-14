@@ -246,7 +246,7 @@ $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blo
                     </div>
                     <?php else: ?>
                     <div class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <p class="text-xs text-yellow-800">Nenhuma prova encontrada neste bloco.</p>
+                        <p class="text-xs text-yellow-800">Não há prova disponível para a sua turma neste bloco.</p>
                     </div>
                     <?php endif; ?>
                     

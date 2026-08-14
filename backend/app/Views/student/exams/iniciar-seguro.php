@@ -40,7 +40,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         <button type="button" id="btn-entrar-tela-cheia" class="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-lg">
             Entrar em tela cheia
         </button>
-        <a href="<?= URL ?>/aluno/provas" class="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-xl text-base border border-gray-500">
+        <a href="<?= URL ?>/aluno/provas" id="link-sair-antes-iniciar" class="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white font-semibold rounded-xl text-base border border-gray-500">
             Sair da prova
         </a>
     </div>
@@ -118,6 +118,9 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
     var saiuFullscreenContagem = 0;
     var cancelamentoIniciado = false;
     var cancelamentoServidorEnviado = false;
+    var entrouFullscreenUmaVez = false;
+    var ignorarVisibilityAte = 0;
+    var transicaoMateria = false;
     var blocoIdCancelar = <?= (int)$blocoId ?>;
     // EducaInclui: acomodações do aluno (resolvidas no controller)
     var ocultarCronometro = <?= !empty($acessibilidade_hide_timer) ? 'true' : 'false' ?>;
@@ -363,6 +366,48 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
     }
 
+    function iniciarTransicaoMateria(ms) {
+        transicaoMateria = true;
+        ignorarVisibilityAte = Date.now() + (ms || 2000);
+        setTimeout(function() {
+            transicaoMateria = false;
+            if (!permitirSair && modoSeguroAtivo && !estaEmFullscreen()) {
+                entrarFullscreen();
+            }
+        }, ms || 2000);
+    }
+
+    function tratarSaidaFullscreen() {
+        if (estaEmFullscreen()) {
+            entrouFullscreenUmaVez = true;
+            ignorarVisibilityAte = Date.now() + 800;
+            if (timerPrimeiraSaida) {
+                clearInterval(timerPrimeiraSaida);
+                timerPrimeiraSaida = null;
+            }
+            var modalEl = document.getElementById('modal-aviso');
+            if (modalEl && modalEl.style.display === 'flex') {
+                modalEl.style.display = 'none';
+                modalEl.classList.add('hidden');
+            }
+            esconderOverlayTelaCheia();
+            <?php if ($blocoTerminoIso): ?>mostrarCronometro();<?php endif; ?>
+            return;
+        }
+        if (permitirSair || !modoSeguroAtivo) return;
+        if (transicaoMateria || Date.now() < ignorarVisibilityAte) {
+            setTimeout(entrarFullscreen, 50);
+            return;
+        }
+        if (saiuFullscreenContagem === 0) {
+            saiuFullscreenContagem = 1;
+            mostrarModalPrimeiraSaida();
+        } else {
+            cancelamentoIniciado = true;
+            mostrarModalCancelarProva();
+        }
+    }
+
     function mostrarOverlayTelaCheia() {
         var el = document.getElementById('overlay-tela-cheia');
         if (el) el.style.display = 'flex';
@@ -396,75 +441,56 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         document.getElementById('btn-entrar-tela-cheia') && document.getElementById('btn-entrar-tela-cheia').addEventListener('click', function() {
             entrarFullscreen();
         });
+        var linkSairAntes = document.getElementById('link-sair-antes-iniciar');
+        if (linkSairAntes) {
+            linkSairAntes.addEventListener('click', function() {
+                permitirSair = true;
+            });
+        }
 
-        document.addEventListener('fullscreenchange', function() {
-            if (estaEmFullscreen()) {
-                if (timerPrimeiraSaida) {
-                    clearInterval(timerPrimeiraSaida);
-                    timerPrimeiraSaida = null;
-                }
-                var modalEl = document.getElementById('modal-aviso');
-                if (modalEl && modalEl.style.display === 'flex') {
-                    modalEl.style.display = 'none';
-                    modalEl.classList.add('hidden');
-                }
-                esconderOverlayTelaCheia();
-                <?php if ($blocoTerminoIso): ?>mostrarCronometro();<?php endif; ?>
-            } else {
-                if (permitirSair || !modoSeguroAtivo) return;
-                if (saiuFullscreenContagem === 0) {
-                    saiuFullscreenContagem = 1;
-                    mostrarModalPrimeiraSaida();
-                } else {
-                    cancelamentoIniciado = true;
-                    mostrarModalCancelarProva();
-                }
-            }
-        });
-        document.addEventListener('webkitfullscreenchange', function() {
-            if (estaEmFullscreen()) {
-                if (timerPrimeiraSaida) {
-                    clearInterval(timerPrimeiraSaida);
-                    timerPrimeiraSaida = null;
-                }
-                var modalEl = document.getElementById('modal-aviso');
-                if (modalEl && modalEl.style.display === 'flex') {
-                    modalEl.style.display = 'none';
-                    modalEl.classList.add('hidden');
-                }
-                esconderOverlayTelaCheia();
-                <?php if ($blocoTerminoIso): ?>mostrarCronometro();<?php endif; ?>
-            } else {
-                if (permitirSair || !modoSeguroAtivo) return;
-                if (saiuFullscreenContagem === 0) {
-                    saiuFullscreenContagem = 1;
-                    mostrarModalPrimeiraSaida();
-                } else {
-                    cancelamentoIniciado = true;
-                    mostrarModalCancelarProva();
-                }
-            }
-        });
+        document.addEventListener('fullscreenchange', tratarSaidaFullscreen);
+        document.addEventListener('webkitfullscreenchange', tratarSaidaFullscreen);
 
         document.addEventListener('click', function(e) {
             var a = e.target && e.target.closest('a');
             if (a && a.classList && a.classList.contains('link-saida-permitida')) {
                 permitirSair = true;
             }
+            var recarregar = e.target && e.target.closest('.btn-recarregar-materias');
+            if (recarregar) {
+                e.preventDefault();
+                iniciarTransicaoMateria(2000);
+                var lista = document.getElementById('lista-materias-container');
+                if (lista) {
+                    fetch('<?= URL ?>/aluno/provas/bloco/<?= (int)$blocoId ?>/iniciar-seguro?partial=1')
+                        .then(function(r) { return r.text(); })
+                        .then(function(html) { lista.innerHTML = html; })
+                        .catch(function() {});
+                }
+                return;
+            }
             var btn = e.target && e.target.closest('.btn-iniciar-materia');
             if (btn && btn.getAttribute('data-prova-id')) {
                 e.preventDefault();
+                iniciarTransicaoMateria(2000);
                 var provaId = btn.getAttribute('data-prova-id');
                 var blocoId = <?= (int)$blocoId ?>;
                 var url = '<?= URL ?>/aluno/provas/realizar/' + provaId + '?bloco_id=' + blocoId + '&modo_bloco=1&modo_seguro=<?= $acessibilidade_relax_secure ? '0' : '1' ?>&embed=1';
-                document.getElementById('iframe-prova').src = url;
+                var tela = document.getElementById('tela-iframe-prova');
+                var iframe = document.getElementById('iframe-prova');
                 document.getElementById('conteudo-prova-segura').style.display = 'none';
-                document.getElementById('tela-iframe-prova').style.display = 'block';
+                if (tela) {
+                    tela.style.display = 'block';
+                    tela.style.pointerEvents = 'auto';
+                }
+                if (iframe) iframe.src = url;
             }
         }, true);
 
         document.addEventListener('visibilitychange', function() {
             if (!modoSeguroAtivo) return;
+            if (!entrouFullscreenUmaVez) return;
+            if (transicaoMateria || Date.now() < ignorarVisibilityAte) return;
             if (document.visibilityState === 'hidden' && !permitirSair && !cancelamentoIniciado) {
                 cancelamentoIniciado = true;
                 fecharIframeProva();
@@ -473,6 +499,8 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         });
         window.addEventListener('beforeunload', function(e) {
             if (!modoSeguroAtivo) return;
+            if (!entrouFullscreenUmaVez) return;
+            if (transicaoMateria) return;
             if (permitirSair || cancelamentoIniciado) return;
             fecharIframeProva();
             cancelarBlocoSeguroAgora();
@@ -484,19 +512,31 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         var loadingHtml = '<div class="flex flex-col items-center justify-center py-12 px-6"><div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div><p class="text-gray-600 font-medium">Atualizando lista...</p><p class="text-sm text-gray-500 mt-1">Aguarde um momento.</p></div>';
         window.addEventListener('message', function(e) {
             if (e.data && e.data.tipo === 'prova_finalizada' && e.data.bloco_id) {
-                document.getElementById('tela-iframe-prova').style.display = 'none';
-                document.getElementById('iframe-prova').src = 'about:blank';
+                iniciarTransicaoMateria(2500);
+                var iframe = document.getElementById('iframe-prova');
+                var tela = document.getElementById('tela-iframe-prova');
+                if (tela) {
+                    tela.style.display = 'none';
+                    tela.style.pointerEvents = 'none';
+                }
+                document.getElementById('conteudo-prova-segura').style.display = 'flex';
+                if (!estaEmFullscreen()) {
+                    entrarFullscreen();
+                }
+                setTimeout(function() {
+                    if (iframe) iframe.src = 'about:blank';
+                }, 400);
                 var container = document.getElementById('lista-materias-container');
                 if (container) container.innerHTML = loadingHtml;
-                document.getElementById('conteudo-prova-segura').style.display = 'flex';
                 var blocoId = e.data.bloco_id;
                 fetch('<?= URL ?>/aluno/provas/bloco/' + blocoId + '/iniciar-seguro?partial=1')
                     .then(function(r) { return r.text(); })
                     .then(function(html) {
                         if (container) container.innerHTML = html;
+                        if (!estaEmFullscreen()) entrarFullscreen();
                     })
                     .catch(function() {
-                        if (container) container.innerHTML = '<p class="text-red-600 py-4">Erro ao atualizar. <a href="<?= URL ?>/aluno/provas/bloco/' + blocoId + '/iniciar-seguro" class="underline">Recarregar</a></p>';
+                        if (container) container.innerHTML = '<p class="text-red-600 py-4">Erro ao atualizar. <button type="button" class="underline btn-recarregar-materias">Recarregar</button></p>';
                     });
             }
         });

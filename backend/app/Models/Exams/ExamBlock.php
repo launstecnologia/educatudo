@@ -413,7 +413,107 @@ class ExamBlock
     }
     
     /**
-     * Busca provas de um bloco
+     * Libera provas vinculadas a um bloco já liberado (aluno só vê prova com liberada=1).
+     */
+    public function garantirProvasLiberadas($blocoId): void
+    {
+        $this->db->query(
+            "UPDATE provas p
+             INNER JOIN provas_blocos_vinculo pbp ON p.id = pbp.prova_id
+             SET p.liberada = 1, p.ativo = 1
+             WHERE pbp.bloco_id = :bloco_id
+             AND p.deleted_at IS NULL
+             AND (p.liberada = 0 OR p.ativo = 0)",
+            ['bloco_id' => (int) $blocoId]
+        );
+    }
+
+    /**
+     * Se o aluno (turma principal + matrículas) tem acesso ao bloco.
+     */
+    public function alunoTemAcessoAoBloco(array $bloco, int $alunoId): bool
+    {
+        $blocoId = (int) ($bloco['id'] ?? 0);
+        if ($blocoId <= 0 || $alunoId <= 0) {
+            return false;
+        }
+        if (!class_exists('AlunoTurmaHelper')) {
+            require_once __DIR__ . '/../../Core/AlunoTurmaHelper.php';
+        }
+        $turmaIdsAluno = AlunoTurmaHelper::getTurmaIds($this->db, $alunoId);
+        $blocoTurmaIds = [];
+        $turmaDireta = isset($bloco['turma_id']) ? (int) $bloco['turma_id'] : 0;
+        if ($turmaDireta > 0) {
+            $blocoTurmaIds[] = $turmaDireta;
+        }
+        $vinculadas = $this->db->fetchAll(
+            'SELECT turma_id FROM provas_blocos_turmas WHERE bloco_id = :bloco_id',
+            ['bloco_id' => $blocoId]
+        ) ?: [];
+        foreach ($vinculadas as $row) {
+            $tid = (int) ($row['turma_id'] ?? 0);
+            if ($tid > 0) {
+                $blocoTurmaIds[] = $tid;
+            }
+        }
+        $blocoTurmaIds = array_values(array_unique($blocoTurmaIds));
+        if ($blocoTurmaIds === []) {
+            return true;
+        }
+        foreach ($turmaIdsAluno as $tid) {
+            if (in_array((int) $tid, $blocoTurmaIds, true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * SQL/params: prova da turma do aluno (ou global) OU já iniciada/finalizada/cancelada por ele.
+     *
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    private function filtroProvasDoAlunoNoBloco(int $alunoId): array
+    {
+        if (!class_exists('AlunoTurmaHelper')) {
+            require_once __DIR__ . '/../../Core/AlunoTurmaHelper.php';
+        }
+        $turmaIds = AlunoTurmaHelper::getTurmaIds($this->db, $alunoId);
+        $params = [];
+        $inP = [];
+        $inPt = [];
+        foreach ($turmaIds as $i => $tid) {
+            $kP = 'turma_p_' . $i;
+            $kPt = 'turma_pt_' . $i;
+            $params[$kP] = (int) $tid;
+            $params[$kPt] = (int) $tid;
+            $inP[] = ':' . $kP;
+            $inPt[] = ':' . $kPt;
+        }
+        if ($inP === []) {
+            $sqlTurma = "(COALESCE(p.turma_id, 0) = 0 AND NOT EXISTS (
+                SELECT 1 FROM provas_turmas pty WHERE pty.prova_id = p.id
+            ))";
+        } else {
+            $sqlTurma = "(p.turma_id IN (" . implode(', ', $inP) . ")
+                OR EXISTS (
+                    SELECT 1 FROM provas_turmas ptx
+                    WHERE ptx.prova_id = p.id AND ptx.turma_id IN (" . implode(', ', $inPt) . ")
+                )
+                OR (COALESCE(p.turma_id, 0) = 0 AND NOT EXISTS (
+                    SELECT 1 FROM provas_turmas pty WHERE pty.prova_id = p.id
+                )))";
+        }
+        $sql = "{$sqlTurma}
+            AND (
+                (p.ativo = 1 AND p.liberada = 1)
+                OR pr.status IN ('finalizado', 'cancelada', 'iniciado')
+            )";
+        return [$sql, $params];
+    }
+
+    /**
+     * Busca provas de um bloco. Com $alunoId, restringe à turma do aluno.
      */
     public function getProvas($blocoId, $alunoId = null)
     {
@@ -438,17 +538,19 @@ class ExamBlock
         }
         
         $sql .= " WHERE pbp.bloco_id = :bloco_id
-             AND p.deleted_at IS NULL
-             AND (
-                 (p.ativo = 1 AND p.liberada = 1)
-                 " . ($alunoId ? "OR pr.status IN ('finalizado', 'cancelada', 'iniciado')" : "") . "
-             )
-             ORDER BY pbp.ordem ASC, p.created_at ASC";
+             AND p.deleted_at IS NULL";
         
-        $params = ['bloco_id' => $blocoId];
+        $params = ['bloco_id' => (int) $blocoId];
         if ($alunoId) {
-            $params['aluno_id'] = $alunoId;
+            $params['aluno_id'] = (int) $alunoId;
+            [$filtroAluno, $paramsTurma] = $this->filtroProvasDoAlunoNoBloco((int) $alunoId);
+            $sql .= " AND {$filtroAluno}";
+            $params = array_merge($params, $paramsTurma);
+        } else {
+            $sql .= " AND p.ativo = 1 AND p.liberada = 1";
         }
+        
+        $sql .= " ORDER BY pbp.ordem ASC, p.created_at ASC";
         
         return $this->db->fetchAll($sql, $params);
     }
@@ -466,32 +568,18 @@ class ExamBlock
             return ['alguma_cancelada' => false, 'todas_finalizadas' => false, 'total_provas' => 0];
         }
 
-        $totalRow = $this->db->fetch(
-            "SELECT COUNT(DISTINCT p.id) AS c
-             FROM provas_blocos_vinculo pbp
-             INNER JOIN provas p ON pbp.prova_id = p.id AND p.deleted_at IS NULL
-             WHERE pbp.bloco_id = :bloco_id",
-            ['bloco_id' => $blocoId]
-        );
-        $totalProvas = (int) ($totalRow['c'] ?? 0);
-
-        $statusRows = $this->db->fetchAll(
-            "SELECT pr.status, COUNT(*) AS c
-             FROM provas_realizacoes pr
-             INNER JOIN provas_blocos_vinculo pbp ON pbp.prova_id = pr.prova_id AND pbp.bloco_id = :bloco_id
-             INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
-             WHERE pr.aluno_id = :aluno_id
-             GROUP BY pr.status",
-            ['bloco_id' => $blocoId, 'aluno_id' => $alunoId]
-        );
-
-        $porStatus = [];
-        foreach ($statusRows as $row) {
-            $porStatus[$row['status'] ?? ''] = (int) ($row['c'] ?? 0);
+        $provasDoAluno = $this->getProvas($blocoId, $alunoId);
+        $totalProvas = count($provasDoAluno);
+        $finalizadas = 0;
+        $canceladas = 0;
+        foreach ($provasDoAluno as $provaLinha) {
+            $status = (string) ($provaLinha['realizacao_status'] ?? '');
+            if ($status === 'finalizado') {
+                $finalizadas++;
+            } elseif ($status === 'cancelada') {
+                $canceladas++;
+            }
         }
-
-        $finalizadas = (int) ($porStatus['finalizado'] ?? 0);
-        $canceladas = (int) ($porStatus['cancelada'] ?? 0);
 
         return [
             'alguma_cancelada' => $canceladas > 0,
