@@ -132,7 +132,18 @@ class TenantCreditsCheckoutService
     private static function getMasterPdo(): ?\PDO
     {
         $masterPdo = $GLOBALS['_educatudo_master_pdo'] ?? null;
-        return $masterPdo instanceof \PDO ? $masterPdo : null;
+        if ($masterPdo instanceof \PDO) {
+            return $masterPdo;
+        }
+        try {
+            require_once __DIR__ . '/../Core/Database.php';
+            $masterPdo = \Database::createMasterPdo();
+            $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
+            return $masterPdo;
+        } catch (\Throwable $e) {
+            error_log('[TenantCreditsCheckoutService] falha ao conectar master: ' . $e->getMessage());
+            return null;
+        }
     }
 
     private static function hasColumn(\PDO $tenantPdo, string $column): bool

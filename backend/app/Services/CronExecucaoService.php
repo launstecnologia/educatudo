@@ -34,26 +34,8 @@ class CronExecucaoService
         }
 
         try {
-            $cfg = \Database::getConfigFromEnv();
-            $host = (string) ($cfg['host'] ?? '127.0.0.1');
-            $port = (int) ($cfg['port'] ?? 3306);
-            $name = trim((string) ($cfg['name'] ?? ''));
-            $user = (string) ($cfg['user'] ?? '');
-            $pass = (string) ($cfg['pass'] ?? '');
-            if ($name === '' || $user === '') {
-                return null;
-            }
-            $pdo = new \PDO(
-                "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4",
-                $user,
-                $pass,
-                [
-                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                    \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
-                ]
-            );
-            $pdo->exec("SET time_zone = '-03:00'");
-            $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $pdo = \Database::createMasterPdo();
+            $GLOBALS['_educatudo_master_pdo'] = $pdo;
             self::$masterPdo = $pdo;
             return self::$masterPdo;
         } catch (\Throwable $e) {

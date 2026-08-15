@@ -50,20 +50,14 @@ class TenantResolver
      */
     public function resolveTenant(): ?array
     {
-        $slug = $this->getSlugFromHeader();
-        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
-        if ($host !== '' && strpos($host, ':') !== false) {
-            $host = explode(':', $host, 2)[0];
-        }
-        $host = strtolower($host);
-        $cacheKey = 'tenant_' . $host . ($slug !== null ? '_' . $slug : '');
-        $cached = RedisCache::get($cacheKey);
+        $cached = self::cachedTenantFromRequest();
         if ($cached !== null) {
-            $decoded = json_decode($cached, true);
-            if (is_array($decoded) && isset($decoded['id'], $decoded['slug'])) {
-                return $decoded;
-            }
+            return $cached;
         }
+
+        $slug = self::slugFromHeader();
+        $host = self::hostFromRequest();
+        $cacheKey = self::cacheKeyFromRequest();
 
         if ($slug !== null) {
             $tenant = $this->resolveBySlug($slug);
@@ -85,9 +79,48 @@ class TenantResolver
     }
 
     /**
+     * Chave Redis de resolução de tenant para a requisição atual (TTL 60s).
+     * Formato: tenant_<host> ou tenant_<host>_<slug> quando X-Tenant está presente.
+     */
+    public static function cacheKeyFromRequest(): string
+    {
+        $slug = self::slugFromHeader();
+        $host = self::hostFromRequest();
+        return 'tenant_' . $host . ($slug !== null ? '_' . $slug : '');
+    }
+
+    /**
+     * Metadados do tenant já cacheados no Redis, sem consultar o MASTER.
+     *
+     * @return array{id:int,slug:string,dominio:?string}|null
+     */
+    public static function cachedTenantFromRequest(): ?array
+    {
+        $cached = RedisCache::get(self::cacheKeyFromRequest());
+        if ($cached === null) {
+            return null;
+        }
+        $decoded = json_decode($cached, true);
+        if (is_array($decoded) && isset($decoded['id'], $decoded['slug']) && (int) $decoded['id'] > 0) {
+            $decoded['id'] = (int) $decoded['id'];
+            return $decoded;
+        }
+        return null;
+    }
+
+    public static function hostFromRequest(): string
+    {
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        if ($host !== '' && strpos($host, ':') !== false) {
+            $host = explode(':', $host, 2)[0];
+        }
+        return strtolower($host);
+    }
+
+    /**
      * Header X-Tenant para dev (valor = slug da escola).
      */
-    private function getSlugFromHeader(): ?string
+    private static function slugFromHeader(): ?string
     {
         if (function_exists('getallheaders')) {
             $headers = array_change_key_case(getallheaders(), CASE_LOWER);

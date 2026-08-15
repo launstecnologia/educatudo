@@ -90,41 +90,65 @@ if (!$isMasterPath && $pathRelative === '') {
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/TenantResolver.php';
 require_once __DIR__ . '/DatabaseManager.php';
+require_once __DIR__ . '/RedisCache.php';
 
-$masterConfig = Database::getConfigFromEnv();
-$required = ['host', 'name', 'user', 'pass'];
-foreach ($required as $key) {
-    if (empty($masterConfig[$key]) && $masterConfig[$key] !== '0') {
-        throw new Exception("Multi-tenant ativo mas configuração do banco master incompleta no .env (DB_HOST, DB_NAME, DB_USER, DB_PASS).");
+if (!function_exists('educatudo_definir_constantes_tenant')) {
+    function educatudo_definir_constantes_tenant(array $tenant): void
+    {
+        if (!defined('TENANT_ID')) {
+            define('TENANT_ID', (int) $tenant['id']);
+        }
+        if (!defined('TENANT_SLUG')) {
+            define('TENANT_SLUG', (string) ($tenant['slug'] ?? ''));
+        }
+        if (!defined('TENANT_DOMAIN')) {
+            define('TENANT_DOMAIN', (string) ($tenant['dominio'] ?? ''));
+        }
     }
 }
-$port = isset($masterConfig['port']) && $masterConfig['port'] !== '' ? (int) $masterConfig['port'] : 3306;
-$connectTimeoutRaw = getenv('DB_CONNECT_TIMEOUT');
-$connectTimeout = ($connectTimeoutRaw !== false && $connectTimeoutRaw !== null && $connectTimeoutRaw !== '')
-    ? (int) $connectTimeoutRaw
-    : 15;
-if ($connectTimeout < 1) {
-    $connectTimeout = 15;
-} elseif ($connectTimeout > 60) {
-    $connectTimeout = 60;
-}
-$dsn = "mysql:host={$masterConfig['host']};port={$port};dbname={$masterConfig['name']};charset=utf8mb4";
-$options = [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    // Conexão não-persistente evita "Packets out of order" quando o MySQL fecha conexões idle
-    PDO::ATTR_PERSISTENT => false,
-    PDO::ATTR_TIMEOUT => $connectTimeout,
-];
-$masterPdo = new PDO($dsn, (string) $masterConfig['user'], (string) $masterConfig['pass'], $options);
-$masterPdo->exec("SET time_zone = '-03:00'");
-$masterPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
-$GLOBALS['_educatudo_master_pdo'] = $masterPdo;
 
+// Rotas /master e domínio MASTER continuam no fluxo original (sempre abrem o MASTER).
 if ($isMasterPath || $isMasterDomain) {
+    $masterPdo = Database::createMasterPdo();
+    $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
     Database::setCurrentInstance(Database::createFromPdo($masterPdo));
     return;
 }
+
+// Fast-path: Redis HIT em tenant + config → abre só o TENANT, sem handshake no MASTER.
+$fastPathAplicado = false;
+try {
+    $tenantCache = TenantResolver::cachedTenantFromRequest();
+    if (is_array($tenantCache) && isset($tenantCache['id'], $tenantCache['slug'])) {
+        $escolaId = (int) $tenantCache['id'];
+        $configCache = $escolaId > 0 ? DatabaseManager::cachedConfig($escolaId) : null;
+        if (is_array($configCache)) {
+            $manager = new DatabaseManager(null);
+            $tenantDb = $manager->createConnectionFromConfig($configCache, $escolaId);
+            Database::setCurrentInstance($tenantDb);
+            $GLOBALS['_educatudo_db_manager'] = $manager;
+            educatudo_definir_constantes_tenant($tenantCache);
+            $fastPathAplicado = true;
+        }
+    }
+} catch (Throwable $e) {
+    Database::setCurrentInstance(null);
+    unset($GLOBALS['_educatudo_db_manager']);
+    $escolaId = isset($escolaId) ? (int) $escolaId : 0;
+    if ($escolaId > 0) {
+        RedisCache::delete('tenant_config_' . $escolaId);
+        RedisCache::delete(TenantResolver::cacheKeyFromRequest());
+    }
+    error_log('[bootstrap_multi_tenant] fast-path falhou, fallback MASTER: ' . $e->getMessage());
+}
+
+if ($fastPathAplicado) {
+    return;
+}
+
+// Fallback (cache miss / inválido / falha de conexão): MASTER → resolve/cacheia → TENANT
+$masterPdo = Database::createMasterPdo();
+$GLOBALS['_educatudo_master_pdo'] = $masterPdo;
 
 $resolver = new TenantResolver($masterPdo);
 $tenant = $resolver->resolveTenant();
@@ -148,12 +172,4 @@ if (!isset($GLOBALS['_educatudo_db_manager'])) {
 $manager = $GLOBALS['_educatudo_db_manager'];
 $tenantDb = $manager->getConnectionForTenant((int) $tenant['id']);
 Database::setCurrentInstance($tenantDb);
-if (!defined('TENANT_ID')) {
-    define('TENANT_ID', (int) $tenant['id']);
-}
-if (!defined('TENANT_SLUG')) {
-    define('TENANT_SLUG', (string) ($tenant['slug'] ?? ''));
-}
-if (!defined('TENANT_DOMAIN')) {
-    define('TENANT_DOMAIN', (string) ($tenant['dominio'] ?? ''));
-}
+educatudo_definir_constantes_tenant($tenant);

@@ -24,6 +24,55 @@ class Database
     }
 
     /**
+     * Timeout de handshake MySQL (segundos), limitado entre 1 e 60.
+     */
+    public static function resolveConnectTimeout(): int
+    {
+        $raw = getenv('DB_CONNECT_TIMEOUT');
+        if ($raw === false || $raw === null || $raw === '') {
+            return 15;
+        }
+        $value = (int) $raw;
+        if ($value < 1) {
+            return 15;
+        }
+        if ($value > 60) {
+            return 60;
+        }
+        return $value;
+    }
+
+    /**
+     * Abre PDO do banco MASTER a partir do .env (DB_*).
+     * Usado pelo bootstrap no path /master e por lazy-load quando o fast-path Redis
+     * não abre o MASTER na requisição.
+     */
+    public static function createMasterPdo(): PDO
+    {
+        $masterConfig = self::getConfigFromEnv();
+        $required = ['host', 'name', 'user', 'pass'];
+        foreach ($required as $key) {
+            if (empty($masterConfig[$key]) && $masterConfig[$key] !== '0') {
+                throw new Exception('Multi-tenant ativo mas configuração do banco master incompleta no .env (DB_HOST, DB_NAME, DB_USER, DB_PASS).');
+            }
+        }
+        $port = isset($masterConfig['port']) && $masterConfig['port'] !== '' ? (int) $masterConfig['port'] : 3306;
+        $connectTimeout = self::resolveConnectTimeout();
+        $dsn = "mysql:host={$masterConfig['host']};port={$port};dbname={$masterConfig['name']};charset=utf8mb4";
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            // Conexão não-persistente evita "Packets out of order" quando o MySQL fecha conexões idle
+            PDO::ATTR_PERSISTENT => false,
+            PDO::ATTR_TIMEOUT => $connectTimeout,
+        ];
+        $masterPdo = new PDO($dsn, (string) $masterConfig['user'], (string) $masterConfig['pass'], $options);
+        $masterPdo->exec("SET time_zone = '-03:00'");
+        $masterPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+        return $masterPdo;
+    }
+
+    /**
      * Carrega apenas DB_* do .env, SEM require app.php (evita recursão e Fatal memory exhausted no servidor).
      */
     private static function loadDbConfigFromEnv()

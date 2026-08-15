@@ -5,20 +5,60 @@
  * e retorna instância de Database conectada ao banco do tenant.
  */
 
+require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/RedisCache.php';
 require_once __DIR__ . '/MasterSecretVault.php';
 
 class DatabaseManager
 {
-    /** @var PDO Conexão com o banco master */
+    /** @var PDO|null Conexão com o banco master (lazy: só abre em cache miss) */
     private $masterPdo;
 
     /** @var Database[] Cache de conexões por escola_id na mesma requisição */
     private $tenantConnections = [];
 
-    public function __construct(PDO $masterPdo)
+    public function __construct(?PDO $masterPdo = null)
     {
         $this->masterPdo = $masterPdo;
+    }
+
+    /**
+     * Abre o MASTER somente sob demanda (cache miss ou serviços que precisam dele).
+     */
+    public function ensureMasterPdo(): PDO
+    {
+        if ($this->masterPdo instanceof PDO) {
+            return $this->masterPdo;
+        }
+        $global = $GLOBALS['_educatudo_master_pdo'] ?? null;
+        if ($global instanceof PDO) {
+            $this->masterPdo = $global;
+            return $this->masterPdo;
+        }
+        $this->masterPdo = Database::createMasterPdo();
+        $GLOBALS['_educatudo_master_pdo'] = $this->masterPdo;
+        return $this->masterPdo;
+    }
+
+    /**
+     * Cria a conexão TENANT a partir da configuração já armazenada no Redis,
+     * sem consultar o banco MASTER.
+     *
+     * @param array $config host, porta, nome_banco, usuario, senha_criptografada, charset
+     */
+    public function createConnectionFromConfig(array $config, ?int $escolaId = null): Database
+    {
+        if ($escolaId !== null && isset($this->tenantConnections[$escolaId])) {
+            return $this->tenantConnections[$escolaId];
+        }
+
+        $pdo = $this->createPdoForTenant($config);
+        $db = Database::createFromPdo($pdo, $this->normalizeDatabaseConfig($config));
+        if ($escolaId !== null) {
+            $this->tenantConnections[$escolaId] = $db;
+        }
+
+        return $db;
     }
 
     /**
@@ -40,11 +80,7 @@ class DatabaseManager
             throw new Exception("Configuração de banco não encontrada para a escola ID {$escolaId}. Verifique a tabela config_escolas_banco no banco master.");
         }
 
-        $pdo = $this->createPdoForTenant($config);
-        $db = Database::createFromPdo($pdo, $this->normalizeDatabaseConfig($config));
-        $this->tenantConnections[$escolaId] = $db;
-
-        return $db;
+        return $this->createConnectionFromConfig($config, $escolaId);
     }
 
     /**
@@ -54,15 +90,11 @@ class DatabaseManager
      */
     private function getConfigTenant(int $escolaId): ?array
     {
-        $cacheKey = 'tenant_config_' . $escolaId;
-        $cached = RedisCache::get($cacheKey);
+        $cached = self::cachedConfig($escolaId);
         if ($cached !== null) {
-            $decoded = json_decode($cached, true);
-            if (is_array($decoded)) {
-                return $decoded;
-            }
+            return $cached;
         }
-        $stmt = $this->masterPdo->prepare(
+        $stmt = $this->ensureMasterPdo()->prepare(
             "SELECT host, porta, nome_banco, usuario, senha_criptografada, charset
              FROM config_escolas_banco
              WHERE escola_id = :escola_id LIMIT 1"
@@ -70,10 +102,40 @@ class DatabaseManager
         $stmt->execute(['escola_id' => $escolaId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row !== false && $row !== null) {
-            RedisCache::set($cacheKey, json_encode($row), 300);
+            RedisCache::set('tenant_config_' . $escolaId, json_encode($row), 300);
             return $row;
         }
         return null;
+    }
+
+    /**
+     * Configuração de banco do tenant já cacheada no Redis (TTL 300s).
+     * Retorna null se a chave não existir ou se o JSON estiver incompleto
+     * (e nesse caso a chave é removida para o próximo fluxo consultar o MASTER).
+     */
+    public static function cachedConfig(int $escolaId): ?array
+    {
+        if ($escolaId < 1) {
+            return null;
+        }
+        $cached = RedisCache::get('tenant_config_' . $escolaId);
+        if ($cached === null) {
+            return null;
+        }
+        $decoded = json_decode($cached, true);
+        if (!is_array($decoded) || !self::configTenantValida($decoded)) {
+            RedisCache::delete('tenant_config_' . $escolaId);
+            return null;
+        }
+        return $decoded;
+    }
+
+    public static function configTenantValida(array $config): bool
+    {
+        $host = trim((string) ($config['host'] ?? ''));
+        $nomeBanco = trim((string) ($config['nome_banco'] ?? ''));
+        $usuario = trim((string) ($config['usuario'] ?? ''));
+        return $host !== '' && $nomeBanco !== '' && $usuario !== '';
     }
 
     private function createPdoForTenant(array $config): PDO
@@ -84,13 +146,16 @@ class DatabaseManager
         $name = $normalized['name'];
         $user = $normalized['user'];
         $pass = $normalized['pass'];
-        $charset = $normalized['charset'];
+        $charset = strtolower((string) $normalized['charset']);
+        if (!in_array($charset, ['utf8mb4', 'utf8'], true)) {
+            $charset = 'utf8mb4';
+        }
 
         if ($name === '') {
             throw new Exception("Nome do banco do tenant não pode ser vazio (config_escolas_banco.nome_banco).");
         }
 
-        $connectTimeout = $this->resolveConnectTimeout();
+        $connectTimeout = Database::resolveConnectTimeout();
 
         $dsn = "mysql:host={$host};port={$port};dbname={$name};charset={$charset}";
         $options = [
@@ -123,14 +188,16 @@ class DatabaseManager
 
     private function normalizeDatabaseConfig(array $config): array
     {
-        $connectTimeout = $this->resolveConnectTimeout();
+        $connectTimeout = Database::resolveConnectTimeout();
         return [
             'host' => $config['host'] ?? 'localhost',
             'port' => (int) ($config['porta'] ?? 3306),
             'name' => $config['nome_banco'] ?? '',
             'user' => $config['usuario'] ?? '',
             'pass' => MasterSecretVault::decryptDbPassword($config['senha_criptografada'] ?? ''),
-            'charset' => $config['charset'] ?? 'utf8mb4',
+            'charset' => in_array(strtolower((string) ($config['charset'] ?? 'utf8mb4')), ['utf8mb4', 'utf8'], true)
+                ? strtolower((string) ($config['charset'] ?? 'utf8mb4'))
+                : 'utf8mb4',
             'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -140,21 +207,5 @@ class DatabaseManager
                 PDO::ATTR_TIMEOUT => $connectTimeout,
             ],
         ];
-    }
-
-    private function resolveConnectTimeout(): int
-    {
-        $raw = getenv('DB_CONNECT_TIMEOUT');
-        if ($raw === false || $raw === null || $raw === '') {
-            return 15;
-        }
-        $value = (int) $raw;
-        if ($value < 1) {
-            return 15;
-        }
-        if ($value > 60) {
-            return 60;
-        }
-        return $value;
     }
 }

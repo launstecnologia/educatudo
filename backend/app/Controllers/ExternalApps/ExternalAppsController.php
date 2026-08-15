@@ -1027,14 +1027,8 @@ class ExternalAppsController extends BaseController
         try {
             $masterPdo = $GLOBALS['_educatudo_master_pdo'] ?? null;
             if ($masterPdo === null || !($masterPdo instanceof PDO)) {
-                $masterConfig = Database::getConfigFromEnv();
-                $port = isset($masterConfig['port']) && $masterConfig['port'] !== '' ? (int) $masterConfig['port'] : 3306;
-                $dsn = "mysql:host={$masterConfig['host']};port={$port};dbname={$masterConfig['name']};charset=utf8mb4";
-                $masterPdo = new PDO($dsn, (string) $masterConfig['user'], (string) $masterConfig['pass'], [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                ]);
-                $masterPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+                $masterPdo = Database::createMasterPdo();
+                $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
             }
             $stmt = $masterPdo->prepare(
                 "SELECT escola_id FROM config_escolas_layout WHERE config_key = 'external_institution_id' AND config_value = :inst LIMIT 1"
@@ -1068,14 +1062,8 @@ class ExternalAppsController extends BaseController
         try {
             $masterPdo = $GLOBALS['_educatudo_master_pdo'] ?? null;
             if ($masterPdo === null || !($masterPdo instanceof PDO)) {
-                $masterConfig = Database::getConfigFromEnv();
-                $port = isset($masterConfig['port']) && $masterConfig['port'] !== '' ? (int) $masterConfig['port'] : 3306;
-                $dsn = "mysql:host={$masterConfig['host']};port={$port};dbname={$masterConfig['name']};charset=utf8mb4";
-                $masterPdo = new PDO($dsn, (string) $masterConfig['user'], (string) $masterConfig['pass'], [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                ]);
-                $masterPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+                $masterPdo = Database::createMasterPdo();
+                $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
             }
 
             $stmt = $masterPdo->prepare("SELECT id FROM escolas WHERE slug = :slug AND ativo = 1 LIMIT 1");

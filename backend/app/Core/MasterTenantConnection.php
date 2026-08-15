@@ -10,7 +10,15 @@ class MasterTenantConnection
         if ($masterPdo instanceof PDO) {
             return $masterPdo;
         }
-        return null;
+        try {
+            require_once __DIR__ . '/Database.php';
+            $masterPdo = Database::createMasterPdo();
+            $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
+            return $masterPdo;
+        } catch (Throwable $e) {
+            error_log('[MasterTenantConnection] falha ao conectar master: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
