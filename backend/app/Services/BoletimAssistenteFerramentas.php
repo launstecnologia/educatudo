@@ -88,6 +88,26 @@ class BoletimAssistenteFerramentas
     }
 
     /**
+     * @return list<array{id:int,nome:string,turma_nome:?string}>
+     */
+    public function listarAlunos(int $limit = 300): array
+    {
+        $out = [];
+        foreach ($this->boletimConfig->getStudentsList($limit) as $aluno) {
+            $id = (int) ($aluno['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => trim((string) ($aluno['nome'] ?? '')),
+                'turma_nome' => isset($aluno['turma_nome']) ? trim((string) $aluno['turma_nome']) : null,
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Lista jornadas candidatas para o escopo do boletim (compacto).
      *
      * @return list<array{id:int,nome:string,materia_nome:?string,bimestre:?int,ano_letivo:?int}>

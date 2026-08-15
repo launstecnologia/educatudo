@@ -92,6 +92,13 @@ class BoletimAssistenteWizard
             error_log('BoletimAssistenteWizard catalogo materias: ' . $e->getMessage());
         }
 
+        $alunos = [];
+        try {
+            $alunos = $this->ferramentas->listarAlunos(400);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard catalogo alunos: ' . $e->getMessage());
+        }
+
         $jornadas = [];
         try {
             $jornadas = $this->ferramentas->listarJornadas(120);
@@ -128,6 +135,7 @@ class BoletimAssistenteWizard
             'series' => $series,
             'turmas' => $turmas,
             'materias' => $materias,
+            'alunos' => $alunos,
             'jornadas' => $jornadas,
             'tipos_avaliacao' => $tipos,
             'eventos_prova' => $eventosProva,
@@ -186,9 +194,21 @@ class BoletimAssistenteWizard
             'series_ids' => [],
             'turmas_ids' => [],
             'materias_ids' => [],
+            'aluno_preview_id' => 0,
             'grupo_linha' => $this->grupoLinhaPadrao(),
             'rascunho_preservado' => null,
         ];
+
+        if (
+            (!is_array($estadoFormulario) || $estadoFormulario === [])
+            && $regraIdAtual !== null
+            && $regraIdAtual > 0
+        ) {
+            $regraExistente = $this->ferramentas->obterRegra($regraIdAtual);
+            if (is_array($regraExistente)) {
+                $estadoFormulario = $regraExistente;
+            }
+        }
 
         if (is_array($estadoFormulario)) {
             if (trim((string) ($estadoFormulario['nome'] ?? '')) !== '') {
@@ -1031,6 +1051,7 @@ class BoletimAssistenteWizard
         $merged['series_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['series_ids'] ?? [])))));
         $merged['turmas_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['turmas_ids'] ?? [])))));
         $merged['materias_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['materias_ids'] ?? [])), static fn ($id) => $id > 0)));
+        $merged['aluno_preview_id'] = max(0, (int) ($merged['aluno_preview_id'] ?? 0));
         $merged['grupo_linha'] = $this->normalizarGrupoLinha($merged['grupo_linha'] ?? null);
         $flagExplicita = array_key_exists('materia_unica', $merged);
         $merged['materia_unica_tocada'] = !empty($merged['materia_unica_tocada']);
@@ -3516,7 +3537,7 @@ class BoletimAssistenteWizard
             ]);
         }
 
-        $tabelas = $this->partirPreviewTabelas($comps);
+        $tabelas = $this->partirPreviewTabelas($comps, $estado);
         $outTabelas = [];
         foreach ($tabelas as $tab) {
             $semanas = is_array($tab['semanas'] ?? null) ? $tab['semanas'] : [];
@@ -3529,7 +3550,7 @@ class BoletimAssistenteWizard
             foreach ($tab['materias'] as $matNome) {
                 $linhas[] = [
                     'materia_nome' => $matNome,
-                    'notas' => $this->notasFicticiasLinha($matNome, $comps, $codigosSemana),
+                    'notas' => $this->notasFicticiasLinha($matNome, $comps, $codigosSemana, $estado),
                 ];
             }
             $outTabelas[] = [
@@ -3555,7 +3576,7 @@ class BoletimAssistenteWizard
      * @param list<array<string,mixed>> $comps
      * @return list<array<string,mixed>>
      */
-    private function partirPreviewTabelas(array $comps): array
+    private function partirPreviewTabelas(array $comps, array $estado): array
     {
         $blocoA = [];
         $blocoB = [];
@@ -3588,8 +3609,13 @@ class BoletimAssistenteWizard
         }
         $comum = array_merge($mediaSem, $comum);
 
-        $materiasA = ['Física', 'Matemática', 'Geografia', 'Biologia', 'Educação Física'];
-        $materiasB = ['Língua Portuguesa', 'História', 'Química', 'Inglês', 'Arte'];
+        $materias = $this->materiasPreview($estado, ['Física', 'Matemática', 'Geografia', 'Biologia', 'Educação Física']);
+        $metade = (int) ceil(count($materias) / 2);
+        $materiasA = array_slice($materias, 0, $metade);
+        $materiasB = array_slice($materias, $metade);
+        if ($materiasB === []) {
+            $materiasB = $materiasA;
+        }
 
         if ($blocoA === [] && $blocoB === []) {
             return [[
@@ -3662,12 +3688,12 @@ class BoletimAssistenteWizard
         }
         $grupos = $this->gruposPreviewBoletim($comps);
         $notaMin = (float) ($estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 7);
-        $materias = ['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências'];
+        $materias = $this->materiasPreview($estado, ['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências']);
         $linhas = [];
         foreach ($materias as $matNome) {
             $linhas[] = [
                 'materia_nome' => $matNome,
-                'notas' => $this->notasFicticiasLinhaBoletim($matNome, $comps, $notaMin),
+                'notas' => $this->notasFicticiasLinhaBoletim($matNome, $comps, $notaMin, $estado),
             ];
         }
         $colunas = [];
@@ -3698,6 +3724,64 @@ class BoletimAssistenteWizard
             'colunas' => $colunas,
             'pecas_disponiveis' => [],
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @param list<string> $fallback
+     * @return list<string>
+     */
+    private function materiasPreview(array $estado, array $fallback): array
+    {
+        $selecionadas = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($estado['materias_ids'] ?? [])),
+            static fn ($id) => $id > 0
+        )));
+        $selecionadasSet = array_fill_keys($selecionadas, true);
+        $nomes = [];
+
+        try {
+            foreach ($this->ferramentas->listarMaterias(500) as $m) {
+                $id = (int) ($m['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                if ($selecionadas !== [] && !isset($selecionadasSet[$id])) {
+                    continue;
+                }
+                $nome = trim((string) ($m['nome'] ?? ''));
+                if ($nome !== '') {
+                    $nomes[] = $nome;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard materias preview: ' . $e->getMessage());
+        }
+
+        $nomes = array_values(array_unique($nomes));
+        return $nomes !== [] ? $nomes : $fallback;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function hashAlunoPreview(array $estado): int
+    {
+        $alunoId = (int) ($estado['aluno_preview_id'] ?? 0);
+        if ($alunoId <= 0) {
+            return 0;
+        }
+        try {
+            foreach ($this->ferramentas->listarAlunos(500) as $aluno) {
+                if ((int) ($aluno['id'] ?? 0) !== $alunoId) {
+                    continue;
+                }
+                return abs(crc32(mb_strtolower((string) ($aluno['nome'] ?? '')) . '#' . $alunoId));
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard aluno preview: ' . $e->getMessage());
+        }
+        return abs(crc32((string) $alunoId));
     }
 
     /**
@@ -3818,9 +3902,9 @@ class BoletimAssistenteWizard
      * @param list<array<string,mixed>> $comps
      * @return array<string,mixed>
      */
-    private function notasFicticiasLinhaBoletim(string $materia, array $comps, float $notaMin): array
+    private function notasFicticiasLinhaBoletim(string $materia, array $comps, float $notaMin, array $estado): array
     {
-        $hash = abs(crc32(mb_strtolower($materia)));
+        $hash = abs(crc32(mb_strtolower($materia))) + $this->hashAlunoPreview($estado);
         $notas = [];
         foreach ($comps as $c) {
             if (!is_array($c)) {
@@ -3981,9 +4065,9 @@ class BoletimAssistenteWizard
      * @param list<string> $codigosSemanaBloco
      * @return array<string,mixed>
      */
-    private function notasFicticiasLinha(string $materia, array $comps, array $codigosSemanaBloco): array
+    private function notasFicticiasLinha(string $materia, array $comps, array $codigosSemanaBloco, array $estado): array
     {
-        $hash = abs(crc32(mb_strtolower($materia)));
+        $hash = abs(crc32(mb_strtolower($materia))) + $this->hashAlunoPreview($estado);
         $notas = [];
         $sumN = 0;
         $sumQ = 0;

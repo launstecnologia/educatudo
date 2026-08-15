@@ -694,6 +694,7 @@ $boletimWizardSteps = [
             series_ids: [],
             turmas_ids: [],
             materias_ids: [],
+            aluno_preview_id: 0,
             grupo_linha: grupoLinhaPadrao(),
             rascunho_preservado: null
         };
@@ -719,6 +720,7 @@ $boletimWizardSteps = [
         if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
         if (estado.bloco_calc == null) estado.bloco_calc = '';
         if (estado.materia_calc == null) estado.materia_calc = 0;
+        estado.aluno_preview_id = Number(estado.aluno_preview_id || 0) || 0;
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         if (!estado.fontes_bimestres || typeof estado.fontes_bimestres !== 'object') {
             estado.fontes_bimestres = { 1: 0, 2: 0, 3: 0, 4: 0 };
@@ -1381,8 +1383,10 @@ $boletimWizardSteps = [
             if (!e.target || e.target.id !== 'bw-formula-bloco-nome-input' || !estado || !estado.bloco_calc) return;
             if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
             estado.nomes_blocos[estado.bloco_calc] = String(e.target.value || '').slice(0, 60);
+            previewAtual = null;
             var chipNome = document.querySelector('#bw-colunas-lista .bw-col-chip[data-codigo="' + estado.bloco_calc + '"] .bw-col-nome');
             if (chipNome) chipNome.textContent = estado.nomes_blocos[estado.bloco_calc] || nomeBlocoCalc(estado.bloco_calc);
+            renderRevisarDinamico();
         });
         bodyEl.addEventListener('dragstart', function (e) {
             var pal = e.target.closest('.bw-pal-chip');
@@ -1497,6 +1501,58 @@ $boletimWizardSteps = [
         });
     }
 
+    function materiasPreviewLocal(fallback) {
+        var selecionadas = {};
+        (estado && Array.isArray(estado.materias_ids) ? estado.materias_ids : []).forEach(function (id) {
+            id = Number(id || 0);
+            if (id > 0) selecionadas[id] = true;
+        });
+        var filtrar = Object.keys(selecionadas).length > 0;
+        var nomes = [];
+        (catalogo.materias || []).forEach(function (m) {
+            var id = Number(m && m.id || 0);
+            if (id <= 0) return;
+            if (filtrar && !selecionadas[id]) return;
+            var nome = String((m && m.nome) || '').trim();
+            if (nome && nomes.indexOf(nome) < 0) nomes.push(nome);
+        });
+        return nomes.length ? nomes : fallback;
+    }
+
+    function alunoPreviewSelecionado() {
+        var id = Number((estado && estado.aluno_preview_id) || 0);
+        if (id <= 0) return null;
+        var alunos = (catalogo && catalogo.alunos) || [];
+        for (var i = 0; i < alunos.length; i++) {
+            if (Number(alunos[i].id || 0) === id) return alunos[i];
+        }
+        return null;
+    }
+
+    function hashPreviewAluno() {
+        var aluno = alunoPreviewSelecionado();
+        return aluno ? hashNome((aluno.nome || '') + '#' + aluno.id) : 0;
+    }
+
+    function htmlAlunoPreviewSelect() {
+        var alunos = (catalogo && catalogo.alunos) || [];
+        if (!alunos.length) return '';
+        var atual = Number((estado && estado.aluno_preview_id) || 0);
+        var html = '<div class="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">';
+        html += '<label class="text-xs font-medium text-slate-700 flex-1 min-w-[16rem]">Simular notas com aluno';
+        html += '<select id="bw-preview-aluno" class="mt-1 block w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm">';
+        html += '<option value="0">Exemplo visual sem aluno</option>';
+        alunos.forEach(function (a) {
+            var label = String(a.nome || ('Aluno #' + a.id));
+            if (a.turma_nome) label += ' · ' + a.turma_nome;
+            html += '<option value="' + Number(a.id || 0) + '"' + (atual === Number(a.id || 0) ? ' selected' : '') + '>' + esc(label) + '</option>';
+        });
+        html += '</select></label>';
+        html += '<p class="text-xs text-slate-500 max-w-md">Atualiza a prévia na hora. Após salvar, use a simulação real da configuração para conferir com dados gravados.</p>';
+        html += '</div>';
+        return html;
+    }
+
     function previewLocalBoletim() {
         var fontes = (estado && estado.fontes_bimestres) || {};
         var faltas = (estado && estado.fontes_faltas) || {};
@@ -1527,7 +1583,7 @@ $boletimWizardSteps = [
         });
         var notaMin = Number((estado && estado.nota_minima_aprovacao) != null ? estado.nota_minima_aprovacao : 7);
         function notasLinha(nome) {
-            var h = hashNome(nome);
+            var h = hashNome(nome) + hashPreviewAluno();
             var notas = {};
             var acc = 0;
             var nMed = 0;
@@ -1547,7 +1603,7 @@ $boletimWizardSteps = [
             notas.resultado = notas.media_final >= notaMin ? 'Aprovado' : 'Reprovado';
             return notas;
         }
-        var mats = ['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências'];
+        var mats = materiasPreviewLocal(['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências']);
         return {
             modo: 'boletim',
             aviso: 'Exemplo com dados fictícios — não são notas reais.',
@@ -1612,7 +1668,7 @@ $boletimWizardSteps = [
         colunas = ordenarColunasLista(colunas);
         outras = ordenarColunasLista(outras);
         function notasLinha(nome, semanas) {
-            var h = hashNome(nome);
+            var h = hashNome(nome) + hashPreviewAluno();
             var notas = {};
             var sumN = 0;
             var sumQ = 0;
@@ -1650,8 +1706,11 @@ $boletimWizardSteps = [
             });
             return notas;
         }
-        var matsA = ['Física', 'Matemática', 'Geografia', 'Biologia', 'Educação Física'];
-        var matsB = ['Língua Portuguesa', 'História', 'Química', 'Inglês', 'Arte'];
+        var mats = materiasPreviewLocal(['Física', 'Matemática', 'Geografia', 'Biologia', 'Educação Física']);
+        var metade = Math.ceil(mats.length / 2);
+        var matsA = mats.slice(0, metade);
+        var matsB = mats.slice(metade);
+        if (!matsB.length) matsB = matsA.slice();
         var sel = pecas;
         var disp = (catalogo.pecas || []).filter(function (p) { return sel.indexOf(p.key) < 0; }).map(function (p) {
             return { key: p.key, label: p.label };
@@ -1757,7 +1816,8 @@ $boletimWizardSteps = [
         if (!pv || !(pv.tabelas || []).length) {
             return '<p class="text-xs text-gray-500">' + esc((pv && pv.aviso) || 'Monte as peças para ver o exemplo.') + '</p>';
         }
-        var html = '<p class="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
+        var html = htmlAlunoPreviewSelect();
+        html += '<p class="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
         (pv.tabelas || []).forEach(function (t) {
             if (pv.modo === 'boletim' && !(t.grupos || []).length && (pv.grupos || []).length) {
                 t = Object.assign({}, t, { grupos: pv.grupos });
@@ -1869,6 +1929,13 @@ $boletimWizardSteps = [
                     abrirFormulaBloco(codCalc);
                 }
             }
+        });
+        bodyEl.addEventListener('change', function (e) {
+            if (!e.target || e.target.id !== 'bw-preview-aluno' || !estado) return;
+            estado.aluno_preview_id = Number(e.target.value || 0) || 0;
+            previewAtual = null;
+            renderRevisarDinamico();
+            agendarMontar();
         });
         bodyEl.addEventListener('dragstart', function (e) {
             var chip = e.target.closest('#bw-colunas-lista .bw-col-chip');
