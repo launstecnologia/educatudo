@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../Core/AuthManager.php';
 require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
 require_once __DIR__ . '/../../Models/Education/JourneyBoletimLancamento.php';
 require_once __DIR__ . '/../../Models/Education/SchoolAbsence.php';
+require_once __DIR__ . '/../../Helpers/BoletimQuadroLayoutHelper.php';
 
 class BoletimConfigController extends BaseController
 {
@@ -338,6 +339,24 @@ class BoletimConfigController extends BaseController
         }
 
         unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
+    }
+
+    public function assistente(): void
+    {
+        $user = $this->auth->getUser();
+        $selectedRegraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
+
+        $data = [
+            'title' => 'Assistente do Boletim - EducaTudo',
+            'page_title' => 'Assistente do Boletim',
+            'user' => $user,
+            'current_page' => 'boletim_config',
+            'csrf_token' => $this->generateCsrfToken(),
+            'selected_regra_id' => $selectedRegraId,
+            'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
+        ];
+
+        $this->viewWithLayout('admin', 'admin/boletim/assistente', $data);
     }
 
     /**
@@ -1729,6 +1748,9 @@ class BoletimConfigController extends BaseController
             $range = $this->periodoToRange($periodoRef);
         }
         $componentes = $regra['componentes'] ?? [];
+        $expansaoQuadro = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
+        $regra = $expansaoQuadro['regra'];
+        $componentes = $expansaoQuadro['componentes'];
 
         $componentesResultado = [];
         $valoresPorCodigo = [];
@@ -2222,6 +2244,39 @@ class BoletimConfigController extends BaseController
                     ? null
                     : ($materiaFiltro > 0 ? $materiaFiltro : null);
                 $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
+                $semanaComp = $this->parseSemanaFromComponente($componente);
+                $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
+                $bimestresComp = $this->parseProvaBimestresFromComponente($componente);
+                if ($blocoIds !== [] && $bimestresComp !== []) {
+                    $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
+                }
+                $semanaForcada = $semanaComp >= 1 && $semanaComp <= 8;
+                if ($semanaForcada) {
+                    if ($blocoIds !== []) {
+                        $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
+                        if ($filtradosSemana !== []) {
+                            $blocoIds = $filtradosSemana;
+                        } elseif ($tipoAvaliacaoComp > 0) {
+                            $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                                $tipoAvaliacaoComp,
+                                $semanaComp,
+                                $range['inicio'] ?? null,
+                                $range['fim'] ?? null,
+                                $bimestresComp
+                            );
+                        } else {
+                            $blocoIds = [];
+                        }
+                    } elseif ($tipoAvaliacaoComp > 0) {
+                        $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                            $tipoAvaliacaoComp,
+                            $semanaComp,
+                            $range['inicio'] ?? null,
+                            $range['fim'] ?? null,
+                            $bimestresComp
+                        );
+                    }
+                }
                 $filtroTitulo = trim((string) ($componente['filtro_titulo'] ?? ''));
                 $filtroTitulo = $filtroTitulo !== '' ? $filtroTitulo : null;
 
@@ -2237,6 +2292,9 @@ class BoletimConfigController extends BaseController
                         $materiaFiltroConsulta
                     );
                     $detalhes['blocos_ids'] = $blocoIds;
+                } elseif ($semanaForcada) {
+                    $rows = [];
+                    $detalhes['aviso_semana'] = 'Nenhum evento de prova com a semana S' . $semanaComp . '.';
                 } else {
                     $rows = $this->boletimConfig->getProvasFinalizadasByAluno(
                         $alunoId,
@@ -2431,7 +2489,31 @@ class BoletimConfigController extends BaseController
 
             $expr = $this->parseExpressaoColunaCalculada($componente);
             $formulaPorMateria = $this->parseFormulaMateriasCalculadoFromComponente($componente);
-            if ($expr === '' && $formulaPorMateria === []) {
+            $agregarNq = $this->parseAgregarNqFromComponente($componente);
+            if ($agregarNq !== []) {
+                $escalaNq = max(0.01, (float) ($componente['escala_max'] ?? 10));
+                $mapNq = $this->matrizColunaAgregarNq($agregarNq, $matrizPercentStatsPorCodigo, $escalaNq);
+                $roundModeComp = $this->resolveRoundModeComponente($componente, $roundMode);
+                if ($mapNq !== []) {
+                    $matrizPorCodigo[$codigo] = $this->applyRoundModeToMateriaMap($mapNq, $roundModeComp);
+                    $listaGlobalCalc = [];
+                    foreach ($matrizPorCodigo[$codigo] as $midC => $vC) {
+                        if (!is_numeric($vC)) {
+                            continue;
+                        }
+                        $listaGlobalCalc[] = [
+                            'valor' => (float) $vC,
+                            'materia_id' => (int) $midC,
+                            'materia_nome' => (string) ($materiaNomesPorId[$midC] ?? ''),
+                        ];
+                    }
+                    $valor = $this->agruparNotas($listaGlobalCalc, 'media');
+                    $valor = $this->applyRoundMode($valor, $roundModeComp);
+                } else {
+                    $detalhes['aviso_calculado'] = 'Sem acertos/questões nas semanas referenciadas em agregar_nq.';
+                }
+                $detalhes['agregar_nq'] = $agregarNq;
+            } elseif ($expr === '' && $formulaPorMateria === []) {
                 $detalhes['erro'] = 'Informe a expressão (use os códigos dos outros blocos, ex.: (semanal + bimestral) / 2).';
             } else {
                 $detalhes['expressao'] = $expr;
@@ -3176,6 +3258,11 @@ class BoletimConfigController extends BaseController
                 }
                 $notasLinha[$cod] = $vcell;
                 $valoresFormula[$cod] = is_numeric($vcell) ? (float) $vcell : 0.0;
+                $statsCod = $matrizPercentStatsPorCodigo[$cod] ?? [];
+                if (isset($statsCod[$mid]) && is_array($statsCod[$mid])) {
+                    $notasLinha[$cod . '__n'] = (int) ($statsCod[$mid]['acertos'] ?? 0);
+                    $notasLinha[$cod . '__q'] = (int) ($statsCod[$mid]['total'] ?? 0);
+                }
             }
             $resumo = $this->resumoNotaLinhaMatriz($regra, $componentesResultado, $notasLinha, $valoresFormula, $formula, (int) $mid);
             if ($resultadoCodigos !== []) {
@@ -5213,7 +5300,8 @@ class BoletimConfigController extends BaseController
             if ($exp === '') {
                 $exp = trim((string) ($componente['expressao'] ?? ''));
             }
-            if ($exp === '' && $fmOut === []) {
+            $agregarNqSave = $this->parseAgregarNqFromComponente($componente);
+            if ($exp === '' && $fmOut === [] && $agregarNqSave === []) {
                 return null;
             }
             // Se há exceções por matéria, o modo é per_materia mesmo quando o JSON do
@@ -5233,6 +5321,9 @@ class BoletimConfigController extends BaseController
             ];
             if ($fmOut !== []) {
                 $payload['formula_materias'] = $fmOut;
+            }
+            if ($agregarNqSave !== []) {
+                $payload['agregar_nq'] = $agregarNqSave;
             }
             $tracoMin = false;
             if (isset($componente['config']) && is_array($componente['config'])) {
@@ -5311,10 +5402,11 @@ class BoletimConfigController extends BaseController
             return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
         if ($src !== 'jornadas') {
-            if ($groupLine === null && $layoutMeta === null && $roundOverride === null) {
+            $quadroMeta = $this->extractQuadroMetaForSave($componente);
+            if ($groupLine === null && $layoutMeta === null && $roundOverride === null && $quadroMeta === []) {
                 return null;
             }
-            $payload = [];
+            $payload = $quadroMeta;
             if ($groupLine !== null) {
                 $payload['group_line'] = $groupLine;
             }
@@ -5379,6 +5471,19 @@ class BoletimConfigController extends BaseController
         }
         if ($faixasOut !== []) {
             $payload['faixas_percentuais'] = $faixasOut;
+        }
+        $bimsOut = [];
+        if (isset($componente['config']) && is_array($componente['config'])) {
+            foreach ((array) ($componente['config']['jornada_bimestres'] ?? []) as $b) {
+                $b = (int) $b;
+                if ($b >= 1 && $b <= 4) {
+                    $bimsOut[] = $b;
+                }
+            }
+        }
+        $bimsOut = array_values(array_unique($bimsOut));
+        if ($bimsOut !== []) {
+            $payload['jornada_bimestres'] = $bimsOut;
         }
         $distNotas = 'por_materia';
         if (isset($componente['config']) && is_array($componente['config'])) {
@@ -5482,8 +5587,8 @@ class BoletimConfigController extends BaseController
         if ($type === '') {
             $type = strtolower(trim((string) ($componente['layout_type'] ?? '')));
         }
-        $allowedGroups = ['b1', 'b2', 'b3', 'b4', 'final'];
-        $allowedTypes = ['media', 'faltas', 'rec', 'resultado', 'other'];
+        $allowedGroups = BoletimQuadroLayoutHelper::gruposPermitidos();
+        $allowedTypes = BoletimQuadroLayoutHelper::tiposPermitidos();
         if (!in_array($group, $allowedGroups, true)) {
             $group = '';
         }
@@ -5516,10 +5621,10 @@ class BoletimConfigController extends BaseController
             $decoded = array_replace_recursive($decoded, $componente['config']);
         }
         $layout = is_array($decoded['layout'] ?? null) ? $decoded['layout'] : [];
-        $group = strtolower(trim((string) ($layout['group'] ?? '')));
-        $type = strtolower(trim((string) ($layout['type'] ?? '')));
-        $allowedGroups = ['b1', 'b2', 'b3', 'b4', 'final'];
-        $allowedTypes = ['media', 'faltas', 'rec', 'resultado', 'other'];
+        $group = strtolower(trim((string) ($layout['group'] ?? $decoded['layout_group'] ?? '')));
+        $type = strtolower(trim((string) ($layout['type'] ?? $decoded['layout_type'] ?? '')));
+        $allowedGroups = BoletimQuadroLayoutHelper::gruposPermitidos();
+        $allowedTypes = BoletimQuadroLayoutHelper::tiposPermitidos();
         if (!in_array($group, $allowedGroups, true)) {
             $group = '';
         }
@@ -5528,6 +5633,236 @@ class BoletimConfigController extends BaseController
         }
 
         return ['group' => $group, 'type' => ($type !== '' ? $type : 'other')];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function decodeComponenteConfig(array $componente): array
+    {
+        $decoded = [];
+        $raw = $componente['config_json'] ?? '';
+        if (is_array($raw)) {
+            $decoded = $raw;
+        } elseif (is_string($raw) && trim($raw) !== '') {
+            $tmp = json_decode(trim($raw), true);
+            if (is_array($tmp)) {
+                $decoded = $tmp;
+            }
+        }
+        if (isset($componente['config']) && is_array($componente['config'])) {
+            $decoded = array_replace_recursive($decoded, $componente['config']);
+        }
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Se o evento tem "Prova semanal" genérica, a simulação/boletim usa o quadro S1–S8 (N/Q).
+     *
+     * @param array<string,mixed> $regra
+     * @param list<array<string,mixed>> $componentes
+     * @return array{regra:array<string,mixed>,componentes:list<array<string,mixed>>}
+     */
+    private function expandirRegraQuadroSemanalNaSimulacao(array $regra, array $componentes): array
+    {
+        if ($componentes === []) {
+            return ['regra' => $regra, 'componentes' => $componentes];
+        }
+        $jaQuadro = BoletimQuadroLayoutHelper::componentesJaSaoQuadro($componentes);
+        $temSemanal = BoletimQuadroLayoutHelper::componentesTemPecaSemanal($componentes);
+        if (!$jaQuadro && !$temSemanal) {
+            return ['regra' => $regra, 'componentes' => $componentes];
+        }
+
+        $codigoSemanal = 'semanal';
+        foreach ($componentes as $c) {
+            if (!is_array($c) || !BoletimQuadroLayoutHelper::componentesTemPecaSemanal([$c])) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod !== '' && !preg_match('/^s[1-8]$/', $cod)) {
+                $codigoSemanal = $cod;
+                break;
+            }
+        }
+
+        $semanas = $this->semanasQuadroNaSimulacao();
+        $novos = BoletimQuadroLayoutHelper::expandirComponentesParaQuadroSemanal(
+            $componentes,
+            $semanas['a'],
+            $semanas['b']
+        );
+        $formula = trim((string) ($regra['formula_final'] ?? ''));
+        if ($formula !== '') {
+            $regra['formula_final'] = BoletimQuadroLayoutHelper::reescreverCodigoSemanalNaFormula($formula, $codigoSemanal);
+        } else {
+            $codigos = [];
+            foreach ($novos as $cN) {
+                $cn = strtolower(trim((string) ($cN['codigo'] ?? '')));
+                if ($cn !== '') {
+                    $codigos[$cn] = true;
+                }
+            }
+            if (isset($codigos['media_final'])) {
+                $regra['formula_final'] = 'media_final';
+            } elseif (isset($codigos['media_bim'])) {
+                $regra['formula_final'] = 'media_bim';
+            } elseif (isset($codigos['media'])) {
+                $regra['formula_final'] = 'media';
+            }
+        }
+        $regra['componentes'] = $novos;
+
+        return ['regra' => $regra, 'componentes' => $novos];
+    }
+
+    /**
+     * @return array{a:list<int>,b:list<int>}
+     */
+    private function semanasQuadroNaSimulacao(): array
+    {
+        $a = [1, 3, 5, 7];
+        $b = [2, 4, 6, 8];
+        $path = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Models/NotasSemanaisConfig.php';
+        if (!class_exists('NotasSemanaisConfig', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('NotasSemanaisConfig', false)) {
+            return ['a' => $a, 'b' => $b];
+        }
+        try {
+            $cfg = (new NotasSemanaisConfig())->obter();
+            $sa = is_array($cfg['semanas_grupo_a'] ?? null) ? $cfg['semanas_grupo_a'] : $a;
+            $sb = is_array($cfg['semanas_grupo_b'] ?? null) ? $cfg['semanas_grupo_b'] : $b;
+            if ($sa !== []) {
+                $a = array_values(array_map('intval', $sa));
+            }
+            if ($sb !== []) {
+                $b = array_values(array_map('intval', $sb));
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimConfig semanas quadro: ' . $e->getMessage());
+        }
+
+        return ['a' => $a, 'b' => $b];
+    }
+
+    private function parseSemanaFromComponente(array $componente): int
+    {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $s = (int) ($cfg['semana'] ?? $componente['semana'] ?? 0);
+
+        return ($s >= 1 && $s <= 8) ? $s : 0;
+    }
+
+    private function parseTipoAvaliacaoIdFromComponente(array $componente): int
+    {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $id = (int) ($cfg['tipo_avaliacao_id'] ?? $componente['tipo_avaliacao_id'] ?? 0);
+
+        return $id > 0 ? $id : 0;
+    }
+
+    /** @return list<int> */
+    private function parseProvaBimestresFromComponente(array $componente): array
+    {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $out = [];
+        foreach ((array) ($cfg['prova_bimestres'] ?? []) as $b) {
+            $n = (int) $b;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $out, true)) {
+                $out[] = $n;
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return list<string> */
+    private function parseAgregarNqFromComponente(array $componente): array
+    {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $raw = $cfg['agregar_nq'] ?? $componente['agregar_nq'] ?? [];
+        if (is_string($raw)) {
+            $raw = preg_split('/[,\s;]+/', $raw) ?: [];
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $v) {
+            $cod = strtolower(trim((string) $v));
+            $cod = preg_replace('/[^a-z0-9_]+/', '_', $cod) ?? '';
+            $cod = trim($cod, '_');
+            if ($cod !== '') {
+                $out[] = $cod;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function extractQuadroMetaForSave(array $componente): array
+    {
+        $payload = [];
+        $semana = $this->parseSemanaFromComponente($componente);
+        if ($semana > 0) {
+            $payload['semana'] = $semana;
+        }
+        $tipoId = $this->parseTipoAvaliacaoIdFromComponente($componente);
+        if ($tipoId > 0) {
+            $payload['tipo_avaliacao_id'] = $tipoId;
+        }
+        $cfg = $this->decodeComponenteConfig($componente);
+        $tipoNome = trim((string) ($cfg['tipo_avaliacao_nome'] ?? $componente['tipo_avaliacao_nome'] ?? ''));
+        if ($tipoNome !== '') {
+            $payload['tipo_avaliacao_nome'] = $tipoNome;
+        }
+        $bimsProva = $this->parseProvaBimestresFromComponente($componente);
+        if ($bimsProva !== []) {
+            $payload['prova_bimestres'] = $bimsProva;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Média 0–escala a partir da soma de acertos/questões de várias colunas (quadro semanal).
+     *
+     * @param list<string> $codigos
+     * @param array<string, array<int, array{acertos?:int,total?:int}>> $statsPorCodigo
+     * @return array<int, float>
+     */
+    private function matrizColunaAgregarNq(array $codigos, array $statsPorCodigo, float $escala): array
+    {
+        $mids = [];
+        foreach ($codigos as $cod) {
+            foreach (array_keys($statsPorCodigo[$cod] ?? []) as $mid) {
+                $mids[(int) $mid] = true;
+            }
+        }
+        $out = [];
+        foreach (array_keys($mids) as $mid) {
+            $n = 0;
+            $q = 0;
+            foreach ($codigos as $cod) {
+                $st = $statsPorCodigo[$cod][$mid] ?? null;
+                if (!is_array($st)) {
+                    continue;
+                }
+                $n += max(0, (int) ($st['acertos'] ?? 0));
+                $q += max(0, (int) ($st['total'] ?? 0));
+            }
+            if ($q > 0) {
+                $out[(int) $mid] = ($n / $q) * $escala;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -5623,7 +5958,13 @@ class BoletimConfigController extends BaseController
      */
     private function resolveBlocoIdsFromComponentePersisted(array $componente): array
     {
-        $raw = isset($componente['blocos_ids']) ? trim((string) $componente['blocos_ids']) : '';
+        $rawBlocos = $componente['blocos_ids'] ?? '';
+        if (is_array($rawBlocos)) {
+            return array_values(array_unique(array_filter(array_map('intval', $rawBlocos), static function ($id) {
+                return $id > 0;
+            })));
+        }
+        $raw = trim((string) $rawBlocos);
         if ($raw !== '') {
             $ids = [];
             foreach (explode(',', $raw) as $part) {

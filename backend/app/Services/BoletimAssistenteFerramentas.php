@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/../Models/System/BoletimConfig.php';
+require_once __DIR__ . '/../Helpers/BoletimQuadroLayoutHelper.php';
 
 class BoletimAssistenteFerramentas
 {
@@ -33,10 +34,12 @@ class BoletimAssistenteFerramentas
             if ($id <= 0) {
                 continue;
             }
+            $chave = isset($row['chave_quadro']) ? strtolower(trim((string) $row['chave_quadro'])) : '';
             $out[] = [
                 'id' => $id,
                 'nome' => trim((string) ($row['nome'] ?? '')),
                 'descricao' => isset($row['descricao']) ? trim((string) $row['descricao']) : null,
+                'chave_quadro' => $chave !== '' ? $chave : null,
             ];
         }
         return $out;
@@ -87,7 +90,7 @@ class BoletimAssistenteFerramentas
     /**
      * Lista jornadas candidatas para o escopo do boletim (compacto).
      *
-     * @return list<array{id:int,nome:string,materia_nome:?string}>
+     * @return list<array{id:int,nome:string,materia_nome:?string,bimestre:?int,ano_letivo:?int}>
      */
     public function listarJornadas(int $limit = 150): array
     {
@@ -128,8 +131,14 @@ class BoletimAssistenteFerramentas
             }
             $out[] = [
                 'id' => $id,
-                'nome' => trim((string) ($j['nome'] ?? ('Jornada #' . $id))),
+                'nome' => trim((string) ($j['titulo'] ?? $j['nome'] ?? ('Jornada #' . $id))),
                 'materia_nome' => isset($j['materia_nome']) ? trim((string) $j['materia_nome']) : null,
+                'bimestre' => isset($j['bimestre']) && $j['bimestre'] !== '' && $j['bimestre'] !== null
+                    ? (int) $j['bimestre']
+                    : null,
+                'ano_letivo' => isset($j['ano_letivo']) && $j['ano_letivo'] !== '' && $j['ano_letivo'] !== null
+                    ? (int) $j['ano_letivo']
+                    : null,
             ];
             if (count($out) >= $limit) {
                 break;
@@ -139,7 +148,35 @@ class BoletimAssistenteFerramentas
     }
 
     /**
-     * @return list<array{id:int,nome:string,codigo:?string,ano_letivo:?int,bimestre:?int,exibir_em:?string}>
+     * @param list<int> $bimestres
+     * @return list<int>
+     */
+    public function resolverIdsJornadaPorBimestre(array $bimestres, int $anoLetivo = 0): array
+    {
+        $bims = array_values(array_unique(array_filter(array_map('intval', $bimestres), static fn ($b) => $b >= 1 && $b <= 4)));
+        if ($bims === []) {
+            return [];
+        }
+        $ids = [];
+        foreach ($this->listarJornadas(300) as $j) {
+            $jb = (int) ($j['bimestre'] ?? 0);
+            if (!in_array($jb, $bims, true)) {
+                continue;
+            }
+            $ja = (int) ($j['ano_letivo'] ?? 0);
+            if ($anoLetivo > 0 && $ja > 0 && $ja !== $anoLetivo) {
+                continue;
+            }
+            $id = (int) ($j['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,codigo:?string,ano_letivo:?int,bimestre:?int,exibir_em:?string,formula_final:?string}>
      */
     public function listarRegras(int $limit = 100): array
     {
@@ -156,6 +193,7 @@ class BoletimAssistenteFerramentas
                 'ano_letivo' => isset($regra['ano_letivo']) ? (int) $regra['ano_letivo'] : null,
                 'bimestre' => isset($regra['bimestre']) ? (int) $regra['bimestre'] : null,
                 'exibir_em' => isset($regra['exibir_em']) ? (string) $regra['exibir_em'] : null,
+                'formula_final' => isset($regra['formula_final']) ? trim((string) $regra['formula_final']) : null,
             ];
         }
         return $out;
@@ -173,6 +211,77 @@ class BoletimAssistenteFerramentas
         return $this->normalizarRegraParaAssistente($regra);
     }
 
+    public function obterRegraPorCodigo(string $codigo): ?array
+    {
+        $codigo = trim($codigo);
+        if ($codigo === '') {
+            return null;
+        }
+        $regra = $this->boletimConfig->getRuleByCode($codigo);
+        if (!$regra) {
+            return null;
+        }
+        return $this->normalizarRegraParaAssistente($regra);
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,bimestre:?int,bimestre_rotulo:?string,ano_letivo:?int}>
+     */
+    public function listarFaltasEventos(int $limit = 300): array
+    {
+        if (!class_exists('SchoolAbsence', false)) {
+            require_once __DIR__ . '/../Models/Education/SchoolAbsence.php';
+        }
+        $out = [];
+        foreach ((new SchoolAbsence())->listEventos($limit) as $ev) {
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $rotulo = trim((string) ($ev['bimestre'] ?? ''));
+            $bim = 0;
+            if (preg_match('/([1-4])/', $rotulo, $m)) {
+                $bim = (int) $m[1];
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => trim((string) ($ev['nome'] ?? '')),
+                'bimestre' => $bim > 0 ? $bim : null,
+                'bimestre_rotulo' => $rotulo !== '' ? $rotulo : null,
+                'ano_letivo' => isset($ev['ano_letivo']) ? (int) $ev['ano_letivo'] : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    public function obterFaltasEvento(int $eventoId): ?array
+    {
+        if ($eventoId <= 0) {
+            return null;
+        }
+        if (!class_exists('SchoolAbsence', false)) {
+            require_once __DIR__ . '/../Models/Education/SchoolAbsence.php';
+        }
+        $ev = (new SchoolAbsence())->getEventoById($eventoId);
+        if (!$ev) {
+            return null;
+        }
+        $rotulo = trim((string) ($ev['bimestre'] ?? ''));
+        $bim = 0;
+        if (preg_match('/([1-4])/', $rotulo, $m)) {
+            $bim = (int) $m[1];
+        }
+
+        return [
+            'id' => (int) ($ev['id'] ?? 0),
+            'nome' => trim((string) ($ev['nome'] ?? '')),
+            'bimestre' => $bim > 0 ? $bim : null,
+            'bimestre_rotulo' => $rotulo !== '' ? $rotulo : null,
+            'ano_letivo' => isset($ev['ano_letivo']) ? (int) $ev['ano_letivo'] : null,
+        ];
+    }
+
     /**
      * Eventos de prova (blocos) com tipo de avaliação.
      *
@@ -186,12 +295,16 @@ class BoletimAssistenteFerramentas
 
         $selectTipoId = $temTipo ? 'pb.tipo_avaliacao_id' : 'NULL AS tipo_avaliacao_id';
         $selectTipoNome = $temTipo ? 'pta.nome AS tipo_avaliacao_nome' : 'NULL AS tipo_avaliacao_nome';
+        $selectChave = ($temTipo && $this->temColuna('provas_tipos_avaliacao', 'chave_quadro'))
+            ? 'pta.chave_quadro'
+            : 'NULL AS chave_quadro';
+        $selectSemana = $this->temColuna('provas_blocos', 'semana') ? 'pb.semana' : 'NULL AS semana';
         $joinTipo = $temTipo
             ? 'LEFT JOIN provas_tipos_avaliacao pta ON pta.id = pb.tipo_avaliacao_id AND pta.deleted_at IS NULL'
             : '';
 
         $sql = "SELECT pb.id, pb.titulo, pb.data_prova, pb.ano_letivo, pb.bimestre,
-                       {$selectTipoId}, {$selectTipoNome}
+                       {$selectTipoId}, {$selectTipoNome}, {$selectChave}, {$selectSemana}
                 FROM provas_blocos pb
                 {$joinTipo}
                 WHERE pb.deleted_at IS NULL";
@@ -209,11 +322,15 @@ class BoletimAssistenteFerramentas
             if ($id <= 0) {
                 continue;
             }
+            $semanaEv = isset($row['semana']) ? (int) $row['semana'] : 0;
+            $chaveEv = isset($row['chave_quadro']) ? strtolower(trim((string) $row['chave_quadro'])) : '';
             $out[] = [
                 'id' => $id,
                 'titulo' => trim((string) ($row['titulo'] ?? '')),
                 'tipo_avaliacao_id' => isset($row['tipo_avaliacao_id']) ? (int) $row['tipo_avaliacao_id'] : null,
                 'tipo_avaliacao_nome' => isset($row['tipo_avaliacao_nome']) ? trim((string) $row['tipo_avaliacao_nome']) : null,
+                'chave_quadro' => $chaveEv !== '' ? $chaveEv : null,
+                'semana' => ($semanaEv >= 1 && $semanaEv <= 8) ? $semanaEv : null,
                 'data_prova' => isset($row['data_prova']) ? (string) $row['data_prova'] : null,
                 'ano_letivo' => isset($row['ano_letivo']) ? (int) $row['ano_letivo'] : null,
                 'bimestre' => isset($row['bimestre']) ? (int) $row['bimestre'] : null,
@@ -225,13 +342,17 @@ class BoletimAssistenteFerramentas
     /**
      * Resolve tipo de avaliação (id ou nome parcial) → IDs de eventos/blocos no período.
      *
+     * @param mixed $tipoAvaliacaoIdOuNome
+     * @param list<int> $bimestres
      * @return array{tipo:?array{id:int,nome:string},blocos_ids:list<int>,eventos:list<array>}
      */
     public function resolverBlocosPorTipo(
         $tipoAvaliacaoIdOuNome,
         ?string $dataInicio = null,
         ?string $dataFim = null,
-        int $limit = 100
+        int $limit = 100,
+        ?int $semana = null,
+        array $bimestres = []
     ): array {
         $tipo = $this->resolverTipoAvaliacao($tipoAvaliacaoIdOuNome);
         if ($tipo === null) {
@@ -248,6 +369,28 @@ class BoletimAssistenteFerramentas
                     return true; // sem data: mantém (pode estar no bimestre)
                 }
                 return $d >= $ini && $d <= $fim;
+            }));
+        }
+        $semanaFiltro = ($semana !== null && $semana >= 1 && $semana <= 8) ? $semana : 0;
+        if ($semanaFiltro > 0) {
+            $eventos = array_values(array_filter($eventos, static function ($ev) use ($semanaFiltro) {
+                return (int) ($ev['semana'] ?? 0) === $semanaFiltro;
+            }));
+        }
+        $bims = [];
+        foreach ($bimestres as $b) {
+            $n = (int) $b;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $bims, true)) {
+                $bims[] = $n;
+            }
+        }
+        if ($bims !== []) {
+            $eventos = array_values(array_filter($eventos, static function ($ev) use ($bims) {
+                $bimEv = (int) ($ev['bimestre'] ?? 0);
+                if ($bimEv <= 0) {
+                    return true;
+                }
+                return in_array($bimEv, $bims, true);
             }));
         }
 
@@ -349,22 +492,6 @@ class BoletimAssistenteFerramentas
                 $calc = 'media';
             }
 
-            $blocosIds = $this->normalizarIds($comp['blocos_ids'] ?? []);
-            $tipoId = isset($comp['tipo_avaliacao_id']) ? (int) $comp['tipo_avaliacao_id'] : 0;
-            $tipoNome = trim((string) ($comp['tipo_avaliacao_nome'] ?? ''));
-            if ($blocosIds === [] && ($tipoId > 0 || $tipoNome !== '')) {
-                $resolvido = $this->resolverBlocosPorTipo(
-                    $tipoId > 0 ? $tipoId : $tipoNome,
-                    $dataIni,
-                    $dataFim
-                );
-                if ($resolvido['tipo'] !== null) {
-                    $tipoId = (int) $resolvido['tipo']['id'];
-                    $tipoNome = $resolvido['tipo']['nome'];
-                    $blocosIds = $resolvido['blocos_ids'];
-                }
-            }
-
             $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
             $groupLine = is_array($config['group_line'] ?? null) ? $config['group_line'] : [];
             $config['group_line'] = [
@@ -377,11 +504,82 @@ class BoletimAssistenteFerramentas
                 'divisor' => max(1, (int) ($groupLine['divisor'] ?? 1)),
                 'materias_ids' => $this->normalizarIds($groupLine['materias_ids'] ?? []),
             ];
-            if ($tipoId > 0) {
-                $config['tipo_avaliacao_id'] = $tipoId;
+            $layoutGroup = strtolower(trim((string) ($config['layout_group'] ?? $comp['layout_group'] ?? '')));
+            $layoutType = strtolower(trim((string) ($config['layout_type'] ?? $comp['layout_type'] ?? '')));
+            if (in_array($layoutGroup, BoletimQuadroLayoutHelper::gruposPermitidos(), true)) {
+                $config['layout_group'] = $layoutGroup;
+            } else {
+                unset($config['layout_group']);
             }
-            if ($tipoNome !== '') {
-                $config['tipo_avaliacao_nome'] = $tipoNome;
+            if (in_array($layoutType, BoletimQuadroLayoutHelper::tiposPermitidos(), true)) {
+                $config['layout_type'] = $layoutType;
+            } else {
+                unset($config['layout_type']);
+            }
+            $semanaComp = (int) ($config['semana'] ?? $comp['semana'] ?? 0);
+            if ($semanaComp >= 1 && $semanaComp <= 8) {
+                $config['semana'] = $semanaComp;
+            } else {
+                unset($config['semana']);
+                $semanaComp = 0;
+            }
+            $agregarNq = $this->normalizarCodigosAgregarNq($config['agregar_nq'] ?? $comp['agregar_nq'] ?? []);
+            if ($agregarNq !== []) {
+                $config['agregar_nq'] = $agregarNq;
+            } else {
+                unset($config['agregar_nq']);
+            }
+
+            $blocosIds = $this->normalizarIds($comp['blocos_ids'] ?? []);
+            $tipoId = isset($comp['tipo_avaliacao_id']) ? (int) $comp['tipo_avaliacao_id'] : 0;
+            $tipoNome = trim((string) ($comp['tipo_avaliacao_nome'] ?? $config['tipo_avaliacao_nome'] ?? ''));
+            if ($tipoId <= 0 && isset($config['tipo_avaliacao_id'])) {
+                $tipoId = (int) $config['tipo_avaliacao_id'];
+            }
+            if ($blocosIds === [] && ($tipoId > 0 || $tipoNome !== '')) {
+                $bimsResolve = [];
+                foreach ((array) ($config['prova_bimestres'] ?? []) as $b) {
+                    $n = (int) $b;
+                    if ($n >= 1 && $n <= 4 && !in_array($n, $bimsResolve, true)) {
+                        $bimsResolve[] = $n;
+                    }
+                }
+                $resolvido = $this->resolverBlocosPorTipo(
+                    $tipoId > 0 ? $tipoId : $tipoNome,
+                    $dataIni,
+                    $dataFim,
+                    100,
+                    $semanaComp > 0 ? $semanaComp : null,
+                    $bimsResolve
+                );
+                if ($resolvido['tipo'] !== null) {
+                    $tipoId = (int) $resolvido['tipo']['id'];
+                    $tipoNome = $resolvido['tipo']['nome'];
+                    $blocosIds = $resolvido['blocos_ids'];
+                    $config['tipo_avaliacao_id'] = $tipoId;
+                    $config['tipo_avaliacao_nome'] = $tipoNome;
+                }
+            }
+
+            if ($source === 'evento_boletim') {
+                $slugEv = trim((string) ($config['regra_codigo'] ?? $comp['regra_codigo'] ?? ''));
+                $config['regra_codigo'] = $slugEv;
+                $config['componente_codigo'] = trim((string) ($config['componente_codigo'] ?? $comp['componente_codigo'] ?? ''));
+                if ($slugEv === '') {
+                    $erros[] = "Bloco \"{$codigo}\" precisa do código do evento de Notas (média final já criada).";
+                } elseif ($this->obterRegraPorCodigo($slugEv) === null) {
+                    $erros[] = "Bloco \"{$codigo}\" aponta para evento inexistente ({$slugEv}).";
+                }
+            }
+
+            if ($source === 'faltas_evento') {
+                $evFaltas = (int) ($config['faltas_evento_id'] ?? $comp['faltas_evento_id'] ?? 0);
+                $config['faltas_evento_id'] = $evFaltas;
+                if ($evFaltas <= 0) {
+                    $erros[] = "Bloco \"{$codigo}\" precisa do evento de faltas.";
+                } elseif ($this->obterFaltasEvento($evFaltas) === null) {
+                    $erros[] = "Bloco \"{$codigo}\" aponta para evento de faltas inexistente.";
+                }
             }
 
             if ($source === 'calculado') {
@@ -389,14 +587,60 @@ class BoletimAssistenteFerramentas
                 $config['expressao'] = $exp;
                 $modeFm = strtolower(trim((string) ($config['formula_mode'] ?? 'single')));
                 $config['formula_mode'] = $modeFm === 'per_materia' ? 'per_materia' : 'single';
-                if ($exp === '') {
-                    $erros[] = "Bloco calculado \"{$codigo}\" precisa de config.expressao (ex.: (semanal + bimestral) / 2).";
+                if ($exp === '' && $agregarNq === []) {
+                    $erros[] = "Bloco calculado \"{$codigo}\" precisa de config.expressao (ex.: (semanal + bimestral) / 2) ou config.agregar_nq (média por acertos/questões das semanas).";
+                }
+            }
+
+            if ($source === 'jornadas') {
+                $config['jornada_ids'] = $this->normalizarIds($config['jornada_ids'] ?? $comp['jornada_ids'] ?? []);
+                $bimsCfg = [];
+                foreach ((array) ($config['jornada_bimestres'] ?? []) as $b) {
+                    $b = (int) $b;
+                    if ($b >= 1 && $b <= 4) {
+                        $bimsCfg[] = $b;
+                    }
+                }
+                if ($bimsCfg !== []) {
+                    $config['jornada_bimestres'] = array_values(array_unique($bimsCfg));
+                    if ($config['jornada_ids'] === []) {
+                        $config['jornada_ids'] = $this->resolverIdsJornadaPorBimestre(
+                            $config['jornada_bimestres'],
+                            (int) ($rascunho['ano_letivo'] ?? 0)
+                        );
+                        if ($config['jornada_ids'] === []) {
+                            $erros[] = "Nenhuma jornada encontrada para o(s) bimestre(s) do bloco \"{$codigo}\".";
+                        }
+                    }
+                } else {
+                    unset($config['jornada_bimestres']);
+                }
+                $config['faixas_percentuais'] = $this->normalizarFaixasPercentuaisJornada(
+                    $config['faixas_percentuais'] ?? []
+                );
+                if ($config['faixas_percentuais'] === []) {
+                    unset($config['faixas_percentuais']);
+                }
+            }
+
+            if ($source === 'provas_sistema') {
+                $bimsProva = [];
+                foreach ((array) ($config['prova_bimestres'] ?? []) as $b) {
+                    $n = (int) $b;
+                    if ($n >= 1 && $n <= 4) {
+                        $bimsProva[] = $n;
+                    }
+                }
+                if ($bimsProva !== []) {
+                    $config['prova_bimestres'] = array_values(array_unique($bimsProva));
+                } else {
+                    unset($config['prova_bimestres']);
                 }
             }
 
             $filtroTitulo = trim((string) ($comp['filtro_titulo'] ?? ''));
             // Se resolveu por tipo/blocos, não força filtro de título
-            if ($blocosIds !== []) {
+            if ($blocosIds !== [] || $semanaComp > 0) {
                 $filtroTitulo = '';
             } elseif ($filtroTitulo === '' && $tipoNome !== '') {
                 // fallback frágil: palavra do tipo (ex.: "Semanal")
@@ -582,6 +826,34 @@ class BoletimAssistenteFerramentas
             }
             $lines[] = 'tipo_avaliacao_id: ' . ($tipoId > 0 ? $tipoId : '');
             $lines[] = 'tipo_avaliacao_nome: ' . $this->escaparReceitaValor($c['tipo_avaliacao_nome'] ?? $cfg['tipo_avaliacao_nome'] ?? '');
+            $semanaRec = (int) ($cfg['semana'] ?? $c['semana'] ?? 0);
+            if ($semanaRec >= 1 && $semanaRec <= 8) {
+                $lines[] = 'semana: ' . $semanaRec;
+            }
+            $lgRec = trim((string) ($cfg['layout_group'] ?? $c['layout_group'] ?? ''));
+            $ltRec = trim((string) ($cfg['layout_type'] ?? $c['layout_type'] ?? ''));
+            if ($lgRec !== '') {
+                $lines[] = 'layout_group: ' . $this->escaparReceitaValor($lgRec);
+            }
+            if ($ltRec !== '') {
+                $lines[] = 'layout_type: ' . $this->escaparReceitaValor($ltRec);
+            }
+            $agRec = $this->normalizarCodigosAgregarNq($cfg['agregar_nq'] ?? []);
+            if ($agRec !== []) {
+                $lines[] = 'agregar_nq: [' . implode(', ', $agRec) . ']';
+            }
+            $regraCodRec = trim((string) ($cfg['regra_codigo'] ?? $c['regra_codigo'] ?? ''));
+            if ($regraCodRec !== '') {
+                $lines[] = 'regra_codigo: ' . $this->escaparReceitaValor($regraCodRec);
+            }
+            $compCodRec = trim((string) ($cfg['componente_codigo'] ?? $c['componente_codigo'] ?? ''));
+            if ($compCodRec !== '') {
+                $lines[] = 'componente_codigo: ' . $this->escaparReceitaValor($compCodRec);
+            }
+            $faltasIdRec = (int) ($cfg['faltas_evento_id'] ?? $c['faltas_evento_id'] ?? 0);
+            if ($faltasIdRec > 0) {
+                $lines[] = 'faltas_evento_id: ' . $faltasIdRec;
+            }
             $lines[] = 'expressao: ' . $this->escaparReceitaValor($cfg['expressao'] ?? $c['expressao'] ?? '');
             $lines[] = 'formula_mode: ' . $this->escaparReceitaValor($cfg['formula_mode'] ?? 'single');
             if (!empty($cfg['jornada_ids']) && is_array($cfg['jornada_ids'])) {
@@ -651,6 +923,34 @@ class BoletimAssistenteFerramentas
             }
             if (!empty($kv['tipo_avaliacao_nome'])) {
                 $config['tipo_avaliacao_nome'] = trim((string) $kv['tipo_avaliacao_nome']);
+            }
+            $semanaKv = (int) ($kv['semana'] ?? 0);
+            if ($semanaKv >= 1 && $semanaKv <= 8) {
+                $config['semana'] = $semanaKv;
+            }
+            $lgKv = strtolower(trim((string) ($kv['layout_group'] ?? '')));
+            $ltKv = strtolower(trim((string) ($kv['layout_type'] ?? '')));
+            if (in_array($lgKv, BoletimQuadroLayoutHelper::gruposPermitidos(), true)) {
+                $config['layout_group'] = $lgKv;
+            }
+            if (in_array($ltKv, BoletimQuadroLayoutHelper::tiposPermitidos(), true)) {
+                $config['layout_type'] = $ltKv;
+            }
+            $agKv = $this->normalizarCodigosAgregarNq($kv['agregar_nq'] ?? []);
+            if ($agKv !== []) {
+                $config['agregar_nq'] = $agKv;
+            }
+            $regraCodKv = trim((string) ($kv['regra_codigo'] ?? ''));
+            if ($regraCodKv !== '') {
+                $config['regra_codigo'] = $regraCodKv;
+            }
+            $compCodKv = trim((string) ($kv['componente_codigo'] ?? ''));
+            if ($compCodKv !== '') {
+                $config['componente_codigo'] = $compCodKv;
+            }
+            $faltasIdKv = (int) ($kv['faltas_evento_id'] ?? 0);
+            if ($faltasIdKv > 0) {
+                $config['faltas_evento_id'] = $faltasIdKv;
             }
             if (!empty($kv['jornada_ids'])) {
                 $config['jornada_ids'] = $this->parseListaIdsReceita($kv['jornada_ids']);
@@ -901,12 +1201,84 @@ class BoletimAssistenteFerramentas
      */
     public function montarContextoCatalogo(): array
     {
+        $tipos = [];
+        $turmas = [];
+        $materias = [];
+        $regras = [];
+        $eventos = [];
+        $quadro = [
+            'semanas_com_evento' => [],
+            'tipos_por_chave' => [],
+            'grupos_materias' => ['A' => [], 'B' => []],
+            'dica' => '',
+        ];
+        try {
+            $tipos = $this->listarTiposAvaliacao();
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo tipos: ' . $e->getMessage());
+        }
+        try {
+            $turmas = array_slice($this->listarTurmas(200), 0, 80);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo turmas: ' . $e->getMessage());
+        }
+        try {
+            $materias = array_slice($this->listarMaterias(200), 0, 80);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo materias: ' . $e->getMessage());
+        }
+        try {
+            $regras = array_slice($this->listarRegras(50), 0, 40);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo regras: ' . $e->getMessage());
+        }
+        try {
+            $eventos = array_slice($this->listarEventosProva(null, 40), 0, 40);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo eventos: ' . $e->getMessage());
+        }
+        try {
+            $quadro = $this->montarContextoQuadroSemanal();
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo quadro: ' . $e->getMessage());
+        }
+        $jornadasCat = [];
+        try {
+            foreach (array_slice($this->listarJornadas(80), 0, 80) as $j) {
+                $jornadasCat[] = [
+                    'id' => (int) ($j['id'] ?? 0),
+                    'nome' => (string) ($j['nome'] ?? ''),
+                    'bimestre' => isset($j['bimestre']) ? (int) $j['bimestre'] : null,
+                    'ano_letivo' => isset($j['ano_letivo']) ? (int) $j['ano_letivo'] : null,
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo jornadas: ' . $e->getMessage());
+        }
+
+        $faltasEventos = [];
+        try {
+            foreach ($this->listarFaltasEventos(80) as $fe) {
+                $faltasEventos[] = [
+                    'id' => (int) ($fe['id'] ?? 0),
+                    'nome' => (string) ($fe['nome'] ?? ''),
+                    'bimestre' => isset($fe['bimestre']) ? (int) $fe['bimestre'] : null,
+                    'ano_letivo' => isset($fe['ano_letivo']) ? (int) $fe['ano_letivo'] : null,
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas catalogo faltas: ' . $e->getMessage());
+        }
+
         return [
-            'tipos_avaliacao' => $this->listarTiposAvaliacao(),
-            'turmas' => array_slice($this->listarTurmas(200), 0, 80),
-            'materias' => array_slice($this->listarMaterias(200), 0, 80),
-            'regras_existentes' => array_slice($this->listarRegras(50), 0, 40),
-            'eventos_prova_recentes' => array_slice($this->listarEventosProva(null, 40), 0, 40),
+            'tipos_avaliacao' => $tipos,
+            'turmas' => $turmas,
+            'materias' => $materias,
+            'regras_existentes' => $regras,
+            'eventos_prova_recentes' => $eventos,
+            'quadro_semanal' => $quadro,
+            'jornadas' => $jornadasCat,
+            'faltas_eventos' => $faltasEventos,
         ];
     }
 
@@ -976,6 +1348,45 @@ class BoletimAssistenteFerramentas
         return is_array($dec) ? $this->normalizarIds($dec) : [];
     }
 
+    /**
+     * Aceita lista [{percentual_min, nota}] ou mapa { "90": 10 }.
+     *
+     * @param mixed $raw
+     * @return list<array{percentual_min:int,nota:float}>
+     */
+    private function normalizarFaixasPercentuaisJornada($raw): array
+    {
+        if (!is_array($raw) || $raw === []) {
+            return [];
+        }
+        $out = [];
+        $isLista = array_is_list($raw) || (isset($raw[0]) && is_array($raw[0]));
+        if ($isLista) {
+            foreach ($raw as $fx) {
+                if (!is_array($fx)) {
+                    continue;
+                }
+                $p = (int) ($fx['percentual_min'] ?? 0);
+                if ($p < 0 || $p > 100 || !is_numeric($fx['nota'] ?? null)) {
+                    continue;
+                }
+                $out[] = ['percentual_min' => $p, 'nota' => max(0.0, (float) $fx['nota'])];
+            }
+        } else {
+            foreach ($raw as $k => $v) {
+                $p = (int) $k;
+                if ($p < 0 || $p > 100 || !is_numeric($v)) {
+                    continue;
+                }
+                $out[] = ['percentual_min' => $p, 'nota' => max(0.0, (float) $v)];
+            }
+        }
+        usort($out, static function (array $a, array $b): int {
+            return (int) $b['percentual_min'] <=> (int) $a['percentual_min'];
+        });
+        return $out;
+    }
+
     /** @return list<int> */
     private function normalizarIds($raw): array
     {
@@ -1028,6 +1439,434 @@ class BoletimAssistenteFerramentas
             return $s;
         }
         return null;
+    }
+
+    /**
+     * Rascunho completo do quadro semanal (S1–S8 N/Q, média semanal, prova bim, ENAC, rec).
+     *
+     * @param array<string,mixed> $opcoes
+     * @return array<string,mixed>
+     */
+    public function montarRascunhoQuadroSemanal(array $opcoes = []): array
+    {
+        $ano = (int) ($opcoes['ano_letivo'] ?? date('Y'));
+        if ($ano < 2000) {
+            $ano = (int) date('Y');
+        }
+        $bim = (int) ($opcoes['bimestre'] ?? 1);
+        if ($bim < 1 || $bim > 4) {
+            $bim = 1;
+        }
+        $semanasA = $this->normalizarListaSemanas($opcoes['semanas_a'] ?? [1, 3, 5, 7], [1, 3, 5, 7]);
+        $semanasB = $this->normalizarListaSemanas($opcoes['semanas_b'] ?? [2, 4, 6, 8], [2, 4, 6, 8]);
+        $tipos = $this->indexarTiposQuadro();
+        $tipoSemanal = $tipos['semanal'] ?? null;
+
+        $soComEvento = !empty($opcoes['so_semanas_com_evento']);
+        $semanasEvento = [];
+        if ($soComEvento) {
+            foreach ($this->listarEventosProva($tipoSemanal['id'] ?? null, 200) as $ev) {
+                $s = (int) ($ev['semana'] ?? 0);
+                if ($s >= 1 && $s <= 8) {
+                    $semanasEvento[$s] = true;
+                }
+            }
+            if ($semanasEvento !== []) {
+                $semanasA = array_values(array_filter($semanasA, static fn ($s) => isset($semanasEvento[$s])));
+                $semanasB = array_values(array_filter($semanasB, static fn ($s) => isset($semanasEvento[$s])));
+            }
+        }
+
+        $componentes = [];
+        $codigosSemana = [];
+        foreach ($semanasA as $s) {
+            $cod = 's' . $s;
+            $componentes[] = $this->componenteSemanaQuadro($cod, 'S' . $s, $s, 'quadro_a', $tipoSemanal);
+            $codigosSemana[] = $cod;
+        }
+        foreach ($semanasB as $s) {
+            $cod = 's' . $s;
+            $componentes[] = $this->componenteSemanaQuadro($cod, 'S' . $s, $s, 'quadro_b', $tipoSemanal);
+            $codigosSemana[] = $cod;
+        }
+
+        $componentes[] = [
+            'codigo' => 'media_sem',
+            'nome' => 'Média Sem',
+            'source_type' => 'calculado',
+            'calc_type' => 'media',
+            'peso' => 1,
+            'filtro_titulo' => '',
+            'blocos_ids' => [],
+            'materias_ids' => [],
+            'materia_unica' => 0,
+            'usar_percentual' => 0,
+            'escala_max' => 10,
+            'obrigatorio' => 0,
+            'config' => [
+                'expressao' => '',
+                'formula_mode' => 'single',
+                'agregar_nq' => $codigosSemana !== [] ? $codigosSemana : ['s1', 's3', 's5', 's7'],
+                'layout_group' => 'quadro_comum',
+                'layout_type' => 'media_sem',
+            ],
+        ];
+
+        $partesMedia = ['media_sem'];
+        $pecasFiltro = null;
+        if (array_key_exists('pecas', $opcoes) && is_array($opcoes['pecas'])) {
+            $pecasFiltro = [];
+            foreach ($opcoes['pecas'] as $p) {
+                $p = strtolower(trim((string) $p));
+                if ($p !== '') {
+                    $pecasFiltro[] = $p;
+                }
+            }
+        }
+        $querPeca = static function (string $chave) use ($pecasFiltro): bool {
+            if ($pecasFiltro === null) {
+                return true;
+            }
+            return in_array($chave, $pecasFiltro, true);
+        };
+
+        $provaBim = $tipos['prova_bim'] ?? $tipos['bimestral'] ?? null;
+        if ($provaBim !== null && $querPeca('bimestral')) {
+            $componentes[] = $this->componenteTipoQuadro(
+                'prova_bim',
+                'Prova Bim',
+                $provaBim,
+                false,
+                'quadro_comum',
+                'media'
+            );
+            $partesMedia[] = 'prova_bim';
+        }
+        foreach ([
+            'enac' => ['enac', 'ENAC'],
+            'participacao' => ['part', 'Part'],
+            'trabalho' => ['trab', 'Trab'],
+        ] as $chave => [$cod, $nome]) {
+            if (!isset($tipos[$chave]) || !$querPeca($chave)) {
+                continue;
+            }
+            $componentes[] = $this->componenteTipoQuadro(
+                $cod,
+                $nome,
+                $tipos[$chave],
+                false,
+                'quadro_comum',
+                'media'
+            );
+            $partesMedia[] = $cod;
+        }
+
+        $nPartes = count($partesMedia);
+        $expBim = $nPartes === 1
+            ? $partesMedia[0]
+            : '(' . implode(' + ', $partesMedia) . ') / ' . $nPartes;
+        $componentes[] = [
+            'codigo' => 'media_bim',
+            'nome' => 'Média Bim',
+            'source_type' => 'calculado',
+            'calc_type' => 'media',
+            'peso' => 1,
+            'filtro_titulo' => '',
+            'blocos_ids' => [],
+            'materias_ids' => [],
+            'materia_unica' => 0,
+            'usar_percentual' => 0,
+            'escala_max' => 10,
+            'obrigatorio' => 0,
+            'config' => [
+                'expressao' => $expBim,
+                'formula_mode' => 'single',
+                'layout_group' => 'quadro_comum',
+                'layout_type' => 'media',
+            ],
+        ];
+
+        $formulaFinal = 'media_bim';
+        if (isset($tipos['recuperacao']) && $querPeca('recuperacao')) {
+            $componentes[] = $this->componenteTipoQuadro(
+                'rec',
+                'Rec',
+                $tipos['recuperacao'],
+                false,
+                'quadro_comum',
+                'rec'
+            );
+            $componentes[] = [
+                'codigo' => 'media_final',
+                'nome' => 'Média Bim Final',
+                'source_type' => 'calculado',
+                'calc_type' => 'media',
+                'peso' => 1,
+                'filtro_titulo' => '',
+                'blocos_ids' => [],
+                'materias_ids' => [],
+                'materia_unica' => 0,
+                'usar_percentual' => 0,
+                'escala_max' => 10,
+                'obrigatorio' => 0,
+                'config' => [
+                    'expressao' => 'max(media_bim, rec)',
+                    'formula_mode' => 'single',
+                    'layout_group' => 'quadro_comum',
+                    'layout_type' => 'resultado',
+                ],
+            ];
+            $formulaFinal = 'media_final';
+        }
+
+        $nome = trim((string) ($opcoes['nome'] ?? ''));
+        if ($nome === '') {
+            $nome = sprintf('Quadro semanal — %dº bimestre %d', $bim, $ano);
+        }
+
+        return [
+            'modo' => ($opcoes['modo'] ?? 'criar') === 'editar' ? 'editar' : 'criar',
+            'regra_id' => !empty($opcoes['regra_id']) ? (int) $opcoes['regra_id'] : null,
+            'nome' => $nome,
+            'codigo' => trim((string) ($opcoes['codigo'] ?? '')),
+            'descricao_curta' => 'Quadro S1–S8 (N/Q), média semanal por acertos, prova bimestral, ENAC/trabalho se houver e recuperação na média final.',
+            'formula_final' => $formulaFinal,
+            'exibir_em' => (string) ($opcoes['exibir_em'] ?? 'boletim'),
+            'ano_letivo' => $ano,
+            'bimestre' => $bim,
+            'default_data_inicio' => (string) ($opcoes['default_data_inicio'] ?? ''),
+            'default_data_fim' => (string) ($opcoes['default_data_fim'] ?? ''),
+            'turmas_ids' => $this->normalizarIds($opcoes['turmas_ids'] ?? []),
+            'materias_ids' => $this->normalizarIds($opcoes['materias_ids'] ?? []),
+            'series_ids' => $this->normalizarIds($opcoes['series_ids'] ?? []),
+            'round_mode' => (($opcoes['round_mode'] ?? '') === 'half') ? 'half' : 'none',
+            'nota_minima_aprovacao' => isset($opcoes['nota_minima_aprovacao'])
+                ? (float) $opcoes['nota_minima_aprovacao']
+                : 6.0,
+            'componentes' => $componentes,
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public function montarContextoQuadroSemanal(): array
+    {
+        $tipos = $this->indexarTiposQuadro();
+        $semanas = [];
+        foreach ($this->listarEventosProva(null, 200) as $ev) {
+            $s = (int) ($ev['semana'] ?? 0);
+            if ($s >= 1 && $s <= 8) {
+                $semanas[$s] = true;
+            }
+        }
+        ksort($semanas);
+
+        return [
+            'semanas_com_evento' => array_map('intval', array_keys($semanas)),
+            'tipos_por_chave' => $tipos,
+            'grupos_materias' => $this->listarGruposMateriasQuadro(),
+            'dica' => 'Quadro: colunas s1..s8 com config.semana + tipo semanal e usar_percentual=1 (mostra N/Q). Prova bim/ENAC/Trab = nota do evento (calc_type=ultima, usar_percentual=0). media_sem usa agregar_nq das semanas. materia_unica=1 junta a mesma matéria de professores diferentes. ENAC/Part/Trab/Rec só se o tipo existir no catálogo. Códigos sem hífen.',
+        ];
+    }
+
+    /** @return list<string> */
+    private function normalizarCodigosAgregarNq($raw): array
+    {
+        if (is_string($raw)) {
+            $raw = trim($raw, "[] \t");
+            $raw = preg_split('/[,\s;]+/', $raw) ?: [];
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $v) {
+            $cod = $this->slugCodigo((string) $v);
+            if ($cod !== '') {
+                $out[] = $cod;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param list<int>|mixed $raw
+     * @param list<int> $fallback
+     * @return list<int>
+     */
+    private function normalizarListaSemanas($raw, array $fallback): array
+    {
+        if (!is_array($raw)) {
+            return $fallback;
+        }
+        $out = [];
+        foreach ($raw as $v) {
+            $s = (int) $v;
+            if ($s >= 1 && $s <= 8) {
+                $out[] = $s;
+            }
+        }
+        $out = array_values(array_unique($out));
+        sort($out);
+
+        return $out !== [] ? $out : $fallback;
+    }
+
+    /**
+     * @return array<string,array{id:int,nome:string,chave_quadro:?string}>
+     */
+    private function indexarTiposQuadro(): array
+    {
+        $out = [];
+        foreach ($this->listarTiposAvaliacao() as $t) {
+            $id = (int) ($t['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $item = [
+                'id' => $id,
+                'nome' => (string) ($t['nome'] ?? ''),
+                'chave_quadro' => $t['chave_quadro'] ?? null,
+            ];
+            $chave = strtolower(trim((string) ($t['chave_quadro'] ?? '')));
+            if ($chave !== '' && !isset($out[$chave])) {
+                $out[$chave] = $item;
+            }
+            $nome = mb_strtolower((string) ($t['nome'] ?? ''));
+            if ($chave !== '') {
+                continue;
+            }
+            $mapa = [
+                'recupera' => 'recuperacao',
+                'enac' => 'enac',
+                'participa' => 'participacao',
+                'trabalho' => 'trabalho',
+                'bimestral' => 'prova_bim',
+                'prova bim' => 'prova_bim',
+                'semanal' => 'semanal',
+            ];
+            foreach ($mapa as $needle => $dest) {
+                if (!isset($out[$dest]) && str_contains($nome, $needle)) {
+                    $out[$dest] = $item;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array{id:int,nome:string}|null $tipo
+     * @return array<string,mixed>
+     */
+    private function componenteSemanaQuadro(string $codigo, string $nome, int $semana, string $grupo, ?array $tipo): array
+    {
+        $cfg = [
+            'semana' => $semana,
+            'layout_group' => $grupo,
+            'layout_type' => 'semana_nq',
+        ];
+        $tipoId = (int) ($tipo['id'] ?? 0);
+        $tipoNome = trim((string) ($tipo['nome'] ?? 'Semanal'));
+        if ($tipoId > 0) {
+            $cfg['tipo_avaliacao_id'] = $tipoId;
+            $cfg['tipo_avaliacao_nome'] = $tipoNome;
+        }
+
+        return [
+            'codigo' => $codigo,
+            'nome' => $nome,
+            'source_type' => 'provas_sistema',
+            'calc_type' => 'media',
+            'peso' => 1,
+            'filtro_titulo' => '',
+            'blocos_ids' => [],
+            'materias_ids' => [],
+            'materia_unica' => 1,
+            'usar_percentual' => 1,
+            'escala_max' => 10,
+            'obrigatorio' => 0,
+            'tipo_avaliacao_id' => $tipoId > 0 ? $tipoId : null,
+            'tipo_avaliacao_nome' => $tipoNome,
+            'config' => $cfg,
+        ];
+    }
+
+    /**
+     * @param array{id:int,nome:string} $tipo
+     * @return array<string,mixed>
+     */
+    private function componenteTipoQuadro(
+        string $codigo,
+        string $nome,
+        array $tipo,
+        bool $usarPercentual,
+        string $grupo,
+        string $layoutType
+    ): array {
+        $tipoId = (int) ($tipo['id'] ?? 0);
+        $tipoNome = trim((string) ($tipo['nome'] ?? $nome));
+
+        return [
+            'codigo' => $codigo,
+            'nome' => $nome,
+            'source_type' => 'provas_sistema',
+            'calc_type' => 'ultima',
+            'peso' => 1,
+            'filtro_titulo' => '',
+            'blocos_ids' => [],
+            'materias_ids' => [],
+            'materia_unica' => 1,
+            'usar_percentual' => $usarPercentual ? 1 : 0,
+            'escala_max' => 10,
+            'obrigatorio' => 0,
+            'tipo_avaliacao_id' => $tipoId > 0 ? $tipoId : null,
+            'tipo_avaliacao_nome' => $tipoNome,
+            'config' => [
+                'tipo_avaliacao_id' => $tipoId,
+                'tipo_avaliacao_nome' => $tipoNome,
+                'layout_group' => $grupo,
+                'layout_type' => $layoutType,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{A:list<array{id:int,nome:string}>,B:list<array{id:int,nome:string}>}
+     */
+    private function listarGruposMateriasQuadro(): array
+    {
+        $out = ['A' => [], 'B' => []];
+        $path = __DIR__ . '/../Modulos/notas-semanais/Models/NotasSemanaisConfig.php';
+        if (!class_exists('NotasSemanaisConfig', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('NotasSemanaisConfig', false)) {
+            return $out;
+        }
+        try {
+            $cfg = new NotasSemanaisConfig();
+            if (!method_exists($cfg, 'listarMateriasComGrupo')) {
+                return $out;
+            }
+            foreach ($cfg->listarMateriasComGrupo() as $m) {
+                $id = (int) ($m['id'] ?? 0);
+                $g = strtoupper((string) ($m['grupo'] ?? ''));
+                if ($id <= 0 || ($g !== 'A' && $g !== 'B')) {
+                    continue;
+                }
+                $out[$g][] = [
+                    'id' => $id,
+                    'nome' => trim((string) ($m['nome'] ?? '')),
+                ];
+            }
+        } catch (Throwable $e) {
+            return $out;
+        }
+
+        return $out;
     }
 
     private function temColuna(string $table, string $column): bool

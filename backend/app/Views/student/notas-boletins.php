@@ -22,16 +22,13 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <aside class="lg:col-span-2">
-                <nav class="space-y-2">
-                    <a href="<?= htmlspecialchars($buildSecaoUrl('boletim'), ENT_QUOTES, 'UTF-8') ?>" class="block px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'boletim' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Boletim</a>
-                    <a href="<?= htmlspecialchars($buildSecaoUrl('notas'), ENT_QUOTES, 'UTF-8') ?>" class="block px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'notas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Notas</a>
-                    <a href="<?= htmlspecialchars($buildSecaoUrl('provas'), ENT_QUOTES, 'UTF-8') ?>" class="block px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'provas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Provas</a>
-                </nav>
-            </aside>
+        <nav class="flex flex-wrap gap-2 mb-6">
+            <a href="<?= htmlspecialchars($buildSecaoUrl('boletim'), ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'boletim' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Boletim</a>
+            <a href="<?= htmlspecialchars($buildSecaoUrl('notas'), ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'notas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Notas</a>
+            <a href="<?= htmlspecialchars($buildSecaoUrl('provas'), ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'provas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Provas</a>
+        </nav>
 
-            <section class="lg:col-span-10 space-y-5">
+        <section class="space-y-5">
                 <?php if ($secaoNotas === 'boletim'): ?>
                     <?php $boletins_gerados = $boletins_gerados_boletim; ?>
                     <?php if (!empty($boletins_gerados)): ?>
@@ -48,7 +45,15 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                         </div>
                     <?php endif; ?>
                 <?php elseif ($secaoNotas === 'notas'): ?>
-                    <?php if (!empty($notas_lancamento_eventos)): ?>
+                    <?php
+                    $quadro = $quadro_notas_semanais ?? [];
+                    $quadroFile = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Views/aluno/quadro.php';
+                    $usarQuadroSemanal = !empty($quadro['modulo_ativo']) && !empty($quadro['tem_dados']) && is_file($quadroFile);
+                    ?>
+                    <?php if ($usarQuadroSemanal): ?>
+                        <?php require $quadroFile; ?>
+                    <?php endif; ?>
+                    <?php if (!$usarQuadroSemanal && !empty($notas_lancamento_eventos)): ?>
                         <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
                             <table class="min-w-full text-sm text-left">
                                 <thead class="bg-gray-100 text-gray-700">
@@ -83,7 +88,7 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
 
                     <?php if (!empty($boletins_gerados_notas)): ?>
                         <?php require __DIR__ . '/../partials/boletim_eventos_notas_cards.php'; ?>
-                    <?php elseif (empty($notas_lancamento_eventos)): ?>
+                    <?php elseif (!$usarQuadroSemanal && empty($notas_lancamento_eventos)): ?>
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhuma nota encontrada.</p>
                         </div>
@@ -91,7 +96,6 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                 <?php else: ?>
                     <?php require __DIR__ . '/../partials/provas_matriz_blocos.php'; ?>
                 <?php endif; ?>
-            </section>
-        </div>
+        </section>
     </div>
 </div>

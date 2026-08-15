@@ -984,14 +984,26 @@ class BoletimConfig
     public function getAvailableClasses(int $limit = 500): array
     {
         $limit = max(1, min($limit, 2000));
+        if ($this->hasColumn('turmas', 'serie_id')) {
+            return $this->db->fetchAll(
+                "SELECT t.id, t.nome, t.serie_id, t.ano_letivo,
+                        s.nome AS serie_nome, c.nome AS curso_nome
+                 FROM turmas t
+                 LEFT JOIN serie s ON s.id = t.serie_id
+                 LEFT JOIN curso c ON c.id = s.curso_id
+                 WHERE (t.ativo = 1 OR t.ativo IS NULL)
+                 ORDER BY t.ano_letivo DESC, c.nome ASC, s.ordem ASC, s.nome ASC, t.nome ASC
+                 LIMIT {$limit}"
+            ) ?: [];
+        }
+
+        $serieNome = $this->hasColumn('turmas', 'serie') ? 't.serie' : 'NULL';
         return $this->db->fetchAll(
-            "SELECT t.id, t.nome, t.serie_id, t.ano_letivo,
-                    s.nome AS serie_nome, c.nome AS curso_nome
+            "SELECT t.id, t.nome, NULL AS serie_id, t.ano_letivo,
+                    {$serieNome} AS serie_nome, NULL AS curso_nome
              FROM turmas t
-             LEFT JOIN serie s ON s.id = t.serie_id
-             LEFT JOIN curso c ON c.id = s.curso_id
              WHERE (t.ativo = 1 OR t.ativo IS NULL)
-             ORDER BY t.ano_letivo DESC, c.nome ASC, s.ordem ASC, s.nome ASC, t.nome ASC
+             ORDER BY t.ano_letivo DESC, t.nome ASC
              LIMIT {$limit}"
         ) ?: [];
     }
@@ -1024,16 +1036,34 @@ class BoletimConfig
         $limit = max(1, min($limit, 10000));
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
-        return $this->db->fetchAll(
-            "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome, t.serie_id
-             FROM alunos a
-             INNER JOIN turmas t ON t.id = a.turma_id
-             WHERE a.ativo = 1
-               AND t.serie_id IN ($placeholders)
-             ORDER BY a.nome ASC
-             LIMIT {$limit}",
-            $ids
-        ) ?: [];
+        if ($this->hasColumn('turmas', 'serie_id')) {
+            return $this->db->fetchAll(
+                "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome, t.serie_id
+                 FROM alunos a
+                 INNER JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.ativo = 1
+                   AND t.serie_id IN ($placeholders)
+                 ORDER BY a.nome ASC
+                 LIMIT {$limit}",
+                $ids
+            ) ?: [];
+        }
+
+        if ($this->hasColumn('turmas', 'serie') && $this->hasTable('serie')) {
+            return $this->db->fetchAll(
+                "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome, s.id AS serie_id
+                 FROM alunos a
+                 INNER JOIN turmas t ON t.id = a.turma_id
+                 INNER JOIN serie s ON s.nome = t.serie
+                 WHERE a.ativo = 1
+                   AND s.id IN ($placeholders)
+                 ORDER BY a.nome ASC
+                 LIMIT {$limit}",
+                $ids
+            ) ?: [];
+        }
+
+        return $this->getStudentsList(min(1000, $limit));
     }
 
     /**
@@ -1064,9 +1094,13 @@ class BoletimConfig
             $params = $ids;
         }
 
+        $serieSelect = $this->hasColumn('turmas', 'serie_id')
+            ? 't.serie_id'
+            : 'NULL AS serie_id';
+
         return $this->db->fetchAll(
             "SELECT DISTINCT a.id, a.nome, a.ra, a.turma_id,
-                    t.nome AS turma_nome, t.serie_id
+                    t.nome AS turma_nome, {$serieSelect}
              FROM alunos a
              LEFT JOIN turmas t ON t.id = a.turma_id
              WHERE a.ativo = 1
@@ -2392,5 +2426,137 @@ class BoletimConfig
     private function normalizeDecimalPlaces(int $value): int
     {
         return $value === 1 ? 1 : 2;
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     * @return list<int>
+     */
+    public function filtrarBlocoIdsPorSemana(array $blocoIds, int $semana): array
+    {
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($blocoIds === [] || $semana < 1 || $semana > 8 || !$this->hasColumn('provas_blocos', 'semana')) {
+            return $blocoIds;
+        }
+        $placeholders = implode(',', array_fill(0, count($blocoIds), '?'));
+        $sql = "SELECT id FROM provas_blocos
+                WHERE deleted_at IS NULL AND semana = ? AND id IN ({$placeholders})";
+        $params = array_merge([$semana], $blocoIds);
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     * @param list<int> $bimestres
+     * @return list<int>
+     */
+    public function filtrarBlocoIdsPorBimestres(array $blocoIds, array $bimestres): array
+    {
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $bims = [];
+        foreach ($bimestres as $b) {
+            $n = (int) $b;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $bims, true)) {
+                $bims[] = $n;
+            }
+        }
+        if ($blocoIds === [] || $bims === [] || !$this->hasColumn('provas_blocos', 'bimestre')) {
+            return $blocoIds;
+        }
+        $placeholdersIds = implode(',', array_fill(0, count($blocoIds), '?'));
+        $placeholdersBims = implode(',', array_fill(0, count($bims), '?'));
+        $sql = "SELECT id FROM provas_blocos
+                WHERE deleted_at IS NULL
+                  AND id IN ({$placeholdersIds})
+                  AND (bimestre IS NULL OR bimestre = 0 OR bimestre IN ({$placeholdersBims}))";
+        $params = array_merge($blocoIds, $bims);
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param list<int> $bimestres
+     * @return list<int>
+     */
+    public function buscarBlocoIdsPorTipoESemana(
+        int $tipoAvaliacaoId,
+        int $semana,
+        ?string $inicio = null,
+        ?string $fim = null,
+        array $bimestres = []
+    ): array {
+        if ($tipoAvaliacaoId <= 0 || $semana < 1 || $semana > 8) {
+            return [];
+        }
+        if (!$this->hasColumn('provas_blocos', 'tipo_avaliacao_id')
+            || !$this->hasColumn('provas_blocos', 'semana')
+        ) {
+            return [];
+        }
+        $sql = 'SELECT id FROM provas_blocos
+                WHERE deleted_at IS NULL
+                  AND tipo_avaliacao_id = :tipo
+                  AND semana = :semana';
+        $params = [
+            'tipo' => $tipoAvaliacaoId,
+            'semana' => $semana,
+        ];
+        if ($inicio !== null && $fim !== null && $inicio !== '' && $fim !== '') {
+            $sql .= ' AND (
+                data_prova IS NULL
+                OR CAST(data_prova AS CHAR) = \'0000-00-00\'
+                OR data_prova BETWEEN DATE(:ini) AND DATE(:fim)
+            )';
+            $params['ini'] = $inicio;
+            $params['fim'] = $fim;
+        }
+        $bims = [];
+        foreach ($bimestres as $b) {
+            $n = (int) $b;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $bims, true)) {
+                $bims[] = $n;
+            }
+        }
+        if ($bims !== [] && $this->hasColumn('provas_blocos', 'bimestre')) {
+            $ph = [];
+            foreach ($bims as $i => $n) {
+                $key = 'bim' . $i;
+                $ph[] = ':' . $key;
+                $params[$key] = $n;
+            }
+            $sql .= ' AND (bimestre IS NULL OR bimestre = 0 OR bimestre IN (' . implode(',', $ph) . '))';
+        }
+        $sql .= ' ORDER BY data_prova DESC, id DESC LIMIT 40';
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return array_values(array_unique($out));
     }
 }

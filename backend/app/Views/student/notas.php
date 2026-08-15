@@ -17,7 +17,18 @@ $isPaginaBoletim = (($current_page ?? '') === 'boletim');
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <?php if (!$isPaginaBoletim): ?>
-            <?php if (!empty($notas_lancamento_eventos)): ?>
+            <?php
+            $quadro = $quadro_notas_semanais ?? [];
+            $quadroFile = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Views/aluno/quadro.php';
+            $usarQuadroSemanal = !empty($quadro['modulo_ativo']) && !empty($quadro['tem_dados']) && is_file($quadroFile);
+            ?>
+            <?php if ($usarQuadroSemanal): ?>
+                <?php
+                $baseUrlNotas = URL . '/notas';
+                $secaoNotas = 'notas';
+                require $quadroFile;
+                ?>
+            <?php elseif (!empty($notas_lancamento_eventos)): ?>
                 <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
                     <table class="min-w-full text-sm text-left">
                         <thead class="bg-gray-100 text-gray-700">

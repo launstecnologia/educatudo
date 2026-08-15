@@ -100,6 +100,8 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
     var historico = [];
     var enviando = false;
     var loadingEl = null;
+    var filaChat = [];
+    var statusFilaEl = null;
 
     function appendBubble(role, text, extraHtml) {
         var wrap = document.createElement('div');
@@ -141,8 +143,43 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
     function setEnviando(ativo) {
         enviando = !!ativo;
         var btn = document.getElementById('boletim-assistente-enviar');
-        if (btn) btn.disabled = enviando;
-        if (input) input.disabled = enviando;
+        if (btn) btn.disabled = false;
+        if (input) input.disabled = false;
+    }
+
+    function enxugarRascunhoParaChat(r) {
+        if (!r || typeof r !== 'object') return r;
+        var out = {};
+        Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+        if (Array.isArray(out.componentes)) {
+            out.componentes = out.componentes.map(function (c) {
+                if (!c || typeof c !== 'object') return c;
+                var cc = {};
+                Object.keys(c).forEach(function (k) { cc[k] = c[k]; });
+                cc.blocos_ids = [];
+                return cc;
+            });
+        }
+        return out;
+    }
+
+    function mostrarStatusFila(texto) {
+        if (statusFilaEl && statusFilaEl.parentNode) {
+            statusFilaEl.textContent = texto;
+            return;
+        }
+        statusFilaEl = document.createElement('div');
+        statusFilaEl.className = 'mr-4 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2';
+        statusFilaEl.textContent = texto;
+        msgs.appendChild(statusFilaEl);
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function removerStatusFila() {
+        if (statusFilaEl && statusFilaEl.parentNode) {
+            statusFilaEl.parentNode.removeChild(statusFilaEl);
+        }
+        statusFilaEl = null;
     }
 
     function coletarEstadoFormulario() {
@@ -332,6 +369,7 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
                 blocos_ids: blocos,
                 materias_ids: Array.isArray(c.materias_ids) ? c.materias_ids : [],
                 usar_percentual: c.usar_percentual ? 1 : 0,
+                materia_unica: c.materia_unica ? 1 : 0,
                 escala_max: c.escala_max != null ? c.escala_max : 10,
                 obrigatorio: c.obrigatorio ? 1 : 0,
                 config: cfg
@@ -381,7 +419,7 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
     }
 
     function enviarMensagem() {
-        if (enviando || !input) return;
+        if (!input) return;
         var texto = (input.value || '').trim();
         if (!texto) return;
         // Sem TudiCoins: só aceita export/import de receita (atalho sem IA).
@@ -396,10 +434,21 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
             }
         }
 
-        appendBubble('user', texto);
-        historico.push({ role: 'user', content: texto });
         input.value = '';
+        appendBubble('user', texto);
+
+        if (enviando) {
+            filaChat.push(texto);
+            mostrarStatusFila('Ainda estou fechando o quadro. Já anotei o ajuste e aplico em seguida.');
+            return;
+        }
+        historico.push({ role: 'user', content: texto });
+        dispararMensagem(texto);
+    }
+
+    function dispararMensagem(texto) {
         setEnviando(true);
+        removerStatusFila();
         mostrarCarregando();
 
         var fd = new FormData();
@@ -407,10 +456,14 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
         fd.append('mensagem', texto);
         fd.append('regra_id', String(regraId));
         fd.append('historico', JSON.stringify(historico.slice(0, -1)));
-        fd.append('estado_formulario', JSON.stringify(coletarEstadoFormulario()));
+        fd.append('estado_formulario', JSON.stringify(enxugarRascunhoParaChat(coletarEstadoFormulario())));
 
         var assistantBubble = null;
         var textoStream = '';
+        var ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timeoutId = setTimeout(function () {
+            if (ac) ac.abort();
+        }, 150000);
 
         function garantirBubbleAssistente() {
             if (assistantBubble) return;
@@ -450,6 +503,10 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
                 msgs.scrollTop = msgs.scrollHeight;
                 return;
             }
+            if (ev.event === 'fase' && payload.fase === 'texto_pronto') {
+                mostrarStatusFila('Fechando o quadro… pode mandar o próximo ajuste.');
+                return;
+            }
             if (ev.event === 'error') {
                 removerCarregando();
                 if (assistantBubble) {
@@ -461,6 +518,7 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
             }
             if (ev.event === 'done') {
                 removerCarregando();
+                removerStatusFila();
                 var mensagemFinal = (payload.mensagem || textoStream || 'Pronto.').trim();
                 if (!assistantBubble) {
                     assistantBubble = appendBubble('assistant', mensagemFinal);
@@ -496,12 +554,15 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
             }
         }
 
-        fetch(urlMensagem, {
+        var fetchOpts = {
             method: 'POST',
             body: fd,
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/event-stream' },
             credentials: 'same-origin'
-        }).then(function (res) {
+        };
+        if (ac) fetchOpts.signal = ac.signal;
+
+        fetch(urlMensagem, fetchOpts).then(function (res) {
             if (!res.ok || !res.body) {
                 return res.json().catch(function () { return {}; }).then(function (j) {
                     removerCarregando();
@@ -531,11 +592,27 @@ $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
                 });
             }
             return ler();
-        }).catch(function () {
+        }).catch(function (err) {
             removerCarregando();
-            appendBubble('assistant', 'Falha de conexão. Tente novamente.');
+            var abortou = err && (err.name === 'AbortError' || err.message === 'The user aborted a request.');
+            appendBubble('assistant', abortou
+                ? 'A IA demorou demais para fechar o quadro. Envie de novo o ajuste.'
+                : 'Falha de conexão. Tente novamente.');
         }).finally(function () {
+            clearTimeout(timeoutId);
             setEnviando(false);
+            if (filaChat.length) {
+                var proximo = filaChat.shift();
+                historico.push({ role: 'user', content: proximo });
+                if (filaChat.length) {
+                    mostrarStatusFila('Aplicando o próximo ajuste…');
+                } else {
+                    removerStatusFila();
+                }
+                dispararMensagem(proximo);
+                return;
+            }
+            removerStatusFila();
             if (input) input.focus();
         });
     }

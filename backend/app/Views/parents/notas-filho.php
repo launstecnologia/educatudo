@@ -31,16 +31,13 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <aside class="lg:col-span-2">
-                <nav class="space-y-2">
-                    <a href="<?= htmlspecialchars($buildSecaoUrl('boletim'), ENT_QUOTES, 'UTF-8') ?>" class="block px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'boletim' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Boletim</a>
-                    <a href="<?= htmlspecialchars($buildSecaoUrl('notas'), ENT_QUOTES, 'UTF-8') ?>" class="block px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'notas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Notas</a>
-                    <a href="<?= htmlspecialchars($buildSecaoUrl('provas'), ENT_QUOTES, 'UTF-8') ?>" class="block px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'provas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Provas</a>
-                </nav>
-            </aside>
+        <nav class="flex flex-wrap gap-2 mb-6">
+            <a href="<?= htmlspecialchars($buildSecaoUrl('boletim'), ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'boletim' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Boletim</a>
+            <a href="<?= htmlspecialchars($buildSecaoUrl('notas'), ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'notas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Notas</a>
+            <a href="<?= htmlspecialchars($buildSecaoUrl('provas'), ENT_QUOTES, 'UTF-8') ?>" class="px-4 py-2 rounded-lg text-sm font-medium <?= $secaoNotas === 'provas' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">Provas</a>
+        </nav>
 
-            <section class="lg:col-span-10 space-y-5">
+        <section class="space-y-5">
                 <?php if (in_array($secaoNotas, ['notas', 'provas'], true)): ?>
                     <form method="get" action="<?= htmlspecialchars($baseUrlNotas, ENT_QUOTES, 'UTF-8') ?>" class="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <input type="hidden" name="secao" value="<?= htmlspecialchars($secaoNotas, ENT_QUOTES, 'UTF-8') ?>">
@@ -122,7 +119,6 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                 <?php else: ?>
                     <?php require __DIR__ . '/../partials/provas_matriz_blocos.php'; ?>
                 <?php endif; ?>
-            </section>
-        </div>
+        </section>
     </div>
 </div>

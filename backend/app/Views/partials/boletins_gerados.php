@@ -114,6 +114,10 @@ $_mostrarHeaderRegra = (bool) ($boletim_pode_excluir ?? false);
             $_regraNomeLinha = (string) ($ev['regra_nome'] ?? '');
             $_regraCodigoLinha = (string) ($ev['regra_codigo'] ?? '');
             $_mostrarHeaderInfo = $_mostrarHeaderRegra && $_regraIdLinha > 0;
+            if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+            }
+            $ehQuadroSemanal = BoletimQuadroLayoutHelper::ehLayoutQuadro($cols);
             ?>
             <div class="boletim-tabela-wrapper" data-regra-id="<?= $_regraIdLinha ?>" data-regra-nome="<?= htmlspecialchars($_regraNomeLinha, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($_mostrarHeaderInfo): ?>
@@ -127,6 +131,9 @@ $_mostrarHeaderRegra = (bool) ($boletim_pode_excluir ?? false);
                         </div>
                     </div>
                 <?php endif; ?>
+                <?php if ($ehQuadroSemanal): ?>
+                    <?php include __DIR__ . '/boletim_quadro_tabela.php'; ?>
+                <?php else: ?>
                 <div class="overflow-x-auto border border-gray-200 rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-slate-50">
@@ -205,6 +212,7 @@ $_mostrarHeaderRegra = (bool) ($boletim_pode_excluir ?? false);
                     </tbody>
                 </table>
                 </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>

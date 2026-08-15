@@ -32,6 +32,11 @@
                 <p class="text-sm text-gray-600 mt-1">Inclui nota manual ENAC. Fórmula usa <code class="text-xs bg-gray-100 px-1 rounded">max</code>: se ENAC for menor que a média dos três, mantém a média; se for maior, faz a média entre a base e o ENAC.</p>
                 <button type="button" data-modelo="media3_enac" class="mt-3 px-3 py-2 bg-violet-600 text-white text-sm rounded-lg hover:bg-violet-700">Aplicar modelo</button>
             </div>
+            <div class="border border-teal-200 rounded-lg p-4 bg-teal-50/40">
+                <h3 class="font-semibold text-gray-900">Quadro semanal (S1–S8)</h3>
+                <p class="text-sm text-gray-600 mt-1">Monta o boletim no layout do quadro: semanas com <strong>N</strong> e <strong>Q</strong>, média semanal (acertos÷questões), prova bimestral (nota inteira), ENAC/trabalho se existirem e recuperação na média final. Junta a mesma matéria de professores diferentes. Ajuste tipos e pesos no editor ou peça no assistente.</p>
+                <button type="button" data-modelo="quadro_semanal" class="mt-3 px-3 py-2 bg-teal-700 text-white text-sm rounded-lg hover:bg-teal-800">Aplicar modelo</button>
+            </div>
         </div>
     </div>
 

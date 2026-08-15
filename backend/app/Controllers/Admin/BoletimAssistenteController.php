@@ -11,6 +11,9 @@ require_once __DIR__ . '/../../Services/BoletimAssistenteWizard.php';
  */
 class BoletimAssistenteController extends BaseController
 {
+    private const LIMITE_ESTADO_BYTES = 250000;
+    private const LIMITE_HISTORICO_BYTES = 80000;
+
     private AuthManager $auth;
     private BoletimAssistenteService $assistente;
     private BoletimAssistenteWizard $wizard;
@@ -51,7 +54,7 @@ class BoletimAssistenteController extends BaseController
         $estado = [];
         $raw = $_POST['wizard_estado'] ?? '';
         if (is_string($raw) && $raw !== '') {
-            if (strlen($raw) > 50000) {
+            if (strlen($raw) > self::LIMITE_ESTADO_BYTES) {
                 $this->json(['success' => false, 'error' => 'Estado do wizard muito grande.'], 400);
             }
             $dec = json_decode($raw, true);
@@ -62,15 +65,40 @@ class BoletimAssistenteController extends BaseController
             $estado = $_POST['wizard_estado'];
         }
 
-        $resultado = $this->wizard->montar($estado);
+        $this->soltarSessao();
+
+        try {
+            $resultado = $this->wizard->montar($estado);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistente wizardMontar: ' . $e->getMessage());
+            $this->json([
+                'success' => false,
+                'error' => 'Não deu para montar o evento agora. Tente de novo ou volte nas peças.',
+                'ok' => false,
+                'estado' => is_array($estado) ? $estado : [],
+                'rascunho' => null,
+                'resumo' => 'Falha ao montar o rascunho.',
+                'erros' => ['Falha ao montar o rascunho.'],
+                'formulas_disponiveis' => [],
+                'preview' => null,
+            ]);
+            return;
+        }
+        try {
+            $resultado = $this->wizard->enriquecerSaida($resultado);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistente preview: ' . $e->getMessage());
+            $resultado['preview'] = $resultado['preview'] ?? null;
+        }
         $this->json([
             'success' => true,
             'ok' => !empty($resultado['ok']),
-            'estado' => $resultado['estado'],
-            'rascunho' => $resultado['rascunho'],
-            'resumo' => $resultado['resumo'],
-            'erros' => $resultado['erros'],
-            'formulas_disponiveis' => $resultado['formulas_disponiveis'],
+            'estado' => $resultado['estado'] ?? $estado,
+            'rascunho' => $resultado['rascunho'] ?? null,
+            'resumo' => $resultado['resumo'] ?? '',
+            'erros' => $resultado['erros'] ?? [],
+            'formulas_disponiveis' => $resultado['formulas_disponiveis'] ?? [],
+            'preview' => $resultado['preview'] ?? null,
         ]);
     }
 
@@ -88,25 +116,75 @@ class BoletimAssistenteController extends BaseController
         $estadoForm = null;
         $estadoRaw = $_POST['estado_formulario'] ?? '';
         if (is_string($estadoRaw) && $estadoRaw !== '') {
+            if (strlen($estadoRaw) > self::LIMITE_ESTADO_BYTES) {
+                $this->json(['success' => false, 'error' => 'Estado do formulário muito grande.'], 400);
+            }
             $dec = json_decode($estadoRaw, true);
             if (is_array($dec)) {
                 $estadoForm = $dec;
             }
         }
 
-        $estado = $this->wizard->estadoPadrao($estadoForm, $regraId > 0 ? $regraId : null);
-        $montado = $this->wizard->montar($estado);
+        $this->soltarSessao();
 
-        $this->json([
-            'success' => true,
-            'disponivel_ia' => CreditosModuleRegistry::acaoIaDisponivel(BoletimAssistenteService::MODULO_CREDITOS),
-            'catalogo' => $this->wizard->catalogo(),
-            'estado' => $montado['estado'],
-            'rascunho' => $montado['rascunho'],
-            'resumo' => $montado['resumo'],
-            'erros' => $montado['erros'],
-            'formulas_disponiveis' => $montado['formulas_disponiveis'],
-        ]);
+        try {
+            $estado = $this->wizard->estadoPadrao($estadoForm, $regraId > 0 ? $regraId : null);
+            $catalogo = $this->wizard->catalogo();
+            $preservado = is_array($estado['rascunho_preservado'] ?? null) ? $estado['rascunho_preservado'] : [];
+            $querQuadro = in_array('semanal', (array) ($estado['pecas'] ?? []), true)
+                || ($estado['modelo_key'] ?? '') === 'quadro_semanal';
+            $rascunhoOut = $preservado !== [] ? $preservado : null;
+            $resumoOut = $preservado !== []
+                ? 'Há um rascunho no formulário. Ajuste pelo chat ou avance para revisar e aplicar.'
+                : 'Monte as escolhas à esquerda ou descreva o quadro no chat.';
+            $errosOut = [];
+            $formulasOut = [];
+            $previewOut = null;
+            if ($preservado !== [] || $querQuadro) {
+                $montado = $this->wizard->enriquecerSaida($this->wizard->montar($estado));
+                $estado = $montado['estado'];
+                $rascunhoOut = $montado['rascunho'];
+                $resumoOut = (string) ($montado['resumo'] ?? $resumoOut);
+                $errosOut = is_array($montado['erros'] ?? null) ? $montado['erros'] : [];
+                $formulasOut = is_array($montado['formulas_disponiveis'] ?? null) ? $montado['formulas_disponiveis'] : [];
+                $previewOut = $montado['preview'] ?? null;
+            }
+            $this->json([
+                'success' => true,
+                'disponivel_ia' => CreditosModuleRegistry::acaoIaDisponivel(BoletimAssistenteService::MODULO_CREDITOS),
+                'catalogo' => $catalogo,
+                'estado' => $estado,
+                'rascunho' => $rascunhoOut,
+                'resumo' => $resumoOut,
+                'erros' => $errosOut,
+                'formulas_disponiveis' => $formulasOut,
+                'preview' => $previewOut ?? null,
+            ]);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistente wizardInicio: ' . $e->getMessage());
+            $this->json([
+                'success' => true,
+                'disponivel_ia' => CreditosModuleRegistry::acaoIaDisponivel(BoletimAssistenteService::MODULO_CREDITOS),
+                'catalogo' => [
+                    'passos' => BoletimAssistenteWizard::PASSOS,
+                    'modelos' => [],
+                    'formulas' => [],
+                    'regras' => [],
+                    'series' => [],
+                    'turmas' => [],
+                    'materias' => [],
+                    'jornadas' => [],
+                    'tipos_avaliacao' => [],
+                    'eventos_prova' => [],
+                    'pecas' => [],
+                ],
+                'estado' => $this->wizard->estadoPadrao(null, $regraId > 0 ? $regraId : null),
+                'rascunho' => null,
+                'resumo' => 'Catálogo parcial. Descreva o quadro no chat mesmo assim.',
+                'erros' => ['Não deu para carregar turmas/matérias agora.'],
+                'formulas_disponiveis' => [],
+            ]);
+        }
     }
 
     /**
@@ -117,7 +195,7 @@ class BoletimAssistenteController extends BaseController
     private function lerPayloadMensagem(): array
     {
         $mensagem = trim((string) ($_POST['mensagem'] ?? ''));
-        $limiteMsg = $this->assistente->mensagemPareceReceita($mensagem) ? 12000 : 4000;
+        $limiteMsg = $this->assistente->mensagemPareceReceita($mensagem) ? 12000 : 8000;
         if (mb_strlen($mensagem) > $limiteMsg) {
             $this->json(['success' => false, 'error' => 'Mensagem muito longa (máx. ' . $limiteMsg . ' caracteres).'], 400);
         }
@@ -125,7 +203,7 @@ class BoletimAssistenteController extends BaseController
         $historico = [];
         $histRaw = $_POST['historico'] ?? '[]';
         if (is_string($histRaw)) {
-            if (strlen($histRaw) > 20000) {
+            if (strlen($histRaw) > self::LIMITE_HISTORICO_BYTES) {
                 $this->json(['success' => false, 'error' => 'Histórico muito grande.'], 400);
             }
             $dec = json_decode($histRaw, true);
@@ -139,7 +217,7 @@ class BoletimAssistenteController extends BaseController
         $estado = null;
         $estadoRaw = $_POST['estado_formulario'] ?? '';
         if (is_string($estadoRaw) && $estadoRaw !== '') {
-            if (strlen($estadoRaw) > 50000) {
+            if (strlen($estadoRaw) > self::LIMITE_ESTADO_BYTES) {
                 $this->json(['success' => false, 'error' => 'Estado do formulário muito grande.'], 400);
             }
             $decEstado = json_decode($estadoRaw, true);
@@ -151,7 +229,7 @@ class BoletimAssistenteController extends BaseController
         $wizard = null;
         $wizardRaw = $_POST['wizard_estado'] ?? '';
         if (is_string($wizardRaw) && $wizardRaw !== '') {
-            if (strlen($wizardRaw) > 50000) {
+            if (strlen($wizardRaw) > self::LIMITE_ESTADO_BYTES) {
                 $this->json(['success' => false, 'error' => 'Estado do wizard muito grande.'], 400);
             }
             $decW = json_decode($wizardRaw, true);
@@ -215,7 +293,11 @@ class BoletimAssistenteController extends BaseController
         }
 
         $payload = $this->lerPayloadMensagem();
+        $this->soltarSessao();
         $atalho = $this->assistente->tentarAtalhoReceitaPublico($payload['mensagem'], $payload['estado']);
+
+        @set_time_limit(200);
+        @ini_set('max_execution_time', '200');
 
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -231,8 +313,13 @@ class BoletimAssistenteController extends BaseController
         }
 
         $emit = static function (string $event, array $data): void {
+            $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($json === false) {
+                $json = json_encode(['error' => 'Falha ao serializar a resposta da IA.'], JSON_UNESCAPED_UNICODE);
+                $event = 'error';
+            }
             echo 'event: ' . $event . "\n";
-            echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+            echo 'data: ' . $json . "\n\n";
             if (function_exists('ob_flush')) {
                 @ob_flush();
             }
@@ -262,19 +349,30 @@ class BoletimAssistenteController extends BaseController
             exit;
         }
 
-        $resultado = $this->assistente->processarMensagemStream(
-            $payload['mensagem'],
-            static function (string $chunk) use ($emit): void {
-                if ($chunk === '') {
-                    return;
+        $emit('fase', ['fase' => 'consultando']);
+
+        try {
+            $resultado = $this->assistente->processarMensagemStream(
+                $payload['mensagem'],
+                static function (string $chunk) use ($emit): void {
+                    if ($chunk === '') {
+                        return;
+                    }
+                    $emit('chunk', ['text' => $chunk]);
+                },
+                $payload['historico'],
+                $payload['estado'],
+                $payload['regra_id'] > 0 ? $payload['regra_id'] : null,
+                $payload['wizard'],
+                static function (string $fase) use ($emit): void {
+                    $emit('fase', ['fase' => $fase]);
                 }
-                $emit('chunk', ['text' => $chunk]);
-            },
-            $payload['historico'],
-            $payload['estado'],
-            $payload['regra_id'] > 0 ? $payload['regra_id'] : null,
-            $payload['wizard']
-        );
+            );
+        } catch (Throwable $e) {
+            error_log('BoletimAssistente mensagemStream: ' . $e->getMessage());
+            $emit('error', ['error' => 'Falha ao consultar a IA. Tente de novo com um pedido mais curto.']);
+            exit;
+        }
 
         if (empty($resultado['success'])) {
             $emit('error', ['error' => $resultado['error'] ?? 'Falha no assistente.']);
@@ -362,6 +460,16 @@ class BoletimAssistenteController extends BaseController
                 break;
             default:
                 $this->json(['success' => false, 'error' => 'Tool desconhecida.'], 400);
+        }
+    }
+
+    /**
+     * Libera o lock da sessão PHP para o chat e o wizard não se bloquearem.
+     */
+    private function soltarSessao(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
         }
     }
 

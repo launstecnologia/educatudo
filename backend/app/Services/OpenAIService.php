@@ -3036,8 +3036,9 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
      *
      * @param array $requestData Dados da requisição
      * @param callable $onChunk Chamado com cada pedaço de texto assim que chega (ex.: echo + flush)
+     * @param int $timeoutSegundos Timeout total do cURL (quadro de boletim pode passar de 120s)
      */
-    public function chatCompletionStream($requestData, callable $onChunk)
+    public function chatCompletionStream($requestData, callable $onChunk, int $timeoutSegundos = 120)
     {
         $apiKey = $this->getOpenAIApiKey();
         if (empty($apiKey)) {
@@ -3045,6 +3046,7 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         }
 
         $requestData['stream'] = true;
+        $timeoutSegundos = max(30, min(300, $timeoutSegundos));
 
         $ch = curl_init($this->baseUrl . '/chat/completions');
         curl_setopt_array($ch, [
@@ -3078,7 +3080,7 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
 
                 return strlen($data);
             },
-            CURLOPT_TIMEOUT => 120,
+            CURLOPT_TIMEOUT => $timeoutSegundos,
             CURLOPT_SSL_VERIFYPEER => true
         ]);
 

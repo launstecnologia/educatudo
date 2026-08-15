@@ -329,6 +329,7 @@ $router->post('/admin/settings/sliders-dashboard', 'Admin/SchoolSettingsAdminCon
 $router->get('/admin/boletim', 'Admin/BoletimConfigController@listagem');
 $router->get('/admin/boletim-guia', 'Admin/BoletimGuiaController@index');
 $router->get('/admin/boletim-configuracao', 'Admin/BoletimConfigController@index');
+$router->get('/admin/boletim-configuracao/assistente', 'Admin/BoletimConfigController@assistente');
 $router->get('/admin/boletim-configuracao/jornadas', 'Admin/BoletimConfigController@jornadasJson');
 $router->get('/admin/boletim-configuracao/evento-componentes', 'Admin/BoletimConfigController@eventoComponentesJson');
 $router->get('/admin/boletim-configuracao/keepalive', 'Admin/BoletimConfigController@keepalive');
