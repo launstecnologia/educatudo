@@ -23,8 +23,15 @@ $documentos = $documentos ?? [];
 $faltando_enturmar = $faltando_enturmar ?? [];
 $zapsign_ativo = !empty($zapsign_ativo);
 $podeEnturmar = !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'], true);
-$email_url = $email_url ?? '';
 $foco_contrato = !empty($foco_contrato) || (($_GET['foco'] ?? '') === 'contrato');
+$tiposDocumentoLabel = [
+    'rg' => 'RG',
+    'cpf' => 'CPF',
+    'comprovante_residencia' => 'Comprovante de residência',
+    'historico' => 'Histórico escolar',
+    'contrato_assinado' => 'Contrato assinado',
+    'outro' => 'Outro',
+];
 $mostrarContratoCard = $foco_contrato || !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'], true);
 
 $tiposCobrancaLabel = [
@@ -56,10 +63,33 @@ if ($cobrancasShow === [] && !empty($enrollment['finance_plan_id'])) {
 
 $page_header_title    = 'Matrícula #' . (int)$enrollment['id'];
 $page_header_subtitle = ($tipoLabel[$enrollment['tipo']] ?? '') . ' — ' . ($enrollment['aluno_nome'] ?? '');
+$passoFaltando = 1;
+foreach ($faltando_enturmar as $campoFalta) {
+    $campoFalta = (string) $campoFalta;
+    if ($campoFalta === 'Ano letivo' || $campoFalta === 'Turma') {
+        $passoFaltando = 1;
+        break;
+    }
+    if (str_starts_with($campoFalta, 'Aluno:')) {
+        $passoFaltando = 2;
+        break;
+    }
+    if (str_starts_with($campoFalta, 'Responsável:')) {
+        $passoFaltando = 3;
+        break;
+    }
+}
+$editUrl = URL . '/admin/enrollment/' . (int)$enrollment['id'] . '/edit';
+if (!empty($faltando_enturmar)) {
+    $editUrl .= '?passo=' . (int) $passoFaltando;
+}
+$podeEditarProcesso = !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'], true);
 ob_start(); ?>
-<a href="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/edit" class="btn-secondary text-sm">
+<?php if ($podeEditarProcesso): ?>
+<a href="<?= $esc($editUrl) ?>" class="btn-secondary text-sm">
     <i class="fa-solid fa-pen mr-1.5"></i> Editar
 </a>
+<?php endif; ?>
 <a href="<?= URL ?>/admin/enrollment" class="btn-secondary text-sm">← Voltar</a>
 <?php $page_header_actions = ob_get_clean();
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
@@ -71,13 +101,18 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
 <?php endif; ?>
 
 <?php if (!empty($faltando_enturmar)): ?>
-<div class="mb-4 p-4 rounded-xl text-sm bg-amber-50 text-amber-800 border border-amber-200">
-    <p class="font-medium mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Campos faltando para enturmar</p>
+<div class="mb-4 p-4 rounded-xl text-sm bg-red-50 text-red-800 border border-red-200">
+    <p class="font-semibold mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Campos faltando para enturmar</p>
     <ul class="list-disc ml-5 space-y-0.5">
         <?php foreach ($faltando_enturmar as $campo): ?>
         <li><?= $esc($campo) ?></li>
         <?php endforeach; ?>
     </ul>
+    <?php if ($podeEditarProcesso): ?>
+    <a href="<?= $esc($editUrl) ?>" class="inline-flex items-center mt-3 text-sm font-semibold hover:underline">
+        <i class="fa-solid fa-pen mr-1.5"></i> Preencher no wizard
+    </a>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -98,7 +133,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
             <h3 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <i class="fa-solid fa-file-signature text-primary"></i>
+                <i class="fa-solid fa-file-signature" style="color: var(--primary-color);"></i>
                 Contratos e assinatura
             </h3>
             <p class="mt-1 text-sm text-gray-600">
@@ -112,27 +147,19 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
             </p>
             <?php endif; ?>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <?php if (!empty($whatsapp_url)): ?>
-            <a href="<?= $esc($whatsapp_url) ?>" target="_blank"
-               class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-500 hover:bg-green-600 text-white">
-                <i class="fa-brands fa-whatsapp mr-1.5"></i> WhatsApp
-            </a>
-            <?php endif; ?>
-            <?php if (!empty($email_url)): ?>
-            <a href="<?= $esc($email_url) ?>"
-               class="btn-secondary inline-flex items-center px-3 py-2 rounded-lg text-sm">
-                <i class="fa-solid fa-envelope mr-1.5"></i> E-mail
-            </a>
-            <?php endif; ?>
-        </div>
+        <?php if (!empty($whatsapp_url)): ?>
+        <a href="<?= $esc($whatsapp_url) ?>" target="_blank"
+           class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-green-500 hover:bg-green-600 text-white shrink-0">
+            <i class="fa-brands fa-whatsapp mr-1.5"></i> WhatsApp
+        </a>
+        <?php endif; ?>
     </div>
 
     <?php if ($contratosProcesso === []): ?>
     <div class="rounded-xl border border-dashed border-gray-300 bg-white/70 p-4 text-sm text-gray-600">
         Nenhuma regra de contrato ativa.
-        <a href="<?= URL ?>/admin/enrollment/config" class="text-primary underline">Configurar em Z-Configuração → Matrícula</a>.
-        Tokens ZapSign em <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="text-primary underline">Assinatura Digital</a>.
+        <a href="<?= URL ?>/admin/enrollment/config" class="underline font-medium" style="color: var(--primary-color);">Configurar em Z-Configuração → Matrícula</a>.
+        Tokens ZapSign em <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="underline font-medium" style="color: var(--primary-color);">Assinatura Digital</a>.
     </div>
     <?php else: ?>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -217,17 +244,29 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
     <?php if (empty($enrollment['assinado_em']) && !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada', 'abandonada'], true)): ?>
     <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/contrato-assinado"
           enctype="multipart/form-data"
-          class="pt-4 border-t border-primary/20 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          class="pt-4 border-t border-gray-200">
         <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
         <input type="hidden" name="tipo_documento" value="contrato_assinado">
-        <div class="sm:col-span-2">
-            <label class="block text-xs font-medium text-gray-600 mb-1">Contrato assinado manualmente (PDF/JPG)</label>
-            <input type="file" name="documento" required accept=".pdf,.jpg,.jpeg,.png,.webp"
-                   class="w-full text-sm text-gray-600">
+        <p class="text-sm font-medium text-gray-800 mb-1">Assinatura manual</p>
+        <p class="text-xs text-gray-500 mb-3">Anexe o contrato já assinado em PDF ou imagem.</p>
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-stretch">
+            <div class="js-dropzone flex-1 rounded-xl border-2 border-dashed border-gray-300 bg-white px-4 py-5 text-center cursor-pointer transition-colors hover:bg-gray-50"
+                 role="button" tabindex="0">
+                <input type="file" name="documento" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="sr-only js-file-input">
+                <div class="js-dropzone-idle">
+                    <i class="fa-solid fa-cloud-arrow-up text-xl text-gray-400 mb-1"></i>
+                    <p class="text-sm font-medium text-gray-800">Arraste e solte o contrato assinado</p>
+                    <p class="text-xs text-gray-500 mt-0.5">ou clique para escolher</p>
+                </div>
+                <div class="js-dropzone-ready hidden">
+                    <p class="js-file-label text-sm font-medium text-gray-800 truncate"></p>
+                    <p class="text-xs text-gray-500 mt-0.5">Clique ou solte para trocar</p>
+                </div>
+            </div>
+            <button type="submit" class="btn-secondary inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap">
+                <i class="fa-solid fa-upload mr-1.5"></i> Registrar assinatura
+            </button>
         </div>
-        <button type="submit" class="btn-secondary inline-flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium">
-            <i class="fa-solid fa-upload mr-1.5"></i> Registrar assinatura manual
-        </button>
     </form>
     <?php elseif (!empty($enrollment['contrato_assinado_path'])): ?>
     <p class="text-xs text-gray-500">
@@ -299,8 +338,26 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
             <h3 class="font-semibold text-gray-800 mb-4">Dados do Aluno</h3>
             <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <div class="col-span-2"><dt class="text-gray-400 text-xs">Nome</dt><dd class="font-medium text-gray-800"><?= $esc($enrollment['aluno_nome']) ?></dd></div>
-                <div><dt class="text-gray-400 text-xs">CPF</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_cpf'] ?? '—') ?></dd></div>
-                <div><dt class="text-gray-400 text-xs">Nascimento</dt><dd class="text-gray-700"><?= $enrollment['aluno_data_nasc'] ? date('d/m/Y', strtotime($enrollment['aluno_data_nasc'])) : '—' ?></dd></div>
+                <div>
+                    <dt class="text-gray-400 text-xs">CPF</dt>
+                    <?php
+                    $cpfShowDigits = preg_replace('/\D+/', '', (string) ($enrollment['aluno_cpf'] ?? '')) ?? '';
+                    $cpfVazio = strlen($cpfShowDigits) !== 11;
+                    ?>
+                    <dd class="<?= $cpfVazio ? 'text-red-600 font-medium' : 'text-gray-700' ?>">
+                        <?= $cpfVazio ? 'Não preenchido' : $esc($enrollment['aluno_cpf']) ?>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-gray-400 text-xs">Nascimento</dt>
+                    <?php
+                    $nascShow = trim((string) ($enrollment['aluno_data_nasc'] ?? ''));
+                    $nascVazio = $nascShow === '' || $nascShow === '0000-00-00';
+                    ?>
+                    <dd class="<?= $nascVazio ? 'text-red-600 font-medium' : 'text-gray-700' ?>">
+                        <?= $nascVazio ? 'Não preenchido' : date('d/m/Y', strtotime($nascShow)) ?>
+                    </dd>
+                </div>
                 <div><dt class="text-gray-400 text-xs">E-mail</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_email'] ?? '—') ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">Telefone</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_telefone'] ?? '—') ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">Turma</dt><dd class="text-gray-700"><?= $esc($enrollment['turma_nome'] ?? '—') ?> <?= $enrollment['turma_serie'] ? '— ' . $esc($enrollment['turma_serie']) : '' ?></dd></div>
@@ -385,50 +442,64 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
 
             <?php if (!empty($documentos)): ?>
             <ul class="space-y-2 mb-4">
-                <?php foreach ($documentos as $doc): ?>
-                <li class="flex items-center justify-between gap-3 text-sm border border-gray-100 rounded-lg px-3 py-2">
-                    <div class="min-w-0">
-                        <p class="font-medium text-gray-800 truncate"><?= $esc($doc['nome_original'] ?? 'Documento') ?></p>
-                        <p class="text-xs text-gray-400">
-                            <?= $esc($doc['tipo'] ?? 'outro') ?>
-                            <?php if (!empty($doc['created_at'])): ?> · <?= date('d/m/Y H:i', strtotime($doc['created_at'])) ?><?php endif; ?>
-                        </p>
+                <?php foreach ($documentos as $doc):
+                    $tipoDoc = (string) ($doc['tipo'] ?? 'outro');
+                ?>
+                <li class="flex items-center justify-between gap-3 text-sm border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50/60">
+                    <div class="min-w-0 flex items-start gap-3">
+                        <span class="mt-0.5 w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center shrink-0 text-gray-500">
+                            <i class="fa-solid fa-file-lines text-sm"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="font-medium text-gray-800 truncate"><?= $esc($doc['nome_original'] ?? 'Documento') ?></p>
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                <?= $esc($tiposDocumentoLabel[$tipoDoc] ?? $tipoDoc) ?>
+                                <?php if (!empty($doc['created_at'])): ?> · <?= date('d/m/Y H:i', strtotime($doc['created_at'])) ?><?php endif; ?>
+                            </p>
+                        </div>
                     </div>
                     <form method="POST"
                           action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/documentos/<?= (int)$doc['id'] ?>/remover"
                           onsubmit="return confirm('Remover este documento?')">
                         <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
-                        <button type="submit" class="text-xs text-red-500 hover:text-red-700">Remover</button>
+                        <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-800 px-2 py-1 rounded-md hover:bg-red-50">Remover</button>
                     </form>
                 </li>
                 <?php endforeach; ?>
             </ul>
             <?php else: ?>
-            <p class="text-sm text-gray-400 mb-4">Nenhum documento anexado.</p>
+            <p class="text-sm text-gray-500 mb-4">Nenhum documento anexado.</p>
             <?php endif; ?>
 
             <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/documentos"
-                  enctype="multipart/form-data" class="space-y-3 border-t border-gray-100 pt-4">
+                  enctype="multipart/form-data" class="border-t border-gray-100 pt-4 space-y-3">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Tipo</label>
-                        <select name="tipo_documento" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                            <option value="rg">RG</option>
-                            <option value="cpf">CPF</option>
-                            <option value="comprovante_residencia">Comprovante de residência</option>
-                            <option value="historico">Histórico escolar</option>
-                            <option value="outro" selected>Outro</option>
-                        </select>
+                <div class="max-w-xs">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+                    <select name="tipo_documento" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white">
+                        <option value="rg">RG</option>
+                        <option value="cpf">CPF</option>
+                        <option value="comprovante_residencia">Comprovante de residência</option>
+                        <option value="historico">Histórico escolar</option>
+                        <option value="outro" selected>Outro</option>
+                    </select>
+                </div>
+                <div class="js-dropzone rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/70 px-4 py-8 text-center cursor-pointer transition-colors hover:bg-gray-50"
+                     role="button" tabindex="0">
+                    <input type="file" name="documento" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="sr-only js-file-input">
+                    <div class="js-dropzone-idle">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm font-semibold text-gray-800">Arraste e solte o arquivo aqui</p>
+                        <p class="text-xs text-gray-500 mt-1">ou clique para escolher · PDF, JPG ou PNG · máx. 10MB</p>
                     </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Arquivo (PDF/JPG/PNG, máx. 10MB)</label>
-                        <input type="file" name="documento" required accept=".pdf,.jpg,.jpeg,.png,.webp"
-                               class="w-full text-sm text-gray-600">
+                    <div class="js-dropzone-ready hidden">
+                        <i class="fa-solid fa-file-circle-check text-2xl mb-2" style="color: var(--primary-color);"></i>
+                        <p class="js-file-label text-sm font-medium text-gray-800 truncate px-2"></p>
+                        <p class="text-xs text-gray-500 mt-1">Clique ou solte outro arquivo para trocar</p>
                     </div>
                 </div>
-                <button type="submit" class="btn-secondary text-sm">
-                    <i class="fa-solid fa-upload mr-1.5"></i> Enviar documento
+                <button type="submit" class="btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                    <i class="fa-solid fa-upload mr-2"></i> Enviar documento
                 </button>
             </form>
         </div>
@@ -467,90 +538,101 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
     <div class="space-y-5">
 
         <!-- Contrato -->
-        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-            <h3 class="font-semibold text-gray-800 mb-4">Contrato</h3>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+            <h3 class="font-semibold text-gray-800">Contrato</h3>
 
             <?php if ($enrollment['assinado_em']): ?>
-            <div class="bg-green-50 rounded-xl p-3 text-sm text-green-700 mb-4">
+            <div class="bg-green-50 border border-green-100 rounded-xl p-3 text-sm text-green-700">
                 <i class="fa-solid fa-check-circle mr-1"></i>
-                Assinado em <?= $fmtDt($enrollment['assinado_em']) ?><br>
-                <span class="text-xs text-green-600">por <?= $esc($enrollment['assinante_nome'] ?? '') ?></span>
+                Assinado em <?= $fmtDt($enrollment['assinado_em']) ?>
+                <?php if (!empty($enrollment['assinante_nome'])): ?>
+                <span class="block text-xs text-green-600 mt-0.5">por <?= $esc($enrollment['assinante_nome']) ?></span>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
 
             <?php if (!empty($enrollment['zapsign_status'])): ?>
-            <div class="text-xs text-gray-500 mb-3">
+            <p class="text-xs text-gray-500">
                 ZapSign: <span class="font-medium text-gray-700"><?= $esc($enrollment['zapsign_status']) ?></span>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!empty($enrollment['contrato_pdf_path'])): ?>
-            <a href="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/contrato/download"
-               class="w-full btn-secondary text-sm flex items-center justify-center gap-2 mb-3">
-                <i class="fa-solid fa-file-pdf text-red-500"></i> Baixar PDF
-            </a>
-            <div class="text-xs text-gray-400 mb-3 break-all">
-                Link público:<br>
-                <a href="<?= URL ?>/matricula/contrato/<?= $esc($enrollment['contrato_token']) ?>"
-                   target="_blank" class="text-blue-600 hover:underline">
-                    <?= URL ?>/matricula/contrato/<?= substr($esc($enrollment['contrato_token']), 0, 16) ?>...
-                </a>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!empty($whatsapp_url)): ?>
-            <a href="<?= $esc($whatsapp_url) ?>" target="_blank"
-               class="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-2.5 rounded-xl transition mb-3">
-                <i class="fa-brands fa-whatsapp text-base"></i> Enviar por WhatsApp
-            </a>
-            <?php endif; ?>
-
-            <?php if (!empty($email_url)): ?>
-            <a href="<?= $esc($email_url) ?>"
-               class="w-full btn-secondary text-sm flex items-center justify-center gap-2 mb-3">
-                <i class="fa-solid fa-envelope"></i> Enviar por e-mail
-            </a>
+            </p>
             <?php endif; ?>
 
             <?php if ($enrollment['status'] !== 'cancelada' && $enrollment['status'] !== 'enturmada'): ?>
-            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/contrato" class="mt-1">
+            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/contrato">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
-                <button type="submit" class="w-full btn-primary-custom text-sm">
-                    <i class="fa-solid fa-file-contract mr-1.5"></i>
-                    <?= $enrollment['contrato_pdf_path'] ? 'Regerar Contrato' : 'Gerar Contrato PDF' ?>
+                <button type="submit" class="w-full btn-primary-custom inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                    <i class="fa-solid fa-file-contract"></i>
+                    <?= $enrollment['contrato_pdf_path'] ? 'Regerar contrato PDF' : 'Gerar contrato PDF' ?>
                 </button>
             </form>
             <?php endif; ?>
 
+            <?php if (!empty($enrollment['contrato_pdf_path'])): ?>
+            <a href="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/contrato/download"
+               class="w-full btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium">
+                <i class="fa-solid fa-download text-gray-500"></i> Baixar PDF
+            </a>
+            <?php if (!empty($enrollment['contrato_token'])): ?>
+            <p class="text-xs text-gray-400 break-all">
+                Link público:
+                <a href="<?= URL ?>/matricula/contrato/<?= $esc($enrollment['contrato_token']) ?>"
+                   target="_blank" class="hover:underline" style="color: var(--primary-color);">
+                    abrir contrato
+                </a>
+            </p>
+            <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if (!empty($whatsapp_url)): ?>
+            <a href="<?= $esc($whatsapp_url) ?>" target="_blank"
+               class="w-full inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-2.5 rounded-lg transition">
+                <i class="fa-brands fa-whatsapp text-base"></i> Enviar por WhatsApp
+            </a>
+            <?php endif; ?>
+
             <?php if (empty($enrollment['assinado_em']) && !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada', 'abandonada'], true)): ?>
             <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/contrato-assinado"
-                  enctype="multipart/form-data" class="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                  enctype="multipart/form-data" class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 space-y-3">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                 <input type="hidden" name="tipo_documento" value="contrato_assinado">
-                <label class="block text-xs text-gray-500">Assinatura manual (PDF/JPG)</label>
-                <input type="file" name="documento" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="w-full text-xs">
-                <button type="submit" class="w-full btn-secondary text-sm">
-                    <i class="fa-solid fa-upload mr-1.5"></i> Registrar assinatura manual
+                <div>
+                    <p class="text-sm font-medium text-gray-800">Assinatura manual</p>
+                    <p class="text-xs text-gray-500 mt-0.5">PDF ou imagem do contrato já assinado</p>
+                </div>
+                <div class="js-dropzone rounded-xl border-2 border-dashed border-gray-300 bg-white px-3 py-5 text-center cursor-pointer transition-colors hover:bg-gray-50"
+                     role="button" tabindex="0">
+                    <input type="file" name="documento" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="sr-only js-file-input">
+                    <div class="js-dropzone-idle">
+                        <i class="fa-solid fa-cloud-arrow-up text-lg text-gray-400 mb-1"></i>
+                        <p class="text-sm font-medium text-gray-800">Arraste e solte aqui</p>
+                        <p class="text-xs text-gray-500 mt-0.5">ou clique para escolher</p>
+                    </div>
+                    <div class="js-dropzone-ready hidden">
+                        <p class="js-file-label text-sm font-medium text-gray-800 truncate"></p>
+                    </div>
+                </div>
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                    <i class="fa-solid fa-upload text-gray-500"></i> Registrar assinatura
                 </button>
             </form>
             <?php endif; ?>
 
             <?php if ($podeEnturmar): ?>
-            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/status" class="mt-2"
+            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/status"
                   onsubmit="return confirm('Enturmar este aluno?')">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                 <input type="hidden" name="novo_status" value="enturmada">
-                <button type="submit" class="w-full btn-secondary text-sm">
-                    <i class="fa-solid fa-user-plus mr-1.5"></i> Enturmar
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                    <i class="fa-solid fa-user-plus text-gray-500"></i> Enturmar
                 </button>
             </form>
             <?php endif; ?>
 
             <?php if ($zapsign_ativo && !empty($enrollment['zapsign_doc_token'])): ?>
-            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/zapsign/sincronizar" class="mt-2">
+            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/zapsign/sincronizar">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
-                <button type="submit" class="w-full btn-secondary text-sm">
-                    <i class="fa-solid fa-rotate mr-1.5"></i> Sync ZapSign
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                    <i class="fa-solid fa-rotate text-gray-500"></i> Sync ZapSign
                 </button>
             </form>
             <?php endif; ?>
@@ -620,3 +702,74 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
     </div>
 
 </div>
+
+<style>
+.js-dropzone.is-dragover {
+    border-color: var(--primary-color) !important;
+    background-color: color-mix(in srgb, var(--primary-color) 8%, white) !important;
+}
+</style>
+<script>
+(function () {
+    function setInputFile(input, file) {
+        try {
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+        } catch (err) {
+            return false;
+        }
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }
+
+    function markReady(zone, fileName) {
+        var idle = zone.querySelector('.js-dropzone-idle');
+        var ready = zone.querySelector('.js-dropzone-ready');
+        var label = zone.querySelector('.js-file-label');
+        if (idle) idle.classList.add('hidden');
+        if (ready) ready.classList.remove('hidden');
+        if (label) label.textContent = fileName || '';
+    }
+
+    document.querySelectorAll('.js-dropzone').forEach(function (zone) {
+        var input = zone.querySelector('.js-file-input');
+        if (!input) return;
+
+        zone.addEventListener('click', function (e) {
+            if (e.target === input) return;
+            input.click();
+        });
+        zone.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                input.click();
+            }
+        });
+        ['dragenter', 'dragover'].forEach(function (evt) {
+            zone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zone.classList.add('is-dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function (evt) {
+            zone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zone.classList.remove('is-dragover');
+            });
+        });
+        zone.addEventListener('drop', function (e) {
+            var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!file) return;
+            setInputFile(input, file);
+        });
+        input.addEventListener('change', function () {
+            if (this.files && this.files[0]) {
+                markReady(zone, this.files[0].name);
+            }
+        });
+    });
+})();
+</script>

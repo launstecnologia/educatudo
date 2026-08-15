@@ -1,13 +1,37 @@
 <?php
 $esc     = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+$prefill = $prefill ?? [];
 $val     = fn($k) => $esc($prefill[$k] ?? $_POST[$k] ?? '');
 $tipoAtual = $tipo ?? 'nova';
 $isRem   = $tipoAtual === 'rematricula';
+$isEdit  = !empty($modo_edicao);
+$enrollmentId = (int) ($enrollment_id ?? 0);
+$faltandoWizard = $faltando_enturmar ?? [];
+$passoInicial = (int) ($passo_inicial ?? 1);
+if ($passoInicial < 1 || $passoInicial > 5) {
+    $passoInicial = 1;
+}
 $descontos = $descontos ?? [];
 $responsaveisPrefill = $responsaveis ?? [];
 $planos_financeiros = $planos_financeiros ?? [];
 $anos_letivos = $anos_letivos ?? [];
 $turmas = $turmas ?? [];
+$anoLetivoSel = (int) ($prefill['ano_letivo_id'] ?? $_POST['ano_letivo_id'] ?? 0);
+$cpfDigitsPrefill = preg_replace('/\D+/', '', (string) ($prefill['aluno_cpf'] ?? '')) ?? '';
+$nascPrefill = trim((string) ($prefill['aluno_data_nasc'] ?? ''));
+$erroCampos = [
+    'ano_letivo_id' => $isEdit && $anoLetivoSel <= 0,
+    'turma_id' => $isEdit && (int) ($prefill['turma_id'] ?? 0) <= 0,
+    'aluno_nome' => $isEdit && trim((string) ($prefill['aluno_nome'] ?? '')) === '',
+    'aluno_cpf' => $isEdit && strlen($cpfDigitsPrefill) !== 11,
+    'aluno_data_nasc' => $isEdit && ($nascPrefill === '' || $nascPrefill === '0000-00-00'),
+];
+$formAction = $isEdit && $enrollmentId > 0
+    ? URL . '/admin/enrollment/' . $enrollmentId . '/edit'
+    : URL . '/admin/enrollment';
+$voltarUrl = $isEdit && $enrollmentId > 0
+    ? URL . '/admin/enrollment/' . $enrollmentId
+    : URL . '/admin/enrollment';
 
 $mensalidadePlanId = 0;
 $cobrancasPost = $_POST['cobrancas'] ?? null;
@@ -24,9 +48,27 @@ if ($mensalidadePlanId <= 0) {
     $fp = (int)($prefill['finance_plan_id'] ?? $_POST['finance_plan_id'] ?? 0);
     if ($fp > 0) $mensalidadePlanId = $fp;
 }
+if ($mensalidadePlanId <= 0) {
+    $rawCobrancas = $prefill['finance_cobrancas'] ?? null;
+    if (is_string($rawCobrancas)) {
+        $rawCobrancas = json_decode($rawCobrancas, true);
+    }
+    if (is_array($rawCobrancas)) {
+        foreach ($rawCobrancas as $row) {
+            if (!is_array($row)) continue;
+            if (($row['tipo'] ?? '') === 'mensalidade' && (int) ($row['plan_id'] ?? 0) > 0) {
+                $mensalidadePlanId = (int) $row['plan_id'];
+                break;
+            }
+        }
+    }
+}
 
-$origemAtual = $_POST['origem'] ?? ($isRem ? 'interno' : '');
+$origemAtual = $_POST['origem'] ?? ($prefill['origem'] ?? ($isRem ? 'interno' : ''));
 $inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none wizard-focus';
+$clsCampo = static function (string $campo) use ($inputClass, $erroCampos): string {
+    return $inputClass . (!empty($erroCampos[$campo]) ? ' campo-obrigatorio-vazio' : '');
+};
 
 require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
 $ufsBrasil = \StudentFormHelper::ufsBrasil();
@@ -73,24 +115,46 @@ $steps = [
 #matriculaWizard .wizard-check:focus {
     --tw-ring-color: var(--primary-color);
 }
+#matriculaWizard .campo-obrigatorio-vazio {
+    border-color: #f87171 !important;
+    background-color: #fef2f2;
+}
+#matriculaWizard .campo-obrigatorio-vazio:focus {
+    box-shadow: 0 0 0 2px rgba(248, 113, 113, .35);
+}
 </style>
 
 <div class="mb-6">
     <div class="flex items-center gap-4">
-        <a href="<?= URL ?>/admin/enrollment"
+        <a href="<?= $esc($voltarUrl) ?>"
            class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
            aria-label="Voltar">
             <i class="fa-solid fa-arrow-left"></i>
         </a>
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-1">Nova Matrícula</h2>
-            <p class="text-sm text-gray-600">Wizard em 5 etapas — ao salvar, você seguirá para o contrato.</p>
+            <h2 class="text-2xl font-bold text-gray-900 mb-1"><?= $isEdit ? 'Editar Matrícula #' . $enrollmentId : 'Nova Matrícula' ?></h2>
+            <p class="text-sm text-gray-600"><?= $isEdit ? 'Complete os campos em vermelho e salve para atualizar o processo.' : 'Wizard em 5 etapas — ao salvar, você seguirá para o contrato.' ?></p>
         </div>
     </div>
 </div>
 
-<?php if ($isRem && !empty($prefill['aluno_nome'])): ?>
-<div class="mb-6 p-4 rounded-lg border border-accent bg-primary/10 text-sm text-gray-700 flex items-center gap-2" style="background-color: color-mix(in srgb, var(--primary-color) 10%, white); border-color: var(--primary-color);">
+<?php if (!empty($status_message)): ?>
+<div class="mb-4 p-3 rounded-xl text-sm <?= ($status_type ?? '') === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200' ?>">
+    <?= $esc($status_message) ?>
+</div>
+<?php endif; ?>
+
+<?php if ($isEdit && $faltandoWizard !== []): ?>
+<div class="mb-6 p-4 rounded-xl text-sm bg-red-50 text-red-800 border border-red-200">
+    <p class="font-medium mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Campos faltando para enturmar</p>
+    <ul class="list-disc ml-5 space-y-0.5">
+        <?php foreach ($faltandoWizard as $campoFalta): ?>
+        <li><?= $esc($campoFalta) ?></li>
+        <?php endforeach; ?>
+    </ul>
+</div>
+<?php elseif ($isRem && !empty($prefill['aluno_nome'])): ?>
+<div class="mb-6 p-4 rounded-lg border text-sm text-gray-700 flex items-center gap-2" style="background-color: color-mix(in srgb, var(--primary-color) 10%, white); border-color: var(--primary-color);">
     <i class="fa-solid fa-circle-info wizard-accent" style="color: var(--primary-color);"></i>
     Dados pré-carregados do aluno. Revise e confirme para gerar o contrato.
 </div>
@@ -102,15 +166,15 @@ $steps = [
         <?php foreach ($steps as $i => $s): ?>
             <button type="button" data-step-target="<?= (int)$s['n'] ?>"
                     class="step-nav-btn group flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition sm:flex-1 sm:max-w-[180px]
-                           <?= $s['n'] === 1
+                           <?= $s['n'] === $passoInicial
                                ? 'wizard-active'
                                : 'border-gray-200 bg-white text-gray-600 wizard-hover' ?>"
-                    data-active="<?= $s['n'] === 1 ? 'true' : 'false' ?>">
+                    data-active="<?= $s['n'] === $passoInicial ? 'true' : 'false' ?>">
                 <span class="step-nav-num flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold border-2
-                             <?= $s['n'] === 1 ? 'wizard-active-num' : 'border-current' ?>"><?= (int)$s['n'] ?></span>
+                             <?= $s['n'] === $passoInicial ? 'wizard-active-num' : 'border-current' ?>"><?= (int)$s['n'] ?></span>
                 <span class="min-w-0">
                     <span class="block font-semibold leading-tight"><?= $esc($s['label']) ?></span>
-                    <span class="block text-xs <?= $s['n'] === 1 ? 'text-gray-600' : 'opacity-80' ?>"><?= $esc($s['sub']) ?></span>
+                    <span class="block text-xs <?= $s['n'] === $passoInicial ? 'text-gray-600' : 'opacity-80' ?>"><?= $esc($s['sub']) ?></span>
                 </span>
             </button>
             <?php if ($i < count($steps) - 1): ?>
@@ -119,7 +183,7 @@ $steps = [
         <?php endforeach; ?>
     </div>
 
-    <form method="POST" action="<?= URL ?>/admin/enrollment" id="matriculaForm" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <form method="POST" action="<?= $esc($formAction) ?>" id="matriculaForm" novalidate class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <input type="hidden" name="_token" value="<?= $esc($csrf_token ?? '') ?>">
         <?php if (!empty($prefill['aluno_id'])): ?>
         <input type="hidden" name="aluno_id" id="aluno_id_input" value="<?= (int)$prefill['aluno_id'] ?>">
@@ -137,7 +201,7 @@ $steps = [
         <input type="hidden" name="finance_plan_id" id="finance_plan_id" value="<?= $mensalidadePlanId > 0 ? $mensalidadePlanId : '' ?>">
 
         <!-- Step 1 — Vínculo -->
-        <div class="step-panel p-6 space-y-6" data-step-panel="1">
+        <div class="step-panel <?= $passoInicial === 1 ? '' : 'hidden' ?> p-6 space-y-6" data-step-panel="1">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Tipo de Vínculo</h3>
                 <p class="mt-1 text-sm text-gray-500">Selecione o tipo de matrícula e a turma de destino.</p>
@@ -185,10 +249,14 @@ $steps = [
                     <label for="ano_letivo_id" class="block text-sm font-medium text-gray-700 mb-2">
                         Ano Letivo <span class="text-red-500">*</span>
                     </label>
-                    <select id="ano_letivo_id" name="ano_letivo_id" required class="<?= $inputClass ?>">
+                    <select id="ano_letivo_id" name="ano_letivo_id" class="<?= $clsCampo('ano_letivo_id') ?>">
                         <option value="">Selecionar...</option>
-                        <?php foreach ($anos_letivos as $al): ?>
-                        <option value="<?= (int)$al['id'] ?>" <?= !empty($al['ativo']) ? 'selected' : '' ?>><?= $esc($al['ano']) ?></option>
+                        <?php foreach ($anos_letivos as $al):
+                            $selAno = $anoLetivoSel > 0
+                                ? $anoLetivoSel === (int) $al['id']
+                                : !empty($al['ativo']);
+                        ?>
+                        <option value="<?= (int)$al['id'] ?>" <?= $selAno ? 'selected' : '' ?>><?= $esc($al['ano']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -196,7 +264,7 @@ $steps = [
                     <label for="turma_id" class="block text-sm font-medium text-gray-700 mb-2">
                         Turma <span class="text-red-500">*</span>
                     </label>
-                    <select id="turma_id" name="turma_id" required class="<?= $inputClass ?>">
+                    <select id="turma_id" name="turma_id" class="<?= $clsCampo('turma_id') ?>">
                         <option value="">Selecionar...</option>
                         <?php foreach ($turmas as $t): ?>
                         <option value="<?= (int)$t['id'] ?>" <?= (int)($prefill['turma_id'] ?? 0) === (int)$t['id'] ? 'selected' : '' ?>>
@@ -215,7 +283,7 @@ $steps = [
         </div>
 
         <!-- Step 2 — Aluno -->
-        <div class="step-panel hidden p-6 space-y-6" data-step-panel="2">
+        <div class="step-panel <?= $passoInicial === 2 ? '' : 'hidden' ?> p-6 space-y-6" data-step-panel="2">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Dados do Aluno</h3>
                 <p class="mt-1 text-sm text-gray-500">Preencha os dados pessoais e o endereço.</p>
@@ -236,12 +304,12 @@ $steps = [
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Nome completo <span class="text-red-500">*</span></label>
-                    <input type="text" name="aluno_nome" id="aluno_nome" value="<?= $val('aluno_nome') ?>" required class="<?= $inputClass ?>">
+                    <input type="text" name="aluno_nome" id="aluno_nome" value="<?= $val('aluno_nome') ?>" class="<?= $clsCampo('aluno_nome') ?>" data-obrigatorio-enturmar="nome">
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">CPF</label>
-                        <input type="text" name="aluno_cpf" id="aluno_cpf" value="<?= $val('aluno_cpf') ?>" class="<?= $inputClass ?>" inputmode="numeric" placeholder="000.000.000-00">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">CPF <?= $isEdit ? '<span class="text-red-500">*</span>' : '' ?></label>
+                        <input type="text" name="aluno_cpf" id="aluno_cpf" value="<?= $val('aluno_cpf') ?>" class="<?= $clsCampo('aluno_cpf') ?>" inputmode="numeric" placeholder="000.000.000-00" data-obrigatorio-enturmar="cpf">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">RG</label>
@@ -250,8 +318,8 @@ $steps = [
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data de nascimento</label>
-                        <input type="date" name="aluno_data_nasc" id="aluno_data_nasc" value="<?= $val('aluno_data_nasc') ?>" class="<?= $inputClass ?>">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data de nascimento <?= $isEdit ? '<span class="text-red-500">*</span>' : '' ?></label>
+                        <input type="date" name="aluno_data_nasc" id="aluno_data_nasc" value="<?= $val('aluno_data_nasc') ?>" class="<?= $clsCampo('aluno_data_nasc') ?>" data-obrigatorio-enturmar="nasc">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Celular / WhatsApp</label>
@@ -259,7 +327,7 @@ $steps = [
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">E-mail</label>
-                        <input type="email" name="aluno_email" id="aluno_email" value="<?= $val('aluno_email') ?>" class="<?= $inputClass ?>">
+                        <input type="text" name="aluno_email" id="aluno_email" value="<?= $val('aluno_email') ?>" class="<?= $inputClass ?>" inputmode="email" autocomplete="email">
                     </div>
                 </div>
                 <div>
@@ -335,7 +403,7 @@ $steps = [
         </div>
 
         <!-- Step 3 — Responsáveis -->
-        <div class="step-panel hidden p-6 space-y-6" data-step-panel="3">
+        <div class="step-panel <?= $passoInicial === 3 ? '' : 'hidden' ?> p-6 space-y-6" data-step-panel="3">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900">Responsáveis</h3>
@@ -359,7 +427,7 @@ $steps = [
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo <span class="text-red-500">*</span></label>
-                            <input type="text" name="responsaveis[__INDEX__][nome]" class="resp-nome <?= $inputClass ?>" required>
+                            <input type="text" name="responsaveis[__INDEX__][nome]" class="resp-nome <?= $inputClass ?>">
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -382,7 +450,7 @@ $steps = [
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                                <input type="email" name="responsaveis[__INDEX__][email]" class="resp-email <?= $inputClass ?>">
+                                <input type="text" name="responsaveis[__INDEX__][email]" class="resp-email <?= $inputClass ?>" inputmode="email" autocomplete="email">
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -505,7 +573,7 @@ $steps = [
         </div>
 
         <!-- Step 4 — Plano -->
-        <div class="step-panel hidden p-6 space-y-6" data-step-panel="4">
+        <div class="step-panel <?= $passoInicial === 4 ? '' : 'hidden' ?> p-6 space-y-6" data-step-panel="4">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Plano / Mensalidade</h3>
                 <p class="mt-1 text-sm text-gray-500">Selecione o plano financeiro e, se houver, regras de desconto.</p>
@@ -573,7 +641,7 @@ $steps = [
         </div>
 
         <!-- Step 5 — Revisar -->
-        <div class="step-panel hidden p-6 space-y-6" data-step-panel="5">
+        <div class="step-panel <?= $passoInicial === 5 ? '' : 'hidden' ?> p-6 space-y-6" data-step-panel="5">
             <div>
                 <h3 class="text-lg font-semibold text-gray-900">Revisar</h3>
                 <p class="mt-1 text-sm text-gray-500">Confira os dados antes de salvar. Em seguida você poderá gerar o contrato.</p>
@@ -593,8 +661,13 @@ $steps = [
                 </button>
                 <button type="submit" id="btn-submit-matricula"
                         class="btn-primary-custom inline-flex items-center px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm">
+                    <?php if ($isEdit): ?>
+                    <i class="fa-solid fa-floppy-disk mr-2"></i>
+                    Salvar alterações
+                    <?php else: ?>
                     <i class="fa-solid fa-file-signature mr-2"></i>
                     Salvar e continuar para contrato
+                    <?php endif; ?>
                 </button>
             </div>
         </div>
@@ -605,7 +678,8 @@ $steps = [
 (function () {
     var wizard = document.getElementById('matriculaWizard');
     var form = document.getElementById('matriculaForm');
-    var currentStep = 1;
+    var currentStep = <?= (int) $passoInicial ?>;
+    var isEdit = <?= $isEdit ? 'true' : 'false' ?>;
     var respIndex = 0;
     var prefillResps = <?= json_encode(array_values(array_map(static function ($r) {
         return [
@@ -665,6 +739,21 @@ $steps = [
         if (n === 2) {
             var nome = document.getElementById('aluno_nome');
             if (!nome.value.trim()) { alert('Nome do aluno é obrigatório.'); nome.focus(); return false; }
+            if (isEdit) {
+                var cpfEl = document.getElementById('aluno_cpf');
+                var cpf = onlyDigits(cpfEl.value);
+                if (cpf.length !== 11) {
+                    alert('CPF do aluno é obrigatório (11 dígitos).');
+                    cpfEl.focus();
+                    return false;
+                }
+                var nasc = document.getElementById('aluno_data_nasc');
+                if (!nasc.value) {
+                    alert('Data de nascimento é obrigatória.');
+                    nasc.focus();
+                    return false;
+                }
+            }
             return true;
         }
         if (n === 3) {
@@ -749,6 +838,30 @@ $steps = [
     function onlyDigits(v) {
         return String(v || '').replace(/\D+/g, '');
     }
+
+    function marcarCampoVazio(el, vazio) {
+        if (!el) return;
+        el.classList.toggle('campo-obrigatorio-vazio', !!vazio);
+    }
+    function atualizarCamposObrigatorios() {
+        if (!isEdit) return;
+        var nome = document.getElementById('aluno_nome');
+        var cpf = document.getElementById('aluno_cpf');
+        var nasc = document.getElementById('aluno_data_nasc');
+        var ano = document.getElementById('ano_letivo_id');
+        var turma = document.getElementById('turma_id');
+        marcarCampoVazio(nome, !(nome && nome.value.trim()));
+        marcarCampoVazio(cpf, onlyDigits(cpf && cpf.value).length !== 11);
+        marcarCampoVazio(nasc, !(nasc && nasc.value));
+        marcarCampoVazio(ano, !(ano && ano.value));
+        marcarCampoVazio(turma, !(turma && turma.value));
+    }
+    ['aluno_nome', 'aluno_cpf', 'aluno_data_nasc', 'ano_letivo_id', 'turma_id'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', atualizarCamposObrigatorios);
+        el.addEventListener('change', atualizarCamposObrigatorios);
+    });
 
     function maskCep(v) {
         var d = onlyDigits(v).slice(0, 8);
@@ -1130,6 +1243,12 @@ $steps = [
         syncLegacyResp();
         if (financePlanInput && planoSelect) {
             financePlanInput.value = planoSelect.value || '';
+        }
+        var btn = document.getElementById('btn-submit-matricula');
+        if (btn && !btn.disabled) {
+            btn.disabled = true;
+            btn.classList.add('opacity-70', 'pointer-events-none');
+            btn.setAttribute('aria-busy', 'true');
         }
     });
 

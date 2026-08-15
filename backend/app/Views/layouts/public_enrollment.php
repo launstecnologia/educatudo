@@ -16,7 +16,7 @@
 </header>
 
 <main class="flex-1 flex items-start justify-center py-10 px-4">
-    <div class="w-full max-w-2xl">
+    <div class="w-full max-w-3xl">
         <?php if (isset($error)): ?>
         <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-8 text-center">
             <i class="fa-solid fa-circle-exclamation text-4xl mb-4 block"></i>

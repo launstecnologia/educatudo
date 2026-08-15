@@ -155,16 +155,87 @@ class MatriculaProcessoService
      * @param array<string,mixed> $input
      * @throws \InvalidArgumentException
      */
-    public function criarCaptacaoInteresse(array $input): int
+    /**
+     * @param array<string,mixed> $input
+     * @param array<string,mixed> $files  $_FILES
+     */
+    public function criarCaptacaoInteresse(array $input, array $files = []): int
     {
         $alunoNome = mb_substr(trim((string) ($input['aluno_nome'] ?? '')), 0, 255);
-        $respNome = mb_substr(trim((string) ($input['resp_nome'] ?? '')), 0, 255);
-        $respTelefone = mb_substr(trim((string) ($input['resp_telefone'] ?? '')), 0, 30);
-        $respEmail = mb_substr(trim((string) ($input['resp_email'] ?? '')), 0, 255);
-
         if ($alunoNome === '') {
             throw new \InvalidArgumentException('Informe o nome do aluno.');
         }
+
+        $dataNasc = trim((string) ($input['aluno_data_nasc'] ?? ''));
+        if ($dataNasc === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataNasc)) {
+            throw new \InvalidArgumentException('Informe a data de nascimento do aluno.');
+        }
+
+        $alunoCpf = preg_replace('/\D+/', '', (string) ($input['aluno_cpf'] ?? '')) ?? '';
+        if (strlen($alunoCpf) !== 11) {
+            throw new \InvalidArgumentException('Informe o CPF do aluno com 11 dígitos.');
+        }
+
+        $anoLetivoId = (int) ($input['ano_letivo_id'] ?? 0);
+        if ($anoLetivoId <= 0) {
+            throw new \InvalidArgumentException('Selecione o ano letivo.');
+        }
+        $ano = $this->db->fetch('SELECT id FROM ano_letivo WHERE id = ? LIMIT 1', [$anoLetivoId]);
+        if (!$ano) {
+            throw new \InvalidArgumentException('Ano letivo inválido.');
+        }
+
+        $turmaId = (int) ($input['turma_id'] ?? 0);
+        if ($turmaId > 0) {
+            $turma = $this->db->fetch('SELECT id FROM turmas WHERE id = ? AND ativo = 1 LIMIT 1', [$turmaId]);
+            if (!$turma) {
+                throw new \InvalidArgumentException('Turma inválida.');
+            }
+        }
+
+        $alunoEmail = mb_substr(trim((string) ($input['aluno_email'] ?? '')), 0, 255);
+        if ($alunoEmail !== '' && !filter_var($alunoEmail, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('E-mail do aluno inválido.');
+        }
+
+        $endParts = [
+            'aluno_endereco' => mb_substr(trim((string) ($input['aluno_endereco'] ?? '')), 0, 255),
+            'aluno_end_numero' => mb_substr(trim((string) ($input['aluno_end_numero'] ?? '')), 0, 30),
+            'aluno_end_complemento' => mb_substr(trim((string) ($input['aluno_end_complemento'] ?? '')), 0, 80),
+            'aluno_end_bairro' => mb_substr(trim((string) ($input['aluno_end_bairro'] ?? '')), 0, 120),
+            'aluno_end_cidade' => mb_substr(trim((string) ($input['aluno_end_cidade'] ?? '')), 0, 120),
+            'aluno_end_uf' => strtoupper(mb_substr(trim((string) ($input['aluno_end_uf'] ?? '')), 0, 2)),
+            'aluno_end_cep' => preg_replace('/\D+/', '', (string) ($input['aluno_end_cep'] ?? '')) ?? '',
+        ];
+        $alunoEndereco = $endParts['aluno_endereco'];
+        $montado = $this->montarEnderecoAluno($endParts);
+        if ($alunoEndereco === '' && $montado !== '') {
+            $alunoEndereco = $montado;
+        }
+
+        $responsaveis = $this->extrairResponsaveisDoPost($input);
+        if ($responsaveis === []) {
+            throw new \InvalidArgumentException('Informe ao menos um responsável.');
+        }
+        if (count($responsaveis) > 8) {
+            $responsaveis = array_slice($responsaveis, 0, 8);
+        }
+        foreach ($responsaveis as $r) {
+            $emailExtra = trim((string) ($r['email'] ?? ''));
+            if ($emailExtra !== '' && !filter_var($emailExtra, FILTER_VALIDATE_EMAIL)) {
+                throw new \InvalidArgumentException('E-mail do responsável inválido.');
+            }
+        }
+        $primario = $responsaveis[0];
+        foreach ($responsaveis as $r) {
+            if (!empty($r['is_pedagogico'])) {
+                $primario = $r;
+                break;
+            }
+        }
+        $respNome = mb_substr(trim((string) ($primario['nome'] ?? '')), 0, 255);
+        $respTelefone = mb_substr(trim((string) ($primario['telefone'] ?? '')), 0, 30);
+        $respEmail = mb_substr(trim((string) ($primario['email'] ?? '')), 0, 255);
         if ($respNome === '') {
             throw new \InvalidArgumentException('Informe o nome do responsável.');
         }
@@ -175,49 +246,201 @@ class MatriculaProcessoService
             throw new \InvalidArgumentException('E-mail do responsável inválido.');
         }
 
-        $dataNasc = trim((string) ($input['aluno_data_nasc'] ?? ''));
-        if ($dataNasc !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataNasc)) {
-            throw new \InvalidArgumentException('Data de nascimento inválida.');
-        }
-
-        $anoLetivoId = (int) ($input['ano_letivo_id'] ?? 0);
-        if ($anoLetivoId > 0) {
-            $ano = $this->db->fetch('SELECT id FROM ano_letivo WHERE id = ? LIMIT 1', [$anoLetivoId]);
-            if (!$ano) {
-                throw new \InvalidArgumentException('Ano letivo inválido.');
-            }
-        }
-
-        $alunoCpf = preg_replace('/\D+/', '', (string) ($input['aluno_cpf'] ?? '')) ?? '';
-        if ($alunoCpf !== '' && strlen($alunoCpf) !== 11) {
-            throw new \InvalidArgumentException('CPF do aluno deve ter 11 dígitos.');
-        }
-
-        $parentesco = trim((string) ($input['resp_parentesco'] ?? ''));
-        if ($parentesco !== '' && !in_array($parentesco, self::CAPTACAO_PARENTESCOS, true)) {
-            throw new \InvalidArgumentException('Parentesco inválido.');
-        }
-
         $observacoes = trim((string) ($input['observacoes'] ?? ''));
         if ($observacoes !== '') {
             $observacoes = mb_substr($observacoes, 0, 2000);
         }
 
-        return $this->model->create([
+        $this->validarUploadsCaptacao($files['arquivo'] ?? []);
+
+        $id = $this->model->create([
             'tipo' => 'nova',
             'status' => 'rascunho',
             'origem' => 'site',
             'aluno_nome' => $alunoNome,
-            'aluno_data_nasc' => $dataNasc !== '' ? $dataNasc : null,
-            'aluno_cpf' => $alunoCpf !== '' ? $alunoCpf : null,
+            'aluno_data_nasc' => $dataNasc,
+            'aluno_cpf' => $alunoCpf,
+            'aluno_rg' => mb_substr(trim((string) ($input['aluno_rg'] ?? '')), 0, 30) ?: null,
+            'aluno_email' => $alunoEmail !== '' ? $alunoEmail : null,
+            'aluno_telefone' => mb_substr(trim((string) ($input['aluno_telefone'] ?? '')), 0, 30) ?: null,
+            'aluno_escola_anterior' => mb_substr(trim((string) ($input['aluno_escola_anterior'] ?? '')), 0, 255) ?: null,
+            'aluno_endereco' => $alunoEndereco !== '' ? $alunoEndereco : null,
+            'aluno_end_numero' => $endParts['aluno_end_numero'] !== '' ? $endParts['aluno_end_numero'] : null,
+            'aluno_end_complemento' => $endParts['aluno_end_complemento'] !== '' ? $endParts['aluno_end_complemento'] : null,
+            'aluno_end_bairro' => $endParts['aluno_end_bairro'] !== '' ? $endParts['aluno_end_bairro'] : null,
+            'aluno_end_cidade' => $endParts['aluno_end_cidade'] !== '' ? $endParts['aluno_end_cidade'] : null,
+            'aluno_end_uf' => $endParts['aluno_end_uf'] !== '' ? $endParts['aluno_end_uf'] : null,
+            'aluno_end_cep' => $endParts['aluno_end_cep'] !== '' ? $endParts['aluno_end_cep'] : null,
             'resp_nome' => $respNome,
+            'resp_cpf' => preg_replace('/\D+/', '', (string) ($primario['cpf'] ?? $primario['documento'] ?? '')) ?: null,
             'resp_telefone' => $respTelefone !== '' ? $respTelefone : null,
             'resp_email' => $respEmail !== '' ? $respEmail : null,
-            'resp_parentesco' => $parentesco !== '' ? $parentesco : null,
-            'ano_letivo_id' => $anoLetivoId > 0 ? $anoLetivoId : null,
+            'resp_parentesco' => mb_substr(trim((string) ($primario['tipo_vinculo'] ?? '')), 0, 80) ?: null,
+            'resp_endereco' => trim((string) ($primario['endereco'] ?? '')) ?: null,
+            'ano_letivo_id' => $anoLetivoId,
+            'turma_id' => $turmaId > 0 ? $turmaId : null,
             'observacoes' => $observacoes !== '' ? $observacoes : null,
             'criado_por' => null,
         ]);
+
+        $this->gravarResponsaveisCaptacao($id, $responsaveis);
+        $this->anexarDocumentosCaptacao($id, $files['arquivo'] ?? [], $input['tipo_documento'] ?? []);
+
+        return $id;
+    }
+
+    /**
+     * @param array<string,mixed> $filesField
+     */
+    private function validarUploadsCaptacao(array $filesField): void
+    {
+        if ($filesField === []) {
+            return;
+        }
+        $names = $filesField['name'] ?? [];
+        $tmps = $filesField['tmp_name'] ?? [];
+        $sizes = $filesField['size'] ?? [];
+        $errors = $filesField['error'] ?? [];
+        if (!is_array($names)) {
+            $names = [$names];
+            $tmps = [$tmps];
+            $sizes = [$sizes];
+            $errors = [$errors];
+        }
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        $count = 0;
+        foreach ($names as $i => $_nome) {
+            if ((int) ($errors[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            $tmp = (string) ($tmps[$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                continue;
+            }
+            $count++;
+            if ($count > 8) {
+                throw new \InvalidArgumentException('Envie no máximo 8 documentos.');
+            }
+            if ((int) ($sizes[$i] ?? 0) > 10 * 1024 * 1024) {
+                throw new \InvalidArgumentException('Cada documento deve ter no máximo 10MB.');
+            }
+            $mime = $finfo->file($tmp) ?: '';
+            if (!in_array($mime, $allowed, true)) {
+                throw new \InvalidArgumentException('Documento inválido. Envie PDF, JPG ou PNG.');
+            }
+        }
+    }
+
+    /**
+     * Captação pública não pede rateio: o primeiro responsável fica como acadêmico/financeiro (100%).
+     *
+     * @param list<array<string,mixed>> $responsaveis
+     */
+    private function gravarResponsaveisCaptacao(int $enrollmentId, array $responsaveis): void
+    {
+        if (!$this->model->temTabelaResponsaveis() || $responsaveis === []) {
+            return;
+        }
+        foreach ($responsaveis as $i => &$r) {
+            $r['is_pedagogico'] = $i === 0 ? 1 : (int) !empty($r['is_pedagogico']);
+            $r['is_financeiro'] = $i === 0 ? 1 : 0;
+            $r['percentual'] = $i === 0 ? 100.0 : null;
+        }
+        unset($r);
+        $this->model->substituirResponsaveis($enrollmentId, $responsaveis);
+    }
+
+    /**
+     * @param array<string,mixed> $filesField  $_FILES['arquivo']
+     * @param mixed $tipos
+     */
+    public function anexarDocumentosCaptacao(int $enrollmentId, array $filesField, $tipos): int
+    {
+        if (!$this->model->temTabelaDocumentos() || $filesField === []) {
+            return 0;
+        }
+        $tiposOk = ['rg', 'cpf', 'comprovante_residencia', 'historico', 'certidao', 'outro'];
+        $tiposLista = is_array($tipos) ? array_values($tipos) : [];
+
+        $names = $filesField['name'] ?? [];
+        $tmps = $filesField['tmp_name'] ?? [];
+        $sizes = $filesField['size'] ?? [];
+        $errors = $filesField['error'] ?? [];
+        if (!is_array($names)) {
+            $names = [$names];
+            $tmps = [$tmps];
+            $sizes = [$sizes];
+            $errors = [$errors];
+        }
+
+        $tenant = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '_', (string) TENANT_SLUG) : 'escola';
+        $relDir = 'storage/enrollments/' . $tenant . '/docs/';
+        $absDir = dirname(__DIR__, 4) . '/' . $relDir;
+        if (!is_dir($absDir) && !mkdir($absDir, 0775, true) && !is_dir($absDir)) {
+            throw new \RuntimeException('Não foi possível criar a pasta de documentos.');
+        }
+
+        $pendentes = [];
+        $maxArquivos = 8;
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        foreach ($names as $i => $nomeOriginal) {
+            if (count($pendentes) >= $maxArquivos) {
+                break;
+            }
+            if ((int) ($errors[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            $tmp = (string) ($tmps[$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                continue;
+            }
+            if ((int) ($sizes[$i] ?? 0) > 10 * 1024 * 1024) {
+                throw new \InvalidArgumentException('Cada documento deve ter no máximo 10MB.');
+            }
+            $mime = $finfo->file($tmp) ?: '';
+            if (!in_array($mime, $allowed, true)) {
+                throw new \InvalidArgumentException('Documento inválido. Envie PDF, JPG ou PNG.');
+            }
+            $tipo = trim((string) ($tiposLista[$i] ?? 'outro'));
+            if (!in_array($tipo, $tiposOk, true)) {
+                $tipo = 'outro';
+            }
+            $pendentes[] = [
+                'tmp' => $tmp,
+                'nome' => (string) $nomeOriginal,
+                'mime' => $mime,
+                'tamanho' => (int) ($sizes[$i] ?? 0),
+                'tipo' => $tipo,
+                'i' => (int) $i,
+            ];
+        }
+
+        $gravados = 0;
+        foreach ($pendentes as $item) {
+            $ext = match ($item['mime']) {
+                'application/pdf' => 'pdf',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+                default => 'jpg',
+            };
+            $filename = 'doc_' . $enrollmentId . '_' . time() . '_' . $item['i'] . '.' . $ext;
+            if (!move_uploaded_file($item['tmp'], $absDir . $filename)) {
+                throw new \RuntimeException('Falha ao salvar documento.');
+            }
+            $this->model->adicionarDocumento($enrollmentId, [
+                'tipo' => $item['tipo'],
+                'nome_original' => mb_substr($item['nome'], 0, 255),
+                'path' => $relDir . $filename,
+                'mime' => $item['mime'],
+                'tamanho' => $item['tamanho'],
+                'criado_por' => null,
+            ]);
+            $gravados++;
+        }
+
+        return $gravados;
     }
 
     public function extrairCobrancasDoPost(array $post): array

@@ -50,24 +50,7 @@ class MatriculaPublicoController extends BaseController
             }
         }
 
-        $anos = $this->service->getAnosLetivos();
-        $anoAtivo = null;
-        foreach ($anos as $al) {
-            if (!empty($al['ativo'])) {
-                $anoAtivo = (int) $al['id'];
-                break;
-            }
-        }
-
-        $this->renderModuloView('interesse', [
-            'escola' => $escola,
-            'nomeEscola' => $nomeEscola,
-            'anos_letivos' => $anos,
-            'ano_letivo_padrao' => $anoAtivo,
-            'csrf_token' => $this->generateCsrfToken(),
-            'old' => [],
-            'erros' => [],
-        ]);
+        $this->renderModuloView('interesse', $this->dadosFormularioCaptacao($escola, $nomeEscola, [], []));
     }
 
     /**
@@ -86,20 +69,12 @@ class MatriculaPublicoController extends BaseController
         }
 
         $escola = $this->service->getEscola();
-        $anos = $this->service->getAnosLetivos();
+        $nomeEscola = $escola['nome'] ?? 'EducaTudo';
 
         try {
-            $this->service->criarCaptacaoInteresse($_POST);
+            $this->service->criarCaptacaoInteresse($_POST, $_FILES);
         } catch (\InvalidArgumentException $e) {
-            $this->renderModuloView('interesse', [
-                'escola' => $escola,
-                'nomeEscola' => $escola['nome'] ?? 'EducaTudo',
-                'anos_letivos' => $anos,
-                'ano_letivo_padrao' => (int) ($_POST['ano_letivo_id'] ?? 0) ?: null,
-                'csrf_token' => $this->generateCsrfToken(),
-                'old' => $_POST,
-                'erros' => [$e->getMessage()],
-            ]);
+            $this->renderModuloView('interesse', $this->dadosFormularioCaptacao($escola, $nomeEscola, $_POST, [$e->getMessage()]));
             return;
         } catch (\Throwable $e) {
             error_log('[MatriculaPublico] captacaoStore: ' . $e->getMessage());
@@ -111,6 +86,39 @@ class MatriculaPublicoController extends BaseController
             'aluno_nome' => trim((string) ($_POST['aluno_nome'] ?? '')),
         ]);
         $this->redirect(URL . '/matricula/interesse?ok=1');
+    }
+
+    /** @param array<string,mixed> $escola */
+    private function dadosFormularioCaptacao(array $escola, string $nomeEscola, array $old, array $erros): array
+    {
+        $anos = $this->service->getAnosLetivos();
+        $anoAtivo = (int) ($old['ano_letivo_id'] ?? 0);
+        if ($anoAtivo <= 0) {
+            foreach ($anos as $al) {
+                if (!empty($al['ativo'])) {
+                    $anoAtivo = (int) $al['id'];
+                    break;
+                }
+            }
+        }
+
+        $turmas = [];
+        try {
+            $turmas = $this->service->getTurmas();
+        } catch (\Throwable $e) {
+            $turmas = [];
+        }
+
+        return [
+            'escola' => $escola,
+            'nomeEscola' => $nomeEscola,
+            'anos_letivos' => $anos,
+            'turmas' => $turmas,
+            'ano_letivo_padrao' => $anoAtivo,
+            'csrf_token' => $this->generateCsrfToken(),
+            'old' => $old,
+            'erros' => $erros,
+        ];
     }
 
     private function captacaoDisponivel(): bool

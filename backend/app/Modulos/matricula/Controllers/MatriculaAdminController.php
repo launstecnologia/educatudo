@@ -275,6 +275,11 @@ class MatriculaAdminController extends BaseController
             return;
         }
 
+        if (!$this->model->schemaReady()) {
+            $this->redirectWithMsg('/admin/enrollment/create', 'Módulo de matrícula ainda não está pronto. Rode as migrations no Master.', 'error');
+            return;
+        }
+
         $user = $this->auth->getUser();
         $data = $this->payloadFromPost($user);
         if ($data['aluno_nome'] === '') {
@@ -282,9 +287,15 @@ class MatriculaAdminController extends BaseController
             return;
         }
 
-        $id = $this->model->create($data);
-        $this->model->transition($id, 'rascunho', $user, 'criacao');
-        $this->service->sincronizarResponsaveisEProdutos($id, $_POST);
+        try {
+            $id = $this->model->create($data);
+            $this->model->transition($id, 'rascunho', $user, 'criacao');
+            $this->service->sincronizarResponsaveisEProdutos($id, $_POST);
+        } catch (\Throwable $e) {
+            error_log('MatriculaAdminController store: ' . $e->getMessage());
+            $this->redirectWithMsg('/admin/enrollment/create', 'Não foi possível salvar a matrícula. Tente de novo.', 'error');
+            return;
+        }
 
         $this->redirectWithMsg('/admin/enrollment/' . $id . '?foco=contrato', 'Processo criado. Continue para o contrato.', 'success');
     }
@@ -301,7 +312,6 @@ class MatriculaAdminController extends BaseController
         if (!empty($enrollment['resp_telefone']) && !empty($enrollment['contrato_token'])) {
             $whatsappUrl = $this->service->buildWhatsAppLink($enrollment, URL);
         }
-        $emailUrl = $this->service->buildEmailLink($enrollment, URL);
 
         $financeContract = null;
         $financeInstallments = [];
@@ -333,7 +343,6 @@ class MatriculaAdminController extends BaseController
             'enrollment' => $enrollment,
             'audit' => $this->model->getAuditTrail($id),
             'whatsapp_url' => $whatsappUrl,
-            'email_url' => $emailUrl,
             'foco_contrato' => $focoContrato,
             'produtos' => $produtos,
             'documentos' => $documentos,
@@ -356,17 +365,62 @@ class MatriculaAdminController extends BaseController
             $this->redirect('/admin/enrollment');
             return;
         }
+        if (in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'], true)) {
+            $this->redirectWithMsg('/admin/enrollment/' . $id, 'Não é possível editar neste status.', 'error');
+            return;
+        }
 
-        $this->viewWithLayout('admin', 'admin/matricula/edit', [
-            'title' => 'Editar Matrícula #' . $id,
+        $prefill = $enrollment;
+        if (!empty($prefill['aluno_data_nasc'])) {
+            $prefill['aluno_data_nasc'] = substr((string) $prefill['aluno_data_nasc'], 0, 10);
+        }
+
+        $responsaveis = $this->model->listarResponsaveis($id);
+        if ($responsaveis === [] && trim((string) ($enrollment['resp_nome'] ?? '')) !== '') {
+            $responsaveis[] = [
+                'nome' => $enrollment['resp_nome'],
+                'cpf' => $enrollment['resp_cpf'] ?? '',
+                'email' => $enrollment['resp_email'] ?? '',
+                'telefone' => $enrollment['resp_telefone'] ?? '',
+                'tipo_vinculo' => $enrollment['resp_parentesco'] ?? '',
+                'endereco' => $enrollment['resp_endereco'] ?? '',
+                'is_financeiro' => 1,
+                'is_pedagogico' => 1,
+            ];
+        } else {
+            foreach ($responsaveis as &$r) {
+                if (empty($r['cpf']) && !empty($r['documento'])) {
+                    $r['cpf'] = $r['documento'];
+                }
+            }
+            unset($r);
+        }
+
+        $faltando = $this->service->camposFaltandoParaEfetivar($enrollment);
+        $passo = (int) ($_GET['passo'] ?? 0);
+        if ($passo < 1 || $passo > 5) {
+            $passo = $this->passoWizardDosCamposFaltando($faltando);
+        }
+
+        $this->viewWithLayout('admin', 'admin/matricula/create', [
+            'title' => 'Editar Matrícula #' . $id . ' — EducaTudo',
             'current_page' => 'enrollment',
             'user' => $this->auth->getUser(),
-            'enrollment' => $enrollment,
+            'prefill' => $prefill,
+            'tipo' => $enrollment['tipo'] ?? 'nova',
             'anos_letivos' => $this->service->getAnosLetivos(),
             'turmas' => $this->service->getTurmas(),
             'planos_financeiros' => $this->service->listarPlanosFinanceiros((int) ($enrollment['ano_letivo_id'] ?? 0) ?: null),
+            'descontos' => $this->service->listarRegrasDesconto(),
             'config' => $this->service->getConfigAssinaturaEscola(),
+            'responsaveis' => $responsaveis,
+            'modo_edicao' => true,
+            'enrollment_id' => $id,
+            'faltando_enturmar' => $faltando,
+            'passo_inicial' => $passo,
             'csrf_token' => $this->generateCsrfToken(),
+            'status_message' => $_GET['msg'] ?? '',
+            'status_type' => $_GET['status_type'] ?? '',
         ]);
     }
 
@@ -386,26 +440,22 @@ class MatriculaAdminController extends BaseController
             return;
         }
 
-        $this->model->update($id, [
-            'ano_letivo_id' => (int) ($_POST['ano_letivo_id'] ?? 0) ?: null,
-            'turma_id' => (int) ($_POST['turma_id'] ?? 0) ?: null,
-            'aluno_nome' => trim($_POST['aluno_nome'] ?? ''),
-            'aluno_cpf' => trim($_POST['aluno_cpf'] ?? '') ?: null,
-            'aluno_data_nasc' => trim($_POST['aluno_data_nasc'] ?? '') ?: null,
-            'aluno_email' => trim($_POST['aluno_email'] ?? '') ?: null,
-            'aluno_telefone' => trim($_POST['aluno_telefone'] ?? '') ?: null,
-            'aluno_rg' => trim($_POST['aluno_rg'] ?? '') ?: null,
-            'aluno_endereco' => trim($_POST['aluno_endereco'] ?? '') ?: null,
-            'resp_nome' => trim($_POST['resp_nome'] ?? ''),
-            'resp_cpf' => trim($_POST['resp_cpf'] ?? '') ?: null,
-            'resp_email' => trim($_POST['resp_email'] ?? '') ?: null,
-            'resp_telefone' => trim($_POST['resp_telefone'] ?? '') ?: null,
-            'resp_parentesco' => trim($_POST['resp_parentesco'] ?? '') ?: null,
-            'resp_endereco' => trim($_POST['resp_endereco'] ?? '') ?: null,
-            'observacoes' => trim($_POST['observacoes'] ?? '') ?: null,
-            'expira_em' => !empty($_POST['expira_em']) ? $_POST['expira_em'] . ' 23:59:59' : null,
-        ]);
-        $this->service->sincronizarResponsaveisEProdutos($id, $_POST);
+        $user = $this->auth->getUser();
+        $data = $this->payloadFromPost($user);
+        unset($data['status'], $data['criado_por'], $data['expira_em'], $data['documento_assinatura_codigo']);
+        if ($data['aluno_nome'] === '') {
+            $this->redirectWithMsg('/admin/enrollment/' . $id . '/edit', 'Nome do aluno é obrigatório.', 'error');
+            return;
+        }
+
+        try {
+            $this->model->update($id, $data);
+            $this->service->sincronizarResponsaveisEProdutos($id, $_POST);
+        } catch (\Throwable $e) {
+            error_log('MatriculaAdminController update: ' . $e->getMessage());
+            $this->redirectWithMsg('/admin/enrollment/' . $id . '/edit', 'Não foi possível salvar as alterações. Tente de novo.', 'error');
+            return;
+        }
 
         $this->redirectWithMsg('/admin/enrollment/' . $id, 'Processo atualizado.', 'success');
     }
@@ -1095,6 +1145,24 @@ class MatriculaAdminController extends BaseController
             'criado_por' => $user['id'] ?? null,
             'documento_assinatura_codigo' => trim((string) ($_POST['documento_assinatura_codigo'] ?? '')) ?: null,
         ];
+    }
+
+    /** @param list<string> $faltando */
+    private function passoWizardDosCamposFaltando(array $faltando): int
+    {
+        foreach ($faltando as $campo) {
+            $campo = (string) $campo;
+            if ($campo === 'Ano letivo' || $campo === 'Turma') {
+                return 1;
+            }
+            if (str_starts_with($campo, 'Aluno:')) {
+                return 2;
+            }
+            if (str_starts_with($campo, 'Responsável:')) {
+                return 3;
+            }
+        }
+        return 1;
     }
 
     private function redirectWithMsg(string $url, string $msg, string $type = 'success'): void
