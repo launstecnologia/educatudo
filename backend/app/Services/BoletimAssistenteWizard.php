@@ -200,7 +200,7 @@ class BoletimAssistenteWizard
         ];
 
         if (
-            (!is_array($estadoFormulario) || $estadoFormulario === [])
+            (!is_array($estadoFormulario) || $estadoFormulario === [] || $this->estadoFormularioEstaVazio($estadoFormulario))
             && $regraIdAtual !== null
             && $regraIdAtual > 0
         ) {
@@ -285,6 +285,27 @@ class BoletimAssistenteWizard
         }
 
         return $estado;
+    }
+
+    /**
+     * @param array<string,mixed> $estadoFormulario
+     */
+    private function estadoFormularioEstaVazio(array $estadoFormulario): bool
+    {
+        $camposTexto = ['nome', 'codigo', 'formula_final', 'exibir_em', 'ano_letivo', 'bimestre'];
+        foreach ($camposTexto as $campo) {
+            if (trim((string) ($estadoFormulario[$campo] ?? '')) !== '') {
+                return false;
+            }
+        }
+
+        foreach (['componentes', 'series_ids', 'turmas_ids', 'materias_ids'] as $campo) {
+            if (!empty($estadoFormulario[$campo])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

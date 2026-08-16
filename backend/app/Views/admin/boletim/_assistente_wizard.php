@@ -222,6 +222,9 @@ $boletimWizardSteps = [
     var colunasDragou = false;
 
     function coletarEstadoFormulario() {
+        if (!document.getElementById('form-regra-boletim')) {
+            return null;
+        }
         var estadoForm = {
             nome: (document.getElementById('regra-nome') || {}).value || '',
             codigo: (document.getElementById('regra-codigo') || {}).value || '',
@@ -263,6 +266,11 @@ $boletimWizardSteps = [
             try { estadoForm.componentes = JSON.parse(jsonEl.value); } catch (e) {}
         }
         return estadoForm;
+    }
+
+    function estadoFormularioParaPost() {
+        var form = coletarEstadoFormulario();
+        return form ? JSON.stringify(enxugarRascunhoParaChat(form)) : '';
     }
 
     function enxugarRascunhoParaChat(r) {
@@ -2165,12 +2173,17 @@ $boletimWizardSteps = [
     }
 
     function passosVisiveis() {
-        if (ehBoletimComposto()) {
-            return PASSOS.filter(function (p) {
+        var vis = ehBoletimComposto()
+            ? PASSOS.filter(function (p) {
                 return ['inicio', 'identidade', 'publico', 'revisar'].indexOf(p.id) >= 0;
+            })
+            : PASSOS.slice();
+        if (estado && estado.modo === 'editar' && estado.origem === 'formulario') {
+            vis = vis.filter(function (p) {
+                return p.id !== 'inicio';
             });
         }
-        return PASSOS;
+        return vis;
     }
 
     function regrasNotasDoAno() {
@@ -2345,6 +2358,10 @@ $boletimWizardSteps = [
     function renderSteps() {
         var vis = passosVisiveis();
         var cur = estado ? estado.passo : 'inicio';
+        if (!vis.some(function (p) { return p.id === cur; })) {
+            cur = vis.length ? vis[vis.length - 1].id : 'inicio';
+            if (estado) estado.passo = cur;
+        }
         var curIdx = 0;
         vis.forEach(function (p, i) { if (p.id === cur) curIdx = i; });
         if (pageMode) {
@@ -2933,6 +2950,9 @@ $boletimWizardSteps = [
         if (ehBoletimComposto() && ['pecas', 'formula'].indexOf(estado.passo) >= 0) {
             estado.passo = 'identidade';
         }
+        if (estado.modo === 'editar' && estado.origem === 'formulario' && estado.passo === 'inicio') {
+            estado.passo = 'revisar';
+        }
         renderSteps();
         renderBody();
     }
@@ -2999,7 +3019,8 @@ $boletimWizardSteps = [
         var fd = new FormData();
         fd.append('_token', csrf);
         fd.append('regra_id', String(regraId));
-        fd.append('estado_formulario', JSON.stringify(enxugarRascunhoParaChat(coletarEstadoFormulario())));
+        var estadoFormularioPost = estadoFormularioParaPost();
+        if (estadoFormularioPost) fd.append('estado_formulario', estadoFormularioPost);
         fetch(urlWizardInicio, {
             method: 'POST',
             body: fd,
@@ -3218,7 +3239,8 @@ $boletimWizardSteps = [
             fd.append('mensagem', texto);
             fd.append('regra_id', String(regraId));
             fd.append('historico', JSON.stringify(historico.slice(0, -1)));
-            fd.append('estado_formulario', JSON.stringify(enxugarRascunhoParaChat(rascunhoAtual || coletarEstadoFormulario())));
+            var baseFormulario = rascunhoAtual ? JSON.stringify(enxugarRascunhoParaChat(rascunhoAtual)) : estadoFormularioParaPost();
+            if (baseFormulario) fd.append('estado_formulario', baseFormulario);
             var wizardPost = wizardEstadoParaPost();
             if (wizardPost) fd.append('wizard_estado', wizardPost);
         } catch (e) {
