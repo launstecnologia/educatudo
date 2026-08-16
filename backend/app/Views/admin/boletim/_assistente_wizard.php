@@ -15,6 +15,7 @@ $boletimAssistenteDadosIniciais = [
     'erros' => is_array($boletim_assistente_erros_iniciais ?? null) ? $boletim_assistente_erros_iniciais : [],
     'formulas_disponiveis' => is_array($boletim_assistente_formulas_iniciais ?? null) ? $boletim_assistente_formulas_iniciais : [],
     'preview' => $boletim_assistente_preview_inicial ?? null,
+    'aviso' => isset($boletim_assistente_aviso_inicial) ? (string) $boletim_assistente_aviso_inicial : null,
 ];
 $ui = __DIR__ . '/../_partials/ui';
 $boletimWizardSteps = [
@@ -46,6 +47,12 @@ $boletimWizardSteps = [
                 <i class="fa-solid fa-circle-info mr-2"></i>
                 Use este assistente para montar a regra do boletim por etapas. As provas, eventos e jornadas serão buscados pelo bimestre selecionado na peça.
             </div>
+            <?php if (!empty($boletimAssistenteDadosIniciais['aviso'])): ?>
+            <div class="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+                <?= htmlspecialchars((string) $boletimAssistenteDadosIniciais['aviso'], ENT_QUOTES, 'UTF-8') ?>
+            </div>
+            <?php endif; ?>
             <?php
             $ui_wizard_steps = $boletimWizardSteps;
             $ui_wizard_current = 1;

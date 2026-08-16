@@ -353,6 +353,7 @@ class BoletimConfigController extends BaseController
         $errosIniciais = [];
         $formulasIniciais = [];
         $previewInicial = null;
+        $avisoInicial = null;
 
         if ($selectedRegraId > 0) {
             try {
@@ -366,8 +367,12 @@ class BoletimConfigController extends BaseController
                 $errosIniciais = is_array($montado['erros'] ?? null) ? $montado['erros'] : [];
                 $formulasIniciais = is_array($montado['formulas_disponiveis'] ?? null) ? $montado['formulas_disponiveis'] : [];
                 $previewInicial = $montado['preview'] ?? null;
+                if (!is_array($rascunhoInicial) || empty($rascunhoInicial['componentes'])) {
+                    $avisoInicial = 'Não consegui carregar a configuração do evento #' . $selectedRegraId . '. Confira se ele existe e está ativo neste ambiente/escola.';
+                }
             } catch (Throwable $e) {
                 error_log('BoletimConfigController assistente estado inicial: ' . $e->getMessage());
+                $avisoInicial = 'Não consegui carregar a configuração do evento #' . $selectedRegraId . ' neste ambiente.';
             }
         }
 
@@ -386,6 +391,7 @@ class BoletimConfigController extends BaseController
             'boletim_assistente_erros_iniciais' => $errosIniciais,
             'boletim_assistente_formulas_iniciais' => $formulasIniciais,
             'boletim_assistente_preview_inicial' => $previewInicial,
+            'boletim_assistente_aviso_inicial' => $avisoInicial,
         ];
 
         $this->viewWithLayout('admin', 'admin/boletim/assistente', $data);
