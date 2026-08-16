@@ -1326,13 +1326,14 @@ class BoletimAssistenteFerramentas
                 'calc_type' => (string) ($c['calc_type'] ?? 'media'),
                 'filtro_titulo' => (string) ($c['filtro_titulo'] ?? ''),
                 'blocos_ids' => $blocos,
-                'materias_ids' => $this->normalizarIds(
-                    !empty($c['materias_ids'])
-                        ? (is_array($c['materias_ids']) ? $c['materias_ids'] : json_decode((string) $c['materias_ids'], true))
-                        : []
-                ),
+                'materias_ids' => $this->decodeIdsJson($c['materias_ids'] ?? null),
+                'materia_unica' => !empty($c['materia_unica']) ? 1 : 0,
+                'usar_percentual' => !empty($c['usar_percentual']) ? 1 : 0,
+                'escala_max' => isset($c['escala_max']) ? (float) $c['escala_max'] : 10.0,
+                'obrigatorio' => !empty($c['obrigatorio']) ? 1 : 0,
                 'config' => $config,
                 'tipo_avaliacao_id' => isset($config['tipo_avaliacao_id']) ? (int) $config['tipo_avaliacao_id'] : null,
+                'tipo_avaliacao_nome' => isset($config['tipo_avaliacao_nome']) ? (string) $config['tipo_avaliacao_nome'] : null,
             ];
         }
 
@@ -1364,8 +1365,18 @@ class BoletimAssistenteFerramentas
         if (!is_string($raw) || trim($raw) === '') {
             return [];
         }
+        $raw = trim($raw);
         $dec = json_decode($raw, true);
-        return is_array($dec) ? $this->normalizarIds($dec) : [];
+        if (is_array($dec)) {
+            return $this->normalizarIds($dec);
+        }
+        if (preg_match('/^\d+(?:\s*,\s*\d+)*$/', $raw)) {
+            return $this->normalizarIds(explode(',', $raw));
+        }
+        if (ctype_digit($raw)) {
+            return [(int) $raw];
+        }
+        return [];
     }
 
     /**

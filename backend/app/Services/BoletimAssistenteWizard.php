@@ -738,6 +738,9 @@ class BoletimAssistenteWizard
     private function chavePecaDoTipo(array $tipo, array $usadas = []): string
     {
         $canon = $this->chaveCanonicaQuadro($tipo['chave_quadro'] ?? null);
+        if ($canon === '') {
+            $canon = $this->chaveCanonicaPorTexto((string) ($tipo['nome'] ?? '') . ' ' . (string) ($tipo['descricao'] ?? ''));
+        }
         if ($canon !== '' && empty($usadas[$canon])) {
             return $canon;
         }
@@ -756,6 +759,33 @@ class BoletimAssistenteWizard
             'recuperacao', 'recupera', 'rec' => 'recuperacao',
             default => '',
         };
+    }
+
+    private function chaveCanonicaPorTexto(string $texto): string
+    {
+        $txt = mb_strtolower(trim($texto));
+        if ($txt === '') {
+            return '';
+        }
+        if (str_contains($txt, 'enac')) {
+            return 'enac';
+        }
+        if (str_contains($txt, 'semanal')) {
+            return 'semanal';
+        }
+        if (str_contains($txt, 'bimestral') || str_contains($txt, 'bimestr')) {
+            return 'bimestral';
+        }
+        if (str_contains($txt, 'trabalho') || str_contains($txt, 'atividade')) {
+            return 'trabalho';
+        }
+        if (str_contains($txt, 'participa')) {
+            return 'participacao';
+        }
+        if (str_contains($txt, 'recupera')) {
+            return 'recuperacao';
+        }
+        return '';
     }
 
     /** @param array{nome?:string,descricao?:?string} $tipo */
@@ -1302,9 +1332,22 @@ class BoletimAssistenteWizard
         }
         $tipoId = (int) (($cfg['tipo_avaliacao_id'] ?? null) ?: ($c['tipo_avaliacao_id'] ?? 0));
         if ($tipoId > 0) {
-            return 'tipo_' . $tipoId;
+            return $this->chavePecaPorTipoId($tipoId);
         }
         return null;
+    }
+
+    private function chavePecaPorTipoId(int $tipoId): string
+    {
+        if ($tipoId <= 0) {
+            return '';
+        }
+        foreach ($this->pecasMeta() as $meta) {
+            if ((int) ($meta['tipo_avaliacao_id'] ?? 0) === $tipoId) {
+                return (string) ($meta['key'] ?? ('tipo_' . $tipoId));
+            }
+        }
+        return 'tipo_' . $tipoId;
     }
 
     private function inferirPapelDeComponente(array $c, string $formula): string
