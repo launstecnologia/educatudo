@@ -60,11 +60,8 @@ $boletimWizardSteps = [
             include $ui . '/wizard_steps.php';
             ?>
             <div class="bg-white rounded-xl shadow-lg p-6 w-full min-h-[calc(100vh-20rem)] flex flex-col">
-                <div class="space-y-2 mb-6">
-                    <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Resumo</p>
-                    <pre id="boletim-wizard-resumo" class="text-sm text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">Monte as escolhas abaixo para ver o resumo.</pre>
-                    <div id="boletim-wizard-erros" class="text-xs text-amber-800 hidden"></div>
-                </div>
+                <pre id="boletim-wizard-resumo" class="hidden"></pre>
+                <div id="boletim-wizard-erros" class="hidden"></div>
                 <div id="boletim-wizard-body" class="flex-1 min-h-[24rem] space-y-4"></div>
                 <div class="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
                     <button type="button" id="boletim-wizard-voltar" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">
@@ -95,11 +92,8 @@ $boletimWizardSteps = [
             <div class="flex-1 min-h-0 flex flex-col">
                 <div class="flex flex-col min-h-0 flex-1">
                     <nav id="boletim-wizard-steps" class="px-4 pt-3 pb-2 flex flex-wrap gap-1.5 border-b border-gray-50 bg-white"></nav>
-                    <div class="px-4 sm:px-5 py-2 border-b border-gray-100 bg-slate-50/70">
-                        <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide">Resumo</p>
-                        <pre id="boletim-wizard-resumo" class="mt-1 text-xs text-gray-600 whitespace-pre-wrap font-sans leading-relaxed max-h-24 overflow-y-auto">Monte as escolhas abaixo para ver o resumo.</pre>
-                        <div id="boletim-wizard-erros" class="mt-2 text-xs text-amber-800 hidden"></div>
-                    </div>
+                    <pre id="boletim-wizard-resumo" class="hidden"></pre>
+                    <div id="boletim-wizard-erros" class="hidden"></div>
                     <div id="boletim-wizard-body" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"></div>
                     <div class="px-4 py-3 border-t border-gray-100 bg-white flex flex-wrap items-center justify-between gap-2">
                         <button type="button" id="boletim-wizard-voltar" class="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40">Voltar</button>
