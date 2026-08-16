@@ -1158,6 +1158,23 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * @param mixed $raw
+     * @return list<int>
+     */
+    private function normalizarIdsLista($raw): array
+    {
+        $out = [];
+        foreach ((array) $raw as $id) {
+            $n = (int) $id;
+            if ($n > 0 && !in_array($n, $out, true)) {
+                $out[] = $n;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param list<string> $pecas
      * @return array<string,array{calc_type:string,materia_unica:int,usar_percentual:int,tipo_avaliacao_id:int,papel:string,bimestres:list<int>}>
      */
@@ -1177,6 +1194,8 @@ class BoletimAssistenteWizard
                 'tipo_avaliacao_id' => 0,
                 'papel' => $this->papelPadrao($p),
                 'bimestres' => $bims,
+                'blocos_ids' => [],
+                'blocos_ids_manual' => 0,
             ];
         }
         return $out;
@@ -1202,6 +1221,8 @@ class BoletimAssistenteWizard
                     'tipo_avaliacao_id' => 0,
                     'papel' => $this->papelPadrao($peca),
                     'bimestres' => [],
+                    'blocos_ids' => [],
+                    'blocos_ids_manual' => 0,
                 ];
             }
             $calc = strtolower(trim((string) ($opts['calc_type'] ?? $base[$peca]['calc_type'])));
@@ -1221,6 +1242,12 @@ class BoletimAssistenteWizard
             }
             if (array_key_exists('bimestres', $opts)) {
                 $base[$peca]['bimestres'] = $this->normalizarBimestresLista($opts['bimestres']);
+            }
+            if (array_key_exists('blocos_ids', $opts)) {
+                $base[$peca]['blocos_ids'] = $this->normalizarIdsLista($opts['blocos_ids']);
+            }
+            if (array_key_exists('blocos_ids_manual', $opts)) {
+                $base[$peca]['blocos_ids_manual'] = !empty($opts['blocos_ids_manual']) ? 1 : 0;
             }
             $base[$peca]['papel'] = $this->normalizarPapel($opts['papel'] ?? ($base[$peca]['papel'] ?? ''), $peca);
         }
@@ -1266,6 +1293,11 @@ class BoletimAssistenteWizard
             $bimsComp = $this->normalizarBimestresLista($c['config']['prova_bimestres'] ?? []);
             if ($bimsComp !== []) {
                 $out[$key]['bimestres'] = $bimsComp;
+            }
+            $blocosComp = $this->normalizarIdsLista($c['blocos_ids'] ?? []);
+            if ($blocosComp !== [] || !empty($c['config']['blocos_ids_manual'])) {
+                $out[$key]['blocos_ids'] = $blocosComp;
+                $out[$key]['blocos_ids_manual'] = 1;
             }
             $out[$key]['papel'] = $this->inferirPapelDeComponente($c, $formulaBlob);
         }
@@ -2277,14 +2309,18 @@ class BoletimAssistenteWizard
                     $bimsPeca = [$bimEstado];
                 }
             }
-            $resolvido = $this->ferramentas->resolverBlocosPorTipo(
-                $tipoRef,
-                $dataIni !== '' ? $dataIni : null,
-                $dataFim !== '' ? $dataFim : null,
-                100,
-                null,
-                $bimsPeca
-            );
+            $manualBlocos = !empty($opts['blocos_ids_manual']);
+            $blocosManualIds = $this->normalizarIdsLista($opts['blocos_ids'] ?? []);
+            $resolvido = $manualBlocos
+                ? ['tipo' => null, 'blocos_ids' => $blocosManualIds]
+                : $this->ferramentas->resolverBlocosPorTipo(
+                    $tipoRef,
+                    $dataIni !== '' ? $dataIni : null,
+                    $dataFim !== '' ? $dataFim : null,
+                    100,
+                    null,
+                    $bimsPeca
+                );
             if ($resolvido['tipo'] !== null) {
                 $tipoId = (int) $resolvido['tipo']['id'];
                 $tipoNome = (string) $resolvido['tipo']['nome'];
@@ -2293,6 +2329,9 @@ class BoletimAssistenteWizard
             }
             if ($bimsPeca !== []) {
                 $config['prova_bimestres'] = $bimsPeca;
+            }
+            if ($manualBlocos) {
+                $config['blocos_ids_manual'] = 1;
             }
             $blocosIds = $resolvido['blocos_ids'] ?? [];
             // Com blocos resolvidos, o motor ignora filtro_titulo — ok.
@@ -2689,6 +2728,8 @@ class BoletimAssistenteWizard
         $dataFim = (string) ($estado['data_fim'] ?? '');
         $optsSemanal = is_array($estado['pecas_opcoes']['semanal'] ?? null) ? $estado['pecas_opcoes']['semanal'] : [];
         $bimsSemanal = $this->normalizarBimestresLista($optsSemanal['bimestres'] ?? []);
+        $manualSemanal = !empty($optsSemanal['blocos_ids_manual']);
+        $blocosSemanal = $this->normalizarIdsLista($optsSemanal['blocos_ids'] ?? []);
         $comps = [];
         foreach ((array) ($rascunho['componentes'] ?? []) as $c) {
             if (!is_array($c)) {
@@ -2703,8 +2744,12 @@ class BoletimAssistenteWizard
                 if ($bimsSemanal !== []) {
                     $c['config']['prova_bimestres'] = $bimsSemanal;
                 }
+                if ($manualSemanal) {
+                    $c['blocos_ids'] = $blocosSemanal;
+                    $c['config']['blocos_ids_manual'] = 1;
+                }
                 $tipoSem = (int) ($c['config']['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
-                if ($tipoSem > 0) {
+                if ($tipoSem > 0 && !$manualSemanal) {
                     $resolvidoSem = $this->ferramentas->resolverBlocosPorTipo(
                         $tipoSem,
                         $dataIni !== '' ? $dataIni : null,
@@ -2739,8 +2784,13 @@ class BoletimAssistenteWizard
                     if ($bimsPeca !== []) {
                         $c['config']['prova_bimestres'] = $bimsPeca;
                     }
+                    $manualBlocosPeca = !empty($opts['blocos_ids_manual']);
+                    if ($manualBlocosPeca) {
+                        $c['blocos_ids'] = $this->normalizarIdsLista($opts['blocos_ids'] ?? []);
+                        $c['config']['blocos_ids_manual'] = 1;
+                    }
                     $tipoPeca = (int) ($opts['tipo_avaliacao_id'] ?? $c['config']['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
-                    if ($tipoPeca > 0) {
+                    if ($tipoPeca > 0 && !$manualBlocosPeca) {
                         $resolvidoPeca = $this->ferramentas->resolverBlocosPorTipo(
                             $tipoPeca,
                             $dataIni !== '' ? $dataIni : null,

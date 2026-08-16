@@ -444,7 +444,9 @@ $boletimWizardSteps = [
             usar_percentual: usarPercentualPadrao(key),
             tipo_avaliacao_id: meta && meta.tipo_avaliacao_id ? Number(meta.tipo_avaliacao_id) : 0,
             papel: papelPadrao(key),
-            bimestres: bimestresPadraoPeca()
+            bimestres: bimestresPadraoPeca(),
+            blocos_ids: [],
+            blocos_ids_manual: 0
         };
     }
 
@@ -473,10 +475,95 @@ $boletimWizardSteps = [
         return html;
     }
 
+    function eventosSelecionaveisPeca(key, opts) {
+        var bims = normalizarBimestresPeca(opts && opts.bimestres);
+        if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
+        var byId = {};
+        bims.forEach(function (b) {
+            eventosDaPecaNoBimestre(key, b).forEach(function (ev) {
+                byId[Number(ev.id)] = ev;
+            });
+        });
+        return Object.keys(byId).map(function (id) { return byId[id]; }).sort(function (a, b) {
+            var sa = Number(a.semana || 0);
+            var sb = Number(b.semana || 0);
+            if (sa !== sb) return sa - sb;
+            return String(a.titulo || '').localeCompare(String(b.titulo || ''));
+        });
+    }
+
+    function labelEventoProva(ev) {
+        var parts = [];
+        parts.push(ev.titulo || ('Evento #' + ev.id));
+        if (ev.semana) parts.push('S' + ev.semana);
+        if (ev.bimestre) parts.push(ev.bimestre + 'º bim.');
+        if (ev.data_prova) parts.push(String(ev.data_prova).slice(0, 10));
+        return parts.join(' · ');
+    }
+
+    function normalizarIdsJs(raw) {
+        var out = [];
+        (Array.isArray(raw) ? raw : []).forEach(function (x) {
+            var n = parseInt(x, 10);
+            if (n > 0 && out.indexOf(n) < 0) out.push(n);
+        });
+        return out;
+    }
+
+    function htmlEventosPeca(key, opts) {
+        if (key === 'jornada') return '';
+        var eventos = eventosSelecionaveisPeca(key, opts || {});
+        if (!eventos.length) {
+            return '<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Nenhum evento encontrado para esta peça no bimestre marcado.</div>';
+        }
+        var manual = Number((opts && opts.blocos_ids_manual) || 0) === 1;
+        var ids = normalizarIdsJs(opts && opts.blocos_ids);
+        var set = {};
+        ids.forEach(function (id) { set[id] = true; });
+        var html = '<div><span class="text-xs font-medium text-gray-600">Eventos que entram nesta peça</span>';
+        html += '<p class="text-xs text-gray-500 mt-0.5">Desmarque algum evento se ele não deve entrar neste boletim.</p>';
+        html += '<div class="grid sm:grid-cols-2 gap-2 mt-2 max-h-44 overflow-y-auto">';
+        eventos.forEach(function (ev) {
+            var id = Number(ev.id);
+            var on = manual ? !!set[id] : true;
+            html += '<label class="inline-flex items-start gap-2 text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer">';
+            html += '<input type="checkbox" class="bw-peca-evento mt-0.5 rounded border-gray-300 text-indigo-600" data-peca="' + key + '" value="' + id + '"' + (on ? ' checked' : '') + '>';
+            html += '<span>' + esc(labelEventoProva(ev)) + '</span></label>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    function htmlEscopoPecasSelecionadas() {
+        var pecas = estado.pecas || [];
+        if (!pecas.length) return '';
+        var html = '<div class="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3 text-xs text-slate-700">';
+        html += '<p class="font-semibold text-indigo-950 uppercase tracking-wide mb-2">Eventos usados por peça</p>';
+        html += '<div class="space-y-1.5">';
+        pecas.forEach(function (key) {
+            var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
+            var bims = normalizarBimestresPeca(opts.bimestres);
+            if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
+            var btxt = bims.length ? bims.map(function (b) { return b + 'º'; }).join(', ') : 'bimestre da identidade';
+            if (key === 'jornada') {
+                var jornadas = [];
+                bims.forEach(function (b) { jornadas = jornadas.concat(jornadasDoBimestre(b)); });
+                var totalJ = estado.jornada_modo === 'selecionadas' ? (estado.jornada_ids || []).length : jornadas.length;
+                html += '<p><strong>' + esc(pecaLabel(key)) + ':</strong> ' + esc(btxt) + ' bimestre · ' + totalJ + ' jornada(s)' + (estado.jornada_modo === 'selecionadas' ? ' marcada(s)' : ' encontrada(s)') + '.</p>';
+                return;
+            }
+            var eventos = eventosSelecionaveisPeca(key, opts);
+            var total = Number(opts.blocos_ids_manual || 0) === 1 ? normalizarIdsJs(opts.blocos_ids).length : eventos.length;
+            html += '<p><strong>' + esc(pecaLabel(key)) + ':</strong> ' + esc(btxt) + ' bimestre · ' + total + ' evento(s)' + (Number(opts.blocos_ids_manual || 0) === 1 ? ' marcado(s)' : ' encontrado(s)') + '.</p>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
     function htmlJornadaPeca(opts) {
         var bims = normalizarBimestresPeca(opts && opts.bimestres);
         if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
-        estado.jornada_modo = 'bimestre';
+        if (estado.jornada_modo !== 'selecionadas') estado.jornada_modo = 'bimestre';
         estado.jornada_bimestres = bims.slice();
         var total = 0;
         bims.forEach(function (b) { total += jornadasDoBimestre(b).length; });
@@ -484,6 +571,30 @@ $boletimWizardSteps = [
         var html = '<div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">';
         html += '<div><span class="text-xs font-medium text-gray-600">Jornadas vinculadas</span>';
         html += '<p class="text-xs text-gray-500 mt-0.5">Serão usadas as jornadas do ' + esc(rotulo) + ' bimestre, conforme o bimestre da peça. Encontradas: ' + total + '.</p></div>';
+        var jornadas = [];
+        bims.forEach(function (b) { jornadas = jornadas.concat(jornadasDoBimestre(b)); });
+        var byJ = {};
+        jornadas.forEach(function (j) { byJ[Number(j.id)] = j; });
+        jornadas = Object.keys(byJ).map(function (id) { return byJ[id]; });
+        if (jornadas.length) {
+            var selJ = {};
+            (estado.jornada_ids || []).forEach(function (id) { selJ[Number(id)] = true; });
+            var manualJ = estado.jornada_modo === 'selecionadas';
+            html += '<div><span class="text-xs font-medium text-gray-600">Jornadas que entram</span>';
+            html += '<p class="text-xs text-gray-500 mt-0.5">Desmarque a jornada que não deve contar para esta peça.</p>';
+            html += '<div class="grid sm:grid-cols-2 gap-2 mt-2 max-h-44 overflow-y-auto">';
+            jornadas.forEach(function (j) {
+                var jid = Number(j.id);
+                var on = manualJ ? !!selJ[jid] : true;
+                var parts = [j.nome || ('Jornada #' + jid)];
+                if (j.materia_nome) parts.push(j.materia_nome);
+                if (j.bimestre) parts.push(j.bimestre + 'º bim.');
+                html += '<label class="inline-flex items-start gap-2 text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer">';
+                html += '<input type="checkbox" class="bw-jornada-id mt-0.5 rounded border-gray-300 text-indigo-600" value="' + jid + '"' + (on ? ' checked' : '') + '>';
+                html += '<span>' + esc(parts.join(' · ')) + '</span></label>';
+            });
+            html += '</div></div>';
+        }
         html += '<div><span class="text-xs font-medium text-gray-600">Pontuação por conclusão</span>';
         html += '<p class="text-xs text-gray-500 mt-0.5">A nota depende de quantas jornadas do bimestre o aluno concluiu.</p>';
         html += '<div class="mt-2 flex flex-wrap gap-3 text-sm">';
@@ -601,6 +712,10 @@ $boletimWizardSteps = [
             if (cfg.tipo_avaliacao_id) opcoes[key].tipo_avaliacao_id = Number(cfg.tipo_avaliacao_id);
             if (cfg.papel_wizard) opcoes[key].papel = cfg.papel_wizard;
             if (cfg.prova_bimestres) opcoes[key].bimestres = normalizarBimestresPeca(cfg.prova_bimestres);
+            if (Array.isArray(c.blocos_ids) && (c.blocos_ids.length || cfg.blocos_ids_manual)) {
+                opcoes[key].blocos_ids = normalizarIdsJs(c.blocos_ids);
+                opcoes[key].blocos_ids_manual = 1;
+            }
         });
         return { pecas: pecas, pecas_opcoes: opcoes };
     }
@@ -770,6 +885,8 @@ $boletimWizardSteps = [
             } else {
                 estado.pecas_opcoes[k].bimestres = normalizarBimestresPeca(estado.pecas_opcoes[k].bimestres);
             }
+            estado.pecas_opcoes[k].blocos_ids = normalizarIdsJs(estado.pecas_opcoes[k].blocos_ids);
+            estado.pecas_opcoes[k].blocos_ids_manual = Number(estado.pecas_opcoes[k].blocos_ids_manual || 0) === 1 ? 1 : 0;
         });
         return estado;
     }
@@ -2583,6 +2700,7 @@ $boletimWizardSteps = [
                 if (on) {
                     html += '<div class="mt-3 pl-7 space-y-3 border-t border-gray-100 pt-3">';
                     html += htmlBimestresPeca(p.key, opts);
+                    html += htmlEventosPeca(p.key, opts);
                     if (p.key === 'jornada') html += htmlJornadaPeca(opts);
                     var calc = opts.calc_type || calcTypePadrao(p.key);
                     if (!pecaMostraNotaEvento(p.key) && calc === 'ultima') calc = 'media';
@@ -2612,6 +2730,7 @@ $boletimWizardSteps = [
             } else {
                 html += '<p class="text-sm text-gray-700">Como o boletim <strong>aparece</strong></p>';
                 html += '<p class="text-xs text-gray-500 mt-1">Em cima: adicione um bloco de cálculo, dê o nome e monte a fórmula. Arraste as colunas. Ao terminar, clique em <strong>Salvar bloco</strong> e depois em <strong>Salvar e continuar</strong>.</p>';
+                html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
                 html += '<div id="bw-colunas-wrap" class="mt-3"></div>';
                 html += '<div id="bw-formula-editor" class="' + (estado.bloco_calc ? '' : 'hidden') + ' mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">';
                 html += '<div id="bw-excecao-banner" class="hidden mb-3 rounded-xl border-2 border-indigo-400 bg-indigo-600 text-white px-3 py-2.5"></div>';
@@ -2697,6 +2816,7 @@ $boletimWizardSteps = [
             html += '<p class="text-xs text-gray-500 mt-1">' + (ehBoletimComposto()
                 ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
                 : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.') + '</p>';
+            html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
             html += '<p class="text-xs text-indigo-700 mt-4">Se estiver certo, clique em <strong>Concluir e aplicar</strong> e depois em <strong>Salvar evento</strong>.</p>';
         }
@@ -2877,11 +2997,31 @@ $boletimWizardSteps = [
                 if (peca === 'jornada') {
                     estado.jornada_modo = 'bimestre';
                     estado.jornada_bimestres = estado.pecas_opcoes[peca].bimestres.slice();
+                    estado.jornada_ids = [];
                     if (!estado.jornada_bimestres.length && estado.bimestre >= 1 && estado.bimestre <= 4) {
                         estado.jornada_bimestres = [Number(estado.bimestre)];
                     }
                     renderAll();
+                } else {
+                    estado.pecas_opcoes[peca].blocos_ids = [];
+                    estado.pecas_opcoes[peca].blocos_ids_manual = 0;
+                    renderAll();
                 }
+                marcarEdicaoManual();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-peca-evento').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var peca = el.getAttribute('data-peca');
+                if (!peca) return;
+                if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
+                if (!estado.pecas_opcoes[peca]) estado.pecas_opcoes[peca] = pecasOpcoesPadraoJs(peca);
+                estado.pecas_opcoes[peca].blocos_ids = [];
+                estado.pecas_opcoes[peca].blocos_ids_manual = 1;
+                bodyEl.querySelectorAll('.bw-peca-evento[data-peca="' + peca + '"]:checked').forEach(function (c) {
+                    estado.pecas_opcoes[peca].blocos_ids.push(parseInt(c.value, 10));
+                });
                 marcarEdicaoManual();
                 agendarMontar();
             });
@@ -2907,6 +3047,7 @@ $boletimWizardSteps = [
         });
         bodyEl.querySelectorAll('.bw-jornada-id').forEach(function (el) {
             el.addEventListener('change', function () {
+                estado.jornada_modo = 'selecionadas';
                 estado.jornada_ids = [];
                 bodyEl.querySelectorAll('.bw-jornada-id:checked').forEach(function (c) {
                     estado.jornada_ids.push(parseInt(c.value, 10));

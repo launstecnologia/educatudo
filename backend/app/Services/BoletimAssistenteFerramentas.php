@@ -557,10 +557,11 @@ class BoletimAssistenteFerramentas
             $blocosIds = $this->normalizarIds($comp['blocos_ids'] ?? []);
             $tipoId = isset($comp['tipo_avaliacao_id']) ? (int) $comp['tipo_avaliacao_id'] : 0;
             $tipoNome = trim((string) ($comp['tipo_avaliacao_nome'] ?? $config['tipo_avaliacao_nome'] ?? ''));
+            $blocosIdsManual = !empty($config['blocos_ids_manual']);
             if ($tipoId <= 0 && isset($config['tipo_avaliacao_id'])) {
                 $tipoId = (int) $config['tipo_avaliacao_id'];
             }
-            if ($blocosIds === [] && ($tipoId > 0 || $tipoNome !== '')) {
+            if ($blocosIds === [] && !$blocosIdsManual && ($tipoId > 0 || $tipoNome !== '')) {
                 $bimsResolve = [];
                 foreach ((array) ($config['prova_bimestres'] ?? []) as $b) {
                     $n = (int) $b;

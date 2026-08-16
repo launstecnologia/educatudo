@@ -5864,6 +5864,10 @@ class BoletimConfigController extends BaseController
         if ($bimsProva !== []) {
             $payload['prova_bimestres'] = $bimsProva;
         }
+        $cfgManual = $this->decodeComponenteConfig($componente);
+        if (!empty($cfgManual['blocos_ids_manual'])) {
+            $payload['blocos_ids_manual'] = 1;
+        }
 
         return $payload;
     }
