@@ -1011,8 +1011,11 @@ class BoletimConfig
     public function getStudentsList(int $limit = 300): array
     {
         $limit = max(1, min($limit, 10000));
+        $serieSelect = $this->hasColumn('turmas', 'serie_id')
+            ? 't.serie_id'
+            : 'NULL AS serie_id';
         return $this->db->fetchAll(
-            "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
+            "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome, {$serieSelect}
              FROM alunos a
              LEFT JOIN turmas t ON t.id = a.turma_id
              WHERE a.ativo = 1

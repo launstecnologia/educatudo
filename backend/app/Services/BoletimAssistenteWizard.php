@@ -3688,7 +3688,7 @@ class BoletimAssistenteWizard
                 'subtitulo' => 'Exemplo',
                 'semanas' => [],
                 'outras' => $comum,
-                'materias' => $materiasA,
+                'materias' => $materias,
             ]];
         }
 

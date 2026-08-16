@@ -1560,26 +1560,77 @@ $boletimWizardSteps = [
         return null;
     }
 
+    function textoNormalizadoBusca(s) {
+        var out = String(s || '').toLowerCase();
+        return out.normalize ? out.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : out;
+    }
+
+    function alunosPreviewFiltrados() {
+        var alunos = (catalogo && catalogo.alunos) || [];
+        if (!estado) return alunos;
+        var turmas = {};
+        (Array.isArray(estado.turmas_ids) ? estado.turmas_ids : []).forEach(function (id) {
+            id = Number(id || 0);
+            if (id > 0) turmas[id] = true;
+        });
+        var series = {};
+        (Array.isArray(estado.series_ids) ? estado.series_ids : []).forEach(function (id) {
+            id = Number(id || 0);
+            if (id > 0) series[id] = true;
+        });
+        var filtraTurma = Object.keys(turmas).length > 0;
+        var filtraSerie = !filtraTurma && Object.keys(series).length > 0;
+        if (!filtraTurma && !filtraSerie) return alunos;
+        return alunos.filter(function (a) {
+            if (filtraTurma) return !!turmas[Number(a.turma_id || 0)];
+            return !!series[Number(a.serie_id || 0)];
+        });
+    }
+
+    function labelAlunoPreview(a) {
+        var label = String((a && a.nome) || ('Aluno #' + ((a && a.id) || '')));
+        if (a && a.turma_nome) label += ' · ' + a.turma_nome;
+        if (a && a.ra) label += ' · RA ' + a.ra;
+        return label;
+    }
+
+    function idAlunoPorLabelPreview(label) {
+        var alvo = textoNormalizadoBusca(label);
+        if (!alvo) return 0;
+        var alunos = alunosPreviewFiltrados();
+        for (var i = 0; i < alunos.length; i++) {
+            if (textoNormalizadoBusca(labelAlunoPreview(alunos[i])) === alvo) {
+                return Number(alunos[i].id || 0) || 0;
+            }
+        }
+        return 0;
+    }
+
     function hashPreviewAluno() {
         var aluno = alunoPreviewSelecionado();
         return aluno ? hashNome((aluno.nome || '') + '#' + aluno.id) : 0;
     }
 
     function htmlAlunoPreviewSelect() {
-        var alunos = (catalogo && catalogo.alunos) || [];
+        var alunosTodos = (catalogo && catalogo.alunos) || [];
+        var alunos = alunosPreviewFiltrados();
         if (!alunos.length) return '';
         var atual = Number((estado && estado.aluno_preview_id) || 0);
+        var atualObj = alunoPreviewSelecionado();
+        var atualLabel = atualObj ? labelAlunoPreview(atualObj) : '';
+        var datalistId = 'bw-preview-alunos-lista';
         var html = '<div class="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">';
         html += '<label class="text-xs font-medium text-slate-700 flex-1 min-w-[16rem]">Simular notas com aluno';
-        html += '<select id="bw-preview-aluno" class="mt-1 block w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm">';
-        html += '<option value="0">Exemplo visual sem aluno</option>';
+        html += '<input id="bw-preview-aluno-busca" list="' + datalistId + '" class="mt-1 block w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm" placeholder="Pesquisar aluno pelo nome" value="' + esc(atualLabel) + '">';
+        html += '<datalist id="' + datalistId + '">';
         alunos.forEach(function (a) {
-            var label = String(a.nome || ('Aluno #' + a.id));
-            if (a.turma_nome) label += ' · ' + a.turma_nome;
-            html += '<option value="' + Number(a.id || 0) + '"' + (atual === Number(a.id || 0) ? ' selected' : '') + '>' + esc(label) + '</option>';
+            html += '<option value="' + esc(labelAlunoPreview(a)) + '" data-id="' + Number(a.id || 0) + '"></option>';
         });
-        html += '</select></label>';
-        html += '<p class="text-xs text-slate-500 max-w-md">Atualiza a prévia na hora. Após salvar, use a simulação real da configuração para conferir com dados gravados.</p>';
+        html += '</datalist>';
+        html += '<input type="hidden" id="bw-preview-aluno" value="' + (atual > 0 ? atual : 0) + '">';
+        html += '</label>';
+        html += '<button type="button" id="bw-preview-aluno-limpar" class="h-9 px-3 text-xs rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Sem aluno</button>';
+        html += '<p class="text-xs text-slate-500 max-w-md">Lista filtrada pelo escopo marcado: ' + alunos.length + ' de ' + alunosTodos.length + ' aluno(s). A prévia atualiza na hora; após salvar, use a simulação real da configuração.</p>';
         html += '</div>';
         return html;
     }
@@ -1962,8 +2013,24 @@ $boletimWizardSteps = [
             }
         });
         bodyEl.addEventListener('change', function (e) {
-            if (!e.target || e.target.id !== 'bw-preview-aluno' || !estado) return;
-            estado.aluno_preview_id = Number(e.target.value || 0) || 0;
+            if (!e.target || e.target.id !== 'bw-preview-aluno-busca' || !estado) return;
+            estado.aluno_preview_id = idAlunoPorLabelPreview(e.target.value || '');
+            previewAtual = null;
+            renderRevisarDinamico();
+            agendarMontar();
+        });
+        bodyEl.addEventListener('input', function (e) {
+            if (!e.target || e.target.id !== 'bw-preview-aluno-busca' || !estado) return;
+            var id = idAlunoPorLabelPreview(e.target.value || '');
+            if (id <= 0 || id === Number(estado.aluno_preview_id || 0)) return;
+            estado.aluno_preview_id = id;
+            previewAtual = null;
+            renderRevisarDinamico();
+            agendarMontar();
+        });
+        bodyEl.addEventListener('click', function (e) {
+            if (!e.target || e.target.id !== 'bw-preview-aluno-limpar' || !estado) return;
+            estado.aluno_preview_id = 0;
             previewAtual = null;
             renderRevisarDinamico();
             agendarMontar();

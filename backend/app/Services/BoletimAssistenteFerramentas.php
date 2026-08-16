@@ -101,7 +101,10 @@ class BoletimAssistenteFerramentas
             $out[] = [
                 'id' => $id,
                 'nome' => trim((string) ($aluno['nome'] ?? '')),
+                'ra' => isset($aluno['ra']) ? trim((string) $aluno['ra']) : null,
+                'turma_id' => isset($aluno['turma_id']) ? (int) $aluno['turma_id'] : null,
                 'turma_nome' => isset($aluno['turma_nome']) ? trim((string) $aluno['turma_nome']) : null,
+                'serie_id' => isset($aluno['serie_id']) ? (int) $aluno['serie_id'] : null,
             ];
         }
         return $out;
@@ -514,12 +517,13 @@ class BoletimAssistenteFerramentas
 
             $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
             $groupLine = is_array($config['group_line'] ?? null) ? $config['group_line'] : [];
+            $groupLineMode = (string) ($groupLine['mode'] ?? 'media');
             $config['group_line'] = [
                 'enabled' => !empty($groupLine['enabled']),
                 'key' => trim((string) ($groupLine['key'] ?? '')),
                 'label' => trim((string) ($groupLine['label'] ?? '')),
-                'mode' => in_array(($groupLine['mode'] ?? 'media'), ['media', 'soma'], true)
-                    ? (string) $groupLine['mode']
+                'mode' => in_array($groupLineMode, ['media', 'soma'], true)
+                    ? $groupLineMode
                     : 'media',
                 'divisor' => max(1, (int) ($groupLine['divisor'] ?? 1)),
                 'materias_ids' => $this->normalizarIds($groupLine['materias_ids'] ?? []),
