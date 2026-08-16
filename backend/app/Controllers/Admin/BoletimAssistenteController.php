@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../Core/AuthManager.php';
 require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
 require_once __DIR__ . '/../../Services/BoletimAssistenteService.php';
 require_once __DIR__ . '/../../Services/BoletimAssistenteWizard.php';
+require_once __DIR__ . '/BoletimConfigController.php';
 
 /**
  * Endpoints JSON do Assistente de Boletim (chat NL → rascunho de regra).
@@ -86,6 +87,7 @@ class BoletimAssistenteController extends BaseController
         }
         try {
             $resultado = $this->wizard->enriquecerSaida($resultado);
+            $resultado = $this->aplicarPreviewRealAluno($resultado);
         } catch (Throwable $e) {
             error_log('BoletimAssistente preview: ' . $e->getMessage());
             $resultado['preview'] = $resultado['preview'] ?? null;
@@ -142,6 +144,7 @@ class BoletimAssistenteController extends BaseController
             $previewOut = null;
             if ($preservado !== [] || $querQuadro) {
                 $montado = $this->wizard->enriquecerSaida($this->wizard->montar($estado));
+                $montado = $this->aplicarPreviewRealAluno($montado);
                 $estado = $montado['estado'];
                 $rascunhoOut = $montado['rascunho'];
                 $resumoOut = (string) ($montado['resumo'] ?? $resumoOut);
@@ -185,6 +188,316 @@ class BoletimAssistenteController extends BaseController
                 'formulas_disponiveis' => [],
             ]);
         }
+    }
+
+    /**
+     * Quando o assistente tem um aluno selecionado, a prévia precisa mostrar os
+     * lançamentos reais calculados pela mesma rotina da tela de configuração.
+     *
+     * @param array<string,mixed> $resultado
+     * @return array<string,mixed>
+     */
+    private function aplicarPreviewRealAluno(array $resultado): array
+    {
+        $estado = is_array($resultado['estado'] ?? null) ? $resultado['estado'] : [];
+        $rascunho = is_array($resultado['rascunho'] ?? null) ? $resultado['rascunho'] : null;
+        $alunoId = (int) ($estado['aluno_preview_id'] ?? 0);
+        if ($alunoId <= 0 || $rascunho === null || empty($rascunho['componentes'])) {
+            return $resultado;
+        }
+
+        [$periodoRef, $dataInicio, $dataFim] = $this->resolverPeriodoPreview($rascunho, $estado);
+
+        try {
+            $configController = new BoletimConfigController();
+            $simulacao = $configController->simularRegraAluno($rascunho, $alunoId, $periodoRef, $dataInicio, $dataFim);
+            $previewReal = $this->montarPreviewRealDaSimulacao($simulacao);
+            if ($previewReal !== null) {
+                $resultado['preview'] = $previewReal;
+            } else {
+                $resultado['preview'] = [
+                    'modo' => 'vazio',
+                    'aviso' => 'Aluno selecionado, mas não há notas reais para este evento no período configurado.',
+                    'tabelas' => [],
+                    'colunas' => [],
+                    'pecas_disponiveis' => [],
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimAssistente preview real aluno #' . $alunoId . ': ' . $e->getMessage());
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array{0:string,1:?string,2:?string}
+     */
+    private function resolverPeriodoPreview(array $rascunho, array $estado): array
+    {
+        $dataInicio = $this->normalizarDataPreview((string) ($rascunho['default_data_inicio'] ?? $estado['data_inicio'] ?? ''));
+        $dataFim = $this->normalizarDataPreview((string) ($rascunho['default_data_fim'] ?? $estado['data_fim'] ?? ''));
+        if ($dataInicio !== null && $dataFim !== null) {
+            if ($dataInicio > $dataFim) {
+                [$dataInicio, $dataFim] = [$dataFim, $dataInicio];
+            }
+            return ['RANGE:' . $dataInicio . ':' . $dataFim, $dataInicio, $dataFim];
+        }
+
+        $ano = (int) ($rascunho['ano_letivo'] ?? $estado['ano_letivo'] ?? date('Y'));
+        $bimestre = (int) ($rascunho['bimestre'] ?? $estado['bimestre'] ?? 1);
+        if ($ano <= 0) {
+            $ano = (int) date('Y');
+        }
+        if ($bimestre < 1 || $bimestre > 4) {
+            $bimestre = 1;
+        }
+
+        return [$ano . '-B' . $bimestre, null, null];
+    }
+
+    private function normalizarDataPreview(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+            return $raw;
+        }
+        $ts = strtotime($raw);
+        return $ts ? date('Y-m-d', $ts) : null;
+    }
+
+    /**
+     * @param array<string,mixed> $simulacao
+     * @return array<string,mixed>|null
+     */
+    private function montarPreviewRealDaSimulacao(array $simulacao): ?array
+    {
+        $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : null;
+        if ($matriz === null) {
+            return null;
+        }
+
+        $colunasRaw = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
+        $linhasRaw = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+        if ($colunasRaw === [] || $linhasRaw === []) {
+            return null;
+        }
+
+        $colunas = [];
+        $semanasA = [];
+        $semanasB = [];
+        $outras = [];
+        $gruposBoletim = [];
+        $temQuadro = false;
+        $temBoletim = false;
+
+        foreach ($colunasRaw as $colRaw) {
+            if (!is_array($colRaw)) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($colRaw['codigo'] ?? '')));
+            if ($codigo === '') {
+                continue;
+            }
+            $col = [
+                'codigo' => $codigo,
+                'nome' => (string) ($colRaw['nome'] ?? $codigo),
+                'layout_group' => strtolower(trim((string) ($colRaw['layout_group'] ?? ''))),
+                'layout_type' => strtolower(trim((string) ($colRaw['layout_type'] ?? ''))),
+                'source_type' => (string) ($colRaw['source_type'] ?? ''),
+                'tipo' => ((string) ($colRaw['source_type'] ?? '')) === 'calculado' ? 'calculado' : 'peca',
+                'travada' => false,
+            ];
+
+            if ($this->colunaPreviewEhSemana($col)) {
+                $temQuadro = true;
+                if ($col['layout_group'] === 'quadro_b' || preg_match('/^s[2468]$/', $codigo)) {
+                    $semanasB[] = $col;
+                } else {
+                    $semanasA[] = $col;
+                }
+                continue;
+            }
+
+            if ($this->colunaPreviewEhBoletim($col)) {
+                $temBoletim = true;
+                $grupoKey = $col['layout_group'] !== '' ? $col['layout_group'] : 'outros';
+                if (!isset($gruposBoletim[$grupoKey])) {
+                    $gruposBoletim[$grupoKey] = [
+                        'key' => $grupoKey,
+                        'label' => $this->labelGrupoBoletimPreview($grupoKey),
+                        'cols' => [],
+                    ];
+                }
+                $gruposBoletim[$grupoKey]['cols'][] = $col;
+            } else {
+                $outras[] = $col;
+            }
+
+            $colunas[] = $col;
+        }
+
+        $linhas = [];
+        foreach ($linhasRaw as $linhaRaw) {
+            if (!is_array($linhaRaw)) {
+                continue;
+            }
+            $nome = trim((string) ($linhaRaw['materia_nome'] ?? ''));
+            if ($nome === '') {
+                $nome = 'Matéria';
+            }
+            $linhas[] = [
+                'materia_nome' => $nome,
+                'notas' => is_array($linhaRaw['notas'] ?? null) ? $linhaRaw['notas'] : [],
+            ];
+        }
+        if ($linhas === []) {
+            return null;
+        }
+
+        if ($temBoletim && !$temQuadro) {
+            $grupos = array_values($gruposBoletim);
+            return [
+                'modo' => 'boletim',
+                'dados_reais' => true,
+                'aviso' => 'Prévia com notas reais do aluno selecionado.',
+                'grupos' => $grupos,
+                'tabelas' => [[
+                    'key' => 'u',
+                    'titulo' => 'Matérias',
+                    'subtitulo' => '',
+                    'semanas' => [],
+                    'outras' => [],
+                    'grupos' => $grupos,
+                    'linhas' => $linhas,
+                ]],
+                'colunas' => $colunas,
+                'pecas_disponiveis' => [],
+            ];
+        }
+
+        if ($temQuadro) {
+            $previewCols = [[
+                'codigo' => '_semanal',
+                'nome' => 'Prova semanal (S1-S8 · N e Q)',
+                'tipo' => 'semana_grupo',
+                'travada' => true,
+            ]];
+            $previewCols = array_merge($previewCols, $outras);
+            $tabelas = [];
+            if ($semanasA !== []) {
+                $tabelas[] = [
+                    'key' => 'a',
+                    'titulo' => 'Matérias Bloco A',
+                    'subtitulo' => 'Prova semanal',
+                    'semanas' => $semanasA,
+                    'outras' => $outras,
+                    'linhas' => $this->filtrarLinhasPreviewPorSemanas($linhas, $semanasA),
+                ];
+            }
+            if ($semanasB !== []) {
+                $tabelas[] = [
+                    'key' => 'b',
+                    'titulo' => 'Matérias Bloco B',
+                    'subtitulo' => 'Prova semanal',
+                    'semanas' => $semanasB,
+                    'outras' => $outras,
+                    'linhas' => $this->filtrarLinhasPreviewPorSemanas($linhas, $semanasB),
+                ];
+            }
+
+            return [
+                'modo' => 'quadro',
+                'dados_reais' => true,
+                'aviso' => 'Prévia com notas reais do aluno selecionado.',
+                'tabelas' => $tabelas,
+                'colunas' => $previewCols,
+                'pecas_disponiveis' => [],
+            ];
+        }
+
+        return [
+            'modo' => 'simples',
+            'dados_reais' => true,
+            'aviso' => 'Prévia com notas reais do aluno selecionado.',
+            'tabelas' => [[
+                'key' => 'u',
+                'titulo' => 'Matérias',
+                'subtitulo' => '',
+                'semanas' => [],
+                'outras' => $outras !== [] ? $outras : $colunas,
+                'linhas' => $linhas,
+            ]],
+            'colunas' => $colunas,
+            'pecas_disponiveis' => [],
+        ];
+    }
+
+    /** @param array<string,mixed> $col */
+    private function colunaPreviewEhSemana(array $col): bool
+    {
+        $codigo = strtolower(trim((string) ($col['codigo'] ?? '')));
+        $layoutType = strtolower(trim((string) ($col['layout_type'] ?? '')));
+        $layoutGroup = strtolower(trim((string) ($col['layout_group'] ?? '')));
+
+        return preg_match('/^s[1-8]$/', $codigo) === 1
+            || $layoutType === 'semana_nq'
+            || in_array($layoutGroup, ['quadro_a', 'quadro_b'], true);
+    }
+
+    /** @param array<string,mixed> $col */
+    private function colunaPreviewEhBoletim(array $col): bool
+    {
+        $layoutGroup = strtolower(trim((string) ($col['layout_group'] ?? '')));
+        return in_array($layoutGroup, ['b1', 'b2', 'b3', 'b4', 'final'], true);
+    }
+
+    private function labelGrupoBoletimPreview(string $grupo): string
+    {
+        $labels = [
+            'b1' => '1º Bimestre',
+            'b2' => '2º Bimestre',
+            'b3' => '3º Bimestre',
+            'b4' => '4º Bimestre',
+            'final' => 'Final',
+        ];
+
+        return $labels[$grupo] ?? $grupo;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @param list<array<string,mixed>> $semanas
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarLinhasPreviewPorSemanas(array $linhas, array $semanas): array
+    {
+        $codigos = array_values(array_filter(array_map(static function ($semana) {
+            return strtolower(trim((string) ($semana['codigo'] ?? '')));
+        }, $semanas)));
+        if ($codigos === []) {
+            return $linhas;
+        }
+
+        $filtradas = [];
+        foreach ($linhas as $linha) {
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            foreach ($codigos as $codigo) {
+                if (array_key_exists($codigo, $notas)
+                    || array_key_exists($codigo . '__n', $notas)
+                    || array_key_exists($codigo . '__q', $notas)) {
+                    $filtradas[] = $linha;
+                    break;
+                }
+            }
+        }
+
+        return $filtradas !== [] ? $filtradas : $linhas;
     }
 
     /**

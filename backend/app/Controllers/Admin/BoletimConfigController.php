@@ -1768,7 +1768,7 @@ class BoletimConfigController extends BaseController
         ];
     }
 
-    private function simularRegraAluno(
+    public function simularRegraAluno(
         array $regra,
         int $alunoId,
         string $periodoRef,

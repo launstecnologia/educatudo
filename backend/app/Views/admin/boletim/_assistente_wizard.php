@@ -1899,7 +1899,10 @@ $boletimWizardSteps = [
             return '<p class="text-xs text-gray-500">' + esc((pv && pv.aviso) || 'Monte as peças para ver o exemplo.') + '</p>';
         }
         var html = htmlAlunoPreviewSelect();
-        html += '<p class="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
+        var avisoCls = pv.dados_reais
+            ? 'text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 mb-2'
+            : 'text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2';
+        html += '<p class="' + avisoCls + '">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
         (pv.tabelas || []).forEach(function (t) {
             if (pv.modo === 'boletim' && !(t.grupos || []).length && (pv.grupos || []).length) {
                 t = Object.assign({}, t, { grupos: pv.grupos });
