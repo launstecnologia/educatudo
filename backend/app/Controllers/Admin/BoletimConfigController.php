@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
 require_once __DIR__ . '/../../Models/Education/JourneyBoletimLancamento.php';
 require_once __DIR__ . '/../../Models/Education/SchoolAbsence.php';
 require_once __DIR__ . '/../../Helpers/BoletimQuadroLayoutHelper.php';
+require_once __DIR__ . '/../../Services/BoletimAssistenteWizard.php';
 
 class BoletimConfigController extends BaseController
 {
@@ -345,6 +346,30 @@ class BoletimConfigController extends BaseController
     {
         $user = $this->auth->getUser();
         $selectedRegraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
+        $estadoInicial = null;
+        $catalogoInicial = null;
+        $rascunhoInicial = null;
+        $resumoInicial = null;
+        $errosIniciais = [];
+        $formulasIniciais = [];
+        $previewInicial = null;
+
+        if ($selectedRegraId > 0) {
+            try {
+                $wizard = new BoletimAssistenteWizard();
+                $estadoInicial = $wizard->estadoPadrao(null, $selectedRegraId);
+                $catalogoInicial = $wizard->catalogo();
+                $montado = $wizard->enriquecerSaida($wizard->montar($estadoInicial));
+                $estadoInicial = $montado['estado'] ?? $estadoInicial;
+                $rascunhoInicial = $montado['rascunho'] ?? null;
+                $resumoInicial = isset($montado['resumo']) ? (string) $montado['resumo'] : null;
+                $errosIniciais = is_array($montado['erros'] ?? null) ? $montado['erros'] : [];
+                $formulasIniciais = is_array($montado['formulas_disponiveis'] ?? null) ? $montado['formulas_disponiveis'] : [];
+                $previewInicial = $montado['preview'] ?? null;
+            } catch (Throwable $e) {
+                error_log('BoletimConfigController assistente estado inicial: ' . $e->getMessage());
+            }
+        }
 
         $data = [
             'title' => 'Assistente do Boletim - EducaTudo',
@@ -354,6 +379,13 @@ class BoletimConfigController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
             'selected_regra_id' => $selectedRegraId,
             'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
+            'boletim_assistente_estado_inicial' => $estadoInicial,
+            'boletim_assistente_catalogo_inicial' => $catalogoInicial,
+            'boletim_assistente_rascunho_inicial' => $rascunhoInicial,
+            'boletim_assistente_resumo_inicial' => $resumoInicial,
+            'boletim_assistente_erros_iniciais' => $errosIniciais,
+            'boletim_assistente_formulas_iniciais' => $formulasIniciais,
+            'boletim_assistente_preview_inicial' => $previewInicial,
         ];
 
         $this->viewWithLayout('admin', 'admin/boletim/assistente', $data);

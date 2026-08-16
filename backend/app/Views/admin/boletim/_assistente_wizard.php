@@ -7,6 +7,15 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
 $assistenteRegraId = (int) ($selected_regra_id ?? $selectedRegraId ?? 0);
 $boletimAssistentePageMode = !empty($boletimAssistentePageMode);
 $boletimAssistenteReturnUrl = URL . '/admin/boletim-configuracao' . ($assistenteRegraId > 0 ? ('?regra_id=' . $assistenteRegraId) : '?novo=1');
+$boletimAssistenteDadosIniciais = [
+    'estado' => is_array($boletim_assistente_estado_inicial ?? null) ? $boletim_assistente_estado_inicial : null,
+    'catalogo' => is_array($boletim_assistente_catalogo_inicial ?? null) ? $boletim_assistente_catalogo_inicial : null,
+    'rascunho' => is_array($boletim_assistente_rascunho_inicial ?? null) ? $boletim_assistente_rascunho_inicial : null,
+    'resumo' => isset($boletim_assistente_resumo_inicial) ? (string) $boletim_assistente_resumo_inicial : null,
+    'erros' => is_array($boletim_assistente_erros_iniciais ?? null) ? $boletim_assistente_erros_iniciais : [],
+    'formulas_disponiveis' => is_array($boletim_assistente_formulas_iniciais ?? null) ? $boletim_assistente_formulas_iniciais : [],
+    'preview' => $boletim_assistente_preview_inicial ?? null,
+];
 $ui = __DIR__ . '/../_partials/ui';
 $boletimWizardSteps = [
     ['label' => 'Começar', 'sub' => 'Origem'],
@@ -107,6 +116,8 @@ $boletimWizardSteps = [
     <?php endif; ?>
 </div>
 
+<script type="application/json" id="boletim-assistente-dados-iniciais"><?= json_encode($boletimAssistenteDadosIniciais, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+
 <style>
 @keyframes boletim-assistente-bounce {
     0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -206,10 +217,15 @@ $boletimWizardSteps = [
         { id: 'revisar', label: '6. Revisar', sub: 'Confirmar' }
     ];
 
-    var catalogo = { modelos: [], formulas: [], regras: [], series: [], pecas: [], papeis: [] };
-    var estado = null;
-    var rascunhoAtual = null;
-    var formulasDisp = [];
+    var dadosIniciaisEl = document.getElementById('boletim-assistente-dados-iniciais');
+    var dadosIniciais = {};
+    if (dadosIniciaisEl && dadosIniciaisEl.textContent) {
+        try { dadosIniciais = JSON.parse(dadosIniciaisEl.textContent) || {}; } catch (e) { dadosIniciais = {}; }
+    }
+    var catalogo = dadosIniciais.catalogo || { modelos: [], formulas: [], regras: [], series: [], pecas: [], papeis: [] };
+    var estado = dadosIniciais.estado || null;
+    var rascunhoAtual = dadosIniciais.rascunho || ((estado && estado.rascunho_preservado) ? estado.rascunho_preservado : null);
+    var formulasDisp = dadosIniciais.formulas_disponiveis || [];
     var historico = [];
     var enviando = false;
     var iniciado = false;
@@ -217,7 +233,7 @@ $boletimWizardSteps = [
     var filaChat = [];
     var statusFilaEl = null;
     var formulaDrag = null;
-    var previewAtual = null;
+    var previewAtual = dadosIniciais.preview || null;
     var colunasDrag = null;
     var colunasDragou = false;
 
@@ -3016,6 +3032,10 @@ $boletimWizardSteps = [
         renderAll();
         if (iniciado) return;
         iniciado = true;
+        if (dadosIniciais.estado) {
+            renderResumo(dadosIniciais.resumo, dadosIniciais.erros || []);
+            return;
+        }
         var fd = new FormData();
         fd.append('_token', csrf);
         fd.append('regra_id', String(regraId));
