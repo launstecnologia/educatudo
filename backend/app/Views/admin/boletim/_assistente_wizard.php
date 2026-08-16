@@ -1471,6 +1471,19 @@ $boletimWizardSteps = [
         return String(Math.round(n * 100) / 100).replace('.', ',');
     }
 
+    function roundPreviewValor(v) {
+        var n = Number(v);
+        if (!isFinite(n)) return v;
+        if (!estado || estado.round_mode !== 'half') {
+            return Math.round(n * 100) / 100;
+        }
+        var base = Math.floor(n);
+        var dec = n - base;
+        if (dec < 0.25) return base;
+        if (dec < 0.75) return base + 0.5;
+        return base + 1;
+    }
+
     function pecaCodigoQuadro(key) {
         var m = {
             semanal: 'media_sem',
@@ -1665,7 +1678,7 @@ $boletimWizardSteps = [
             var nMed = 0;
             var accF = 0;
             bims.forEach(function (b) {
-                var media = Math.round(10 * (5 + Math.abs(h + b * 7) % 51) / 10) / 10;
+                var media = roundPreviewValor(Math.round(10 * (5 + Math.abs(h + b * 7) % 51) / 10) / 10);
                 var falt = Math.abs(h + b * 5) % 9;
                 notas['b' + b + '_media'] = media;
                 notas['b' + b + '_faltas'] = falt;
@@ -1673,8 +1686,8 @@ $boletimWizardSteps = [
                 nMed += 1;
                 accF += falt;
             });
-            notas.media_final = nMed ? Math.round(100 * acc / nMed) / 100 : 0;
-            notas.rec_final = (h % 3) === 0 ? Math.round(10 * (5 + Math.abs(h + 11) % 40) / 10) / 10 : '—';
+            notas.media_final = nMed ? roundPreviewValor(acc / nMed) : 0;
+            notas.rec_final = (h % 3) === 0 ? roundPreviewValor(Math.round(10 * (5 + Math.abs(h + 11) % 40) / 10) / 10) : '—';
             notas.faltas_final = accF;
             notas.resultado = notas.media_final >= notaMin ? 'Aprovado' : 'Reprovado';
             return notas;
@@ -1755,7 +1768,7 @@ $boletimWizardSteps = [
                 sumN += n;
                 sumQ += 10;
             });
-            notas.media_sem = sumQ ? Math.round(1000 * sumN / sumQ) / 100 : 0;
+            notas.media_sem = sumQ ? roundPreviewValor(10 * sumN / sumQ) : 0;
             outras.forEach(function (o) {
                 if (o.codigo === 'media_sem') return;
                 if (o.source_type === 'calculado' && o.codigo === 'media_bim') {
@@ -1765,20 +1778,20 @@ $boletimWizardSteps = [
                         if (c === 'media_sem') return;
                         if (typeof notas[c] === 'number') { acc += notas[c]; nPart += 1; }
                     });
-                    notas.media_bim = Math.round(100 * acc / nPart) / 100;
+                    notas.media_bim = roundPreviewValor(acc / nPart);
                     return;
                 }
                 if (o.source_type === 'calculado' && o.codigo === 'media_final') {
                     var base = typeof notas.media_bim === 'number' ? notas.media_bim : notas.media_sem;
                     var extra = typeof notas.enac === 'number' ? notas.enac : (typeof notas.rec === 'number' ? notas.rec : base);
-                    notas.media_final = Math.max(base, extra);
+                    notas.media_final = roundPreviewValor(Math.max(base, extra));
                     return;
                 }
                 if (o.codigo === 'rec' && (h % 3) === 0) {
                     notas[o.codigo] = '—';
                     return;
                 }
-                notas[o.codigo] = Math.round(10 * (5 + Math.abs(h + o.codigo.length * 7) % 51) / 10) / 10;
+                notas[o.codigo] = roundPreviewValor(Math.round(10 * (5 + Math.abs(h + o.codigo.length * 7) % 51) / 10) / 10);
             });
             return notas;
         }
