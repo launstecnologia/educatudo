@@ -2564,7 +2564,8 @@ class BoletimAssistenteWizard
         if ($this->ehBoletimComposto($estado)) {
             return false;
         }
-        if (($estado['modelo_key'] ?? '') === 'quadro_semanal') {
+        if (($estado['modelo_key'] ?? '') === 'quadro_semanal'
+            && in_array('semanal', (array) ($estado['pecas'] ?? []), true)) {
             return true;
         }
         return in_array('semanal', (array) ($estado['pecas'] ?? []), true);

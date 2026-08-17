@@ -1831,11 +1831,12 @@ $boletimWizardSteps = [
     function previewLocal() {
         if (ehBoletimComposto()) return previewLocalBoletim();
         var pecas = (estado && estado.pecas) ? estado.pecas.slice() : [];
-        var semanasA = [1, 3, 5, 7].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; });
-        var semanasB = [2, 4, 6, 8].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; });
-        var outras = [{ codigo: 'media_sem', nome: 'Média Sem', layout_type: 'media_sem', source_type: 'calculado' }];
-        var colunas = [{ codigo: '_semanal', nome: 'Prova semanal (S1–S8 · N e Q)', tipo: 'semana_grupo', travada: true }];
-        var partesMedia = ['media_sem'];
+        var temSemanal = pecas.indexOf('semanal') >= 0;
+        var semanasA = temSemanal ? [1, 3, 5, 7].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
+        var semanasB = temSemanal ? [2, 4, 6, 8].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
+        var outras = temSemanal ? [{ codigo: 'media_sem', nome: 'Média Sem', layout_type: 'media_sem', source_type: 'calculado' }] : [];
+        var colunas = temSemanal ? [{ codigo: '_semanal', nome: 'Prova semanal (S1-S8 · N e Q)', tipo: 'semana_grupo', travada: true }] : [];
+        var partesMedia = temSemanal ? ['media_sem'] : [];
         pecas.forEach(function (k) {
             if (k === 'semanal') return;
             var cod = pecaCodigoQuadro(k);
@@ -1885,21 +1886,23 @@ $boletimWizardSteps = [
                 sumN += n;
                 sumQ += 10;
             });
-            notas.media_sem = sumQ ? roundPreviewValor(10 * sumN / sumQ) : 0;
+            if (temSemanal) {
+                notas.media_sem = sumQ ? roundPreviewValor(10 * sumN / sumQ) : 0;
+            }
             outras.forEach(function (o) {
                 if (o.codigo === 'media_sem') return;
                 if (o.source_type === 'calculado' && o.codigo === 'media_bim') {
-                    var acc = notas.media_sem;
-                    var nPart = 1;
+                    var acc = temSemanal ? notas.media_sem : 0;
+                    var nPart = temSemanal ? 1 : 0;
                     partesMedia.forEach(function (c) {
                         if (c === 'media_sem') return;
                         if (typeof notas[c] === 'number') { acc += notas[c]; nPart += 1; }
                     });
-                    notas.media_bim = roundPreviewValor(acc / nPart);
+                    notas.media_bim = nPart ? roundPreviewValor(acc / nPart) : '—';
                     return;
                 }
                 if (o.source_type === 'calculado' && o.codigo === 'media_final') {
-                    var base = typeof notas.media_bim === 'number' ? notas.media_bim : notas.media_sem;
+                    var base = typeof notas.media_bim === 'number' ? notas.media_bim : (temSemanal ? notas.media_sem : 0);
                     var extra = typeof notas.enac === 'number' ? notas.enac : (typeof notas.rec === 'number' ? notas.rec : base);
                     notas.media_final = roundPreviewValor(Math.max(base, extra));
                     return;
@@ -1921,15 +1924,18 @@ $boletimWizardSteps = [
         var disp = (catalogo.pecas || []).filter(function (p) { return sel.indexOf(p.key) < 0; }).map(function (p) {
             return { key: p.key, label: p.label };
         });
+        var tabelas = temSemanal ? [
+            { key: 'a', titulo: 'Matérias Bloco A', subtitulo: 'Prova semanal', semanas: semanasA, outras: outras, linhas: matsA.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasA) }; }) },
+            { key: 'b', titulo: 'Matérias Bloco B', subtitulo: 'Prova semanal', semanas: semanasB, outras: outras, linhas: matsB.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasB) }; }) }
+        ] : [
+            { key: 'u', titulo: 'Matérias', subtitulo: 'Exemplo', semanas: [], outras: outras, linhas: mats.map(function (n) { return { materia_nome: n, notas: notasLinha(n, []) }; }) }
+        ];
         return {
-            modo: 'quadro',
+            modo: temSemanal ? 'quadro' : 'simples',
             aviso: 'Exemplo com dados fictícios — não são notas reais.',
             colunas: colunas,
             pecas_disponiveis: disp,
-            tabelas: [
-                { key: 'a', titulo: 'Matérias Bloco A', subtitulo: 'Prova semanal', semanas: semanasA, outras: outras, linhas: matsA.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasA) }; }) },
-                { key: 'b', titulo: 'Matérias Bloco B', subtitulo: 'Prova semanal', semanas: semanasB, outras: outras, linhas: matsB.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasB) }; }) }
-            ]
+            tabelas: tabelas
         };
     }
 
