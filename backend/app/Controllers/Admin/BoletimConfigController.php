@@ -1682,7 +1682,22 @@ class BoletimConfigController extends BaseController
             $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
         }
 
-        $alunos = $this->boletimConfig->getStudentsByIds($idsComGravacao);
+        $alunos = $atualizarPreview
+            ? $this->resolveAlunosVinculadosRegra($regra)
+            : $this->boletimConfig->getStudentsByIds($idsComGravacao);
+        if ($alunos === []) {
+            $_SESSION['boletim_flash'] = 'Nenhum aluno ativo encontrado para o escopo deste evento.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $qs = [
+                'regra_id' => $regraId,
+                'periodo_ref' => $periodoRef,
+            ];
+            if ($dataInicio !== null && $dataFim !== null) {
+                $qs['data_inicio'] = $dataInicio;
+                $qs['data_fim'] = $dataFim;
+            }
+            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+        }
         $stats = $this->gravarBoletinsSimulacaoParaAlunos(
             $regra,
             $regraId,
@@ -1698,7 +1713,7 @@ class BoletimConfigController extends BaseController
         $erros = $stats['erros'];
         $errosAmostra = $stats['errosAmostra'];
 
-        $tipoAtualizado = $atualizarPreview ? 'prévias' : 'boletins oficiais';
+        $tipoAtualizado = $atualizarPreview ? 'prévias dos alunos vinculados' : 'boletins oficiais';
         $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
         if (!empty($errosAmostra)) {
             $msg .= ' Exemplo(s): ' . implode(' | ', $errosAmostra);
