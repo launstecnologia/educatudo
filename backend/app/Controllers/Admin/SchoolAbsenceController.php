@@ -336,6 +336,177 @@ class SchoolAbsenceController extends BaseController
         unset($_SESSION['faltas_flash'], $_SESSION['faltas_flash_type']);
     }
 
+    public function exportarExcel(): void
+    {
+        $eventos = $this->absence->listEventos(0);
+        $turmas = $this->absence->listTurmasAtivas();
+        $turmasById = [];
+        foreach ($turmas as $t) {
+            $tid = (int) ($t['id'] ?? 0);
+            if ($tid > 0) {
+                $turmasById[$tid] = $t;
+            }
+        }
+
+        $materiasById = [];
+        foreach ($this->absence->listMateriasCadastradas(2000) as $materia) {
+            $mid = (int) ($materia['id'] ?? 0);
+            if ($mid > 0) {
+                $materiasById[$mid] = $materia;
+            }
+        }
+
+        $headers = ['Evento', 'Bimestre', 'Ano letivo', 'Turmas', 'Matérias', 'Criado em', 'Atualizado em'];
+        $rows = [];
+        foreach ($eventos as $ev) {
+            $turmasLbl = [];
+            foreach ((array) ($ev['turmas_ids'] ?? []) as $tidEv) {
+                $tidEv = (int) $tidEv;
+                if ($tidEv > 0 && isset($turmasById[$tidEv])) {
+                    $tx = $turmasById[$tidEv];
+                    $turmasLbl[] = trim((string) (($tx['serie_nome'] ?? '') . ' - ' . ($tx['nome'] ?? ('#' . $tidEv))));
+                }
+            }
+
+            $materiasLbl = [];
+            $materiasIds = (array) ($ev['materias_ids'] ?? []);
+            if ($materiasIds === []) {
+                $materiasLbl[] = 'Grade horária';
+            } else {
+                foreach ($materiasIds as $midEv) {
+                    $midEv = (int) $midEv;
+                    if ($midEv > 0 && isset($materiasById[$midEv])) {
+                        $materiasLbl[] = (string) ($materiasById[$midEv]['nome'] ?? ('#' . $midEv));
+                    } elseif ($midEv > 0) {
+                        $materiasLbl[] = '#' . $midEv;
+                    }
+                }
+            }
+
+            $rows[] = [
+                (string) ($ev['nome'] ?? ''),
+                (string) ($ev['bimestre'] ?? ''),
+                (string) ((int) ($ev['ano_letivo'] ?? 0)),
+                implode(', ', $turmasLbl),
+                implode(', ', $materiasLbl),
+                (string) ($ev['created_at'] ?? ''),
+                (string) ($ev['updated_at'] ?? ''),
+            ];
+        }
+
+        $xlsx = $this->criarXlsxSimples('Faltas', $headers, $rows);
+        $filename = 'faltas_eventos_' . date('Y-m-d_His') . '.xlsx';
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        header('Content-Length: ' . strlen($xlsx));
+        echo $xlsx;
+        exit;
+    }
+
+    /**
+     * @param string[] $headers
+     * @param array<int, array<int, string>> $rows
+     */
+    private function criarXlsxSimples(string $sheetName, array $headers, array $rows): string
+    {
+        $xml = static function ($value): string {
+            return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        };
+        $columnName = static function (int $index): string {
+            $name = '';
+            do {
+                $name = chr(65 + ($index % 26)) . $name;
+                $index = intdiv($index, 26) - 1;
+            } while ($index >= 0);
+            return $name;
+        };
+        $cellString = static function (string $ref, string $value, int $style = 0) use ($xml): string {
+            $preserve = trim($value) !== $value || strpos($value, "\n") !== false;
+            return '<c r="' . $ref . '" t="inlineStr" s="' . $style . '"><is><t'
+                . ($preserve ? ' xml:space="preserve"' : '') . '>' . $xml($value) . '</t></is></c>';
+        };
+
+        $sheetRows = [];
+        $headerCells = [];
+        foreach (array_values($headers) as $col => $header) {
+            $headerCells[] = $cellString($columnName($col) . '1', (string) $header, 1);
+        }
+        $sheetRows[] = '<row r="1" ht="24" customHeight="1">' . implode('', $headerCells) . '</row>';
+        foreach (array_values($rows) as $rowIndex => $row) {
+            $excelRow = $rowIndex + 2;
+            $cells = [];
+            foreach (array_values($row) as $col => $value) {
+                $cells[] = $cellString($columnName($col) . $excelRow, (string) $value, 2);
+            }
+            $sheetRows[] = '<row r="' . $excelRow . '">' . implode('', $cells) . '</row>';
+        }
+
+        $lastColumn = $columnName(max(0, count($headers) - 1));
+        $lastRow = max(1, count($rows) + 1);
+        $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . '<dimension ref="A1:' . $lastColumn . $lastRow . '"/>'
+            . '<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+            . '<sheetFormatPr defaultRowHeight="18"/>'
+            . '<sheetData>' . implode('', $sheetRows) . '</sheetData>'
+            . '<autoFilter ref="A1:' . $lastColumn . $lastRow . '"/>'
+            . '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'
+            . '</worksheet>';
+
+        $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts>'
+            . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF5B21B6"/><bgColor indexed="64"/></patternFill></fill></fills>'
+            . '<borders count="2"><border/><border><left style="thin"><color rgb="FFD1D5DB"/></left><right style="thin"><color rgb="FFD1D5DB"/></right><top style="thin"><color rgb="FFD1D5DB"/></top><bottom style="thin"><color rgb="FFD1D5DB"/></bottom><diagonal/></border></borders>'
+            . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+            . '<cellXfs count="3">'
+            . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+            . '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+            . '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+        $files = [
+            '[Content_Types].xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+            '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+            'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' . $xml($sheetName) . '" sheetId="1" r:id="rId1"/></sheets></workbook>',
+            'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+            'xl/worksheets/sheet1.xml' => $sheet,
+            'xl/styles.xml' => $styles,
+        ];
+
+        return $this->criarZipArmazenado($files);
+    }
+
+    /** @param array<string,string> $files */
+    private function criarZipArmazenado(array $files): string
+    {
+        $body = '';
+        $central = '';
+        $offset = 0;
+        $count = 0;
+        foreach ($files as $name => $data) {
+            $name = str_replace('\\', '/', (string) $name);
+            $crc = crc32($data);
+            $size = strlen($data);
+            $nameLength = strlen($name);
+            $local = pack('VvvvvvVVVvv', 0x04034b50, 20, 0, 0, 0, 0, $crc, $size, $size, $nameLength, 0)
+                . $name . $data;
+            $body .= $local;
+            $central .= pack('VvvvvvvVVVvvvvvVV', 0x02014b50, 20, 20, 0, 0, 0, 0, $crc, $size, $size, $nameLength, 0, 0, 0, 0, 0, $offset)
+                . $name;
+            $offset += strlen($local);
+            $count++;
+        }
+
+        return $body . $central
+            . pack('VvvvvVVv', 0x06054b50, 0, 0, $count, $count, strlen($central), strlen($body), 0);
+    }
+
     public function criarEvento(): void
     {
         if (!$this->validateCsrf($_POST['_token'] ?? '')) {

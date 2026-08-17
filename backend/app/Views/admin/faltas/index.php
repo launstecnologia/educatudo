@@ -7,6 +7,7 @@ $flashMessage = (string) ($flash_message ?? '');
 $flashType = (string) ($flash_type ?? 'success');
 $materiasCatalogo = $materias_catalogo ?? [];
 $urlCriarFaltas = URL . '/admin/faltas/criar';
+$urlExportarExcel = URL . '/admin/faltas/exportar-excel';
 $urlAtualizarFaltas = URL . '/admin/faltas/atualizar';
 $urlLancarFaltas = URL . '/admin/faltas/lancar';
 ?>
@@ -16,9 +17,15 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Só Faltas</h1>
         </div>
-        <button type="button" id="btn-abrir-modal-novo-evento-faltas" class="btn-primary-custom shrink-0 inline-flex items-center justify-center p-2.5 rounded-xl hover:opacity-90 shadow-sm" title="Novo evento de faltas — bimestre, turmas e matérias" aria-label="Novo evento de faltas">
-            <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        </button>
+        <div class="flex items-center gap-2">
+            <a href="<?= htmlspecialchars($urlExportarExcel, ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-sm" title="Exportar os eventos de faltas para Excel" aria-label="Exportar faltas em Excel">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11v6m0 0l-3-3m3 3l3-3M4 7h16M5 7l1-2h12l1 2"/></svg>
+                <span class="hidden sm:inline">Exportar Excel</span>
+            </a>
+            <button type="button" id="btn-abrir-modal-novo-evento-faltas" class="btn-primary-custom shrink-0 inline-flex items-center justify-center p-2.5 rounded-xl hover:opacity-90 shadow-sm" title="Novo evento de faltas — bimestre, turmas e matérias" aria-label="Novo evento de faltas">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </button>
+        </div>
     </div>
 
     <?php if ($flashMessage !== ''): ?>

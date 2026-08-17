@@ -389,6 +389,7 @@ $router->get('/admin/doc-sistema/{pagina}', 'Admin/DocSistemaController@index');
 
 // Faltas (Admin/Coordenação)
 $router->get('/admin/faltas', 'Admin/SchoolAbsenceController@index');
+$router->get('/admin/faltas/exportar-excel', 'Admin/SchoolAbsenceController@exportarExcel');
 $router->get('/admin/faltas/lancar', 'Admin/SchoolAbsenceController@lancar');
 $router->post('/admin/faltas/criar', 'Admin/SchoolAbsenceController@criarEvento');
 $router->post('/admin/faltas/atualizar', 'Admin/SchoolAbsenceController@atualizarEvento');

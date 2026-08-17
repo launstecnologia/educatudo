@@ -76,13 +76,17 @@ class SchoolAbsence
 
     public function listEventos(int $limit = 200): array
     {
-        $limit = max(1, min($limit, 1000));
+        $useLimit = $limit > 0;
+        $limit = $useLimit ? max(1, min($limit, 1000)) : 0;
+        $sql = "SELECT id, nome, bimestre, ano_letivo, turmas_json, materias_json, created_at, updated_at
+                FROM faltas_eventos
+                WHERE ativo = 1
+                ORDER BY ano_letivo DESC, updated_at DESC, id DESC";
+        if ($useLimit) {
+            $sql .= ' LIMIT ' . $limit;
+        }
         $rows = $this->db->fetchAll(
-            "SELECT id, nome, bimestre, ano_letivo, turmas_json, materias_json, created_at, updated_at
-             FROM faltas_eventos
-             WHERE ativo = 1
-             ORDER BY ano_letivo DESC, updated_at DESC, id DESC
-             LIMIT {$limit}"
+            $sql
         ) ?: [];
 
         foreach ($rows as &$row) {
