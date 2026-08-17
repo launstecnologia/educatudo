@@ -1692,11 +1692,11 @@ class BoletimConfigController extends BaseController
             $this->redirect('/admin/boletim-configuracao');
         }
 
-        $atualizarPreview = false;
+        $publicarAPartirDePrevia = false;
         $idsComGravacao = $this->boletimConfig->listAlunoIdsWithOfficialBoletim($regraId, $periodoRef);
         if ($idsComGravacao === []) {
             $idsComGravacao = $this->boletimConfig->listAlunoIdsWithGeneratedBoletim($regraId, $periodoRef, true);
-            $atualizarPreview = $idsComGravacao !== [];
+            $publicarAPartirDePrevia = $idsComGravacao !== [];
         }
         if ($idsComGravacao === []) {
             $_SESSION['boletim_flash'] = 'Não há boletins gravados neste período para atualizar. Confira o período selecionado ou use "Gerar boletins de todos os alunos vinculados" na primeira vez ou quando precisar incluir alunos que ainda não têm registro.';
@@ -1712,7 +1712,7 @@ class BoletimConfigController extends BaseController
             $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
         }
 
-        $alunos = $atualizarPreview
+        $alunos = $publicarAPartirDePrevia
             ? $this->resolveAlunosVinculadosRegra($regra)
             : $this->boletimConfig->getStudentsByIds($idsComGravacao);
         if ($alunos === []) {
@@ -1736,14 +1736,14 @@ class BoletimConfigController extends BaseController
             $dataFim,
             $alunos,
             'atualizarBoletinsGravados',
-            $atualizarPreview
+            false
         );
         $gerados = $stats['gerados'];
         $linhas = $stats['linhas'];
         $erros = $stats['erros'];
         $errosAmostra = $stats['errosAmostra'];
 
-        $tipoAtualizado = $atualizarPreview ? 'prévias dos alunos vinculados' : 'boletins oficiais';
+        $tipoAtualizado = $publicarAPartirDePrevia ? 'boletins oficiais dos alunos vinculados' : 'boletins oficiais';
         $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
         if (!empty($errosAmostra)) {
             $msg .= ' Exemplo(s): ' . implode(' | ', $errosAmostra);

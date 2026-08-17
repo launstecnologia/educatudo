@@ -865,10 +865,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
                     <p class="text-sm font-semibold text-amber-950">Atualizar boletins existentes</p>
                     <p class="text-sm text-amber-950">
-                        Recalcula só quem já tem boletim gravado neste evento. Útil depois de ajustar a regra ou provas, sem percorrer alunos novos.
+                        Recalcula os boletins oficiais deste período. Se ainda existir apenas prévia, publica oficialmente para todos os alunos vinculados.
                     </p>
                     <button type="submit" class="w-full px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium">
-                        Atualizar boletins já gravados neste período
+                        Atualizar/publicar boletins deste período
                     </button>
                 </form>
 
