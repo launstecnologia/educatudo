@@ -767,6 +767,21 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <button type="button" id="btn-add-bloco" class="btn-primary-custom shrink-0 h-10 px-3 rounded-lg hover:opacity-90 text-sm font-medium inline-flex items-center justify-center">+ Adicionar bloco</button>
                 </div>
 
+                <div id="wrap-semanas-quadro" class="hidden rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+                    <div class="flex flex-col gap-1 mb-3">
+                        <h4 class="text-sm font-semibold text-indigo-950">Semanas do quadro semanal</h4>
+                        <p class="text-xs text-indigo-800">Marque quais colunas S1–S8 aparecem no boletim e entram na Média Sem.</p>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                        <?php for ($semanaQuadro = 1; $semanaQuadro <= 8; $semanaQuadro++): ?>
+                            <label class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-indigo-950">
+                                <input type="checkbox" class="semana-quadro-toggle rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="s<?= $semanaQuadro ?>" data-semana="<?= $semanaQuadro ?>">
+                                <span>S<?= $semanaQuadro ?></span>
+                            </label>
+                        <?php endfor; ?>
+                    </div>
+                </div>
+
                 <div id="lista-blocos" class="space-y-3"></div>
 
                 <div class="pt-2">
@@ -2617,6 +2632,147 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         inputJson.value = JSON.stringify(componentes);
     }
 
+    var wrapSemanasQuadro = document.getElementById('wrap-semanas-quadro');
+    var semanasQuadroChecks = Array.from(document.querySelectorAll('.semana-quadro-toggle'));
+    var ordemSemanasQuadro = ['s1', 's3', 's5', 's7', 's2', 's4', 's6', 's8'];
+
+    function codigoSemanaQuadro(semana) {
+        var n = Number(semana || 0);
+        return n >= 1 && n <= 8 ? ('s' + n) : '';
+    }
+
+    function criarComponenteSemanaQuadro(semana) {
+        var n = Number(semana || 0);
+        var cod = codigoSemanaQuadro(n);
+        var grupo = (n % 2 === 1) ? 'quadro_a' : 'quadro_b';
+        return {
+            id: 0,
+            codigo: cod,
+            nome: 'S' + n,
+            source_type: 'provas_sistema',
+            calc_type: 'media',
+            peso: 1,
+            filtro_titulo: '',
+            bloco_id: 0,
+            blocos_ids: [],
+            materia_id: 0,
+            materias_ids: [],
+            materia_unica: 1,
+            usar_percentual: 1,
+            escala_max: 10,
+            obrigatorio: 0,
+            config: {
+                semana: n,
+                layout_group: grupo,
+                layout_type: 'semana_nq',
+                tipo_avaliacao_nome: 'Semanal'
+            }
+        };
+    }
+
+    function isComponenteSemanaQuadro(comp) {
+        var cod = String((comp && comp.codigo) || '').toLowerCase().trim();
+        var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
+        return /^s[1-8]$/.test(cod) || String(cfg.layout_type || '').toLowerCase() === 'semana_nq';
+    }
+
+    function isMediaSemQuadro(comp) {
+        var cod = String((comp && comp.codigo) || '').toLowerCase().trim();
+        var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
+        var agregacaoSemanas = Array.isArray(cfg.agregar_nq) && cfg.agregar_nq.some(function (x) {
+            return /^s[1-8]$/.test(String(x || '').toLowerCase().trim());
+        });
+        return cod === 'media_sem' || String(cfg.layout_type || '').toLowerCase() === 'media_sem' || agregacaoSemanas;
+    }
+
+    function ordenarComponentesQuadroSemanal() {
+        componentes.sort(function (a, b) {
+            var ac = String((a && a.codigo) || '').toLowerCase().trim();
+            var bc = String((b && b.codigo) || '').toLowerCase().trim();
+            var ai = ordemSemanasQuadro.indexOf(ac);
+            var bi = ordemSemanasQuadro.indexOf(bc);
+            if (ai >= 0 && bi >= 0) return ai - bi;
+            if (ai >= 0 && bi < 0) return -1;
+            if (ai < 0 && bi >= 0) return 1;
+            return 0;
+        });
+    }
+
+    function syncSemanasQuadroPanel() {
+        if (!wrapSemanasQuadro || semanasQuadroChecks.length === 0) {
+            return;
+        }
+        var codigosAtivos = {};
+        var temQuadro = false;
+        componentes.forEach(function (comp) {
+            if (isComponenteSemanaQuadro(comp)) {
+                var cfg = (comp.config && typeof comp.config === 'object') ? comp.config : {};
+                var cod = String(comp.codigo || '').toLowerCase().trim();
+                if (!/^s[1-8]$/.test(cod)) {
+                    cod = codigoSemanaQuadro(cfg.semana || 0);
+                }
+                if (cod !== '') {
+                    codigosAtivos[cod] = true;
+                    temQuadro = true;
+                }
+            } else if (isMediaSemQuadro(comp)) {
+                temQuadro = true;
+            }
+        });
+        wrapSemanasQuadro.classList.toggle('hidden', !temQuadro);
+        semanasQuadroChecks.forEach(function (check) {
+            check.checked = !!codigosAtivos[String(check.value || '').toLowerCase()];
+        });
+    }
+
+    function atualizarMediaSemComSemana(codigo, ativo) {
+        componentes.forEach(function (comp) {
+            if (!isMediaSemQuadro(comp)) {
+                return;
+            }
+            if (!comp.config || typeof comp.config !== 'object') {
+                comp.config = {};
+            }
+            var lista = Array.isArray(comp.config.agregar_nq)
+                ? comp.config.agregar_nq.map(function (x) { return String(x || '').toLowerCase().trim(); }).filter(Boolean)
+                : [];
+            if (ativo) {
+                if (lista.indexOf(codigo) < 0) {
+                    lista.push(codigo);
+                }
+            } else {
+                lista = lista.filter(function (x) { return x !== codigo; });
+            }
+            comp.config.agregar_nq = ordemSemanasQuadro.filter(function (x) { return lista.indexOf(x) >= 0; });
+        });
+    }
+
+    function setSemanaQuadroAtiva(semana, ativo) {
+        var cod = codigoSemanaQuadro(semana);
+        if (!cod) {
+            return;
+        }
+        var idx = componentes.findIndex(function (comp) {
+            var cc = String((comp && comp.codigo) || '').toLowerCase().trim();
+            var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
+            return cc === cod || (String(cfg.layout_type || '').toLowerCase() === 'semana_nq' && Number(cfg.semana || 0) === Number(semana));
+        });
+        if (ativo && idx < 0) {
+            componentes.push(criarComponenteSemanaQuadro(semana));
+        } else if (!ativo && idx >= 0) {
+            componentes.splice(idx, 1);
+        }
+        atualizarMediaSemComSemana(cod, ativo);
+        ordenarComponentesQuadroSemanal();
+        renderLista();
+    }
+
+    semanasQuadroChecks.forEach(function (check) {
+        check.addEventListener('change', function () {
+            setSemanaQuadroAtiva(Number(check.dataset.semana || 0), !!check.checked);
+        });
+    });
+
     function getSelectedMateriasFromModal() {
         return Array.from(document.querySelectorAll('.bloco-materia-checkbox:checked'))
             .map(function (el) { return parseInt(el.value, 10); })
@@ -2946,6 +3102,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             empty.className = 'p-4 rounded-lg border border-dashed border-gray-300 text-sm text-gray-500';
             empty.textContent = 'Nenhum bloco adicionado ainda. Clique em "Adicionar bloco".';
             lista.appendChild(empty);
+            syncSemanasQuadroPanel();
             syncJson();
             return;
         }
@@ -3096,6 +3253,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             lista.appendChild(card);
         });
 
+        syncSemanasQuadroPanel();
         syncJson();
     }
 
