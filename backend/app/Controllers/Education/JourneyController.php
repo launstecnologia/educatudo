@@ -606,6 +606,38 @@ class JourneyController extends BaseController
         return false;
     }
 
+    private function timestampInicioJornada($jornada)
+    {
+        if (!$jornada || !is_array($jornada)) {
+            return false;
+        }
+
+        $dataInicio = $jornada['data_inicio'] ?? null;
+        $horaInicio = trim((string)($jornada['hora_inicio'] ?? '')) ?: '00:00';
+
+        if (empty($dataInicio) && !empty($jornada['estrutura'])) {
+            $estrutura = json_decode((string)$jornada['estrutura'], true);
+            if (is_array($estrutura)) {
+                $dataInicio = $estrutura['data_inicio'] ?? null;
+                $horaInicio = trim((string)($estrutura['hora_inicio'] ?? '')) ?: '00:00';
+            }
+        }
+
+        if (empty($dataInicio)) {
+            return false;
+        }
+
+        return strtotime($dataInicio . ' ' . $horaInicio);
+    }
+
+    private function garantirJornadaDisponivelParaAluno($jornada): void
+    {
+        $tsInicio = $this->timestampInicioJornada($jornada);
+        if ($tsInicio !== false && time() < $tsInicio) {
+            throw new Exception('Esta jornada ainda não está disponível. Ela estará disponível a partir de ' . date('d/m/Y H:i', $tsInicio) . '.');
+        }
+    }
+
     /**
      * Verifica se a jornada está disponível para a turma (turma principal ou em estrutura.turmas_selecionadas).
      * Usado para compatibilidade com MariaDB (sem JSON_CONTAINS no SQL).
@@ -1683,7 +1715,7 @@ class JourneyController extends BaseController
                  LEFT JOIN materias m ON j.materia_id = m.id
                  WHERE j.id = :jornada_id 
                      AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
-                     AND j.status != 'pausada'
+                     AND (j.status IS NULL OR j.status != 'pausada')
                      AND (j.ativo = 1 OR j.ativo IS NULL)",
                 ['jornada_id' => $id]
             );
@@ -1732,7 +1764,7 @@ class JourneyController extends BaseController
         
         // Verifica se a jornada já pode ser iniciada (agora >= data_inicio + hora_inicio) — não em preview
         if (!$preview && $dataInicio) {
-            $tsInicio = strtotime($dataInicio . ' ' . $horaInicio);
+            $tsInicio = $this->timestampInicioJornada($jornada);
             if ($tsInicio !== false && time() < $tsInicio) {
                 $_SESSION['error_message'] = 'Esta jornada ainda não está disponível. Ela estará disponível a partir de ' . date('d/m/Y H:i', $tsInicio) . '.';
                 $this->redirect('/jornadas');
@@ -2028,8 +2060,8 @@ class JourneyController extends BaseController
              FROM jornadas_aulas ja
              JOIN jornadas j ON ja.jornada_id = j.id
              WHERE ja.id = :aula_id 
-                 AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
-                 AND j.status != 'pausada'",
+                 AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
+                 AND (j.status IS NULL OR j.status != 'pausada')",
             ['aula_id' => $aula_id]
         );
         if ($aula && !$this->jornadaPermiteAluno($aula, (int) ($aluno['id'] ?? 0))) {
@@ -2142,7 +2174,7 @@ class JourneyController extends BaseController
                  FROM jornadas_aulas ja
                  JOIN jornadas j ON ja.jornada_id = j.id
                  LEFT JOIN jornadas_materias jm ON j.materia_id = jm.id
-                 WHERE ja.id = :aula_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                 WHERE ja.id = :aula_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['aula_id' => $aulaId]
             );
             if ($aula && !$this->jornadaPermiteAluno($aula, (int) ($aluno['id'] ?? 0))) {
@@ -2241,7 +2273,7 @@ class JourneyController extends BaseController
             $jornada = $this->db->fetch(
                 "SELECT {$this->colunasSqlJornadasPermiteAluno('j')} FROM jornadas j
                  JOIN jornadas_aulas ja ON j.id = ja.jornada_id
-                 WHERE ja.id = :aula_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                 WHERE ja.id = :aula_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['aula_id' => $aulaId]
             );
             if ($jornada && !$this->jornadaPermiteAluno($jornada, (int) ($aluno['id'] ?? 0))) {
@@ -2329,7 +2361,7 @@ class JourneyController extends BaseController
             
             // Busca dados da jornada (checagem de turma em PHP por compatibilidade MariaDB)
             $jornada = $this->db->fetch(
-                "SELECT {$this->colunasSqlJornadasMensagem('j')} FROM jornadas j WHERE j.id = :jornada_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                "SELECT {$this->colunasSqlJornadasMensagem('j')} FROM jornadas j WHERE j.id = :jornada_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['jornada_id' => $jornadaId]
             );
             if ($jornada && !$this->jornadaPermiteAluno($jornada, (int) ($aluno['id'] ?? 0))) {
@@ -2579,7 +2611,7 @@ class JourneyController extends BaseController
                 "SELECT ja.id, j.status as jornada_status, j.turma_id, j.estrutura
                  FROM jornadas_aulas ja
                  JOIN jornadas j ON ja.jornada_id = j.id
-                 WHERE ja.id = :aula_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                 WHERE ja.id = :aula_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['aula_id' => $aulaId]
             );
             if ($aula && !$this->jornadaPermiteAluno($aula, (int) ($aluno['id'] ?? 0))) {
@@ -2673,7 +2705,7 @@ class JourneyController extends BaseController
             
             // Verifica se a jornada pertence à turma do aluno (checagem em PHP por compatibilidade MariaDB)
             $jornada = $this->db->fetch(
-                "SELECT {$this->colunasSqlJornadasPermiteAluno('j')} FROM jornadas j WHERE j.id = :jornada_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                "SELECT {$this->colunasSqlJornadasPermiteAluno('j')} FROM jornadas j WHERE j.id = :jornada_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['jornada_id' => $jornada_id]
             );
             if ($jornada && !$this->jornadaPermiteAluno($jornada, (int) ($aluno['id'] ?? 0))) {
@@ -2769,8 +2801,8 @@ class JourneyController extends BaseController
                  FROM jornadas_modulos m
                  JOIN jornadas j ON m.jornada_id = j.id
                  WHERE m.id = :modulo_id 
-                     AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
-                     AND j.status != 'pausada'",
+                     AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
+                     AND (j.status IS NULL OR j.status != 'pausada')",
                 ['modulo_id' => $modulo_id]
             );
             $aluno = $this->fetchAlunoParaListagemJornadas((int) $user['id']);
@@ -2784,6 +2816,7 @@ class JourneyController extends BaseController
                 ]);
                 throw new Exception('Módulo não encontrado, não autorizado ou jornada não está ativa');
             }
+            $this->garantirJornadaDisponivelParaAluno($modulo);
             $alunoId = (int) $aluno['id'];
             
             // Tempo gasto: usa valor enviado pelo front (segundos) ou calcula pelo início da etapa
@@ -2907,8 +2940,8 @@ class JourneyController extends BaseController
                  FROM jornadas_modulos m
                  JOIN jornadas j ON m.jornada_id = j.id
                  WHERE m.id = :modulo_id
-                     AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
-                     AND j.status != 'pausada'",
+                     AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
+                     AND (j.status IS NULL OR j.status != 'pausada')",
                 ['modulo_id' => $modulo_id]
             );
             $aluno = $this->fetchAlunoParaListagemJornadas((int) $user['id']);
@@ -2947,6 +2980,7 @@ class JourneyController extends BaseController
                 ]);
                 throw new Exception('Você não tem acesso a esta jornada (verifique se está na turma correta).');
             }
+            $this->garantirJornadaDisponivelParaAluno($modulo);
             
             $jornadaIdParaInsert = !empty($jornada_id) ? $jornada_id : ($modulo['jornada_id'] ?? null);
             if (empty($jornadaIdParaInsert)) {
@@ -3155,13 +3189,14 @@ class JourneyController extends BaseController
                  FROM jornadas_modulos m
                  JOIN jornadas j ON m.jornada_id = j.id
                  WHERE m.id = :modulo_id 
-                     AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
-                     AND j.status != 'pausada'",
+                     AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
+                     AND (j.status IS NULL OR j.status != 'pausada')",
                 ['modulo_id' => $modulo_id]
             );
             if (!$modulo || !$this->jornadaPermiteAluno($modulo, (int) ($aluno['id'] ?? 0))) {
                 throw new Exception('Módulo não encontrado ou não autorizado');
             }
+            $this->garantirJornadaDisponivelParaAluno($modulo);
             $alunoId = (int) $aluno['id'];
             
             if ($acao === 'iniciar') {
@@ -3311,12 +3346,21 @@ class JourneyController extends BaseController
                      JOIN jornadas j ON m.jornada_id = j.id
                      WHERE m.id = :modulo_id 
                          AND m.jornada_id = :jornada_id 
-                         AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
-                         AND j.status != 'pausada'",
+                         AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '')
+                         AND (j.status IS NULL OR j.status != 'pausada')",
                     ['modulo_id' => $modulo_id, 'jornada_id' => $jornada_id]
                 );
                 if ($modulo && !$this->jornadaPermiteAluno($modulo, (int) ($aluno['id'] ?? 0))) {
                     $modulo = null;
+                }
+                if ($modulo) {
+                    try {
+                        $this->garantirJornadaDisponivelParaAluno($modulo);
+                    } catch (Exception $e) {
+                        $_SESSION['error_message'] = $e->getMessage();
+                        $this->redirect('/jornadas');
+                        return;
+                    }
                 }
             }
             if (!$modulo) {
@@ -4019,6 +4063,7 @@ class JourneyController extends BaseController
                 ]);
                 throw new Exception('Você não tem acesso a esta jornada (verifique se está na turma correta).');
             }
+            $this->garantirJornadaDisponivelParaAluno($exercicio);
             
             $moduloIdExercicio = (int) $exercicio['modulo_id'];
             if ($modulo_id && (int) $modulo_id !== $moduloIdExercicio) {
@@ -4528,7 +4573,7 @@ class JourneyController extends BaseController
                 "SELECT {$this->colunasSqlJornadasShow('j')}, p.nome as professor_nome
                  FROM jornadas j
                  JOIN professores p ON j.professor_id = p.id
-                 WHERE j.id = :id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                 WHERE j.id = :id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['id' => $jornadaId]
             );
             if ($jornada && !$this->jornadaPermiteAluno($jornada, (int) ($aluno['id'] ?? 0))) {
@@ -4617,7 +4662,7 @@ class JourneyController extends BaseController
                  FROM jornadas_redacoes jr
                  INNER JOIN jornadas j ON jr.jornada_id = j.id
                  LEFT JOIN jornadas_aulas ja ON jr.aula_id = ja.id
-                 WHERE jr.id = :id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                 WHERE jr.id = :id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['id' => $jornadaRedacaoId]
             );
             if ($redacaoJornada && !$this->jornadaPermiteAluno($redacaoJornada, (int) ($aluno['id'] ?? 0))) {
@@ -4710,7 +4755,7 @@ class JourneyController extends BaseController
             
             // Verificar se a jornada está ativa (checagem em PHP por compatibilidade MariaDB)
             $jornada = $this->db->fetch(
-                "SELECT {$this->colunasSqlJornadasPermiteAluno('j')} FROM jornadas j WHERE j.id = :jornada_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND j.status != 'pausada'",
+                "SELECT {$this->colunasSqlJornadasPermiteAluno('j')} FROM jornadas j WHERE j.id = :jornada_id AND (j.status = 'ativa' OR j.status = 'em_andamento' OR j.status = 'aguardando' OR j.status = 'finalizada' OR j.status IS NULL OR j.status = '') AND (j.status IS NULL OR j.status != 'pausada')",
                 ['jornada_id' => $jornadaId]
             );
             if ($jornada && !$this->jornadaPermiteAluno($jornada, (int) ($aluno['id'] ?? 0))) {
