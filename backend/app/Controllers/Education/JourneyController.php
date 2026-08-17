@@ -2776,13 +2776,15 @@ class JourneyController extends BaseController
             $aluno = $this->fetchAlunoParaListagemJornadas((int) $user['id']);
             if (!$modulo || !$aluno || !$this->jornadaPermiteAluno($modulo, (int) ($aluno['id'] ?? 0))) {
                 $this->logJornadaError('jornada_aluno finalizarEtapa: módulo não encontrado ou não autorizado', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
+                    'aluno_id' => $aluno['id'] ?? null,
                     'modulo_id' => $modulo_id,
                     'tem_modulo' => (bool)$modulo,
                     'tem_aluno' => (bool)$aluno,
                 ]);
                 throw new Exception('Módulo não encontrado, não autorizado ou jornada não está ativa');
             }
+            $alunoId = (int) $aluno['id'];
             
             // Tempo gasto: usa valor enviado pelo front (segundos) ou calcula pelo início da etapa
             $tempoGasto = 0;
@@ -2794,7 +2796,7 @@ class JourneyController extends BaseController
                      WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id",
                     [
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id']
+                        'aluno_id' => $alunoId
                     ]
                 );
                 if ($inicioEtapa && $inicioEtapa['inicio']) {
@@ -2809,7 +2811,7 @@ class JourneyController extends BaseController
                  WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id AND atividade_tipo = 'modulo'",
                 [
                     'modulo_id' => $modulo_id,
-                    'aluno_id' => $user['id']
+                    'aluno_id' => $alunoId
                 ]
             );
             
@@ -2836,7 +2838,7 @@ class JourneyController extends BaseController
                     [
                         'jornada_id' => $modulo['jornada_id'],
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id'],
+                        'aluno_id' => $alunoId,
                         'tempo' => $tempoGasto
                     ]
                 );
@@ -2850,13 +2852,14 @@ class JourneyController extends BaseController
                 'trace' => $e->getTraceAsString(),
                 'modulo_id' => $modulo_id ?? null,
                 'tipo' => $tipo ?? null,
-                'aluno_id' => $user['id'] ?? null,
+                'user_id' => $user['id'] ?? null,
+                'aluno_id' => $alunoId ?? null,
             ]);
             $status = $this->isTransientConnectionError($e) ? 503 : 400;
             $message = $this->isTransientConnectionError($e)
                 ? 'Instabilidade temporária de conexão. Tente novamente em alguns segundos.'
                 : $e->getMessage();
-            $this->json(['error' => $message], $status);
+            $this->json(['success' => false, 'error' => $message], $status);
         }
     }
     
@@ -2916,24 +2919,28 @@ class JourneyController extends BaseController
                 ]);
                 throw new Exception('Aluno não encontrado. Faça login novamente.');
             }
+            $alunoId = (int) $aluno['id'];
             if (!$modulo || !$this->jornadaPermiteAluno($modulo, (int) ($aluno['id'] ?? 0))) {
                 if (!$modulo) {
                     $this->logJornadaError('jornada_aluno enviarResumo: módulo não encontrado', [
-                        'aluno_id' => $user['id'],
+                        'user_id' => $user['id'],
+                        'aluno_id' => $alunoId,
                         'modulo_id' => $modulo_id,
                     ]);
                     throw new Exception('Módulo não encontrado');
                 }
                 if (($modulo['jornada_status'] ?? '') === 'pausada') {
                     $this->logJornadaError('jornada_aluno enviarResumo: jornada pausada', [
-                        'aluno_id' => $user['id'],
+                        'user_id' => $user['id'],
+                        'aluno_id' => $alunoId,
                         'modulo_id' => $modulo_id,
                         'jornada_id' => $modulo['jornada_id'] ?? null,
                     ]);
                     throw new Exception('Esta jornada está pausada. O envio de resumos está temporariamente indisponível.');
                 }
                 $this->logJornadaError('jornada_aluno enviarResumo: turma não autorizada', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                     'turma_id' => $aluno['turma_id'] ?? null,
                     'modulo_id' => $modulo_id,
                     'jornada_id' => $modulo['jornada_id'] ?? null,
@@ -2944,7 +2951,8 @@ class JourneyController extends BaseController
             $jornadaIdParaInsert = !empty($jornada_id) ? $jornada_id : ($modulo['jornada_id'] ?? null);
             if (empty($jornadaIdParaInsert)) {
                 $this->logJornadaError('jornada_aluno enviarResumo: jornada_id ausente (POST e módulo)', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                     'modulo_id' => $modulo_id,
                 ]);
                 throw new Exception('Dados da jornada incompletos. Recarregue a página e tente novamente.');
@@ -2955,7 +2963,7 @@ class JourneyController extends BaseController
                 "SELECT {$this->colunasJornadasResumosAlunos()} FROM jornadas_resumos_alunos 
                  WHERE aluno_id = :aluno_id AND modulo_id = :modulo_id",
                 [
-                    'aluno_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                     'modulo_id' => $modulo_id
                 ]
             );
@@ -2980,7 +2988,7 @@ class JourneyController extends BaseController
                     [
                         'jornada_id' => $jornadaIdParaInsert,
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id'],
+                        'aluno_id' => $alunoId,
                         'resumo' => $resumo
                     ]
                 );
@@ -2992,7 +3000,7 @@ class JourneyController extends BaseController
                  WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id",
                 [
                     'modulo_id' => $modulo_id,
-                    'aluno_id' => $user['id']
+                    'aluno_id' => $alunoId
                 ]
             );
             
@@ -3009,7 +3017,7 @@ class JourneyController extends BaseController
                  WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id AND atividade_tipo = 'modulo'",
                 [
                     'modulo_id' => $modulo_id,
-                    'aluno_id' => $user['id']
+                    'aluno_id' => $alunoId
                 ]
             );
             
@@ -3021,7 +3029,7 @@ class JourneyController extends BaseController
                     [
                         'jornada_id' => $jornadaIdParaInsert,
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id'],
+                        'aluno_id' => $alunoId,
                         'tempo' => $tempoGasto
                     ]
                 );
@@ -3048,7 +3056,8 @@ class JourneyController extends BaseController
             $this->logJornadaError('jornada_aluno enviarResumo: exceção ao enviar resumo', [
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'aluno_id' => $user['id'] ?? null,
+                'user_id' => $user['id'] ?? null,
+                'aluno_id' => $alunoId ?? null,
                 'modulo_id' => $modulo_id ?? null,
                 'jornada_id' => $jornada_id ?? null,
             ]);
@@ -3071,7 +3080,8 @@ class JourneyController extends BaseController
             $this->logJornadaError('jornada_aluno enviarResumo: erro fatal', [
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'aluno_id' => $user['id'] ?? null,
+                'user_id' => $user['id'] ?? null,
+                'aluno_id' => $alunoId ?? null,
             ]);
             $errorResponse = [
                 'success' => false,
@@ -3152,6 +3162,7 @@ class JourneyController extends BaseController
             if (!$modulo || !$this->jornadaPermiteAluno($modulo, (int) ($aluno['id'] ?? 0))) {
                 throw new Exception('Módulo não encontrado ou não autorizado');
             }
+            $alunoId = (int) $aluno['id'];
             
             if ($acao === 'iniciar') {
                 // Verifica se já existe progresso (início da etapa)
@@ -3160,7 +3171,7 @@ class JourneyController extends BaseController
                      WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id AND atividade_tipo = 'modulo'",
                     [
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id']
+                        'aluno_id' => $alunoId
                     ]
                 );
                 
@@ -3173,7 +3184,7 @@ class JourneyController extends BaseController
                         [
                             'jornada_id' => $modulo['jornada_id'],
                             'modulo_id' => $modulo_id,
-                            'aluno_id' => $user['id']
+                            'aluno_id' => $alunoId
                         ]
                     );
                 }
@@ -3185,7 +3196,7 @@ class JourneyController extends BaseController
                      ORDER BY created_at ASC LIMIT 1",
                     [
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id']
+                        'aluno_id' => $alunoId
                     ]
                 );
                 
@@ -3201,7 +3212,7 @@ class JourneyController extends BaseController
                      WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id AND atividade_tipo = 'modulo'",
                     [
                         'modulo_id' => $modulo_id,
-                        'aluno_id' => $user['id']
+                        'aluno_id' => $alunoId
                     ]
                 );
                 
@@ -3228,7 +3239,7 @@ class JourneyController extends BaseController
                         [
                             'jornada_id' => $modulo['jornada_id'],
                             'modulo_id' => $modulo_id,
-                            'aluno_id' => $user['id'],
+                            'aluno_id' => $alunoId,
                             'tempo' => $tempo_gasto
                         ]
                     );
@@ -3242,7 +3253,8 @@ class JourneyController extends BaseController
                 'exception' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'modulo_id' => $modulo_id ?? null,
-                'aluno_id' => $user['id'] ?? null,
+                'user_id' => $user['id'] ?? null,
+                'aluno_id' => $alunoId ?? null,
             ]);
             $this->json(['success' => false, 'error' => $e->getMessage()], 400);
         }
@@ -3953,18 +3965,33 @@ class JourneyController extends BaseController
             
             if (!$exercicio_id) {
                 $this->logJornadaError('jornada_aluno responderExercicioModulo: ID do exercício não enviado', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
                     'post_keys' => array_keys($_POST),
                 ]);
                 throw new Exception('ID do exercício é obrigatório');
             }
+
+            $aluno = $this->fetchAlunoParaListagemJornadas((int) $user['id']);
+            if (!$aluno) {
+                $this->logJornadaError('jornada_aluno responderExercicioModulo: aluno não encontrado no BD', [
+                    'user_id' => $user['id'],
+                    'exercicio_id' => $exercicio_id,
+                ]);
+                throw new Exception('Aluno não encontrado. Faça login novamente.');
+            }
+            $alunoId = (int) $aluno['id'];
             
             // Converte resposta para string
             $resposta = $resposta === null ? '' : (string)$resposta;
             
             // Busca o exercício e o módulo (necessário para saber o tipo e validar resposta vazia)
             $exercicio = $this->db->fetch(
-                "SELECT {$this->colunasSqlJornadasModulosExerciciosResponder('me')}, m.jornada_id, m.id as modulo_id, j.status as jornada_status
+                "SELECT {$this->colunasSqlJornadasModulosExerciciosResponder('me')},
+                        m.jornada_id,
+                        m.id as modulo_id,
+                        j.turma_id,
+                        j.status as jornada_status,
+                        j.estrutura
                  FROM jornadas_modulos_exercicios me
                  JOIN jornadas_modulos m ON me.modulo_id = m.id
                  JOIN jornadas j ON m.jornada_id = j.id
@@ -3974,21 +4001,43 @@ class JourneyController extends BaseController
             
             if (!$exercicio) {
                 $this->logJornadaError('jornada_aluno responderExercicioModulo: exercício não encontrado', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                     'exercicio_id' => $exercicio_id,
                 ]);
                 throw new Exception('Exercício não encontrado');
             }
-            
-            // Se modulo_id não foi fornecido, usa o do exercício
-            if (!$modulo_id) {
-                $modulo_id = $exercicio['modulo_id'];
+
+            if (!$this->jornadaPermiteAluno($exercicio, $alunoId)) {
+                $this->logJornadaError('jornada_aluno responderExercicioModulo: jornada não autorizada para aluno', [
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
+                    'turma_id' => $aluno['turma_id'] ?? null,
+                    'exercicio_id' => $exercicio_id,
+                    'modulo_id' => $exercicio['modulo_id'] ?? null,
+                    'jornada_id' => $exercicio['jornada_id'] ?? null,
+                ]);
+                throw new Exception('Você não tem acesso a esta jornada (verifique se está na turma correta).');
             }
+            
+            $moduloIdExercicio = (int) $exercicio['modulo_id'];
+            if ($modulo_id && (int) $modulo_id !== $moduloIdExercicio) {
+                $this->logJornadaError('jornada_aluno responderExercicioModulo: módulo divergente do exercício', [
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
+                    'exercicio_id' => $exercicio_id,
+                    'modulo_id_post' => $modulo_id,
+                    'modulo_id_exercicio' => $moduloIdExercicio,
+                ]);
+                throw new Exception('Dados do exercício inconsistentes. Recarregue a página e tente novamente.');
+            }
+            $modulo_id = $moduloIdExercicio;
             
             // Verifica se a jornada está pausada (única restrição real)
             if ($exercicio['jornada_status'] === 'pausada') {
                 $this->logJornadaError('jornada_aluno responderExercicioModulo: jornada pausada', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                     'exercicio_id' => $exercicio_id,
                     'modulo_id' => $modulo_id,
                 ]);
@@ -3998,7 +4047,8 @@ class JourneyController extends BaseController
             // Resposta vazia só é permitida para dissertativa (rascunho em branco)
             if (($resposta === '' || trim($resposta) === '') && ($exercicio['tipo'] ?? '') !== 'dissertativa') {
                 $this->logJornadaError('jornada_aluno responderExercicioModulo: resposta obrigatória não enviada', [
-                    'aluno_id' => $user['id'],
+                    'user_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                     'exercicio_id' => $exercicio_id,
                     'tipo_exercicio' => $exercicio['tipo'] ?? null,
                 ]);
@@ -4070,7 +4120,7 @@ class JourneyController extends BaseController
                  WHERE exercicio_modulo_id = :exercicio_id AND aluno_id = :aluno_id AND atividade_tipo = 'exercicio_modulo'",
                 [
                     'exercicio_id' => $exercicio_id,
-                    'aluno_id' => $user['id']
+                    'aluno_id' => $alunoId
                 ]
             );
             
@@ -4110,7 +4160,7 @@ class JourneyController extends BaseController
                         'jornada_id' => $exercicio['jornada_id'],
                         'modulo_id' => $modulo_id,
                         'exercicio_id' => $exercicio_id,
-                        'aluno_id' => $user['id'],
+                        'aluno_id' => $alunoId,
                         'pontuacao' => $pontuacao,
                         'resposta' => $respostaJson
                     ]
@@ -4127,7 +4177,7 @@ class JourneyController extends BaseController
                 [
                     'modulo_id' => $modulo_id,
                     'modulo_id2' => $modulo_id,
-                    'aluno_id' => $user['id'],
+                    'aluno_id' => $alunoId,
                 ]
             );
             if ((int) ($contagemModulo['total_pub'] ?? 0) > 0
@@ -4135,7 +4185,7 @@ class JourneyController extends BaseController
                 $progressoModulo = $this->db->fetch(
                     "SELECT {$this->colunasJornadasProgressoAlunos()} FROM jornadas_progresso_alunos 
                      WHERE modulo_id = :modulo_id AND aluno_id = :aluno_id AND atividade_tipo = 'modulo'",
-                    ['modulo_id' => $modulo_id, 'aluno_id' => $user['id']]
+                    ['modulo_id' => $modulo_id, 'aluno_id' => $alunoId]
                 );
                 if ($progressoModulo) {
                     if ($progressoModulo['status'] !== 'concluido') {
@@ -4152,7 +4202,7 @@ class JourneyController extends BaseController
                         [
                             'jornada_id' => $exercicio['jornada_id'],
                             'modulo_id' => $modulo_id,
-                            'aluno_id' => $user['id']
+                            'aluno_id' => $alunoId
                         ]
                     );
                     $moduloAutoConcluido = true;
@@ -4161,7 +4211,7 @@ class JourneyController extends BaseController
 
             // Rastro final do envio da resposta (inclui acerto/erro e pontuação).
             $this->registrarAuditoriaExercicio([
-                'aluno_id' => (int) $user['id'],
+                'aluno_id' => $alunoId,
                 'jornada_id' => (int) $exercicio['jornada_id'],
                 'modulo_id' => (int) $modulo_id,
                 'exercicio_id' => (int) $exercicio_id,
@@ -4178,7 +4228,7 @@ class JourneyController extends BaseController
             ]);
 
             if ($moduloAutoConcluido) {
-                $this->invalidateJourneyListCacheForAluno((int) $user['id']);
+                $this->invalidateJourneyListCacheForAluno($alunoId);
             }
 
             $this->json([
@@ -4195,7 +4245,8 @@ class JourneyController extends BaseController
                 'trace' => $e->getTraceAsString(),
                 'exercicio_id' => $exercicio_id ?? null,
                 'modulo_id' => $modulo_id ?? null,
-                'aluno_id' => $user['id'] ?? null,
+                'user_id' => $user['id'] ?? null,
+                'aluno_id' => $alunoId ?? null,
             ]);
             header('Content-Type: application/json');
             $status = $this->isTransientConnectionError($e) ? 503 : 400;
@@ -4239,8 +4290,14 @@ class JourneyController extends BaseController
                 $this->json(['success' => false, 'error' => 'Dados inválidos'], 400);
             }
 
+            $aluno = $this->fetchAlunoParaListagemJornadas((int) $user['id']);
+            if (!$aluno) {
+                $this->json(['success' => false, 'error' => 'Aluno não encontrado'], 403);
+            }
+            $alunoId = (int) $aluno['id'];
+
             $exercicio = $this->db->fetch(
-                "SELECT me.id, me.modulo_id, m.jornada_id, j.status as jornada_status
+                "SELECT me.id, me.modulo_id, m.jornada_id, j.turma_id, j.status as jornada_status, j.estrutura
                  FROM jornadas_modulos_exercicios me
                  JOIN jornadas_modulos m ON me.modulo_id = m.id
                  JOIN jornadas j ON m.jornada_id = j.id
@@ -4255,12 +4312,15 @@ class JourneyController extends BaseController
             if (!$exercicio) {
                 $this->json(['success' => false, 'error' => 'Exercício não encontrado'], 404);
             }
+            if (!$this->jornadaPermiteAluno($exercicio, $alunoId)) {
+                $this->json(['success' => false, 'error' => 'Você não tem acesso a esta jornada'], 403);
+            }
             if (($exercicio['jornada_status'] ?? '') === 'pausada') {
                 $this->json(['success' => false, 'error' => 'Jornada pausada'], 400);
             }
 
             $this->registrarAuditoriaExercicio([
-                'aluno_id' => (int) $user['id'],
+                'aluno_id' => $alunoId,
                 'jornada_id' => (int) $exercicio['jornada_id'],
                 'modulo_id' => (int) $moduloId,
                 'exercicio_id' => (int) $exercicioId,
@@ -4309,6 +4369,12 @@ class JourneyController extends BaseController
                 $this->json(['success' => false, 'error' => 'Lote excede o limite de 100 eventos'], 400);
             }
 
+            $aluno = $this->fetchAlunoParaListagemJornadas((int) $user['id']);
+            if (!$aluno) {
+                $this->json(['success' => false, 'error' => 'Aluno não encontrado'], 403);
+            }
+            $alunoId = (int) $aluno['id'];
+
             $pares = [];
             foreach ($eventos as $evento) {
                 if (!is_array($evento)) {
@@ -4339,7 +4405,7 @@ class JourneyController extends BaseController
             }
 
             $exerciciosValidos = $this->db->fetchAll(
-                "SELECT me.id, me.modulo_id, m.jornada_id, j.status as jornada_status
+                "SELECT me.id, me.modulo_id, m.jornada_id, j.turma_id, j.status as jornada_status, j.estrutura
                  FROM jornadas_modulos_exercicios me
                  JOIN jornadas_modulos m ON me.modulo_id = m.id
                  JOIN jornadas j ON m.jornada_id = j.id
@@ -4349,6 +4415,9 @@ class JourneyController extends BaseController
 
             $mapExercicios = [];
             foreach ($exerciciosValidos as $row) {
+                if (!$this->jornadaPermiteAluno($row, $alunoId)) {
+                    continue;
+                }
                 $mapExercicios[(int) $row['id'] . ':' . (int) $row['modulo_id']] = $row;
             }
 
@@ -4383,7 +4452,7 @@ class JourneyController extends BaseController
                 }
 
                 $this->registrarAuditoriaExercicio([
-                    'aluno_id' => (int) $user['id'],
+                    'aluno_id' => $alunoId,
                     'jornada_id' => (int) $mapExercicios[$chave]['jornada_id'],
                     'modulo_id' => (int) $moduloId,
                     'exercicio_id' => (int) $exercicioId,

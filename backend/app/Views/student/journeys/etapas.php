@@ -265,14 +265,29 @@ function salvarInicioEtapa(moduloId) {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
+    .then(async function(response) {
+        const textResponse = await response.text();
+        let data = null;
+        try {
+            data = textResponse ? JSON.parse(textResponse) : null;
+        } catch (error) {
+            throw new Error('O servidor retornou uma resposta inválida. Recarregue a página e tente novamente.');
+        }
+        if (!response.ok) {
+            throw new Error(data && data.error ? data.error : 'Não foi possível iniciar a etapa.');
+        }
+        return data;
+    })
     .then(data => {
         if (data && data.success) {
             console.log('Início da etapa registrado');
+        } else {
+            alert(data && data.error ? data.error : 'Não foi possível iniciar a etapa.');
         }
     })
     .catch(error => {
         console.error('Erro ao salvar início da etapa:', error);
+        alert(error && error.message ? error.message : 'Erro ao iniciar etapa. Tente novamente.');
     });
 }
 
@@ -293,7 +308,19 @@ function iniciarEtapa(moduloId) {
     formData.append('acao', 'iniciar');
     if (jornadaPreview) formData.append('preview', '1');
     fetch('<?= URL ?>/jornadas/salvar-tempo-etapa', { method: 'POST', body: formData })
-        .then(r => r.json())
+        .then(async function(response) {
+            const textResponse = await response.text();
+            let data = null;
+            try {
+                data = textResponse ? JSON.parse(textResponse) : null;
+            } catch (error) {
+                throw new Error('O servidor retornou uma resposta inválida. Recarregue a página e tente novamente.');
+            }
+            if (!response.ok) {
+                throw new Error(data && data.error ? data.error : 'Não foi possível iniciar a etapa.');
+            }
+            return data;
+        })
         .then(data => {
             hideJornadaEnviando();
             if (data && data.success) {
@@ -314,6 +341,9 @@ function iniciarEtapa(moduloId) {
                 btn.disabled = false;
                 btn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Iniciar etapa';
             }
+            if (!(data && data.success)) {
+                alert(data && data.error ? data.error : 'Não foi possível iniciar a etapa.');
+            }
         })
         .catch(function(err) {
             console.error(err);
@@ -322,6 +352,7 @@ function iniciarEtapa(moduloId) {
                 btn.disabled = false;
                 btn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Iniciar etapa';
             }
+            alert(err && err.message ? err.message : 'Erro ao iniciar etapa. Tente novamente.');
         });
 }
 
