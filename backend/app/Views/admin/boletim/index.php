@@ -4098,6 +4098,33 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         }
         if (editIndex >= 0 && componentes[editIndex]) {
             const merged = Object.assign({}, componentes[editIndex], payload);
+            if (merged.source_type === 'provas_sistema') {
+                var semMerged = fields.semana ? Number(fields.semana.value || 0) : 0;
+                if (!merged.config || typeof merged.config !== 'object') {
+                    merged.config = {};
+                }
+                if (semMerged >= 1 && semMerged <= 8) {
+                    merged.config.semana = semMerged;
+                    if (!merged.config.layout_group) {
+                        merged.config.layout_group = (semMerged % 2 === 1) ? 'quadro_a' : 'quadro_b';
+                    }
+                    if (!merged.config.layout_type) {
+                        merged.config.layout_type = 'semana_nq';
+                    }
+                } else {
+                    delete merged.config.semana;
+                    if (String(merged.config.layout_type || '').toLowerCase() === 'semana_nq') {
+                        delete merged.config.layout_type;
+                    }
+                    if (['quadro_a', 'quadro_b'].indexOf(String(merged.config.layout_group || '').toLowerCase()) >= 0) {
+                        delete merged.config.layout_group;
+                    }
+                    if (merged.config.layout && typeof merged.config.layout === 'object'
+                        && String(merged.config.layout.type || '').toLowerCase() === 'semana_nq') {
+                        delete merged.config.layout;
+                    }
+                }
+            }
             if (merged.source_type === 'nenhuma') {
                 merged.filtro_titulo = '';
                 merged.blocos_ids = [];

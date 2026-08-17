@@ -469,13 +469,16 @@ class BoletimQuadroLayoutHelper
     {
         $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
         if (preg_match('/^s[1-8]$/', $cod)) {
-            return false;
+            return true;
         }
-        $nome = mb_strtolower(trim((string) ($c['nome'] ?? '')));
-        $filtro = mb_strtolower(trim((string) ($c['filtro_titulo'] ?? '')));
-        $blob = $cod . ' ' . $nome . ' ' . $filtro;
+        $cfg = self::configDoComponente($c);
+        $grupo = strtolower(trim((string) ($cfg['layout_group'] ?? $cfg['layout']['group'] ?? $c['layout_group'] ?? '')));
+        $tipo = strtolower(trim((string) ($cfg['layout_type'] ?? $cfg['layout']['type'] ?? $c['layout_type'] ?? '')));
+        if ($tipo === 'semana_nq' || in_array($grupo, ['quadro_a', 'quadro_b'], true)) {
+            return true;
+        }
 
-        return str_contains($blob, 'semanal');
+        return false;
     }
 
     /**
