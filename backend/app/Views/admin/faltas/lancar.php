@@ -20,6 +20,7 @@ $eventoAtualId = $eventoAtual ? (int) ($eventoAtual['id'] ?? 0) : 0;
 $materiasOpcoesFiltroUi = $faltasMatriz ? $matrizMateriasTodas : $materiasFiltroOpcoes;
 $urlListaFaltas = URL . '/admin/faltas';
 $urlLancarFaltas = URL . '/admin/faltas/lancar';
+$urlExportarLancamentoExcel = URL . '/admin/faltas/lancar/exportar-excel';
 $exibirNumeroChamada = false;
 foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
     if (!empty($_lnChk['numero_chamada'])) {
@@ -246,10 +247,16 @@ foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
             <?php endif; ?>
 
             <div>
-                <button type="submit" class="btn-primary-custom inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:opacity-90" title="Salvar faltas e observações da tabela">
-                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    Salvar
-                </button>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <a href="<?= htmlspecialchars($urlExportarLancamentoExcel . '?' . http_build_query($_GET), ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200" title="Exportar as faltas desta tela para Excel" aria-label="Exportar lançamento em Excel">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11v6m0 0l-3-3m3 3l3-3M4 7h16M5 7l1-2h12l1 2"/></svg>
+                        Exportar Excel
+                    </a>
+                    <button type="submit" class="btn-primary-custom inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg shadow-sm hover:opacity-90" title="Salvar faltas e observações da tabela">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        Salvar
+                    </button>
+                </div>
             </div>
         </form>
     </div>

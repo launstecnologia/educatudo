@@ -408,6 +408,181 @@ class SchoolAbsenceController extends BaseController
         exit;
     }
 
+    public function exportarLancamentoExcel(): void
+    {
+        $eventoId = (int) ($_GET['evento_id'] ?? 0);
+        if ($eventoId <= 0) {
+            $_SESSION['faltas_flash'] = 'Abra um evento para exportar o detalhamento das faltas.';
+            $_SESSION['faltas_flash_type'] = 'error';
+            $this->redirect(URL . '/admin/faltas');
+            return;
+        }
+
+        $eventoAtual = $this->absence->getEventoById($eventoId);
+        if (!$eventoAtual) {
+            $_SESSION['faltas_flash'] = 'Evento não encontrado.';
+            $_SESSION['faltas_flash_type'] = 'error';
+            $this->redirect(URL . '/admin/faltas');
+            return;
+        }
+
+        $dados = $this->dadosParaViewLancamentoFaltas($eventoAtual);
+        $lancamentosMap = (array) ($dados['lancamentos_map'] ?? []);
+        $totaisPorAluno = $this->absence->getTotalFaltasPorAlunoNoEvento($eventoId);
+        $faltasMatriz = !empty($dados['faltas_matriz']);
+
+        $exibirNumeroChamada = false;
+        foreach (array_merge((array) ($dados['matriz_linhas_alunos'] ?? []), (array) ($dados['linhas_faltas'] ?? [])) as $_linhaChk) {
+            if (!empty($_linhaChk['numero_chamada'])) {
+                $exibirNumeroChamada = true;
+                break;
+            }
+        }
+
+        $temLegado = false;
+        foreach (array_keys($lancamentosMap) as $mapKey) {
+            if (substr((string) $mapKey, -2) === '_0') {
+                $temLegado = true;
+                break;
+            }
+        }
+
+        $materias = [];
+        if ($faltasMatriz) {
+            foreach ((array) ($dados['matriz_colunas_materias'] ?? []) as $col) {
+                $mid = (int) ($col['id'] ?? 0);
+                if ($mid > 0 && !isset($materias[$mid])) {
+                    $materias[$mid] = (string) ($col['nome'] ?? ('#' . $mid));
+                }
+            }
+        } else {
+            foreach ((array) ($dados['linhas_faltas'] ?? []) as $ln) {
+                $mid = (int) ($ln['materia_id'] ?? 0);
+                if ($mid > 0 && !isset($materias[$mid])) {
+                    $materias[$mid] = (string) ($ln['materia_nome'] ?? ('#' . $mid));
+                }
+            }
+        }
+
+        $headers = [];
+        if ($exibirNumeroChamada) {
+            $headers[] = 'Nº';
+        }
+        $headers[] = 'Aluno';
+        $headers[] = 'Turma';
+        if ($temLegado) {
+            $headers[] = 'Sem matéria';
+        }
+        foreach ($materias as $materiaNome) {
+            $headers[] = $materiaNome;
+        }
+        $headers[] = 'Observações';
+        $headers[] = 'Total faltas';
+
+        $rows = [];
+        if ($faltasMatriz) {
+            foreach ((array) ($dados['matriz_linhas_alunos'] ?? []) as $linha) {
+                $alunoId = (int) ($linha['aluno_id'] ?? 0);
+                if ($alunoId <= 0) {
+                    continue;
+                }
+                $row = [];
+                if ($exibirNumeroChamada) {
+                    $row[] = isset($linha['numero_chamada']) && $linha['numero_chamada'] !== null ? (int) $linha['numero_chamada'] : '';
+                }
+                $row[] = (string) ($linha['nome'] ?? '');
+                $row[] = (string) ($linha['turma_nome'] ?? '');
+
+                $observacoes = [];
+                if ($temLegado) {
+                    $mapLegado = $lancamentosMap[$alunoId . '_0'] ?? [];
+                    $legacy = (float) (($mapLegado['faltas'] ?? 0) ?: 0);
+                    $obsLegado = trim((string) ($mapLegado['observacao'] ?? ''));
+                    $row[] = $legacy;
+                    if ($obsLegado !== '') {
+                        $observacoes[] = 'Sem matéria: ' . $obsLegado;
+                    }
+                }
+                foreach ($materias as $mid => $_nomeMateria) {
+                    $mapMateria = $lancamentosMap[$alunoId . '_' . $mid] ?? [];
+                    $faltas = (float) (($mapMateria['faltas'] ?? 0) ?: 0);
+                    $obsMateria = trim((string) ($mapMateria['observacao'] ?? ''));
+                    $row[] = $faltas;
+                    if ($obsMateria !== '') {
+                        $observacoes[] = $_nomeMateria . ': ' . $obsMateria;
+                    }
+                }
+                $row[] = implode(' | ', $observacoes);
+                $row[] = (float) ($totaisPorAluno[$alunoId] ?? 0);
+                $rows[] = $row;
+            }
+        } else {
+            $alunos = [];
+            foreach ((array) ($dados['linhas_faltas'] ?? []) as $linha) {
+                $alunoId = (int) ($linha['aluno_id'] ?? 0);
+                if ($alunoId <= 0) {
+                    continue;
+                }
+                if (!isset($alunos[$alunoId])) {
+                    $alunos[$alunoId] = [
+                        'nome' => (string) ($linha['nome'] ?? ''),
+                        'turma_nome' => (string) ($linha['turma_nome'] ?? ''),
+                        'numero_chamada' => isset($linha['numero_chamada']) && $linha['numero_chamada'] !== null ? (int) $linha['numero_chamada'] : null,
+                    ];
+                }
+            }
+
+            foreach ($alunos as $alunoId => $info) {
+                $row = [];
+                if ($exibirNumeroChamada) {
+                    $row[] = $info['numero_chamada'] !== null ? (int) $info['numero_chamada'] : '';
+                }
+                $row[] = $info['nome'];
+                $row[] = $info['turma_nome'];
+
+                $observacoes = [];
+                if ($temLegado) {
+                    $mapLegado = $lancamentosMap[$alunoId . '_0'] ?? [];
+                    $legacy = (float) (($mapLegado['faltas'] ?? 0) ?: 0);
+                    $obsLegado = trim((string) ($mapLegado['observacao'] ?? ''));
+                    $row[] = $legacy;
+                    if ($obsLegado !== '') {
+                        $observacoes[] = 'Sem matéria: ' . $obsLegado;
+                    }
+                }
+                foreach ($materias as $mid => $_nomeMateria) {
+                    $mapMateria = $lancamentosMap[$alunoId . '_' . $mid] ?? [];
+                    $faltas = (float) (($mapMateria['faltas'] ?? 0) ?: 0);
+                    $obsMateria = trim((string) ($mapMateria['observacao'] ?? ''));
+                    $row[] = $faltas;
+                    if ($obsMateria !== '') {
+                        $observacoes[] = $_nomeMateria . ': ' . $obsMateria;
+                    }
+                }
+                $row[] = implode(' | ', $observacoes);
+                $row[] = (float) ($totaisPorAluno[$alunoId] ?? 0);
+                $rows[] = $row;
+            }
+        }
+
+        $xlsx = $this->criarXlsxSimples(
+            'Faltas do evento',
+            $headers,
+            $rows
+        );
+        $filename = 'faltas_evento_' . $eventoId . '_' . date('Y-m-d_His') . '.xlsx';
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        header('Content-Length: ' . strlen($xlsx));
+        echo $xlsx;
+        exit;
+    }
+
     /**
      * @param string[] $headers
      * @param array<int, array<int, string>> $rows
@@ -441,7 +616,12 @@ class SchoolAbsenceController extends BaseController
             $excelRow = $rowIndex + 2;
             $cells = [];
             foreach (array_values($row) as $col => $value) {
-                $cells[] = $cellString($columnName($col) . $excelRow, (string) $value, 2);
+                $ref = $columnName($col) . $excelRow;
+                if ($value !== '' && is_numeric($value)) {
+                    $cells[] = '<c r="' . $ref . '"><v>' . (string) ((float) $value) . '</v></c>';
+                } else {
+                    $cells[] = $cellString($ref, (string) $value, 2);
+                }
             }
             $sheetRows[] = '<row r="' . $excelRow . '">' . implode('', $cells) . '</row>';
         }
