@@ -762,7 +762,7 @@ class BoletimConfig
     {
         $limit = max(1, min($limit, 1000));
         return $this->db->fetchAll(
-            "SELECT id, nome, codigo, descricao_curta, exibir_em, ano_letivo, bimestre, series_ids, turmas_ids, updated_at
+            "SELECT id, nome, codigo, descricao_curta, exibir_em, ano_letivo, bimestre, series_ids, turmas_ids, vis_aluno, vis_pais, vis_coordenacao, updated_at
              FROM boletim_regras
              WHERE ativo = 1
              ORDER BY updated_at DESC, id DESC
@@ -907,6 +907,36 @@ class BoletimConfig
         $n = (int) $this->db->update(
             "UPDATE boletim_regras SET ativo = 0 WHERE id = :id AND ativo = 1",
             ['id' => $ruleId]
+        );
+
+        return $n > 0;
+    }
+
+    public function updateRuleVisibility(int $ruleId, int $visAluno, int $visPais, ?int $visCoordenacao = null): bool
+    {
+        if ($ruleId <= 0) {
+            return false;
+        }
+
+        $set = [
+            'vis_aluno = :vis_aluno',
+            'vis_pais = :vis_pais',
+        ];
+        $params = [
+            'id' => $ruleId,
+            'vis_aluno' => $visAluno ? 1 : 0,
+            'vis_pais' => $visPais ? 1 : 0,
+        ];
+        if ($visCoordenacao !== null) {
+            $set[] = 'vis_coordenacao = :vis_coordenacao';
+            $params['vis_coordenacao'] = $visCoordenacao ? 1 : 0;
+        }
+
+        $n = (int) $this->db->update(
+            "UPDATE boletim_regras
+             SET " . implode(', ', $set) . "
+             WHERE id = :id AND ativo = 1",
+            $params
         );
 
         return $n > 0;

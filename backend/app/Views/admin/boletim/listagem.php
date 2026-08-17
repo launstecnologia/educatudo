@@ -4,6 +4,8 @@ $csrfToken = (string) ($csrf_token ?? '');
 $filtroNome = (string) ($filtro_nome ?? '');
 $filtroAno = (string) ($filtro_ano ?? '');
 $filtroBimestre = (string) ($filtro_bimestre ?? '');
+$flashMessage = (string) ($flash_message ?? '');
+$flashType = (string) ($flash_type ?? 'success');
 $filtrosAtivosCount = 0;
 foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     if ($fv !== '') {
@@ -51,6 +53,11 @@ $bimestreLabel = static function ($bimestre) {
         </div>
     </div>
 </div>
+
+<?php if ($flashMessage !== ''): ?>
+    <?php $flashClasses = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
+    <div class="mb-6 p-4 rounded-lg border <?= $flashClasses ?>"><?= htmlspecialchars($flashMessage) ?></div>
+<?php endif; ?>
 
 <!-- Filtro em drawer lateral -->
 <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
@@ -112,6 +119,13 @@ $bimestreLabel = static function ($bimestre) {
     <input type="hidden" name="regra_id" id="duplicar-evento-regra-id" value="">
 </form>
 
+<!-- Visibilidade para aluno/pais (form compartilhado) -->
+<form id="form-visibilidade-evento-boletim" method="POST" action="<?= URL ?>/admin/boletim-configuracao/visibilidade-regra" class="hidden" aria-hidden="true">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+    <input type="hidden" name="regra_id" id="visibilidade-evento-regra-id" value="">
+    <input type="hidden" name="visivel" id="visibilidade-evento-valor" value="">
+</form>
+
 <!-- Eventos Table -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
     <div class="overflow-x-auto">
@@ -151,9 +165,15 @@ $bimestreLabel = static function ($bimestre) {
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= ($evento['exibir_em'] ?? 'boletim') === 'notas' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800' ?>">
-                            <?= ($evento['exibir_em'] ?? 'boletim') === 'notas' ? 'Notas' : 'Boletim' ?>
-                        </span>
+                        <div class="flex flex-col items-start gap-1">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= ($evento['exibir_em'] ?? 'boletim') === 'notas' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800' ?>">
+                                <?= ($evento['exibir_em'] ?? 'boletim') === 'notas' ? 'Notas' : 'Boletim' ?>
+                            </span>
+                            <?php $liberadoAlunoPais = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1); ?>
+                            <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full <?= $liberadoAlunoPais ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>">
+                                <?= $liberadoAlunoPais ? 'Aluno/pais liberado' : 'Aluno/pais oculto' ?>
+                            </span>
+                        </div>
                     </td>
                     <td class="px-6 py-4">
                         <?php $seriesNomes = $evento['series_nomes'] ?? []; ?>
@@ -195,6 +215,12 @@ $bimestreLabel = static function ($bimestre) {
                         <button type="button" onclick="duplicarEventoBoletim(<?= $eventoId ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-copy text-gray-400 w-4 text-center"></i> Duplicar
+                        </button>
+                        <?php $liberadoAlunoPaisMenu = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1); ?>
+                        <button type="button" onclick="alterarVisibilidadeEventoBoletim(<?= $eventoId ?>, <?= $liberadoAlunoPaisMenu ? 0 : 1 ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
+                            <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Liberar para alunos/pais' ?>
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <button type="button" onclick="excluirEventoBoletim(<?= $eventoId ?>)"
@@ -282,6 +308,16 @@ function excluirEventoBoletim(id) {
     }
     document.getElementById('excluir-evento-regra-id').value = id;
     document.getElementById('form-excluir-evento-boletim').submit();
+}
+
+function alterarVisibilidadeEventoBoletim(id, visivel) {
+    const acao = Number(visivel) === 1 ? 'liberar para alunos e pais visualizarem' : 'ocultar de alunos e pais';
+    if (!confirm('Deseja ' + acao + ' este evento?')) {
+        return;
+    }
+    document.getElementById('visibilidade-evento-regra-id').value = id;
+    document.getElementById('visibilidade-evento-valor').value = Number(visivel) === 1 ? '1' : '0';
+    document.getElementById('form-visibilidade-evento-boletim').submit();
 }
 
 document.addEventListener('keydown', function (e) {

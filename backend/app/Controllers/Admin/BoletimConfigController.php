@@ -155,9 +155,12 @@ class BoletimConfigController extends BaseController
                 'page' => $page,
                 'total_pages' => $totalPages,
             ],
+            'flash_message' => $_SESSION['boletim_flash'] ?? '',
+            'flash_type' => $_SESSION['boletim_flash_type'] ?? 'success',
         ];
 
         $this->viewWithLayout('admin', 'admin/boletim/listagem', $data);
+        unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
     }
 
     public function index()
@@ -1201,6 +1204,33 @@ class BoletimConfigController extends BaseController
         }
 
         $this->redirect('/admin/boletim-configuracao?novo=1');
+    }
+
+    public function alternarVisibilidadeRegra()
+    {
+        $this->assertCsrfOrRedirect();
+
+        $regraId = isset($_POST['regra_id']) ? (int) $_POST['regra_id'] : 0;
+        $visivel = isset($_POST['visivel']) ? (int) $_POST['visivel'] : 0;
+        if ($regraId <= 0) {
+            $_SESSION['boletim_flash'] = 'Informe um evento válido para alterar a visibilidade.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim');
+            return;
+        }
+
+        $ok = $this->boletimConfig->updateRuleVisibility($regraId, $visivel, $visivel, null);
+        if ($ok) {
+            $_SESSION['boletim_flash'] = $visivel
+                ? 'Evento liberado para alunos e pais visualizarem.'
+                : 'Evento ocultado para alunos e pais.';
+            $_SESSION['boletim_flash_type'] = 'success';
+        } else {
+            $_SESSION['boletim_flash'] = 'Não foi possível alterar a visibilidade do evento.';
+            $_SESSION['boletim_flash_type'] = 'error';
+        }
+
+        $this->redirect('/admin/boletim');
     }
 
     /**
