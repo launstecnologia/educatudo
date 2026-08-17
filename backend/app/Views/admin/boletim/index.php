@@ -536,9 +536,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     <?php endif; ?>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="hidden">
+        <div class="xl:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200">
             <div class="px-5 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Evento do Boletim</h2>
+                <h2 class="text-lg font-semibold text-gray-900">Configuração por blocos</h2>
+                <p class="text-sm text-gray-500 mt-1">Monte e edite manualmente os blocos que compõem este boletim.</p>
             </div>
 
             <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/salvar" class="p-5 space-y-5" id="form-regra-boletim">
