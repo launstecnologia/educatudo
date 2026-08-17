@@ -1662,9 +1662,14 @@ class BoletimConfigController extends BaseController
             $this->redirect('/admin/boletim-configuracao');
         }
 
+        $atualizarPreview = false;
         $idsComGravacao = $this->boletimConfig->listAlunoIdsWithOfficialBoletim($regraId, $periodoRef);
         if ($idsComGravacao === []) {
-            $_SESSION['boletim_flash'] = 'Não há boletins gravados neste período para atualizar. Use "Gerar boletins de todos os alunos vinculados" na primeira vez ou quando precisar incluir alunos que ainda não têm registro.';
+            $idsComGravacao = $this->boletimConfig->listAlunoIdsWithGeneratedBoletim($regraId, $periodoRef, true);
+            $atualizarPreview = $idsComGravacao !== [];
+        }
+        if ($idsComGravacao === []) {
+            $_SESSION['boletim_flash'] = 'Não há boletins gravados neste período para atualizar. Confira o período selecionado ou use "Gerar boletins de todos os alunos vinculados" na primeira vez ou quando precisar incluir alunos que ainda não têm registro.';
             $_SESSION['boletim_flash_type'] = 'error';
             $qs = [
                 'regra_id' => $regraId,
@@ -1685,14 +1690,16 @@ class BoletimConfigController extends BaseController
             $dataInicio,
             $dataFim,
             $alunos,
-            'atualizarBoletinsGravados'
+            'atualizarBoletinsGravados',
+            $atualizarPreview
         );
         $gerados = $stats['gerados'];
         $linhas = $stats['linhas'];
         $erros = $stats['erros'];
         $errosAmostra = $stats['errosAmostra'];
 
-        $msg = 'Atualização dos boletins já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+        $tipoAtualizado = $atualizarPreview ? 'prévias' : 'boletins oficiais';
+        $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
         if (!empty($errosAmostra)) {
             $msg .= ' Exemplo(s): ' . implode(' | ', $errosAmostra);
         }
@@ -1710,7 +1717,7 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Recalcula a matriz e substitui linhas em boletim_resultados_gerados (oficial) por aluno.
+     * Recalcula a matriz e substitui linhas em boletim_resultados_gerados por aluno.
      *
      * @param list<array{id:int,nome?:string}> $alunos
      * @return array{gerados:int,linhas:int,erros:int,errosAmostra:list<string>}
@@ -1722,7 +1729,8 @@ class BoletimConfigController extends BaseController
         ?string $dataInicio,
         ?string $dataFim,
         array $alunos,
-        string $logContexto
+        string $logContexto,
+        bool $preview = false
     ): array {
         $gerados = 0;
         $linhas = 0;
@@ -1746,7 +1754,7 @@ class BoletimConfigController extends BaseController
                     $dataFim,
                     $colunas,
                     $rows,
-                    false
+                    $preview
                 );
                 $gerados++;
                 $linhas += count($rows);

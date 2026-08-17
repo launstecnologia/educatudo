@@ -1244,6 +1244,16 @@ class BoletimConfig
      */
     public function listAlunoIdsWithOfficialBoletim(int $regraId, string $periodoRef): array
     {
+        return $this->listAlunoIdsWithGeneratedBoletim($regraId, $periodoRef, false);
+    }
+
+    /**
+     * IDs de alunos que já têm boletim gravado para regra + período.
+     *
+     * @return list<int>
+     */
+    public function listAlunoIdsWithGeneratedBoletim(int $regraId, string $periodoRef, ?bool $preview = null): array
+    {
         if ($regraId <= 0) {
             return [];
         }
@@ -1254,17 +1264,23 @@ class BoletimConfig
         if ($periodoRef === '') {
             return [];
         }
+        $previewSql = '';
+        $params = [
+            'regra_id' => $regraId,
+            'periodo_ref' => $periodoRef,
+        ];
+        if ($preview !== null) {
+            $previewSql = ' AND preview = :preview_flag';
+            $params['preview_flag'] = $preview ? 1 : 0;
+        }
         $rows = $this->db->fetchAll(
             "SELECT DISTINCT aluno_id
              FROM boletim_resultados_gerados
              WHERE regra_id = :regra_id
                AND periodo_ref = :periodo_ref
-               AND preview = 0
+               {$previewSql}
              ORDER BY aluno_id ASC",
-            [
-                'regra_id' => $regraId,
-                'periodo_ref' => $periodoRef,
-            ]
+            $params
         ) ?: [];
         $out = [];
         foreach ($rows as $row) {
