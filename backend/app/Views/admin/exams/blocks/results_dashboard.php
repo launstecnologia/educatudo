@@ -39,6 +39,21 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                class="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-sm font-medium rd-no-print">
                 Matriz de Desempenho
             </a>
+            <?php if (!empty($bloco['gabarito_liberado'])): ?>
+            <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-100 text-emerald-800 text-sm font-medium">
+                <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+                Gabarito liberado
+            </span>
+            <?php else: ?>
+            <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/liberar-gabarito" class="inline"
+                  onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm font-medium">
+                    <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+                    Liberar gabarito
+                </button>
+            </form>
+            <?php endif; ?>
             <button type="button" id="rd-btn-ia"
                     class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium">
                 Analisar com IA

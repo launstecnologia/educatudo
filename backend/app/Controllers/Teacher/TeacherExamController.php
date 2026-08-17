@@ -439,6 +439,7 @@ class TeacherExamController extends BaseController
             'mostrarBotaoAprovacaoFinal' => $mostrarBotaoAprovacaoFinal,
             'status_filtro' => $filterStatus,
             'total_canceladas' => $totalCanceladas,
+            'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'provas_blocos'
         ];
         
@@ -989,6 +990,7 @@ class TeacherExamController extends BaseController
             'user' => $user,
             'bloco' => $bloco,
             'dashboard' => $dashboard,
+            'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'provas_blocos',
         ]);
     }
@@ -1224,6 +1226,17 @@ class TeacherExamController extends BaseController
         }
 
         $blocoId = (int)$blocoId;
+        $origem = (string)($_POST['origem'] ?? '');
+        $redirect = $origem === 'gerenciar'
+            ? '/admin/provas/blocos/' . $blocoId . '/gerenciar'
+            : '/admin/provas/blocos/' . $blocoId . '/resultados-novos';
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Recarregue a página e tente novamente.', 'error');
+            $this->redirect($redirect);
+            return;
+        }
+
         $bloco = $this->blocoModel->findById($blocoId);
         if (!$bloco) {
             $this->setFlashMessage('Bloco não encontrado', 'error');
@@ -1233,7 +1246,7 @@ class TeacherExamController extends BaseController
 
         if (!empty($bloco['gabarito_liberado'])) {
             $this->setFlashMessage('O gabarito deste bloco já foi liberado.', 'info');
-            $this->redirect('/admin/provas/blocos/' . $blocoId . '/resultados-novos');
+            $this->redirect($redirect);
             return;
         }
 
@@ -1245,7 +1258,7 @@ class TeacherExamController extends BaseController
         );
 
         $this->setFlashMessage('Gabarito liberado com sucesso para os alunos.', 'success');
-        $this->redirect('/admin/provas/blocos/' . $blocoId . '/resultados-novos');
+        $this->redirect($redirect);
     }
 
     /**

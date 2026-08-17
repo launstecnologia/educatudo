@@ -31,6 +31,7 @@ $total_canceladas = (int)($total_canceladas ?? 0);
                 <?php else: ?>
                     <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/liberar-gabarito" class="inline"
                           onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
+                        <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
                         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">
                             Liberar gabarito
                         </button>

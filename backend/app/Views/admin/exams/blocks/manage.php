@@ -57,6 +57,22 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                 <i class="fa-solid fa-ban" aria-hidden="true"></i>
                 Cancelados<?= !empty($total_canceladas) ? ' (' . (int)$total_canceladas . ')' : '' ?>
             </a>
+            <?php if (!empty($bloco['gabarito_liberado'])): ?>
+            <span class="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg font-medium">
+                <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+                Gabarito liberado
+            </span>
+            <?php else: ?>
+            <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/liberar-gabarito" class="inline"
+                  onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
+                <input type="hidden" name="origem" value="gerenciar">
+                <button type="submit" class="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700">
+                    <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+                    Liberar gabarito
+                </button>
+            </form>
+            <?php endif; ?>
             <?php endif; ?>
             <?php if (!$modoLancamentoNota): ?>
             <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/visualizar-completo"
