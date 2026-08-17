@@ -1437,7 +1437,38 @@ class BoletimConfig
             ];
         }
 
-        return array_values($eventos);
+        $maisRecentes = [];
+        foreach (array_values($eventos) as $evento) {
+            $escopoKey = implode('|', [
+                strtolower(trim((string) ($evento['exibir_em'] ?? 'boletim'))),
+                mb_strtolower(trim((string) ($evento['regra_nome'] ?? '')), 'UTF-8'),
+                (string) ((int) ($evento['ano_letivo'] ?? 0)),
+                (string) ((int) ($evento['bimestre'] ?? 0)),
+            ]);
+            $updatedAt = strtotime((string) ($evento['updated_at'] ?? '')) ?: 0;
+            $atual = $maisRecentes[$escopoKey] ?? null;
+            $atualUpdatedAt = is_array($atual) ? (strtotime((string) ($atual['updated_at'] ?? '')) ?: 0) : -1;
+
+            if (
+                $atual === null
+                || $updatedAt > $atualUpdatedAt
+                || ($updatedAt === $atualUpdatedAt && (int) ($evento['regra_id'] ?? 0) > (int) ($atual['regra_id'] ?? 0))
+            ) {
+                $maisRecentes[$escopoKey] = $evento;
+            }
+        }
+
+        $eventosFiltrados = array_values($maisRecentes);
+        usort($eventosFiltrados, static function (array $a, array $b): int {
+            $bUpdatedAt = strtotime((string) ($b['updated_at'] ?? '')) ?: 0;
+            $aUpdatedAt = strtotime((string) ($a['updated_at'] ?? '')) ?: 0;
+            if ($bUpdatedAt !== $aUpdatedAt) {
+                return $bUpdatedAt <=> $aUpdatedAt;
+            }
+            return (int) ($b['regra_id'] ?? 0) <=> (int) ($a['regra_id'] ?? 0);
+        });
+
+        return $eventosFiltrados;
     }
 
     public function getGeneratedBoletimByAlunoAndRegra(int $alunoId, int $regraId): ?array
