@@ -1,5 +1,8 @@
 <?php
 // Rotas para Pais (perfil: pai)
+$router->get('/pais/filhos/{id}/rematricula', 'Modulos/matricula/MatriculaPaisController@rematricula');
+$router->post('/pais/filhos/{id}/rematricula', 'Modulos/matricula/MatriculaPaisController@confirmar');
+
 $router->get('/pais/selecionar-filho', 'User/ParentController@selecionarFilho');
 $router->get('/pais/dashboard', 'User/ParentController@dashboard');
 $router->get('/pais/filhos', 'User/ParentController@filhos');
@@ -13,6 +16,12 @@ $router->get('/pais/filhos/{id}/plano-aula/pdf/{planoId}', 'User/ParentControlle
 $router->get('/pais/filhos/{id}/redacoes', 'User/ParentController@redacoesFilho');
 $router->get('/pais/filhos/{id}/relatorios', 'User/ParentController@relatoriosFilho');
 $router->get('/pais/filhos/{id}/financeiro', 'User/ParentController@financeiroFilho');
+$router->get('/pais/filhos/{id}/mural-recados', 'User/ParentController@muralRecadosFilho');
+$router->get('/pais/filhos/{id}/drive', 'User/ParentController@driveFilho');
+$router->get('/pais/filhos/{id}/drive/folder/{folderId}', 'User/ParentController@driveFilhoFolder');
+$router->get('/pais/filhos/{id}/drive/view/{itemId}', 'User/ParentController@driveFilhoView');
+$router->get('/pais/filhos/{id}/drive/download/{itemId}', 'User/ParentController@driveFilhoDownload');
+$router->get('/pais/filhos/{id}/drive/serve/{itemId}', 'User/ParentController@driveFilhoServe');
 
 // Comunicação
 $router->get('/pais/mensagens', 'User/ParentController@mensagens');

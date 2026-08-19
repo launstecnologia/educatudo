@@ -1614,5 +1614,270 @@ class ParentController extends BaseController
             'eventos' => $eventos,
         ]);
     }
+
+    /**
+     * Mural de Recados do filho — somente leitura, mesmos recados que o aluno vê
+     * (recados publicados para "todos" ou para a turma dele). O pai não marca como visto:
+     * mural_recados_vistos só rastreia leitura por aluno_id, aqui é só exibido como informação.
+     */
+    public function muralRecadosFilho($id)
+    {
+        $user = $this->auth->getUser();
+        $filhos = $this->getFilhos();
+        $filho = $this->getFilhoById((int) $id);
+
+        if (!$filho) {
+            $this->redirect('/pais/filhos');
+        }
+
+        $turmaId = isset($filho['turma_id']) && $filho['turma_id'] !== '' ? (int) $filho['turma_id'] : 0;
+        $params = [];
+        $sql = "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao, r.data_sai_mural, r.autor_tipo, r.autor_id,
+                CASE WHEN r.autor_tipo = 'professor' THEN (SELECT p.nome FROM professores p WHERE p.id = r.autor_id LIMIT 1) ELSE 'Admin' END as autor_nome
+                FROM mural_recados r
+                WHERE (r.enviar_para_todos = 1" . ($turmaId > 0 ? " OR EXISTS (
+                    SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :turma_id
+                  )" : "") . ")
+                AND (CURDATE() <= r.data_sai_mural)
+                ORDER BY r.data_publicacao DESC";
+        if ($turmaId > 0) {
+            $params['turma_id'] = $turmaId;
+        }
+        $recados = $this->db->fetchAll($sql, $params);
+
+        foreach ($recados as &$recado) {
+            $recado['ja_visto'] = (bool) $this->db->fetch(
+                "SELECT 1 FROM mural_recados_vistos WHERE mural_recado_id = :rid AND aluno_id = :aid",
+                ['rid' => $recado['id'], 'aid' => $filho['id']]
+            );
+        }
+        unset($recado);
+
+        $this->viewWithLayout('parent', 'parents/mural-recados-filho', [
+            'title' => 'Mural de Recados do Filho - EducaTudo',
+            'page_title' => 'Mural de Recados',
+            'current_page' => 'mural-recados',
+            'filhos' => $filhos,
+            'filho' => $filho,
+            'user' => $user,
+            'recados' => $recados,
+        ]);
+    }
+
+    /** Instancia os Models/Service do módulo Drive (compartilhados com aluno/professor) */
+    private function driveModels(): array
+    {
+        require_once __DIR__ . '/../../Modulos/drive/Models/DriveItem.php';
+        require_once __DIR__ . '/../../Modulos/drive/Models/DriveShare.php';
+        require_once __DIR__ . '/../../Modulos/drive/Services/DriveStorageService.php';
+        return [new DriveItem(), new DriveShare(), new DriveStorageService($this->config)];
+    }
+
+    private function driveEnabled(): bool
+    {
+        require_once __DIR__ . '/../../Core/FeatureGate.php';
+        return FeatureGate::isModuleEnabled('drive');
+    }
+
+    /**
+     * Drive do filho — somente leitura (visualizar/baixar), mesmos itens que o aluno vê
+     * (arquivos/pastas dele + itens compartilhados com ele). Sem upload/criar pasta/
+     * renomear/excluir/compartilhar — reaproveita a view do aluno com canEdit=false.
+     */
+    public function driveFilho($id)
+    {
+        $filhos = $this->getFilhos();
+        $filho = $this->getFilhoById((int) $id);
+        if (!$filho) {
+            $this->redirect('/pais/filhos');
+        }
+        if (!$this->driveEnabled()) {
+            $this->redirect('/pais/filhos/' . (int) $filho['id']);
+        }
+
+        [$driveItem, $driveShare] = $this->driveModels();
+        $alunoId = (int) $filho['id'];
+        $baseUrl = URL . '/pais/filhos/' . $alunoId . '/drive';
+
+        $this->viewWithLayout('parent', 'aluno/drive/index', [
+            'title' => 'Arquivos do Filho - EducaTudo',
+            'current_page' => 'drive',
+            'filhos' => $filhos,
+            'filho' => $filho,
+            'user' => $this->auth->getUser(),
+            'baseUrl' => $baseUrl,
+            'items' => $driveItem->listChildren($alunoId, 'aluno', null),
+            'shared' => $driveShare->listSharedWithMe($alunoId, 'aluno'),
+            'breadcrumb' => [['id' => null, 'name' => 'Arquivos de ' . ($filho['nome'] ?? 'Aluno')]],
+            'currentFolderId' => null,
+            'canEdit' => false,
+            'flash' => null,
+        ]);
+    }
+
+    public function driveFilhoFolder($id, $folderId)
+    {
+        $filhos = $this->getFilhos();
+        $filho = $this->getFilhoById((int) $id);
+        if (!$filho) {
+            $this->redirect('/pais/filhos');
+        }
+        if (!$this->driveEnabled()) {
+            $this->redirect('/pais/filhos/' . (int) $filho['id']);
+        }
+
+        [$driveItem, $driveShare] = $this->driveModels();
+        $alunoId = (int) $filho['id'];
+        $baseUrl = URL . '/pais/filhos/' . $alunoId . '/drive';
+        $folderId = (int) $folderId;
+
+        $folder = $driveItem->getById($folderId);
+        if (!$folder || $folder['type'] !== 'folder' || !$driveShare->canAccess($folderId, $alunoId, 'aluno')) {
+            $this->redirect('/pais/filhos/' . $alunoId . '/drive');
+        }
+
+        $isOwner = (int) $folder['owner_id'] === $alunoId && $folder['owner_type'] === 'student';
+        $items = $isOwner
+            ? $driveItem->listChildren($alunoId, 'aluno', $folderId)
+            : $driveItem->listChildrenByParentId($folderId);
+
+        $this->viewWithLayout('parent', 'aluno/drive/index', [
+            'title' => $folder['name'] . ' - Arquivos do Filho - EducaTudo',
+            'current_page' => 'drive',
+            'filhos' => $filhos,
+            'filho' => $filho,
+            'user' => $this->auth->getUser(),
+            'baseUrl' => $baseUrl,
+            'items' => $items,
+            'shared' => [],
+            'breadcrumb' => $driveItem->getBreadcrumb($folderId),
+            'currentFolderId' => $folderId,
+            'canEdit' => false,
+            'flash' => null,
+        ]);
+    }
+
+    public function driveFilhoView($id, $itemId)
+    {
+        $filho = $this->getFilhoById((int) $id);
+        if (!$filho) {
+            $this->redirect('/pais/filhos');
+        }
+        if (!$this->driveEnabled()) {
+            $this->redirect('/pais/filhos/' . (int) $filho['id']);
+        }
+
+        [$driveItem, $driveShare] = $this->driveModels();
+        $alunoId = (int) $filho['id'];
+        $baseUrl = URL . '/pais/filhos/' . $alunoId . '/drive';
+        $itemId = (int) $itemId;
+
+        $item = $driveItem->getById($itemId);
+        if (!$item || $item['type'] !== 'file' || !$driveShare->canAccess($itemId, $alunoId, 'aluno')) {
+            $this->redirect('/pais/filhos/' . $alunoId . '/drive');
+        }
+
+        $mime = $item['mime_type'] ?? '';
+        $ext = strtolower(pathinfo($item['name'], PATHINFO_EXTENSION));
+        $viewable = in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'], true)
+            || strpos($mime, 'pdf') !== false
+            || strpos($mime, 'image/') === 0;
+
+        $this->viewWithLayout('parent', 'aluno/drive/view', [
+            'title' => $item['name'] . ' - Arquivos do Filho - EducaTudo',
+            'baseUrl' => $baseUrl,
+            'item' => $item,
+            'parentId' => $item['parent_id'],
+            'breadcrumb' => $driveItem->getBreadcrumb($itemId),
+            'viewable' => $viewable,
+        ]);
+    }
+
+    public function driveFilhoDownload($id, $itemId)
+    {
+        $filho = $this->getFilhoById((int) $id);
+        if (!$filho || !$this->driveEnabled()) {
+            $this->redirect('/pais/filhos');
+        }
+
+        [$driveItem, $driveShare, $driveStorage] = $this->driveModels();
+        $alunoId = (int) $filho['id'];
+        $itemId = (int) $itemId;
+
+        $item = $driveItem->getById($itemId);
+        if (!$item || $item['type'] !== 'file' || !$driveShare->canAccess($itemId, $alunoId, 'aluno')) {
+            $this->redirect('/pais/filhos/' . $alunoId . '/drive');
+        }
+
+        $name = $item['name'];
+        $key = $item['file_path'];
+
+        if ($driveStorage->isS3()) {
+            $url = $driveStorage->getDownloadUrl($key, $name);
+            if ($url) {
+                header('Location: ' . $url);
+                exit;
+            }
+            $this->redirect('/pais/filhos/' . $alunoId . '/drive');
+        }
+
+        $path = $driveStorage->getLocalPath($key);
+        if (!$path || !file_exists($path) || !is_readable($path)) {
+            $this->redirect('/pais/filhos/' . $alunoId . '/drive');
+        }
+
+        header('Content-Type: ' . ($item['mime_type'] ?: 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . addslashes($name) . '"');
+        header('Content-Length: ' . (int) $item['file_size']);
+        readfile($path);
+        exit;
+    }
+
+    public function driveFilhoServe($id, $itemId)
+    {
+        $filho = $this->getFilhoById((int) $id);
+        if (!$filho || !$this->driveEnabled()) {
+            http_response_code(404);
+            exit;
+        }
+
+        [$driveItem, $driveShare, $driveStorage] = $this->driveModels();
+        $alunoId = (int) $filho['id'];
+        $itemId = (int) $itemId;
+
+        $item = $driveItem->getById($itemId);
+        if (!$item || $item['type'] !== 'file') {
+            http_response_code(404);
+            exit;
+        }
+        if (!$driveShare->canAccess($itemId, $alunoId, 'aluno')) {
+            http_response_code(403);
+            exit;
+        }
+
+        $name = $item['name'];
+        $key = $item['file_path'];
+        $mime = $item['mime_type'] ?: 'application/octet-stream';
+
+        if ($driveStorage->isS3()) {
+            if ($driveStorage->streamInline($key, $name, $mime)) {
+                exit;
+            }
+            http_response_code(502);
+            exit;
+        }
+
+        $path = $driveStorage->getLocalPath($key);
+        if (!$path || !file_exists($path) || !is_readable($path)) {
+            http_response_code(404);
+            exit;
+        }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . addslashes($name) . '"');
+        header('Content-Length: ' . (int) $item['file_size']);
+        readfile($path);
+        exit;
+    }
 }
 }
