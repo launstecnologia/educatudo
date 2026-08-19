@@ -4453,11 +4453,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             wrap.querySelector('.btn-ok').addEventListener('click', function (e) {
                 e.stopPropagation();
                 var val = input.value.trim();
-                if (val === '') {
-                    alert('Informe uma nota.');
-                    return;
-                }
-                postCell({ valor: val }).then(function (res) {
+                // Campo deixado em branco = "sem nota" (traço). Mesmo efeito de
+                // clicar em "remover sobrescrita": some a nota manual aqui.
+                var payload = (val === '') ? { limpar: '1' } : { valor: val };
+                postCell(payload).then(function (res) {
                     if (!res || !res.success) {
                         alert((res && res.message) || 'Erro ao salvar.');
                         return;
