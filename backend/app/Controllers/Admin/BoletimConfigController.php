@@ -1256,6 +1256,10 @@ class BoletimConfigController extends BaseController
         $periodoRef = trim((string) ($_POST['periodo_ref'] ?? ''));
         $valorRaw = trim((string) ($_POST['valor'] ?? ''));
         $limpar = !empty($_POST['limpar']);
+        // 'vazio' força a célula a ficar "sem nota" (traço), mesmo que exista dado
+        // real por trás (prova/jornada) — diferente de 'limpar', que remove a
+        // sobrescrita e volta a usar o dado real/fórmula quando ele existir.
+        $vazio = !empty($_POST['vazio']);
 
         // materia_id = 0 é válido pra blocos 'manual' (ex.: ENAC, valor global por
         // componente) e negativo é válido pra linhas agrupadas em "linha única"
@@ -1268,6 +1272,17 @@ class BoletimConfigController extends BaseController
 
         if ($limpar) {
             $resultado = $this->boletimConfig->removerNotaManual($componenteId, $alunoId, $periodoRef, $materiaId);
+        } elseif ($vazio) {
+            $resultado = $this->boletimConfig->saveManualNote([
+                'regra_id' => $regraId,
+                'componente_id' => $componenteId,
+                'aluno_id' => $alunoId,
+                'materia_id' => $materiaId,
+                'periodo_ref' => $periodoRef,
+                'nota' => null,
+                'bloqueado' => false,
+                'observacao' => null,
+            ]);
         } else {
             if ($valorRaw === '' || !is_numeric(str_replace(',', '.', $valorRaw))) {
                 echo json_encode(['success' => false, 'message' => 'Informe uma nota válida.'], JSON_UNESCAPED_UNICODE);
@@ -1900,9 +1915,15 @@ class BoletimConfigController extends BaseController
                     ? $this->boletimConfig->getManualNote($compIdManual, $alunoId, $periodoRef)
                     : null;
                 if ($manual) {
-                    $valor = (float) $manual['nota'];
                     $bloqueado = (int) ($manual['bloqueado'] ?? 0) === 1;
                     $detalhes['manual_id'] = (int) $manual['id'];
+                    if (is_numeric($manual['nota'] ?? null)) {
+                        $valor = (float) $manual['nota'];
+                    } else {
+                        // Sobrescrita explícita "sem nota" (nota = NULL): mantém $valor
+                        // vazio, força o traço mesmo que fosse obrigatório.
+                        $detalhes['manual_vazio'] = true;
+                    }
                 } elseif ($compIdManual > 0) {
                     $outros = $this->boletimConfig->listManualNotesOtherPeriods($compIdManual, $alunoId, $periodoRef, 8);
                     if (!empty($outros)) {
@@ -2491,10 +2512,29 @@ class BoletimConfigController extends BaseController
                 $materiasComOverrideOv = [];
                 foreach ($overridesPorMateria as $midOv => $rowOv) {
                     $midOv = (int) $midOv;
-                    if ($midOv === 0 || !is_numeric($rowOv['nota'] ?? null)) {
+                    if ($midOv === 0) {
                         continue;
                     }
-                    $matrizPorCodigo[$codigo][$midOv] = $this->applyRoundMode((float) $rowOv['nota'], $roundModeOv);
+                    $notaOv = $rowOv['nota'] ?? null;
+                    if ($notaOv === null) {
+                        // Sobrescrita explícita "sem nota": força a célula vazia (traço)
+                        // pra essa matéria/aluno, mesmo que exista dado real (prova/
+                        // jornada) por trás — diferente de não ter sobrescrita nenhuma.
+                        $matrizPorCodigo[$codigo][$midOv] = null;
+                        $materiasComOverrideOv[$midOv] = [
+                            'manual_id' => (int) ($rowOv['id'] ?? 0),
+                            'bloqueado' => (int) ($rowOv['bloqueado'] ?? 0) === 1,
+                            'vazio' => true,
+                        ];
+                        if ((int) ($rowOv['bloqueado'] ?? 0) === 1) {
+                            $bloqueado = true;
+                        }
+                        continue;
+                    }
+                    if (!is_numeric($notaOv)) {
+                        continue;
+                    }
+                    $matrizPorCodigo[$codigo][$midOv] = $this->applyRoundMode((float) $notaOv, $roundModeOv);
                     $materiasComOverrideOv[$midOv] = [
                         'manual_id' => (int) ($rowOv['id'] ?? 0),
                         'bloqueado' => (int) ($rowOv['bloqueado'] ?? 0) === 1,
@@ -2666,10 +2706,28 @@ class BoletimConfigController extends BaseController
                 $materiasComOverride = [];
                 foreach ($overridesPorMateria as $midOv => $rowOv) {
                     $midOv = (int) $midOv;
-                    if ($midOv === 0 || !is_numeric($rowOv['nota'] ?? null)) {
+                    if ($midOv === 0) {
                         continue;
                     }
-                    $matrizPorCodigo[$codigo][$midOv] = $this->applyRoundMode((float) $rowOv['nota'], $roundModeComp);
+                    $notaOv = $rowOv['nota'] ?? null;
+                    if ($notaOv === null) {
+                        // Sobrescrita explícita "sem nota": força a célula vazia (traço)
+                        // pra essa matéria/aluno, mesmo que a fórmula calculasse um valor.
+                        $matrizPorCodigo[$codigo][$midOv] = null;
+                        $materiasComOverride[$midOv] = [
+                            'manual_id' => (int) ($rowOv['id'] ?? 0),
+                            'bloqueado' => (int) ($rowOv['bloqueado'] ?? 0) === 1,
+                            'vazio' => true,
+                        ];
+                        if ((int) ($rowOv['bloqueado'] ?? 0) === 1) {
+                            $bloqueado = true;
+                        }
+                        continue;
+                    }
+                    if (!is_numeric($notaOv)) {
+                        continue;
+                    }
+                    $matrizPorCodigo[$codigo][$midOv] = $this->applyRoundMode((float) $notaOv, $roundModeComp);
                     $materiasComOverride[$midOv] = [
                         'manual_id' => (int) ($rowOv['id'] ?? 0),
                         'bloqueado' => (int) ($rowOv['bloqueado'] ?? 0) === 1,

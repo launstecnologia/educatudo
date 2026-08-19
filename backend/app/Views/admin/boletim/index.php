@@ -4453,9 +4453,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             wrap.querySelector('.btn-ok').addEventListener('click', function (e) {
                 e.stopPropagation();
                 var val = input.value.trim();
-                // Campo deixado em branco = "sem nota" (traço). Mesmo efeito de
-                // clicar em "remover sobrescrita": some a nota manual aqui.
-                var payload = (val === '') ? { limpar: '1' } : { valor: val };
+                // Campo deixado em branco = força "sem nota" (traço), mesmo que
+                // exista dado real (prova/jornada) por trás. Diferente do botão
+                // ↺, que remove a sobrescrita e volta a usar o dado real/fórmula.
+                var payload = (val === '') ? { vazio: '1' } : { valor: val };
                 postCell(payload).then(function (res) {
                     if (!res || !res.success) {
                         alert((res && res.message) || 'Erro ao salvar.');

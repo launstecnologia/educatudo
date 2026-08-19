@@ -96,7 +96,7 @@ class BoletimConfig
                 componente_id INT NOT NULL,
                 aluno_id INT NOT NULL,
                 periodo_ref VARCHAR(20) NOT NULL,
-                nota DECIMAL(8,2) NOT NULL,
+                nota DECIMAL(8,2) NULL DEFAULT NULL,
                 bloqueado TINYINT(1) NOT NULL DEFAULT 0,
                 observacao VARCHAR(255) NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -1692,7 +1692,7 @@ class BoletimConfig
                 'aluno_id' => (int) $payload['aluno_id'],
                 'materia_id' => $materiaId,
                 'periodo_ref' => (string) $payload['periodo_ref'],
-                'nota' => (float) $payload['nota'],
+                'nota' => $payload['nota'] === null ? null : (float) $payload['nota'],
                 'bloqueado' => !empty($payload['bloqueado']) ? 1 : 0,
                 'observacao' => $payload['observacao'] ?? null,
             ]
@@ -2195,6 +2195,22 @@ class BoletimConfig
             }
             $this->db->query("ALTER TABLE boletim_notas_manuais DROP INDEX uk_boletim_notas_manuais_item");
             $this->db->query("ALTER TABLE boletim_notas_manuais ADD UNIQUE KEY uk_boletim_notas_manuais_item_materia (componente_id, aluno_id, periodo_ref, materia_id)");
+        }
+
+        // Escolas antigas (tabela criada antes desta feature) ainda têm `nota
+        // NOT NULL` — sem isso não dá pra gravar uma sobrescrita manual
+        // explicitamente "sem nota" (ver migration 2026_08_19_boletim_nota_manual_vazia.sql).
+        $notaNullable = $this->db->fetch(
+            "SELECT 1
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'boletim_notas_manuais'
+               AND COLUMN_NAME = 'nota'
+               AND IS_NULLABLE = 'YES'
+             LIMIT 1"
+        );
+        if (!$notaNullable) {
+            $this->db->query("ALTER TABLE boletim_notas_manuais MODIFY COLUMN nota DECIMAL(8,2) NULL DEFAULT NULL");
         }
     }
 
