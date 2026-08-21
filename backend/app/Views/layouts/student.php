@@ -67,7 +67,7 @@
             'highlight_index' => 2,
             'items' => [
                 ['label' => 'Dashboard', 'route' => '/dashboard', 'icon' => 'home'],
-                ['label' => 'Exercícios', 'route' => '/exercicios-personalizados/criar', 'icon' => 'books'],
+                ['label' => 'Exercícios', 'route' => '/exercicios-personalizados/minhas-listas', 'icon' => 'books'],
                 ['label' => LayoutHelper::getIaName(), 'route' => '/chat', 'icon' => 'chat'],
                 ['label' => 'Redações', 'route' => '/redacoes', 'icon' => 'pencil'],
                 ['label' => 'Jogos', 'route' => '/jogos/access', 'icon' => 'game']
@@ -104,7 +104,7 @@
     if (is_array($mobileBottomNavItems)) {
         $rotaModuloMobileNav = [
             '/chat' => 'chat',
-            '/exercicios-personalizados/criar' => 'exercicios_ia',
+            '/exercicios-personalizados' => 'exercicios_ia',
             '/exercicios' => 'exercicios',
             '/redacoes' => 'redacoes',
             '/jogos/access' => 'jogos',
@@ -1109,8 +1109,8 @@
                         // Menu do aluno: só módulos habilitados (status 1). Desativado/inativo somem.
                         $modulosAluno = [
                             'chat' => LayoutHelper::isModuleEnabled('chat'),
-                            // O link do menu vai pra /exercicios-personalizados/criar (geração
-                            // por IA) — o módulo certo a checar é 'exercicios_ia', não
+                            // O link do menu vai pra /exercicios-personalizados/minhas-listas
+                            // (geração por IA) — o módulo certo a checar é 'exercicios_ia', não
                             // 'exercicios' (que é o módulo separado "Banco de Dados").
                             'exercicios' => LayoutHelper::isModuleEnabled('exercicios_ia'),
                             'simulados' => LayoutHelper::isModuleEnabled('simulados'),
@@ -1255,7 +1255,7 @@
                         <?php endif; ?>
                         <?php $itemsEstudo['aluno_flashcards'] = ob_get_clean(); ob_start(); ?>
                         <?php if (LayoutHelper::isModuleEnabled('exercicios_ia')): ?>
-                        <a href="<?= $exerciciosEnabled ? URL . '/exercicios-personalizados/criar' : '#' ?>"
+                        <a href="<?= $exerciciosEnabled ? URL . '/exercicios-personalizados/minhas-listas' : '#' ?>"
                            onclick="<?= $exerciciosEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Exercícios\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/exercicios') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$exerciciosEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
                             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
