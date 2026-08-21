@@ -181,6 +181,7 @@ $router->get('/aluno/provas/bloco/{id}/cancelar-seguro', 'Exams/ExamController@c
 $router->get('/aluno/provas/bloco/{id}/resultados', 'Exams/ExamController@resultadosBloco');
 $router->post('/aluno/provas/iniciar/{id}', 'Exams/ExamController@iniciar');
 $router->post('/aluno/provas/salvar-resposta/{id}', 'Exams/ExamController@salvarResposta');
+$router->post('/aluno/provas/log-evento', 'Exams/ExamController@logEvento');
 $router->post('/aluno/provas/voz-para-texto', 'User/StudentController@vozParaTexto');
 
 // Planos de Aula (Aluno)

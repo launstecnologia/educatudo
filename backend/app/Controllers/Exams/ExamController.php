@@ -5,7 +5,8 @@
  */
 
 require_once __DIR__ . '/../../Models/Exams/Exam.php';
-require_once __DIR__ . '/../../Models/Education/Subject.php';
+require_once __DIR__ . '/../../Models/Exams/ProvaLogEvento.php';
+require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
 require_once __DIR__ . '/../../Models/Education/ClassRoom.php';
 require_once __DIR__ . '/../../Models/User/Teacher.php';
 require_once __DIR__ . '/../../Models/User/Student.php';
@@ -29,15 +30,30 @@ class ExamController extends BaseController
         $this->auth = new AuthManager();
         $this->db = Database::getInstance();
         $this->provaModel = new Exam();
-        $this->subjectModel = new Subject();
+        $this->subjectModel = new ComponenteCurricular();
         $this->turmaModel = new ClassRoom();
         $this->teacherModel = new Teacher();
         $this->studentModel = new Student();
         $this->planoAulaModel = new LessonPlan();
         
+        // Log de Provas (Master): endpoint tolerante a sessão quebrada — é usado
+        // justamente para reportar quando a sessão caiu, então não pode exigir
+        // login válido (senão perdemos exatamente os casos que queremos ver).
+        // A validação de identidade (sessão OU token, nunca id "no olho" vindo do
+        // corpo) acontece dentro de logEvento(), não aqui.
+        // Path EXATO da única rota registrada pra esse método (config/routes/student.php)
+        // — não usar sufixo/regex solto aqui: este controller atende professor/admin/aluno,
+        // e um match frouxo poderia acabar pulando o login de outra rota por engano.
+        $uriAtual = rtrim((string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: ''), '/');
+        $isLogEventoRoute = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? '')) === 'POST'
+            && $uriAtual === '/aluno/provas/log-evento';
+
         // Verifica se está logado
-        if (!$this->auth->isLoggedIn()) {
+        if (!$isLogEventoRoute && !$this->auth->isLoggedIn()) {
             if ($this->wantsJsonResponse()) {
+                $this->registrarLogProva('erro_sessao', [
+                    'detalhe' => 'Sessão expirada/inválida em ' . ($_SERVER['REQUEST_URI'] ?? ''),
+                ]);
                 $this->json(['error' => 'Sessão expirada. Faça login novamente.'], 401);
                 return;
             }
@@ -50,6 +66,137 @@ class ExamController extends BaseController
         if ($user && !in_array($user['tipo'], ['professor', 'admin', 'admin_escola', 'aluno'])) {
             $this->redirectToCorrectDashboard($user['tipo']);
         }
+    }
+
+    /**
+     * Registra uma anomalia da tela de prova no Log de Provas (Master).
+     * Nunca lança exceção — log não pode derrubar a prova do aluno.
+     *
+     * @param array<string,mixed> $extra aluno_id, prova_id, bloco_id, detalhe (sobrescreve os automáticos)
+     */
+    private function registrarLogProva(string $tipoEvento, array $extra = []): void
+    {
+        try {
+            $user = $this->auth->getUser();
+            (new ProvaLogEvento())->registrar(array_merge([
+                'tipo_evento' => $tipoEvento,
+                'aluno_id' => $user && ($user['tipo'] ?? '') === 'aluno' ? $user['id'] : null,
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
+            ], $extra));
+        } catch (Throwable $e) {
+            error_log('registrarLogProva falhou: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Log de Provas (Master): gera um token opaco (guardado no Redis, TTL curto) amarrando
+     * aluno_id/prova_id/bloco_id — emitido enquanto a sessão AINDA está válida (na própria
+     * renderização da prova). É o que permite `logEvento()` confiar em quem é o aluno mesmo
+     * depois que a sessão já caiu, SEM aceitar um aluno_id arbitrário mandado pelo cliente
+     * (isso permitiria um aluno forjar evento de "tentativa de burlar prova" em nome de outro).
+     * Se o Redis estiver fora do ar, retorna '' e o evento simplesmente fica sem aluno_id
+     * nesse caso raro (nunca um aluno_id não verificado).
+     */
+    private function gerarTokenLogProva(int $alunoId, int $provaId, int $blocoId): string
+    {
+        try {
+            $token = bin2hex(random_bytes(16));
+            $ok = RedisCache::set(
+                'log_prova_token_' . $token,
+                json_encode(['aluno_id' => $alunoId, 'prova_id' => $provaId, 'bloco_id' => $blocoId], JSON_UNESCAPED_UNICODE),
+                14400 // 4h — mais que suficiente para a duração de qualquer prova
+            );
+            return $ok ? $token : '';
+        } catch (Throwable $e) {
+            return '';
+        }
+    }
+
+    /**
+     * @return array{aluno_id:int,prova_id:int,bloco_id:int}|null
+     */
+    private function resolverTokenLogProva(string $token): ?array
+    {
+        if ($token === '') {
+            return null;
+        }
+        try {
+            $raw = RedisCache::get('log_prova_token_' . $token);
+            if ($raw === null || $raw === '') {
+                return null;
+            }
+            $dados = json_decode($raw, true);
+            if (!is_array($dados)) {
+                return null;
+            }
+            return [
+                'aluno_id' => (int) ($dados['aluno_id'] ?? 0),
+                'prova_id' => (int) ($dados['prova_id'] ?? 0),
+                'bloco_id' => (int) ($dados['bloco_id'] ?? 0),
+            ];
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Log de Provas (Master): recebe eventos de anomalia direto do navegador do aluno
+     * durante a prova — tentativa de sair da tela cheia/modo seguro, F5, voltar
+     * navegador, etc. Não exige sessão válida (ver __construct: rota tolerante a
+     * sessão quebrada, é justamente pra isso que ela existe).
+     *
+     * IMPORTANTE: como a rota é pública, o aluno_id/prova_id/bloco_id do corpo NUNCA
+     * é aceito "no olho": com sessão válida usamos só a identidade da sessão; sem
+     * sessão, só aceitamos o que vier amarrado a um token emitido por gerarTokenLogProva()
+     * (ver __construct/realizar()) — sem isso, qualquer um poderia forjar um evento de
+     * "tentativa de burlar prova" em nome de outro aluno real.
+     */
+    public function logEvento()
+    {
+        $input = file_get_contents('php://input');
+        $body = is_string($input) ? json_decode($input, true) : null;
+        if (!is_array($body)) {
+            $body = $_POST;
+        }
+
+        $tipoEvento = (string) ($body['tipo_evento'] ?? 'outro');
+        if (!in_array($tipoEvento, ProvaLogEvento::TIPOS_VALIDOS, true)) {
+            $tipoEvento = 'outro';
+        }
+
+        $extra = [
+            'aluno_id' => null,
+            'prova_id' => null,
+            'bloco_id' => null,
+            'detalhe' => (string) ($body['detalhe'] ?? ''),
+        ];
+
+        $user = $this->auth->getUser();
+        if ($user && ($user['tipo'] ?? '') === 'aluno') {
+            // Sessão ainda válida: identidade vem só da sessão, nunca do corpo da requisição.
+            $extra['aluno_id'] = (int) $user['id'];
+            $provaIdBody = !empty($body['prova_id']) ? (int) $body['prova_id'] : null;
+            if ($provaIdBody !== null && $this->db->fetch("SELECT id FROM provas WHERE id = :id", ['id' => $provaIdBody])) {
+                $extra['prova_id'] = $provaIdBody;
+            }
+            $extra['bloco_id'] = !empty($body['bloco_id']) ? (int) $body['bloco_id'] : null;
+        } else {
+            // Sessão já quebrada: só confia em aluno_id/prova_id/bloco_id vindos do token
+            // emitido enquanto a sessão ainda era válida. Sem token válido, o evento é
+            // gravado mesmo assim (detalhe/tipo/ip/user-agent ainda são úteis pro Master),
+            // só que sem identificar aluno/prova — nunca com um id não verificado.
+            $resolvido = $this->resolverTokenLogProva((string) ($body['token'] ?? ''));
+            if ($resolvido) {
+                $extra['aluno_id'] = $resolvido['aluno_id'] > 0 ? $resolvido['aluno_id'] : null;
+                $extra['prova_id'] = $resolvido['prova_id'] > 0 ? $resolvido['prova_id'] : null;
+                $extra['bloco_id'] = $resolvido['bloco_id'] > 0 ? $resolvido['bloco_id'] : null;
+            }
+        }
+
+        $this->registrarLogProva($tipoEvento, $extra);
+
+        $this->json(['success' => true]);
     }
 
     /**
@@ -3463,9 +3610,11 @@ class ExamController extends BaseController
         if ($modoBloco && $blocoProva && !empty($blocoProva['data_prova']) && !empty($blocoProva['hora_fim'])) {
             $blocoTerminoIso = $blocoProva['data_prova'] . ' ' . $blocoProva['hora_fim'];
         }
+        $logProvaToken = $this->gerarTokenLogProva((int) $user['id'], (int) $id, $modoBloco ? (int) ($blocoProva['id'] ?? 0) : 0);
         $data = [
             'title' => $modoBloco ? 'Realizar Bloco de Provas - EducaTudo' : 'Realizar Prova - EducaTudo',
             'user' => $user,
+            'log_prova_token' => $logProvaToken,
             'prova' => $prova,
             'questoes' => $questoes,
             'respostas' => $respostasMap,
@@ -3608,6 +3757,10 @@ class ExamController extends BaseController
             
         } catch (Exception $e) {
             error_log("Erro ao salvar resposta: " . $e->getMessage());
+            $this->registrarLogProva('erro_salvar_resposta', [
+                'prova_id' => $provaIdParaSalvar ?? $id,
+                'detalhe' => $e->getMessage(),
+            ]);
             $this->json(['error' => $e->getMessage()], 400);
         }
     }
@@ -5097,6 +5250,11 @@ class ExamController extends BaseController
             
         } catch (Throwable $e) {
             error_log("Erro ao finalizar prova: " . $e->getMessage());
+            $this->registrarLogProva('erro_finalizar', [
+                'prova_id' => $id,
+                'bloco_id' => $blocoId ?? null,
+                'detalhe' => $e->getMessage(),
+            ]);
             $this->json(['error' => $e->getMessage()], 400);
         } finally {
             ini_set('display_errors', (string) $oldDisplayErrors);
@@ -6841,6 +6999,11 @@ Retorne APENAS um JSON válido no seguinte formato:
             'aluno_id' => (int) $aluno['id'],
             'method' => $_SERVER['REQUEST_METHOD'] ?? 'GET',
             'afetadas' => $afetadas,
+        ]);
+        $this->registrarLogProva('saida_modo_seguro', [
+            'aluno_id' => (int) $aluno['id'],
+            'bloco_id' => $blocoId,
+            'detalhe' => 'Saiu do modo seguro (aba trocada/fechada) — ' . (int) $afetadas . ' realização(ões) cancelada(s).',
         ]);
         $this->json(['success' => true, 'afetadas' => $afetadas]);
     }

@@ -645,6 +645,9 @@ function continuarFinalizarProva(comprovanteBase64) {
         else if (msg === 'Failed to fetch' || msg.indexOf('fetch') !== -1) msg = 'Falha de conexão. Verifique a internet e tente novamente.';
         else if (msg.indexOf('Resposta inválida') !== -1) msg = 'O servidor retornou um erro. Tente novamente ou contate o suporte.';
         else if (msg.indexOf('Sessão expirada') !== -1) msg = 'Sua sessão expirou. Faça login novamente e entre na prova.';
+        // Erro que não chegou a virar resposta do servidor (rede caiu, timeout) — só dá pra
+        // saber disso aqui no cliente, por isso registra o log daqui em vez do backend.
+        registrarLogProvaEvento('erro_finalizar', 'Falha ao finalizar (cliente): ' + (error && error.message ? error.message : String(error)));
         mostrarModal('Erro', msg);
     });
 };
@@ -882,6 +885,36 @@ timerIntervalId = setInterval(atualizarTimer, 1000);
 // BLOQUEIOS DE SEGURANÇA
 // ============================================
 
+// Log de Provas (Master): reporta tentativa de burlar o modo seguro/tela cheia.
+// Usa sendBeacon (não bloqueia nem atrasa a prova, funciona até no beforeunload) com
+// fallback pra fetch keepalive em navegador sem sendBeacon. Não depende de sessão
+// válida — o endpoint aceita mesmo com sessão expirada (ver ExamController::logEvento).
+// O servidor NUNCA confia em aluno_id vindo daqui: com sessão válida usa a sessão, sem
+// sessão exige o token abaixo (emitido nesta mesma página enquanto a sessão era válida)
+// — por isso não mandamos aluno_id no payload, só o token.
+var LOG_PROVA_TOKEN = <?= json_encode((string) ($log_prova_token ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+var LOG_PROVA_PROVA_ID = <?= (int)($prova['id'] ?? 0) ?>;
+var LOG_PROVA_BLOCO_ID = <?= (int)($bloco['id'] ?? 0) ?>;
+function registrarLogProvaEvento(tipoEvento, detalhe) {
+    try {
+        var payload = JSON.stringify({
+            tipo_evento: tipoEvento,
+            token: LOG_PROVA_TOKEN || undefined,
+            prova_id: LOG_PROVA_PROVA_ID || undefined,
+            bloco_id: LOG_PROVA_BLOCO_ID || undefined,
+            detalhe: detalhe || ''
+        });
+        var url = '<?= URL ?>/aluno/provas/log-evento';
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+        } else {
+            fetch(url, { method: 'POST', body: payload, headers: { 'Content-Type': 'application/json' }, keepalive: true, credentials: 'same-origin' }).catch(function() {});
+        }
+    } catch (e) {
+        // log não pode quebrar a prova
+    }
+}
+
 function aplicarBloqueiosSeguranca() {
     <?php if (!empty($modo_embed) && !empty($modo_seguro)): ?>
     // Captura Esc e F11 no iframe para não sair do fullscreen do pai
@@ -889,6 +922,7 @@ function aplicarBloqueiosSeguranca() {
         if (e.key === 'Escape' || e.key === 'F11') {
             e.preventDefault();
             e.stopPropagation();
+            registrarLogProvaEvento('tentativa_sair_tela_cheia', 'Tecla ' + e.key + ' durante prova em modo seguro/embed.');
             mostrarModal('Atenção', 'Para sair da prova, finalize todas as matérias e use o botão "Sair do modo prova" na tela principal.');
         }
     }, true);
@@ -1027,9 +1061,10 @@ function aplicarBloqueiosSeguranca() {
     window.history.pushState(null, null, window.location.href);
     window.addEventListener('popstate', function() {
         window.history.pushState(null, null, window.location.href);
+        registrarLogProvaEvento('tentativa_voltar_navegador', 'Aluno tentou usar o botão Voltar do navegador durante a prova.');
         mostrarModal('Atenção', 'Não é permitido navegar para trás durante a prova.');
     });
-    
+
     document.addEventListener('visibilitychange', function() {
         if (window._finalizandoProva || window._provaCancelada) return;
         if (document.hidden) {
@@ -1046,6 +1081,7 @@ function aplicarBloqueiosSeguranca() {
                 return;
             }
             <?php endif; ?>
+            registrarLogProvaEvento('tentativa_sair_tela_cheia', 'Aluno trocou de aba/minimizou a janela durante a prova.');
             mostrarModal('Atenção', 'Você não deve sair desta página durante a prova.');
         }
     });
@@ -1055,20 +1091,23 @@ function bloquearTeclas(e) {
     // Bloquear F5
     if (e.key === 'F5') {
         e.preventDefault();
+        registrarLogProvaEvento('tentativa_atualizar_pagina', 'Aluno apertou F5 durante a prova.');
         mostrarModal('Atenção', 'Atualizar a página não é permitido durante a prova.');
         return false;
     }
-    
+
     // Bloquear Ctrl+R
     if (e.ctrlKey && (e.key === 'r' || e.key === 'R')) {
         e.preventDefault();
+        registrarLogProvaEvento('tentativa_atualizar_pagina', 'Aluno apertou Ctrl+R durante a prova.');
         mostrarModal('Atenção', 'Atualizar a página não é permitido durante a prova.');
         return false;
     }
-    
+
     // Bloquear Ctrl+F5
     if (e.ctrlKey && e.key === 'F5') {
         e.preventDefault();
+        registrarLogProvaEvento('tentativa_atualizar_pagina', 'Aluno apertou Ctrl+F5 durante a prova.');
         return false;
     }
 }
