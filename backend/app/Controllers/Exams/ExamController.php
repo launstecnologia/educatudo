@@ -7000,11 +7000,33 @@ Retorne APENAS um JSON válido no seguinte formato:
             'method' => $_SERVER['REQUEST_METHOD'] ?? 'GET',
             'afetadas' => $afetadas,
         ]);
-        $this->registrarLogProva('saida_modo_seguro', [
-            'aluno_id' => (int) $aluno['id'],
-            'bloco_id' => $blocoId,
-            'detalhe' => 'Saiu do modo seguro (aba trocada/fechada) — ' . (int) $afetadas . ' realização(ões) cancelada(s).',
-        ]);
+        // O cliente dispara essa chamada de até 3 formas em paralelo (img ping, sendBeacon,
+        // fetch) de propósito — a aba pode fechar antes de qualquer uma completar, então
+        // manda todas pra aumentar a chance de uma chegar (ver realizar.php:381-406). Sem
+        // essa checagem, as 3 batidas nesse endpoint gerariam 3 linhas idênticas no Log de
+        // Provas pra uma única saída real do aluno.
+        // Nunca pode quebrar o cancelamento (ex.: migration do Log de Provas ainda não
+        // rodou nessa escola) — nesse caso segue e loga normalmente (pior caso: volta a
+        // duplicar, não perde o cancelamento em si).
+        $jaLogado = null;
+        try {
+            $jaLogado = $this->db->fetch(
+                "SELECT id FROM provas_log_eventos
+                 WHERE tipo_evento = 'saida_modo_seguro' AND aluno_id = :aluno_id AND bloco_id = :bloco_id
+                   AND created_at >= (NOW() - INTERVAL 30 SECOND)
+                 LIMIT 1",
+                ['aluno_id' => (int) $aluno['id'], 'bloco_id' => $blocoId]
+            );
+        } catch (Throwable $e) {
+            // segue com $jaLogado = null
+        }
+        if (!$jaLogado) {
+            $this->registrarLogProva('saida_modo_seguro', [
+                'aluno_id' => (int) $aluno['id'],
+                'bloco_id' => $blocoId,
+                'detalhe' => 'Saiu do modo seguro (aba trocada/fechada) — ' . (int) $afetadas . ' realização(ões) cancelada(s).',
+            ]);
+        }
         $this->json(['success' => true, 'afetadas' => $afetadas]);
     }
     
