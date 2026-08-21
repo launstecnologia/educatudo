@@ -6,7 +6,7 @@
 
 require_once __DIR__ . '/../../Models/Exams/Exam.php';
 require_once __DIR__ . '/../../Models/Exams/ProvaLogEvento.php';
-require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
+require_once __DIR__ . '/../../Models/Education/Subject.php';
 require_once __DIR__ . '/../../Models/Education/ClassRoom.php';
 require_once __DIR__ . '/../../Models/User/Teacher.php';
 require_once __DIR__ . '/../../Models/User/Student.php';
@@ -30,7 +30,7 @@ class ExamController extends BaseController
         $this->auth = new AuthManager();
         $this->db = Database::getInstance();
         $this->provaModel = new Exam();
-        $this->subjectModel = new ComponenteCurricular();
+        $this->subjectModel = new Subject();
         $this->turmaModel = new ClassRoom();
         $this->teacherModel = new Teacher();
         $this->studentModel = new Student();
