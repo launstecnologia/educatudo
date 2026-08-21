@@ -371,7 +371,7 @@ class StudentAgendaService
     {
         try {
             $rows = $this->db->fetchAll(
-                "SELECT id, titulo, tipo, descricao, data, hora, link
+                "SELECT id, titulo, tipo, descricao, data, hora, banca, local, link
                  FROM aluno_agenda_itens
                  WHERE aluno_id = :aluno_id AND data BETWEEN :inicio AND :fim
                  ORDER BY data ASC, hora ASC",
@@ -382,18 +382,17 @@ class StudentAgendaService
             return [];
         }
 
-        $cores = [
-            'pessoal' => 'yellow',
-            'prova' => 'red',
-            'jornada' => 'blue',
-            'redacao' => 'purple',
-            'estudo' => 'teal',
-            'outro' => 'gray',
-        ];
+        if (!class_exists('AgendaController')) {
+            require_once __DIR__ . '/../Controllers/Student/AgendaController.php';
+        }
+        $tiposPessoal = \AgendaController::tiposItemPessoal();
 
         $eventos = [];
         foreach ($rows as $r) {
             $tipo = (string) ($r['tipo'] ?? 'pessoal');
+            if (!array_key_exists($tipo, $tiposPessoal)) {
+                $tipo = 'pessoal';
+            }
             $data = (string) ($r['data'] ?? '');
             $hora = (string) ($r['hora'] ?? '');
             $link = trim((string) ($r['link'] ?? ''));
@@ -407,10 +406,14 @@ class StudentAgendaService
                 $data . ($hora !== '' ? ' ' . $hora : ' 00:00:00'),
                 null,
                 $link !== '' ? $link : null,
-                $cores[$tipo] ?? 'yellow',
+                $tiposPessoal[$tipo]['cor'] ?? '#eab308',
                 'star'
             );
-            $eventos[array_key_last($eventos)]['tipo_pessoal'] = $tipo;
+            $ultimo = array_key_last($eventos);
+            $eventos[$ultimo]['tipo_pessoal'] = $tipo;
+            $eventos[$ultimo]['tipo_pessoal_label'] = $tiposPessoal[$tipo]['label'] ?? 'Pessoal';
+            $eventos[$ultimo]['banca'] = (string) ($r['banca'] ?? '');
+            $eventos[$ultimo]['local'] = (string) ($r['local'] ?? '');
         }
         return $eventos;
     }

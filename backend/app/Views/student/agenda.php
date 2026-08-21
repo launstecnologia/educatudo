@@ -42,7 +42,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
 <div class="mb-6">
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-bold text-gray-900 flex-1">Agenda</h1>
-        <button type="button" onclick="abrirFormItem()" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-2">
+        <button type="button" onclick="abrirFormItem()" class="btn-ai-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             Adicionar
         </button>
@@ -83,8 +83,8 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
             $evsDia = $eventosPorDia[$dataKey] ?? [];
             $isHoje = ($dataKey === $hoje);
         ?>
-        <div class="min-h-[90px] p-1.5 flex flex-col bg-white <?= $isHoje ? 'ring-2 ring-inset ring-purple-400' : '' ?>">
-            <span class="text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full self-end <?= $isHoje ? 'bg-purple-500 text-white' : 'text-gray-600' ?>"><?= $dia ?></span>
+        <div class="min-h-[90px] p-1.5 flex flex-col bg-white" <?= $isHoje ? 'style="box-shadow: inset 0 0 0 2px var(--primary-color, #a855f7);"' : '' ?>>
+            <span class="text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full self-end <?= $isHoje ? 'text-white' : 'text-gray-600' ?>" <?= $isHoje ? 'style="background-color: var(--primary-color, #a855f7);"' : '' ?>><?= $dia ?></span>
             <?php foreach (array_slice($evsDia, 0, 3) as $ev): ?>
                 <button type="button" onclick="abrirDetalheEvento(<?= htmlspecialchars(json_encode($ev), ENT_QUOTES) ?>)" class="text-left text-[11px] rounded px-1 py-0.5 mt-0.5 truncate font-medium hover:opacity-80" style="background-color:<?= $ev['cor'] ?>22; color:<?= $ev['cor'] ?>;">
                     <?= htmlspecialchars($ev['titulo']) ?>
@@ -112,9 +112,12 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
             <div class="text-sm text-gray-600 space-y-1" id="modalEventoDetalhes"></div>
             <p class="text-sm text-gray-700" id="modalEventoDescricao"></p>
         </div>
-        <div class="px-6 pb-4 flex items-center justify-between">
-            <a id="modalEventoLink" href="#" target="_blank" rel="noopener" class="text-purple-600 text-sm font-medium hover:underline hidden">Abrir link</a>
-            <button type="button" id="modalEventoExcluir" onclick="excluirItemPessoalAtual()" class="text-red-500 text-sm font-medium hover:underline hidden">Excluir item</button>
+        <div class="px-6 pb-4 flex items-center justify-between gap-3">
+            <a id="modalEventoLink" href="#" target="_blank" rel="noopener" class="text-accent text-sm font-medium hover:underline hidden">Abrir link</a>
+            <div class="flex items-center gap-4 ml-auto">
+                <button type="button" id="modalEventoEditar" onclick="editarItemPessoalAtual()" class="text-accent text-sm font-medium hover:underline hidden">Editar</button>
+                <button type="button" id="modalEventoExcluir" onclick="excluirItemPessoalAtual()" class="text-red-500 text-sm font-medium hover:underline hidden">Excluir item</button>
+            </div>
         </div>
     </div>
 </div>
@@ -123,7 +126,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
 <div id="modalNovoItem" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden overflow-y-auto py-8">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-900">Adicionar à agenda</h3>
+            <h3 class="text-lg font-bold text-gray-900" id="modalNovoItemTitulo">Adicionar à agenda</h3>
             <button type="button" onclick="fecharFormItem()" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
@@ -167,7 +170,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
                 <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                 <textarea id="itemDescricao" rows="3" maxlength="2000" placeholder="Detalhes, conteúdo cobrado..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent"></textarea>
             </div>
-            <button type="submit" class="w-full py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">Salvar</button>
+            <button type="submit" class="btn-ai-primary w-full py-2.5 rounded-lg font-medium transition-colors">Salvar</button>
         </form>
     </div>
 </div>
@@ -176,6 +179,8 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
 var TIPO_LABELS = <?= json_encode($tipoLabels) ?>;
 var CSRF_TOKEN = <?= json_encode($csrfToken) ?>;
 var itemPessoalAtualId = null;
+var itemPessoalAtualDados = null;
+var itemPessoalEmEdicaoId = null;
 
 function abrirDetalheEvento(ev) {
     document.getElementById('modalEventoTitulo').textContent = ev.titulo;
@@ -208,12 +213,17 @@ function abrirDetalheEvento(ev) {
     }
 
     var excluirBtn = document.getElementById('modalEventoExcluir');
-    if (ev.tipo === 'pessoal' && ev.item_id) {
-        itemPessoalAtualId = ev.item_id;
+    var editarBtn = document.getElementById('modalEventoEditar');
+    if (ev.tipo === 'pessoal' && ev.id) {
+        itemPessoalAtualId = ev.id;
+        itemPessoalAtualDados = ev;
         excluirBtn.classList.remove('hidden');
+        editarBtn.classList.remove('hidden');
     } else {
         itemPessoalAtualId = null;
+        itemPessoalAtualDados = null;
         excluirBtn.classList.add('hidden');
+        editarBtn.classList.add('hidden');
     }
 
     document.getElementById('modalEvento').classList.remove('hidden');
@@ -242,10 +252,31 @@ function excluirItemPessoalAtual() {
 }
 
 function abrirFormItem() {
+    itemPessoalEmEdicaoId = null;
+    document.getElementById('modalNovoItemTitulo').textContent = 'Adicionar à agenda';
+    document.getElementById('formNovoItem').reset();
+    document.getElementById('modalNovoItem').classList.remove('hidden');
+}
+
+function editarItemPessoalAtual() {
+    if (!itemPessoalAtualId || !itemPessoalAtualDados) return;
+    var ev = itemPessoalAtualDados;
+    itemPessoalEmEdicaoId = itemPessoalAtualId;
+    document.getElementById('modalNovoItemTitulo').textContent = 'Editar item';
+    document.getElementById('itemTitulo').value = ev.titulo || '';
+    document.getElementById('itemTipo').value = ev.tipo_pessoal || 'pessoal';
+    document.getElementById('itemData').value = ev.data || '';
+    document.getElementById('itemHora').value = ev.hora || '';
+    document.getElementById('itemBanca').value = ev.banca || '';
+    document.getElementById('itemLocal').value = ev.local || '';
+    document.getElementById('itemLink').value = ev.link || '';
+    document.getElementById('itemDescricao').value = ev.descricao || '';
+    fecharModalEvento();
     document.getElementById('modalNovoItem').classList.remove('hidden');
 }
 
 function fecharFormItem() {
+    itemPessoalEmEdicaoId = null;
     document.getElementById('modalNovoItem').classList.add('hidden');
 }
 
@@ -262,7 +293,11 @@ document.getElementById('formNovoItem').addEventListener('submit', function (e) 
     fd.append('link', document.getElementById('itemLink').value.trim());
     fd.append('descricao', document.getElementById('itemDescricao').value.trim());
 
-    fetch('<?= URL ?>/agenda/item', { method: 'POST', body: fd })
+    var url = itemPessoalEmEdicaoId
+        ? '<?= URL ?>/agenda/item/' + itemPessoalEmEdicaoId + '/editar'
+        : '<?= URL ?>/agenda/item';
+
+    fetch(url, { method: 'POST', body: fd })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.success) {

@@ -125,6 +125,72 @@ class AgendaController extends BaseController
         }
     }
 
+    public function editarItemPessoal(string $id): void
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['success' => false, 'error' => 'Token inválido', 'csrf_token' => $this->refreshCsrfToken()], 400);
+            return;
+        }
+
+        $itemId = (int) $id;
+        $existente = $this->db->fetch(
+            "SELECT id FROM aluno_agenda_itens WHERE id = :id AND aluno_id = :aluno_id",
+            ['id' => $itemId, 'aluno_id' => $this->alunoId()]
+        );
+        if (!$existente) {
+            $this->json(['success' => false, 'error' => 'Item não encontrado'], 404);
+            return;
+        }
+
+        $titulo = trim((string) ($_POST['titulo'] ?? ''));
+        $data = trim((string) ($_POST['data'] ?? ''));
+        $hora = trim((string) ($_POST['hora'] ?? ''));
+        $tipo = trim((string) ($_POST['tipo'] ?? 'pessoal'));
+        $banca = trim((string) ($_POST['banca'] ?? ''));
+        $local = trim((string) ($_POST['local'] ?? ''));
+        $link = trim((string) ($_POST['link'] ?? ''));
+        $descricao = trim((string) ($_POST['descricao'] ?? ''));
+
+        if ($titulo === '' || $data === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            $this->json(['success' => false, 'error' => 'Título e data são obrigatórios'], 400);
+            return;
+        }
+        if (!array_key_exists($tipo, self::tiposItemPessoal())) {
+            $tipo = 'pessoal';
+        }
+        if ($hora !== '' && !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $hora)) {
+            $hora = '';
+        }
+        if ($link !== '' && !preg_match('#^https?://#i', $link)) {
+            $link = '';
+        }
+
+        try {
+            $this->db->update(
+                "UPDATE aluno_agenda_itens
+                 SET titulo = :titulo, tipo = :tipo, descricao = :descricao, data = :data,
+                     hora = :hora, banca = :banca, local = :local, link = :link
+                 WHERE id = :id AND aluno_id = :aluno_id",
+                [
+                    'id' => $itemId,
+                    'aluno_id' => $this->alunoId(),
+                    'titulo' => mb_substr($titulo, 0, 255),
+                    'tipo' => $tipo,
+                    'descricao' => $descricao !== '' ? mb_substr($descricao, 0, 2000) : null,
+                    'data' => $data,
+                    'hora' => $hora !== '' ? $hora : null,
+                    'banca' => $banca !== '' ? mb_substr($banca, 0, 255) : null,
+                    'local' => $local !== '' ? mb_substr($local, 0, 255) : null,
+                    'link' => $link !== '' ? mb_substr($link, 0, 500) : null,
+                ]
+            );
+            $this->json(['success' => true, 'id' => $itemId]);
+        } catch (\Throwable $e) {
+            error_log("Agenda: falha ao editar item pessoal: " . $e->getMessage());
+            $this->json(['success' => false, 'error' => 'Erro ao salvar item'], 500);
+        }
+    }
+
     public function excluirItemPessoal(string $id): void
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {

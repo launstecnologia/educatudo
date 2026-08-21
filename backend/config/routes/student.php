@@ -369,4 +369,5 @@ $router->get('/cursos/disciplina/{id}/certificado', 'Student/AvaCertificateStude
 $router->get('/calendario-letivo', 'User/StudentController@calendarioLetivo');
 $router->get('/agenda', 'Student/AgendaController@agenda');
 $router->post('/agenda/item', 'Student/AgendaController@criarItemPessoal');
+$router->post('/agenda/item/{id}/editar', 'Student/AgendaController@editarItemPessoal');
 $router->post('/agenda/item/{id}/excluir', 'Student/AgendaController@excluirItemPessoal');
