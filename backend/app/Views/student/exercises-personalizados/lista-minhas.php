@@ -53,8 +53,13 @@
                         <span>📚 <?= htmlspecialchars($lista['tema']) ?></span>
                         <span>📊 <?= $lista['total_questoes'] ?> questões</span>
                     </div>
+                    <p class="text-xs text-gray-400 mb-1">
+                        Solicitada em <?= !empty($lista['created_at']) ? date('d/m/Y \à\s H:i', strtotime($lista['created_at'])) : '—' ?>
+                    </p>
                     <p class="text-xs text-gray-400 mb-4">
-                        Criada em <?= !empty($lista['created_at']) ? date('d/m/Y \à\s H:i', strtotime($lista['created_at'])) : '—' ?>
+                        <?php if ($lista['status'] === 'concluido' && !empty($lista['updated_at'])): ?>
+                        Entregue em <?= date('d/m/Y \à\s H:i', strtotime($lista['updated_at'])) ?>
+                        <?php endif; ?>
                     </p>
 
                     <?php if ($lista['status'] === 'concluido'): ?>

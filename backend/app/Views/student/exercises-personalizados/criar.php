@@ -46,17 +46,17 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label for="quantidade_facil" class="block text-sm font-medium text-gray-700 mb-1">Fácil</label>
-                        <input type="number" id="quantidade_facil" name="quantidade_facil" min="0" max="30" value="3"
+                        <input type="number" id="quantidade_facil" name="quantidade_facil" min="0" max="30" value="0"
                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     </div>
                     <div>
                         <label for="quantidade_medio" class="block text-sm font-medium text-gray-700 mb-1">Médio</label>
-                        <input type="number" id="quantidade_medio" name="quantidade_medio" min="0" max="30" value="4"
+                        <input type="number" id="quantidade_medio" name="quantidade_medio" min="0" max="30" value="0"
                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     </div>
                     <div>
                         <label for="quantidade_dificil" class="block text-sm font-medium text-gray-700 mb-1">Difícil</label>
-                        <input type="number" id="quantidade_dificil" name="quantidade_dificil" min="0" max="30" value="3"
+                        <input type="number" id="quantidade_dificil" name="quantidade_dificil" min="0" max="30" value="0"
                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     </div>
                 </div>
