@@ -395,6 +395,7 @@ class CustomExerciseController extends BaseController
         }
 
         require_once __DIR__ . '/../../Services/AIJobService.php';
+        require_once __DIR__ . '/../../Services/CustomExerciseImportService.php';
         $job = \App\Services\AIJobService::getJob((int) $jobId);
         if (!$job || $job['status'] !== 'done') {
             $this->json(['success' => false, 'error' => 'Job não concluído ou não encontrado'], 404);
@@ -405,7 +406,7 @@ class CustomExerciseController extends BaseController
         $listaId = (int) ($payload['lista_id'] ?? 0);
 
         $lista = $this->db->fetch(
-            "SELECT * FROM listas_personalizadas_exercicios WHERE id = :id AND aluno_id = :aluno_id",
+            "SELECT id FROM listas_personalizadas_exercicios WHERE id = :id AND aluno_id = :aluno_id",
             ['id' => $listaId, 'aluno_id' => $user['id']]
         );
         if (!$lista) {
@@ -413,56 +414,31 @@ class CustomExerciseController extends BaseController
             return;
         }
 
-        $result = json_decode($job['result'], true) ?: [];
-        $questoes = $result['questoes'] ?? [];
-        if (empty($questoes)) {
-            $this->db->update(
-                "UPDATE listas_personalizadas_exercicios SET status = 'erro', mensagem_erro = 'Nenhuma questão gerada' WHERE id = :id",
-                ['id' => $listaId]
-            );
-            $this->json(['success' => false, 'error' => 'Nenhuma questão gerada'], 422);
+        // Mesma lógica usada pelo cron (process_ai_jobs.php) — o navegador pode chegar
+        // primeiro (aluno ainda na tela) ou o cron pode ter resolvido antes; idempotente.
+        // importar() usa transação e relança em caso de falha no meio do INSERT (rollback
+        // desfaz e devolve a lista pra 'gerando' — o timeout do cron resolve depois);
+        // aqui só precisamos não deixar essa exceção estourar sem virar um JSON limpo.
+        try {
+            \CustomExerciseImportService::importar($listaId, $job);
+        } catch (\Throwable $e) {
+            if (class_exists('Logger')) {
+                Logger::error('[EXERC PERSONALIZADO] Falha ao importar questões da IA', ['lista_id' => $listaId, 'exception' => $e], 'exercicios_personalizados');
+            }
+            $this->json(['success' => false, 'error' => 'Erro ao salvar os exercícios. Tente novamente em instantes.'], 500);
             return;
         }
 
-        $letras = ['A', 'B', 'C', 'D', 'E'];
-        foreach ($questoes as $index => $questao) {
-            $alternativas = $questao['alternativas'] ?? [];
-            $porLetra = [];
-            $letraCorreta = 'A';
-            foreach (array_slice($alternativas, 0, 5) as $i => $alt) {
-                $letra = $letras[$i];
-                $porLetra[$letra] = $alt['texto'] ?? '';
-                if (!empty($alt['correta'])) {
-                    $letraCorreta = $letra;
-                }
-            }
-
-            $this->db->insert(
-                "INSERT INTO questoes_personalizadas
-                 (lista_id, pergunta, alternativa_a, alternativa_b, alternativa_c, alternativa_d, alternativa_e, resposta_correta, explicacao, nivel_dificuldade, ordem)
-                 VALUES (:lista_id, :pergunta, :a, :b, :c, :d, :e, :correta, :explicacao, :nivel, :ordem)",
-                [
-                    'lista_id' => $listaId,
-                    'pergunta' => $questao['enunciado'] ?? 'Pergunta não fornecida',
-                    'a' => $porLetra['A'] ?? '',
-                    'b' => $porLetra['B'] ?? '',
-                    'c' => $porLetra['C'] ?? '',
-                    'd' => $porLetra['D'] ?? '',
-                    'e' => $porLetra['E'] ?? '',
-                    'correta' => $letraCorreta,
-                    'explicacao' => $questao['explicacao'] ?? '',
-                    'nivel' => ['facil' => 'Fácil', 'medio' => 'Médio', 'dificil' => 'Difícil', 'desafio' => 'Difícil'][$questao['nivel_dificuldade'] ?? 'medio'] ?? 'Médio',
-                    'ordem' => $index + 1,
-                ]
-            );
-        }
-
-        $this->db->update(
-            "UPDATE listas_personalizadas_exercicios SET status = 'concluido' WHERE id = :id",
+        $listaAtualizada = $this->db->fetch(
+            "SELECT status, mensagem_erro FROM listas_personalizadas_exercicios WHERE id = :id",
             ['id' => $listaId]
         );
+        if (($listaAtualizada['status'] ?? '') === 'erro') {
+            $this->json(['success' => false, 'error' => $listaAtualizada['mensagem_erro'] ?? 'Não foi possível gerar os exercícios'], 422);
+            return;
+        }
 
-        $this->json(['success' => true, 'lista_id' => $listaId, 'questoes_importadas' => count($questoes)]);
+        $this->json(['success' => true, 'lista_id' => $listaId]);
     }
 
     /**
@@ -495,6 +471,93 @@ class CustomExerciseController extends BaseController
         );
 
         $this->json(['success' => true]);
+    }
+
+    /**
+     * Botão "Tentar novamente" em "Minhas Listas" (lista com status='erro', inclusive
+     * as que o cron marcou como erro por ter travado em 'gerando' além do tempo limite).
+     * Reaproveita tema/matéria/quantidade do job anterior (guardados em ai_jobs.payload),
+     * cobra créditos de novo (a falha anterior já foi estornada automaticamente pelo
+     * AIJobService) e reenfileira.
+     */
+    public function tentarNovamente($listaId)
+    {
+        $user = $this->authManager->getUser();
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['success' => false, 'error' => 'Token inválido'], 400);
+            return;
+        }
+
+        $listaId = (int) $listaId;
+        $lista = $this->db->fetch(
+            "SELECT * FROM listas_personalizadas_exercicios WHERE id = :id AND aluno_id = :aluno_id",
+            ['id' => $listaId, 'aluno_id' => $user['id']]
+        );
+        if (!$lista) {
+            $this->json(['success' => false, 'error' => 'Lista não encontrada'], 404);
+            return;
+        }
+        if ($lista['status'] !== 'erro') {
+            $this->json(['success' => false, 'error' => 'Essa lista não está com erro.'], 400);
+            return;
+        }
+
+        $ultimoJob = $this->db->fetch(
+            "SELECT payload FROM ai_jobs
+             WHERE job_type = 'gerar_questao_ia' AND JSON_EXTRACT(payload, '$.lista_id') = :lista_id
+             ORDER BY id DESC LIMIT 1",
+            ['lista_id' => $listaId]
+        );
+        $payloadAnterior = $ultimoJob ? (json_decode($ultimoJob['payload'], true) ?: []) : [];
+
+        // Cobrança primeiro, fora do try de reenfileiramento: se o crédito em si falhar
+        // (ex.: saldo insuficiente), não há nada a estornar — só devolve o erro.
+        require_once __DIR__ . '/../../Services/CreditosService.php';
+        $creditosSvc = new \App\Services\CreditosService();
+        $refCredLista = 'ex_pers_retry_' . $listaId . '_' . str_replace('.', '', uniqid('', true));
+        try {
+            $creditosSvc->consumir('aluno', (int) $user['id'], 'gerar_exercicio_ia_aluno', $refCredLista);
+        } catch (\Exception $eCred) {
+            $this->json(['success' => false, 'error' => $eCred->getMessage()], 400);
+            return;
+        }
+
+        try {
+            // Sem questões parciais de uma importação anterior mal-sucedida.
+            $this->db->delete("DELETE FROM questoes_personalizadas WHERE lista_id = :id", ['id' => $listaId]);
+
+            $this->db->update(
+                "UPDATE listas_personalizadas_exercicios SET status = 'gerando', mensagem_erro = NULL WHERE id = :id",
+                ['id' => $listaId]
+            );
+
+            require_once __DIR__ . '/../../Services/AIJobService.php';
+            $payload = array_merge($payloadAnterior, [
+                'disciplina' => $payloadAnterior['disciplina'] ?? $lista['materia'],
+                'assunto' => $payloadAnterior['assunto'] ?? $lista['tema'],
+                'quantidade' => $payloadAnterior['quantidade'] ?? $lista['quantidade_exercicios'],
+                'lista_id' => $listaId,
+                'credits_ref' => $refCredLista,
+                'credits_modulo' => 'gerar_exercicio_ia_aluno',
+            ]);
+            $jobId = \App\Services\AIJobService::enqueue('gerar_questao_ia', $payload, (int) $user['id'], 'aluno', false);
+
+            $this->json(['success' => true, 'lista_id' => $listaId, 'job_id' => $jobId]);
+        } catch (\Exception $e) {
+            // Crédito já foi debitado acima — estorna, igual ao fluxo de gerarExercicios().
+            try {
+                $creditosSvc->estornarPorReferencia('gerar_exercicio_ia_aluno', $refCredLista);
+            } catch (\Exception $eEst) {
+                if (class_exists('Logger')) {
+                    Logger::warning('[EXERC PERSONALIZADO] Estorno após falha em tentarNovamente', ['lista_id' => $listaId, 'exception' => $eEst], 'exercicios_personalizados');
+                }
+            }
+            $this->db->update(
+                "UPDATE listas_personalizadas_exercicios SET status = 'erro', mensagem_erro = :erro WHERE id = :id",
+                ['id' => $listaId, 'erro' => mb_substr($e->getMessage(), 0, 500)]
+            );
+            $this->json(['success' => false, 'error' => $e->getMessage()], 400);
+        }
     }
 
     /**

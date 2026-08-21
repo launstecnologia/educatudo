@@ -24,6 +24,7 @@ require_once __DIR__ . '/../app/Services/MetricsService.php';
 require_once __DIR__ . '/../app/Services/OpenAIService.php';
 require_once __DIR__ . '/../app/Services/EssayAIService.php';
 require_once __DIR__ . '/../app/Services/FlashcardService.php';
+require_once __DIR__ . '/../app/Services/CustomExerciseImportService.php';
 require_once __DIR__ . '/../app/Helpers/EssayTextStructureHelper.php';
 
 date_default_timezone_set('America/Sao_Paulo');
@@ -48,6 +49,18 @@ try {
 
         if ($processed > 0) {
             echo date('Y-m-d H:i:s') . " [escola={$escolaId}] {$processed} job(s) processado(s)\n";
+        }
+
+        // Resolve listas de Exercícios Personalizados presas em 'gerando' — importa as que
+        // já têm job pronto/falho, ou marca erro por timeout. Não depende do navegador do
+        // aluno estar aberto (ver CustomExerciseImportService).
+        try {
+            $resolvidas = \CustomExerciseImportService::processarPendencias();
+            if ($resolvidas > 0) {
+                echo date('Y-m-d H:i:s') . " [escola={$escolaId}] {$resolvidas} lista(s) de exercícios resolvida(s)\n";
+            }
+        } catch (\Throwable $eImport) {
+            echo date('Y-m-d H:i:s') . " [escola={$escolaId}] erro ao resolver exercícios: " . $eImport->getMessage() . "\n";
         }
 
         \App\Services\AIJobService::cleanup();

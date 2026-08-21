@@ -33,7 +33,8 @@
     <?php else: ?>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <?php foreach ($listas as $lista): ?>
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+                     <?= $lista['status'] === 'gerando' ? 'data-lista-gerando="' . (int) $lista['id'] . '"' : '' ?>>
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex-1">
                             <h3 class="text-lg font-bold text-gray-900 mb-1"><?= htmlspecialchars($lista['titulo']) ?></h3>
@@ -47,11 +48,14 @@
                             ?>
                         </span>
                     </div>
-                    
-                    <div class="flex items-center space-x-4 text-sm text-gray-600 mb-4">
+
+                    <div class="flex items-center space-x-4 text-sm text-gray-600 mb-1">
                         <span>📚 <?= htmlspecialchars($lista['tema']) ?></span>
                         <span>📊 <?= $lista['total_questoes'] ?> questões</span>
                     </div>
+                    <p class="text-xs text-gray-400 mb-4">
+                        Criada em <?= !empty($lista['created_at']) ? date('d/m/Y \à\s H:i', strtotime($lista['created_at'])) : '—' ?>
+                    </p>
 
                     <?php if ($lista['status'] === 'concluido'): ?>
                         <div class="space-y-2">
@@ -59,7 +63,7 @@
                                 🚀 Iniciar Exercício
                             </button>
                             <?php if ($lista['total_sessoes'] > 0): ?>
-                            <a href="<?= URL ?>/exercicios-personalizados/historico?lista_id=<?= $lista['id'] ?>" 
+                            <a href="<?= URL ?>/exercicios-personalizados/historico?lista_id=<?= $lista['id'] ?>"
                                class="block w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-center text-sm">
                                 📚 Ver Histórico
                             </a>
@@ -72,13 +76,16 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                <span class="text-yellow-800">Gerando...</span>
+                                <span class="text-yellow-800">Gerando... você pode sair desta tela, ela atualiza sozinha.</span>
                             </div>
                         </div>
                     <?php else: ?>
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                            <p class="text-xs text-red-800"><?= htmlspecialchars($lista['mensagem_erro'] ?? 'Erro desconhecido') ?></p>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
+                            <p class="text-xs text-red-800">Ops, não consegui gerar: <?= htmlspecialchars($lista['mensagem_erro'] ?? 'erro desconhecido') ?></p>
                         </div>
+                        <button onclick="tentarNovamente(<?= $lista['id'] ?>, this); return false;" class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">
+                            🔁 Tentar novamente
+                        </button>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
@@ -212,5 +219,60 @@ function iniciarExercicio(listaId) {
     return false; // Previne comportamento padrão do botão
 }
 
+function tentarNovamente(listaId, botao) {
+    if (botao) {
+        botao.disabled = true;
+        botao.textContent = 'Reenviando...';
+    }
+    const formData = new FormData();
+    formData.append('_token', <?= json_encode($csrf_token) ?>);
+    fetch('<?= URL ?>/exercicios-personalizados/tentar-novamente/' + listaId, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            mostrarErro('Erro: ' + (data.error || 'Não foi possível reenviar.'));
+            if (botao) {
+                botao.disabled = false;
+                botao.textContent = '🔁 Tentar novamente';
+            }
+            return;
+        }
+        window.location.reload();
+    })
+    .catch(error => {
+        mostrarErro('Erro ao reenviar: ' + error.message);
+        if (botao) {
+            botao.disabled = false;
+            botao.textContent = '🔁 Tentar novamente';
+        }
+    });
+}
+
+// Atualização automática: enquanto houver lista "Gerando" nesta página, verifica o status
+// periodicamente e recarrega só quando algo realmente mudou — o aluno não precisa apertar F5.
+(function () {
+    const cardsGerando = document.querySelectorAll('[data-lista-gerando]');
+    if (cardsGerando.length === 0) return;
+
+    const listaIds = Array.from(cardsGerando).map(function (el) { return el.getAttribute('data-lista-gerando'); });
+
+    const intervalId = setInterval(function () {
+        Promise.all(listaIds.map(function (id) {
+            return fetch('<?= URL ?>/exercicios-personalizados/status?lista_id=' + id)
+                .then(function (r) { return r.json(); })
+                .then(function (data) { return data.status; })
+                .catch(function () { return 'gerando'; });
+        })).then(function (statuses) {
+            const aindaGerando = statuses.some(function (s) { return s === 'gerando'; });
+            if (!aindaGerando) {
+                clearInterval(intervalId);
+                window.location.reload();
+            }
+        });
+    }, 6000);
+})();
 </script>
 

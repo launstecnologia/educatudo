@@ -229,6 +229,7 @@ $router->get('/exercicios-personalizados/criar', 'Exercises/CustomExerciseContro
 $router->post('/exercicios-personalizados/gerar', 'Exercises/CustomExerciseController@gerarExercicios');
 $router->post('/exercicios-personalizados/importar-questoes-ia/{jobId}', 'Exercises/CustomExerciseController@importarQuestoesIA');
 $router->post('/exercicios-personalizados/erro-geracao-ia', 'Exercises/CustomExerciseController@erroGeracaoIA');
+$router->post('/exercicios-personalizados/tentar-novamente/{listaId}', 'Exercises/CustomExerciseController@tentarNovamente');
 $router->get('/exercicios-personalizados/minhas-listas', 'Exercises/CustomExerciseController@listaMinhasListas');
 $router->get('/exercicios-personalizados/status', 'Exercises/CustomExerciseController@verificarStatus');
 $router->post('/exercicios-personalizados/iniciar', 'Exercises/CustomExerciseController@iniciarExecucao');

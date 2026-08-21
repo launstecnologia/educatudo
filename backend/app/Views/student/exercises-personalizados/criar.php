@@ -205,37 +205,15 @@ document.getElementById('createExerciseForm').addEventListener('submit', functio
             return;
         }
 
-        EducaAiLoading.setStatus('Gerando seus exercícios com IA...', 'generatingModal');
-        new AIJobPoller(data.job_id, {
-            onDone: function () {
-                const fd = new FormData();
-                fd.append('_token', document.querySelector('input[name="_token"]').value);
-                fetch('<?= URL ?>/exercicios-personalizados/importar-questoes-ia/' + data.job_id, { method: 'POST', body: fd })
-                    .then(r => r.json())
-                    .then(() => {
-                        EducaAiLoading.stopFakeProgress();
-                        EducaAiLoading.setProgress(100, 'generatingModal');
-                        EducaAiLoading.setStatus('Redirecionando...', 'generatingModal');
-                        setTimeout(() => {
-                            window.location.href = '<?= URL ?>/exercicios-personalizados/minhas-listas';
-                        }, 500);
-                    })
-                    .catch(() => {
-                        EducaAiLoading.hide('generatingModal');
-                        EducaAiLoading.setButtonLoading(submitBtn, false);
-                        mostrarErro('Exercícios gerados, mas não consegui salvá-los. Veja "Minhas Listas".');
-                    });
-            },
-            onFailed: function (err) {
-                const fd = new FormData();
-                fd.append('lista_id', data.lista_id);
-                fd.append('_token', document.querySelector('input[name="_token"]').value);
-                fetch('<?= URL ?>/exercicios-personalizados/erro-geracao-ia', { method: 'POST', body: fd });
-                EducaAiLoading.hide('generatingModal');
-                EducaAiLoading.setButtonLoading(submitBtn, false);
-                mostrarErro('Não foi possível gerar os exercícios: ' + err);
-            }
-        });
+        // Assíncrono de verdade: o job já está na fila (processado pelo cron, que também
+        // importa o resultado sozinho — ver CustomExerciseImportService). Não precisa
+        // esperar terminar aqui; manda pra "Minhas Listas", onde a lista aparece como
+        // "Gerando" e atualiza sozinha quando ficar pronta.
+        EducaAiLoading.setStatus('Exercícios sendo gerados! Redirecionando...', 'generatingModal');
+        EducaAiLoading.setProgress(100, 'generatingModal');
+        setTimeout(() => {
+            window.location.href = '<?= URL ?>/exercicios-personalizados/minhas-listas';
+        }, 600);
     })
     .catch(error => {
         console.error('Erro completo:', error);
