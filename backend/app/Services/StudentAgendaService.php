@@ -127,7 +127,10 @@ class StudentAgendaService
                 null,
                 $data . ($hora !== '' && $hora !== '00:00:00' ? ' ' . $hora : ' 00:00:00'),
                 null,
-                URL . '/prova/' . (int) ($r['id'] ?? 0),
+                // Não existe rota de "detalhe" de uma prova específica pro aluno (era
+                // /prova/{id}, que nunca existiu — sempre deu 404). A lista já mostra
+                // cada prova no estado certo (disponível, aguardando, resultado).
+                URL . '/aluno/provas',
                 'red',
                 'clipboard'
             );
@@ -144,8 +147,12 @@ class StudentAgendaService
             return [];
         }
         try {
+            // jornadas não tem coluna data_fim (o prazo mora dentro do JSON de `estrutura`,
+            // extraído logo abaixo) — essa query pedia a coluna direto e sempre quebrava
+            // (SQLSTATE 42S22 Column not found), caindo no catch: eventos de Jornada nunca
+            // apareciam na Agenda, silenciosamente.
             $rows = $this->db->fetchAll(
-                "SELECT id, titulo, turma_id, estrutura, data_fim
+                "SELECT id, titulo, turma_id, estrutura
                  FROM jornadas
                  WHERE (turma_id = :turma_id OR (estrutura IS NOT NULL AND estrutura != ''))
                    AND (ativo = 1 OR ativo IS NULL)",
@@ -167,9 +174,6 @@ class StudentAgendaService
             }
             $estrutura = json_decode((string) ($r['estrutura'] ?? ''), true);
             $dataFim = is_array($estrutura) ? ($estrutura['data_fim'] ?? null) : null;
-            if (empty($dataFim) && !empty($r['data_fim'])) {
-                $dataFim = $r['data_fim'];
-            }
             if (empty($dataFim) || $dataFim < $inicio || $dataFim > $fim) {
                 continue;
             }
@@ -251,7 +255,10 @@ class StudentAgendaService
                 'Prazo de entrega',
                 $endsAt !== '' ? $endsAt : null,
                 null,
-                URL . '/redacao/proposta/' . (int) ($r['id'] ?? 0),
+                // /redacao/proposta/{id} nunca existiu como rota (sempre 404) — a proposta
+                // é da Jornada da Redação (tabela redacoes_orientadas_propostas), cuja rota
+                // real é /jornada-redacao/{id} (StudentEssayController@show).
+                URL . '/jornada-redacao/' . (int) ($r['id'] ?? 0),
                 'purple',
                 'pencil'
             );
