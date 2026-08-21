@@ -200,8 +200,15 @@ class JourneyController extends BaseController
         if ($respostaNorm === '') {
             return null;
         }
-        foreach ($opcoes as $opcao) {
-            $letraNorm = strtoupper(trim((string) ($opcao['letra'] ?? '')));
+        foreach ($opcoes as $idxOpcao => $opcao) {
+            $letraOpcao = trim((string) ($opcao['letra'] ?? ''));
+            if ($letraOpcao === '') {
+                // Mesmo fallback usado na exibição do gabarito (executar-exercicios.php)
+                // e na gravação da pontuação (responderExercicioModulo): quando a opção não
+                // tem "letra" explícita no questoes_json, assume A/B/C... pela posição no array.
+                $letraOpcao = chr(65 + ((int) $idxOpcao % 26));
+            }
+            $letraNorm = strtoupper($letraOpcao);
             $ehCorreta = !empty($opcao['correta']);
             if ($letraNorm !== '' && $letraNorm === $respostaNorm && $ehCorreta) {
                 return true;
