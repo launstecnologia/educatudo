@@ -91,10 +91,25 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
                 </button>
             <?php endforeach; ?>
             <?php if (count($evsDia) > 3): ?>
-                <span class="text-[10px] text-gray-400 mt-0.5">+<?= count($evsDia) - 3 ?> mais</span>
+                <button type="button" onclick="abrirDiaCompleto(<?= htmlspecialchars(json_encode($dia . ' de ' . $mesesNomes[$mes - 1]), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($evsDia), ENT_QUOTES) ?>)" class="text-left text-[10px] text-accent font-medium mt-0.5 hover:underline">
+                    +<?= count($evsDia) - 3 ?> mais
+                </button>
             <?php endif; ?>
         </div>
         <?php endfor; ?>
+    </div>
+</div>
+
+<!-- Modal: todos os eventos do dia -->
+<div id="modalDia" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+            <h3 class="text-lg font-bold text-gray-900" id="modalDiaTitulo"></h3>
+            <button type="button" onclick="fecharModalDia()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="px-4 py-3 space-y-1.5 overflow-y-auto" id="modalDiaLista"></div>
     </div>
 </div>
 
@@ -233,6 +248,49 @@ function fecharModalEvento() {
     document.getElementById('modalEvento').classList.add('hidden');
 }
 
+function abrirDiaCompleto(dataLabel, eventos) {
+    document.getElementById('modalDiaTitulo').textContent = dataLabel;
+
+    var listaEl = document.getElementById('modalDiaLista');
+    listaEl.innerHTML = '';
+    eventos.forEach(function (ev) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'w-full text-left flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors';
+        btn.addEventListener('click', function () {
+            fecharModalDia();
+            abrirDetalheEvento(ev);
+        });
+
+        var bolinha = document.createElement('span');
+        bolinha.className = 'w-2.5 h-2.5 rounded-full shrink-0';
+        bolinha.style.backgroundColor = ev.cor || '#6b7280';
+        btn.appendChild(bolinha);
+
+        var textos = document.createElement('span');
+        textos.className = 'min-w-0 flex-1';
+        var tituloEl = document.createElement('span');
+        tituloEl.className = 'block text-sm font-medium text-gray-900 truncate';
+        tituloEl.textContent = ev.titulo || '';
+        textos.appendChild(tituloEl);
+        if (ev.hora) {
+            var horaEl = document.createElement('span');
+            horaEl.className = 'block text-xs text-gray-500';
+            horaEl.textContent = ev.hora;
+            textos.appendChild(horaEl);
+        }
+        btn.appendChild(textos);
+
+        listaEl.appendChild(btn);
+    });
+
+    document.getElementById('modalDia').classList.remove('hidden');
+}
+
+function fecharModalDia() {
+    document.getElementById('modalDia').classList.add('hidden');
+}
+
 function excluirItemPessoalAtual() {
     if (!itemPessoalAtualId) return;
     if (!confirm('Excluir este item da agenda?')) return;
@@ -313,8 +371,10 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         fecharModalEvento();
         fecharFormItem();
+        fecharModalDia();
     }
 });
 document.getElementById('modalEvento').addEventListener('click', function (e) { if (e.target === this) fecharModalEvento(); });
 document.getElementById('modalNovoItem').addEventListener('click', function (e) { if (e.target === this) fecharFormItem(); });
+document.getElementById('modalDia').addEventListener('click', function (e) { if (e.target === this) fecharModalDia(); });
 </script>
