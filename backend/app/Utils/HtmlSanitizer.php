@@ -68,7 +68,7 @@ class HtmlSanitizer
         if (is_dir($cacheDir) && is_writable($cacheDir)) {
             $config->set('Cache.SerializerPath', $cacheDir);
         }
-        $config->set('HTML.Allowed', 'p,strong,b,em,i,u,s,sub,sup,ul,ol,li,span[class|style|data-type|data-latex],br,h1,h2,h3,h4,h5,h6,blockquote,div[class|style|data-type|data-latex],mark,table,thead,tbody,tfoot,tr,th,td,colgroup,col,img[src|alt|class|style|width|height]');
+        $config->set('HTML.Allowed', 'p,strong,em,ul,ol,li,span,br,table,thead,tbody,tfoot,tr,th,td,colgroup,col,img[src|alt|class|style|width|height]');
         $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'data' => true]);
         // data:image;base64 pode ser grande; sem isso o Purifier remove o src no aluno.
         // Obs.: URI.SafeDataURI não existe no HTMLPurifier 4.19 (gera Warning).
@@ -79,21 +79,15 @@ class HtmlSanitizer
             'padding', 'margin',
             'text-align', 'vertical-align',
             'background-color', 'color',
-            'font-size', 'font-weight', 'font-family', 'font-style',
-            'text-decoration', 'line-height', 'letter-spacing'
+            'font-size', 'font-weight'
         ]);
         $config->set('HTML.Nofollow', true);
         $config->set('HTML.TargetBlank', false);
-        $config->set('AutoFormat.RemoveEmpty', false);
-        $config->set('HTML.DefinitionID', 'educatudo-exercise-html-with-img-v4');
-        $config->set('HTML.DefinitionRev', 4);
+        $config->set('AutoFormat.RemoveEmpty', true);
+        $config->set('HTML.DefinitionID', 'educatudo-exercise-html-with-img-v3');
+        $config->set('HTML.DefinitionRev', 3);
         if ($def = $config->getHTMLDefinition(true)) {
             $def->addAttribute('span', 'class', 'Text');
-            $def->addAttribute('span', 'data-type', 'Text');
-            $def->addAttribute('span', 'data-latex', 'Text');
-            $def->addAttribute('div', 'class', 'Text');
-            $def->addAttribute('div', 'data-type', 'Text');
-            $def->addAttribute('div', 'data-latex', 'Text');
         }
         self::$purifierWithImg = new \HTMLPurifier($config);
         return self::$purifierWithImg;
@@ -148,11 +142,11 @@ class HtmlSanitizer
                 $cleaned = $purifier->purify($html);
             } catch (\Throwable $e) {
                 // Fallback: não derruba a importação por HTML “sujo” do banco externo.
-                $allowed = '<p><strong><b><em><i><u><s><sub><sup><ul><ol><li><span><br><h1><h2><h3><h4><h5><h6><blockquote><div><mark><img><table><thead><tbody><tr><th><td>';
+                $allowed = '<p><strong><em><ul><ol><li><span><br><img><table><thead><tbody><tr><th><td>';
                 $cleaned = strip_tags($html, $allowed);
             }
         } else {
-            $allowed = '<p><strong><b><em><i><u><s><sub><sup><ul><ol><li><span><br><h1><h2><h3><h4><h5><h6><blockquote><div><mark><img><table><thead><tbody><tr><th><td>';
+            $allowed = '<p><strong><em><ul><ol><li><span><br><img><table><thead><tbody><tr><th><td>';
             $cleaned = strip_tags($html, $allowed);
         }
         if (!is_string($cleaned)) {
@@ -178,41 +172,7 @@ class HtmlSanitizer
         if (is_string($filtered)) {
             $cleaned = $filtered;
         }
-        $cleaned = self::converterMathLaunsParaLatex($cleaned);
         return trim($cleaned);
-    }
-
-    /**
-     * Converte nós de matemática do Launs Editor (data-latex) para delimitadores
-     * que o MathJax do aluno já renderiza: \( ... \) e $$ ... $$.
-     */
-    private static function converterMathLaunsParaLatex(string $html): string
-    {
-        if ($html === '' || (stripos($html, 'inline-math') === false && stripos($html, 'block-math') === false)) {
-            return $html;
-        }
-
-        $converted = preg_replace_callback(
-            '/<(span|div)\b([^>]*)>(.*?)<\/\1>/is',
-            static function ($m) {
-                $attrs = $m[2] ?? '';
-                if (!preg_match('/data-type\s*=\s*["\'](inline-math|block-math)["\']/i', $attrs, $tm)) {
-                    return $m[0];
-                }
-                $latex = '';
-                if (preg_match('/data-latex\s*=\s*["\']([^"\']*)["\']/i', $attrs, $lm)) {
-                    $latex = html_entity_decode((string) $lm[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                    $latex = htmlspecialchars($latex, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                }
-                if (($tm[1] ?? '') === 'block-math') {
-                    return '$$' . $latex . '$$';
-                }
-                return '\\(' . $latex . '\\)';
-            },
-            $html
-        );
-
-        return is_string($converted) ? $converted : $html;
     }
 
     /**
