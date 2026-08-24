@@ -230,48 +230,24 @@ class ParentAcademicReadService
 
     public function journeys(int $studentId): array
     {
-        $student = $this->db->fetch('SELECT turma_id FROM alunos WHERE id = :id', ['id' => $studentId]);
-        $classId = (int) ($student['turma_id'] ?? 0);
-        if ($classId <= 0) return [];
-        $hasSubject = $this->hasColumn('jornadas', 'materia_id') && $this->db->tableExists('materias');
-        $subjectSelect = $hasSubject ? 'm.nome' : 'NULL';
-        $subjectJoin = $hasSubject ? 'LEFT JOIN materias m ON m.id = j.materia_id' : '';
-        $rows = $this->db->fetchAll(
-            "SELECT j.id, j.titulo, j.status, j.created_at,
-                    p.nome teacher_name, {$subjectSelect} subject_name,
-                    (SELECT COUNT(*) FROM jornadas_modulos jm WHERE jm.jornada_id = j.id) total_modules,
-                    (SELECT COUNT(DISTINCT jpa.modulo_id) FROM jornadas_progresso_alunos jpa
-                     WHERE jpa.jornada_id = j.id AND jpa.aluno_id = :student_id
-                       AND jpa.atividade_tipo = 'modulo' AND jpa.status = 'concluido') completed_modules,
-                    EXISTS(SELECT 1 FROM jornadas_progresso_alunos started
-                     WHERE started.jornada_id = j.id AND started.aluno_id = :started_student) started,
-                    EXISTS(SELECT 1 FROM jornadas_progresso_alunos finished
-                     WHERE finished.jornada_id = j.id AND finished.aluno_id = :finished_student
-                       AND finished.atividade_tipo = 'jornada_concluida' AND finished.status = 'concluido') completed
-             FROM jornadas j
-             LEFT JOIN professores p ON p.id = j.professor_id
-             {$subjectJoin}
-             WHERE j.turma_id = :class_id AND (j.ativo = 1 OR j.ativo IS NULL)
-             ORDER BY j.created_at DESC",
-            [
-                'student_id' => $studentId,
-                'started_student' => $studentId,
-                'finished_student' => $studentId,
-                'class_id' => $classId,
-            ]
-        );
+        require_once __DIR__ . '/ParentJornadasService.php';
+        $rows = (new ParentJornadasService($this->db))->listarDetalhadas($studentId, 0);
         return array_map(function (array $row): array {
-            $total = (int) ($row['total_modules'] ?? 0); $done = (int) ($row['completed_modules'] ?? 0);
-            return ['id' => (int) $row['id'], 'title' => (string) $row['titulo'],
-                'status' => (string) ($row['status'] ?: 'active'),
-                'teacher_name' => $row['teacher_name'],
-                'subject_name' => $row['subject_name'],
+            $total = (int) ($row['total_modulos'] ?? 0);
+            $done = (int) ($row['modulos_feitos'] ?? 0);
+            return [
+                'id' => (int) $row['id'],
+                'title' => (string) ($row['titulo'] ?? ''),
+                'status' => (string) (($row['status'] ?? '') ?: 'active'),
+                'teacher_name' => $row['professor_nome'] ?? null,
+                'subject_name' => $row['materia_nome'] ?? null,
                 'total_modules' => $total,
                 'completed_modules' => $done,
-                'started' => !empty($row['started']),
-                'completed' => !empty($row['completed']),
+                'started' => !empty($row['fez']),
+                'completed' => !empty($row['concluiu']),
                 'progress_percent' => $total > 0 ? round(min(100, $done * 100 / $total), 1) : 0.0,
-                'created_at' => $this->isoDate($row['created_at'] ?? null)];
+                'created_at' => $this->isoDate($row['created_at'] ?? null),
+            ];
         }, $rows);
     }
 
