@@ -20,6 +20,27 @@ $subtituloLista      = $subtituloLista ?? ($modo_recuperacao
     : 'Materiais disponibilizados pelo professor para sua turma.');
 $url_ver_base        = $url_ver_base ?? (URL . '/aluno/arquivos/ver');
 $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_titulo !== '';
+$filtroOffcanvas     = !empty($filtro_offcanvas);
+$limparUrl           = $baseUrl . ($filtro_pasta_id ? '?pasta_id=' . (int) $filtro_pasta_id : '');
+$qtdFiltros          = ((int) (bool) $filtro_materia_id) + ((int) (bool) $filtro_professor_id) + ((int) ($filtro_titulo !== ''));
+$chipMateria         = '';
+$chipProfessor       = '';
+if ($filtro_materia_id) {
+    foreach ($materias as $mChip) {
+        if ((int) ($mChip['id'] ?? 0) === (int) $filtro_materia_id) {
+            $chipMateria = (string) ($mChip['nome'] ?? '');
+            break;
+        }
+    }
+}
+if ($filtro_professor_id) {
+    foreach ($professores as $pChip) {
+        if ((int) ($pChip['id'] ?? 0) === (int) $filtro_professor_id) {
+            $chipProfessor = (string) ($pChip['nome'] ?? '');
+            break;
+        }
+    }
+}
 ?>
 
 <?php if (!empty($_SESSION['flash_message'] ?? '')): ?>
@@ -30,20 +51,54 @@ $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_tit
 
 <!-- Cabeçalho -->
 <div class="mb-5">
-    <?php if ($pasta_atual): ?>
-    <nav class="flex items-center gap-2 text-sm mb-2">
-        <a href="<?= $baseUrl ?>" class="text-indigo-600 hover:underline flex items-center gap-1">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-            <?= htmlspecialchars($tituloLista) ?>
-        </a>
-        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-        <span class="font-medium text-gray-700"><?= htmlspecialchars((string)($pasta_atual['nome'] ?? '')) ?></span>
-    </nav>
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div class="min-w-0">
+            <?php if ($pasta_atual): ?>
+            <nav class="flex items-center gap-2 text-sm mb-2">
+                <a href="<?= htmlspecialchars($baseUrl) ?>" class="text-indigo-600 hover:underline flex items-center gap-1">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    <?= htmlspecialchars($tituloLista) ?>
+                </a>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="font-medium text-gray-700"><?= htmlspecialchars((string)($pasta_atual['nome'] ?? '')) ?></span>
+            </nav>
+            <?php endif; ?>
+            <h2 class="text-2xl font-bold text-gray-900"><?= $pasta_atual ? htmlspecialchars((string)($pasta_atual['nome'] ?? '')) : htmlspecialchars($tituloLista) ?></h2>
+            <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($subtituloLista) ?></p>
+        </div>
+        <?php if ($filtroOffcanvas): ?>
+        <button type="button"
+                onclick="openFiltroArquivosDrawer()"
+                class="relative inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 shrink-0">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+            </svg>
+            Filtros
+            <?php if ($qtdFiltros > 0): ?>
+                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary text-white text-xs font-semibold"><?= $qtdFiltros ?></span>
+            <?php endif; ?>
+        </button>
+        <?php endif; ?>
+    </div>
+    <?php if ($filtroOffcanvas && $qtdFiltros > 0): ?>
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+            <?php if ($chipMateria !== ''): ?>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><?= htmlspecialchars($chipMateria) ?></span>
+            <?php endif; ?>
+            <?php if ($chipProfessor !== ''): ?>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><?= htmlspecialchars($chipProfessor) ?></span>
+            <?php endif; ?>
+            <?php if ($filtro_titulo !== ''): ?>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><?= htmlspecialchars($filtro_titulo) ?></span>
+            <?php endif; ?>
+            <a href="<?= htmlspecialchars($limparUrl) ?>" class="text-xs font-medium text-gray-500 hover:text-gray-800">Limpar</a>
+        </div>
     <?php endif; ?>
-    <h2 class="text-2xl font-bold text-gray-900"><?= $pasta_atual ? htmlspecialchars((string)($pasta_atual['nome'] ?? '')) : htmlspecialchars($tituloLista) ?></h2>
-    <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($subtituloLista) ?></p>
 </div>
 
+<?php if ($filtroOffcanvas): ?>
+<!-- Filtros no offcanvas (portal dos pais) -->
+<?php else: ?>
 <!-- Filtros -->
 <?php if ($temFiltroAtivo || $filtro_materia_id || $filtro_professor_id || $filtro_titulo !== ''): ?>
 <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
@@ -84,7 +139,7 @@ $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_tit
         </div>
         <div class="flex gap-2">
             <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Filtrar</button>
-            <a href="<?= $baseUrl ?><?= $filtro_pasta_id ? '?pasta_id=' . (int)$filtro_pasta_id : '' ?>" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Limpar</a>
+            <a href="<?= $limparUrl ?>" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300">Limpar</a>
         </div>
     </form>
 
@@ -93,6 +148,7 @@ $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_tit
 <?php else: ?>
     </div>
 </details>
+<?php endif; ?>
 <?php endif; ?>
 
 <!-- Lista principal (pastas + arquivos) -->
@@ -204,3 +260,82 @@ $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_tit
     <?php endif; ?>
 
 </div>
+
+<?php if ($filtroOffcanvas): ?>
+<div id="filtroArquivosDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFiltroArquivosDrawer()"></div>
+<aside id="filtroArquivosDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true"
+       role="dialog"
+       aria-labelledby="filtroArquivosDrawerTitle">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <h2 id="filtroArquivosDrawerTitle" class="text-xl font-bold text-gray-900">Filtros</h2>
+        <button type="button" onclick="closeFiltroArquivosDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </div>
+    <form method="get" action="<?= htmlspecialchars($baseUrl) ?>" class="flex flex-col flex-1 overflow-hidden">
+        <?php if ($filtro_pasta_id): ?>
+            <input type="hidden" name="pasta_id" value="<?= (int) $filtro_pasta_id ?>">
+        <?php endif; ?>
+        <div class="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+            <div>
+                <label for="filtro_arquivo_materia_id" class="block text-sm font-medium text-gray-700 mb-1">Matéria</label>
+                <select id="filtro_arquivo_materia_id" name="materia_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="">Todas</option>
+                    <?php foreach ($materias as $m): ?>
+                        <option value="<?= (int) $m['id'] ?>" <?= (int) $filtro_materia_id === (int) $m['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) ($m['nome'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="filtro_arquivo_professor_id" class="block text-sm font-medium text-gray-700 mb-1">Professor</label>
+                <select id="filtro_arquivo_professor_id" name="professor_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="">Todos</option>
+                    <?php foreach ($professores as $p): ?>
+                        <option value="<?= (int) $p['id'] ?>" <?= (int) $filtro_professor_id === (int) $p['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) ($p['nome'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="filtro_arquivo_titulo" class="block text-sm font-medium text-gray-700 mb-1">Título ou descrição</label>
+                <input id="filtro_arquivo_titulo" type="text" name="titulo" value="<?= htmlspecialchars($filtro_titulo) ?>" placeholder="Buscar..."
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex gap-3">
+            <a href="<?= htmlspecialchars($limparUrl) ?>" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Limpar</a>
+            <button type="submit" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 btn-primary-custom rounded-lg text-sm font-semibold hover:opacity-90">Aplicar filtros</button>
+        </div>
+    </form>
+</aside>
+<script>
+(function () {
+    function openFiltroArquivosDrawer() {
+        var drawer = document.getElementById('filtroArquivosDrawer');
+        var backdrop = document.getElementById('filtroArquivosDrawerBackdrop');
+        if (!drawer || !backdrop) return;
+        backdrop.classList.remove('hidden');
+        drawer.classList.remove('translate-x-full');
+        drawer.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+    }
+    function closeFiltroArquivosDrawer() {
+        var drawer = document.getElementById('filtroArquivosDrawer');
+        var backdrop = document.getElementById('filtroArquivosDrawerBackdrop');
+        if (!drawer || !backdrop) return;
+        drawer.classList.add('translate-x-full');
+        drawer.setAttribute('aria-hidden', 'true');
+        backdrop.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+    window.openFiltroArquivosDrawer = openFiltroArquivosDrawer;
+    window.closeFiltroArquivosDrawer = closeFiltroArquivosDrawer;
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeFiltroArquivosDrawer();
+    });
+})();
+</script>
+<?php endif; ?>

@@ -68,6 +68,7 @@ class ArquivosPaisController extends BaseController
             'url_ver_base' => URL . $basePath . '/ver',
             'subtituloLista' => 'Materiais disponibilizados pelo professor para '
                 . (string) ($filho['nome'] ?? 'o aluno') . '.',
+            'filtro_offcanvas' => true,
             'filtro_materia_id' => $resultado['filtro_materia_id'],
             'filtro_professor_id' => $resultado['filtro_professor_id'],
             'filtro_titulo' => $resultado['filtro_titulo'],

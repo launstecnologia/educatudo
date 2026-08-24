@@ -1116,12 +1116,42 @@ class ParentController extends BaseController
                     'turma_id' => $filho['turma_id'],
                     'ano_atual' => $anoAtual
                 ]
-            );
+            ) ?: [];
             foreach ($planosAula as &$plano) {
                 $plano['data_exibicao'] = $this->formatarDataPlanoAula($plano);
             }
             unset($plano);
         }
+
+        $filtroProfessor = trim((string) ($_GET['professor'] ?? ''));
+        $filtroMateria = trim((string) ($_GET['materia'] ?? ''));
+        $filtroData = trim((string) ($_GET['data'] ?? ''));
+        $opcoesProfessor = $this->valoresUnicosPlanosAula($planosAula, 'professor_nome');
+        $opcoesMateria = $this->valoresUnicosPlanosAula($planosAula, 'materia_nome');
+        $opcoesData = $this->valoresUnicosPlanosAula($planosAula, 'data_exibicao', true);
+
+        $planosFiltrados = [];
+        foreach ($planosAula as $plano) {
+            if ($filtroProfessor !== '' && trim((string) ($plano['professor_nome'] ?? '')) !== $filtroProfessor) {
+                continue;
+            }
+            if ($filtroMateria !== '' && trim((string) ($plano['materia_nome'] ?? '')) !== $filtroMateria) {
+                continue;
+            }
+            if ($filtroData !== '' && trim((string) ($plano['data_exibicao'] ?? '')) !== $filtroData) {
+                continue;
+            }
+            $planosFiltrados[] = $plano;
+        }
+
+        $perPage = 15;
+        $totalPlanos = count($planosFiltrados);
+        $totalPages = max(1, (int) ceil($totalPlanos / $perPage));
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $planosPagina = array_slice($planosFiltrados, ($page - 1) * $perPage, $perPage);
         
         $data = [
             'title' => 'Plano de Aula do aluno - EducaTudo',
@@ -1130,7 +1160,20 @@ class ParentController extends BaseController
             'filhos' => $filhos,
             'filho' => $filho,
             'user' => $user,
-            'planos_aula' => $planosAula
+            'planos_aula' => $planosPagina,
+            'total_planos' => count($planosAula),
+            'opcoes_professor' => $opcoesProfessor,
+            'opcoes_materia' => $opcoesMateria,
+            'opcoes_data' => $opcoesData,
+            'filtro_professor' => $filtroProfessor,
+            'filtro_materia' => $filtroMateria,
+            'filtro_data' => $filtroData,
+            'paginacao' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $totalPlanos,
+                'total_pages' => $totalPages,
+            ],
         ];
         
         $this->viewWithLayout('parent', 'parents/plano-aula-filho', $data);
@@ -1217,6 +1260,43 @@ class ParentController extends BaseController
             'system_title' => LayoutHelper::getSystemTitle()
         ];
         $this->view('teacher/planos-aula/pdf', $data);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $planos
+     * @return list<string>
+     */
+    private function valoresUnicosPlanosAula(array $planos, string $chave, bool $ordenarPorData = false): array
+    {
+        $map = [];
+        foreach ($planos as $plano) {
+            $valor = trim((string) ($plano[$chave] ?? ''));
+            if ($valor !== '') {
+                $map[$valor] = true;
+            }
+        }
+        $lista = array_keys($map);
+        if ($ordenarPorData) {
+            usort($lista, function ($a, $b) {
+                return $this->timestampDataExibicaoPlano((string) $a) <=> $this->timestampDataExibicaoPlano((string) $b);
+            });
+        } else {
+            sort($lista, SORT_NATURAL | SORT_FLAG_CASE);
+        }
+        return $lista;
+    }
+
+    private function timestampDataExibicaoPlano(string $dataExibicao): int
+    {
+        $primeira = trim(explode(',', $dataExibicao)[0]);
+        $primeira = trim(explode(' - ', $primeira)[0]);
+        $primeira = preg_replace('/^A partir de\s+/u', '', $primeira) ?? $primeira;
+        $dt = \DateTime::createFromFormat('d/m/Y', $primeira);
+        if ($dt instanceof \DateTime) {
+            return $dt->getTimestamp();
+        }
+        $ts = strtotime($primeira);
+        return $ts !== false ? (int) $ts : 0;
     }
 
     private function formatarDataPlanoAula(array $plano): string
