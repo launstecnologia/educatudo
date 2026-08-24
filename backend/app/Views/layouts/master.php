@@ -46,6 +46,11 @@ $master_iniciais = MasterAvatarService::iniciais($master_nome);
                         <p class="text-sm text-slate-500 truncate mt-0.5">Bem-vindo, <?= htmlspecialchars($master_nome ?? 'Admin') ?></p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
+                        <a href="<?= URL ?>/master/logs"
+                           class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors <?= (($current_page ?? '') === 'logs') ? 'ring-2 ring-blue-100 border-blue-200 text-blue-700' : '' ?>">
+                            <i class="fa-solid fa-file-lines text-xs opacity-70"></i>
+                            Logs
+                        </a>
                         <a href="<?= URL ?>/master/documentacao"
                            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors <?= (($current_page ?? '') === 'documentacao') ? 'ring-2 ring-blue-100 border-blue-200 text-blue-700' : '' ?>">
                             <i class="fa-solid fa-book text-xs opacity-70"></i>

@@ -136,6 +136,14 @@ $iconClass = static function (bool $active): string {
                 <span>Migrations</span>
             </a>
 
+            <?php $active = ($current_page ?? '') === 'logs'; ?>
+            <a href="<?= URL ?>/master/logs" class="<?= $navItemClass($active) ?>">
+                <svg class="<?= $iconClass($active) ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Logs</span>
+            </a>
+
             <?php if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true'): ?>
             <?php $active = $current_page === 'performance'; ?>
             <a href="<?= URL ?>/master/performance" class="<?= $navItemClass($active) ?>">
