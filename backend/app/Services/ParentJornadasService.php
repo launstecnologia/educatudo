@@ -1,7 +1,7 @@
 <?php
 /**
  * Histórico de jornadas no portal dos pais — mesma visibilidade do aluno
- * (turma principal + estrutura.turmas_selecionadas + alunos_selecionados).
+ * (turma principal + estrutura.turmas_selecionadas + progresso do aluno).
  */
 
 require_once __DIR__ . '/../Core/AlunoTurmaHelper.php';
@@ -10,6 +10,12 @@ require_once __DIR__ . '/../Models/Education/JourneyBoletimLancamento.php';
 class ParentJornadasService
 {
     private $db;
+
+    /** @var array<int, array<int,true>> */
+    private $cacheProgresso = [];
+
+    /** @var array<string, list<array<string,mixed>>> */
+    private $cacheCandidatas = [];
 
     public function __construct($db = null)
     {
@@ -26,11 +32,8 @@ class ParentJornadasService
         }
 
         $turmaIds = $this->turmaIdsDoAluno($alunoId, $turmaIdFallback);
-        if ($turmaIds === []) {
-            return [];
-        }
-
-        $candidatas = $this->listarCandidatas($alunoId, $turmaIds);
+        $idsProgresso = $this->idsComProgresso($alunoId);
+        $candidatas = $this->listarCandidatas($turmaIds, $idsProgresso);
         $ids = [];
         foreach ($candidatas as $j) {
             if (!$this->passaFiltroPeriodo($j, $anoLetivo, $bimestre)) {
@@ -54,11 +57,9 @@ class ParentJornadasService
     public function anosDisponiveis(int $alunoId, int $turmaIdFallback = 0): array
     {
         $turmaIds = $this->turmaIdsDoAluno($alunoId, $turmaIdFallback);
-        if ($turmaIds === []) {
-            return [];
-        }
+        $idsProgresso = $this->idsComProgresso($alunoId);
         $anos = [];
-        foreach ($this->listarCandidatas($alunoId, $turmaIds) as $j) {
+        foreach ($this->listarCandidatas($turmaIds, $idsProgresso) as $j) {
             $ano = (int) ($j['ano_letivo'] ?? 0);
             if ($ano <= 0 && !empty($j['created_at'])) {
                 $ano = (int) date('Y', strtotime((string) $j['created_at']));
@@ -85,48 +86,128 @@ class ParentJornadasService
     }
 
     /**
-     * @param list<int> $turmaIds
-     * @return list<array<string,mixed>>
+     * @return array<int,true>
      */
-    private function listarCandidatas(int $alunoId, array $turmaIds): array
+    private function idsComProgresso(int $alunoId): array
     {
-        $params = [];
-        $ph = [];
-        foreach (array_values($turmaIds) as $i => $tid) {
-            $key = 'tid_' . $i;
-            $ph[] = ':' . $key;
-            $params[$key] = $tid;
+        if (isset($this->cacheProgresso[$alunoId])) {
+            return $this->cacheProgresso[$alunoId];
         }
-        $inSql = implode(',', $ph);
-        $hasAno = $this->temColuna('jornadas', 'ano_letivo');
-        $hasBim = $this->temColuna('jornadas', 'bimestre');
-        $cols = 'j.id, j.turma_id, j.estrutura, j.created_at';
-        if ($hasAno) {
-            $cols .= ', j.ano_letivo';
+        if (!$this->db->tableExists('jornadas_progresso_alunos')) {
+            $this->cacheProgresso[$alunoId] = [];
+            return [];
         }
-        if ($hasBim) {
-            $cols .= ', j.bimestre';
-        }
-
         try {
             $rows = $this->db->fetchAll(
-                "SELECT {$cols}
-                 FROM jornadas j
-                 WHERE j.turma_id IN ({$inSql})
-                    OR (j.estrutura IS NOT NULL AND TRIM(j.estrutura) <> '')
-                 ORDER BY j.created_at DESC
-                 LIMIT 800",
-                $params
+                'SELECT DISTINCT jornada_id
+                 FROM jornadas_progresso_alunos
+                 WHERE aluno_id = :aluno_id AND jornada_id IS NOT NULL',
+                ['aluno_id' => $alunoId]
             ) ?: [];
-        } catch (Exception $e) {
-            error_log('ParentJornadasService listarCandidatas: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('ParentJornadasService idsComProgresso: ' . $e->getMessage());
+            $this->cacheProgresso[$alunoId] = [];
+            return [];
+        }
+
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['jornada_id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+        $this->cacheProgresso[$alunoId] = $ids;
+        return $ids;
+    }
+
+    /**
+     * @param list<int> $turmaIds
+     * @param array<int,true> $idsProgresso
+     * @return list<array<string,mixed>>
+     */
+    private function listarCandidatas(array $turmaIds, array $idsProgresso): array
+    {
+        $cacheKey = implode(',', $turmaIds) . '#' . implode(',', array_keys($idsProgresso));
+        if (isset($this->cacheCandidatas[$cacheKey])) {
+            return $this->cacheCandidatas[$cacheKey];
+        }
+
+        $porId = [];
+        $cols = $this->colunasCandidatas();
+
+        if ($turmaIds !== []) {
+            [$inSql, $params] = $this->placeholders($turmaIds, 'tid');
+            if ($inSql !== '') {
+                try {
+                    $porTurma = $this->db->fetchAll(
+                        "SELECT {$cols} FROM jornadas j WHERE j.turma_id IN ({$inSql}) ORDER BY j.created_at DESC",
+                        $params
+                    ) ?: [];
+                    $porId = $this->indexarPorId($porId, $porTurma);
+                } catch (Throwable $e) {
+                    error_log('ParentJornadasService listarCandidatas turma: ' . $e->getMessage());
+                }
+                $porId = $this->indexarPorId($porId, $this->buscarPorTurmasSelecionadas($turmaIds, $cols, $params, $inSql));
+            }
+        }
+
+        $faltandoProgresso = [];
+        foreach (array_keys($idsProgresso) as $jid) {
+            if (!isset($porId[$jid])) {
+                $faltandoProgresso[] = $jid;
+            }
+        }
+        if ($faltandoProgresso !== []) {
+            $porId = $this->indexarPorId($porId, $this->buscarPorIds($faltandoProgresso, $cols));
+        }
+
+        $out = [];
+        foreach ($porId as $j) {
+            if ($this->alunoElegivel($this->normalizarCandidata($j), $turmaIds, $idsProgresso)) {
+                $out[] = $j;
+            }
+        }
+        $this->cacheCandidatas[$cacheKey] = $out;
+        return $out;
+    }
+
+    /**
+     * Jornadas cuja turma principal é outra, mas o aluno está em estrutura.turmas_selecionadas.
+     * Traz só o array de turmas (JSON_EXTRACT), não o JSON inteiro da jornada.
+     *
+     * @param list<int> $turmaIds
+     * @param array<string,int> $paramsTurma
+     * @return list<array<string,mixed>>
+     */
+    private function buscarPorTurmasSelecionadas(array $turmaIds, string $cols, array $paramsTurma, string $inSql): array
+    {
+        $colsExtra = $cols . ", JSON_EXTRACT(j.estrutura, '$.turmas_selecionadas') AS turmas_selecionadas_json";
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT {$colsExtra}
+                 FROM jornadas j
+                 WHERE JSON_EXTRACT(j.estrutura, '$.turmas_selecionadas') IS NOT NULL
+                   AND (j.turma_id IS NULL OR j.turma_id NOT IN ({$inSql}))",
+                $paramsTurma
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('ParentJornadasService buscarPorTurmasSelecionadas: ' . $e->getMessage());
             return [];
         }
 
         $out = [];
-        foreach ($rows as $j) {
-            if ($this->alunoElegivel($j, $alunoId, $turmaIds)) {
-                $out[] = $j;
+        $turmaSet = array_fill_keys(array_map('intval', $turmaIds), true);
+        foreach ($rows as $row) {
+            $lista = json_decode((string) ($row['turmas_selecionadas_json'] ?? ''), true);
+            if (!is_array($lista)) {
+                continue;
+            }
+            foreach ($lista as $tid) {
+                if (isset($turmaSet[(int) $tid])) {
+                    $out[] = $row;
+                    break;
+                }
             }
         }
         return $out;
@@ -134,27 +215,104 @@ class ParentJornadasService
 
     /**
      * @param array<string,mixed> $jornada
-     * @param list<int> $turmaIds
+     * @return array<string,mixed>
      */
-    private function alunoElegivel(array $jornada, int $alunoId, array $turmaIds): bool
+    private function normalizarCandidata(array $jornada): array
     {
-        $cobre = false;
-        foreach ($turmaIds as $tid) {
-            if (JourneyBoletimLancamento::jornadaCobreTurma($jornada, (int) $tid)) {
-                $cobre = true;
-                break;
+        if (isset($jornada['estrutura'])) {
+            return $jornada;
+        }
+        $lista = json_decode((string) ($jornada['turmas_selecionadas_json'] ?? ''), true);
+        $jornada['estrutura'] = json_encode(['turmas_selecionadas' => is_array($lista) ? $lista : []]);
+        return $jornada;
+    }
+
+    private function colunasCandidatas(): string
+    {
+        $cols = 'j.id, j.turma_id, j.created_at';
+        if ($this->temColuna('jornadas', 'ano_letivo')) {
+            $cols .= ', j.ano_letivo';
+        }
+        if ($this->temColuna('jornadas', 'bimestre')) {
+            $cols .= ', j.bimestre';
+        }
+        return $cols;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return list<array<string,mixed>>
+     */
+    private function buscarPorIds(array $ids, string $cols): array
+    {
+        [$inSql, $params] = $this->placeholders($ids, 'jid');
+        if ($inSql === '') {
+            return [];
+        }
+        try {
+            return $this->db->fetchAll(
+                "SELECT {$cols} FROM jornadas j WHERE j.id IN ({$inSql})",
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('ParentJornadasService buscarPorIds: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $porId
+     * @param list<array<string,mixed>> $rows
+     * @return array<int,array<string,mixed>>
+     */
+    private function indexarPorId(array $porId, array $rows): array
+    {
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $porId[$id] = $row;
             }
         }
-        if (!$cobre) {
-            return false;
+        return $porId;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array{0:string,1:array<string,int>}
+     */
+    private function placeholders(array $ids, string $prefix): array
+    {
+        $ph = [];
+        $params = [];
+        foreach (array_values($ids) as $i => $id) {
+            $intId = (int) $id;
+            if ($intId <= 0) {
+                continue;
+            }
+            $key = $prefix . '_' . $i;
+            $ph[] = ':' . $key;
+            $params[$key] = $intId;
         }
-        $e = json_decode((string) ($jornada['estrutura'] ?? ''), true) ?: [];
-        $tipo = strtolower(trim((string) ($e['tipo_selecao_alunos'] ?? 'todos')));
-        if ($tipo === 'selecionados') {
-            $ids = array_map('intval', (array) ($e['alunos_selecionados'] ?? []));
-            return in_array($alunoId, $ids, true);
+        return [implode(',', $ph), $params];
+    }
+
+    /**
+     * @param array<string,mixed> $jornada
+     * @param list<int> $turmaIds
+     * @param array<int,true> $idsProgresso
+     */
+    private function alunoElegivel(array $jornada, array $turmaIds, array $idsProgresso): bool
+    {
+        $jid = (int) ($jornada['id'] ?? 0);
+        if ($jid > 0 && isset($idsProgresso[$jid])) {
+            return true;
         }
-        return true;
+        foreach ($turmaIds as $tid) {
+            if (JourneyBoletimLancamento::jornadaCobreTurma($jornada, (int) $tid)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -199,6 +357,8 @@ class ParentJornadasService
 
         $hasStatus = $this->temColuna('jornadas', 'status');
         $statusExpr = $hasStatus ? 'j.status' : 'NULL';
+        $joinMateria = ($hasMateriaId && $hasMaterias) ? 'LEFT JOIN materias m ON m.id = j.materia_id' : '';
+        $materiaExpr = ($hasMateriaId && $hasMaterias) ? 'm.nome' : 'NULL';
 
         $modulosExpr = $hasModulos
             ? '(SELECT COUNT(*) FROM jornadas_modulos jm WHERE jm.jornada_id = j.id)'
@@ -252,12 +412,9 @@ class ParentJornadasService
                   AND COALESCE(jpaAltAc.pontuacao, 0) > 0)"
             : '0';
 
-        $params = [];
-        $idPh = [];
-        foreach (array_values($ids) as $i => $jid) {
-            $key = 'jid_' . $i;
-            $idPh[] = ':' . $key;
-            $params[$key] = $jid;
+        [$idSql, $params] = $this->placeholders($ids, 'jid');
+        if ($idSql === '') {
+            return [];
         }
         if ($hasProgress) {
             $params['aluno_id_fez'] = $alunoId;
@@ -292,13 +449,13 @@ class ParentJornadasService
                  FROM jornadas j
                  LEFT JOIN professores p ON p.id = j.professor_id
                  {$joinMateria}
-                 WHERE j.id IN (" . implode(',', $idPh) . ")
+                 WHERE j.id IN ({$idSql})
                  ORDER BY j.created_at DESC",
                 $params
             );
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             error_log('ParentJornadasService carregarDetalhes: ' . $e->getMessage());
-            return [];
+            return $this->carregarDetalhesBasico($ids);
         }
 
         if (!is_array($rows)) {
@@ -345,6 +502,57 @@ class ParentJornadasService
             if (!$row['fez'] && $fimTs !== null && $fimTs > 0 && time() > $fimTs) {
                 $row['expirada'] = true;
             }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Fallback sem agregações — ainda mostra a lista se o SELECT completo falhar.
+     *
+     * @param list<int> $ids
+     * @return list<array<string,mixed>>
+     */
+    private function carregarDetalhesBasico(array $ids): array
+    {
+        [$idSql, $params] = $this->placeholders($ids, 'jid');
+        if ($idSql === '') {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT j.id, j.titulo, j.descricao, j.estrutura, j.created_at,
+                        p.nome AS professor_nome
+                 FROM jornadas j
+                 LEFT JOIN professores p ON p.id = j.professor_id
+                 WHERE j.id IN ({$idSql})
+                 ORDER BY j.created_at DESC",
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('ParentJornadasService carregarDetalhesBasico: ' . $e->getMessage());
+            return [];
+        }
+
+        foreach ($rows as &$row) {
+            $row['total_modulos'] = 0;
+            $row['total_exercicios'] = 0;
+            $row['total_redacoes'] = 0;
+            $row['total_interacoes'] = 0;
+            $row['modulos_feitos'] = 0;
+            $row['total_exercicios_alternativa'] = 0;
+            $row['exercicios_alternativa_feitos'] = 0;
+            $row['exercicios_alternativa_acertos'] = 0;
+            $row['exercicios_alternativa_erros'] = 0;
+            $row['fez'] = false;
+            $row['concluiu'] = false;
+            $row['percentual_modulos'] = 0;
+            $row['percentual_exercicios_alternativa_feitos'] = 0;
+            $row['percentual_exercicios_alternativa_acerto'] = 0;
+            $row['expirada'] = false;
+            $row['materia_nome'] = null;
+            $row['status'] = null;
         }
         unset($row);
 
