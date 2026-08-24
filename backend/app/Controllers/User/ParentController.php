@@ -969,6 +969,28 @@ class ParentController extends BaseController
         $jornadas = $jornadasSvc->listarDetalhadas((int) $filho['id'], (int) ($filho['turma_id'] ?? 0), $anoLetivo, $bimestre);
         $kpisJornadas = $this->buildKpisJornadas($jornadas);
         $anosDisponiveis = $jornadasSvc->anosDisponiveis((int) $filho['id'], (int) ($filho['turma_id'] ?? 0));
+
+        $totaisAlternativas = [
+            'total' => 0,
+            'feitos' => 0,
+            'acertos' => 0,
+            'erros' => 0,
+        ];
+        foreach ($jornadas as $jCalc) {
+            $totaisAlternativas['total'] += (int) ($jCalc['total_exercicios_alternativa'] ?? 0);
+            $totaisAlternativas['feitos'] += (int) ($jCalc['exercicios_alternativa_feitos'] ?? 0);
+            $totaisAlternativas['acertos'] += (int) ($jCalc['exercicios_alternativa_acertos'] ?? 0);
+            $totaisAlternativas['erros'] += (int) ($jCalc['exercicios_alternativa_erros'] ?? 0);
+        }
+
+        $perPage = 15;
+        $totalJornadas = count($jornadas);
+        $totalPages = max(1, (int) ceil($totalJornadas / $perPage));
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $jornadasPagina = array_slice($jornadas, ($page - 1) * $perPage, $perPage);
         
         $data = [
             'title' => 'Jornadas do Filho - EducaTudo',
@@ -977,11 +999,18 @@ class ParentController extends BaseController
             'filhos' => $filhos,
             'filho' => $filho,
             'user' => $user,
-            'jornadas' => $jornadas,
+            'jornadas' => $jornadasPagina,
             'kpis_jornadas' => $kpisJornadas,
+            'totais_alternativas' => $totaisAlternativas,
             'filtro_ano_letivo' => $anoLetivo,
             'filtro_bimestre' => $bimestre,
             'anos_disponiveis' => $anosDisponiveis,
+            'paginacao' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $totalJornadas,
+                'total_pages' => $totalPages,
+            ],
         ];
         
         $this->viewWithLayout('parent', 'parents/jornadas-filho', $data);
