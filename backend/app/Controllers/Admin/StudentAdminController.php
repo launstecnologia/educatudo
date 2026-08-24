@@ -21,6 +21,14 @@ class StudentAdminController extends AdminBaseController
         $user = $this->auth->getUser();
         $authManager = new AuthManager();
         $alunosOnline = $authManager->getAlunosOnline();
+
+        $contar = function (string $sql) {
+            try {
+                return (int) ($this->db->fetch($sql)['count'] ?? 0);
+            } catch (Throwable $e) {
+                return 0;
+            }
+        };
         
         // Verificar se é diretor ou dev para mostrar valor total a pagar
         $isDiretorOuDev = false;
@@ -36,9 +44,8 @@ class StudentAdminController extends AdminBaseController
                 $valorPorUsuario = floatval(LayoutHelper::get('valor_por_usuario', '0.00'));
                 
                 // Contar total de pagantes (alunos + professores)
-                $totalAlunosPagantes = $this->db->fetch("SELECT COUNT(*) as count FROM alunos WHERE ativo = 1 AND pagante = 1")['count'];
-                $totalProfessoresPagantes = $this->db->fetch("SELECT COUNT(*) as count FROM professores WHERE ativo = 1 AND pagante = 1")['count'];
-                $totalPagantes = $totalAlunosPagantes + $totalProfessoresPagantes;
+                $totalPagantes = $contar("SELECT COUNT(*) as count FROM alunos WHERE ativo = 1 AND pagante = 1")
+                    + $contar("SELECT COUNT(*) as count FROM professores WHERE ativo = 1 AND pagante = 1");
                 
                 // Calcular valor total
                 $valorTotalPagar = $totalPagantes * $valorPorUsuario;
@@ -48,19 +55,17 @@ class StudentAdminController extends AdminBaseController
         // Estatísticas gerais
         $stats = [
             'alunos_online' => is_array($alunosOnline) ? count($alunosOnline) : 0,
-            'total_alunos' => $this->db->fetch("SELECT COUNT(*) as count FROM alunos WHERE ativo = 1 AND pagante = 1")['count'],
-            'total_professores' => $this->db->fetch("SELECT COUNT(*) as count FROM professores WHERE ativo = 1 AND pagante = 1")['count'],
-            'total_turmas' => $this->db->fetch("SELECT COUNT(*) as count FROM turmas WHERE ativo = 1")['count'],
-            'total_jornadas' => $this->db->fetch("SELECT COUNT(*) as count FROM jornadas")['count'],
-            'total_exercicios' => $this->db->fetch("SELECT COUNT(*) as count FROM exercicios")['count'],
+            'total_alunos' => $contar("SELECT COUNT(*) as count FROM alunos WHERE ativo = 1 AND pagante = 1"),
+            'total_professores' => $contar("SELECT COUNT(*) as count FROM professores WHERE ativo = 1 AND pagante = 1"),
+            'total_turmas' => $contar("SELECT COUNT(*) as count FROM turmas WHERE ativo = 1"),
+            'total_jornadas' => $contar("SELECT COUNT(*) as count FROM jornadas"),
+            'total_exercicios' => $contar("SELECT COUNT(*) as count FROM exercicios"),
             'is_diretor_ou_dev' => $isDiretorOuDev,
             'valor_total_pagar' => $valorTotalPagar
         ];
 
         if ($this->podeVerAlertasSensiveis($user)) {
-            $stats['alertas_novos'] = $this->db->fetch(
-                "SELECT COUNT(*) as count FROM alertas_sensiveis WHERE status = 'novo'"
-            )['count'];
+            $stats['alertas_novos'] = $contar("SELECT COUNT(*) as count FROM alertas_sensiveis WHERE status = 'novo'");
         }
         
         $panoramaJornada = $this->obterPanoramaJornadaDashboard();
@@ -88,10 +93,28 @@ class StudentAdminController extends AdminBaseController
 
     private function obterPanoramaJornadaDashboard(): array
     {
-        $fallback = [
-            'ensino_medio' => $this->calcularPanoramaJornadaPorTipoEnsino('medio'),
-            'fundamental_ii' => $this->calcularPanoramaJornadaPorTipoEnsino('fundamental_ii'),
+        $vazio = [
+            'jornadas_escopo' => 0,
+            'pares_atribuidos' => 0,
+            'concluidos' => 0,
+            'pendentes' => 0,
+            'taxa_conclusao' => 0,
+            'total' => 0,
+            'realizadas' => 0,
+            'nao_realizadas' => 0,
+            'percentual' => 0,
         ];
+        try {
+            $fallback = [
+                'ensino_medio' => $this->calcularPanoramaJornadaPorTipoEnsino('medio'),
+                'fundamental_ii' => $this->calcularPanoramaJornadaPorTipoEnsino('fundamental_ii'),
+            ];
+        } catch (Throwable $e) {
+            $fallback = [
+                'ensino_medio' => $vazio,
+                'fundamental_ii' => $vazio,
+            ];
+        }
 
         try {
             $rows = $this->db->fetchAll(
@@ -99,7 +122,7 @@ class StudentAdminController extends AdminBaseController
                  FROM dashboard_jornadas_resumo
                  WHERE segmento IN ('medio', 'fundamental_ii')"
             );
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             return $fallback;
         }
 

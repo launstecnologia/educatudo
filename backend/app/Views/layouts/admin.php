@@ -322,22 +322,26 @@
         }
         $docs = ['terms', 'privacy'];
         $version = 'v1.0';
-        foreach ($docs as $doc) {
-            $row = $db->fetch(
-                "SELECT id FROM usuarios_consentimentos 
-                 WHERE user_id = :user_id AND user_role = 'admin'
-                   AND document_type = :document_type AND document_version = :document_version
-                 LIMIT 1",
-                [
-                    'user_id' => $user['id'],
-                    'document_type' => $doc,
-                    'document_version' => $version
-                ]
-            );
-            if (!$row) {
-                $needsConsent = true;
-                break;
+        try {
+            foreach ($docs as $doc) {
+                $row = $db->fetch(
+                    "SELECT id FROM usuarios_consentimentos 
+                     WHERE user_id = :user_id AND user_role = 'admin'
+                       AND document_type = :document_type AND document_version = :document_version
+                     LIMIT 1",
+                    [
+                        'user_id' => $user['id'],
+                        'document_type' => $doc,
+                        'document_version' => $version
+                    ]
+                );
+                if (!$row) {
+                    $needsConsent = true;
+                    break;
+                }
             }
+        } catch (Throwable $e) {
+            $needsConsent = false;
         }
     }
     ?>

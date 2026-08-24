@@ -57,11 +57,16 @@
         if (($user['perfil_admin'] ?? '') === 'dev' || $podeVerAlertas) {
             require_once __DIR__ . '/../../../Core/Database.php';
             $db = Database::getInstance();
-            if (($user['perfil_admin'] ?? '') === 'dev') {
-                $openTicketsCount = $db->fetch("SELECT COUNT(*) as total FROM suporte_tickets WHERE status = 'aberto'")['total'] ?? 0;
-            }
-            if ($podeVerAlertas) {
-                $alertasSensiveisNovos = $db->fetch("SELECT COUNT(*) as total FROM alertas_sensiveis WHERE status = 'novo'")['total'] ?? 0;
+            try {
+                if (($user['perfil_admin'] ?? '') === 'dev') {
+                    $openTicketsCount = $db->fetch("SELECT COUNT(*) as total FROM suporte_tickets WHERE status = 'aberto'")['total'] ?? 0;
+                }
+                if ($podeVerAlertas) {
+                    $alertasSensiveisNovos = $db->fetch("SELECT COUNT(*) as total FROM alertas_sensiveis WHERE status = 'novo'")['total'] ?? 0;
+                }
+            } catch (Throwable $e) {
+                $openTicketsCount = 0;
+                $alertasSensiveisNovos = 0;
             }
         }
         if (!class_exists('AdminPermissionMatrix')) {
