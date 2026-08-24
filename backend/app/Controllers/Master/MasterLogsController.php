@@ -27,7 +27,7 @@ class MasterLogsController extends BaseController
 
         $svc = new LogsAplicacaoService();
         $arquivos = $svc->arquivosDisponiveis();
-        $arquivo = $svc->normalizarArquivo((string) ($_GET['arquivo'] ?? 'error.log'));
+        $arquivo = $svc->normalizarArquivo((string) ($_GET['arquivo'] ?? LogsAplicacaoService::ARQUIVO_TODOS));
         $busca = trim((string) ($_GET['busca'] ?? ''));
         $limite = (int) ($_GET['limite'] ?? LogsAplicacaoService::LIMITE_PADRAO);
         $resultado = $svc->ultimasEntradas($arquivo, $limite, $busca);
@@ -42,6 +42,7 @@ class MasterLogsController extends BaseController
             'linhas' => $resultado['linhas'],
             'busca' => $busca,
             'limite' => max(1, min(LogsAplicacaoService::LIMITE_MAXIMO, $limite)),
+            'diagnostico' => $svc->diagnostico(),
         ]);
     }
 }
