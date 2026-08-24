@@ -91,7 +91,8 @@ class LogsAplicacaoService
             if ($path === '' || !is_readable($path)) {
                 continue;
             }
-            foreach ($this->lerCauda($path, $limite * 2) as $texto) {
+            $cauda = in_array($nome, ['php-error.log', 'error.log'], true) ? max($limite * 4, 400) : $limite * 2;
+            foreach ($this->lerCauda($path, $cauda) as $texto) {
                 $texto = trim((string) $texto);
                 if ($texto === '') {
                     continue;
@@ -105,7 +106,12 @@ class LogsAplicacaoService
             }
         }
 
-        usort($entradas, static function (array $a, array $b): int {
+        usort($entradas, function (array $a, array $b): int {
+            $prioA = $this->prioridadeArquivo((string) ($a['arquivo'] ?? ''));
+            $prioB = $this->prioridadeArquivo((string) ($b['arquivo'] ?? ''));
+            if ($prioA !== $prioB) {
+                return $prioA <=> $prioB;
+            }
             return ($b['ordem'] <=> $a['ordem']);
         });
 
@@ -122,6 +128,101 @@ class LogsAplicacaoService
             'arquivo' => $arquivo,
             'linhas' => $entradas,
         ];
+    }
+
+    /**
+     * Erros únicos (URL + mensagem), lidos mais fundo em php-error.log / error.log / app do dia.
+     * Evita 15 cards iguais do chat do aluno escondendo o 500 do admin.
+     *
+     * @return list<array<string,string>>
+     */
+    public function errosDistintos(string $busca = '', int $max = 25): array
+    {
+        $buscaNorm = mb_strtolower(trim($busca));
+        $disco = $this->listarArquivosDisco();
+        $hoje = date('Y-m-d');
+        $ontem = date('Y-m-d', strtotime('-1 day'));
+        $candidatos = [
+            'php-error.log',
+            'error.log',
+            'app_' . $hoje . '.log',
+            'app_' . $ontem . '.log',
+            'database_' . $hoje . '.log',
+        ];
+        $fontes = [];
+        foreach ($candidatos as $nome) {
+            if (isset($disco[$nome])) {
+                $fontes[] = $nome;
+            }
+        }
+
+        $vistos = [];
+        $erros = [];
+        foreach ($fontes as $nome) {
+            $path = $this->caminhoSeguro($nome);
+            if ($path === '' || !is_readable($path)) {
+                continue;
+            }
+            $conteudo = $this->lerBytesFinais($path, 12 * 1024 * 1024);
+            if ($conteudo === '') {
+                continue;
+            }
+            $agulha = $buscaNorm !== '' ? $buscaNorm : '/admin';
+            foreach ($this->partirConteudoLog($path, $conteudo, 8000, $agulha) as $texto) {
+                $this->acumularErroDistinto($erros, $vistos, $texto, $nome, '');
+            }
+            if ($buscaNorm === '') {
+                foreach ($this->partirConteudoLog($path, $conteudo, 800, null) as $texto) {
+                    $this->acumularErroDistinto($erros, $vistos, $texto, $nome, '');
+                }
+            }
+        }
+
+        usort($erros, static function (array $a, array $b): int {
+            $adminA = (int) (stripos($a['url'] ?? '', '/admin') !== false);
+            $adminB = (int) (stripos($b['url'] ?? '', '/admin') !== false);
+            if ($adminA !== $adminB) {
+                return $adminB <=> $adminA;
+            }
+            return ($b['ordem'] <=> $a['ordem']);
+        });
+
+        $erros = array_slice($erros, 0, max(1, $max));
+        foreach ($erros as &$item) {
+            unset($item['ordem']);
+        }
+        unset($item);
+        return $erros;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $erros
+     * @param array<string,true> $vistos
+     */
+    private function acumularErroDistinto(array &$erros, array &$vistos, string $texto, string $nome, string $buscaNorm): void
+    {
+        $texto = trim($texto);
+        if ($texto === '') {
+            return;
+        }
+        if ($buscaNorm !== '' && mb_strpos(mb_strtolower($texto), $buscaNorm) === false) {
+            return;
+        }
+        $parsed = $this->parseLinha($texto);
+        if (empty($parsed['eh_erro']) && ($parsed['mensagem'] ?? '') === '') {
+            return;
+        }
+        $parsed['arquivo'] = $nome;
+        $chave = mb_strtolower(
+            ($parsed['url'] !== '' ? $parsed['url'] : '')
+            . '|'
+            . mb_substr($parsed['mensagem'] !== '' ? $parsed['mensagem'] : $parsed['texto'], 0, 160)
+        );
+        if (isset($vistos[$chave])) {
+            return;
+        }
+        $vistos[$chave] = true;
+        $erros[] = $parsed;
     }
 
     public function normalizarArquivo(string $arquivo): string
@@ -141,12 +242,29 @@ class LogsAplicacaoService
     {
         $nomes = [];
         foreach (array_keys($this->listarArquivosDisco()) as $nome) {
-            if ($nome === 'rotas_nao_encontrada.log') {
+            if ($nome === 'rotas_nao_encontrada.log' || $nome === 'app.data.log') {
                 continue;
             }
             $nomes[] = $nome;
         }
+        usort($nomes, function (string $a, string $b): int {
+            return $this->prioridadeArquivo($a) <=> $this->prioridadeArquivo($b);
+        });
         return $nomes;
+    }
+
+    private function prioridadeArquivo(string $nome): int
+    {
+        if ($nome === 'php-error.log' || $nome === 'error.log') {
+            return 0;
+        }
+        if (str_starts_with($nome, 'app_')) {
+            return 1;
+        }
+        if (str_starts_with($nome, 'database_')) {
+            return 2;
+        }
+        return 3;
     }
 
     /**
@@ -244,46 +362,65 @@ class LogsAplicacaoService
         return $this->caminhoPermitido($real) ? $real : '';
     }
 
-    /**
-     * @return list<string>
-     */
-    private function lerCauda(string $path, int $maxLinhas): array
+    private function lerCauda(string $path, int $maxLinhas, int $maxBytes = 1048576): array
+    {
+        $conteudo = $this->lerBytesFinais($path, $maxBytes);
+        if ($conteudo === '') {
+            return [];
+        }
+        return $this->partirConteudoLog($path, $conteudo, $maxLinhas, null);
+    }
+
+    private function lerBytesFinais(string $path, int $maxBytes): string
     {
         $tamanho = @filesize($path);
         if ($tamanho === false || $tamanho <= 0) {
-            return [];
+            return '';
         }
-
-        $maxBytes = min((int) $tamanho, 1024 * 1024);
+        $maxBytes = min((int) $tamanho, max(1024, $maxBytes));
         $fh = @fopen($path, 'rb');
         if ($fh === false) {
-            return [];
+            return '';
         }
         if ($maxBytes < $tamanho) {
             fseek($fh, -$maxBytes, SEEK_END);
         }
         $conteudo = (string) stream_get_contents($fh);
         fclose($fh);
+        return $conteudo;
+    }
 
+    /**
+     * @return list<string>
+     */
+    private function partirConteudoLog(string $path, string $conteudo, int $maxLinhas, ?string $filtro): array
+    {
         $nome = basename($path);
         $ehBlocoLogger = (bool) preg_match('/^(app(\.data)?_|app\.data\.log$|database_|openai_|auth_|api_|email_|general_)/', $nome)
             || $nome === 'app.data.log';
 
         if ($ehBlocoLogger) {
-            $blocos = preg_split('/\n-{20,}\n?/', $conteudo) ?: [];
-            $blocos = array_values(array_filter($blocos, static fn ($b) => trim((string) $b) !== ''));
-            if (count($blocos) > $maxLinhas) {
-                $blocos = array_slice($blocos, -$maxLinhas);
-            }
-            return $blocos;
+            $itens = preg_split('/\n-{20,}\n?/', $conteudo) ?: [];
+        } else {
+            $itens = preg_split("/\r\n|\n|\r/", $conteudo) ?: [];
         }
 
-        $linhas = preg_split("/\r\n|\n|\r/", $conteudo) ?: [];
-        $linhas = array_values(array_filter($linhas, static fn ($l) => trim((string) $l) !== ''));
-        if (count($linhas) > $maxLinhas) {
-            $linhas = array_slice($linhas, -$maxLinhas);
+        $filtroNorm = $filtro !== null && $filtro !== '' ? mb_strtolower($filtro) : '';
+        $itens = array_values(array_filter($itens, static function ($item) use ($filtroNorm) {
+            $item = trim((string) $item);
+            if ($item === '') {
+                return false;
+            }
+            if ($filtroNorm === '') {
+                return true;
+            }
+            return mb_strpos(mb_strtolower($item), $filtroNorm) !== false;
+        }));
+
+        if (count($itens) > $maxLinhas) {
+            $itens = array_slice($itens, -$maxLinhas);
         }
-        return $linhas;
+        return $itens;
     }
 
     /**
@@ -307,6 +444,9 @@ class LogsAplicacaoService
             $url = trim($m[1]);
         } elseif (preg_match('/\|\s*URI:\s*([^|]+)/u', $texto, $m)) {
             $url = trim($m[1]);
+        }
+        if ($escola === '' && $url !== '' && preg_match('#https?://([a-z0-9-]+)\.#i', $url, $m)) {
+            $escola = strtolower($m[1]);
         }
         if (preg_match('/EXCEÇÃO NÃO CAPTURADA:\s*(.+)$/um', $texto, $m)) {
             $mensagem = trim($m[1]);

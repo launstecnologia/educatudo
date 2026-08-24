@@ -31,6 +31,7 @@ class MasterLogsController extends BaseController
         $busca = trim((string) ($_GET['busca'] ?? ''));
         $limite = (int) ($_GET['limite'] ?? LogsAplicacaoService::LIMITE_PADRAO);
         $resultado = $svc->ultimasEntradas($arquivo, $limite, $busca);
+        $errosDistintos = $svc->errosDistintos($busca, 25);
 
         $this->viewWithLayout('master', 'master/logs/index', [
             'title' => 'Logs do sistema - Painel Master',
@@ -40,6 +41,7 @@ class MasterLogsController extends BaseController
             'arquivos' => $arquivos,
             'arquivo' => $resultado['arquivo'],
             'linhas' => $resultado['linhas'],
+            'erros_distintos' => $errosDistintos,
             'busca' => $busca,
             'limite' => max(1, min(LogsAplicacaoService::LIMITE_MAXIMO, $limite)),
             'diagnostico' => $svc->diagnostico(),

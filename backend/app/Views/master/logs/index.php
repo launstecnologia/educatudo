@@ -5,7 +5,10 @@ $linhas = $linhas ?? [];
 $busca = (string) ($busca ?? '');
 $limite = (int) ($limite ?? 100);
 $diagnostico = $diagnostico ?? ['diretorio' => '', 'gravavel' => false, 'php_error_log' => '', 'arquivos' => []];
-$erros = array_values(array_filter($linhas, static fn ($l) => !empty($l['eh_erro']) || ($l['mensagem'] ?? '') !== ''));
+$erros = $erros_distintos ?? [];
+if ($erros === []) {
+    $erros = array_values(array_filter($linhas, static fn ($l) => !empty($l['eh_erro']) || ($l['mensagem'] ?? '') !== ''));
+}
 ?>
 
 <div class="mb-6">
@@ -45,11 +48,33 @@ $erros = array_values(array_filter($linhas, static fn ($l) => !empty($l['eh_erro
         </div>
         <button type="submit" class="self-end px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">Atualizar</button>
     </div>
+    <div class="sm:col-span-4 flex flex-wrap gap-2">
+        <?php
+        $qsBase = ['arquivo' => $arquivo, 'limite' => $limite];
+        $atalhos = [
+            '/admin' => 'Admin',
+            '/admin/arquivos' => 'Arquivos',
+            'xdq' => 'xdq',
+            '/aluno' => 'Aluno',
+            'SQLSTATE' => 'SQLSTATE',
+        ];
+        foreach ($atalhos as $valor => $rotulo):
+            $href = URL . '/master/logs?' . http_build_query($qsBase + ['busca' => $valor]);
+        ?>
+        <a href="<?= htmlspecialchars($href) ?>"
+           class="px-2.5 py-1 rounded-full text-xs font-medium border <?= $busca === $valor ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300' ?>">
+            <?= htmlspecialchars($rotulo) ?>
+        </a>
+        <?php endforeach; ?>
+        <?php if ($busca !== ''): ?>
+        <a href="<?= htmlspecialchars(URL . '/master/logs?' . http_build_query($qsBase)) ?>" class="px-2.5 py-1 rounded-full text-xs font-medium text-slate-500 hover:text-slate-800">Limpar busca</a>
+        <?php endif; ?>
+    </div>
 </form>
 
 <?php if (!empty($erros)): ?>
 <div class="mb-6 space-y-3">
-    <h3 class="text-sm font-semibold text-red-700">Erros encontrados</h3>
+    <h3 class="text-sm font-semibold text-red-700">Erros distintos (admin primeiro)</h3>
     <?php foreach (array_slice($erros, 0, 15) as $erro): ?>
     <div class="bg-red-50 border border-red-200 rounded-xl p-4">
         <div class="flex flex-wrap gap-2 text-xs mb-2">
