@@ -1,29 +1,17 @@
-/* Encaixe do Launs Editor na tela de exercícios da jornada */
+/* Layout do Launs Editor nos exercícios da jornada (professor) */
 .launs-jornada-wrap {
-    min-height: 280px;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    overflow: hidden;
     background: #fff;
 }
 
-.launs-jornada-wrap:not(:has(.launs-editor)) {
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-}
-
-.launs-jornada-wrap.is-compact {
-    min-height: 180px;
-}
-
-.launs-jornada-wrap .launs-editor {
-    min-height: inherit;
-}
-
 .launs-jornada-wrap .launs-editor__doc {
-    min-height: 240px;
+    min-height: 140px;
 }
 
 .launs-jornada-wrap.is-compact .launs-editor__doc {
-    min-height: 88px;
-    padding: 12px 14px;
+    min-height: 56px;
 }
 
 .alt-list {
@@ -65,8 +53,9 @@
 
 .launs-editor__media-popup,
 .launs-editor__math-popup,
-.launs-editor__slash,
-.launs-editor__bubble,
-.launs-editor__context {
+.launs-editor__slash-menu,
+.launs-editor__bubble-menu,
+.launs-editor__context-menu,
+.launs-editor__overflow {
     z-index: 80;
 }

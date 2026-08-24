@@ -68,7 +68,7 @@ class HtmlSanitizer
         if (is_dir($cacheDir) && is_writable($cacheDir)) {
             $config->set('Cache.SerializerPath', $cacheDir);
         }
-        $config->set('HTML.Allowed', 'p,strong,b,em,i,u,s,sub,sup,ul,ol,li,span[class|style|data-type|data-latex],br,h1,h2,h3,h4,h5,h6,blockquote,div[class|style|data-type|data-latex],mark,table,thead,tbody,tfoot,tr,th,td,colgroup,col,img[src|alt|class|style|width|height],video[src|controls|title|width|height|preload]');
+        $config->set('HTML.Allowed', 'p,strong,b,em,i,u,s,sub,sup,ul,ol,li,span[class|style|data-type|data-latex],br,h1,h2,h3,h4,h5,h6,blockquote,div[class|style|data-type|data-latex],mark,table,thead,tbody,tfoot,tr,th,td,colgroup,col,img[src|alt|class|style|width|height]');
         $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'data' => true]);
         // data:image;base64 pode ser grande; sem isso o Purifier remove o src no aluno.
         // Obs.: URI.SafeDataURI não existe no HTMLPurifier 4.19 (gera Warning).
@@ -85,8 +85,8 @@ class HtmlSanitizer
         $config->set('HTML.Nofollow', true);
         $config->set('HTML.TargetBlank', false);
         $config->set('AutoFormat.RemoveEmpty', false);
-        $config->set('HTML.DefinitionID', 'educatudo-exercise-html-with-img-v5');
-        $config->set('HTML.DefinitionRev', 5);
+        $config->set('HTML.DefinitionID', 'educatudo-exercise-html-with-img-v4');
+        $config->set('HTML.DefinitionRev', 4);
         if ($def = $config->getHTMLDefinition(true)) {
             $def->addAttribute('span', 'class', 'Text');
             $def->addAttribute('span', 'data-type', 'Text');
@@ -94,14 +94,6 @@ class HtmlSanitizer
             $def->addAttribute('div', 'class', 'Text');
             $def->addAttribute('div', 'data-type', 'Text');
             $def->addAttribute('div', 'data-latex', 'Text');
-            $def->addElement('video', 'Block', 'Empty', 'Common', [
-                'src' => 'URI',
-                'controls' => 'Bool',
-                'title' => 'Text',
-                'width' => 'Number',
-                'height' => 'Number',
-                'preload' => 'Enum#auto,metadata,none',
-            ]);
         }
         self::$purifierWithImg = new \HTMLPurifier($config);
         return self::$purifierWithImg;
@@ -156,11 +148,11 @@ class HtmlSanitizer
                 $cleaned = $purifier->purify($html);
             } catch (\Throwable $e) {
                 // Fallback: não derruba a importação por HTML “sujo” do banco externo.
-                $allowed = '<p><strong><b><em><i><u><s><sub><sup><ul><ol><li><span><br><h1><h2><h3><h4><h5><h6><blockquote><div><mark><img><video><table><thead><tbody><tr><th><td>';
+                $allowed = '<p><strong><b><em><i><u><s><sub><sup><ul><ol><li><span><br><h1><h2><h3><h4><h5><h6><blockquote><div><mark><img><table><thead><tbody><tr><th><td>';
                 $cleaned = strip_tags($html, $allowed);
             }
         } else {
-            $allowed = '<p><strong><b><em><i><u><s><sub><sup><ul><ol><li><span><br><h1><h2><h3><h4><h5><h6><blockquote><div><mark><img><video><table><thead><tbody><tr><th><td>';
+            $allowed = '<p><strong><b><em><i><u><s><sub><sup><ul><ol><li><span><br><h1><h2><h3><h4><h5><h6><blockquote><div><mark><img><table><thead><tbody><tr><th><td>';
             $cleaned = strip_tags($html, $allowed);
         }
         if (!is_string($cleaned)) {

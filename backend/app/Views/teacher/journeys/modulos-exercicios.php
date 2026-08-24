@@ -1988,46 +1988,22 @@ function inicializarSelectTipo() {
 
 // Inicializa quando o DOM estiver pronto
 function iniciarEditoresLaunsPagina() {
-    if (typeof LaunsEditor === 'undefined' || typeof LaunsJornadaEditor === 'undefined') {
-        window._launsInitTentativas = (window._launsInitTentativas || 0) + 1;
-        if (window._launsInitTentativas < 50) {
-            setTimeout(iniciarEditoresLaunsPagina, 100);
-        } else {
-            console.error('LaunsEditor não carregou.');
-        }
-        return;
-    }
-    if (window._launsEditoresPaginaProntos) {
-        return;
-    }
-    var hostEnunciado = document.getElementById('editor-enunciado-jornada');
-    if (!hostEnunciado) {
-        window._launsInitTentativas = (window._launsInitTentativas || 0) + 1;
-        if (window._launsInitTentativas < 50) {
-            setTimeout(iniciarEditoresLaunsPagina, 100);
-        }
+    if (typeof LaunsJornadaEditor === 'undefined') {
+        console.error('LaunsJornadaEditor não carregou.');
         return;
     }
     LaunsJornadaEditor.configurar({
         uploadUrl: baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio',
         csrfToken: csrfTokenModuloExercicios
     });
-    var enunciado = LaunsJornadaEditor.criar(hostEnunciado, {
+    LaunsJornadaEditor.criar('#editor-enunciado-jornada', {
         hiddenInput: '#enunciado-jornada',
-        placeholder: 'Comece a escrever…'
+        placeholder: 'Digite o enunciado aqui…'
     });
-    if (!enunciado) {
-        window._launsInitTentativas = (window._launsInitTentativas || 0) + 1;
-        if (window._launsInitTentativas < 50) {
-            setTimeout(iniciarEditoresLaunsPagina, 100);
-        }
-        return;
-    }
-    window._launsEditoresPaginaProntos = true;
-    document.querySelectorAll('#opcoes-lista .alt-editor').forEach(function(el) {
+    document.querySelectorAll('#opcoes-lista .alt-editor').forEach(function(el, i) {
         LaunsJornadaEditor.criar(el, {
             compact: true,
-            placeholder: 'Comece a escrever…'
+            placeholder: 'Alternativa ' + letras[i] + '…'
         });
     });
 }
@@ -2395,7 +2371,7 @@ function abrirModalEdicao(exercicio) {
         LaunsJornadaEditor.criar(editEditor, {
             content: enunciadoVal,
             hiddenInput: '#edit-enunciado-hidden',
-            placeholder: 'Comece a escrever…'
+            placeholder: 'Digite o enunciado aqui…'
         });
     } else if (editEditor) {
         if (/<[a-z][\s\S]*>/i.test(enunciadoVal)) {
@@ -2680,7 +2656,7 @@ function adicionarOpcaoEdicao(opcaoExistente = null) {
         LaunsJornadaEditor.criar(editor, {
             compact: true,
             content: texto,
-            placeholder: 'Comece a escrever…'
+            placeholder: 'Alternativa ' + letra + '…'
         });
     } else if (editor) {
         if (/<[a-z][\s\S]*>/i.test(texto)) {
