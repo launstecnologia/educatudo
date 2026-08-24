@@ -364,6 +364,33 @@ if (!function_exists('buildStructuredErrorLog')) {
     }
 }
 
+if (!function_exists('deveExibirDetalheErroNaTela')) {
+    function deveExibirDetalheErroNaTela(): bool
+    {
+        if (defined('DEBUG') && DEBUG) {
+            return true;
+        }
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            return false;
+        }
+        if (!empty($_SESSION['master_user_id'])) {
+            return true;
+        }
+        $tipo = strtolower((string) ($_SESSION['user_type'] ?? ''));
+        return in_array($tipo, ['admin', 'admin_escola', 'professor', 'monitor'], true);
+    }
+}
+
+if (!function_exists('ehErroDeBancoNaMensagem')) {
+    function ehErroDeBancoNaMensagem(string $msg): bool
+    {
+        return (bool) preg_match(
+            '/ERRO NO BANCO|banco de dados|SQLSTATE|Erro na execução da (consulta|query)|Base table or view not found/i',
+            $msg
+        );
+    }
+}
+
 // Configurar handler de erros fatais do PHP
 register_shutdown_function(function() {
     $error = error_get_last();
@@ -519,14 +546,17 @@ set_exception_handler(function($e) {
         }
     
     $debug = defined('DEBUG') && DEBUG;
+    $mostrarDetalhe = $e && deveExibirDetalheErroNaTela();
     $errorMessage = 'Ocorreu um erro inesperado. Tente novamente mais tarde.';
     $errorDetails = '';
-    $isDatabaseError = $e && (stripos($e->getMessage(), 'ERRO NO BANCO') !== false || stripos($e->getMessage(), 'banco de dados') !== false);
+    $isDatabaseError = $e && ehErroDeBancoNaMensagem($e->getMessage());
 
-    if (($debug || $isDatabaseError) && $e) {
+    if ($mostrarDetalhe && $e) {
+        $uriAtual = (string) ($_SERVER['REQUEST_URI'] ?? '');
         $errorMessage = htmlspecialchars($e->getMessage());
         $errorDetails = '<div class="mt-4 text-left bg-gray-50 p-4 rounded border border-gray-200">
             <p class="font-semibold text-sm text-gray-700 mb-2">Detalhes do Erro:</p>
+            <p class="text-xs text-gray-600 mb-1"><strong>URL:</strong> ' . htmlspecialchars($uriAtual !== '' ? $uriAtual : 'N/A') . '</p>
             <p class="text-xs text-gray-600 mb-1"><strong>Arquivo:</strong> ' . htmlspecialchars($e->getFile()) . '</p>
             <p class="text-xs text-gray-600 mb-1"><strong>Linha:</strong> ' . $e->getLine() . '</p>
             <details class="mt-2">
@@ -546,7 +576,7 @@ set_exception_handler(function($e) {
         header('Content-Type: application/json');
         echo json_encode([
             'success' => false,
-            'error' => ($debug || $isDatabaseError) && $e ? $e->getMessage() : 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
+            'error' => $mostrarDetalhe && $e ? $e->getMessage() : 'Ocorreu um erro inesperado. Tente novamente mais tarde.',
             'debug' => $debug && $e ? [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -557,9 +587,9 @@ set_exception_handler(function($e) {
     }
     
     http_response_code(500);
-    $pageTitle = $isDatabaseError ? 'Erro no banco de dados - EducaTudo' : 'Erro - EducaTudo';
-    $heading = $isDatabaseError ? 'Erro no banco de dados' : 'Erro Interno';
-    $boxClass = $isDatabaseError ? 'border-l-4 border-red-500' : '';
+    $pageTitle = ($mostrarDetalhe && $isDatabaseError) ? 'Erro no banco de dados - EducaTudo' : 'Erro - EducaTudo';
+    $heading = ($mostrarDetalhe && $isDatabaseError) ? 'Erro no banco de dados' : 'Erro Interno';
+    $boxClass = ($mostrarDetalhe && $isDatabaseError) ? 'border-l-4 border-red-500' : '';
     echo '<!DOCTYPE html>
     <html lang="pt-BR">
     <head>
@@ -572,7 +602,7 @@ set_exception_handler(function($e) {
         <div class="bg-white p-8 rounded-lg shadow-lg max-w-4xl w-full ' . $boxClass . '">
             <h1 class="text-2xl font-bold text-red-600 mb-4">' . htmlspecialchars($heading) . '</h1>
             <p class="text-gray-700 mb-4">' . $errorMessage . '</p>
-            ' . ($isDatabaseError ? '<p class="text-sm text-gray-500 mt-2">Corrija o arquivo <strong>.env</strong> no servidor (DB_HOST, DB_NAME, DB_USER, DB_PASS) e tente novamente.</p>' : '') . '
+            ' . ($mostrarDetalhe && $e && stripos($e->getMessage(), 'ERRO NO BANCO') !== false ? '<p class="text-sm text-gray-500 mt-2">Corrija o arquivo <strong>.env</strong> no servidor (DB_HOST, DB_NAME, DB_USER, DB_PASS) e tente novamente.</p>' : '') . '
             ' . $errorDetails . '
         </div>
     </body>

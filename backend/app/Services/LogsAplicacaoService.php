@@ -303,6 +303,10 @@ class LogsAplicacaoService
         }
         if (preg_match('/URL:\s*([^|]+)/u', $texto, $m)) {
             $url = trim($m[1]);
+        } elseif (preg_match('/Request URI:\s*(\S+)/u', $texto, $m)) {
+            $url = trim($m[1]);
+        } elseif (preg_match('/\|\s*URI:\s*([^|]+)/u', $texto, $m)) {
+            $url = trim($m[1]);
         }
         if (preg_match('/EXCEÇÃO NÃO CAPTURADA:\s*(.+)$/um', $texto, $m)) {
             $mensagem = trim($m[1]);
