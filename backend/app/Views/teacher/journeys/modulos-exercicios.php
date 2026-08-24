@@ -141,41 +141,9 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Enunciado *</label>
                 <input type="hidden" name="enunciado" id="enunciado-jornada" required>
-                <div class="editor-toolbar">
-                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault();saveSelJornada()" onclick="fmtEnunciadoJornada('bold')"><b>B</b></button>
-                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('italic')"><i>I</i></button>
-                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('underline')"><u>U</u></button>
-                    <div class="tb-sep"></div>
-                    <button type="button" class="tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();saveSelJornada();fmtEnunciadoJornada('insertUnorderedList')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
-                    </button>
-                    <button type="button" class="tb-btn" title="Lista numerada" onmousedown="event.preventDefault();saveSelJornada();fmtEnunciadoJornada('insertOrderedList')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4M4 10h2" stroke-linecap="round"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-linecap="round"/></svg>
-                    </button>
-                    <div class="tb-sep"></div>
-                    <button type="button" class="tb-btn tb-font-size" title="Diminuir letra" onmousedown="event.preventDefault();fmtFontSizeJornada(-1)"><span>A−</span></button>
-                    <button type="button" class="tb-btn tb-font-size" title="Aumentar letra" onmousedown="event.preventDefault();fmtFontSizeJornada(1)"><span>A+</span></button>
-                    <div class="tb-sep"></div>
-                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('justifyLeft')">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
-                    </button>
-                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('justifyCenter')">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-                    </button>
-                    <div class="tb-sep"></div>
-                    <button type="button" class="tb-math-btn" data-math-open="editor-enunciado-jornada" onmousedown="event.preventDefault()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M18 14l2 2-2 2M22 14l-2 2 2 2"/></svg>
-                        ∑ Inserir Equação
-                    </button>
-                    <div class="tb-sep"></div>
-                    <input type="file" id="enunciado-jornada-insert-image-input" accept="image/*" class="hidden">
-                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" onclick="document.getElementById('enunciado-jornada-insert-image-input').click()">
-                        <svg class="tb-img-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                        Imagem
-                    </button>
+                <div class="launs-jornada-wrap">
+                    <div id="editor-enunciado-jornada"></div>
                 </div>
-                <div id="editor-enunciado-jornada" class="rich-editor" contenteditable="true" data-math="inline"
-                     data-placeholder="Digite o enunciado aqui... Use ∑ Inserir Equação para adicionar fórmulas visuais."></div>
             </div>
             
             <div id="opcoes-container" class="hidden">
@@ -185,15 +153,9 @@
                     <div class="alt-item" data-opcao-index="<?= $i ?>">
                         <div class="alt-letter"><?= $l ?></div>
                         <div class="alt-input-wrap">
-                            <div class="alt-toolbar">
-                                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('bold')" title="Negrito"><b>B</b></button>
-                                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('italic')" title="Itálico"><i>I</i></button>
-                                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('underline')" title="Sublinhado"><u>U</u></button>
-                                <div class="alt-tb-sep"></div>
-                                <button type="button" class="alt-tb-btn alt-tb-eq" onmousedown="event.preventDefault();abrirMathAltJornada(this)" title="Inserir equação">∑ eq</button>
-                                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();abrirInserirImagemAltJornada(this)" title="Inserir ou colar imagem">📷</button>
+                            <div class="launs-jornada-wrap is-compact">
+                                <div class="alt-editor" id="opcao-editor-jornada-<?= $i ?>"></div>
                             </div>
-                            <div class="alt-editor" id="opcao-editor-jornada-<?= $i ?>" contenteditable="true" data-math="inline" data-placeholder="Alternativa <?= $l ?>..."></div>
                         </div>
                         <div class="flex items-center space-x-2 flex-shrink-0">
                             <input type="checkbox" name="resposta_opcao[]" value="<?= $i ?>" id="radio-jornada-<?= $i ?>" class="w-5 h-5 text-blue-600 focus:ring-blue-500">
@@ -202,7 +164,6 @@
                     </div>
                     <?php endforeach; ?>
                 </div>
-                <input type="file" id="alt-jornada-insert-image-input" accept="image/*" class="hidden">
                 <span class="text-xs text-gray-500">Preencha pelo menos 2 alternativas e marque uma ou mais como gabarito.</span>
             </div>
 
@@ -694,6 +655,10 @@ function syncEnunciadoEdicao() {
     var editor = document.getElementById('editor-enunciado-edicao');
     var hidden = document.getElementById('edit-enunciado-hidden');
     if (!editor || !hidden) return;
+    if (typeof LaunsJornadaEditor !== 'undefined') {
+        hidden.value = LaunsJornadaEditor.htmlDeElemento(editor);
+        return;
+    }
     var html = (editor.innerHTML || '').trim();
     if (html && (editor.querySelector('ul, ol, img') || /<ul|<ol|<li|<img/i.test(html))) {
         hidden.value = html;
@@ -1056,10 +1021,12 @@ function atualizarIndicesOpcoes() {
 
 (function() {
     function obterConteudoEditorRich(ed) {
+        if (typeof LaunsJornadaEditor !== 'undefined') {
+            return LaunsJornadaEditor.htmlDeElemento(ed);
+        }
         if (!ed) return '';
         var html = (ed.innerHTML || '').trim();
         if (!html) return '';
-        // Quando houver imagem/lista, preserva o HTML para não perder o conteúdo visual.
         if (ed.querySelector('ul, ol, img') || /<ul|<ol|<li|<img/i.test(html)) {
             return html;
         }
@@ -1246,11 +1213,11 @@ function fecharModalLerImagem() {
     if (uploadAreaEl) uploadAreaEl.classList.remove('hidden');
 }
 
-// Sincronizar enunciado Jornada (contenteditable -> hidden)
+// Sincronizar enunciado Jornada (Launs -> hidden)
 document.addEventListener('DOMContentLoaded', function() {
     var editorEnunciado = document.getElementById('editor-enunciado-jornada');
     var hiddenEnunciado = document.getElementById('enunciado-jornada');
-    if (editorEnunciado && hiddenEnunciado) {
+    if (editorEnunciado && hiddenEnunciado && typeof LaunsJornadaEditor === 'undefined') {
         function syncEnunciadoJornada() {
             if (editorEnunciado.innerHTML && (editorEnunciado.querySelector('ul, ol, img') || /<ul|<ol|<li|<img/i.test(editorEnunciado.innerHTML))) {
                 hiddenEnunciado.value = editorEnunciado.innerHTML || '';
@@ -1268,6 +1235,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Paste e clique em imagem: enunciado e alternativas jornada
 document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('paste', function(e) {
+        if (e.target && e.target.closest && e.target.closest('.launs-editor')) return;
         var editor = e.target && (e.target.id === 'editor-enunciado-jornada' || (e.target.classList && e.target.classList.contains('alt-editor'))) ? e.target : (e.target && e.target.closest ? e.target.closest('#editor-enunciado-jornada, #opcoes-lista .alt-editor, #edit-opcoes-lista .alt-editor') : null);
         if (!editor) return;
         var items = e.clipboardData && e.clipboardData.items;
@@ -1290,6 +1258,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var img = e.target && e.target.tagName === 'IMG' ? e.target : null;
         if (!img) return;
         if (!img.closest('#editor-enunciado-jornada') && !img.closest('#opcoes-lista .alt-editor') && !img.closest('#edit-opcoes-lista .alt-editor')) return;
+        if (img.closest('.launs-editor')) return;
         e.preventDefault();
         e.stopPropagation();
         showImageResizePopoverJornada(img);
@@ -1626,6 +1595,10 @@ function pareceHtml(valor) {
 function preencherEditorInteligente(editorEl, valor) {
     if (!editorEl) return;
     const conteudo = String(valor || '');
+    if (typeof LaunsJornadaEditor !== 'undefined' && editorEl._launsEditor) {
+        LaunsJornadaEditor.setarConteudo(editorEl, conteudo);
+        return;
+    }
     if (pareceHtml(conteudo)) {
         editorEl.innerHTML = conteudo;
         return;
@@ -2014,8 +1987,30 @@ function inicializarSelectTipo() {
 }
 
 // Inicializa quando o DOM estiver pronto
+function iniciarEditoresLaunsPagina() {
+    if (typeof LaunsJornadaEditor === 'undefined') {
+        console.error('LaunsJornadaEditor não carregou.');
+        return;
+    }
+    LaunsJornadaEditor.configurar({
+        uploadUrl: baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio',
+        csrfToken: csrfTokenModuloExercicios
+    });
+    LaunsJornadaEditor.criar('#editor-enunciado-jornada', {
+        hiddenInput: '#enunciado-jornada',
+        placeholder: 'Digite o enunciado aqui…'
+    });
+    document.querySelectorAll('#opcoes-lista .alt-editor').forEach(function(el, i) {
+        LaunsJornadaEditor.criar(el, {
+            compact: true,
+            placeholder: 'Alternativa ' + letras[i] + '…'
+        });
+    });
+}
+
 function initPage() {
     inicializarSelectTipo();
+    iniciarEditoresLaunsPagina();
     const params = new URLSearchParams(window.location.search);
     const editarId = params.get('editar');
     if (editarId) {
@@ -2076,21 +2071,28 @@ function preencherFormularioPrincipalComExercicio(exercicio) {
     const enunciadoVal = exercicio.enunciado || '';
     if (editorEnunciado && hiddenEnunciado) {
         preencherEditorInteligente(editorEnunciado, enunciadoVal);
-        // Esta tela (edição via ?editar= na página, diferente do modal) não
-        // tem um campo de prévia dedicado pra imagem_url — a imagem gerada
-        // pela IA (ou anexada manualmente) só existe visualmente dentro do
-        // enunciado, mesmo padrão do botão "Inserir ou colar imagem" logo
-        // acima. Sem isso, a imagem salva no exercício nunca aparecia aqui.
-        if (exercicio.imagem_url && !editorEnunciado.innerHTML.includes(exercicio.imagem_url)) {
-            const imgTag = document.createElement('img');
-            imgTag.src = exercicio.imagem_url;
-            imgTag.style.maxWidth = '400px';
-            imgTag.style.width = '100%';
-            imgTag.style.borderRadius = '8px';
-            imgTag.style.marginTop = '8px';
-            editorEnunciado.appendChild(imgTag);
+        if (exercicio.imagem_url) {
+            var htmlAtual = (typeof LaunsJornadaEditor !== 'undefined')
+                ? LaunsJornadaEditor.htmlDeElemento(editorEnunciado)
+                : (editorEnunciado.innerHTML || '');
+            if (htmlAtual.indexOf(exercicio.imagem_url) === -1) {
+                var imgHtml = '<p><img src="' + exercicio.imagem_url + '" alt=""></p>';
+                if (typeof LaunsJornadaEditor !== 'undefined' && editorEnunciado._launsEditor) {
+                    LaunsJornadaEditor.setarConteudo(editorEnunciado, htmlAtual + imgHtml);
+                } else {
+                    const imgTag = document.createElement('img');
+                    imgTag.src = exercicio.imagem_url;
+                    imgTag.style.maxWidth = '400px';
+                    imgTag.style.width = '100%';
+                    imgTag.style.borderRadius = '8px';
+                    imgTag.style.marginTop = '8px';
+                    editorEnunciado.appendChild(imgTag);
+                }
+            }
         }
-        hiddenEnunciado.value = editorEnunciado.innerHTML;
+        hiddenEnunciado.value = (typeof LaunsJornadaEditor !== 'undefined')
+            ? LaunsJornadaEditor.htmlDeElemento(editorEnunciado)
+            : editorEnunciado.innerHTML;
     }
 
     const campoGabarito = document.getElementById('campo_resposta_correta');
@@ -2285,49 +2287,8 @@ function abrirModalEdicao(exercicio) {
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Enunciado *</label>
                         <input type="hidden" name="enunciado" id="edit-enunciado-hidden" required>
-                        <div class="editor-toolbar">
-                            <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault();saveSelEdicao()" onclick="fmtEnunciadoEdicao('bold')"><b>B</b></button>
-                            <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('italic')"><i>I</i></button>
-                            <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('underline')"><u>U</u></button>
-                            <div class="tb-sep"></div>
-                            <button type="button" class="tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();saveSelEdicao();fmtEnunciadoEdicao('insertUnorderedList')">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
-                            </button>
-                            <button type="button" class="tb-btn" title="Lista numerada" onmousedown="event.preventDefault();saveSelEdicao();fmtEnunciadoEdicao('insertOrderedList')">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4M4 10h2" stroke-linecap="round"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-linecap="round"/></svg>
-                            </button>
-                            <div class="tb-sep"></div>
-                            <button type="button" class="tb-btn tb-font-size" title="Diminuir letra" onmousedown="event.preventDefault();fmtFontSizeEdicao(-1)"><span>A−</span></button>
-                            <button type="button" class="tb-btn tb-font-size" title="Aumentar letra" onmousedown="event.preventDefault();fmtFontSizeEdicao(1)"><span>A+</span></button>
-                            <div class="tb-sep"></div>
-                            <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('justifyLeft')">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
-                            </button>
-                            <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('justifyCenter')">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-                            </button>
-                            <div class="tb-sep"></div>
-                            <button type="button" class="tb-math-btn" data-math-open="editor-enunciado-edicao" onmousedown="event.preventDefault()">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M18 14l2 2-2 2M22 14l-2 2 2 2"/></svg>
-                                ∑ Inserir Equação
-                            </button>
-                            <div class="tb-sep"></div>
-                            <input type="file" id="edit-enunciado-insert-image-input" accept="image/*" class="hidden">
-                            <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" onclick="document.getElementById('edit-enunciado-insert-image-input').click()">
-                                <svg class="tb-img-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                                Imagem
-                            </button>
-                        </div>
-                        <div id="editor-enunciado-edicao" class="rich-editor" contenteditable="true" data-math="inline"
-                             data-placeholder="Digite o enunciado aqui... Use ∑ Inserir Equação para adicionar fórmulas visuais."></div>
-                        <div class="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
-                            <button type="button" id="btn-ver-codigo-latex-enunciado" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                                📋 Ver código LaTeX do enunciado (para copiar em Inserir equação)
-                            </button>
-                            <div id="edit-codigo-latex-enunciado-wrap" class="hidden mt-2">
-                                <textarea id="edit-codigo-latex-enunciado" readonly rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-mono"></textarea>
-                                <button type="button" id="btn-copiar-codigo-latex-enunciado" class="mt-2 px-3 py-1.5 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-800">Copiar</button>
-                            </div>
+                        <div class="launs-jornada-wrap">
+                            <div id="editor-enunciado-edicao"></div>
                         </div>
                     </div>
                     
@@ -2397,32 +2358,6 @@ function abrirModalEdicao(exercicio) {
             </div>
         `;
     document.body.appendChild(modal);
-    // Vincular "Inserir Equação" ao editor do modal (modal é criado dinamicamente, MathEditor.init() já rodou no load)
-    var mathBtnEdicao = modal.querySelector('[data-math-open="editor-enunciado-edicao"]');
-    var editorEnunciadoEdicao = document.getElementById('editor-enunciado-edicao');
-    if (mathBtnEdicao && editorEnunciadoEdicao && typeof MathEditor !== 'undefined' && MathEditor.abrir) {
-        mathBtnEdicao.addEventListener('click', function(e) {
-            e.preventDefault();
-            MathEditor.abrir(editorEnunciadoEdicao);
-        });
-    }
-    var editEnunciadoInput = document.getElementById('edit-enunciado-insert-image-input');
-    if (editEnunciadoInput) {
-        editEnunciadoInput.addEventListener('change', function() {
-            var file = this.files && this.files[0];
-            if (!file) return;
-            var el = document.getElementById('editor-enunciado-edicao');
-            if (el) {
-                uploadImageForEditorJornada(file).then(function(url) {
-                    insertImageInEditorJornada(el, url);
-                    syncEnunciadoEdicao();
-                }).catch(function(err) {
-                    alert('Erro ao enviar imagem: ' + (err.message || err));
-                });
-            }
-            this.value = '';
-        });
-    }
     
     // Define a variável global antes de preencher o formulário
     exercicioEditando = exercicio;
@@ -2432,7 +2367,13 @@ function abrirModalEdicao(exercicio) {
     document.getElementById('edit-tipo').value = (exercicio.tipo === 'verdadeiro_falso' ? 'alternativas' : (exercicio.tipo || 'alternativas'));
     var enunciadoVal = exercicio.enunciado || '';
     var editEditor = document.getElementById('editor-enunciado-edicao');
-    if (editEditor) {
+    if (typeof LaunsJornadaEditor !== 'undefined' && editEditor) {
+        LaunsJornadaEditor.criar(editEditor, {
+            content: enunciadoVal,
+            hiddenInput: '#edit-enunciado-hidden',
+            placeholder: 'Digite o enunciado aqui…'
+        });
+    } else if (editEditor) {
         if (/<[a-z][\s\S]*>/i.test(enunciadoVal)) {
             editEditor.innerHTML = enunciadoVal;
         } else if (typeof MathEditor !== 'undefined' && MathEditor.preencherDeLaTeX) {
@@ -2649,6 +2590,11 @@ function abrirModalEdicao(exercicio) {
 
 function fecharModalEdicao() {
     const modal = document.getElementById('modal-editar-exercicio');
+    if (modal && typeof LaunsJornadaEditor !== 'undefined') {
+        modal.querySelectorAll('#editor-enunciado-edicao, .alt-editor').forEach(function(el) {
+            LaunsJornadaEditor.destruir(el);
+        });
+    }
     if (modal) {
         modal.remove();
     }
@@ -2693,15 +2639,9 @@ function adicionarOpcaoEdicao(opcaoExistente = null) {
         <div class="alt-letter">${letra}</div>
         <div class="alt-input-wrap">
             <label class="opcao-texto-label block text-xs font-medium text-gray-700 mb-1">Editar texto da alternativa ${letra}</label>
-            <div class="alt-toolbar">
-                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('bold')" title="Negrito"><b>B</b></button>
-                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('italic')" title="Itálico"><i>I</i></button>
-                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('underline')" title="Sublinhado"><u>U</u></button>
-                <div class="alt-tb-sep"></div>
-                <button type="button" class="alt-tb-btn alt-tb-eq" onmousedown="event.preventDefault();abrirMathAltJornada(this)" title="Inserir equação">∑ eq</button>
-                <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();abrirInserirImagemAltJornada(this)" title="Inserir ou colar imagem">📷</button>
+            <div class="launs-jornada-wrap is-compact">
+                <div class="alt-editor" id="${editorId}"></div>
             </div>
-            <div class="alt-editor" id="${editorId}" contenteditable="true" data-math="inline" data-placeholder="Alternativa ${letra}..."></div>
         </div>
         <div class="flex items-center space-x-2 flex-shrink-0">
             <input type="checkbox" name="resposta_opcao_edit[]" value="${index}" id="radio-edit-${index}" class="w-5 h-5 text-blue-600 focus:ring-blue-500">
@@ -2710,8 +2650,15 @@ function adicionarOpcaoEdicao(opcaoExistente = null) {
         <button type="button" onclick="removerOpcaoEdicao(this)" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">Remover</button>
     `;
     
+    container.appendChild(div);
     const editor = div.querySelector('.alt-editor');
-    if (editor) {
+    if (typeof LaunsJornadaEditor !== 'undefined' && editor) {
+        LaunsJornadaEditor.criar(editor, {
+            compact: true,
+            content: texto,
+            placeholder: 'Alternativa ' + letra + '…'
+        });
+    } else if (editor) {
         if (/<[a-z][\s\S]*>/i.test(texto)) {
             editor.innerHTML = texto;
         } else if (typeof MathEditor !== 'undefined' && MathEditor.preencherDeLaTeX) {
@@ -2721,17 +2668,20 @@ function adicionarOpcaoEdicao(opcaoExistente = null) {
         }
     }
     
-    const radio = div.querySelector('input[type="radio"]');
+    const radio = div.querySelector('input[name="resposta_opcao_edit[]"]');
     if (radio && correta) {
         radio.checked = true;
     }
     
-    container.appendChild(div);
     atualizarIndicesOpcoesEdicao();
 }
 
 function removerOpcaoEdicao(button) {
     const div = button.closest('div[data-opcao-index]');
+    if (div && typeof LaunsJornadaEditor !== 'undefined') {
+        var ed = div.querySelector('.alt-editor');
+        if (ed) LaunsJornadaEditor.destruir(ed);
+    }
     div.remove();
     opcoesCountEdicao--;
     atualizarIndicesOpcoesEdicao();
@@ -2770,6 +2720,9 @@ function adicionarListenerFormEdicao() {
                 e.preventDefault();
                 syncEnunciadoEdicao();
                 const obterConteudoEditorRichEdicao = function(ed) {
+                    if (typeof LaunsJornadaEditor !== 'undefined') {
+                        return LaunsJornadaEditor.htmlDeElemento(ed);
+                    }
                     if (!ed) return '';
                     var html = (ed.innerHTML || '').trim();
                     if (!html) return '';
@@ -2831,7 +2784,9 @@ function adicionarListenerFormEdicao() {
                 var enunciadoEnviar = formData.get('enunciado');
                 if (!enunciadoEnviar || String(enunciadoEnviar).trim() === '') {
                     var edEnunciado = document.getElementById('editor-enunciado-edicao');
-                    if (edEnunciado) {
+                    if (edEnunciado && typeof LaunsJornadaEditor !== 'undefined') {
+                        formData.set('enunciado', LaunsJornadaEditor.htmlDeElemento(edEnunciado));
+                    } else if (edEnunciado) {
                         var html = (edEnunciado.innerHTML || '').trim();
                         var txt = (edEnunciado.innerText || '').trim();
                         if (html) formData.set('enunciado', html);

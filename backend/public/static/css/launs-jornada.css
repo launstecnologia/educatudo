@@ -1,0 +1,61 @@
+/* Layout do Launs Editor nos exercícios da jornada (professor) */
+.launs-jornada-wrap {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #fff;
+}
+
+.launs-jornada-wrap .launs-editor__doc {
+    min-height: 140px;
+}
+
+.launs-jornada-wrap.is-compact .launs-editor__doc {
+    min-height: 56px;
+}
+
+.alt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.alt-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.alt-item:last-child {
+    border-bottom: none;
+}
+
+.alt-letter {
+    flex-shrink: 0;
+    font-weight: 700;
+    min-width: 1.5rem;
+    padding-top: 8px;
+}
+
+.alt-input-wrap {
+    flex: 1 1 280px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.alt-item .alt-correct {
+    white-space: nowrap;
+}
+
+.launs-editor__media-popup,
+.launs-editor__math-popup,
+.launs-editor__slash-menu,
+.launs-editor__bubble-menu,
+.launs-editor__context-menu,
+.launs-editor__overflow {
+    z-index: 80;
+}

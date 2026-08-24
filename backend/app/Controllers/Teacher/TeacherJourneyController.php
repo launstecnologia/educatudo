@@ -4422,9 +4422,19 @@ class TeacherJourneyController extends BaseController
                 'page_mode' => $pageMode,
                 'csrf_token' => $this->generateCsrfToken(),
                 'current_page' => 'journeys',
-                'additional_css' => '<link rel="stylesheet" href="' . URL . '/public/static/css/mathlive-static.css"><link rel="stylesheet" href="' . URL . '/public/static/css/math-editor.css">',
-                'additional_js' => '<script src="' . URL . '/public/static/js/mathlive.min.js"></script><script src="' . URL . '/public/static/js/math-editor.js"></script>',
             ];
+
+            if ($pageMode === 'editor') {
+                $data['additional_css'] =
+                    '<link rel="stylesheet" href="https://2e92db82-1a13-4326-8958-950a47e71e83.lovableproject.com/__l5e/assets-v1/21693493-223b-4eb4-b2c2-d3f98bdc07f8/launs-editor.css">'
+                    . '<link rel="stylesheet" href="' . URL . '/public/static/css/launs-jornada.css">';
+                $data['additional_js'] =
+                    '<script src="https://2e92db82-1a13-4326-8958-950a47e71e83.lovableproject.com/__l5e/assets-v1/d736b61e-56cc-4825-8812-6945eee8a2bb/launs-editor.umd.js"></script>'
+                    . '<script src="' . URL . '/public/static/js/launs-editor-jornada.js"></script>';
+            } else {
+                $data['additional_css'] = '<link rel="stylesheet" href="' . URL . '/public/static/css/mathlive-static.css"><link rel="stylesheet" href="' . URL . '/public/static/css/math-editor.css">';
+                $data['additional_js'] = '<script src="' . URL . '/public/static/js/mathlive.min.js"></script><script src="' . URL . '/public/static/js/math-editor.js"></script>';
+            }
 
             if ($pageMode === 'editor') {
                 $this->viewWithLayout('professor', 'teacher/journeys/modulos-exercicios', $data);
