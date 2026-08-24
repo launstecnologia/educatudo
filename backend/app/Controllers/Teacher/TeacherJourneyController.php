@@ -4425,12 +4425,20 @@ class TeacherJourneyController extends BaseController
             ];
 
             if ($pageMode === 'editor') {
+                $launsStatic = dirname(__DIR__, 3) . '/public/static';
+                $vCssWrap = (string) (@filemtime($launsStatic . '/css/launs-jornada.css') ?: time());
+                $vJsEditor = (string) (@filemtime($launsStatic . '/js/launs-editor.umd.js') ?: time());
+                $vJsHelper = (string) (@filemtime($launsStatic . '/js/launs-editor-jornada.js') ?: time());
+                $cdnCss = 'https://launs-text.lovable.app/__l5e/assets-v1/21693493-223b-4eb4-b2c2-d3f98bdc07f8/launs-editor.css';
+                $cdnJs = 'https://launs-text.lovable.app/__l5e/assets-v1/d736b61e-56cc-4825-8812-6945eee8a2bb/launs-editor.umd.js';
+                $jsLocal = URL . '/public/static/js/launs-editor.umd.js?v=' . $vJsEditor;
                 $data['additional_css'] =
-                    '<link rel="stylesheet" href="https://2e92db82-1a13-4326-8958-950a47e71e83.lovableproject.com/__l5e/assets-v1/21693493-223b-4eb4-b2c2-d3f98bdc07f8/launs-editor.css">'
-                    . '<link rel="stylesheet" href="' . URL . '/public/static/css/launs-jornada.css">';
+                    '<link rel="stylesheet" href="' . $cdnCss . '">'
+                    . '<link rel="stylesheet" href="' . URL . '/public/static/css/launs-jornada.css?v=' . $vCssWrap . '">';
                 $data['additional_js'] =
-                    '<script src="https://2e92db82-1a13-4326-8958-950a47e71e83.lovableproject.com/__l5e/assets-v1/d736b61e-56cc-4825-8812-6945eee8a2bb/launs-editor.umd.js"></script>'
-                    . '<script src="' . URL . '/public/static/js/launs-editor-jornada.js"></script>';
+                    '<script src="' . $cdnJs . '"></script>'
+                    . '<script>if(typeof LaunsEditor==="undefined"){document.write(\'<script src="' . $jsLocal . '"><\\/script>\');}</script>'
+                    . '<script src="' . URL . '/public/static/js/launs-editor-jornada.js?v=' . $vJsHelper . '"></script>';
             } else {
                 $data['additional_css'] = '<link rel="stylesheet" href="' . URL . '/public/static/css/mathlive-static.css"><link rel="stylesheet" href="' . URL . '/public/static/css/math-editor.css">';
                 $data['additional_js'] = '<script src="' . URL . '/public/static/js/mathlive.min.js"></script><script src="' . URL . '/public/static/js/math-editor.js"></script>';
@@ -5362,29 +5370,43 @@ Retorne APENAS um JSON válido no seguinte formato:
                 }
             }
 
-            // Upload por arquivo
-            if ($imageUrl === null && !empty($_FILES['imagem']['name'])) {
+            // Upload por arquivo (imagem ou vídeo do Launs Editor)
+            if ($imageUrl === null && !empty($_FILES['imagem']['tmp_name']) && is_uploaded_file($_FILES['imagem']['tmp_name'])) {
                 $file = $_FILES['imagem'];
-                $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                if (!in_array($file['type'], $allowedTypes)) {
-                    throw new Exception('Tipo não permitido. Use JPG, PNG, GIF ou WebP.');
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = (string) $finfo->file($file['tmp_name']);
+                $mimesImagem = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                $mimesVideo = ['video/mp4', 'video/webm'];
+                $ehImagem = in_array($mime, $mimesImagem, true);
+                $ehVideo = in_array($mime, $mimesVideo, true);
+                if (!$ehImagem && !$ehVideo) {
+                    throw new Exception('Tipo não permitido. Use JPG, PNG, GIF, WebP, MP4 ou WebM.');
                 }
-                if ($file['size'] > 10 * 1024 * 1024) {
-                    throw new Exception('Arquivo muito grande. Máximo 10MB.');
+                $limite = $ehVideo ? (100 * 1024 * 1024) : (10 * 1024 * 1024);
+                if ((int) $file['size'] > $limite) {
+                    throw new Exception($ehVideo ? 'Vídeo muito grande. Máximo 100MB.' : 'Arquivo muito grande. Máximo 10MB.');
                 }
-                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $filename = 'exercicio_' . $user['id'] . '_' . time() . '_' . uniqid() . '.' . $ext;
+                $extMap = [
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                    'video/mp4' => 'mp4',
+                    'video/webm' => 'webm',
+                ];
+                $ext = $extMap[$mime] ?? 'bin';
+                $filename = 'exercicio_' . (int) $user['id'] . '_' . time() . '_' . uniqid('', true) . '.' . $ext;
                 $key = MediaStorageService::userKey('teacher', $user['id'], $filename);
-                if ($media->put('jornadas_exercicios', $key, $file['tmp_name'], $file['type'])) {
+                if ($media->put('jornadas_exercicios', $key, $file['tmp_name'], $mime)) {
                     $imageUrl = $this->buildStableJourneyExerciseMediaUrl($key);
                 }
             }
 
             if ($imageUrl === null) {
-                throw new Exception('Nenhuma imagem recebida. Escolha um arquivo ou cole uma imagem (Ctrl+V).');
+                throw new Exception('Nenhuma mídia recebida. Escolha um arquivo ou cole uma imagem (Ctrl+V).');
             }
 
-            $this->json(['success' => true, 'image_url' => $imageUrl]);
+            $this->json(['success' => true, 'url' => $imageUrl, 'image_url' => $imageUrl]);
         } catch (Exception $e) {
             error_log("Erro ao fazer upload de imagem do exercício: " . $e->getMessage());
             $this->json(['error' => $e->getMessage()], 400);

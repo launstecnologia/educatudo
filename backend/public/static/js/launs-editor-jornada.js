@@ -1,6 +1,6 @@
 /**
  * Integração do Launs Editor nos exercícios da jornada (professor).
- * Upload de imagem vai para /professor/jornadas/modulos/upload-imagem-exercicio (S3/media).
+ * Upload devolve a URL pública (S3/media) gravada no src da imagem/vídeo.
  */
 (function (global) {
     'use strict';
@@ -100,9 +100,14 @@
         return (el.innerHTML || '').trim();
     }
 
-    function uploadImagem(file) {
-        if (!file || !file.type || file.type.indexOf('image/') !== 0) {
-            return Promise.reject(new Error('Arquivo não é uma imagem'));
+    function enviarParaS3(file) {
+        if (!file || !file.type) {
+            return Promise.reject(new Error('Arquivo inválido'));
+        }
+        var ehImagem = file.type.indexOf('image/') === 0;
+        var ehVideo = file.type.indexOf('video/') === 0;
+        if (!ehImagem && !ehVideo) {
+            return Promise.reject(new Error('Envie uma imagem ou um vídeo.'));
         }
         if (!config.uploadUrl) {
             return Promise.reject(new Error('URL de upload não configurada'));
@@ -115,10 +120,11 @@
         }
         return fetch(config.uploadUrl, { method: 'POST', body: fd }).then(function (r) {
             return r.json().then(function (data) {
-                if (!r.ok || !data || !data.success || !data.image_url) {
-                    throw new Error((data && data.error) ? data.error : 'Falha no upload da imagem');
+                var url = data && (data.url || data.image_url);
+                if (!r.ok || !data || !data.success || !url) {
+                    throw new Error((data && data.error) ? data.error : 'Falha no upload para o S3.');
                 }
-                return data.image_url;
+                return url;
             });
         });
     }
@@ -143,27 +149,42 @@
             return null;
         }
         if (typeof LaunsEditor === 'undefined') {
-            console.error('LaunsEditor não carregou (CDN).');
+            console.error('LaunsEditor não carregou.');
             return null;
         }
-        destruir(el);
 
         var compact = !!opts.compact;
-        var editor = new LaunsEditor({
-            element: el,
-            content: htmlParaEditor(opts.content || ''),
-            placeholder: opts.placeholder || 'Escreva aqui…',
-            toolbar: compact
-                ? { groups: [['bold', 'italic', 'underline'], ['mathKeyboard', 'image']], overflow: [] }
-                : true,
-            menus: compact ? { slash: false, context: false } : undefined,
-            upload: uploadImagem,
-            media: { maxImageSizeMB: 10, optimizeImages: true }
-        });
+        var editor;
+        try {
+            destruir(el);
+            editor = new LaunsEditor({
+                element: el,
+                content: htmlParaEditor(opts.content || ''),
+                placeholder: opts.placeholder || 'Comece a escrever…',
+                toolbar: true,
+                menus: compact ? { slash: false } : undefined,
+                upload: enviarParaS3,
+                media: {
+                    maxImageSizeMB: 10,
+                    maxVideoSizeMB: 100,
+                    maxImageDimension: 1600,
+                    imageFormat: 'image/webp',
+                    imageQuality: 0.82
+                }
+            });
+        } catch (err) {
+            console.error('Falha ao criar LaunsEditor', err);
+            return null;
+        }
 
         el._launsEditor = editor;
 
-        function syncHidden() {
+        editor.on('error', function (e) {
+            var msg = e && e.error && e.error.message ? e.error.message : 'Erro no editor.';
+            alert(msg);
+        });
+
+        function sincronizar() {
             if (!opts.hiddenInput) {
                 return;
             }
@@ -175,8 +196,8 @@
             }
         }
 
-        editor.on('change', syncHidden);
-        syncHidden();
+        editor.on('change', sincronizar);
+        sincronizar();
         return editor;
     }
 
@@ -199,6 +220,7 @@
         htmlDeElemento: htmlDeElemento,
         htmlDoEditor: htmlDoEditor,
         htmlParaEditor: htmlParaEditor,
-        uploadImagem: uploadImagem
+        uploadImagem: enviarParaS3,
+        enviarParaS3: enviarParaS3
     };
 })(window);
