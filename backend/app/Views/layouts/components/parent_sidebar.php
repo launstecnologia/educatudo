@@ -103,8 +103,8 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 </svg>
                 <span class="sidebar-text">Recados</span>
             </a>
-            <?php if (FeatureGate::isModuleEnabled('drive')): ?>
-            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/drive" class="flex items-center px-4 py-3 <?= $current_page === 'drive' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
+            <?php if (FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
+            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/arquivos" class="flex items-center px-4 py-3 <?= $current_page === 'arquivos' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
                 </svg>
@@ -128,7 +128,7 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                 <span class="text-sm">Recados (selecione um filho)</span>
             </span>
-            <?php if (FeatureGate::isModuleEnabled('drive')): ?>
+            <?php if (FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path></svg>
                 <span class="text-sm">Arquivos (selecione um filho)</span>

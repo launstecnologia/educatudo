@@ -40,3 +40,8 @@ $router->get('/aluno/arquivos/ver/{id}', 'Modulos/arquivos/ArquivosAlunoControll
 $router->get('/aluno/arquivos/abrir/{id}', 'Modulos/arquivos/ArquivosAlunoController@abrir');
 $router->get('/aluno/arquivos/visualizar/{id}', 'Modulos/arquivos/ArquivosAlunoController@visualizarAnexo');
 $router->get('/aluno/recuperacao', 'Modulos/arquivos/ArquivosAlunoController@recuperacao');
+
+// Pais (somente leitura — mesmos materiais da turma do aluno)
+$router->get('/pais/filhos/{id}/arquivos/ver/{pubId}', 'Modulos/arquivos/ArquivosPaisController@ver');
+$router->get('/pais/filhos/{id}/arquivos/visualizar/{anexoId}', 'Modulos/arquivos/ArquivosPaisController@visualizarAnexo');
+$router->get('/pais/filhos/{id}/arquivos', 'Modulos/arquivos/ArquivosPaisController@index');

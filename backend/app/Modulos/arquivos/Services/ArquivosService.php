@@ -1019,5 +1019,83 @@ class ArquivosService
         }
         return $anexo;
     }
+
+    /**
+     * Envia o anexo ao navegador (inline ou download). S3 com fallback local.
+     */
+    public function enviarAnexoAoNavegador(array $anexo, array $config, bool $download): void
+    {
+        $filename = (string) ($anexo['nome_original'] ?? 'arquivo');
+        $contentType = self::mimePorExtensao((string) ($anexo['extensao'] ?? ''));
+        $disposition = $download ? 'attachment' : 'inline';
+
+        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
+        $media = new MediaStorageService($config);
+        $mediaKey = self::anexoPathToMediaKey((string) ($anexo['caminho'] ?? ''));
+        if ($media->isS3() && $mediaKey !== '') {
+            $signedUrl = $media->getViewUrl('arquivos', $mediaKey, $filename, 900);
+            if (!empty($signedUrl) && $this->streamSignedUrl($signedUrl, $contentType, $filename, $disposition)) {
+                return;
+            }
+            if (!$download && $media->streamInline('arquivos', $mediaKey, $filename, $contentType)) {
+                return;
+            }
+        }
+
+        $basePath = defined('ROOT_PATH') ? ROOT_PATH . '/' : (__DIR__ . '/../../../../');
+        $fullPath = $basePath . ltrim((string) ($anexo['caminho'] ?? ''), '/');
+        if ((!file_exists($fullPath) || !is_readable($fullPath)) && $mediaKey !== '') {
+            $fullPath = $basePath . 'public/uploads/arquivos/' . $mediaKey;
+        }
+        if (!file_exists($fullPath) || !is_readable($fullPath)) {
+            http_response_code(404);
+            echo 'Arquivo não encontrado';
+            return;
+        }
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: ' . $disposition . '; filename="' . str_replace('"', '\\"', $filename) . '"');
+        header('Content-Length: ' . filesize($fullPath));
+        header('Cache-Control: private, max-age=3600');
+        readfile($fullPath);
+    }
+
+    private function streamSignedUrl(string $signedUrl, string $contentType, string $filename, string $disposition): bool
+    {
+        if ($signedUrl === '') {
+            return false;
+        }
+        if (!headers_sent()) {
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: ' . $disposition . '; filename="' . str_replace('"', '\\"', $filename) . '"');
+            header('Cache-Control: private, max-age=3600');
+        }
+        $fp = @fopen($signedUrl, 'rb');
+        if ($fp !== false) {
+            while (!feof($fp)) {
+                echo fread($fp, 8192);
+            }
+            fclose($fp);
+            return true;
+        }
+        if (function_exists('curl_init')) {
+            $ch = curl_init($signedUrl);
+            if ($ch !== false) {
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+                curl_setopt($ch, CURLOPT_HEADER, false);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+                curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $chunk) {
+                    echo $chunk;
+                    return strlen($chunk);
+                });
+                $ok = curl_exec($ch);
+                $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                return $ok !== false && $httpCode >= 200 && $httpCode < 300;
+            }
+        }
+        return false;
+    }
 }
 }

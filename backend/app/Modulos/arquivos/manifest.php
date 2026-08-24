@@ -41,6 +41,9 @@ return [
         'admin' => [
             ['label' => 'Arquivos', 'path' => '/admin/arquivos', 'feature_key' => null],
         ],
+        'pais' => [
+            ['label' => 'Arquivos', 'path' => '/pais/filhos/{id}/arquivos', 'feature_key' => 'aluno_arquivos'],
+        ],
     ],
     'controllers_dir' => __DIR__ . '/Controllers',
     'views_dir' => __DIR__ . '/Views',

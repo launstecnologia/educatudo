@@ -201,6 +201,12 @@ class FeatureGate
                 return $map[$prefix];
             }
         }
+
+        // Pais: id do filho fica no meio da URI (/pais/filhos/{id}/arquivos)
+        if (preg_match('#/pais/filhos/\d+/arquivos(?:/|$)#', $uri)) {
+            return 'aluno_arquivos';
+        }
+
         return null;
     }
 }

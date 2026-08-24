@@ -17,6 +17,7 @@ $router->get('/pais/filhos/{id}/redacoes', 'User/ParentController@redacoesFilho'
 $router->get('/pais/filhos/{id}/relatorios', 'User/ParentController@relatoriosFilho');
 $router->get('/pais/filhos/{id}/financeiro', 'User/ParentController@financeiroFilho');
 $router->get('/pais/filhos/{id}/mural-recados', 'User/ParentController@muralRecadosFilho');
+// Arquivos da turma (professor → aluno): rotas em app/Modulos/arquivos/routes.php
 $router->get('/pais/filhos/{id}/drive', 'User/ParentController@driveFilho');
 $router->get('/pais/filhos/{id}/drive/folder/{folderId}', 'User/ParentController@driveFilhoFolder');
 $router->get('/pais/filhos/{id}/drive/view/{itemId}', 'User/ParentController@driveFilhoView');

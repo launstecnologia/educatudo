@@ -1,8 +1,9 @@
 <div class="mb-6">
     <?php
     $modo_recuperacao = !empty($modo_recuperacao) || !empty($pub['recuperacao']);
-    $voltarUrl = URL . ($modo_recuperacao ? '/aluno/recuperacao' : '/aluno/arquivos');
-    $voltarLabel = $modo_recuperacao ? '← Voltar à recuperação' : '← Voltar aos arquivos';
+    $voltarUrl = $voltar_url ?? (URL . ($modo_recuperacao ? '/aluno/recuperacao' : '/aluno/arquivos'));
+    $voltarLabel = $voltar_label ?? ($modo_recuperacao ? '← Voltar à recuperação' : '← Voltar aos arquivos');
+    $url_visualizar_base = $url_visualizar_base ?? (URL . '/aluno/arquivos/visualizar');
     ?>
     <a href="<?= $voltarUrl ?>" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium mb-2 inline-block"><?= htmlspecialchars($voltarLabel) ?></a>
     <h1 class="text-2xl font-bold text-gray-900"><?= htmlspecialchars($pub['titulo']) ?></h1>
@@ -54,7 +55,7 @@ $temVideos = !empty($videos);
             <?php foreach ($anexos as $a): ?>
                 <li class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                     <span class="text-gray-700 truncate"><?= htmlspecialchars($a['nome_original']) ?></span>
-                    <a href="<?= URL ?>/aluno/arquivos/visualizar/<?= (int)$a['id'] ?>?download=1" class="shrink-0 ml-3 bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-medium">
+                    <a href="<?= htmlspecialchars($url_visualizar_base) ?>/<?= (int)$a['id'] ?>?download=1" class="shrink-0 ml-3 bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 text-sm font-medium">
                         Baixar
                     </a>
                 </li>

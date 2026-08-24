@@ -15,9 +15,10 @@ $modo_recuperacao    = !empty($modo_recuperacao);
 $base_path           = $base_path ?? ($modo_recuperacao ? '/aluno/recuperacao' : '/aluno/arquivos');
 $baseUrl             = URL . $base_path;
 $tituloLista         = $modo_recuperacao ? 'Recuperação' : 'Arquivos';
-$subtituloLista      = $modo_recuperacao
+$subtituloLista      = $subtituloLista ?? ($modo_recuperacao
     ? 'Materiais de recuperação disponibilizados pelo professor para sua turma.'
-    : 'Materiais disponibilizados pelo professor para sua turma.';
+    : 'Materiais disponibilizados pelo professor para sua turma.');
+$url_ver_base        = $url_ver_base ?? (URL . '/aluno/arquivos/ver');
 $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_titulo !== '';
 ?>
 
@@ -165,7 +166,7 @@ $temFiltroAtivo      = $filtro_materia_id || $filtro_professor_id || $filtro_tit
             </div>
             <!-- Botão ver -->
             <div class="pl-4">
-                <a href="<?= URL ?>/aluno/arquivos/ver/<?= (int)$row['id'] ?>"
+                <a href="<?= htmlspecialchars($url_ver_base) ?>/<?= (int)$row['id'] ?>"
                    class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 whitespace-nowrap">
                     Ver
                 </a>
