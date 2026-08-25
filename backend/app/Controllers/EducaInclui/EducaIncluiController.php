@@ -407,7 +407,7 @@ class EducaIncluiController extends AdminBaseController
     private function resolveLogoDataUri(): string
     {
         try {
-            $url = (string) \LayoutHelper::getNavbarLogoUrl();
+            $url = (string) \LayoutHelper::getDocumentLogoUrl();
             if ($url === '') {
                 return '';
             }

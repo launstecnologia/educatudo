@@ -414,8 +414,8 @@ class SchoolSettingsAdminController extends AdminBaseController
         }
         
         try {
-            $type = $_POST['type'] ?? ''; // 'logo', 'logo-1x1', ..., 'pwa_icon' (apenas retorna URL, não grava em config)
-            $allowedTypes = ['logo', 'logo-1x1', 'logo-horizontal', 'logo-white', 'logo-horizontal-white', 'cover', 'pwa_icon'];
+            $type = $_POST['type'] ?? ''; // 'logo', 'logo-navbar', 'logo-login', ..., 'pwa_icon' (apenas retorna URL, não grava em config)
+            $allowedTypes = ['logo', 'logo-navbar', 'logo-login', 'logo-1x1', 'logo-horizontal', 'logo-white', 'logo-horizontal-white', 'cover', 'pwa_icon'];
             
             if (!in_array($type, $allowedTypes)) {
                 throw new Exception('Tipo de upload inválido');
@@ -461,23 +461,25 @@ class SchoolSettingsAdminController extends AdminBaseController
                 return;
             }
             
-            // Mapear tipo para chave de configuração
             $configKeyMap = [
-                'logo' => 'logo_url',
-                'logo-1x1' => 'logo_1x1_url',
-                'logo-horizontal' => 'logo_horizontal_url',
-                'logo-white' => 'logo_white_url',
-                'logo-horizontal-white' => 'logo_horizontal_white_url',
-                'cover' => 'login_cover_url'
+                'logo' => ['logo_url'],
+                'logo-navbar' => ['logo_navbar_url'],
+                'logo-login' => ['logo_login_url'],
+                'logo-1x1' => ['logo_1x1_url'],
+                'logo-horizontal' => ['logo_horizontal_url'],
+                'logo-white' => ['logo_white_url'],
+                'logo-horizontal-white' => ['logo_horizontal_white_url'],
+                'cover' => ['login_cover_url'],
             ];
-            
-            $configKey = $configKeyMap[$type] ?? 'logo_url';
-            
-            $this->db->query(
-                "INSERT INTO config_layout (config_key, config_value) VALUES (:config_key, :config_value)
-                 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP",
-                ['config_key' => $configKey, 'config_value' => $url]
-            );
+
+            $configKeys = $configKeyMap[$type] ?? ['logo_url'];
+            foreach ($configKeys as $configKey) {
+                $this->db->query(
+                    "INSERT INTO config_layout (config_key, config_value) VALUES (:config_key, :config_value)
+                     ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP",
+                    ['config_key' => $configKey, 'config_value' => $url]
+                );
+            }
 
             LayoutHelper::invalidateCache();
             
@@ -485,7 +487,7 @@ class SchoolSettingsAdminController extends AdminBaseController
                 'success' => true, 
                 'message' => 'Imagem enviada com sucesso!',
                 'url' => $url,
-                'config_key' => $configKey
+                'config_key' => $configKeys[0]
             ]);
             
         } catch (Exception $e) {

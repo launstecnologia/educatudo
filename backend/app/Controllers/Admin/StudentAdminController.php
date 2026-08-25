@@ -3815,9 +3815,7 @@ class StudentAdminController extends AdminBaseController
             }
         }
 
-        // Logo do PDF: prioriza a logo da escola (mesma usada no navbar/sidebar via
-        // LayoutHelper::getNavbarLogoUrl). Faz fallback para a logo institucional do
-        // Educatudo apenas se a escola não tiver logo configurada.
+        // Logo do PDF: logo padrão do sistema (documentos), não a do navbar.
         $logoData = $this->resolveSchoolLogoForPdf();
         if ($logoData === '') {
             $logoPath = __DIR__ . '/../../../logo-educatudo.png';
@@ -3896,7 +3894,7 @@ class StudentAdminController extends AdminBaseController
     private function resolveSchoolLogoForPdf(): string
     {
         try {
-            $url = (string) LayoutHelper::getNavbarLogoUrl();
+            $url = (string) LayoutHelper::getDocumentLogoUrl();
             if ($url === '') {
                 return '';
             }

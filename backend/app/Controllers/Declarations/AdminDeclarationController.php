@@ -254,7 +254,7 @@ class AdminDeclarationController extends AdminBaseController
     private function resolveSchoolLogoForPdf(): string
     {
         try {
-            $url = (string) LayoutHelper::getNavbarLogoUrl();
+            $url = (string) LayoutHelper::getDocumentLogoUrl();
             return $url !== '' ? $this->urlLocalParaDataUri($url) : '';
         } catch (\Throwable $e) {
             error_log('AdminDeclarationController resolveSchoolLogoForPdf: ' . $e->getMessage());

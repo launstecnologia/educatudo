@@ -1948,17 +1948,13 @@ HTML;
             require_once $base . '/app/Core/LayoutHelper.php';
         }
         try {
-            $navbar = trim((string) \LayoutHelper::getNavbarLogoUrl());
-            if ($navbar !== '') {
-                $urls[] = $navbar;
-            }
-            $principal = trim((string) \LayoutHelper::getLogoUrl());
-            if ($principal !== '' && $principal !== $navbar) {
+            $principal = trim((string) \LayoutHelper::getDocumentLogoUrl());
+            if ($principal !== '') {
                 $urls[] = $principal;
             }
-            $horizontal = trim((string) \LayoutHelper::getLogoHorizontalUrl());
-            if ($horizontal !== '' && !in_array($horizontal, $urls, true)) {
-                $urls[] = $horizontal;
+            $login = trim((string) \LayoutHelper::getLoginLogoUrl());
+            if ($login !== '' && !in_array($login, $urls, true)) {
+                $urls[] = $login;
             }
         } catch (\Throwable $e) {
             // layout ainda não carregado

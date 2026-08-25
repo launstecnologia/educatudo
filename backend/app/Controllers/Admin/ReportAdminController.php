@@ -654,7 +654,7 @@ class ReportAdminController extends AdminBaseController
     private function resolveSchoolLogoForCoordinationReportPdf(): string
     {
         try {
-            $url = (string) LayoutHelper::getNavbarLogoUrl();
+            $url = (string) LayoutHelper::getDocumentLogoUrl();
             if ($url === '') {
                 return '';
             }

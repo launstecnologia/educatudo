@@ -25,15 +25,53 @@
         </div>
         <div class="p-6">
             <div class="space-y-6">
-                
-                <!-- Logo Padrão Upload -->
+                <?php
+                $logoNavbarPreview = trim((string) ($config_layout['logo_navbar_url'] ?? ''));
+                if ($logoNavbarPreview === '') {
+                    $logoNavbarPreview = (string) LayoutHelper::getNavbarLogoUrl();
+                }
+                $logoLoginPreview = trim((string) ($config_layout['logo_login_url'] ?? ''));
+                if ($logoLoginPreview === '') {
+                    $logoLoginPreview = (string) LayoutHelper::getLoginLogoUrl();
+                }
+                $logoSlots = [
+                    [
+                        'type' => 'logo',
+                        'label' => 'Padrão do sistema',
+                        'hint' => 'Vai em documentos, declarações, boletins e PDFs.',
+                        'url' => (string) ($config_layout['logo_url'] ?? ''),
+                        'box' => 'w-20 h-20 bg-white',
+                        'button' => 'Escolher logo padrão',
+                    ],
+                    [
+                        'type' => 'logo-navbar',
+                        'label' => 'Logo do navbar',
+                        'hint' => 'Menu lateral (admin, professor, aluno e pais). Prefira versão clara para fundo escuro.',
+                        'url' => $logoNavbarPreview,
+                        'box' => 'w-24 h-16 bg-gray-800',
+                        'button' => 'Escolher logo do navbar',
+                    ],
+                    [
+                        'type' => 'logo-login',
+                        'label' => 'Logo da tela inicial',
+                        'hint' => 'Páginas de login e recuperação de senha.',
+                        'url' => $logoLoginPreview,
+                        'box' => 'w-24 h-16 bg-white',
+                        'button' => 'Escolher logo da tela inicial',
+                    ],
+                ];
+                foreach ($logoSlots as $slot):
+                    $previewId = $slot['type'] . '-preview';
+                    $inputId = $slot['type'] . '-input';
+                ?>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Padrão</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2"><?= htmlspecialchars($slot['label']) ?></label>
                     <div class="flex items-center space-x-4">
                         <div class="flex-shrink-0">
-                            <div id="logo-preview" class="w-20 h-20 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <?php if (!empty($config_layout['logo_url'])): ?>
-                                    <img src="<?= htmlspecialchars($config_layout['logo_url']) ?>" alt="Logo" class="max-w-full max-h-full object-contain">
+                            <div id="<?= htmlspecialchars($previewId) ?>"
+                                 class="<?= htmlspecialchars($slot['box']) ?> rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
+                                <?php if ($slot['url'] !== ''): ?>
+                                    <img src="<?= htmlspecialchars($slot['url']) ?>" alt="<?= htmlspecialchars($slot['label']) ?>" class="max-w-full max-h-full object-contain">
                                 <?php else: ?>
                                     <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -42,115 +80,16 @@
                             </div>
                         </div>
                         <div class="flex-1">
-                            <input type="file" id="logo-input" accept="image/*" class="hidden">
-                            <button onclick="document.getElementById('logo-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                Escolher Logo
+                            <input type="file" id="<?= htmlspecialchars($inputId) ?>" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" data-logo-upload="<?= htmlspecialchars($slot['type']) ?>">
+                            <button type="button" onclick="document.getElementById('<?= htmlspecialchars($inputId) ?>').click()" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 transition-colors">
+                                <?= htmlspecialchars($slot['button']) ?>
                             </button>
-                            <p class="text-sm text-gray-500 mt-1">Formatos: JPG, PNG, GIF, SVG</p>
+                            <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($slot['hint']) ?></p>
+                            <p class="text-xs text-gray-400 mt-0.5">Formatos: JPG, PNG, GIF ou WebP</p>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Logo Quadrada (1x1) Upload -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Quadrada (1x1)</label>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0">
-                            <div id="logo-1x1-preview" class="w-16 h-16 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <?php if (!empty($config_layout['logo_1x1_url'])): ?>
-                                    <img src="<?= htmlspecialchars($config_layout['logo_1x1_url']) ?>" alt="Logo 1x1" class="max-w-full max-h-full object-contain">
-                                <?php else: ?>
-                                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <input type="file" id="logo-1x1-input" accept="image/*" class="hidden">
-                            <button onclick="document.getElementById('logo-1x1-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                Escolher Logo 1x1
-                            </button>
-                            <p class="text-sm text-gray-500 mt-1">Para favicon e ícones quadrados</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Logo Horizontal Upload -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Horizontal</label>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0">
-                            <div id="logo-horizontal-preview" class="w-24 h-16 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <?php if (!empty($config_layout['logo_horizontal_url'])): ?>
-                                    <img src="<?= htmlspecialchars($config_layout['logo_horizontal_url']) ?>" alt="Logo Horizontal" class="max-w-full max-h-full object-contain">
-                                <?php else: ?>
-                                    <svg class="w-8 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <input type="file" id="logo-horizontal-input" accept="image/*" class="hidden">
-                            <button onclick="document.getElementById('logo-horizontal-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                Escolher Logo Horizontal
-                            </button>
-                            <p class="text-sm text-gray-500 mt-1">Para páginas de login e headers</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Logo Branca Upload -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Branca</label>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0">
-                            <div id="logo-white-preview" class="w-20 h-20 bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <?php if (!empty($config_layout['logo_white_url'])): ?>
-                                    <img src="<?= htmlspecialchars($config_layout['logo_white_url']) ?>" alt="Logo Branca" class="max-w-full max-h-full object-contain">
-                                <?php else: ?>
-                                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <input type="file" id="logo-white-input" accept="image/*" class="hidden">
-                            <button onclick="document.getElementById('logo-white-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                Escolher Logo Branca
-                            </button>
-                            <p class="text-sm text-gray-500 mt-1">Para fundos escuros (navbar)</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Logo Horizontal Branca Upload -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Logo Horizontal Branca</label>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0">
-                            <div id="logo-horizontal-white-preview" class="w-24 h-16 bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                <?php if (!empty($config_layout['logo_horizontal_white_url'])): ?>
-                                    <img src="<?= htmlspecialchars($config_layout['logo_horizontal_white_url']) ?>" alt="Logo Horizontal Branca" class="max-w-full max-h-full object-contain">
-                                <?php else: ?>
-                                    <svg class="w-8 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <div class="flex-1">
-                            <input type="file" id="logo-horizontal-white-input" accept="image/*" class="hidden">
-                            <button onclick="document.getElementById('logo-horizontal-white-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                                Escolher Logo Horizontal Branca
-                            </button>
-                            <p class="text-sm text-gray-500 mt-1">Para fundos escuros (navbar)</p>
-                        </div>
-                    </div>
-                </div>
-                
+                <?php endforeach; ?>
                 <!-- Capa de Login Upload -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Capa da Página de Login</label>
@@ -420,24 +359,10 @@ document.querySelectorAll('input[type="color"]').forEach(colorInput => {
 });
 
 // Upload de imagens
-document.getElementById('logo-input').addEventListener('change', function(e) {
-    uploadImage(e.target.files[0], 'logo');
-});
-
-document.getElementById('logo-1x1-input').addEventListener('change', function(e) {
-    uploadImage(e.target.files[0], 'logo-1x1');
-});
-
-document.getElementById('logo-horizontal-input').addEventListener('change', function(e) {
-    uploadImage(e.target.files[0], 'logo-horizontal');
-});
-
-document.getElementById('logo-white-input').addEventListener('change', function(e) {
-    uploadImage(e.target.files[0], 'logo-white');
-});
-
-document.getElementById('logo-horizontal-white-input').addEventListener('change', function(e) {
-    uploadImage(e.target.files[0], 'logo-horizontal-white');
+document.querySelectorAll('[data-logo-upload]').forEach(function (input) {
+    input.addEventListener('change', function (e) {
+        uploadImage(e.target.files[0], input.getAttribute('data-logo-upload'));
+    });
 });
 
 document.getElementById('cover-input').addEventListener('change', function(e) {

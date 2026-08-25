@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../Core/LayoutHelper.php';
-$logo_horizontal_url = LayoutHelper::getLogoHorizontalUrl();
+$logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
 $system_title = LayoutHelper::getSystemTitle();
 ?>
 <!DOCTYPE html>

@@ -1316,8 +1316,8 @@ class LessonPlanController extends BaseController
         $data = [
             'title' => 'Plano de Aula - ' . $plano['titulo'],
             'plano' => $plano,
-            'logo_url' => LayoutHelper::getLogoUrl(),
-            'logo_horizontal_url' => LayoutHelper::getLogoHorizontalUrl(),
+            'logo_url' => LayoutHelper::getDocumentLogoUrl(),
+            'logo_horizontal_url' => LayoutHelper::getDocumentLogoUrl(),
             'system_title' => LayoutHelper::getSystemTitle()
         ];
         

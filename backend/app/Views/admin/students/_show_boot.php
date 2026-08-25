@@ -33,7 +33,7 @@ $flash_message = (string)($flash_message ?? '');
 $flash_type = (string)($flash_type ?? '');
 $logoHorizontalPrintUrl = '';
 if (class_exists('LayoutHelper')) {
-    $logoHorizontalPrintUrl = (string) (LayoutHelper::getLogoHorizontalUrl() ?: LayoutHelper::getLogoUrl() ?: '');
+    $logoHorizontalPrintUrl = (string) (LayoutHelper::getDocumentLogoUrl() ?: '');
 }
 
 // Garantir que $student é um array

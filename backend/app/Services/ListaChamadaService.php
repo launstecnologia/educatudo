@@ -579,7 +579,7 @@ class ListaChamadaService
         if (!class_exists('LayoutHelper')) {
             require_once __DIR__ . '/../Core/LayoutHelper.php';
         }
-        $logoUrl = (string) (\LayoutHelper::getLogoHorizontalUrl() ?: \LayoutHelper::getLogoUrl() ?: '');
+        $logoUrl = (string) (\LayoutHelper::getDocumentLogoUrl() ?: '');
         if ($logoUrl === '') {
             return '';
         }

@@ -163,7 +163,7 @@ class AvaCertificateService
     private function resolveSchoolLogoForPdf(): string
     {
         try {
-            $url = (string) LayoutHelper::getNavbarLogoUrl();
+            $url = (string) LayoutHelper::getDocumentLogoUrl();
             if ($url === '') {
                 return '';
             }

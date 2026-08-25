@@ -1819,7 +1819,7 @@ if (!class_exists('AuthController')) {
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         
         $logo_url = LayoutHelper::getLogoUrl();
-        $logo_horizontal_url = LayoutHelper::getLogoHorizontalUrl();
+        $logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
         $login_cover_url = LayoutHelper::getLoginCoverUrl();
         $system_title = LayoutHelper::getSystemTitle();
         $system_subtitle = LayoutHelper::getSystemSubtitle();
@@ -1977,7 +1977,7 @@ if (!class_exists('AuthController')) {
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         
         $logo_url = LayoutHelper::getLogoUrl();
-        $logo_horizontal_url = LayoutHelper::getLogoHorizontalUrl();
+        $logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
         $login_cover_url = LayoutHelper::getLoginCoverUrl();
         $system_title = LayoutHelper::getSystemTitle();
         $system_subtitle = LayoutHelper::getSystemSubtitle();

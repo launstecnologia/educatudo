@@ -617,6 +617,21 @@ class LayoutHelper
     {
         return self::get('logo_url', '');
     }
+
+    /**
+     * Logo padrão do sistema: documentos, declarações e PDFs.
+     * Não usa a variante do navbar (geralmente clara, ruim em papel branco).
+     */
+    public static function getDocumentLogoUrl()
+    {
+        foreach (['logo_url', 'logo_horizontal_url', 'logo_login_url'] as $key) {
+            $url = trim((string) self::get($key, ''));
+            if ($url !== '') {
+                return $url;
+            }
+        }
+        return '';
+    }
     
     /**
      * Obter URL da logo quadrada (1x1)
@@ -652,7 +667,6 @@ class LayoutHelper
 
     /**
      * Mapa de chave de logo (config) para URL.
-     * Chaves: logo, logo_horizontal, logo_1x1, logo_white, logo_horizontal_white
      */
     public static function getLogoUrlByKey($key)
     {
@@ -662,6 +676,8 @@ class LayoutHelper
             'logo_1x1' => self::get('logo_1x1_url', ''),
             'logo_white' => self::get('logo_white_url', ''),
             'logo_horizontal_white' => self::get('logo_horizontal_white_url', ''),
+            'logo_navbar' => self::get('logo_navbar_url', ''),
+            'logo_login' => self::get('logo_login_url', ''),
         ];
         $key = (string) $key;
         return isset($map[$key]) ? $map[$key] : '';
@@ -672,6 +688,10 @@ class LayoutHelper
      */
     public static function getLoginLogoUrl()
     {
+        $dedicada = trim((string) self::get('logo_login_url', ''));
+        if ($dedicada !== '') {
+            return $dedicada;
+        }
         $use = trim((string) self::get('logo_use_login', ''));
         if ($use !== '') {
             $url = self::getLogoUrlByKey($use);
@@ -691,6 +711,10 @@ class LayoutHelper
      */
     public static function getNavbarLogoUrl()
     {
+        $dedicada = trim((string) self::get('logo_navbar_url', ''));
+        if ($dedicada !== '') {
+            return $dedicada;
+        }
         $use = trim((string) self::get('logo_use_navbar', ''));
         if ($use !== '') {
             $url = self::getLogoUrlByKey($use);
@@ -910,6 +934,10 @@ class LayoutHelper
             case 'favicon':
                 if (self::getLogo1x1Url()) {
                     return self::getLogo1x1Tag($class, $alt);
+                }
+                $doc = self::getDocumentLogoUrl();
+                if ($doc !== '') {
+                    return '<img src="' . htmlspecialchars($doc) . '" alt="' . htmlspecialchars($alt) . '" class="' . htmlspecialchars($class) . '">';
                 }
                 return self::getLogoTag($class, $alt);
                 
