@@ -89,6 +89,9 @@ class MediaStorageService
     private function getTenantSlug(): string
     {
         $slug = trim((string) ($this->config['tenant']['slug'] ?? ''));
+        if ($slug === '' && defined('TENANT_SLUG')) {
+            $slug = trim((string) TENANT_SLUG);
+        }
         if ($slug === '') {
             $slug = trim((string) ($this->config['school']['code'] ?? ''));
         }
@@ -291,6 +294,9 @@ class MediaStorageService
     public function getLocalPath(string $type, string $key): ?string
     {
         $key = $this->normalizeKey($key);
+        if ($key === '') {
+            return null;
+        }
         if ($this->useLocalFilesForType($type)) {
             $basePath = $this->localBasePath($type);
             return $basePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $key);
@@ -526,7 +532,10 @@ class MediaStorageService
     {
         $key = str_replace('\\', '/', trim($key));
         $key = trim($key, '/');
-        return $key === '' ? '' : $key;
+        if ($key === '' || str_contains($key, "\0") || preg_match('#(^|/)\.\.(/|$)#', $key) === 1) {
+            return '';
+        }
+        return $key;
     }
 
     private function guessMimeByFilename(string $filename): string

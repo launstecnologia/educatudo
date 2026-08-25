@@ -302,8 +302,8 @@ class LayoutHelper
             --logo-navbar-size: " . ((float) ($config['logo_size_navbar'] ?? '1') * 2.5) . "rem;
         }
         
-        .logo-login-wrap img { max-height: var(--logo-login-size) !important; width: auto !important; object-fit: contain; }
-        .logo-navbar-wrap img { max-height: var(--logo-navbar-size) !important; width: auto !important; object-fit: contain; }
+        .logo-login-wrap img { max-height: var(--logo-login-size) !important; height: auto !important; width: auto !important; object-fit: contain; }
+        .logo-navbar-wrap img { max-height: var(--logo-navbar-size) !important; height: var(--logo-navbar-size) !important; width: auto !important; object-fit: contain; }
         
         /* Aplicar cores customizadas */
         .bg-primary { background-color: var(--primary-color) !important; }
@@ -501,9 +501,10 @@ class LayoutHelper
             margin: 0 auto !important;
         }
 
-        /* Quando sidebar está expandido (w-64), mostrar logo maior */
+        /* Quando sidebar está expandido, usa o tamanho configurado (logo_size_navbar) */
         .sidebar-custom:not(.collapsed) .sidebar-text-container img {
-            height: 3.75rem !important; /* logo grande (admin, aluno e professor) */
+            height: var(--logo-navbar-size) !important;
+            max-height: var(--logo-navbar-size) !important;
             width: auto !important;
             margin-bottom: 0.5rem !important;
         }

@@ -5,7 +5,7 @@
  * Variáveis esperadas:
  * - $student (array)
  * - $csrf_token (string)
- * - $mode: 'edit' | 'readonly' | 'hero'
+ * - $mode: 'edit' | 'readonly' | 'hero' | 'compact'
  * - $admin_permissions (array, opcional)
  * - $size: 'sm' | 'md' | 'lg' (opcional, default md)
  */
@@ -43,18 +43,18 @@ $initialsId = 'studentPhotoInitials_' . $studentId . '_' . $mode;
 ?>
 
 <div class="flex items-center gap-5 <?= $mode === 'hero' ? 'flex-shrink-0 flex-col items-center text-center' : '' ?>">
-    <div class="flex-shrink-0 <?= $mode === 'hero' ? 'flex flex-col items-center' : '' ?>">
+    <div class="flex-shrink-0 relative <?= $mode === 'hero' ? 'flex flex-col items-center' : '' ?>">
         <div id="<?= $previewId ?>_wrap"
-             class="<?= $sc['box'] ?> rounded-full bg-white/20 flex items-center justify-center overflow-hidden relative <?= $mode === 'hero' ? $sc['ring'] . ' ring-white/40 shadow-lg' : 'border border-gray-200 bg-slate-200' ?>">
+             class="<?= $sc['box'] ?> rounded-full flex items-center justify-center overflow-hidden relative <?= $mode === 'hero' ? $sc['ring'] . ' ring-white/40 shadow-lg bg-white/20' : ($mode === 'compact' ? 'border border-violet-100 bg-violet-100' : 'border border-gray-200 bg-slate-200') ?>">
             <?php if (!empty($fotoUrl)): ?>
                 <img id="<?= $previewId ?>"
                      class="<?= $sc['box'] ?> rounded-full object-cover absolute inset-0"
                      src="<?= htmlspecialchars($fotoUrl) ?>"
                      alt="Foto de <?= $nome ?>"
                      onerror="this.classList.add('hidden'); document.getElementById('<?= $initialsId ?>')?.classList.remove('hidden');">
-                <span id="<?= $initialsId ?>" class="hidden <?= $sc['text'] ?> font-semibold <?= $mode === 'hero' ? 'text-white' : 'text-slate-600' ?>"><?= $initials ?></span>
+                <span id="<?= $initialsId ?>" class="hidden <?= $sc['text'] ?> font-semibold <?= $mode === 'hero' ? 'text-white' : ($mode === 'compact' ? 'text-violet-700' : 'text-slate-600') ?>"><?= $initials ?></span>
             <?php else: ?>
-                <span id="<?= $initialsId ?>" class="<?= $sc['text'] ?> font-semibold <?= $mode === 'hero' ? 'text-white' : 'text-slate-600' ?>"><?= $initials ?></span>
+                <span id="<?= $initialsId ?>" class="<?= $sc['text'] ?> font-semibold <?= $mode === 'hero' ? 'text-white' : ($mode === 'compact' ? 'text-violet-700' : 'text-slate-600') ?>"><?= $initials ?></span>
             <?php endif; ?>
         </div>
         <?php if ($mode === 'hero' && $canUpload && $studentId > 0): ?>
@@ -65,9 +65,17 @@ $initialsId = 'studentPhotoInitials_' . $studentId . '_' . $mode;
             Enviar foto
         </button>
         <?php endif; ?>
+        <?php if ($mode === 'compact' && $canUpload && $studentId > 0): ?>
+        <button type="button"
+                onclick="uploadStudentPhoto(<?= $studentId ?>, '<?= $previewId ?>', '<?= $initialsId ?>')"
+                class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border border-gray-200 text-slate-600 shadow-sm hover:bg-slate-50"
+                aria-label="Enviar foto do aluno">
+            <i class="fa-solid fa-camera text-[10px]"></i>
+        </button>
+        <?php endif; ?>
     </div>
 
-    <?php if ($mode !== 'hero' && $canUpload && $studentId > 0): ?>
+    <?php if ($mode !== 'hero' && $mode !== 'compact' && $canUpload && $studentId > 0): ?>
     <div>
         <button type="button"
                 onclick="uploadStudentPhoto(<?= $studentId ?>, '<?= $previewId ?>', '<?= $initialsId ?>')"

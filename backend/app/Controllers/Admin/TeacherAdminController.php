@@ -4,7 +4,7 @@
  */
 
 require_once __DIR__ . '/../../Models/User/Teacher.php';
-require_once __DIR__ . '/../../Models/Education/Subject.php';
+require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
 require_once __DIR__ . '/AdminBaseController.php';
 
 if (!class_exists('TeacherAdminController')) {
@@ -163,8 +163,8 @@ class TeacherAdminController extends AdminBaseController
             
             $file = $_FILES['csv_file']['tmp_name'];
             $teacherModel = new Teacher();
-            require_once __DIR__ . '/../../Models/Education/Subject.php';
-            $subjectModel = new Subject();
+            require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
+            $subjectModel = new ComponenteCurricular();
             
             // Ler arquivo CSV
             $handle = fopen($file, 'r');

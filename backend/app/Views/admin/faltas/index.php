@@ -75,6 +75,7 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
                                 'ano_letivo' => (int) ($ev['ano_letivo'] ?? 0),
                                 'turmas_ids' => array_values(array_map('intval', (array) ($ev['turmas_ids'] ?? []))),
                                 'materias_ids' => array_values(array_map('intval', (array) ($ev['materias_ids'] ?? []))),
+                                'origem' => (string) ($ev['origem'] ?? 'manual'),
                             ];
                             $evB64 = base64_encode(json_encode($evPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                             ?>
@@ -174,6 +175,14 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
                             </div>
                         </div>
                         <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Origem das faltas</label>
+                            <select name="origem" id="faltas-modal-origem" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <option value="manual">Lançamento manual (secretaria)</option>
+                                <option value="diario">Diário / catraca (recalcula o total, não soma no escuro)</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Com origem Diário, a Gestão de Presença reescreve o número deste evento a partir das chamadas — eventos manuais antigos não são alterados.</p>
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Turmas do evento</label>
                             <div class="flex flex-wrap gap-x-6 gap-y-3 p-4 bg-gray-50 border border-gray-200 rounded-xl max-h-56 overflow-y-auto">
                                 <?php foreach ($turmas as $t): ?>
@@ -239,6 +248,7 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
         var inpNome = document.getElementById('faltas-modal-nome');
         var selBim = document.getElementById('faltas-modal-bimestre');
         var inpAno = document.getElementById('faltas-modal-ano');
+        var selOrigem = document.getElementById('faltas-modal-origem');
         var btnSubmit = document.getElementById('faltas-modal-submit');
         var btnSubmitLabel = document.getElementById('faltas-modal-submit-label');
 
@@ -309,6 +319,7 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
             inpNome.value = '';
             selBim.value = '';
             inpAno.value = String(new Date().getFullYear());
+            if (selOrigem) selOrigem.value = 'manual';
             resetCheckboxes(formEvento, '.faltas-modal-cb-turma');
             resetCheckboxes(formEvento, '.faltas-modal-cb-materia');
             openModal(modalEvento);
@@ -332,6 +343,7 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
             inpNome.value = data.nome || '';
             selBim.value = data.bimestre || '';
             inpAno.value = String(data.ano_letivo || new Date().getFullYear());
+            if (selOrigem) selOrigem.value = data.origem || 'manual';
             setCheckboxesByIds(formEvento, '.faltas-modal-cb-turma', data.turmas_ids || []);
             setCheckboxesByIds(formEvento, '.faltas-modal-cb-materia', data.materias_ids || []);
             openModal(modalEvento);

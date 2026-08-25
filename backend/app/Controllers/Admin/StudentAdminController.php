@@ -18,77 +18,8 @@ class StudentAdminController extends AdminBaseController
 {
     public function dashboard()
     {
-        $user = $this->auth->getUser();
-        $authManager = new AuthManager();
-        $alunosOnline = $authManager->getAlunosOnline();
-
-        $contar = function (string $sql) {
-            try {
-                return (int) ($this->db->fetch($sql)['count'] ?? 0);
-            } catch (Throwable $e) {
-                return 0;
-            }
-        };
-        
-        // Verificar se é diretor ou dev para mostrar valor total a pagar
-        $isDiretorOuDev = false;
-        $valorTotalPagar = 0;
-        
-        if (isset($user['perfil_admin'])) {
-            $perfil = $user['perfil_admin'];
-            if ($perfil === 'dev' || $perfil === 'diretor') {
-                $isDiretorOuDev = true;
-                
-                // Buscar valor por usuário
-                require_once __DIR__ . '/../../Core/LayoutHelper.php';
-                $valorPorUsuario = floatval(LayoutHelper::get('valor_por_usuario', '0.00'));
-                
-                // Contar total de pagantes (alunos + professores)
-                $totalPagantes = $contar("SELECT COUNT(*) as count FROM alunos WHERE ativo = 1 AND pagante = 1")
-                    + $contar("SELECT COUNT(*) as count FROM professores WHERE ativo = 1 AND pagante = 1");
-                
-                // Calcular valor total
-                $valorTotalPagar = $totalPagantes * $valorPorUsuario;
-            }
-        }
-        
-        // Estatísticas gerais
-        $stats = [
-            'alunos_online' => is_array($alunosOnline) ? count($alunosOnline) : 0,
-            'total_alunos' => $contar("SELECT COUNT(*) as count FROM alunos WHERE ativo = 1 AND pagante = 1"),
-            'total_professores' => $contar("SELECT COUNT(*) as count FROM professores WHERE ativo = 1 AND pagante = 1"),
-            'total_turmas' => $contar("SELECT COUNT(*) as count FROM turmas WHERE ativo = 1"),
-            'total_jornadas' => $contar("SELECT COUNT(*) as count FROM jornadas"),
-            'total_exercicios' => $contar("SELECT COUNT(*) as count FROM exercicios"),
-            'is_diretor_ou_dev' => $isDiretorOuDev,
-            'valor_total_pagar' => $valorTotalPagar
-        ];
-
-        if ($this->podeVerAlertasSensiveis($user)) {
-            $stats['alertas_novos'] = $contar("SELECT COUNT(*) as count FROM alertas_sensiveis WHERE status = 'novo'");
-        }
-        
-        $panoramaJornada = $this->obterPanoramaJornadaDashboard();
-
-        $aulasOnline = [];
-        try {
-            require_once __DIR__ . '/../../Models/Education/OnlineClass.php';
-            $aulasOnline = (new OnlineClass())->listLiveAndUpcomingForAdmin(5);
-        } catch (Throwable $e) {
-            $aulasOnline = [];
-        }
-
-        $data = [
-            'title' => 'Painel Administrativo - EducaTudo',
-            'user' => $user,
-            'stats' => $stats,
-            'panorama_jornada' => $panoramaJornada,
-            'aulas_online' => $aulasOnline,
-            'csrf_token' => $this->generateCsrfToken(),
-            'current_page' => 'dashboard'
-        ];
-        
-        $this->viewWithLayout('admin', 'admin/dashboard', $data);
+        require_once __DIR__ . '/../../Modulos/dashboard-gestao/Controllers/DashboardGestaoAdminController.php';
+        (new DashboardGestaoAdminController())->index();
     }
 
     private function obterPanoramaJornadaDashboard(): array

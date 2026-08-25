@@ -159,4 +159,9 @@ class ExpoColagProjeto
         $destinos = self::TRANSICOES[$de] ?? [];
         return in_array($para, $destinos, true);
     }
+
+    public function excluir(int $id): void
+    {
+        $this->db->query('DELETE FROM expo_colag_projetos WHERE id = :id', ['id' => $id]);
+    }
 }

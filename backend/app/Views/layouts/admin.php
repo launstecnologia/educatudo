@@ -136,6 +136,8 @@
                 height: 100vh;
                 overflow-y: auto;
                 overscroll-behavior: contain;
+                display: flex;
+                flex-direction: column;
             }
         }
 
@@ -180,9 +182,10 @@
         <?php include __DIR__ . '/components/admin_sidebar.php'; ?>
 
         <!-- Main Content -->
-        <main class="flex-1 w-full md:w-auto overflow-x-hidden min-h-0">
+        <main class="flex-1 w-full md:w-auto overflow-x-hidden min-h-0 flex flex-col">
+            <div class="plataforma-pagina plataforma-pagina-preenche">
             <!-- Header com menu hamburger, título, notificações e avatar (padrão Professor) -->
-            <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-30">
+            <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-30 shrink-0">
                 <div class="flex justify-between items-center gap-2">
                     <!-- Botão menu mobile -->
                     <button id="mobileMenuToggle" type="button" class="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Abrir menu">
@@ -233,31 +236,10 @@
                 </div>
             </header>
             
-            <div class="p-6 mobile-content">
+            <div class="p-6 mobile-content plataforma-conteudo">
                 <?= $content ?>
-                
-                <!-- Footer -->
-                <footer class="mt-8 pt-4 border-t border-gray-200">
-                    <div class="space-y-2">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <p class="text-xs text-gray-600 flex items-center justify-center sm:justify-start gap-2">
-                                <span>Todos os direitos reservados</span>
-                                <img src="<?= URL ?>/public/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-4 w-auto inline-block" loading="lazy">
-                            </p>
-                            <p class="text-xs text-gray-600 flex items-center justify-center sm:justify-end gap-2">
-                                <span>Desenvolvido por</span>
-                                <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="inline-flex items-center">
-                                    <img src="<?= URL ?>/public/assets/logos/logo-launs-black.png" alt="Launs" class="h-3 w-auto inline-block" loading="lazy">
-                                </a>
-                            </p>
-                        </div>
-                        <p class="text-xs text-gray-600 text-center">
-                            <a href="<?= URL ?>/termos-de-uso" class="hover:underline">Termos de Uso</a> •
-                            <a href="<?= URL ?>/politica-privacidade" class="hover:underline">Política de Privacidade</a> •
-                            <a href="<?= URL ?>/politica-retencao" class="hover:underline">Política de Retenção de Dados</a>
-                        </p>
-                    </div>
-                </footer>
+            </div>
+            <?php include __DIR__ . '/components/plataforma_footer.php'; ?>
             </div>
         </main>
     </div>

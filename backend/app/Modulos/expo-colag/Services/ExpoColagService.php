@@ -147,6 +147,41 @@ class ExpoColagService
     }
 
     /**
+     * Vagas do professor na edição (rascunho e cancelado não ocupam limite).
+     *
+     * @return array{atingiu: bool, max: int, atual: int, error?: string}
+     */
+    public function situacaoLimiteProfessor(int $professorId, ?int $edicaoId = null, ?int $excetoProjetoId = null): array
+    {
+        $edicaoResult = $this->obterOuCriarEdicaoAtiva();
+        if (!$edicaoResult['success']) {
+            return ['atingiu' => false, 'max' => 3, 'atual' => 0];
+        }
+        $edicao = $edicaoResult['edicao'];
+        $config = $edicao['config_decoded'] ?? self::configPadrao();
+        $max = max(1, (int) ($config['max_projetos_professor'] ?? 3));
+        $eid = ($edicaoId !== null && $edicaoId > 0) ? $edicaoId : (int) $edicao['id'];
+        $projetos = $this->projetoModel->listarPorProfessor($professorId, $eid);
+        $atual = 0;
+        foreach ($projetos as $p) {
+            if ($excetoProjetoId !== null && $excetoProjetoId > 0 && (int) $p['id'] === $excetoProjetoId) {
+                continue;
+            }
+            $st = (string) ($p['status'] ?? '');
+            if ($st === 'Cancelado' || $st === 'Rascunho') {
+                continue;
+            }
+            $atual++;
+        }
+
+        $out = ['atingiu' => $atual >= $max, 'max' => $max, 'atual' => $atual];
+        if ($out['atingiu']) {
+            $out['error'] = "Limite de {$max} projetos por professor atingido nesta edição.";
+        }
+        return $out;
+    }
+
+    /**
      * @param array<string, mixed> $input
      * @return array{success: bool, id?: int, error?: string}
      */
@@ -164,15 +199,11 @@ class ExpoColagService
         $edicao = $edicaoResult['edicao'];
         $config = $edicao['config_decoded'] ?? self::configPadrao();
 
-        $maxProf = (int) ($config['max_projetos_professor'] ?? 3);
-        $projetos = $this->projetoModel->listarPorProfessor($professorId, (int) $edicao['id']);
-        $ativos = array_filter($projetos, static function ($p) {
-            return ($p['status'] ?? '') !== 'Cancelado';
-        });
-        if (count($ativos) >= $maxProf) {
+        $limite = $this->situacaoLimiteProfessor($professorId, (int) $edicao['id']);
+        if ($limite['atingiu']) {
             return [
                 'success' => false,
-                'error' => "Limite de {$maxProf} projetos por professor atingido nesta edição.",
+                'error' => $limite['error'] ?? "Limite de {$limite['max']} projetos por professor atingido nesta edição.",
             ];
         }
 
@@ -225,6 +256,65 @@ class ExpoColagService
 
         $this->projetoModel->update($projetoId, $dados);
         return ['success' => true];
+    }
+
+    /**
+     * Remove o projeto e dependências. Bloqueia se houver inscrição ativa.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function excluirProjeto(int $projetoId, int $professorId): array
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto || (int) $projeto['professor_id'] !== $professorId) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+        if ((string) ($projeto['status'] ?? '') === 'Concluido') {
+            return ['success' => false, 'error' => 'Projeto concluído não pode ser excluído.'];
+        }
+        if ($this->inscricaoModel->contarAtivasPorProjeto($projetoId) > 0) {
+            return ['success' => false, 'error' => 'Há alunos inscritos neste projeto. Cancele as inscrições antes de excluir.'];
+        }
+
+        try {
+            $this->db->beginTransaction();
+            $this->apagarDependenciasProjeto($projetoId);
+            $this->projetoModel->excluir($projetoId);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            error_log('ExpoColagService::excluirProjeto: ' . $e->getMessage());
+            return ['success' => false, 'error' => 'Não foi possível excluir o projeto.'];
+        }
+
+        return ['success' => true];
+    }
+
+    private function apagarDependenciasProjeto(int $projetoId): void
+    {
+        $params = ['id' => $projetoId];
+        $this->db->query(
+            'DELETE a FROM expo_colag_projeto_tarefa_atribuicoes a
+             INNER JOIN expo_colag_projeto_tarefas t ON t.id = a.tarefa_id
+             WHERE t.projeto_id = :id',
+            $params
+        );
+        $this->db->query('DELETE FROM expo_colag_projeto_tarefas WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_inscricoes WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_stands WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_materias WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_professores WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_objetivos WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_tipos_trabalho WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_papeis WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_habilidades WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_visibilidade WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_etapas WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_encontros WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_rubrica WHERE projeto_id = :id', $params);
+        $this->db->query('DELETE FROM expo_colag_projeto_materiais WHERE projeto_id = :id', $params);
     }
 
     public function indicadoresProfessor(int $professorId): array
@@ -1152,6 +1242,14 @@ class ExpoColagService
         }
         if ($status !== 'Rascunho') {
             return ['success' => false, 'error' => 'Só é possível publicar a partir de rascunho.'];
+        }
+
+        $limite = $this->situacaoLimiteProfessor($professorId, (int) ($projeto['edicao_id'] ?? 0), $projetoId);
+        if ($limite['atingiu']) {
+            return [
+                'success' => false,
+                'error' => $limite['error'] ?? "Limite de {$limite['max']} projetos por professor atingido nesta edição.",
+            ];
         }
 
         $r1 = $this->alterarStatusProjeto($projetoId, $professorId, 'Publicado');

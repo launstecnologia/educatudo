@@ -86,36 +86,37 @@ class CursoController extends BaseController
             'pagination' => $pagination,
             'csrf_token' => $this->generateCsrfToken(),
             'status' => $_GET['status'] ?? '',
-            'message' => $_GET['message'] ?? ''
+            'message' => $_GET['message'] ?? '',
+            'has_tipo_possui_serie' => $this->hasTipoPossuiSerie(),
         ];
         $this->viewWithLayout('admin', 'admin/curso/index', $data);
     }
 
-    public function create()
+    /**
+     * Dados de um curso (JSON) para popular o offcanvas de edição
+     */
+    public function dados($id)
     {
-        $user = $this->auth->getUser();
         if (!$this->tableExists()) {
-            $this->redirect('/admin/curso?status=error&message=' . rawurlencode('Execute as migrations 022-026 para habilitar cursos.'));
+            $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
-        $data = [
-            'title' => 'Cadastrar Curso - EducaTudo',
-            'user' => $user,
-            'current_page' => 'curso',
-            'csrf_token' => $this->generateCsrfToken(),
-            'has_tipo_possui_serie' => $this->hasTipoPossuiSerie()
-        ];
-        $this->viewWithLayout('admin', 'admin/curso/create', $data);
+        $item = $this->db->fetch("SELECT * FROM curso WHERE id = :id", ['id' => $id]);
+        if (!$item) {
+            $this->json(['error' => 'Curso não encontrado.'], 404);
+            return;
+        }
+        $this->json(['success' => true, 'item' => $item]);
     }
 
     public function store()
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->redirect('/admin/curso?status=error&message=' . rawurlencode('Token inválido.'));
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
         if (!$this->tableExists()) {
-            $this->redirect('/admin/curso');
+            $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
         try {
@@ -143,43 +144,20 @@ class CursoController extends BaseController
                     ['nome' => $nome, 'descricao' => $descricao, 'ativo' => $ativo, 'ordem' => $ordem]
                 );
             }
-            $this->redirect('/admin/curso?status=success&message=' . rawurlencode('Curso cadastrado com sucesso.'));
+            $this->json(['success' => true, 'message' => 'Curso cadastrado com sucesso.']);
         } catch (Exception $e) {
-            $this->redirect('/admin/curso?status=error&message=' . rawurlencode($e->getMessage()));
+            $this->json(['error' => $e->getMessage()], 400);
         }
-    }
-
-    public function edit($id)
-    {
-        $user = $this->auth->getUser();
-        if (!$this->tableExists()) {
-            $this->redirect('/admin/curso');
-            return;
-        }
-        $item = $this->db->fetch("SELECT * FROM curso WHERE id = :id", ['id' => $id]);
-        if (!$item) {
-            $this->redirect('/admin/curso');
-            return;
-        }
-        $data = [
-            'title' => 'Editar Curso - EducaTudo',
-            'user' => $user,
-            'current_page' => 'curso',
-            'item' => $item,
-            'csrf_token' => $this->generateCsrfToken(),
-            'has_tipo_possui_serie' => $this->hasTipoPossuiSerie()
-        ];
-        $this->viewWithLayout('admin', 'admin/curso/edit', $data);
     }
 
     public function update($id)
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->redirect('/admin/curso?status=error&message=' . rawurlencode('Token inválido.'));
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
         if (!$this->tableExists()) {
-            $this->redirect('/admin/curso');
+            $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
         try {
@@ -207,9 +185,9 @@ class CursoController extends BaseController
                     ['nome' => $nome, 'descricao' => $descricao, 'ativo' => $ativo, 'ordem' => $ordem, 'id' => $id]
                 );
             }
-            $this->redirect('/admin/curso?status=success&message=' . rawurlencode('Curso atualizado com sucesso.'));
+            $this->json(['success' => true, 'message' => 'Curso atualizado com sucesso.']);
         } catch (Exception $e) {
-            $this->redirect('/admin/curso?status=error&message=' . rawurlencode($e->getMessage()));
+            $this->json(['error' => $e->getMessage()], 400);
         }
     }
 

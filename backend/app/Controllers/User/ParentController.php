@@ -723,13 +723,25 @@ class ParentController extends BaseController
             ['aluno_id' => $filho['id']]
         );
 
-        $ocorrencias = $this->db->fetchAll(
-            "SELECT data_ocorrencia, titulo, detalhe, nivel_gravidade, atitude_coordenacao, retorno_em
-             FROM alunos_ocorrencias
-             WHERE aluno_id = :aluno_id AND enviar_pais = 1
-             ORDER BY data_ocorrencia DESC",
-            ['aluno_id' => $filho['id']]
-        );
+        $ocorrencias = [];
+        try {
+            $ocorrencias = $this->db->fetchAll(
+                "SELECT o.data_ocorrencia, o.titulo, o.detalhe, o.nivel_gravidade, o.retorno_em
+                 FROM alunos_ocorrencias o
+                 WHERE o.enviar_pais = 1
+                   AND (
+                       o.aluno_id = :aluno_id
+                       OR EXISTS (
+                           SELECT 1 FROM alunos_ocorrencias_itens oi
+                           WHERE oi.ocorrencia_id = o.id AND oi.aluno_id = :aluno_id2
+                       )
+                   )
+                 ORDER BY o.data_ocorrencia DESC",
+                ['aluno_id' => $filho['id'], 'aluno_id2' => $filho['id']]
+            );
+        } catch (Exception $e) {
+            $ocorrencias = [];
+        }
         
         $data = [
             'title' => 'Detalhes do Filho - EducaTudo',

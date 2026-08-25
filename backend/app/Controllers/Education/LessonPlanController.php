@@ -5,7 +5,7 @@
  */
 
 require_once __DIR__ . '/../../Models/Education/LessonPlan.php';
-require_once __DIR__ . '/../../Models/Education/Subject.php';
+require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
 require_once __DIR__ . '/../../Models/Education/ClassRoom.php';
 require_once __DIR__ . '/../../Models/User/Teacher.php';
 require_once __DIR__ . '/../../Helpers/LessonPlanAfternoonHelper.php';
@@ -29,7 +29,7 @@ class LessonPlanController extends BaseController
         $this->auth = new AuthManager();
         $this->db = Database::getInstance();
         $this->planoAulaModel = new LessonPlan();
-        $this->subjectModel = new Subject();
+        $this->subjectModel = new ComponenteCurricular();
         $this->turmaModel = new ClassRoom();
         $this->teacherModel = new Teacher();
         

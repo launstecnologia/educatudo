@@ -47,8 +47,9 @@ class AdminStudentProfileService
 
         try {
             $turmaLabelSql = $this->controller->sqlTurmaLabelFieldsAndJoins();
+            $turnoSelect = $this->temColuna('turmas', 'turno') ? ', t.turno as turma_turno' : '';
             $aluno = $this->db->fetch(
-                "SELECT a.*, t.nome as turma_nome, t.serie_id as turma_serie_id,
+                "SELECT a.*, t.nome as turma_nome, t.serie_id as turma_serie_id{$turnoSelect},
                         {$turmaLabelSql['select']},
                         COALESCE(
                             (SELECT GROUP_CONCAT(DISTINCT r2.nome ORDER BY r2.nome SEPARATOR ', ')
@@ -153,11 +154,9 @@ class AdminStudentProfileService
             $documentosAluno = [];
         }
 
-        // Perf: trilha de auditoria saiu da carga principal e foi pra página própria
-        // (/admin/students/{id}/auditoria) — ver StudentAdminController::auditoriaAluno.
-        // Antes rodava (SHOW TABLES + SELECT) em toda visita ao perfil, mesmo sem
-        // ninguém abrir essa seção.
-        $auditLogs = [];
+        // Duas últimas ações sensíveis para o resumo da ficha; o histórico completo
+        // continua na página própria /admin/students/{id}/auditoria.
+        $auditLogs = $this->getAuditTrail($id, 2);
 
         // ========== RELATÓRIO/ESTATÍSTICAS ==========
         try {
@@ -391,10 +390,11 @@ class AdminStudentProfileService
         $ocorrenciasAluno = [];
         try {
             $ocorrenciasAluno = $this->db->fetchAll(
-                "SELECT o.*, u.nome as criado_por_nome
+                "SELECT o.*, MAX(u.nome) as criado_por_nome, MAX(cat.nome) as categoria_nome
                  FROM alunos_ocorrencias o
                  LEFT JOIN alunos_ocorrencias_itens oi ON oi.ocorrencia_id = o.id
                  LEFT JOIN usuarios u ON u.id = o.criado_por
+                 LEFT JOIN ocorrencias_categorias cat ON cat.id = o.categoria_id
                  WHERE o.aluno_id = :aluno_id OR oi.aluno_id = :aluno_id2
                  GROUP BY o.id
                  ORDER BY o.data_ocorrencia DESC, o.created_at DESC
@@ -402,7 +402,21 @@ class AdminStudentProfileService
                 ['aluno_id' => $id, 'aluno_id2' => $id]
             );
         } catch (\Exception $e) {
-            $ocorrenciasAluno = [];
+            try {
+                $ocorrenciasAluno = $this->db->fetchAll(
+                    "SELECT o.*, MAX(u.nome) as criado_por_nome
+                     FROM alunos_ocorrencias o
+                     LEFT JOIN alunos_ocorrencias_itens oi ON oi.ocorrencia_id = o.id
+                     LEFT JOIN usuarios u ON u.id = o.criado_por
+                     WHERE o.aluno_id = :aluno_id OR oi.aluno_id = :aluno_id2
+                     GROUP BY o.id
+                     ORDER BY o.data_ocorrencia DESC, o.created_at DESC
+                     LIMIT 100",
+                    ['aluno_id' => $id, 'aluno_id2' => $id]
+                );
+            } catch (\Exception $e2) {
+                $ocorrenciasAluno = [];
+            }
         }
 
         // Jornadas feitas (concluídas) pelo aluno
@@ -956,14 +970,14 @@ class AdminStudentProfileService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getAuditTrail(int $alunoId): array
+    public function getAuditTrail(int $alunoId, int $limit = 30): array
     {
         if ($alunoId <= 0) {
             return [];
         }
+        $limit = max(1, min(50, $limit));
         try {
-            $existe = $this->db->fetch("SHOW TABLES LIKE 'logs_auditoria'");
-            if ($existe === false || empty($existe)) {
+            if (!$this->temTabela('logs_auditoria')) {
                 return [];
             }
             $prefixo = '/admin/students/' . $alunoId;
@@ -972,7 +986,7 @@ class AdminStudentProfileService
                  FROM logs_auditoria
                  WHERE resource_accessed = :exato OR resource_accessed LIKE :prefixo
                  ORDER BY created_at DESC
-                 LIMIT 30",
+                 LIMIT {$limit}",
                 ['exato' => $prefixo, 'prefixo' => $prefixo . '/%']
             );
             return is_array($rows) ? $rows : [];

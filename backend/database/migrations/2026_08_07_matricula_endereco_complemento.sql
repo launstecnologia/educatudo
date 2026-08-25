@@ -6,9 +6,16 @@ SET @has_mp := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEM
 SET @has_mpr := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=@db AND TABLE_NAME='matricula_processos_responsaveis');
 
 SET @col := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='matricula_processos' AND COLUMN_NAME='aluno_end_complemento');
-SET @sql := IF(@has_mp>0 AND @col=0,
+SET @has_num := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='matricula_processos' AND COLUMN_NAME='aluno_end_numero');
+SET @has_end := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='matricula_processos' AND COLUMN_NAME='aluno_endereco');
+-- wizard_campos (aluno_end_numero) é posterior na ordem alfabética; não usar AFTER nessa coluna.
+SET @sql := IF(@has_mp>0 AND @col=0 AND @has_num>0,
   "ALTER TABLE matricula_processos ADD COLUMN `aluno_end_complemento` VARCHAR(120) DEFAULT NULL AFTER `aluno_end_numero`",
-  'SELECT 1');
+  IF(@has_mp>0 AND @col=0 AND @has_end>0,
+    "ALTER TABLE matricula_processos ADD COLUMN `aluno_end_complemento` VARCHAR(120) DEFAULT NULL AFTER `aluno_endereco`",
+    IF(@has_mp>0 AND @col=0,
+      "ALTER TABLE matricula_processos ADD COLUMN `aluno_end_complemento` VARCHAR(120) DEFAULT NULL",
+      'SELECT 1')));
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @col := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='matricula_processos_responsaveis' AND COLUMN_NAME='end_cep');

@@ -127,6 +127,14 @@ $badgeStatus = static function (string $st): string {
                                 <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/editar" class="text-gray-600 hover:underline">Editar</a>
                                 <span class="text-gray-300 mx-1">·</span>
                                 <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/preview" class="text-gray-600 hover:underline">Preview</a>
+                                <?php if ($st !== 'Concluido'): ?>
+                                <span class="text-gray-300 mx-1">·</span>
+                                <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/excluir" class="inline"
+                                      onsubmit="return confirm('Excluir este projeto? Esta ação não pode ser desfeita.');">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                                    <button type="submit" class="text-red-600 font-medium hover:underline">Excluir</button>
+                                </form>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

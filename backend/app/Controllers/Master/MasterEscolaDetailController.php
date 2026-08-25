@@ -2008,6 +2008,7 @@ class MasterEscolaDetailController extends BaseController
             $files = scandir($migrationDir);
             foreach ($files as $f) {
                 if (pathinfo($f, PATHINFO_EXTENSION) !== 'sql') continue;
+                if (stripos($f, '_rollback') !== false) continue;
                 if (stripos($f, 'master') !== false) continue;
                 $migrationFiles[] = $f;
             }

@@ -28,6 +28,12 @@ ob_start(); ?>
 <a href="<?= URL ?>/admin/enrollment/config" class="btn-secondary text-sm">
     <i class="fa-solid fa-gear mr-1.5"></i> Configuração
 </a>
+<a href="<?= URL ?>/admin/enrollment/campanhas" class="btn-secondary text-sm">
+    <i class="fa-solid fa-bullhorn mr-1.5"></i> Campanhas
+</a>
+<a href="<?= URL ?>/admin/enrollment/virada" class="btn-secondary text-sm">
+    <i class="fa-solid fa-arrow-right-arrow-left mr-1.5"></i> Virada de ano
+</a>
 <a href="<?= URL ?>/admin/enrollment/rematricula-lote" class="btn-secondary text-sm">
     <i class="fa-solid fa-users mr-1.5"></i> Rematrícula em lote
 </a>

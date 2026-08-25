@@ -21,6 +21,9 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                    <?php if (!empty($tem_chave_quadro)): ?>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quadro</th>
+                    <?php endif; ?>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordem</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -29,13 +32,21 @@
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($tipos)): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">Nenhum tipo de avaliação cadastrado.</td>
+                        <td colspan="<?= !empty($tem_chave_quadro) ? 6 : 5 ?>" class="px-6 py-12 text-center text-gray-500">Nenhum tipo de avaliação cadastrado.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($tipos as $tipo): ?>
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= htmlspecialchars($tipo['nome']) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-600"><?= !empty($tipo['descricao']) ? htmlspecialchars($tipo['descricao']) : '<span class="text-gray-400">Sem descrição</span>' ?></td>
+                            <?php if (!empty($tem_chave_quadro)): ?>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                <?php
+                                $cq = (string) ($tipo['chave_quadro'] ?? '');
+                                echo htmlspecialchars((string) (($chaves_quadro[$cq] ?? '') !== '' ? $chaves_quadro[$cq] : '—'), ENT_QUOTES, 'UTF-8');
+                                ?>
+                            </td>
+                            <?php endif; ?>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= (int)($tipo['ordem'] ?? 0) ?></td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <?php if (!empty($tipo['ativo'])): ?>

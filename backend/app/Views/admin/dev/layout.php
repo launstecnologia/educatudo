@@ -213,6 +213,36 @@
                         <p class="text-sm text-gray-500 mt-1">Subtítulo que aparece nas páginas de login</p>
                     </div>
                     
+                    <!-- Tamanho da Logo -->
+                    <?php
+                    $tamanhosLogo = ['1' => 'Normal (100%)', '1.25' => 'Grande (125%)', '1.5' => 'Muito grande (150%)', '2' => 'Extra grande (200%)'];
+                    $tamanhoNavbarAtual = (string) ($config_layout['logo_size_navbar'] ?? '1');
+                    $tamanhoLoginAtual = (string) ($config_layout['logo_size_login'] ?? '1');
+                    ?>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tamanho da logo no menu (sidebar)</label>
+                        <select name="config[logo_size_navbar]"
+                                id="logo-size-navbar"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
+                            <?php foreach ($tamanhosLogo as $val => $label): ?>
+                                <option value="<?= htmlspecialchars($val) ?>" <?= $tamanhoNavbarAtual === (string) $val ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="text-sm text-gray-500 mt-1">Ajusta a logo no menu lateral (admin, professor e aluno)</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tamanho da logo na página de login</label>
+                        <select name="config[logo_size_login]"
+                                id="logo-size-login"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
+                            <?php foreach ($tamanhosLogo as $val => $label): ?>
+                                <option value="<?= htmlspecialchars($val) ?>" <?= $tamanhoLoginAtual === (string) $val ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="text-sm text-gray-500 mt-1">Ajusta a logo exibida na tela de login</p>
+                    </div>
+                    
                     <!-- Nome do Menu Colag (Navbar do Aluno) -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Menu Colag (Navbar do Aluno)</label>
@@ -510,7 +540,22 @@ function resetColors() {
     }
 }
 
+function aplicarTamanhoLogoNavbar() {
+    const selectNavbar = document.getElementById('logo-size-navbar');
+    if (!selectNavbar) {
+        return;
+    }
+    const escala = parseFloat(selectNavbar.value) || 1;
+    document.documentElement.style.setProperty('--logo-navbar-size', (escala * 2.5) + 'rem');
+}
+
+const selectLogoNavbar = document.getElementById('logo-size-navbar');
+if (selectLogoNavbar) {
+    selectLogoNavbar.addEventListener('change', aplicarTamanhoLogoNavbar);
+}
+
 // Atualizar preview inicial
 updatePreview();
+aplicarTamanhoLogoNavbar();
 
 </script>

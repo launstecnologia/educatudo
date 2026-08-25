@@ -2,7 +2,7 @@
 // Rotas para Administração (perfil: admin_escola)
 $router->get('/admin/jornadas/ai-job/{id}/status', 'AIJobController@status');
 $router->get('/admin/ai-job/{id}/status', 'AIJobController@status');
-$router->get('/admin/dashboard', 'Admin/StudentAdminController@dashboard');
+// Dashboard: rota em app/Modulos/dashboard-gestao/routes.php
 $router->get('/admin/creditos/pacotes', 'Admin/SchoolSettingsAdminController@creditosPacotes');
 $router->post('/admin/creditos/pacotes', 'Admin/SchoolSettingsAdminController@creditosPacotesSalvar');
 $router->post('/admin/creditos/pacotes/toggle', 'Admin/SchoolSettingsAdminController@creditosPacotesToggle');
@@ -155,12 +155,26 @@ $router->get('/admin/reunioes/geral',           'Admin/MeetingController@geralIn
 $router->post('/admin/reunioes/geral/salvar',   'Admin/MeetingController@geralSalvar');
 $router->post('/admin/reunioes/geral/excluir',  'Admin/MeetingController@geralExcluir');
 
-$router->get('/admin/ocorrencias', 'Admin/OccurrenceAdminController@ocorrenciasIndex');
-$router->get('/admin/tentativas-login', 'Admin/OccurrenceAdminController@tentativasLoginIndex');
-$router->post('/admin/ocorrencias', 'Admin/OccurrenceAdminController@salvarOcorrenciaGeral');
+$router->get('/admin/resultados-finais', 'Admin/ResultadoFinalAdminController@index');
+$router->get('/admin/resultados-finais/relatorios', 'Admin/ResultadoFinalAdminController@relatorios');
+$router->get('/admin/resultados-finais/relatorios/pdf', 'Admin/ResultadoFinalAdminController@relatorioPdf');
+$router->get('/admin/resultados-finais/relatorios/csv', 'Admin/ResultadoFinalAdminController@relatorioCsv');
+$router->get('/admin/resultados-finais/layouts', 'Admin/ResultadoFinalAdminController@layouts');
+$router->post('/admin/resultados-finais/layouts', 'Admin/ResultadoFinalAdminController@salvarLayouts');
+$router->get('/admin/resultados-finais/turma/{id}', 'Admin/ResultadoFinalAdminController@turma');
+$router->post('/admin/resultados-finais/turma/{id}/homologar', 'Admin/ResultadoFinalAdminController@homologar');
+$router->post('/admin/resultados-finais/turma/{id}/especial', 'Admin/ResultadoFinalAdminController@especial');
+$router->post('/admin/resultados-finais/turma/{id}/especial/{especialId}/excluir', 'Admin/ResultadoFinalAdminController@excluirEspecial');
+$router->get('/admin/resultados-finais/turma/{id}/ata', 'Admin/ResultadoFinalAdminController@ata');
+$router->get('/admin/resultados-finais/turma/{id}/ata/pdf', 'Admin/ResultadoFinalAdminController@ataPdf');
+$router->post('/admin/resultados-finais/resultado/{id}/reabrir', 'Admin/ResultadoFinalAdminController@reabrir');
+$router->get('/admin/resultados-finais/aluno/{id}/ficha', 'Admin/ResultadoFinalAdminController@ficha');
+$router->get('/admin/resultados-finais/aluno/{id}/ficha/pdf', 'Admin/ResultadoFinalAdminController@fichaPdf');
+$router->get('/admin/resultados-finais/aluno/{id}/boletim/pdf', 'Admin/ResultadoFinalAdminController@boletimPdf');
+
 $router->post('/admin/ocorrencias/transcrever-audio', 'Admin/OccurrenceAdminController@transcreverOcorrenciaAudioGeral');
 $router->post('/admin/ocorrencias/auto-preencher', 'Admin/OccurrenceAdminController@autoPreencherOcorrenciaGeral');
-$router->get('/admin/ocorrencias/buscar-alunos', 'Admin/OccurrenceAdminController@buscarAlunosOcorrencias');
+$router->get('/admin/tentativas-login', 'Admin/OccurrenceAdminController@tentativasLoginIndex');
 $router->post('/admin/students/cadastrar-pai', 'Admin/StudentAdminController@cadastrarPai');
 $router->post('/admin/students/transfer', 'Admin/StudentAdminController@processarTransferenciaAlunos');
 $router->get('/admin/students/remanejamento', 'Admin/StudentAdminController@remanejamentoAlunos');
@@ -397,14 +411,7 @@ $router->post('/admin/faltas/atualizar', 'Admin/SchoolAbsenceController@atualiza
 $router->post('/admin/faltas/salvar', 'Admin/SchoolAbsenceController@salvarLancamentos');
 $router->post('/admin/faltas/excluir', 'Admin/SchoolAbsenceController@excluirEvento');
 
-// Acompanhamento do Diário de Classe
-$router->get('/admin/diario', 'Admin/ClassDiaryAdminController@index');
-$router->get('/admin/diario/indicadores', 'Admin/ClassDiaryAdminController@indicadores');
-$router->get('/admin/diario/aula', 'Admin/ClassDiaryAdminController@aula');
-$router->get('/admin/diario/lancar', 'Admin/ClassDiaryAdminController@lancar');
-$router->post('/admin/diario/salvar', 'Admin/ClassDiaryAdminController@salvar');
-$router->get('/admin/diario/relatorio/pdf', 'Admin/ClassDiaryAdminController@relatorioPdf');
-$router->get('/admin/diario/relatorio/excel', 'Admin/ClassDiaryAdminController@relatorioExcel');
+// Diário de Classe: rotas em app/Modulos/diario/routes.php
 
 // Painel de Conformidade Pedagógica / Central de Pendências / Modo Auditoria
 $router->get('/admin/conformidade', 'Admin/ComplianceController@dashboard');
@@ -608,12 +615,18 @@ $router->delete('/admin/dev/webhooks/{id}', 'Integrations/WebhookController@dele
 $router->post('/admin/dev/webhooks/{id}/test', 'Integrations/WebhookController@test');
 
 // Gestão de Matérias
-$router->get('/admin/subjects', 'Admin/SchoolSettingsAdminController@materias');
-$router->get('/admin/subjects/create', 'Admin/SchoolSettingsAdminController@criarMateria');
-$router->post('/admin/subjects', 'Admin/SchoolSettingsAdminController@salvarMateria');
-$router->get('/admin/subjects/{id}/edit', 'Admin/SchoolSettingsAdminController@editarMateria');
-$router->put('/admin/subjects/{id}', 'Admin/SchoolSettingsAdminController@atualizarMateria');
-$router->delete('/admin/subjects/{id}', 'Admin/SchoolSettingsAdminController@excluirMateria');
+$router->get('/admin/componentes-curriculares', 'Admin/ComponenteCurricularAdminController@index');
+$router->get('/admin/componentes-curriculares/{id}/dados', 'Admin/ComponenteCurricularAdminController@dados');
+$router->post('/admin/componentes-curriculares', 'Admin/ComponenteCurricularAdminController@store');
+$router->put('/admin/componentes-curriculares/{id}', 'Admin/ComponenteCurricularAdminController@update');
+$router->delete('/admin/componentes-curriculares/{id}', 'Admin/ComponenteCurricularAdminController@delete');
+
+// Salas / Ambientes (CRUD - reaproveita school_locations, usada também pelo Patrimônio)
+$router->get('/admin/salas', 'Admin/SalaAdminController@index');
+$router->get('/admin/salas/{id}/dados', 'Admin/SalaAdminController@dados');
+$router->post('/admin/salas', 'Admin/SalaAdminController@store');
+$router->put('/admin/salas/{id}', 'Admin/SalaAdminController@update');
+$router->delete('/admin/salas/{id}', 'Admin/SalaAdminController@delete');
 
 // Unidades da Escola (matriz/filial + dados institucionais)
 $router->get('/admin/unidades', 'Admin/SchoolUnitsAdminController@index');
@@ -638,14 +651,13 @@ $router->post('/admin/patrimonio/bens', 'Admin/PatrimonyAdminController@storeAss
 $router->post('/admin/patrimonio/movimentacoes', 'Admin/PatrimonyAdminController@moveAsset');
 $router->post('/admin/patrimonio/conferencias', 'Admin/PatrimonyAdminController@checkAsset');
 
-// Gestão de Turmas (CRUD Completo)
+// Gestão de Turmas (CRUD Completo - criar/editar em offcanvas no index; show continua página própria)
 $router->get('/admin/turmas', 'Education/ClassController@index');
-$router->get('/admin/turmas/create', 'Education/ClassController@create');
 $router->post('/admin/turmas', 'Education/ClassController@store');
 $router->get('/admin/turmas/{id}', 'Education/ClassController@show');
+$router->get('/admin/turmas/{id}/dados', 'Education/ClassController@dados');
 $router->get('/admin/turmas/{id}/buscar-alunos', 'Education/ClassController@buscarAlunosParaVincular');
 $router->post('/admin/turmas/{id}/vincular-aluno', 'Education/ClassController@vincularAluno');
-$router->get('/admin/turmas/{id}/edit', 'Education/ClassController@edit');
 $router->post('/admin/turmas/{id}', 'Education/ClassController@update');
 $router->delete('/admin/turmas/{id}', 'Education/ClassController@destroy');
 $router->post('/admin/turmas/bulk-delete', 'Education/ClassController@bulkDestroy');
@@ -659,24 +671,31 @@ $router->get('/admin/turmas/{id}/lista-chamada/exportar', 'Admin/StudentAdminCon
 $router->get('/admin/turmas/{id}/lista-chamada/pdf', 'Admin/StudentAdminController@listaChamadaPdf');
 $router->get('/admin/turmas/{id}/export-alunos-csv', 'Education/ClassController@exportarAlunosCsv');
 
-// Acadêmico e Pedagógico — landing pages
-$router->get('/admin/academico',   'Education/AnoLetivoController@academico');
-$router->get('/admin/pedagogico',  'Education/AnoLetivoController@pedagogico');
-$router->get('/admin/avaliacoes',  'Education/AnoLetivoController@avaliacoes');
+// Hubs do menu principal — landing pages
+$router->get('/admin/academico',       'Education/AnoLetivoController@academico');
+$router->get('/admin/pedagogico',      'Education/AnoLetivoController@pedagogico');
+$router->get('/admin/avaliacoes',      'Education/AnoLetivoController@avaliacoes');
+$router->get('/admin/gestao-escolar',  'Education/AnoLetivoController@gestaoEscolar');
+$router->get('/admin/comunicacao',     'Education/AnoLetivoController@comunicacao');
+$router->get('/admin/conteudo',            'Education/AnoLetivoController@conteudo');
+$router->get('/admin/financeiro-escolar',  'Education/AnoLetivoController@financeiroEscolar');
+$router->get('/admin/monitoramento-escolar', 'Education/AnoLetivoController@monitoramento');
+$router->get('/admin/relatorios',          'Education/AnoLetivoController@relatorios');
+$router->get('/admin/sistema',             'Education/AnoLetivoController@sistema');
+$router->get('/admin/gestao-usuarios',     'Education/AnoLetivoController@gestaoUsuarios');
+$router->get('/admin/z-configuracao',      'Education/AnoLetivoController@zConfiguracao');
 
-// Ano Letivo (CRUD - estrutura normalizada)
+// Ano Letivo (CRUD - estrutura normalizada, offcanvas em index)
 $router->get('/admin/ano-letivo', 'Education/AnoLetivoController@index');
-$router->get('/admin/ano-letivo/create', 'Education/AnoLetivoController@create');
+$router->get('/admin/ano-letivo/{id}/dados', 'Education/AnoLetivoController@dados');
 $router->post('/admin/ano-letivo', 'Education/AnoLetivoController@store');
-$router->get('/admin/ano-letivo/{id}/edit', 'Education/AnoLetivoController@edit');
 $router->post('/admin/ano-letivo/{id}/update', 'Education/AnoLetivoController@update');
 $router->post('/admin/ano-letivo/{id}/delete', 'Education/AnoLetivoController@destroy');
 
-// Curso (CRUD - tabela curso, estrutura normalizada)
+// Curso (CRUD - tabela curso, estrutura normalizada, offcanvas em index)
 $router->get('/admin/curso', 'Education/CursoController@index');
-$router->get('/admin/curso/create', 'Education/CursoController@create');
+$router->get('/admin/curso/{id}/dados', 'Education/CursoController@dados');
 $router->post('/admin/curso', 'Education/CursoController@store');
-$router->get('/admin/curso/{id}/edit', 'Education/CursoController@edit');
 $router->post('/admin/curso/{id}/update', 'Education/CursoController@update');
 $router->post('/admin/curso/{id}/delete', 'Education/CursoController@destroy');
 $router->post('/admin/curso/bulk-delete', 'Education/CursoController@bulkDestroy');
@@ -684,14 +703,22 @@ $router->get('/admin/curso/{id}/importar-alunos', 'Education/CursoController@imp
 $router->post('/admin/curso/{id}/importar-alunos/processar', 'Education/CursoController@processarImportacaoAlunos');
 $router->get('/admin/curso/{id}/modelo-csv', 'Education/CursoController@modeloCsv');
 
-// Série (CRUD - depende de curso)
+// Série (CRUD - depende de curso, offcanvas em index)
 $router->get('/admin/serie', 'Education/SerieController@index');
-$router->get('/admin/serie/create', 'Education/SerieController@create');
+$router->get('/admin/serie/{id}/dados', 'Education/SerieController@dados');
 $router->post('/admin/serie', 'Education/SerieController@store');
-$router->get('/admin/serie/{id}/edit', 'Education/SerieController@edit');
 $router->post('/admin/serie/{id}/update', 'Education/SerieController@update');
 $router->post('/admin/serie/{id}/delete', 'Education/SerieController@destroy');
 $router->post('/admin/serie/bulk-delete', 'Education/SerieController@bulkDestroy');
+
+// Matriz Curricular (CRUD - série × Componente Curricular × carga horária)
+$router->get('/admin/matrizes-curriculares', 'Admin/MatrizCurricularAdminController@index');
+$router->get('/admin/matrizes-curriculares/{id}/dados', 'Admin/MatrizCurricularAdminController@dados');
+$router->post('/admin/matrizes-curriculares', 'Admin/MatrizCurricularAdminController@store');
+$router->post('/admin/matrizes-curriculares/{id}/update', 'Admin/MatrizCurricularAdminController@update');
+$router->post('/admin/matrizes-curriculares/{id}/delete', 'Admin/MatrizCurricularAdminController@delete');
+
+// Regras Acadêmicas: rotas em app/Modulos/regras-academicas/routes.php
 
 // Gestão de Tipos de Curso e Cursos (legado)
 $router->get('/admin/cursos', 'Education/CourseCatalogController@index');
@@ -700,9 +727,9 @@ $router->post('/admin/cursos', 'Education/CourseCatalogController@storeCurso');
 
 // Grade Horária de Aulas
 $router->get('/admin/grade-horaria', 'Education/GradeHorariaController@index');
-$router->get('/admin/grade-horaria/create', 'Education/GradeHorariaController@create');
+$router->get('/admin/grade-horaria/pdf', 'Education/GradeHorariaController@pdf');
 $router->post('/admin/grade-horaria', 'Education/GradeHorariaController@store');
-$router->get('/admin/grade-horaria/{id}/edit', 'Education/GradeHorariaController@edit');
+$router->get('/admin/grade-horaria/{id}/dados', 'Education/GradeHorariaController@dados');
 $router->post('/admin/grade-horaria/{id}', 'Education/GradeHorariaController@update');
 $router->delete('/admin/grade-horaria/{id}', 'Education/GradeHorariaController@destroy');
 $router->post('/admin/grade-horaria/processar-imagem-ia', 'Education/GradeHorariaController@processarImagemIA');

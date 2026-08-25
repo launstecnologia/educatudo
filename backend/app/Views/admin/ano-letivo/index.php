@@ -10,11 +10,11 @@ $page_header_subtitle = 'Cadastre os anos letivos para uso em turmas e matrícul
 if ($schema_ready) {
     ob_start();
     ?>
-    <a href="<?= URL ?>/admin/ano-letivo/create"
+    <button type="button" onclick="openAnoLetivoDrawer()"
        class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
         <i class="fa-solid fa-plus mr-2"></i>
         Novo Ano Letivo
-    </a>
+    </button>
     <?php
     $page_header_actions = ob_get_clean();
 } else {
@@ -35,11 +35,11 @@ include __DIR__ . '/../_partials/flash_message.php';
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-12 text-center text-gray-500">
     <i class="fa-solid fa-calendar-days text-4xl text-gray-300 mb-4"></i>
     <p>Nenhum ano letivo cadastrado</p>
-    <a href="<?= URL ?>/admin/ano-letivo/create"
+    <button type="button" onclick="openAnoLetivoDrawer()"
        class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
         <i class="fa-solid fa-plus mr-2"></i>
         Cadastrar o primeiro ano letivo
-    </a>
+    </button>
 </div>
 <?php else: ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -73,10 +73,10 @@ include __DIR__ . '/../_partials/flash_message.php';
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php ob_start(); ?>
-                        <a href="<?= URL ?>/admin/ano-letivo/<?= (int) $row['id'] ?>/edit"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <button type="button" onclick="openAnoLetivoDrawer(<?= (int) $row['id'] ?>)"
+                           class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
-                        </a>
+                        </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form action="<?= URL ?>/admin/ano-letivo/<?= (int) $row['id'] ?>/delete" method="POST"
                               onsubmit="return confirm('Excluir este ano letivo?');">
@@ -128,4 +128,131 @@ include __DIR__ . '/../_partials/flash_message.php';
     </div>
     <?php endif; ?>
 </div>
+<?php endif; ?>
+
+<?php if ($schema_ready): ?>
+<!-- Offcanvas: Cadastrar/Editar Ano Letivo -->
+<div id="anoLetivoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeAnoLetivoDrawer()"></div>
+<aside id="anoLetivoDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+        <h2 id="anoLetivoDrawerTitle" class="text-xl font-bold text-gray-900">Novo Ano Letivo</h2>
+        <button type="button" onclick="closeAnoLetivoDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+
+    <form id="ano-letivo-form" class="flex flex-col flex-1 overflow-hidden" data-mode="create">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <input type="hidden" id="al_id" value="">
+
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do ano letivo</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                    <div>
+                        <label for="al_ano" class="block text-sm font-medium text-gray-700 mb-1">Ano <span class="text-red-500">*</span></label>
+                        <input type="number" id="al_ano" name="ano" required min="2000" max="2100"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="al_ativo" name="ativo" value="1" checked
+                                   class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm text-gray-700">Ano letivo ativo</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="al_data_inicio" class="block text-sm font-medium text-gray-700 mb-1">Data início</label>
+                        <input type="date" id="al_data_inicio" name="data_inicio"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label for="al_data_fim" class="block text-sm font-medium text-gray-700 mb-1">Data fim</label>
+                        <input type="date" id="al_data_fim" name="data_fim"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button type="button" onclick="closeAnoLetivoDrawer()"
+                    class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                Cancelar
+            </button>
+            <button type="submit"
+                    class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
+                <span id="al-form-submit-label">Salvar</span>
+            </button>
+        </div>
+    </form>
+</aside>
+
+<script>
+function openAnoLetivoDrawer(id) {
+    var form = document.getElementById('ano-letivo-form');
+    form.reset();
+    document.getElementById('al_id').value = '';
+    document.getElementById('al_ativo').checked = true;
+
+    if (!id) {
+        form.dataset.mode = 'create';
+        document.getElementById('anoLetivoDrawerTitle').textContent = 'Novo Ano Letivo';
+        document.getElementById('al-form-submit-label').textContent = 'Salvar';
+        showAnoLetivoDrawer();
+        return;
+    }
+
+    form.dataset.mode = 'edit';
+    document.getElementById('anoLetivoDrawerTitle').textContent = 'Editar Ano Letivo';
+    document.getElementById('al-form-submit-label').textContent = 'Salvar Alterações';
+    showAnoLetivoDrawer();
+
+    fetch('<?= URL ?>/admin/ano-letivo/' + id + '/dados')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data.success) { alert('Erro: ' + (data.error || '')); closeAnoLetivoDrawer(); return; }
+            document.getElementById('al_id').value = data.item.id;
+            document.getElementById('al_ano').value = data.item.ano;
+            document.getElementById('al_ativo').checked = !!parseInt(data.item.ativo, 10);
+            document.getElementById('al_data_inicio').value = data.item.data_inicio || '';
+            document.getElementById('al_data_fim').value = data.item.data_fim || '';
+        })
+        .catch(function () { alert('Erro de conexão.'); closeAnoLetivoDrawer(); });
+}
+
+function showAnoLetivoDrawer() {
+    document.getElementById('anoLetivoDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('anoLetivoDrawer');
+    drawer.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(function () { drawer.classList.remove('translate-x-full'); });
+}
+
+function closeAnoLetivoDrawer() {
+    var drawer = document.getElementById('anoLetivoDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    setTimeout(function () { document.getElementById('anoLetivoDrawerBackdrop').classList.add('hidden'); }, 300);
+}
+
+document.getElementById('ano-letivo-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var mode = this.dataset.mode;
+    var id = document.getElementById('al_id').value;
+    var url = mode === 'create' ? '<?= URL ?>/admin/ano-letivo' : '<?= URL ?>/admin/ano-letivo/' + id + '/update';
+    fetch(url, { method: 'POST', body: new FormData(this) })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+            if (result.success) { window.location.reload(); }
+            else { alert('Erro: ' + result.error); }
+        })
+        .catch(function () { alert('Erro de conexão. Tente novamente.'); });
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeAnoLetivoDrawer(); }
+});
+</script>
 <?php endif; ?>

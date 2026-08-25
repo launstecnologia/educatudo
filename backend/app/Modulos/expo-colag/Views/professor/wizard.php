@@ -835,8 +835,11 @@ if (!empty($projeto['formatos_aceitos'])) {
               msg.classList.remove('hidden');
               msg.className = 'rounded-lg px-4 py-3 text-sm ' + (res.j.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200');
               msg.textContent = res.j.message || (res.j.success ? 'Salvo.' : 'Erro.');
-              if (res.j.success && res.j.id && !form.querySelector('[name="projeto_id"]').value) {
-                  form.querySelector('[name="projeto_id"]').value = res.j.id;
+              var pidInput = form.querySelector('[name="projeto_id"]');
+              var pidAtual = parseInt((pidInput && pidInput.value) || '0', 10) || 0;
+              if (res.j.success && res.j.id && pidInput && pidAtual <= 0) {
+                  pidInput.value = String(res.j.id);
+                  root.setAttribute('data-projeto-id', String(res.j.id));
                   history.replaceState(null, '', root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + res.j.id + '/editar');
               }
               if (res.j.success && res.j.redirect && document.getElementById('campoAcao').value === 'publicar') {

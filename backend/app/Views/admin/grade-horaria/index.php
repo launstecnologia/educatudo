@@ -4,30 +4,20 @@ $user = $user ?? null;
 $current_page = $current_page ?? 'grade_horaria';
 $itens = $itens ?? [];
 $dias_semana = $dias_semana ?? [];
+$turmas = $turmas ?? [];
+$turmas_filtro = $turmas_filtro ?? $turmas;
+$professores = $professores ?? [];
+$materias = $materias ?? [];
+$tipos_ensino = $tipos_ensino ?? [];
+$series = $series ?? [];
+$filtros = $filtros ?? [];
 $csrf_token = $csrf_token ?? '';
 $success_message = $_SESSION['success_message'] ?? null;
 $error_message = $_SESSION['error_message'] ?? null;
 unset($_SESSION['success_message'], $_SESSION['error_message']);
-
-$itensPorDia = array_fill(1, 7, []);
-foreach ($itens as $item) {
-    $dia = (int) ($item['dia_semana'] ?? 0);
-    if (isset($itensPorDia[$dia])) {
-        $itensPorDia[$dia][] = $item;
-    }
-}
-
-$diasCurtos = [
-    1 => 'Segunda',
-    2 => 'Terça',
-    3 => 'Quarta',
-    4 => 'Quinta',
-    5 => 'Sexta',
-    6 => 'Sábado',
-    7 => 'Domingo',
-];
 ?>
 
+<div class="grade-no-print">
 <?php
 ob_start();
 ?>
@@ -36,11 +26,11 @@ ob_start();
     <i class="fa-regular fa-image mr-2 text-gray-500"></i>
     Importar por imagem
 </button>
-<a href="<?= URL ?>/admin/grade-horaria/create"
-   class="inline-flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm">
+<button type="button" onclick="openAulaDrawer()"
+        class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
     <i class="fa-solid fa-plus mr-2"></i>
     Nova aula
-</a>
+</button>
 <?php
 $page_header_actions = ob_get_clean();
 $page_header_title = 'Grade Horária de Aulas';
@@ -54,85 +44,106 @@ include __DIR__ . '/../_partials/page_header_list.php';
 <?php if ($error_message): ?>
     <div class="mb-6 p-4 rounded-lg bg-red-100 text-red-800 border border-red-200"><?= htmlspecialchars($error_message) ?></div>
 <?php endif; ?>
-
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-    <div class="px-5 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
-        <div>
-            <h3 class="text-lg font-semibold text-gray-900">Semana de aulas</h3>
-            <p class="mt-1 text-sm text-gray-500"><?= count($itens) ?> aula<?= count($itens) === 1 ? '' : 's' ?> cadastrada<?= count($itens) === 1 ? '' : 's' ?></p>
-        </div>
-        <p class="text-xs text-gray-500"><i class="fa-solid fa-arrows-left-right mr-1"></i>Arraste horizontalmente para ver toda a semana</p>
-    </div>
-
-    <div class="overflow-x-auto">
-        <div class="grid grid-cols-7 min-w-[1540px] divide-x divide-gray-200">
-            <?php foreach ($diasCurtos as $diaNumero => $diaNome): ?>
-                <section class="bg-slate-50/60 min-h-[520px]">
-                    <div class="sticky top-0 z-10 px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                        <div>
-                            <h4 class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($diaNome) ?></h4>
-                            <p class="text-xs text-gray-500"><?= htmlspecialchars($dias_semana[$diaNumero] ?? $diaNome) ?></p>
-                        </div>
-                        <span class="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-white border border-gray-200 text-xs font-semibold text-gray-600">
-                            <?= count($itensPorDia[$diaNumero]) ?>
-                        </span>
-                    </div>
-
-                    <div class="p-3 space-y-3">
-                        <?php if (empty($itensPorDia[$diaNumero])): ?>
-                            <div class="py-12 text-center text-gray-400">
-                                <i class="fa-regular fa-calendar text-2xl text-gray-300"></i>
-                                <p class="mt-2 text-xs">Sem aulas</p>
-                            </div>
-                        <?php else: ?>
-                            <?php foreach ($itensPorDia[$diaNumero] as $item):
-                                $tarde = ($item['periodo'] ?? '') === 'tarde';
-                                ob_start();
-                            ?>
-                                <a href="<?= URL ?>/admin/grade-horaria/<?= (int) $item['id'] ?>/edit" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
-                                </a>
-                                <form action="<?= URL ?>/admin/grade-horaria/<?= (int) $item['id'] ?>" method="post" onsubmit="return confirm('Remover esta aula da grade?');">
-                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                                    <input type="hidden" name="_method" value="DELETE">
-                                    <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                                        <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
-                                    </button>
-                                </form>
-                            <?php
-                                $row_actions_dropdown_items = ob_get_clean();
-                                $row_actions_dropdown_id = 'grade-actions-' . (int) $item['id'];
-                            ?>
-                                <article class="bg-white rounded-lg border border-gray-200 border-l-4 <?= $tarde ? 'border-l-indigo-400' : 'border-l-amber-400' ?> shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                                    <div class="p-3">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <div>
-                                                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                                    <i class="fa-regular fa-clock mr-1"></i><?= htmlspecialchars(substr((string) $item['horario_de'], 0, 5)) ?>–<?= htmlspecialchars(substr((string) $item['horario_ate'], 0, 5)) ?>
-                                                </p>
-                                                <h5 class="mt-1 text-sm font-semibold text-gray-900 leading-snug"><?= htmlspecialchars((string) ($item['materia_nome'] ?? '')) ?></h5>
-                                            </div>
-                                            <span class="inline-flex px-2 py-1 text-[11px] font-semibold rounded-full <?= $tarde ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800' ?>">
-                                                <?= $tarde ? 'Tarde' : 'Manhã' ?>
-                                            </span>
-                                        </div>
-                                        <div class="mt-3 space-y-1.5 text-xs text-gray-600">
-                                            <p><i class="fa-solid fa-users w-4 text-gray-400"></i><span class="font-medium text-gray-800"><?= htmlspecialchars((string) ($item['turma_nome'] ?? '')) ?></span></p>
-                                            <p class="leading-snug"><i class="fa-regular fa-user w-4 text-gray-400"></i><?= htmlspecialchars((string) ($item['professor_nome'] ?? '')) ?></p>
-                                        </div>
-                                    </div>
-                                    <div class="px-3 py-2 bg-gray-50/70 border-t border-gray-100 flex justify-end">
-                                        <?php include __DIR__ . '/../_partials/row_actions_dropdown.php'; ?>
-                                    </div>
-                                </article>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                </section>
-            <?php endforeach; ?>
-        </div>
-    </div>
 </div>
+
+<?php include __DIR__ . '/_conteudo.php'; ?>
+
+<!-- Criar/Editar aula em drawer lateral -->
+<div id="aulaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeAulaDrawer()"></div>
+<aside id="aulaDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+        <h2 id="aulaDrawerTitle" class="text-xl font-bold text-gray-900">Nova Aula</h2>
+        <button type="button" onclick="closeAulaDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+
+    <form id="aula-form" class="flex flex-col flex-1 overflow-hidden" data-mode="create">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <input type="hidden" id="aula_id" value="">
+
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <div id="aula-form-erro" class="hidden text-sm rounded-lg p-3 bg-red-100 text-red-800"></div>
+
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados da Aula</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                    <div>
+                        <label for="aula_dia_semana" class="block text-sm font-medium text-gray-700 mb-1">Dia da Semana *</label>
+                        <select id="aula_dia_semana" name="dia_semana" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Selecione</option>
+                            <?php foreach ($dias_semana as $num => $nome): ?>
+                                <option value="<?= (int) $num ?>"><?= htmlspecialchars($nome) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="aula_periodo" class="block text-sm font-medium text-gray-700 mb-1">Período *</label>
+                        <select id="aula_periodo" name="periodo" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="manha">Manhã</option>
+                            <option value="tarde">Tarde</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="aula_horario_de" class="block text-sm font-medium text-gray-700 mb-1">Horário de *</label>
+                        <input type="time" id="aula_horario_de" name="horario_de" required value="07:00"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label for="aula_horario_ate" class="block text-sm font-medium text-gray-700 mb-1">Horário até *</label>
+                        <input type="time" id="aula_horario_ate" name="horario_ate" required value="08:00"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label for="aula_turma_id" class="block text-sm font-medium text-gray-700 mb-1">Turma *</label>
+                        <select id="aula_turma_id" name="turma_id" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Selecione a turma</option>
+                            <?php foreach ($turmas as $t): ?>
+                                <option value="<?= (int) $t['id'] ?>"><?= htmlspecialchars($t['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="aula_professor_id" class="block text-sm font-medium text-gray-700 mb-1">Professor *</label>
+                        <select id="aula_professor_id" name="professor_id" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Selecione o professor</option>
+                            <?php foreach ($professores as $p): ?>
+                                <option value="<?= (int) $p['id'] ?>"><?= htmlspecialchars($p['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="aula_materia_id" class="block text-sm font-medium text-gray-700 mb-1">Matéria *</label>
+                        <select id="aula_materia_id" name="materia_id" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Selecione a matéria</option>
+                            <?php foreach ($materias as $m): ?>
+                                <option value="<?= (int) $m['id'] ?>"><?= htmlspecialchars($m['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button type="button" onclick="closeAulaDrawer()"
+                    class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                Cancelar
+            </button>
+            <button type="submit"
+                    class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
+                <span id="aula-form-submit-label">Salvar</span>
+            </button>
+        </div>
+    </form>
+</aside>
 
 <!-- Modal: Importar por imagem (IA) - passo 1: upload / passo 2: preview e salvar -->
 <div id="modal-imagem-ia" class="hidden fixed inset-0 z-50 overflow-y-auto">
@@ -229,6 +240,94 @@ var materiasIA = [];
 var csrfTokenIA = '<?= htmlspecialchars($csrf_token) ?>';
 var urlBase = '<?= URL ?>';
 var pollingGradeIA = null;
+
+// ---- Criar/Editar aula (drawer) ----
+function showAulaDrawer() {
+    document.getElementById('aulaDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('aulaDrawer');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+function closeAulaDrawer() {
+    document.getElementById('aulaDrawerBackdrop').classList.add('hidden');
+    var drawer = document.getElementById('aulaDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+
+function openAulaDrawer(id) {
+    var form = document.getElementById('aula-form');
+    form.reset();
+    document.getElementById('aula_id').value = '';
+    document.getElementById('aula-form-erro').classList.add('hidden');
+
+    if (!id) {
+        form.dataset.mode = 'create';
+        document.getElementById('aulaDrawerTitle').textContent = 'Nova Aula';
+        document.getElementById('aula-form-submit-label').textContent = 'Salvar';
+        showAulaDrawer();
+        return;
+    }
+
+    form.dataset.mode = 'edit';
+    document.getElementById('aulaDrawerTitle').textContent = 'Editar Aula';
+    document.getElementById('aula-form-submit-label').textContent = 'Salvar Alterações';
+    showAulaDrawer();
+
+    fetch(urlBase + '/admin/grade-horaria/' + id + '/dados')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) {
+                alert('Erro: ' + (data.error || 'Não foi possível carregar a aula.'));
+                closeAulaDrawer();
+                return;
+            }
+            var item = data.item;
+            document.getElementById('aula_id').value = item.id;
+            document.getElementById('aula_dia_semana').value = item.dia_semana;
+            document.getElementById('aula_periodo').value = item.periodo;
+            document.getElementById('aula_horario_de').value = item.horario_de;
+            document.getElementById('aula_horario_ate').value = item.horario_ate;
+            document.getElementById('aula_turma_id').value = item.turma_id;
+            document.getElementById('aula_professor_id').value = item.professor_id;
+            document.getElementById('aula_materia_id').value = item.materia_id;
+        })
+        .catch(function() {
+            alert('Erro de conexão.');
+            closeAulaDrawer();
+        });
+}
+
+document.getElementById('aula-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var mode = this.dataset.mode;
+    var id = document.getElementById('aula_id').value;
+    var url = mode === 'create' ? (urlBase + '/admin/grade-horaria') : (urlBase + '/admin/grade-horaria/' + id);
+    var erroEl = document.getElementById('aula-form-erro');
+    erroEl.classList.add('hidden');
+    fetch(url, { method: 'POST', body: new FormData(this) })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success) {
+                window.location.reload();
+            } else {
+                erroEl.textContent = result.error || 'Erro ao salvar.';
+                erroEl.classList.remove('hidden');
+            }
+        })
+        .catch(function() {
+            erroEl.textContent = 'Erro de conexão. Tente novamente.';
+            erroEl.classList.remove('hidden');
+        });
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeAulaDrawer();
+    }
+});
 
 function fecharModalImportacao() {
     if (pollingGradeIA) {

@@ -80,9 +80,11 @@ class ListaChamadaService
             return [];
         }
 
+        $sexoSql = $this->sqlSexoAluno();
+
         return $this->db->fetchAll(
             "SELECT c.numero_chamada, c.entrada_tardia, c.marcado_tr, c.data_entrada_turma,
-                    a.id AS aluno_id, a.nome, a.ra, a.sexo, a.ativo
+                    a.id AS aluno_id, a.nome, a.ra, {$sexoSql}, a.ativo
              FROM alunos_turma_chamada c
              INNER JOIN alunos a ON a.id = c.aluno_id
              WHERE c.turma_id = :t AND c.ano_letivo_id = :a
@@ -235,8 +237,9 @@ class ListaChamadaService
         $config = $this->getConfig($turmaId, $anoLetivoId);
         $dataCorte = $config['data_corte'] ?? null;
 
+        $sexoSql = $this->sqlSexoAluno();
         $alunos = $this->db->fetchAll(
-            "SELECT c.id AS chamada_id, c.aluno_id, c.data_entrada_turma, c.marcado_tr, a.nome, a.sexo
+            "SELECT c.id AS chamada_id, c.aluno_id, c.data_entrada_turma, c.marcado_tr, a.nome, {$sexoSql}
              FROM alunos_turma_chamada c
              INNER JOIN alunos a ON a.id = c.aluno_id
              WHERE c.turma_id = :t AND c.ano_letivo_id = :a",
@@ -662,6 +665,12 @@ class ListaChamadaService
         }
 
         return date('d/m/Y', $ts);
+    }
+
+    /** Fragmento SQL seguro: só referencia a.sexo se a coluna existir. */
+    private function sqlSexoAluno(): string
+    {
+        return $this->alunoTemColuna('sexo') ? 'a.sexo' : 'NULL AS sexo';
     }
 
     private function alunoTemColuna(string $coluna): bool

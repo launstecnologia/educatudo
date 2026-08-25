@@ -216,6 +216,7 @@ class GeradorQuestaoAgent implements AgenteIAInterface
             . "Quantidade de questões NESTE LOTE: {$tamanhoLote}\n"
             . "Pedido total do professor: {$quantidadeTotal} (já geradas em lotes anteriores: {$jaGeradas}; este é o lote {$loteNum}).\n"
             . "IMPORTANTE: devolva EXATAMENTE {$tamanhoLote} questões neste JSON, completas e válidas.\n"
+            . "DIRETRIZES DESTE LOTE: Varie amplamente os cenários e valores numéricos entre as questões (nunca repita mesmos valores ou historinhas). Distribua as respostas corretas entre as posições (A, B, C, D, E). Não inclua tags HTML no texto.\n"
             . ($tipoQuestao === 'multipla_escolha' ? "Quantidade de alternativas por questão: {$qtdAlternativas}\n" : '')
             . 'tipo_recurso_visual_decidido: ' . ($tipoRecursoVisual ?: 'null') . "\n"
             . $blocoReferencias

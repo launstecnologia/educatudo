@@ -14,31 +14,101 @@ class Student
     }
 
     /**
-     * Colunas realmente existentes na tabela alunos (cache por request).
-     * Usado para filtrar campos opcionais quando alguma migration ainda
+     * Colunas realmente existentes na tabela alunos (cache por tenant).
+     * Usado para filtrar campos quando alguma migration ainda
      * não rodou no tenant, evitando "Unknown column".
      *
      * @return array<string, bool>
      */
     private function colunasAlunos(): array
     {
-        static $cache = null;
-        if ($cache !== null) {
-            return $cache;
+        static $cache = [];
+        $key = class_exists('TenantResolver', false)
+            ? \TenantResolver::workerCacheKey()
+            : (defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant');
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
         }
-        $cache = [];
+        $cache[$key] = $this->lerColunasAlunosDoSchema();
+        return $cache[$key];
+    }
+
+    /** @return array<string, bool> */
+    private function lerColunasAlunosDoSchema(): array
+    {
+        $mapa = [];
         try {
             $rows = $this->db->fetchAll(
                 "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alunos'"
             );
-            foreach ($rows as $r) {
-                $cache[(string) $r['COLUMN_NAME']] = true;
-            }
+            $mapa = $this->mapaNomesColunas($rows, ['COLUMN_NAME', 'column_name']);
         } catch (\Throwable $e) {
-            $cache = [];
+            $mapa = [];
         }
-        return $cache;
+        if ($this->mapaColunasTemNomes($mapa)) {
+            return $mapa;
+        }
+        try {
+            $rows = $this->db->fetchAll('SHOW COLUMNS FROM alunos');
+            return $this->mapaNomesColunas($rows, ['Field', 'field', 'COLUMN_NAME', 'column_name']);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @param list<string> $chaves
+     * @return array<string, bool>
+     */
+    private function mapaNomesColunas(array $rows, array $chaves): array
+    {
+        $mapa = [];
+        foreach ($rows as $r) {
+            $nome = '';
+            foreach ($chaves as $chave) {
+                if (isset($r[$chave]) && (string) $r[$chave] !== '') {
+                    $nome = (string) $r[$chave];
+                    break;
+                }
+            }
+            if ($nome !== '') {
+                $mapa[$nome] = true;
+            }
+        }
+        return $mapa;
+    }
+
+    /** @param array<string, bool> $mapa */
+    private function mapaColunasTemNomes(array $mapa): bool
+    {
+        foreach ($mapa as $nome => $ok) {
+            if ($ok && (string) $nome !== '') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param list<string> $columns
+     * @return list<string>
+     */
+    private function filtrarColunasExistentes(array $columns): array
+    {
+        $existentes = $this->colunasAlunos();
+        if (!$this->mapaColunasTemNomes($existentes)) {
+            $evitar = ['cpf' => true, 'foto_url' => true];
+            return array_values(array_filter(
+                $columns,
+                static fn ($col) => !isset($evitar[$col])
+            ));
+        }
+        return array_values(array_filter(
+            $columns,
+            static fn ($col) => isset($existentes[$col])
+        ));
     }
     
     /**
@@ -137,7 +207,9 @@ class Student
             'zona', 'pais', 'whatsapp', 'email_secundario',
             'nome_mae', 'nome_pai', 'codigo_inep'];
         $colsExistentes = $this->colunasAlunos();
-        if (!empty($colsExistentes)) {
+        if (!$this->mapaColunasTemNomes($colsExistentes)) {
+            $optionalColumns = [];
+        } else {
             $optionalColumns = array_values(array_filter(
                 $optionalColumns,
                 static fn ($col) => isset($colsExistentes[$col])
@@ -183,6 +255,13 @@ class Student
             }
         }
 
+        $columns = $this->filtrarColunasExistentes($columns);
+        if (isset($colsExistentes['password']) && !in_array('password', $columns, true)) {
+            $columns[] = 'password';
+            $params['password'] = (string) ($data['password'] ?? '');
+        }
+        $params = array_intersect_key($params, array_flip($columns));
+
         $placeholders = array_map(static fn ($col) => ':' . $col, $columns);
         $sql = 'INSERT INTO alunos (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
 
@@ -199,28 +278,23 @@ class Student
         require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
         $dataNasc = StudentFormHelper::normalizarDataNasc($data['data_nasc'] ?? null);
 
-        $setParts = [
-            'nome = ?',
-            'nickname = ?',
-            'email = ?',
-            'ra = ?',
-            'codigo_aluno = ?',
-            'cpf = ?',
-            'foto_url = ?',
-            'turma_id = ?',
-            'serie = ?',
+        $base = [
+            'nome' => $data['nome'],
+            'nickname' => $data['nickname'] ?? null,
+            'email' => $data['email'] ?? null,
+            'ra' => $data['ra'] ?? null,
+            'codigo_aluno' => $data['codigo_aluno'] ?? null,
+            'cpf' => $data['cpf'] ?? null,
+            'foto_url' => $data['foto_url'] ?? null,
+            'turma_id' => $data['turma_id'] ?? null,
+            'serie' => $data['serie'] ?? null,
         ];
-        $params = [
-            $data['nome'],
-            $data['nickname'] ?? null,
-            $data['email'] ?? null,
-            $data['ra'] ?? null,
-            $data['codigo_aluno'] ?? null,
-            $data['cpf'] ?? null,
-            $data['foto_url'] ?? null,
-            $data['turma_id'] ?? null,
-            $data['serie'] ?? null,
-        ];
+        $setParts = [];
+        $params = [];
+        foreach ($this->filtrarColunasExistentes(array_keys($base)) as $col) {
+            $setParts[] = $col . ' = ?';
+            $params[] = $base[$col];
+        }
 
         if ($dataNasc === null) {
             $setParts[] = 'data_nasc = NULL';
@@ -252,7 +326,9 @@ class Student
             'zona', 'pais', 'whatsapp', 'email_secundario',
             'nome_mae', 'nome_pai', 'codigo_inep'];
         $colsExistentes = $this->colunasAlunos();
-        if (!empty($colsExistentes)) {
+        if (!$this->mapaColunasTemNomes($colsExistentes)) {
+            $camposOpcionais = [];
+        } else {
             $camposOpcionais = array_values(array_filter(
                 $camposOpcionais,
                 static fn ($col) => isset($colsExistentes[$col])

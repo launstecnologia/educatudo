@@ -63,6 +63,18 @@ if (!function_exists('env')) {
 }
 
 $schoolCodeConfig = $tenantSlugRuntime !== '' ? $tenantSlugRuntime : env('SCHOOL_CODE', 'default');
+$entraComoSecret = (string) env('ENTRA_COMO_SECRET', '');
+$requestHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+$requestHost = preg_replace('/:\d+$/', '', $requestHost);
+$isLocalHost = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true)
+    || str_ends_with($requestHost, '.localhost');
+$isLocalEnv = defined('ENVIRONMENT') && ENVIRONMENT === 'development';
+if ($entraComoSecret === '' && $isLocalEnv && $isLocalHost) {
+    $entraComoSecret = hash(
+        'sha256',
+        'entrar-como-local-' . env('DB_HOST', '') . env('DB_NAME', '') . env('DB_USER', '') . env('DB_PASS', '')
+    );
+}
 
 return [
     'app' => [
@@ -106,8 +118,8 @@ return [
         'lockout_duration' => (int) env('LOCKOUT_DURATION', 900),
         // Limite por IP: maior que o por nickname, para não bloquear outros usuários no mesmo IP (ex.: laboratório)
         'max_login_attempts_ip' => (int) env('MAX_LOGIN_ATTEMPTS_IP', 50),
-        // Chave para "Entrar como" (master): se não definir ENTRA_COMO_SECRET, usa valor derivado do banco no .env
-        'entra_como_secret' => env('ENTRA_COMO_SECRET') !== '' ? env('ENTRA_COMO_SECRET') : hash('sha256', 'entrar-como-' . env('DB_HOST', '') . env('DB_NAME', '') . env('DB_USER', '') . env('DB_PASS', '')),
+        // Em localhost, permite testar "Entrar como" mesmo sem ENTRA_COMO_SECRET no .env.
+        'entra_como_secret' => $entraComoSecret,
     ],
 
     'upload' => [

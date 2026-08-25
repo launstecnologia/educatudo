@@ -112,9 +112,12 @@ class ModeloDocumentoService
         'info_pertinente' => 'Informação pertinente (texto livre)',
         'info_pertinente_html' => 'Informação pertinente (HTML com bullets)',
         'titulo' => 'Título do documento',
-        'doc_rotulo' => 'Declaração / Documento',
+        'doc_rotulo' => 'Rótulo do documento (Declaração, Autorização…)',
         'numero' => 'Número da emissão',
-        'ano' => 'Ano do número',
+        'ano' => 'Ano do número da emissão',
+        'pagina' => 'Número da página (PDF)',
+        'total_paginas' => 'Total de páginas (PDF)',
+        'periodo_nome' => 'Nome do período (bimestre/trimestre)',
         'cidade_data' => 'Cidade, data por extenso',
         'diretor_nome' => 'Nome do diretor',
         'secretario_nome' => 'Nome do secretário',
@@ -141,6 +144,15 @@ class ModeloDocumentoService
         'rodape_unidades' => 'Linha de unidades/contato do rodapé',
         'assinante_nome' => 'Nome de quem assina (layout padrão)',
         'assinante_cargo' => 'Cargo de quem assina (Direção, Coordenação…)',
+        'quadro_notas_html' => 'Quadro de notas/componentes (HTML)',
+        'situacao_final' => 'Situação acadêmica final',
+        'frequencia_percentual' => 'Frequência (%)',
+        'tabela_html' => 'Tabela coletiva (ata/relatório)',
+        'titulo_relatorio' => 'Título do relatório acadêmico',
+        'periodo_label' => 'Rótulo do período (ano/bimestre…)',
+        'total_alunos' => 'Total de alunos (ata/relatório)',
+        'total_homologados' => 'Total homologados',
+        'total_pendencias' => 'Total de pendências críticas',
     ];
 
     /** Cargos disponíveis na assinatura do layout padrão. */
@@ -244,8 +256,16 @@ class ModeloDocumentoService
         'declaracao_comparecimento',
         'declaracao_transferencia',
         'declaracao_aut_saida',
+        'declaracao_aut_retirada',
+        'declaracao_aut_imagem',
+        'declaracao_aut_passeio',
         'declaracao_ficha_matricula',
         'declaracao_bolsista_integral',
+        'resultado_ficha_individual',
+        'resultado_ata_finais',
+        'resultado_boletim_padrao',
+        'resultado_relatorio_padrao',
+        'resultado_historico',
     ];
 
     private $db;
@@ -272,6 +292,467 @@ class ModeloDocumentoService
         return str_starts_with($codigo, 'declaracao_');
     }
 
+    /** @return array<string,string> chave => rótulo */
+    public const CATEGORIAS = [
+        'declaracao' => 'Declarações',
+        'autorizacao' => 'Autorizações',
+        'contrato' => 'Contratos',
+        'oficial' => 'Documentos oficiais',
+        'outro' => 'Outros modelos',
+    ];
+
+    /**
+     * Blocos prontos para montar o documento no editor (logo, título, tabela…).
+     *
+     * @return list<array{id:string,label:string,icone:string,alvo:string,html:string,ajuda:string}>
+     */
+    public static function blocosEditor(): array
+    {
+        return [
+            [
+                'id' => 'logo',
+                'label' => 'Logo',
+                'icone' => 'fa-image',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Insere a logo da unidade/escola na coluna ou no texto.',
+                'html' => '<p style="text-align:center;margin:0;">{{logo_html}}</p>',
+            ],
+            [
+                'id' => 'cabecalho_escola',
+                'label' => 'Logo + escola',
+                'icone' => 'fa-building-columns',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Duas colunas: logo à esquerda e nome da escola centralizado na vertical.',
+                'html' => self::htmlLinhaColunas(
+                    [28, 72],
+                    'middle',
+                    [
+                        '<p style="text-align:center;margin:0;">{{logo_html}}</p>',
+                        '<p class="escola" style="margin:0 0 2px 0;">{{escola_nome}}</p>'
+                            . '<p class="meta" style="margin:0;">{{escola_endereco}}</p>'
+                            . '<p class="meta" style="margin:0;">{{escola_docs}}</p>',
+                    ]
+                ),
+            ],
+            [
+                'id' => 'titulo',
+                'label' => 'Título',
+                'icone' => 'fa-heading',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Número + título do documento.',
+                'html' => '<div class="doc-num">{{doc_rotulo}} nº {{numero}}/{{ano}}</div>'
+                    . '<h1 class="doc-title">{{titulo}}</h1>',
+            ],
+            [
+                'id' => 'texto',
+                'label' => 'Texto livre',
+                'icone' => 'fa-align-left',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Parágrafo com o nome do aluno já marcado.',
+                'html' => '<p>Declaramos, para os devidos fins, que '
+                    . '<span class="destaque">{{aluno_nome}}</span>{{aluno_cpf_frase}}.</p>',
+            ],
+            [
+                'id' => 'tabela_aluno',
+                'label' => 'Tabela do aluno',
+                'icone' => 'fa-table',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Nome, CPF, turma, série, ano.',
+                'html' => '<table class="dados">'
+                    . '<tr><td class="label">Aluno(a)</td><td>{{aluno_nome}}</td></tr>'
+                    . '<tr><td class="label">CPF</td><td>{{aluno_cpf}}</td></tr>'
+                    . '<tr><td class="label">Nascimento</td><td>{{aluno_data_nasc}}</td></tr>'
+                    . '<tr><td class="label">Turma</td><td>{{turma_nome}}</td></tr>'
+                    . '<tr><td class="label">Série</td><td>{{serie}}</td></tr>'
+                    . '<tr><td class="label">Ano letivo</td><td>{{ano_letivo}}</td></tr>'
+                    . '</table>',
+            ],
+            [
+                'id' => 'tabela_responsavel',
+                'label' => 'Tabela do responsável',
+                'icone' => 'fa-user-group',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Dados do responsável legal.',
+                'html' => '<table class="dados">'
+                    . '<tr><td class="label">Responsável</td><td>{{resp_nome}}</td></tr>'
+                    . '<tr><td class="label">CPF</td><td>{{resp_cpf}}</td></tr>'
+                    . '<tr><td class="label">Parentesco</td><td>{{resp_parentesco}}</td></tr>'
+                    . '<tr><td class="label">Telefone</td><td>{{resp_telefone}}</td></tr>'
+                    . '<tr><td class="label">E-mail</td><td>{{resp_email}}</td></tr>'
+                    . '</table>',
+            ],
+            [
+                'id' => 'frequencia',
+                'label' => 'Tabela de frequência',
+                'icone' => 'fa-calendar-check',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Preenchida na emissão da declaração de frequência.',
+                'html' => '{{frequencia_html}}',
+            ],
+            [
+                'id' => 'quadro_notas',
+                'label' => 'Quadro de notas',
+                'icone' => 'fa-list-ol',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Componentes e notas (ficha/boletim).',
+                'html' => '{{quadro_notas_html}}',
+            ],
+            [
+                'id' => 'tabela_coletiva',
+                'label' => 'Tabela coletiva',
+                'icone' => 'fa-table-cells',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Ata / relatório da turma.',
+                'html' => '{{tabela_html}}',
+            ],
+            [
+                'id' => 'responsaveis',
+                'label' => 'Lista de responsáveis',
+                'icone' => 'fa-users',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Tabela gerada na ficha de matrícula.',
+                'html' => '{{responsaveis_html}}',
+            ],
+            [
+                'id' => 'data_cidade',
+                'label' => 'Cidade e data',
+                'icone' => 'fa-location-dot',
+                'alvo' => 'rodape_html',
+                'ajuda' => 'Ex.: Ribeirão Preto, 22 de agosto de 2026.',
+                'html' => '<div class="fecho">{{cidade_data}}.</div>',
+            ],
+            [
+                'id' => 'assinaturas',
+                'label' => 'Assinaturas (escola)',
+                'icone' => 'fa-signature',
+                'alvo' => 'rodape_html',
+                'ajuda' => 'Secretaria + Direção.',
+                'html' => self::htmlLinhaColunas(
+                    [50, 50],
+                    'bottom',
+                    [
+                        '<p style="text-align:center;margin:0;">________________________</p>'
+                            . '<p class="nome" style="text-align:center;margin:4px 0 0;font-weight:bold;">{{secretario_nome}}</p>'
+                            . '<p class="cargo" style="text-align:center;margin:0;">Secretaria</p>',
+                        '<p style="text-align:center;margin:0;">________________________</p>'
+                            . '<p class="nome" style="text-align:center;margin:4px 0 0;font-weight:bold;">{{diretor_nome}}</p>'
+                            . '<p class="cargo" style="text-align:center;margin:0;">Direção</p>',
+                    ]
+                ),
+            ],
+            [
+                'id' => 'assinatura_resp',
+                'label' => 'Assinatura do responsável',
+                'icone' => 'fa-pen',
+                'alvo' => 'rodape_html',
+                'ajuda' => 'Responsável legal + Direção (autorizações).',
+                'html' => self::htmlLinhaColunas(
+                    [50, 50],
+                    'bottom',
+                    [
+                        '<p style="text-align:center;margin:0;">________________________</p>'
+                            . '<p class="nome" style="text-align:center;margin:4px 0 0;font-weight:bold;">{{resp_nome}}</p>'
+                            . '<p class="cargo" style="text-align:center;margin:0;">Responsável legal</p>',
+                        '<p style="text-align:center;margin:0;">________________________</p>'
+                            . '<p class="nome" style="text-align:center;margin:4px 0 0;font-weight:bold;">{{diretor_nome}}</p>'
+                            . '<p class="cargo" style="text-align:center;margin:0;">Direção</p>',
+                    ]
+                ),
+            ],
+        ];
+    }
+
+    /**
+     * Linha de colunas estilo Elementor (tabela — CKEditor e Dompdf preservam).
+     *
+     * @param list<int> $larguras Soma deve ser 100
+     * @param 'top'|'middle'|'bottom'|'topo'|'meio'|'base' $valign
+     * @param list<string> $celulas HTML de cada coluna
+     */
+    public static function htmlLinhaColunas(array $larguras, string $valign = 'middle', array $celulas = []): string
+    {
+        $va = match ($valign) {
+            'top', 'topo' => 'top',
+            'bottom', 'base' => 'bottom',
+            default => 'middle',
+        };
+        $tds = [];
+        foreach (array_values($larguras) as $i => $w) {
+            $w = max(1, min(100, (int) $w));
+            $inner = trim((string) ($celulas[$i] ?? ''));
+            if ($inner === '') {
+                $inner = '<p>&nbsp;</p>';
+            }
+            $tds[] = '<td class="doc-col" style="width:' . $w . '%;vertical-align:' . $va
+                . ';padding:8px 10px;border:none;border-color:transparent;">' . $inner . '</td>';
+        }
+        $cols = [];
+        foreach (array_values($larguras) as $w) {
+            $w = max(1, min(100, (int) $w));
+            $cols[] = '<col style="width:' . $w . '%">';
+        }
+        return '<table class="doc-linha" width="100%" border="0" style="width:100%;border-collapse:collapse;table-layout:fixed;border:none;">'
+            . '<colgroup>' . implode('', $cols) . '</colgroup><tbody><tr>'
+            . implode('', $tds) . '</tr></tbody></table><p>&nbsp;</p>';
+    }
+
+    /**
+     * Presets de estrutura (ícones de colunas, como no Elementor).
+     *
+     * @return list<array{id:string,label:string,cols:list<int>}>
+     */
+    public static function estruturasEditor(): array
+    {
+        return [
+            ['id' => '100', 'label' => '1 coluna', 'cols' => [100]],
+            ['id' => '50_50', 'label' => '50 / 50', 'cols' => [50, 50]],
+            ['id' => '2col', 'label' => '2 colunas', 'cols' => [50, 50]],
+            ['id' => '3col', 'label' => '3 colunas', 'cols' => [33, 34, 33]],
+            ['id' => '4col', 'label' => '4 colunas', 'cols' => [25, 25, 25, 25]],
+            ['id' => '25_75', 'label' => '25 / 75', 'cols' => [25, 75]],
+            ['id' => '33_67', 'label' => '33 / 67', 'cols' => [33, 67]],
+            ['id' => '40_60', 'label' => '40 / 60', 'cols' => [40, 60]],
+            ['id' => '30_70', 'label' => '30 / 70', 'cols' => [30, 70]],
+            ['id' => '60_40', 'label' => '60 / 40', 'cols' => [60, 40]],
+            ['id' => '67_33', 'label' => '67 / 33', 'cols' => [67, 33]],
+            ['id' => '75_25', 'label' => '75 / 25', 'cols' => [75, 25]],
+        ];
+    }
+
+    /**
+     * @return array{layout:list<array<string,mixed>>,conteudo:list<array<string,mixed>>,dados:list<array<string,mixed>>,tabelas:list<array<string,mixed>>,extras:list<array<string,mixed>>}
+     */
+    public static function catalogoElementosEditor(): array
+    {
+        $item = static fn (string $tipo, string $label, string $icone, string $ajuda = '') => [
+            'tipo' => $tipo,
+            'label' => $label,
+            'icone' => $icone,
+            'ajuda' => $ajuda,
+        ];
+        return [
+            'layout' => self::estruturasEditor(),
+            'conteudo' => [
+                $item('titulo', 'Título', 'fa-heading'),
+                $item('texto', 'Texto', 'fa-align-left'),
+                $item('texto_rico', 'Texto rico', 'fa-pen-to-square'),
+                $item('logo', 'Logo', 'fa-image', 'Logo da unidade ou da escola'),
+                $item('imagem', 'Imagem', 'fa-photo-film'),
+            ],
+            'dados' => [
+                $item('dados_escola', 'Dados da escola', 'fa-building-columns'),
+                $item('dados_aluno', 'Dados do aluno', 'fa-user-graduate'),
+                $item('dados_responsavel', 'Dados do responsável', 'fa-user'),
+                $item('dados_turma', 'Dados da turma', 'fa-users'),
+                $item('frequencia', 'Frequência', 'fa-chart-pie'),
+                $item('observacoes', 'Observações', 'fa-comment'),
+                $item('assinaturas', 'Assinaturas', 'fa-signature'),
+            ],
+            'tabelas' => [
+                $item('tabela_aluno', 'Tabela do aluno', 'fa-table'),
+                $item('tabela_notas', 'Tabela de notas', 'fa-table-list'),
+                $item('tabela_frequencia', 'Tabela de frequência', 'fa-calendar-check'),
+                $item('historico', 'Histórico escolar', 'fa-scroll'),
+                $item('resultado_final', 'Resultado final', 'fa-flag-checkered'),
+            ],
+            'extras' => [
+                $item('linha', 'Linha divisória', 'fa-minus'),
+                $item('espacador', 'Espaçador', 'fa-arrows-up-down'),
+                $item('pagina', 'Número da página', 'fa-file-lines'),
+                $item('quebra_pagina', 'Quebra de página', 'fa-file-circle-plus'),
+                $item('qrcode', 'QR Code', 'fa-qrcode'),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    public static function estruturaVazia(string $formato = 'a4', string $orientacao = 'retrato', int $margem = 15): array
+    {
+        $pagina = [
+            'size' => strtolower($formato) === 'a5' ? 'A5' : 'A4',
+            'orientation' => $orientacao === 'paisagem' ? 'landscape' : 'portrait',
+            'margin' => ['top' => $margem, 'right' => $margem, 'bottom' => $margem, 'left' => $margem],
+        ];
+        return [
+            'version' => 1,
+            'page' => $pagina,
+            'header' => ['repeat' => true, 'sections' => []],
+            'body' => ['sections' => [self::secaoPadrao([100], 'body')]],
+            'footer' => ['repeat' => true, 'sections' => []],
+        ];
+    }
+
+    /**
+     * @param list<int> $larguras
+     * @return array<string,mixed>
+     */
+    public static function secaoPadrao(array $larguras, string $role = 'body'): array
+    {
+        $cols = [];
+        foreach ($larguras as $w) {
+            $cols[] = [
+                'id' => self::idEstrutura('c'),
+                'width' => max(10, min(100, (int) $w)),
+                'vAlign' => 'top',
+                'elements' => [],
+            ];
+        }
+        return [
+            'id' => self::idEstrutura('s'),
+            'type' => 'section',
+            'role' => $role,
+            'columns' => $cols,
+        ];
+    }
+
+    public static function idEstrutura(string $prefixo = 'n'): string
+    {
+        try {
+            $rand = bin2hex(random_bytes(4));
+        } catch (\Throwable $e) {
+            $rand = (string) mt_rand(100000, 999999);
+        }
+        return $prefixo . '_' . $rand;
+    }
+
+    /**
+     * Todos os placeholders, agrupados. Chaves que ainda não estiverem em nenhum
+     * grupo entram em “Outros” — a lista da lateral nunca fica incompleta.
+     *
+     * @return array<string,array{label:string,chaves:list<string>}>
+     */
+    public static function gruposPlaceholders(): array
+    {
+        $grupos = [
+            'documento' => [
+                'label' => 'Documento',
+                'chaves' => [
+                    'titulo', 'doc_rotulo', 'numero', 'ano', 'data_hoje', 'cidade_data',
+                    'diretor_nome', 'secretario_nome', 'assinante_nome', 'assinante_cargo',
+                    'documento_assinatura', 'observacoes', 'info_pertinente', 'info_pertinente_html',
+                    'pagina', 'total_paginas',
+                ],
+            ],
+            'escola' => [
+                'label' => 'Escola',
+                'chaves' => [
+                    'escola_nome', 'escola_cnpj', 'escola_cnpj_numero', 'escola_endereco',
+                    'escola_docs', 'escola_origem', 'logo_html', 'razao_social', 'cnpj_layout',
+                    'rodape_unidades',
+                ],
+            ],
+            'aluno' => [
+                'label' => 'Aluno',
+                'chaves' => [
+                    'aluno_nome', 'aluno_cpf', 'aluno_rg', 'aluno_cpf_frase', 'aluno_data_nasc',
+                    'aluno_nasc_frase', 'aluno_email', 'aluno_telefone', 'aluno_endereco',
+                    'aluno_cidade', 'aluno_codigo', 'matricula_numero',
+                ],
+            ],
+            'responsavel' => [
+                'label' => 'Responsáveis',
+                'chaves' => [
+                    'resp_nome', 'resp_cpf', 'resp_rg', 'resp_email', 'resp_telefone', 'resp_celular',
+                    'resp_parentesco', 'resp_endereco', 'resp_bairro', 'resp_cep', 'resp_cidade',
+                    'resp_estado_civil', 'responsaveis_html',
+                    'se_resp2', 'resp2_nome', 'resp2_cpf', 'resp2_rg', 'resp2_email', 'resp2_telefone',
+                    'resp2_celular', 'resp2_parentesco', 'resp2_endereco', 'resp2_bairro', 'resp2_cep',
+                    'resp2_cidade', 'resp2_estado_civil',
+                    'se_resp_fin', 'resp_fin_nome', 'resp_fin_cpf', 'resp_fin_rg', 'resp_fin_email',
+                    'resp_fin_telefone', 'resp_fin_celular', 'resp_fin_endereco', 'resp_fin_bairro',
+                    'resp_fin_cep', 'resp_fin_cidade',
+                ],
+            ],
+            'turma' => [
+                'label' => 'Turma / matrícula',
+                'chaves' => [
+                    'turma_nome', 'turma_frase', 'serie', 'ano_letivo', 'curso_nome',
+                    'situacao_matricula', 'data_entrada', 'data_saida', 'tipo_matricula',
+                    'periodo_label', 'periodo_nome', 'periodo_inicio', 'periodo_fim',
+                ],
+            ],
+            'autorizacao' => [
+                'label' => 'Autorização / comparecimento',
+                'chaves' => [
+                    'data_comparecimento', 'periodo_texto', 'periodo_texto_frase', 'data_evento',
+                    'aut_horario', 'aut_motivo', 'aut_nome_autorizado', 'aut_documento',
+                    'aut_parentesco', 'aut_local', 'aut_hora_saida', 'aut_hora_retorno', 'aut_finalidade',
+                ],
+            ],
+            'academico' => [
+                'label' => 'Notas / frequência / resultados',
+                'chaves' => [
+                    'quadro_notas_html', 'frequencia_html', 'frequencia_percentual', 'historico_html',
+                    'tabela_html', 'situacao_final', 'titulo_relatorio', 'total_alunos',
+                    'total_homologados', 'total_pendencias',
+                ],
+            ],
+            'contrato' => [
+                'label' => 'Contrato / valores',
+                'chaves' => [
+                    'valor_anuidade', 'valor_parcela', 'valor_liquido_parcela', 'valor_primeira_parcela',
+                    'desconto_primeira', 'desconto_primeira_obs', 'valor_liquido_primeira',
+                    'qtd_parcelas_primeira', 'valor_mensalidades_liq', 'desconto_parcela', 'num_parcelas',
+                    'data_rematricula', 'pagante_modo',
+                    'pagante1_nome', 'pagante1_cpf', 'pagante1_percentual',
+                    'pagante2_nome', 'pagante2_cpf', 'pagante2_percentual',
+                    'pagante3_nome', 'pagante3_cpf', 'pagante3_percentual',
+                    'desc1_nome', 'desc1_valor', 'desc2_nome', 'desc2_valor',
+                    'desc3_nome', 'desc3_valor', 'desc4_nome', 'desc4_valor',
+                ],
+            ],
+        ];
+
+        $usadas = [];
+        foreach ($grupos as $grupo) {
+            foreach ($grupo['chaves'] as $chave) {
+                $usadas[$chave] = true;
+            }
+        }
+        $resto = [];
+        foreach (array_keys(self::PLACEHOLDERS) as $chave) {
+            if (!isset($usadas[$chave])) {
+                $resto[] = $chave;
+            }
+        }
+        if ($resto !== []) {
+            $grupos['outros'] = [
+                'label' => 'Outros',
+                'chaves' => $resto,
+            ];
+        }
+
+        return $grupos;
+    }
+
+    public static function categoriaDoCodigo(string $codigo): string
+    {
+        $codigo = strtolower(trim($codigo));
+        if (str_contains($codigo, '_aut_') || str_starts_with($codigo, 'declaracao_aut_')) {
+            return 'autorizacao';
+        }
+        if (str_starts_with($codigo, 'declaracao_')) {
+            return 'declaracao';
+        }
+        if (str_starts_with($codigo, 'contrato_')) {
+            return 'contrato';
+        }
+        if (str_starts_with($codigo, 'resultado_')) {
+            return 'oficial';
+        }
+        return 'outro';
+    }
+
+    /** CSS/estilo do PDF: contratos ficam simples; o restante usa o visual de declaração. */
+    public static function estiloDoModelo(array $modelo): string
+    {
+        return self::categoriaDoCodigo((string) ($modelo['codigo'] ?? '')) === 'contrato'
+            ? 'simples'
+            : 'declaracao';
+    }
+
     public function schemaReady(): bool
     {
         try {
@@ -290,6 +771,9 @@ class ModeloDocumentoService
         if ($this->temColuna('orientacao')) {
             $sql .= ', orientacao';
         }
+        if ($this->temColuna('formato_papel')) {
+            $sql .= ', formato_papel';
+        }
         if ($this->temColuna('usar_layout_padrao')) {
             $sql .= ', usar_layout_padrao';
         }
@@ -299,6 +783,25 @@ class ModeloDocumentoService
         }
         $sql .= ' ORDER BY nome ASC';
         return $this->db->fetchAll($sql) ?: [];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarPorCategoria(string $categoria, bool $somenteAtivos = false): array
+    {
+        $todos = $this->listar($somenteAtivos);
+        $categoria = strtolower(trim($categoria));
+        if ($categoria === '' || $categoria === 'todos') {
+            return $todos;
+        }
+        $out = [];
+        foreach ($todos as $row) {
+            if (self::categoriaDoCodigo((string) ($row['codigo'] ?? '')) === $categoria) {
+                $out[] = $row;
+            }
+        }
+        return $out;
     }
 
     /** Modelos de declaração (código declaracao_*). */
@@ -546,23 +1049,31 @@ class ModeloDocumentoService
      */
     public function aplicarLayoutPadraoNoModelo(array $modelo): array
     {
-        if (!self::isModeloDeclaracao($modelo)) {
-            return $modelo;
-        }
-        $usar = true;
+        $usar = false;
         if ($this->temColuna('usar_layout_padrao')) {
-            $usar = (int) ($modelo['usar_layout_padrao'] ?? 1) === 1;
+            $usar = (int) ($modelo['usar_layout_padrao'] ?? 0) === 1;
+        } elseif (self::isModeloDeclaracao($modelo)) {
+            $usar = true;
         }
         if (!$usar || !$this->layoutPadraoReady()) {
             return $modelo;
         }
         $layout = $this->getLayoutPadrao();
-        $modelo['cabecalho_html'] = (string) ($layout['cabecalho_html'] ?? '');
-        $modelo['rodape_html'] = (string) ($layout['rodape_html'] ?? '');
-        if (!empty($layout['imagem_cabecalho'])) {
+        $cabModelo = (string) ($modelo['cabecalho_html'] ?? '');
+        $rodModelo = (string) ($modelo['rodape_html'] ?? '');
+        $cabLayout = trim((string) ($layout['cabecalho_html'] ?? ''));
+        $rodLayout = trim((string) ($layout['rodape_html'] ?? ''));
+        // Só preenche cabeçalho/rodapé vazios. O HTML montado no modelo é o que sai no PDF.
+        if ($cabLayout !== '' && $this->htmlEditorVazio($cabModelo)) {
+            $modelo['cabecalho_html'] = $cabLayout;
+        }
+        if ($rodLayout !== '' && $this->htmlEditorVazio($rodModelo)) {
+            $modelo['rodape_html'] = $rodLayout;
+        }
+        if (!empty($layout['imagem_cabecalho']) && trim((string) ($modelo['imagem_cabecalho'] ?? '')) === '') {
             $modelo['imagem_cabecalho'] = $layout['imagem_cabecalho'];
         }
-        if (!empty($layout['imagem_rodape'])) {
+        if (!empty($layout['imagem_rodape']) && trim((string) ($modelo['imagem_rodape'] ?? '')) === '') {
             $modelo['imagem_rodape'] = $layout['imagem_rodape'];
         }
         $modelo['_layout_razao_social'] = (string) ($layout['razao_social'] ?? '');
@@ -571,6 +1082,300 @@ class ModeloDocumentoService
         $modelo['_layout_cargo_assinante'] = (string) ($layout['cargo_assinante'] ?? 'direcao');
         $modelo['_layout_assinante_nome'] = (string) ($layout['assinante_nome'] ?? '');
         return $modelo;
+    }
+
+    private function htmlEditorVazio(string $html): bool
+    {
+        if (preg_match('/<(img|svg|table|hr|figure)\b/i', $html) === 1) {
+            return false;
+        }
+        $texto = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $texto = str_replace("\xC2\xA0", ' ', $texto);
+        return trim($texto) === '';
+    }
+
+    /**
+     * @param array<string,mixed> $modelo
+     * @return array<string,mixed>
+     */
+    public function estruturaDoModelo(array $modelo): array
+    {
+        $raw = trim((string) ($modelo['estrutura_json'] ?? ''));
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded) && isset($decoded['body'])) {
+                return $this->normalizarEstrutura($decoded, $modelo);
+            }
+        }
+        return $this->estruturaAPartirDeHtml($modelo);
+    }
+
+    public function modeloTemEstruturaVisual(array $modelo): bool
+    {
+        $raw = trim((string) ($modelo['estrutura_json'] ?? ''));
+        if ($raw === '') {
+            return false;
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) && isset($decoded['body']);
+    }
+
+    /**
+     * @param array<string,mixed> $estrutura
+     * @param array<string,mixed> $modelo
+     * @return array<string,mixed>
+     */
+    public function normalizarEstrutura(array $estrutura, array $modelo = []): array
+    {
+        $base = self::estruturaVazia(
+            (string) ($modelo['formato_papel'] ?? 'a4'),
+            (string) ($modelo['orientacao'] ?? 'retrato'),
+            (int) ($modelo['margem_mm'] ?? 15)
+        );
+        if (isset($estrutura['page']) && is_array($estrutura['page'])) {
+            $base['page'] = array_merge($base['page'], $estrutura['page']);
+        }
+        foreach (['header', 'body', 'footer'] as $area) {
+            if (!isset($estrutura[$area]) || !is_array($estrutura[$area])) {
+                continue;
+            }
+            $base[$area]['repeat'] = array_key_exists('repeat', $estrutura[$area])
+                ? !empty($estrutura[$area]['repeat'])
+                : ($area !== 'body');
+            $secoes = $estrutura[$area]['sections'] ?? [];
+            if (is_array($secoes)) {
+                $base[$area]['sections'] = array_values(array_filter($secoes, 'is_array'));
+            }
+        }
+        $base['version'] = 1;
+        return $this->estruturaSemLogoDuplicado($base);
+    }
+
+    /**
+     * Se já existe bloco tipo logo, tira {{logo_html}} de textos/HTML irmãos (evita duas logos no PDF).
+     *
+     * @param array<string,mixed> $estrutura
+     * @return array<string,mixed>
+     */
+    private function estruturaSemLogoDuplicado(array $estrutura): array
+    {
+        foreach (['header', 'body', 'footer'] as $area) {
+            $secoes = $estrutura[$area]['sections'] ?? null;
+            if (!is_array($secoes)) {
+                continue;
+            }
+            $temLogo = false;
+            foreach ($secoes as $secao) {
+                if (!is_array($secao)) {
+                    continue;
+                }
+                foreach ($secao['columns'] ?? [] as $col) {
+                    if (!is_array($col)) {
+                        continue;
+                    }
+                    foreach ($col['elements'] ?? [] as $el) {
+                        if (is_array($el) && ($el['type'] ?? '') === 'logo') {
+                            $temLogo = true;
+                            break 3;
+                        }
+                    }
+                }
+            }
+            if (!$temLogo) {
+                continue;
+            }
+            foreach ($secoes as $si => $secao) {
+                if (!is_array($secao)) {
+                    continue;
+                }
+                foreach ($secao['columns'] ?? [] as $ci => $col) {
+                    if (!is_array($col)) {
+                        continue;
+                    }
+                    foreach ($col['elements'] ?? [] as $ei => $el) {
+                        if (!is_array($el)) {
+                            continue;
+                        }
+                        $tipo = (string) ($el['type'] ?? '');
+                        if (!in_array($tipo, ['html', 'texto', 'texto_rico'], true)) {
+                            continue;
+                        }
+                        $props = is_array($el['props'] ?? null) ? $el['props'] : [];
+                        foreach (['html', 'text'] as $campo) {
+                            if (isset($props[$campo]) && is_string($props[$campo])) {
+                                $props[$campo] = $this->removerPlaceholderLogo($props[$campo]);
+                            }
+                        }
+                        $estrutura[$area]['sections'][$si]['columns'][$ci]['elements'][$ei]['props'] = $props;
+                    }
+                }
+            }
+        }
+        return $estrutura;
+    }
+
+    private function removerPlaceholderLogo(string $html): string
+    {
+        $html = (string) preg_replace('/\{\{\s*logo_html\s*\}\}/i', '', $html);
+        $html = (string) preg_replace('/<p[^>]*>\s*(?:&nbsp;|\xC2\xA0|\s)*<\/p>/i', '', $html);
+
+        return $html;
+    }
+
+    /**
+     * @param array<string,mixed> $estrutura
+     */
+    private function estruturaTemTipo(array $estrutura, string $tipo): bool
+    {
+        foreach (['header', 'body', 'footer'] as $area) {
+            foreach ($estrutura[$area]['sections'] ?? [] as $secao) {
+                if (!is_array($secao)) {
+                    continue;
+                }
+                foreach ($secao['columns'] ?? [] as $col) {
+                    if (!is_array($col)) {
+                        continue;
+                    }
+                    foreach ($col['elements'] ?? [] as $el) {
+                        if (is_array($el) && ($el['type'] ?? '') === $tipo) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param array<string,mixed> $modelo
+     * @return array<string,mixed>
+     */
+    public function estruturaAPartirDeHtml(array $modelo): array
+    {
+        $est = self::estruturaVazia(
+            (string) ($modelo['formato_papel'] ?? 'a4'),
+            (string) ($modelo['orientacao'] ?? 'retrato'),
+            (int) ($modelo['margem_mm'] ?? 15)
+        );
+        $map = [
+            'header' => (string) ($modelo['cabecalho_html'] ?? ''),
+            'body' => (string) ($modelo['corpo_html'] ?? ''),
+            'footer' => (string) ($modelo['rodape_html'] ?? ''),
+        ];
+        foreach ($map as $area => $html) {
+            $html = trim($html);
+            $cols = $area === 'header' ? [30, 70] : [100];
+            $secao = self::secaoPadrao($cols, $area);
+            if ($html !== '') {
+                if ($area === 'header' && count($secao['columns']) === 2) {
+                    $htmlLimpo = $this->removerPlaceholderLogo($html);
+                    $secao['columns'][0]['elements'][] = [
+                        'id' => self::idEstrutura('e'),
+                        'type' => 'logo',
+                        'props' => ['width' => 120, 'align' => 'center', 'vAlign' => 'middle'],
+                    ];
+                    $secao['columns'][1]['elements'][] = [
+                        'id' => self::idEstrutura('e'),
+                        'type' => 'html',
+                        'props' => ['html' => $htmlLimpo],
+                    ];
+                } else {
+                    $secao['columns'][0]['elements'][] = [
+                        'id' => self::idEstrutura('e'),
+                        'type' => 'html',
+                        'props' => ['html' => $html],
+                    ];
+                }
+            } elseif ($area === 'body') {
+                $secao['columns'][0]['elements'][] = [
+                    'id' => self::idEstrutura('e'),
+                    'type' => 'titulo',
+                    'props' => ['text' => '{{escola_nome}}', 'tag' => 'h1'],
+                ];
+            } else {
+                $est[$area]['sections'] = [];
+                continue;
+            }
+            $est[$area]['sections'] = [$secao];
+        }
+        return $est;
+    }
+
+    /**
+     * @param array<string,mixed> $estrutura
+     * @param array<string,string> $vars
+     * @return array{cabecalho:string,corpo:string,rodape:string}
+     */
+    public function htmlDaEstrutura(array $estrutura, array $vars = []): array
+    {
+        require_once __DIR__ . '/DocumentoRenderer.php';
+        $renderer = new DocumentoRenderer();
+        return $renderer->renderizarPartes($estrutura, $vars);
+    }
+
+    /**
+     * @param array<string,mixed> $estrutura
+     * @param array<string,mixed> $data
+     */
+    public function salvarEstrutura(int $id, array $estrutura, array $data, ?array $user = null): int
+    {
+        if (!$this->temColuna('estrutura_json')) {
+            throw new \RuntimeException(
+                'Execute a migration 2026_08_22_modelos_documentos_estrutura.sql no painel Master.'
+            );
+        }
+        $exist = $id > 0 ? $this->findById($id) : null;
+        $estrutura = $this->normalizarEstrutura($estrutura, array_merge($exist ?: [], $data));
+        $codigoTentativa = $this->normalizarCodigo((string) ($data['codigo'] ?? $exist['codigo'] ?? ''));
+        if ($id <= 0 && self::isCodigoSistema($codigoTentativa)) {
+            throw new \InvalidArgumentException(
+                'Este código pertence a um modelo do sistema. Edite o modelo existente em vez de criar outro com o mesmo código.'
+            );
+        }
+        $json = json_encode($estrutura, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($json) || $json === '') {
+            throw new \InvalidArgumentException('Estrutura do documento inválida.');
+        }
+
+        $partes = $this->htmlDaEstrutura($estrutura);
+        $corpo = trim($partes['corpo']);
+        if ($corpo === '') {
+            $corpo = '<p>&nbsp;</p>';
+        }
+        $payload = [
+            'codigo' => (string) ($data['codigo'] ?? $exist['codigo'] ?? ''),
+            'nome' => (string) ($data['nome'] ?? $exist['nome'] ?? ''),
+            'descricao' => (string) ($data['descricao'] ?? $exist['descricao'] ?? ''),
+            'cabecalho_html' => $partes['cabecalho'],
+            'corpo_html' => $corpo,
+            'rodape_html' => $partes['rodape'],
+            'ativo' => array_key_exists('ativo', $data)
+                ? (!empty($data['ativo']) ? 1 : 0)
+                : (int) ($exist['ativo'] ?? 1),
+            'orientacao' => (string) ($data['orientacao'] ?? $exist['orientacao'] ?? 'retrato'),
+            'formato_papel' => (string) ($data['formato_papel'] ?? $exist['formato_papel'] ?? 'a4'),
+            'margem_mm' => $data['margem_mm'] ?? $exist['margem_mm'] ?? 15,
+            'espacamento_linha' => $data['espacamento_linha'] ?? $exist['espacamento_linha'] ?? 1.5,
+            'usar_layout_padrao' => array_key_exists('usar_layout_padrao', $data)
+                ? (!empty($data['usar_layout_padrao']) ? 1 : 0)
+                : (int) ($exist['usar_layout_padrao'] ?? 1),
+            'estrutura_json' => $json,
+        ];
+        if (trim($payload['nome']) === '') {
+            throw new \InvalidArgumentException('Informe o nome do modelo.');
+        }
+        if (trim($payload['codigo']) === '') {
+            $payload['codigo'] = 'modelo_' . date('YmdHis');
+        }
+        $saved = $this->salvar($payload, $id > 0 ? $id : null, $user);
+        if ($this->temColuna('estrutura_json')) {
+            $this->db->update(
+                'UPDATE secretaria_modelos_documentos SET estrutura_json = ? WHERE id = ?',
+                [$json, $saved]
+            );
+        }
+        return $saved;
     }
 
     public function findById(int $id): ?array
@@ -619,10 +1424,16 @@ class ModeloDocumentoService
             'ativo' => !empty($data['ativo']) ? 1 : 0,
             'atualizado_por' => $user['id'] ?? null,
             'orientacao' => $orientacao,
+            'formato_papel' => $this->normalizarFormatoPapel((string) ($data['formato_papel'] ?? 'a4')),
+            'margem_mm' => $this->normalizarMargemMm($data['margem_mm'] ?? 20),
+            'espacamento_linha' => $this->normalizarEspacamento($data['espacamento_linha'] ?? 1.5),
             'usar_layout_padrao' => array_key_exists('usar_layout_padrao', $data)
                 ? (!empty($data['usar_layout_padrao']) ? 1 : 0)
                 : 0,
         ];
+        if ($this->temColuna('estrutura_json') && array_key_exists('estrutura_json', $data)) {
+            $payload['estrutura_json'] = $data['estrutura_json'];
+        }
 
         $temImagens = $this->temColuna('imagem_cabecalho');
         $imgCab = array_key_exists('imagem_cabecalho', $data) ? $data['imagem_cabecalho'] : null;
@@ -661,9 +1472,25 @@ class ModeloDocumentoService
                 $sets .= ', orientacao = ?';
                 $params[] = $payload['orientacao'];
             }
+            if ($this->temColuna('formato_papel')) {
+                $sets .= ', formato_papel = ?';
+                $params[] = $payload['formato_papel'];
+            }
+            if ($this->temColuna('margem_mm')) {
+                $sets .= ', margem_mm = ?';
+                $params[] = $payload['margem_mm'];
+            }
+            if ($this->temColuna('espacamento_linha')) {
+                $sets .= ', espacamento_linha = ?';
+                $params[] = $payload['espacamento_linha'];
+            }
             if ($this->temColuna('usar_layout_padrao')) {
                 $sets .= ', usar_layout_padrao = ?';
                 $params[] = $payload['usar_layout_padrao'];
+            }
+            if (isset($payload['estrutura_json'])) {
+                $sets .= ', estrutura_json = ?';
+                $params[] = $payload['estrutura_json'];
             }
             if ($temImagens && $imgCab !== null) {
                 $sets .= ', imagem_cabecalho = ?';
@@ -707,10 +1534,30 @@ class ModeloDocumentoService
             $marks .= ',?';
             $params[] = $payload['orientacao'];
         }
+        if ($this->temColuna('formato_papel')) {
+            $cols .= ', formato_papel';
+            $marks .= ',?';
+            $params[] = $payload['formato_papel'];
+        }
+        if ($this->temColuna('margem_mm')) {
+            $cols .= ', margem_mm';
+            $marks .= ',?';
+            $params[] = $payload['margem_mm'];
+        }
+        if ($this->temColuna('espacamento_linha')) {
+            $cols .= ', espacamento_linha';
+            $marks .= ',?';
+            $params[] = $payload['espacamento_linha'];
+        }
         if ($this->temColuna('usar_layout_padrao')) {
             $cols .= ', usar_layout_padrao';
             $marks .= ',?';
             $params[] = $payload['usar_layout_padrao'];
+        }
+        if (isset($payload['estrutura_json'])) {
+            $cols .= ', estrutura_json';
+            $marks .= ',?';
+            $params[] = $payload['estrutura_json'];
         }
         if ($temImagens) {
             $cols .= ', imagem_cabecalho, imagem_rodape';
@@ -762,9 +1609,9 @@ class ModeloDocumentoService
         if (!isset($vars['rodape_unidades'])) {
             $vars['rodape_unidades'] = $vars['escola_docs'] ?? '';
         }
+        $unidadeAssinatura = null;
         if (!isset($vars['assinante_nome']) || $vars['assinante_nome'] === ''
             || !isset($vars['assinante_cargo']) || $vars['assinante_cargo'] === '') {
-            $unidadeAssinatura = null;
             $unidadeId = (int) ($modelo['_layout_unidade_assinatura_id'] ?? 0);
             if ($unidadeId > 0) {
                 try {
@@ -786,54 +1633,95 @@ class ModeloDocumentoService
             }
         }
 
-        $cab = $this->aplicarPlaceholders((string) ($modelo['cabecalho_html'] ?? ''), $vars);
-        $corpo = $this->aplicarPlaceholders((string) ($modelo['corpo_html'] ?? ''), $vars);
-        $rodape = $this->aplicarPlaceholders((string) ($modelo['rodape_html'] ?? ''), $vars);
+        if (trim((string) ($vars['logo_html'] ?? '')) === '') {
+            $unidadeParaLogo = is_array($unidadeAssinatura) ? $unidadeAssinatura : null;
+            if ($unidadeParaLogo === null) {
+                $unidadeIdLogo = (int) ($modelo['_layout_unidade_assinatura_id'] ?? 0);
+                if ($unidadeIdLogo > 0) {
+                    try {
+                        require_once BASE_PATH . '/app/Models/Education/SchoolUnit.php';
+                        $unidadeParaLogo = (new \SchoolUnit())->findById($unidadeIdLogo) ?: null;
+                    } catch (\Throwable $e) {
+                        $unidadeParaLogo = null;
+                    }
+                }
+            }
+            $vars['logo_html'] = $this->logoHtmlInstitucional(is_array($unidadeParaLogo) ? $unidadeParaLogo : null, $config);
+        }
+
+        $htmlBrutoCab = '';
+        $htmlBrutoCorpo = '';
+        $estruturaVisual = null;
+        if ($this->modeloTemEstruturaVisual($modelo)) {
+            $estruturaVisual = $this->estruturaDoModelo($modelo);
+            $partes = $this->htmlDaEstrutura($estruturaVisual, $vars);
+            $htmlBrutoCab = $partes['cabecalho'];
+            $htmlBrutoCorpo = $partes['corpo'];
+            $cab = $this->aplicarPlaceholders($partes['cabecalho'], $vars);
+            $corpo = $this->aplicarPlaceholders($partes['corpo'], $vars);
+            $rodape = $this->aplicarPlaceholders($partes['rodape'], $vars);
+        } else {
+            $htmlBrutoCab = (string) ($modelo['cabecalho_html'] ?? '');
+            $htmlBrutoCorpo = (string) ($modelo['corpo_html'] ?? '');
+            $cab = $this->aplicarPlaceholders($htmlBrutoCab, $vars);
+            $corpo = $this->aplicarPlaceholders($htmlBrutoCorpo, $vars);
+            $rodape = $this->aplicarPlaceholders((string) ($modelo['rodape_html'] ?? ''), $vars);
+        }
 
         $codigo = (string) ($modelo['codigo'] ?? '');
         if ($estilo === 'auto') {
             $estilo = str_starts_with($codigo, 'declaracao_') ? 'declaracao' : 'simples';
         }
 
-        $css = $estilo === 'declaracao' ? $this->cssDeclaracao() : $this->cssSimples();
-        $orientacao = (($modelo['orientacao'] ?? 'retrato') === 'paisagem') ? 'paisagem' : 'retrato';
-        $css .= "\n" . $this->cssBanners($orientacao);
+        $css = $estilo === 'declaracao' ? $this->cssDeclaracao($modelo) : $this->cssSimples($modelo);
+        if ($estruturaVisual !== null) {
+            $css = $this->cssSimples($modelo);
+        }
+        $css .= "\n" . $this->cssEstrutura();
+        $css .= "\n" . $this->cssBanners($modelo);
 
         $imgCabHtml = '';
         $imgRodHtml = '';
         $srcCab = $this->resolverImagemSrc((string) ($modelo['imagem_cabecalho'] ?? ''), $config);
         $srcRod = $this->resolverImagemSrc((string) ($modelo['imagem_rodape'] ?? ''), $config);
-        // Dimensões em mm — Dompdf respeita melhor que max-height/object-fit
-        [$cabH, $rodH] = $orientacao === 'paisagem' ? ['32mm', '22mm'] : ['42mm', '28mm'];
+        [$cabH, $rodH] = $this->alturasFaixa($modelo);
 
-        // Declarações: capa + rodapé em faixa. Contratos: só logo centralizada (sem capa/rodapé).
-        if ($estilo === 'declaracao') {
-            if ($srcCab !== '') {
-                $srcEsc = htmlspecialchars($srcCab, ENT_QUOTES, 'UTF-8');
-                $imgCabHtml = '<div class="banner-cab"><img src="' . $srcEsc
-                    . '" alt="Cabeçalho" width="100%" style="width:100%;max-height:' . $cabH . ';height:auto;"></div>';
+        // Editor visual / documentos oficiais: o layout do modelo é a fonte.
+        // Não prependar faixa do papel timbrado (Dompdf estica PNG e gera páginas em branco).
+        $pularFaixa = $estruturaVisual !== null
+            || self::categoriaDoCodigo($codigo) === 'oficial';
+        if (!$pularFaixa) {
+            if ($estilo === 'declaracao') {
+                if ($srcCab !== '') {
+                    $srcEsc = htmlspecialchars($srcCab, ENT_QUOTES, 'UTF-8');
+                    $imgCabHtml = '<div class="banner-cab"><img src="' . $srcEsc
+                        . '" alt="Cabeçalho" style="height:' . $cabH . ';width:auto;max-width:100%;"></div>';
+                } else {
+                    $logoHtml = trim((string) ($vars['logo_html'] ?? ''));
+                    $modeloJaTemLogo = str_contains($htmlBrutoCab . $htmlBrutoCorpo, '{{logo_html}}');
+                    if ($logoHtml !== '' && !$modeloJaTemLogo) {
+                        $imgCabHtml = '<div class="doc-logo" style="text-align:center;margin:0 0 16px;">' . $logoHtml . '</div>';
+                    }
+                }
+                if ($srcRod !== '') {
+                    $srcEsc = htmlspecialchars($srcRod, ENT_QUOTES, 'UTF-8');
+                    $imgRodHtml = '<div class="banner-rod"><img src="' . $srcEsc
+                        . '" alt="Rodapé" style="height:' . $rodH . ';width:auto;max-width:100%;"></div>';
+                }
+            } else {
+                $logoHtml = trim((string) ($vars['logo_html'] ?? ''));
+                $modeloJaTemLogo = str_contains($htmlBrutoCab . $htmlBrutoCorpo, '{{logo_html}}');
+                if ($modeloJaTemLogo) {
+                    $logoHtml = '';
+                }
+                if ($logoHtml === '' && !$modeloJaTemLogo && $srcCab !== '') {
+                    $srcEsc = htmlspecialchars($srcCab, ENT_QUOTES, 'UTF-8');
+                    $logoHtml = '<img src="' . $srcEsc . '" alt="Logo" width="180" height="70" style="height:70px;width:auto;max-width:220px;">';
+                }
+                if ($logoHtml !== '') {
+                    $imgCabHtml = '<div class="doc-logo" style="text-align:center;margin:0 0 16px;">' . $logoHtml . '</div>';
+                }
             }
-            if ($srcRod !== '') {
-                $srcEsc = htmlspecialchars($srcRod, ENT_QUOTES, 'UTF-8');
-                $imgRodHtml = '<div class="banner-rod"><img src="' . $srcEsc
-                    . '" alt="Rodapé" width="100%" style="width:100%;max-height:' . $rodH . ';height:auto;"></div>';
-            }
-        } else {
-            $logoHtml = trim((string) ($vars['logo_html'] ?? ''));
-            $modeloJaTemLogo = str_contains((string) ($modelo['cabecalho_html'] ?? ''), '{{logo_html}}')
-                || str_contains((string) ($modelo['corpo_html'] ?? ''), '{{logo_html}}');
-            if ($modeloJaTemLogo) {
-                $logoHtml = ''; // já entra via placeholder no HTML do modelo
-            }
-            if ($logoHtml === '' && !$modeloJaTemLogo && $srcCab !== '') {
-                // Reaproveita a imagem de capa como logo (sem faixa full-width)
-                $srcEsc = htmlspecialchars($srcCab, ENT_QUOTES, 'UTF-8');
-                $logoHtml = '<img src="' . $srcEsc . '" alt="Logo" style="max-height:70px;max-width:220px;width:auto;height:auto;">';
-            }
-            if ($logoHtml !== '') {
-                $imgCabHtml = '<div class="doc-logo" style="text-align:center;margin:0 0 16px;">' . $logoHtml . '</div>';
-            }
-            $css .= "\n  .doc-logo img { display:block; margin:0 auto; max-height:70px; max-width:220px; width:auto; height:auto; }\n";
         }
 
         return <<<HTML
@@ -862,6 +1750,80 @@ HTML;
         return (($modelo['orientacao'] ?? 'retrato') === 'paisagem') ? 'landscape' : 'portrait';
     }
 
+    /** @return 'A4'|'A5' */
+    public function papelDompdf(array $modelo): string
+    {
+        return $this->normalizarFormatoPapel((string) ($modelo['formato_papel'] ?? 'a4')) === 'a5' ? 'A5' : 'A4';
+    }
+
+    public function margemMm(array $modelo): int
+    {
+        return $this->normalizarMargemMm($modelo['margem_mm'] ?? 20);
+    }
+
+    public function espacamentoLinha(array $modelo): float
+    {
+        return $this->normalizarEspacamento($modelo['espacamento_linha'] ?? 1.5);
+    }
+
+    /**
+     * @param \Dompdf\Dompdf $dompdf
+     */
+    public function aplicarPapelDompdf($dompdf, array $modelo): void
+    {
+        if (!is_object($dompdf) || !method_exists($dompdf, 'setPaper')) {
+            return;
+        }
+        if ($this->modeloTemEstruturaVisual($modelo)) {
+            $page = $this->estruturaDoModelo($modelo)['page'] ?? [];
+            if (($page['orientation'] ?? '') === 'landscape') {
+                $modelo['orientacao'] = 'paisagem';
+            } elseif (($page['orientation'] ?? '') === 'portrait') {
+                $modelo['orientacao'] = 'retrato';
+            }
+            if (!empty($page['size'])) {
+                $modelo['formato_papel'] = $this->normalizarFormatoPapel((string) $page['size']);
+            }
+            if (isset($page['margin']['top'])) {
+                $modelo['margem_mm'] = $this->normalizarMargemMm($page['margin']['top']);
+            }
+        }
+        $dompdf->setPaper($this->papelDompdf($modelo), $this->orientacaoDompdf($modelo));
+    }
+
+    public function normalizarFormatoPapel(string $formato): string
+    {
+        return strtolower(trim($formato)) === 'a5' ? 'a5' : 'a4';
+    }
+
+    public function normalizarMargemMm($valor): int
+    {
+        $m = (int) $valor;
+        if ($m < 8) {
+            return 8;
+        }
+        if ($m > 40) {
+            return 40;
+        }
+        return $m;
+    }
+
+    public function normalizarEspacamento($valor): float
+    {
+        $v = (float) str_replace(',', '.', (string) $valor);
+        $permitidos = [1.0, 1.15, 1.5, 2.0];
+        $melhor = 1.5;
+        $delta = 99;
+        foreach ($permitidos as $p) {
+            $d = abs($p - $v);
+            if ($d < $delta) {
+                $delta = $d;
+                $melhor = $p;
+            }
+        }
+        return $melhor;
+    }
+
     /**
      * Resolve caminho/chave de imagem para data-URI (Dompdf) ou URL.
      *
@@ -874,9 +1836,21 @@ HTML;
             return '';
         }
 
-        // Já é data URI ou http(s)
-        if (str_starts_with($ref, 'data:') || str_starts_with($ref, 'http://') || str_starts_with($ref, 'https://')) {
+        if (str_starts_with($ref, 'data:image/png')
+            || str_starts_with($ref, 'data:image/jpeg')
+            || str_starts_with($ref, 'data:image/gif')
+            || str_starts_with($ref, 'data:image/webp')
+            || str_starts_with($ref, 'data:image/jpg')) {
             return $ref;
+        }
+        if (str_starts_with($ref, 'data:')) {
+            return '';
+        }
+        // PDF com remote desligado: só data-URI. Converte /media/serve do tenant; rejeita URL externa.
+        if (str_starts_with($ref, 'http://') || str_starts_with($ref, 'https://')
+            || str_starts_with($ref, '/media/serve')
+            || str_starts_with($ref, 'media/serve')) {
+            return $this->urlParaDataUri($ref, $config);
         }
 
         // Rejeitar traversal / absolutos no valor persistido
@@ -911,10 +1885,17 @@ HTML;
             if ($allowedRoot !== false && !str_starts_with($real, $allowedRoot . DIRECTORY_SEPARATOR) && $real !== $allowedRoot) {
                 continue;
             }
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeReal = $finfo ? finfo_file($finfo, $real) : false;
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+            $permitidos = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+            if (!is_string($mimeReal) || !in_array($mimeReal, $permitidos, true)) {
+                continue;
+            }
             $bin = @file_get_contents($real);
-            $ext = strtolower((string) pathinfo($real, PATHINFO_EXTENSION));
-            $map = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif'];
-            $mime = $map[$ext] ?? 'image/png';
+            $mime = $mimeReal;
             break;
         }
 
@@ -925,10 +1906,16 @@ HTML;
                 $media = new \MediaStorageService($config);
                 $contents = $media->getContents('arquivos', $ref);
                 if (is_string($contents) && $contents !== '') {
-                    $bin = $contents;
-                    $ext = strtolower((string) pathinfo($ref, PATHINFO_EXTENSION));
-                    $map = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif'];
-                    $mime = $map[$ext] ?? 'image/png';
+                    $finfoBuf = finfo_open(FILEINFO_MIME_TYPE);
+                    $mimeBuf = $finfoBuf ? finfo_buffer($finfoBuf, $contents) : false;
+                    if ($finfoBuf) {
+                        finfo_close($finfoBuf);
+                    }
+                    $okMime = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+                    if (is_string($mimeBuf) && in_array($mimeBuf, $okMime, true)) {
+                        $bin = $contents;
+                        $mime = $mimeBuf;
+                    }
                 }
             } catch (\Throwable $e) {
                 // ignore
@@ -939,6 +1926,226 @@ HTML;
             return '';
         }
         return 'data:' . $mime . ';base64,' . base64_encode($bin);
+    }
+
+    /**
+     * Logo da unidade (se houver), da escola (config de layout) ou da faixa
+     * do papel timbrado, em data-URI para o Dompdf (remote desligado).
+     *
+     * @param array<string,mixed>|null $unidade
+     * @param array<string,mixed>|null $config
+     */
+    public function logoHtmlInstitucional(?array $unidade, ?array $config = null): string
+    {
+        $urls = [];
+        $unidadeLogo = trim((string) ($unidade['logo_url'] ?? ''));
+        if ($unidadeLogo !== '') {
+            $urls[] = $unidadeLogo;
+        }
+
+        $base = defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4);
+        if (!class_exists('LayoutHelper', false)) {
+            require_once $base . '/app/Core/LayoutHelper.php';
+        }
+        try {
+            $navbar = trim((string) \LayoutHelper::getNavbarLogoUrl());
+            if ($navbar !== '') {
+                $urls[] = $navbar;
+            }
+            $principal = trim((string) \LayoutHelper::getLogoUrl());
+            if ($principal !== '' && $principal !== $navbar) {
+                $urls[] = $principal;
+            }
+            $horizontal = trim((string) \LayoutHelper::getLogoHorizontalUrl());
+            if ($horizontal !== '' && !in_array($horizontal, $urls, true)) {
+                $urls[] = $horizontal;
+            }
+        } catch (\Throwable $e) {
+            // layout ainda não carregado
+        }
+
+        if ($unidadeLogo === '') {
+            try {
+                require_once $base . '/app/Models/Education/SchoolUnit.php';
+                $ativas = (new \SchoolUnit())->getActive();
+                $matriz = $ativas[0] ?? null;
+                if (is_array($matriz)) {
+                    $fallbackUnidade = trim((string) ($matriz['logo_url'] ?? ''));
+                    if ($fallbackUnidade !== '' && !in_array($fallbackUnidade, $urls, true)) {
+                        array_unshift($urls, $fallbackUnidade);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // sem tabela unidades
+            }
+        }
+
+        foreach ($urls as $url) {
+            $data = $this->urlParaDataUri((string) $url, $config);
+            if ($data === '') {
+                continue;
+            }
+            return $this->htmlImgLogo($data);
+        }
+
+        try {
+            $layout = $this->getLayoutPadrao();
+            $srcFaixa = $this->resolverImagemSrc((string) ($layout['imagem_cabecalho'] ?? ''), $config);
+            if ($this->ehDataUriImagem($srcFaixa)) {
+                return $this->htmlImgLogo($srcFaixa);
+            }
+        } catch (\Throwable $e) {
+            // sem papel timbrado
+        }
+
+        return '';
+    }
+
+    private function htmlImgLogo(string $src): string
+    {
+        return '<img src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
+            . '" alt="Logo" width="180" height="70" style="height:70px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;">';
+    }
+
+    private function ehDataUriImagem(string $src): bool
+    {
+        return str_starts_with($src, 'data:image/png')
+            || str_starts_with($src, 'data:image/jpeg')
+            || str_starts_with($src, 'data:image/gif')
+            || str_starts_with($src, 'data:image/webp')
+            || str_starts_with($src, 'data:image/jpg');
+    }
+
+    /**
+     * Converte URL local de logo (media/serve layout) em data-URI. Sem fetch HTTP.
+     *
+     * @param array<string,mixed>|null $config
+     */
+    private function urlParaDataUri(string $url, ?array $config = null): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+        if ($this->ehDataUriImagem($url)) {
+            return $url;
+        }
+        if (str_starts_with($url, 'data:')) {
+            return '';
+        }
+
+        $parts = parse_url($url) ?: [];
+        $query = [];
+        if (!empty($parts['query'])) {
+            parse_str((string) $parts['query'], $query);
+        }
+
+        $slugAtual = $this->slugTenantAtual($config);
+        $slugQuery = preg_replace('/[^a-z0-9_-]/i', '', (string) ($query['tenant'] ?? '')) ?? '';
+        if ($slugQuery !== '' && $slugAtual !== '' && strcasecmp($slugQuery, $slugAtual) !== 0) {
+            return '';
+        }
+
+        $type = strtolower(trim((string) ($query['type'] ?? '')));
+        $key = basename(str_replace('\\', '/', (string) ($query['key'] ?? '')));
+
+        if ($key === '' && !empty($parts['path'])) {
+            $pathUrl = str_replace('\\', '/', (string) $parts['path']);
+            if (preg_match('#/storage/files/([a-zA-Z0-9_-]+)/layout/([^/]+)$#', $pathUrl, $m) === 1) {
+                $slugPath = (string) ($m[1] ?? '');
+                if ($slugAtual !== '' && strcasecmp($slugPath, $slugAtual) !== 0) {
+                    return '';
+                }
+                $key = basename((string) ($m[2] ?? ''));
+                $type = 'layout';
+            }
+        }
+
+        if ($type === '') {
+            $type = 'layout';
+        }
+        if ($type !== 'layout') {
+            return '';
+        }
+        if ($key === '' || $key === '.' || $key === '..' || str_contains($key, "\0") || str_contains($key, '..')) {
+            return '';
+        }
+
+        $base = defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4);
+        $filePath = '';
+        $cfg = is_array($config) ? $config : [];
+        if ($slugAtual !== '') {
+            $cfg['tenant'] = array_merge($cfg['tenant'] ?? [], ['slug' => $slugAtual]);
+        }
+
+        try {
+            require_once $base . '/app/Services/MediaStorageService.php';
+            $media = new \MediaStorageService($cfg);
+            $localPath = $media->getLocalPath('layout', $key);
+            if ($localPath !== null && is_file($localPath) && is_readable($localPath)) {
+                $filePath = $localPath;
+            }
+        } catch (\Throwable $e) {
+            $filePath = '';
+        }
+
+        if ($filePath === '' && $slugAtual !== '') {
+            $cand = $base . '/storage/files/' . $slugAtual . '/layout/' . $key;
+            if (is_file($cand) && is_readable($cand)) {
+                $filePath = $cand;
+            }
+        }
+
+        if ($filePath === '') {
+            return '';
+        }
+
+        $real = realpath($filePath);
+        if ($real === false) {
+            return '';
+        }
+        $slugPasta = $slugAtual !== '' ? $slugAtual : 'default';
+        $rootTenant = realpath($base . '/storage/files/' . $slugPasta . '/layout');
+        if ($rootTenant === false
+            || (!str_starts_with($real, $rootTenant . DIRECTORY_SEPARATOR) && $real !== $rootTenant)) {
+            return '';
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeReal = $finfo ? finfo_file($finfo, $real) : false;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        $permitidos = [
+            'image/png' => true,
+            'image/jpeg' => true,
+            'image/gif' => true,
+            'image/webp' => true,
+        ];
+        if (!is_string($mimeReal) || !isset($permitidos[$mimeReal])) {
+            return '';
+        }
+        $bin = @file_get_contents($real);
+        if (!is_string($bin) || $bin === '') {
+            return '';
+        }
+        return 'data:' . $mimeReal . ';base64,' . base64_encode($bin);
+    }
+
+    /**
+     * @param array<string,mixed>|null $config
+     */
+    private function slugTenantAtual(?array $config): string
+    {
+        $slug = '';
+        if (defined('TENANT_SLUG')) {
+            $slug = (string) TENANT_SLUG;
+        }
+        if ($slug === '' && is_array($config)) {
+            $slug = (string) ($config['tenant']['slug'] ?? $config['school']['code'] ?? '');
+        }
+        $slug = preg_replace('/[^a-z0-9_-]/i', '', $slug) ?? '';
+        return $slug;
     }
 
     private function temColuna(string $coluna): bool
@@ -1029,6 +2236,28 @@ HTML;
         $alunoNome = trim((string) ($aluno['nome'] ?? ''));
         $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
         $alunoRg = trim((string) ($aluno['rg'] ?? $aluno['documento_rg'] ?? ''));
+        $pickAluno = static function (array $arr, array $keys): string {
+            foreach ($keys as $k) {
+                if (isset($arr[$k]) && trim((string) $arr[$k]) !== '') {
+                    return trim((string) $arr[$k]);
+                }
+            }
+            return '';
+        };
+        $alunoEndereco = trim(implode(', ', array_filter([
+            $pickAluno($aluno, ['logradouro', 'endereco', 'endereco_logradouro'])
+                . ($pickAluno($aluno, ['numero', 'endereco_numero']) !== ''
+                    ? ', ' . $pickAluno($aluno, ['numero', 'endereco_numero']) : ''),
+            $pickAluno($aluno, ['complemento', 'endereco_complemento']),
+            $pickAluno($aluno, ['bairro', 'endereco_bairro']),
+            trim($pickAluno($aluno, ['cidade', 'endereco_cidade'])
+                . ($pickAluno($aluno, ['uf', 'estado', 'endereco_uf']) !== ''
+                    ? ' / ' . $pickAluno($aluno, ['uf', 'estado', 'endereco_uf']) : '')),
+            $pickAluno($aluno, ['cep', 'endereco_cep']) !== ''
+                ? 'CEP ' . $pickAluno($aluno, ['cep', 'endereco_cep']) : '',
+        ])));
+        $alunoCidade = $pickAluno($aluno, ['cidade', 'endereco_cidade']);
+        $alunoTelefone = $pickAluno($aluno, ['celular', 'telefone']);
         $infoPertinente = trim((string) ($viewData['info_pertinente'] ?? $dados['info_pertinente'] ?? ''));
         $infoPertinenteHtml = '';
         if ($infoPertinente !== '') {
@@ -1131,7 +2360,9 @@ HTML;
             'aluno_data_nasc' => $alunoNasc,
             'aluno_nasc_frase' => $alunoNasc !== '—' ? ', nascido(a) em ' . $alunoNasc : '',
             'aluno_email' => $esc($aluno['email'] ?? '—'),
-            'aluno_telefone' => $esc($aluno['telefone'] ?? '—'),
+            'aluno_telefone' => $esc($alunoTelefone !== '' ? $alunoTelefone : '—'),
+            'aluno_endereco' => $esc($alunoEndereco !== '' ? $alunoEndereco : '—'),
+            'aluno_cidade' => $esc($alunoCidade !== '' ? $alunoCidade : '—'),
             'aluno_codigo' => $esc(trim((string) ($aluno['codigo_aluno'] ?? $aluno['ra'] ?? '')) ?: '—'),
             'resp_nome' => $esc($respNome !== '' ? $respNome : '________________________'),
             'resp_cpf' => $esc($resp0['cpf'] ?? '—'),
@@ -1250,6 +2481,17 @@ HTML;
             'resp_fin_bairro' => 'Centro',
             'resp_fin_cep' => '14000-000',
             'resp_fin_cidade' => 'Ribeirão Preto/SP',
+            'pagante1_nome' => 'Ana Paula Silva',
+            'pagante1_cpf' => '987.654.321-00',
+            'pagante1_percentual' => '100%',
+            'pagante2_nome' => '',
+            'pagante2_cpf' => '',
+            'pagante2_percentual' => '',
+            'pagante3_nome' => '',
+            'pagante3_cpf' => '',
+            'pagante3_percentual' => '',
+            'pagante_modo' => 'Único pagante',
+            'documento_assinatura' => 'Contrato de Matrícula',
             'valor_anuidade' => 'R$ 13.000,00',
             'valor_parcela' => 'R$ 1.000,00',
             'valor_liquido_parcela' => 'R$ 950,00',
@@ -1313,9 +2555,25 @@ HTML;
             'assinante_nome' => 'Diretor(a) Exemplo',
             'assinante_cargo' => 'Direção',
             'logo_html' => '',
+            'quadro_notas_html' => '<table class="dados"><tr><td class="label">Língua Portuguesa</td><td>8,5</td></tr><tr><td class="label">Matemática</td><td>7,0</td></tr></table>',
+            'situacao_final' => 'Aprovado',
+            'frequencia_percentual' => '95,0%',
+            'tabela_html' => '<table class="dados"><tr><td class="label">Aluno</td><td class="label">Situação</td></tr><tr><td>Maria Eduarda Silva</td><td>Aprovado</td></tr></table>',
+            'titulo_relatorio' => 'Relatório de fechamento',
+            'periodo_label' => '2º bimestre',
+            'periodo_nome' => '2º bimestre',
+            'pagina' => '1',
+            'total_paginas' => '1',
+            'total_alunos' => '28',
+            'total_homologados' => '26',
+            'total_pendencias' => '2',
         ];
         foreach ($amostra as $k => $v) {
-            $out[$k] = $esc($v);
+            $htmlKeys = [
+                'logo_html', 'frequencia_html', 'info_pertinente_html', 'responsaveis_html',
+                'historico_html', 'quadro_notas_html', 'tabela_html',
+            ];
+            $out[$k] = in_array($k, $htmlKeys, true) ? $v : $esc($v);
         }
         return $out;
     }
@@ -1423,47 +2681,77 @@ HTML;
         return trim($codigo, '_');
     }
 
-    private function cssSimples(): string
+    private function cssSimples(array $modelo = []): string
     {
+        $margem = $this->margemMm($modelo);
+        $lh = number_format($this->espacamentoLinha($modelo), 2, '.', '');
         return <<<CSS
-  body { font-family: DejaVu Sans, sans-serif; font-size: 10pt; color: #222; line-height: 1.45; margin: 24px 28px; }
+  @page { margin: {$margem}mm; }
+  body { font-family: DejaVu Sans, sans-serif; font-size: 11pt; color: #222; line-height: {$lh}; margin: 0; }
   h1,h2,h3 { color: #111; }
   p { margin: 0 0 8px; }
   table { width: 100%; border-collapse: collapse; margin: 8px 0; }
   th, td { border: 1px solid #ccc; padding: 4px 6px; font-size: 9pt; }
   th { background: #f3f4f6; }
+  .page-break { page-break-after: always; break-after: page; }
 CSS;
     }
 
     /**
-     * Faixas de cabeçalho/rodapé dimensionadas para A4 (retrato ou paisagem).
-     * Dompdf: preferir mm + width 100% / height auto (object-fit é pouco confiável).
+     * Colunas tipo Elementor: sem borda no PDF, vertical-align via style inline.
      */
-    private function cssBanners(string $orientacao): string
+    private function cssEstrutura(): string
     {
-        // A4 retrato 210×297 · paisagem 297×210 — faixas ~12–15% da altura útil
-        if ($orientacao === 'paisagem') {
-            $cabMax = '32mm';
-            $rodMax = '22mm';
-        } else {
-            $cabMax = '42mm';
-            $rodMax = '28mm';
-        }
+        return <<<CSS
+  table.doc-linha { width: 100% !important; border-collapse: collapse; table-layout: fixed; margin: 0 0 8px 0; border: none !important; page-break-inside: auto; }
+  table.doc-linha table { width: 100%; margin: 0 !important; border: none !important; border-collapse: collapse; height: auto !important; }
+  figure.table { width: 100%; margin: 0 0 10px 0; }
+  figure.table table { width: 100%; border: none !important; }
+  table.doc-linha td, table.doc-linha th,
+  figure.table td, figure.table th { border: none !important; background: transparent !important; padding: 4px 8px; vertical-align: middle; }
+  table.dados { margin: 8px 0; }
+  table.dados td, table.dados th { border: 1px solid #ccc !important; background: transparent; }
+  .doc-logo-el img, .doc-logo img { height: 70px; width: auto; max-width: 220px; display: inline-block; vertical-align: middle; }
+  table.doc-linha img { max-width: 100%; }
+  figure.image, .image { margin: 4px 0; }
+  .image img { max-width: 100%; height: auto; }
+  .image-style-align-left { float: left; margin: 0 10px 8px 0; }
+  .image-style-align-right { float: right; margin: 0 0 8px 10px; }
+  .image-style-align-center, .image-style-block-align-center { display: table; margin: 0 auto; }
+  .doc-secao { page-break-inside: auto; }
+CSS;
+    }
+    private function cssBanners(array $modelo): string
+    {
+        [$cabMax, $rodMax] = $this->alturasFaixa($modelo);
 
         return <<<CSS
-  .banner-cab { width: 100%; margin: 0 0 8px 0; padding: 0; text-align: center; overflow: hidden; max-height: {$cabMax}; }
-  .banner-cab img { display: block; width: 100%; max-width: 100%; height: auto; max-height: {$cabMax}; margin: 0 auto; }
-  .banner-rod { width: 100%; margin: 12px 0 0 0; padding: 0; text-align: center; overflow: hidden; max-height: {$rodMax}; }
-  .banner-rod img { display: block; width: 100%; max-width: 100%; height: auto; max-height: {$rodMax}; margin: 0 auto; }
+  .banner-cab { width: 100%; margin: 0 0 8px 0; padding: 0; text-align: center; }
+  .banner-cab img { display: inline-block; height: {$cabMax}; width: auto; max-width: 100%; }
+  .banner-rod { width: 100%; margin: 12px 0 0 0; padding: 0; text-align: center; }
+  .banner-rod img { display: inline-block; height: {$rodMax}; width: auto; max-width: 100%; }
 CSS;
     }
 
-    private function cssDeclaracao(): string
+    /** @return array{0:string,1:string} */
+    private function alturasFaixa(array $modelo): array
     {
+        $a5 = $this->normalizarFormatoPapel((string) ($modelo['formato_papel'] ?? 'a4')) === 'a5';
+        $paisagem = (($modelo['orientacao'] ?? 'retrato') === 'paisagem');
+        if ($a5) {
+            return $paisagem ? ['22mm', '15mm'] : ['29mm', '20mm'];
+        }
+        return $paisagem ? ['32mm', '22mm'] : ['42mm', '28mm'];
+    }
+
+    private function cssDeclaracao(array $modelo = []): string
+    {
+        $margem = $this->margemMm($modelo);
+        $lh = number_format($this->espacamentoLinha($modelo), 2, '.', '');
         return <<<CSS
-  @page { margin: 22mm 20mm 22mm 20mm; }
+  @page { margin: {$margem}mm; }
   * { box-sizing: border-box; }
-  body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #1f2937; font-size: 11pt; margin: 0; line-height: 1.6; }
+  body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #1f2937; font-size: 11pt; margin: 0; line-height: {$lh}; }
   .header { display: table; width: 100%; border-bottom: 2px solid #064e3b; padding-bottom: 10px; margin-bottom: 6px; }
   .header .logo-cell { display: table-cell; width: 90px; vertical-align: middle; }
   .header .title-cell { display: table-cell; vertical-align: middle; padding-left: 12px; }
@@ -1472,8 +2760,8 @@ CSS;
   .header .meta { font-size: 8.5pt; color: #4b5563; margin: 1px 0; }
   .doc-num { text-align: right; font-size: 8.5pt; color: #6b7280; margin: 6px 0 18px 0; }
   h1.doc-title { text-align: center; font-size: 15pt; color: #111827; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 26px 0; }
-  .corpo { text-align: justify; font-size: 11.5pt; margin: 0 4px; }
-  .corpo p { margin: 0 0 14px 0; }
+  .corpo { margin: 0 4px; }
+  .corpo p { margin: 0 0 0.6em 0; }
   .destaque { font-weight: bold; color: #111827; }
   table.dados { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 10.5pt; }
   table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; }
@@ -1485,6 +2773,7 @@ CSS;
   .assinaturas .nome { font-size: 10pt; font-weight: bold; }
   .assinaturas .cargo { font-size: 9pt; color: #4b5563; }
   .footer { margin-top: 40px; text-align: center; font-size: 7.5pt; color: #9ca3af; }
+  .page-break { page-break-after: always; break-after: page; }
 CSS;
     }
 }

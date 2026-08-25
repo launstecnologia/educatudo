@@ -323,6 +323,22 @@ class ExpoColagProfessorController extends BaseController
         $this->redirect($result['success'] ? '/professor/expo-colag' : '/professor/expo-colag/projetos/' . (int) $id . '/editar');
     }
 
+    public function excluir($id): void
+    {
+        $user = $this->requireProfessor();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/professor/expo-colag');
+            return;
+        }
+        $result = $this->service->excluirProjeto((int) $id, (int) $user['id']);
+        $this->setFlashMessage(
+            $result['success'] ? 'Projeto excluído.' : ($result['error'] ?? 'Não foi possível excluir.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/professor/expo-colag');
+    }
+
     public function preview($id): void
     {
         $user = $this->requireProfessor();

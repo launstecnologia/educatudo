@@ -37,6 +37,11 @@ class RedisCache
         return self::PORT;
     }
 
+    private static function redisPassword(): string
+    {
+        return self::readEnvValue('REDIS_PASSWORD');
+    }
+
     /** Lê variável do .env / ambiente sem depender de env() (bootstrap roda antes de config/app.php). */
     private static function readEnvValue(string $name): string
     {
@@ -84,6 +89,16 @@ class RedisCache
             $ok = @$redis->connect(self::redisHost(), self::redisPort(), self::CONNECT_TIMEOUT);
             if ($ok !== true) {
                 self::$failed = true;
+                return null;
+            }
+            $password = self::redisPassword();
+            if ($password !== '' && @$redis->auth($password) !== true) {
+                self::$failed = true;
+                try {
+                    $redis->close();
+                } catch (Throwable $e) {
+                    // ignore
+                }
                 return null;
             }
             // Evita hang infinito em get/set se Redis travar a meio do request.

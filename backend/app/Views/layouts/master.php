@@ -90,30 +90,13 @@ $master_iniciais = MasterAvatarService::iniciais($master_nome);
                     </div>
                 </div>
             </header>
-            <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-                <main class="px-4 md:px-8 py-6">
-                    <?= $content ?? '' ?>
-                </main>
-                <footer class="border-t border-slate-200 bg-white px-4 md:px-8 py-4">
-                    <div class="space-y-2">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <p class="text-xs text-slate-500 flex items-center justify-center sm:justify-start gap-2">
-                                <span>Todos os direitos reservados</span>
-                                <img src="<?= URL ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-4 w-auto inline-block" loading="lazy">
-                            </p>
-                            <p class="text-xs text-slate-500 flex items-center justify-center sm:justify-end gap-2">
-                                <span>Desenvolvido por</span>
-                                <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="inline-flex items-center">
-                                    <img src="<?= URL ?>/assets/logos/logo-launs-black.png" alt="Launs" class="h-3 w-auto inline-block" loading="lazy">
-                                </a>
-                            </p>
-                        </div>
-                        <p class="text-xs text-slate-500 text-center">
-                            Documentação: <a href="<?= URL ?>/master/documentacao" class="text-blue-600 hover:underline">/master/documentacao</a>
-                            · arquivos em <code class="text-xs">doc_sistema/</code>
-                        </p>
-                    </div>
-                </footer>
+            <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
+                <div class="plataforma-pagina plataforma-pagina-preenche">
+                    <main class="px-4 md:px-8 py-6 plataforma-conteudo">
+                        <?= $content ?? '' ?>
+                    </main>
+                    <?php include __DIR__ . '/components/plataforma_footer.php'; ?>
+                </div>
             </div>
         </div>
     </div>

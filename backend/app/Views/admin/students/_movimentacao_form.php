@@ -93,6 +93,30 @@
 
             <?php if (!empty($show_tr_fields)): ?>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-red-50 border border-red-100 rounded-lg">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Escola de destino</label>
+                    <input type="text" name="escola_nome" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Nome da escola">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                    <input type="text" name="escola_cidade" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">UF</label>
+                    <input type="text" name="escola_uf" maxlength="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 uppercase" placeholder="SP">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Código INEP da escola</label>
+                    <input type="text" name="escola_inep" maxlength="20" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Motivo</label>
+                    <input type="text" name="motivo" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Mudança de cidade, a pedido da família…">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Data da transferência</label>
+                    <input type="date" name="data_transferencia" value="<?= date('Y-m-d') ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Observação (obrigatória)</label>
                     <textarea name="observation" rows="2" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Ex.: Transferência para outra escola — documentação recebida"></textarea>

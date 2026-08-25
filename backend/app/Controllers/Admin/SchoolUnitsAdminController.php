@@ -73,6 +73,7 @@ class SchoolUnitsAdminController extends AdminBaseController
         }
         try {
             $dados = $this->extractPost();
+            $this->aplicarLogo($dados);
             $id = $this->model()->create($dados);
             $this->auditarUnidade('CREATE_UNIT', (int) $id, ['nome' => $dados['nome'] ?? null]);
             $this->json(['success' => true, 'message' => 'Unidade cadastrada com sucesso', 'id' => $id]);
@@ -107,7 +108,9 @@ class SchoolUnitsAdminController extends AdminBaseController
             if (!$unit) {
                 throw new \RuntimeException('Unidade não encontrada');
             }
-            $this->model()->update((int) $id, $this->extractPost());
+            $dados = $this->extractPost();
+            $this->aplicarLogo($dados);
+            $this->model()->update((int) $id, $dados);
             $this->auditarUnidade('UPDATE_UNIT', (int) $id);
             $this->json(['success' => true, 'message' => 'Unidade atualizada com sucesso']);
         } catch (\Throwable $e) {
@@ -152,7 +155,6 @@ class SchoolUnitsAdminController extends AdminBaseController
             'email', 'diretor_nome', 'secretario_nome',
             'ato_autorizacao', 'ato_credenciamento', 'ato_reconhecimento',
             'diretor_registro', 'secretario_registro',
-            'logo_url',
         ];
         $out = [];
         foreach ($fields as $f) {
@@ -160,6 +162,72 @@ class SchoolUnitsAdminController extends AdminBaseController
         }
         $out['ativo'] = isset($_POST['ativo']) ? 1 : 0;
         return $out;
+    }
+
+    /**
+     * Aplica upload ou remoção do logo. Sem arquivo novo e sem remover, não
+     * altera logo_url (update preserva o valor atual).
+     *
+     * @param array<string, mixed> $dados
+     */
+    private function aplicarLogo(array &$dados): void
+    {
+        $arquivo = $_FILES['logo'] ?? null;
+        if (is_array($arquivo)) {
+            $erroUpload = (int) ($arquivo['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($erroUpload !== UPLOAD_ERR_NO_FILE && $erroUpload !== UPLOAD_ERR_OK) {
+                throw new \RuntimeException('Falha no upload do logo. Use PNG, JPG, WEBP ou GIF de até 5MB.');
+            }
+            if ($erroUpload === UPLOAD_ERR_OK && (int) ($arquivo['size'] ?? 0) > 0) {
+                $dados['logo_url'] = $this->salvarLogo($arquivo);
+                return;
+            }
+        }
+        if (!empty($_POST['remover_logo'])) {
+            $dados['logo_url'] = '';
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $file
+     */
+    private function salvarLogo(array $file): string
+    {
+        if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('Falha no upload do logo.');
+        }
+        if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            throw new \RuntimeException('Logo muito grande (máx. 5MB).');
+        }
+
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            throw new \RuntimeException('Arquivo de logo inválido.');
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? finfo_file($finfo, $tmp) : false;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        $permitidos = [
+            'image/png' => 'png',
+            'image/jpeg' => 'jpg',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+        ];
+        if (!is_string($mime) || !isset($permitidos[$mime])) {
+            throw new \RuntimeException('Use uma imagem PNG, JPG, WEBP ou GIF.');
+        }
+
+        $nome = 'unidade_logo_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $permitidos[$mime];
+        require_once __DIR__ . '/../../Services/MediaStorageService.php';
+        $media = new \MediaStorageService($this->config);
+        if (!$media->put('layout', $nome, $tmp, $mime)) {
+            throw new \RuntimeException('Não foi possível salvar o logo.');
+        }
+
+        return $media->getDisplayUrl('layout', $nome);
     }
 }
 }

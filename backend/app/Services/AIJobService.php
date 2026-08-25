@@ -1035,6 +1035,7 @@ class AIJobService
             new \App\AI\Agentes\Questoes\ValidadorQuestaoAgent(),
             new \App\AI\Agentes\Questoes\RevisorQuestaoAgent(),
             new \App\AI\Agentes\Questoes\RevisorCriticoAgent(),
+            new \App\AI\Agentes\Questoes\ValidadorQuestaoAgent(),
             new \App\AI\Agentes\Questoes\GeradorRecursoVisualAgent(),
         ], $contexto);
 

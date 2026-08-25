@@ -85,14 +85,16 @@ class SchoolUnit
         if (!$this->tableExists()) {
             return false;
         }
-        $row = $this->db->fetch(
-            "SELECT u.* FROM alunos a
-             INNER JOIN unidades u ON u.id = a.unidade_id
-             WHERE a.id = :id LIMIT 1",
-            ['id' => (int) $alunoId]
-        );
-        if ($row) {
-            return $row;
+        if ($this->colunaAlunoUnidadeExiste()) {
+            $row = $this->db->fetch(
+                "SELECT u.* FROM alunos a
+                 INNER JOIN unidades u ON u.id = a.unidade_id
+                 WHERE a.id = :id LIMIT 1",
+                ['id' => (int) $alunoId]
+            );
+            if ($row) {
+                return $row;
+            }
         }
         return $this->db->fetch(
             "SELECT * FROM unidades WHERE ativo = 1 ORDER BY tipo = 'matriz' DESC, id ASC LIMIT 1"
@@ -136,11 +138,36 @@ class SchoolUnit
      */
     public function countStudents($id): int
     {
+        if (!$this->colunaAlunoUnidadeExiste()) {
+            return 0;
+        }
         $row = $this->db->fetch(
             "SELECT COUNT(*) AS total FROM alunos WHERE unidade_id = :id",
             ['id' => (int) $id]
         );
         return (int) ($row['total'] ?? 0);
+    }
+
+    /**
+     * Indica se alunos.unidade_id existe (a migration original pode ter criado
+     * a tabela unidades sem a coluna, e a listagem de Instituição quebrava).
+     */
+    private function colunaAlunoUnidadeExiste(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alunos' AND COLUMN_NAME = 'unidade_id'"
+            );
+            $cache = !empty($row['total']);
+        } catch (\Throwable $e) {
+            $cache = false;
+        }
+        return $cache;
     }
 
     /**

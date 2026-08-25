@@ -17,6 +17,12 @@
     </div>
 </div>
 
+<?php if (!empty($status_message)): ?>
+<div class="mb-4 p-3 rounded-xl text-sm <?= ($status_type ?? '') === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200' ?>">
+    <?= htmlspecialchars((string) $status_message) ?>
+</div>
+<?php endif; ?>
+
 <!-- Filtro ano letivo -->
 <form method="GET" class="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 mb-6">
     <div class="flex items-end gap-3">
@@ -30,6 +36,41 @@
                 <option value="<?= (int)$al['id'] ?>" <?= $ano_letivo_id == $al['id'] ? 'selected' : '' ?>><?= htmlspecialchars($al['ano']) ?></option>
                 <?php endforeach; ?>
             </select>
+        </div>
+    </div>
+</form>
+
+<form method="POST" action="<?= URL ?>/admin/finance/plans/clonar" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+    <h3 class="font-semibold text-gray-800 mb-1">Clonar planos para o ano novo</h3>
+    <p class="text-sm text-gray-500 mb-4">Não edite o plano do ano atual. Clone com o reajuste e use o mapa da campanha de rematrícula.</p>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Ano origem</label>
+            <select name="ano_origem_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Selecione</option>
+                <?php foreach ($anos_letivos as $al): ?>
+                <option value="<?= (int)$al['id'] ?>" <?= $ano_letivo_id == $al['id'] ? 'selected' : '' ?>><?= htmlspecialchars($al['ano']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Ano destino</label>
+            <select name="ano_destino_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Selecione</option>
+                <?php foreach ($anos_letivos as $al): ?>
+                <option value="<?= (int)$al['id'] ?>"><?= htmlspecialchars($al['ano']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Reajuste (%)</label>
+            <input type="number" step="0.01" name="reajuste_pct" value="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        </div>
+        <div>
+            <button type="submit" class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90">
+                Clonar planos
+            </button>
         </div>
     </div>
 </form>

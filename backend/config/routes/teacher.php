@@ -239,10 +239,7 @@ $router->get('/professor/relatorios', 'User/TeacherController@relatorios');
 $router->get('/professor/relatorios/turma/{id}', 'User/TeacherController@relatorioTurma');
 $router->get('/professor/relatorios/aluno/{id}', 'User/TeacherController@relatorioAluno');
 
-// Diário de Classe (Professor)
-$router->get('/professor/diario', 'Teacher/ClassDiaryController@index');
-$router->get('/professor/diario/abrir', 'Teacher/ClassDiaryController@abrir');
-$router->post('/professor/diario/salvar', 'Teacher/ClassDiaryController@salvar');
+// Diário de Classe: rotas em app/Modulos/diario/routes.php
 
 // Planos de Aula (Professor)
 $router->get('/professor/planos-aula', 'Education/LessonPlanController@index');

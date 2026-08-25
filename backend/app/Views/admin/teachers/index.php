@@ -390,7 +390,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
                 <?php if (empty($materias_disponiveis)): ?>
                     <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                         Nenhuma matéria cadastrada no sistema.
-                        <a href="<?= URL ?>/admin/subjects/create" class="text-blue-600 hover:underline">Cadastre matérias primeiro</a>.
+                        <a href="<?= URL ?>/admin/componentes-curriculares" class="text-blue-600 hover:underline">Cadastre componentes curriculares primeiro</a>.
                     </p>
                 <?php else: ?>
                     <div id="teacher-materias-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">

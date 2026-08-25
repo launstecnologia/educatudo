@@ -3,7 +3,6 @@
  * EducaTudo - Controller de Administracao (extraido de AdminController)
  */
 
-require_once __DIR__ . '/../../Models/Education/Subject.php';
 require_once __DIR__ . '/../../Core/LayoutHelper.php';
 require_once __DIR__ . '/AdminBaseController.php';
 
@@ -324,14 +323,39 @@ class SchoolSettingsAdminController extends AdminBaseController
         
         try {
             $configs = $_POST['config'] ?? [];
+            if (!is_array($configs)) {
+                $configs = [];
+            }
+
+            $tamanhosPermitidos = ['1', '1.25', '1.5', '2'];
+            foreach (['logo_size_navbar', 'logo_size_login'] as $chaveTamanho) {
+                if (!array_key_exists($chaveTamanho, $configs)) {
+                    continue;
+                }
+                $valor = (string) $configs[$chaveTamanho];
+                if (!in_array($valor, $tamanhosPermitidos, true)) {
+                    unset($configs[$chaveTamanho]);
+                }
+            }
             
             foreach ($configs as $key => $value) {
+                if (is_array($value)) {
+                    continue;
+                }
                 $this->db->query(
                     "INSERT INTO config_layout (config_key, config_value) VALUES (?, ?) 
                      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP",
                     [$key, $value]
                 );
             }
+
+            require_once __DIR__ . '/../../Core/RedisCache.php';
+            RedisCache::delete('config_layout');
+            RedisCache::delete('config_layout_single');
+            if (defined('TENANT_ID') && (int) TENANT_ID > 0) {
+                RedisCache::delete('config_layout_' . (int) TENANT_ID);
+            }
+            RedisCache::delete('config_layout_' . ((int) ($_SESSION['tenant_id'] ?? 0)));
             
             $this->json(['success' => true, 'message' => 'Configurações salvas com sucesso!']);
             
@@ -485,156 +509,8 @@ class SchoolSettingsAdminController extends AdminBaseController
         $this->viewWithLayout('admin', 'admin/classes/index', $data);
     }
 
-    public function materias()
-    {
-        $subjectModel = new Subject();
-        $materias = $subjectModel->getAll();
-        
-        $data = [
-            'title' => 'Gestão de Matérias - EducaTudo',
-            'subjects' => $materias,
-            'user' => $this->auth->getUser(),
-            'current_page' => 'subjects'
-        ];
-        
-        $this->viewWithLayout('admin', 'admin/subjects/index', $data);
-    }
-
-    public function criarMateria()
-    {
-        $data = [
-            'title' => 'Cadastrar Matéria - EducaTudo',
-            'user' => $this->auth->getUser(),
-            'csrf_token' => $this->generateCsrfToken(),
-            'current_page' => 'subjects'
-        ];
-        
-        $this->viewWithLayout('admin', 'admin/subjects/create', $data);
-    }
-
-    public function salvarMateria()
-    {
-        // Verifica CSRF token
-        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->json(['error' => 'Token inválido'], 400);
-        }
-        
-        try {
-            $nome = trim($_POST['nome'] ?? '');
-            
-            // Validações
-            if (empty($nome)) {
-                throw new Exception('Nome da matéria é obrigatório');
-            }
-            
-            $subjectModel = new Subject();
-            
-            // Verifica se nome já existe
-            if ($subjectModel->nameExists($nome)) {
-                throw new Exception('Nome da matéria já cadastrado');
-            }
-            
-            // Cria matéria
-            $subjectModel->create([
-                'nome' => $nome,
-                'professor_id' => null
-            ]);
-            
-            $this->json(['success' => true, 'message' => 'Matéria cadastrada com sucesso']);
-            
-        } catch (Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
-        }
-    }
-
-    public function editarMateria($id)
-    {
-        $subjectModel = new Subject();
-        $materia = $subjectModel->findById($id);
-        
-        if (!$materia) {
-            $this->redirect('/admin/subjects');
-        }
-        
-        $data = [
-            'title' => 'Editar Matéria - EducaTudo',
-            'subject' => $materia,
-            'user' => $this->auth->getUser(),
-            'csrf_token' => $this->generateCsrfToken(),
-            'current_page' => 'subjects'
-        ];
-        
-        $this->viewWithLayout('admin', 'admin/subjects/edit', $data);
-    }
-
-    public function atualizarMateria($id)
-    {
-        // Verifica CSRF token
-        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->json(['error' => 'Token inválido'], 400);
-        }
-        
-        try {
-            $nome = trim($_POST['nome'] ?? '');
-            
-            // Validações
-            if (empty($nome)) {
-                throw new Exception('Nome da matéria é obrigatório');
-            }
-            
-            $subjectModel = new Subject();
-            
-            // Verifica se matéria existe
-            if (!$subjectModel->exists($id)) {
-                throw new Exception('Matéria não encontrada');
-            }
-            
-            // Verifica se nome já existe (exceto para a própria matéria)
-            if ($subjectModel->nameExists($nome, $id)) {
-                throw new Exception('Nome da matéria já cadastrado');
-            }
-            
-            // Atualiza matéria
-            $subjectModel->update($id, [
-                'nome' => $nome,
-                'professor_id' => null
-            ]);
-            
-            $this->json(['success' => true, 'message' => 'Matéria atualizada com sucesso']);
-            
-        } catch (Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
-        }
-    }
-
-    public function excluirMateria($id)
-    {
-        try {
-            $subjectModel = new Subject();
-            
-            // Verifica se matéria existe
-            if (!$subjectModel->exists($id)) {
-                throw new Exception('Matéria não encontrada');
-            }
-            
-            // Verifica se há jornadas vinculadas à matéria
-            // Como não há mais professor_id na tabela materias,
-            // esta verificação não é mais necessária
-            $jornadasVinculadas = [['total' => 0]];
-            
-            if ($jornadasVinculadas[0]['total'] > 0) {
-                throw new Exception('Não é possível excluir matéria com jornadas vinculadas');
-            }
-            
-            // Exclui matéria
-            $subjectModel->delete($id);
-            
-            $this->json(['success' => true, 'message' => 'Matéria excluída com sucesso']);
-            
-        } catch (Exception $e) {
-            $this->json(['error' => $e->getMessage()], 400);
-        }
-    }
+    // Ações de "Matérias" migraram para Admin/ComponenteCurricularAdminController
+    // (módulo renomeado para "Componentes Curriculares" — ver .claude/docs/nomenclatura.md).
 
     public function creditosPacotes()
     {

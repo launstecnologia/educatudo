@@ -266,9 +266,22 @@ $steps = [
                     </label>
                     <select id="turma_id" name="turma_id" class="<?= $clsCampo('turma_id') ?>">
                         <option value="">Selecionar...</option>
-                        <?php foreach ($turmas as $t): ?>
+                        <?php foreach ($turmas as $t):
+                            $resumoT = is_array($t['vagas_resumo'] ?? null) ? $t['vagas_resumo'] : null;
+                            $badgeVaga = '';
+                            if ($resumoT) {
+                                if (!empty($resumoT['ilimitado'])) {
+                                    $badgeVaga = ' · vagas ilimitadas';
+                                } else {
+                                    $tot = (int) ($resumoT['vagas'] ?? 0);
+                                    $ocup = (int) ($resumoT['ocupadas'] ?? 0) + (int) ($resumoT['reservadas'] ?? 0);
+                                    $rest = (int) ($resumoT['restantes'] ?? 0);
+                                    $badgeVaga = ' · ' . $ocup . '/' . $tot . ($rest <= 0 ? ' lotada' : '');
+                                }
+                            }
+                        ?>
                         <option value="<?= (int)$t['id'] ?>" <?= (int)($prefill['turma_id'] ?? 0) === (int)$t['id'] ? 'selected' : '' ?>>
-                            <?= $esc($t['nome']) ?> — <?= $esc($t['serie']) ?> (<?= $esc($t['turno'] ?? '') ?>)
+                            <?= $esc($t['nome']) ?> — <?= $esc($t['serie']) ?> (<?= $esc($t['turno'] ?? '') ?>)<?= $esc($badgeVaga) ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -333,6 +346,40 @@ $steps = [
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Escola anterior</label>
                     <input type="text" name="aluno_escola_anterior" id="aluno_escola_anterior" value="<?= $val('aluno_escola_anterior') ?>" class="<?= $inputClass ?>">
+                </div>
+
+                <div class="pt-2 border-t border-gray-100">
+                    <h4 class="text-sm font-semibold text-gray-800 mb-3">Censo Escolar</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome da mãe</label>
+                            <input type="text" name="aluno_nome_mae" id="aluno_nome_mae" value="<?= $val('aluno_nome_mae') ?>" class="<?= $inputClass ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome do pai</label>
+                            <input type="text" name="aluno_nome_pai" id="aluno_nome_pai" value="<?= $val('aluno_nome_pai') ?>" class="<?= $inputClass ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cor / raça</label>
+                            <select name="aluno_cor_raca" id="aluno_cor_raca" class="<?= $inputClass ?>">
+                                <?php
+                                $corSel = (string) ($prefill['aluno_cor_raca'] ?? '');
+                                $coresCenso = ['' => 'Não informado', 'branca' => 'Branca', 'preta' => 'Preta', 'parda' => 'Parda', 'amarela' => 'Amarela', 'indigena' => 'Indígena', 'nao_declarada' => 'Não declarada'];
+                                foreach ($coresCenso as $ck => $cl):
+                                ?>
+                                <option value="<?= $esc($ck) ?>" <?= $corSel === $ck ? 'selected' : '' ?>><?= $esc($cl) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nacionalidade</label>
+                            <input type="text" name="aluno_nacionalidade" id="aluno_nacionalidade" value="<?= $val('aluno_nacionalidade') ?>" class="<?= $inputClass ?>" placeholder="Brasileira">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Código INEP</label>
+                            <input type="text" name="aluno_codigo_inep" id="aluno_codigo_inep" value="<?= $val('aluno_codigo_inep') ?>" class="<?= $inputClass ?>" maxlength="20">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="pt-2 border-t border-gray-100">

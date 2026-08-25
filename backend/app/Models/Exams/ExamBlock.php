@@ -697,6 +697,11 @@ class ExamBlock
                 $columns[] = 'tipo_avaliacao_id';
                 $params['tipo_avaliacao_id'] = !empty($data['tipo_avaliacao_id']) ? (int)$data['tipo_avaliacao_id'] : null;
             }
+            if ($this->hasProvasBlocosColumn('semana')) {
+                $columns[] = 'semana';
+                $semana = isset($data['semana']) ? (int) $data['semana'] : 0;
+                $params['semana'] = ($semana >= 1 && $semana <= 8) ? $semana : null;
+            }
             if ($this->hasProvasBlocosColumn('formato_evento')) {
                 $columns[] = 'formato_evento';
                 $params['formato_evento'] = $formatoEvento;
@@ -861,6 +866,11 @@ class ExamBlock
             if ($this->hasProvasBlocosColumn('tipo_avaliacao_id')) {
                 $setParts[] = 'tipo_avaliacao_id = :tipo_avaliacao_id';
                 $params['tipo_avaliacao_id'] = !empty($data['tipo_avaliacao_id']) ? (int)$data['tipo_avaliacao_id'] : null;
+            }
+            if ($this->hasProvasBlocosColumn('semana')) {
+                $setParts[] = 'semana = :semana';
+                $semana = isset($data['semana']) ? (int) $data['semana'] : 0;
+                $params['semana'] = ($semana >= 1 && $semana <= 8) ? $semana : null;
             }
             if ($this->hasProvasBlocosColumn('formato_evento')) {
                 $setParts[] = 'formato_evento = :formato_evento';

@@ -112,7 +112,7 @@ class ClassRoom
                 }
             }
             $sql = "INSERT INTO turmas (nome, ano_letivo, serie, ativo, curso_novo_id, serie_id, ano_letivo_id) VALUES (:nome, :ano_letivo, :serie, :ativo, :curso_novo_id, :serie_id, :ano_letivo_id)";
-            return $this->db->insert($sql, [
+            $id = $this->db->insert($sql, [
                 'nome' => $data['nome'],
                 'ano_letivo' => $ano,
                 'serie' => $serieNome,
@@ -121,26 +121,32 @@ class ClassRoom
                 'serie_id' => isset($data['serie_id']) && $data['serie_id'] !== '' ? (int)$data['serie_id'] : null,
                 'ano_letivo_id' => $anoLetivoId ? (int)$anoLetivoId : null
             ]);
+            $this->aplicarCamposExtras((int) $id, $data);
+            return $id;
         }
 
         if ($this->supportsCursos()) {
             $sql = "INSERT INTO turmas (nome, ano_letivo, serie, curso_id, ativo) VALUES (:nome, :ano_letivo, :serie, :curso_id, :ativo)";
-            return $this->db->insert($sql, [
+            $id = $this->db->insert($sql, [
                 'nome' => $data['nome'],
                 'ano_letivo' => $data['ano_letivo'],
                 'serie' => $data['serie'],
                 'curso_id' => $data['curso_id'] ?? null,
                 'ativo' => $data['ativo'] ?? 1
             ]);
+            $this->aplicarCamposExtras((int) $id, $data);
+            return $id;
         }
 
         $sql = "INSERT INTO turmas (nome, ano_letivo, serie, ativo) VALUES (:nome, :ano_letivo, :serie, :ativo)";
-        return $this->db->insert($sql, [
+        $id = $this->db->insert($sql, [
             'nome' => $data['nome'],
             'ano_letivo' => $data['ano_letivo'],
             'serie' => $data['serie'],
             'ativo' => $data['ativo'] ?? 1
         ]);
+        $this->aplicarCamposExtras((int) $id, $data);
+        return $id;
     }
     
     /**
@@ -167,7 +173,7 @@ class ClassRoom
                 }
             }
             $sql = "UPDATE turmas SET nome = :nome, ano_letivo = :ano_letivo, serie = :serie, ativo = :ativo, curso_novo_id = :curso_novo_id, serie_id = :serie_id, ano_letivo_id = :ano_letivo_id, curso_id = NULL WHERE id = :id";
-            return $this->db->update($sql, [
+            $ok = $this->db->update($sql, [
                 'nome' => $data['nome'],
                 'ano_letivo' => $ano,
                 'serie' => $serieNome,
@@ -177,11 +183,13 @@ class ClassRoom
                 'ano_letivo_id' => $anoLetivoId ? (int)$anoLetivoId : null,
                 'id' => $id
             ]);
+            $this->aplicarCamposExtras((int) $id, $data);
+            return $ok;
         }
 
         if ($this->supportsCursos()) {
             $sql = "UPDATE turmas SET nome = :nome, ano_letivo = :ano_letivo, serie = :serie, curso_id = :curso_id, ativo = :ativo WHERE id = :id";
-            return $this->db->update($sql, [
+            $ok = $this->db->update($sql, [
                 'nome' => $data['nome'],
                 'ano_letivo' => $data['ano_letivo'],
                 'serie' => $data['serie'],
@@ -189,16 +197,76 @@ class ClassRoom
                 'ativo' => $data['ativo'] ?? 1,
                 'id' => $id
             ]);
+            $this->aplicarCamposExtras((int) $id, $data);
+            return $ok;
         }
 
         $sql = "UPDATE turmas SET nome = :nome, ano_letivo = :ano_letivo, serie = :serie, ativo = :ativo WHERE id = :id";
-        return $this->db->update($sql, [
+        $ok = $this->db->update($sql, [
             'nome' => $data['nome'],
             'ano_letivo' => $data['ano_letivo'],
             'serie' => $data['serie'],
             'ativo' => $data['ativo'] ?? 1,
             'id' => $id
         ]);
+        $this->aplicarCamposExtras((int) $id, $data);
+        return $ok;
+    }
+
+    private function aplicarCamposExtras(int $id, array $data): void
+    {
+        if ($id <= 0) {
+            return;
+        }
+        $sets = [];
+        $params = [];
+        if (array_key_exists('vagas', $data) && $this->temColunaTurma('vagas')) {
+            $raw = $data['vagas'];
+            $sets[] = 'vagas = :vagas';
+            $params['vagas'] = ($raw === '' || $raw === null) ? null : ((int) $raw > 0 ? (int) $raw : null);
+        }
+        if (array_key_exists('turma_origem_id', $data) && $this->temColunaTurma('turma_origem_id')) {
+            $sets[] = 'turma_origem_id = :turma_origem_id';
+            $params['turma_origem_id'] = (int) ($data['turma_origem_id'] ?? 0) ?: null;
+        }
+        if (array_key_exists('matriz_curricular_id', $data) && $this->temColunaTurma('matriz_curricular_id')) {
+            $sets[] = 'matriz_curricular_id = :matriz_curricular_id';
+            $params['matriz_curricular_id'] = (int) ($data['matriz_curricular_id'] ?? 0) ?: null;
+        }
+        if (array_key_exists('turno', $data) && $this->temColunaTurma('turno')) {
+            $raw = trim((string) ($data['turno'] ?? ''));
+            $sets[] = 'turno = :turno';
+            $params['turno'] = $raw !== '' ? $raw : null;
+        }
+        if (array_key_exists('sala_padrao_id', $data) && $this->temColunaTurma('sala_padrao_id')) {
+            $sets[] = 'sala_padrao_id = :sala_padrao_id';
+            $params['sala_padrao_id'] = (int) ($data['sala_padrao_id'] ?? 0) ?: null;
+        }
+        if (array_key_exists('observacoes', $data) && $this->temColunaTurma('observacoes')) {
+            $raw = trim((string) ($data['observacoes'] ?? ''));
+            $sets[] = 'observacoes = :observacoes';
+            $params['observacoes'] = $raw !== '' ? $raw : null;
+        }
+        if ($sets === []) {
+            return;
+        }
+        $params['id'] = $id;
+        $this->db->update(
+            'UPDATE turmas SET ' . implode(', ', $sets) . ' WHERE id = :id',
+            $params
+        );
+    }
+
+    private function temColunaTurma(string $coluna): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/i', $coluna)) {
+            return false;
+        }
+        try {
+            return $this->db->fetch('SHOW COLUMNS FROM turmas LIKE :c', ['c' => $coluna]) !== false;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
     
     /**
@@ -452,6 +520,27 @@ class ClassRoom
     }
 
     /**
+     * Anos letivos ativos (tabela `ano_letivo`), para o dropdown de "Ano
+     * Letivo" do formulário de turma (fluxo "nova estrutura") — hoje o campo
+     * era travado no ano corrente (`date('Y')`); com essa lista o admin pode
+     * escolher outro ano (ex.: preparar turmas do ano seguinte).
+     */
+    public function getAnosLetivoNovo()
+    {
+        try {
+            $hasTable = $this->db->fetch("SHOW TABLES LIKE 'ano_letivo'");
+            if ($hasTable === false) {
+                return [];
+            }
+            return $this->db->fetchAll(
+                "SELECT id, ano FROM ano_letivo WHERE ativo = 1 ORDER BY ano DESC"
+            );
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
      * Séries da tabela serie (por curso_id), para uso no formulário de turma.
      */
     public function getSeriesNovo()
@@ -484,6 +573,25 @@ class ClassRoom
             }
             $row = $this->db->fetch("SELECT id FROM ano_letivo WHERE ano = :ano LIMIT 1", ['ano' => (int)$ano]);
             return $row ? (int)$row['id'] : null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Ano civil (ex.: 2026) correspondente a um ano_letivo_id — usado pra
+     * manter a coluna legada `turmas.ano_letivo` (int) em sincronia quando o
+     * admin escolhe um Ano Letivo diferente do calendário atual.
+     */
+    public function getAnoById($anoLetivoId)
+    {
+        try {
+            $hasTable = $this->db->fetch("SHOW TABLES LIKE 'ano_letivo'");
+            if ($hasTable === false) {
+                return null;
+            }
+            $row = $this->db->fetch("SELECT ano FROM ano_letivo WHERE id = :id LIMIT 1", ['id' => (int) $anoLetivoId]);
+            return $row ? (int) $row['ano'] : null;
         } catch (Exception $e) {
             return null;
         }

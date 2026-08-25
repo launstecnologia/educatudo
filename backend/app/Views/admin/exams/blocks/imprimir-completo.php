@@ -104,9 +104,13 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
                     <?php endif; ?>
                     <?php if (!empty($q['tipo']) && $q['tipo'] === 'multipla_escolha' && !empty($q['alternativas'])): ?>
                     <div class="alternativas">
-                        <?php foreach ($q['alternativas'] as $alt): ?>
+                        <?php 
+                        $letrasAlt = ['A', 'B', 'C', 'D', 'E', 'F'];
+                        foreach ($q['alternativas'] as $aIdx => $alt): 
+                            $letraAlt = $letrasAlt[$aIdx] ?? '';
+                        ?>
                         <div class="alternativa <?= !empty($alt['correta']) ? 'correta' : '' ?>">
-                            <?= !empty($alt['correta']) ? '✓' : '◦' ?> <?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
+                            <?= !empty($alt['correta']) ? '<strong style="color:#16a34a;">✓ ' . htmlspecialchars($letraAlt) . ')</strong>' : '<strong>' . htmlspecialchars($letraAlt) . ')</strong>' ?> <?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
                         </div>
                         <?php endforeach; ?>
                     </div>

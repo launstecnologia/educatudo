@@ -79,11 +79,23 @@ SELECT 'Matriz', 'matriz'
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `unidades`);
 
--- Backfill: vincula alunos sem unidade à unidade matriz (a mais antiga)
-UPDATE `alunos`
-SET `unidade_id` = (SELECT MIN(id) FROM `unidades`)
-WHERE `unidade_id` IS NULL
-  AND EXISTS (SELECT 1 FROM `unidades`);
+-- Backfill: vincula alunos sem unidade à unidade matriz (a mais antiga).
+-- Só executa se a coluna existir — senão o UPDATE estoura 1054 na cláusula WHERE.
+SET @has_col := (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db
+    AND TABLE_NAME = 'alunos'
+    AND COLUMN_NAME = 'unidade_id'
+);
+SET @sql := IF(
+  @has_col > 0,
+  'UPDATE alunos SET unidade_id = (SELECT MIN(id) FROM unidades) WHERE unidade_id IS NULL AND EXISTS (SELECT 1 FROM unidades)',
+  'SELECT 1'
+);
+PREPARE stmt_unidade_backfill FROM @sql;
+EXECUTE stmt_unidade_backfill;
+DEALLOCATE PREPARE stmt_unidade_backfill;
 
 -- Histórico/auditoria das declarações e documentos emitidos
 CREATE TABLE IF NOT EXISTS `declaracoes_emitidas` (

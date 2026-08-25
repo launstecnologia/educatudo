@@ -134,3 +134,7 @@ $router->post('/matricula/contrato/{token}/assinar',     'Modulos/matricula/Matr
 $router->get('/matricula/contrato/{token}/pdf',          'Modulos/matricula/MatriculaPublicoController@downloadPdf');
 $router->post('/webhooks/zapsign/{tenant_slug}',         'Modulos/matricula/ZapSignWebhookController@handle');
 $router->post('/webhooks/zapsign',                       'Modulos/matricula/ZapSignWebhookController@handle');
+
+// Catraca / portaria — Gestão de Presença (Bearer token da integração da escola)
+$router->post('/api/webhooks/presenca',                  'Modulos/presenca/PresencaWebhookController@receber');
+$router->post('/api/webhooks/presenca/{provedor}',       'Modulos/presenca/PresencaWebhookController@receber');

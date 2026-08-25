@@ -5,6 +5,8 @@
  */
 
 require_once __DIR__ . '/../../Models/Education/ClassRoom.php';
+require_once __DIR__ . '/../../Models/Education/MatrizCurricular.php';
+require_once __DIR__ . '/../../Models/Education/Sala.php';
 require_once __DIR__ . '/../../Helpers/AdminPasswordHelper.php';
 
 if (!class_exists('ClassController')) {
@@ -43,8 +45,15 @@ class ClassController extends BaseController
         $turmas = $this->turmaModel->getAll($perPage, $offset);
 
         // Adicionar contagem de alunos para cada turma
+        $vagaSvc = null;
+        $vagaPath = dirname(__DIR__, 2) . '/Modulos/matricula/Services/MatriculaVagaService.php';
+        if (is_file($vagaPath)) {
+            require_once $vagaPath;
+            $vagaSvc = new \App\Modulos\Matricula\Services\MatriculaVagaService($this->db);
+        }
         foreach ($turmas as &$turma) {
             $turma['total_alunos'] = $this->turmaModel->countStudents($turma['id']);
+            $turma['vagas_resumo'] = $vagaSvc ? $vagaSvc->resumo((int) $turma['id']) : null;
         }
 
         // Estatísticas do total geral (não só da página atual) — soma via o
@@ -71,25 +80,6 @@ class ClassController extends BaseController
             'total_pages' => $perPage > 0 ? (int)ceil($totalTurmasGeral / $perPage) : 1,
         ];
 
-        $data = [
-            'title' => 'Gerenciar Turmas - EducaTudo',
-            'user' => $user,
-            'current_page' => 'turmas',
-            'turmas' => $turmas,
-            'pagination' => $pagination,
-            'stats_turmas' => $statsTurmas,
-            'csrf_token' => $this->generateCsrfToken()
-        ];
-
-        $this->viewWithLayout('admin', 'admin/turmas/index', $data);
-    }
-    
-    /**
-     * Exibe formulário de criação
-     */
-    public function create()
-    {
-        $user = $this->auth->getUser();
         $cursosNovo = $this->turmaModel->supportsCursoNovo() ? $this->turmaModel->getCursosNovo() : [];
         $seriesNovo = $this->turmaModel->getSeriesNovo();
         $seriesPorCurso = [];
@@ -102,22 +92,66 @@ class ClassController extends BaseController
         }
         $anoAtual = (int)date('Y');
         $anoLetivoId = $this->turmaModel->getAnoLetivoIdByAno($anoAtual);
-        
+        $matrizesEmUso = [];
+        if ($this->db->fetch("SHOW COLUMNS FROM turmas LIKE 'matriz_curricular_id'") !== false) {
+            $matrizesEmUso = array_column(
+                $this->db->fetchAll("SELECT DISTINCT matriz_curricular_id FROM turmas WHERE matriz_curricular_id IS NOT NULL"),
+                'matriz_curricular_id'
+            );
+        }
+
         $data = [
-            'title' => 'Cadastrar Turma - EducaTudo',
+            'title' => 'Gerenciar Turmas - EducaTudo',
             'user' => $user,
             'current_page' => 'turmas',
+            'turmas' => $turmas,
+            'pagination' => $pagination,
+            'stats_turmas' => $statsTurmas,
             'csrf_token' => $this->generateCsrfToken(),
             'series' => $this->getSeries(),
             'cursos' => $this->getCursos(),
             'cursosNovo' => $cursosNovo,
             'seriesPorCurso' => $seriesPorCurso,
+            'matrizesPorSerie' => $this->matrizesPorSerie($matrizesEmUso),
+            'anosLetivo' => $this->turmaModel->getAnosLetivoNovo(),
+            'salas' => (new Sala())->getAll(true),
             'ano_letivo_id' => $anoLetivoId,
         ];
-        
-        $this->viewWithLayout('admin', 'admin/turmas/create', $data);
+
+        $this->viewWithLayout('admin', 'admin/turmas/index', $data);
     }
-    
+
+    /**
+     * Dados de uma turma (JSON) para popular o offcanvas de edição
+     */
+    public function dados($id)
+    {
+        $turma = $this->turmaModel->findById($id);
+        if (!$turma) {
+            $this->json(['error' => 'Turma não encontrada'], 404);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'item' => [
+                'id' => (int) $turma['id'],
+                'nome' => $turma['nome'],
+                'curso_id' => $turma['curso_id'] ?? null,
+                'serie' => $turma['serie'] ?? '',
+                'curso_novo_id' => $turma['curso_novo_id'] ?? null,
+                'serie_id' => $turma['serie_id'] ?? null,
+                'matriz_curricular_id' => $turma['matriz_curricular_id'] ?? null,
+                'ano_letivo_id' => $turma['ano_letivo_id'] ?? null,
+                'turno' => $turma['turno'] ?? '',
+                'sala_padrao_id' => $turma['sala_padrao_id'] ?? null,
+                'observacoes' => $turma['observacoes'] ?? '',
+                'vagas' => $turma['vagas'] ?? null,
+                'ativo' => (int) ($turma['ativo'] ?? 0),
+            ],
+        ]);
+    }
+
     /**
      * Salva nova turma
      */
@@ -126,18 +160,22 @@ class ClassController extends BaseController
         // Verifica CSRF token
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->json(['error' => 'Token inválido'], 400);
+            return;
         }
-        
+
         try {
             $nome = trim($_POST['nome'] ?? '');
-            $anoLetivo = (int)date('Y');
             $ativo = isset($_POST['ativo']) ? 1 : 0;
             $cursoNovoIdRaw = $_POST['curso_novo_id'] ?? null;
             $cursoNovoId = ($cursoNovoIdRaw !== null && $cursoNovoIdRaw !== '') ? (int)$cursoNovoIdRaw : null;
             $serieIdRaw = $_POST['serie_id'] ?? null;
             $serieId = ($serieIdRaw !== null && $serieIdRaw !== '') ? (int)$serieIdRaw : null;
-            $anoLetivoIdRaw = $_POST['ano_letivo_id'] ?? null;
-            $anoLetivoId = ($anoLetivoIdRaw !== null && $anoLetivoIdRaw !== '') ? (int)$anoLetivoIdRaw : $this->turmaModel->getAnoLetivoIdByAno($anoLetivo);
+            [$anoLetivo, $anoLetivoId] = $this->resolverAnoLetivo($_POST['ano_letivo_id'] ?? null);
+            $matrizCurricularIdRaw = $_POST['matriz_curricular_id'] ?? null;
+            $matrizCurricularId = ($matrizCurricularIdRaw !== null && $matrizCurricularIdRaw !== '') ? (int)$matrizCurricularIdRaw : null;
+            $turno = trim($_POST['turno'] ?? '');
+            $salaPadraoId = $this->validarSalaPadrao($_POST['sala_padrao_id'] ?? null);
+            $observacoes = trim($_POST['observacoes'] ?? '');
 
             // Fluxo nova estrutura (tabela curso): curso_novo_id preenchido
             if ($cursoNovoId > 0 && $this->turmaModel->supportsCursoNovo()) {
@@ -158,6 +196,7 @@ class ClassController extends BaseController
                 if ($this->turmaModel->nameExists($nome)) {
                     throw new Exception('Nome da turma já cadastrado');
                 }
+                $this->validarMatrizDaSerie($matrizCurricularId, $serieId);
                 $this->turmaModel->create([
                     'nome' => $nome,
                     'ano_letivo' => $anoLetivo,
@@ -165,7 +204,12 @@ class ClassController extends BaseController
                     'ativo' => $ativo,
                     'curso_novo_id' => $cursoNovoId,
                     'serie_id' => $serieId,
-                    'ano_letivo_id' => $anoLetivoId
+                    'ano_letivo_id' => $anoLetivoId,
+                    'matriz_curricular_id' => $matrizCurricularId,
+                    'turno' => $turno,
+                    'sala_padrao_id' => $salaPadraoId,
+                    'observacoes' => $observacoes,
+                    'vagas' => $this->vagasDoPost(),
                 ]);
                 $this->json(['success' => true, 'message' => 'Turma cadastrada com sucesso']);
                 return;
@@ -183,7 +227,7 @@ class ClassController extends BaseController
                 }
                 $serie = (string)($curso['nome'] ?? '');
             }
-            
+
             if (empty($nome)) {
                 throw new Exception('Nome da turma é obrigatório');
             }
@@ -193,62 +237,24 @@ class ClassController extends BaseController
             if ($this->turmaModel->nameExists($nome)) {
                 throw new Exception('Nome da turma já cadastrado');
             }
-            
+
             $this->turmaModel->create([
                 'nome' => $nome,
                 'ano_letivo' => $anoLetivo,
                 'serie' => $serie,
                 'curso_id' => $cursoId,
-                'ativo' => $ativo
+                'ativo' => $ativo,
+                'turno' => $turno,
+                'sala_padrao_id' => $salaPadraoId,
+                'observacoes' => $observacoes,
+                'vagas' => $this->vagasDoPost(),
             ]);
-            
+
             $this->json(['success' => true, 'message' => 'Turma cadastrada com sucesso']);
-            
+
         } catch (Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }
-    }
-    
-    /**
-     * Exibe formulário de edição
-     */
-    public function edit($id)
-    {
-        $user = $this->auth->getUser();
-        
-        $turma = $this->turmaModel->findById($id);
-        
-        if (!$turma) {
-            $this->redirect('/admin/turmas');
-        }
-        
-        $cursosNovo = $this->turmaModel->supportsCursoNovo() ? $this->turmaModel->getCursosNovo() : [];
-        $seriesNovo = $this->turmaModel->getSeriesNovo();
-        $seriesPorCurso = [];
-        foreach ($seriesNovo as $s) {
-            $cid = (int)$s['curso_id'];
-            if (!isset($seriesPorCurso[$cid])) {
-                $seriesPorCurso[$cid] = [];
-            }
-            $seriesPorCurso[$cid][] = $s;
-        }
-        $anoAtual = (int)($turma['ano_letivo'] ?? date('Y'));
-        $anoLetivoId = (int)($turma['ano_letivo_id'] ?? 0) ?: $this->turmaModel->getAnoLetivoIdByAno($anoAtual);
-        
-        $data = [
-            'title' => 'Editar Turma - EducaTudo',
-            'user' => $user,
-            'current_page' => 'turmas',
-            'turma' => $turma,
-            'csrf_token' => $this->generateCsrfToken(),
-            'series' => $this->getSeries(),
-            'cursos' => $this->getCursos(),
-            'cursosNovo' => $cursosNovo,
-            'seriesPorCurso' => $seriesPorCurso,
-            'ano_letivo_id' => $anoLetivoId,
-        ];
-        
-        $this->viewWithLayout('admin', 'admin/turmas/edit', $data);
     }
     
     /**
@@ -259,18 +265,22 @@ class ClassController extends BaseController
         // Verifica CSRF token
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->json(['error' => 'Token inválido'], 400);
+            return;
         }
         
         try {
             $nome = trim($_POST['nome'] ?? '');
-            $anoLetivo = (int)date('Y');
             $ativo = isset($_POST['ativo']) ? 1 : 0;
             $cursoNovoIdRaw = $_POST['curso_novo_id'] ?? null;
             $cursoNovoId = ($cursoNovoIdRaw !== null && $cursoNovoIdRaw !== '') ? (int)$cursoNovoIdRaw : null;
             $serieIdRaw = $_POST['serie_id'] ?? null;
             $serieId = ($serieIdRaw !== null && $serieIdRaw !== '') ? (int)$serieIdRaw : null;
-            $anoLetivoIdRaw = $_POST['ano_letivo_id'] ?? null;
-            $anoLetivoId = ($anoLetivoIdRaw !== null && $anoLetivoIdRaw !== '') ? (int)$anoLetivoIdRaw : $this->turmaModel->getAnoLetivoIdByAno($anoLetivo);
+            [$anoLetivo, $anoLetivoId] = $this->resolverAnoLetivo($_POST['ano_letivo_id'] ?? null);
+            $matrizCurricularIdRaw = $_POST['matriz_curricular_id'] ?? null;
+            $matrizCurricularId = ($matrizCurricularIdRaw !== null && $matrizCurricularIdRaw !== '') ? (int)$matrizCurricularIdRaw : null;
+            $turno = trim($_POST['turno'] ?? '');
+            $salaPadraoId = $this->validarSalaPadrao($_POST['sala_padrao_id'] ?? null);
+            $observacoes = trim($_POST['observacoes'] ?? '');
 
             if (!$this->turmaModel->exists($id)) {
                 throw new Exception('Turma não encontrada');
@@ -295,6 +305,7 @@ class ClassController extends BaseController
                 if (empty($nome)) {
                     throw new Exception('Nome da turma é obrigatório');
                 }
+                $this->validarMatrizDaSerie($matrizCurricularId, $serieId);
                 $this->turmaModel->update($id, [
                     'nome' => $nome,
                     'ano_letivo' => $anoLetivo,
@@ -302,7 +313,12 @@ class ClassController extends BaseController
                     'ativo' => $ativo,
                     'curso_novo_id' => $cursoNovoId,
                     'serie_id' => $serieId,
-                    'ano_letivo_id' => $anoLetivoId
+                    'ano_letivo_id' => $anoLetivoId,
+                    'matriz_curricular_id' => $matrizCurricularId,
+                    'turno' => $turno,
+                    'sala_padrao_id' => $salaPadraoId,
+                    'observacoes' => $observacoes,
+                    'vagas' => $this->vagasDoPost(),
                 ]);
                 $this->json(['success' => true, 'message' => 'Turma atualizada com sucesso']);
                 return;
@@ -326,17 +342,21 @@ class ClassController extends BaseController
             if (empty($serie)) {
                 throw new Exception('Curso/Série é obrigatório');
             }
-            
+
             $this->turmaModel->update($id, [
                 'nome' => $nome,
                 'ano_letivo' => $anoLetivo,
                 'serie' => $serie,
                 'curso_id' => $cursoId,
-                'ativo' => $ativo
+                'ativo' => $ativo,
+                'turno' => $turno,
+                'sala_padrao_id' => $salaPadraoId,
+                'observacoes' => $observacoes,
+                'vagas' => $this->vagasDoPost(),
             ]);
-            
+
             $this->json(['success' => true, 'message' => 'Turma atualizada com sucesso']);
-            
+
         } catch (Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }
@@ -349,6 +369,16 @@ class ClassController extends BaseController
     {
         $params = $this->getRequestBodyParams();
         return $params['_token'] ?? '';
+    }
+
+    private function vagasDoPost(): ?int
+    {
+        $raw = trim((string) ($_POST['vagas'] ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        $n = (int) $raw;
+        return $n > 0 ? $n : null;
     }
 
     /**
@@ -543,6 +573,20 @@ class ClassController extends BaseController
         
         $turma['total_alunos'] = $turmaResolver->contarAlunosPorTurma($turmaId);
 
+        $vagasResumo = null;
+        $filaEspera = [];
+        try {
+            $vagaPath = dirname(__DIR__, 2) . '/Modulos/matricula/Services/MatriculaVagaService.php';
+            if (is_file($vagaPath)) {
+                require_once $vagaPath;
+                $vagaSvc = new \App\Modulos\Matricula\Services\MatriculaVagaService($this->db);
+                $vagasResumo = $vagaSvc->resumo($turmaId);
+                $filaEspera = $vagaSvc->listarFila($turmaId);
+            }
+        } catch (Exception $e) {
+            $vagasResumo = null;
+        }
+
         $anos_letivo_para_vinculo = [];
         try {
             $hasAnoLetivo = $this->db->fetch("SHOW TABLES LIKE 'ano_letivo'");
@@ -563,6 +607,8 @@ class ClassController extends BaseController
             'alunos' => $alunos,
             'matriculas_schema_ready' => $hasMatricula,
             'anos_letivo_para_vinculo' => $anos_letivo_para_vinculo,
+            'vagas_resumo' => $vagasResumo,
+            'fila_espera' => $filaEspera,
             'csrf_token' => $this->generateCsrfToken()
         ];
         
@@ -796,6 +842,102 @@ class ClassController extends BaseController
         return $anosLetivos;
     }
     
+    /**
+     * Matrizes Curriculares ativas, agrupadas por serie_id — usado pelo form de
+     * turma (fluxo "nova estrutura") para popular o dropdown conforme a série
+     * selecionada.
+     *
+     * @param int[]|null $incluirMesmoInativas Ids de matriz atualmente vinculados
+     *   a alguma turma — incluídos na lista mesmo se estiverem inativos, senão o
+     *   dropdown "perde" a opção selecionada e salvar o form (a turma continua com
+     *   o mesmo valor pré-marcado no offcanvas) desvincula a matriz silenciosamente
+     *   (matriz inativada depois do vínculo). Desde que o form de turma virou um
+     *   único offcanvas reaproveitado por todas as turmas (não mais uma página por
+     *   turma), a lista de exceções cobre todas as turmas da página, não uma só.
+     */
+    private function matrizesPorSerie(?array $incluirMesmoInativas = null): array
+    {
+        $model = new MatrizCurricular();
+        $matrizes = $model->getAll(['ativo' => 1]);
+
+        $idsAtuais = array_map('intval', array_column($matrizes, 'id'));
+        foreach ($incluirMesmoInativas ?? [] as $id) {
+            $id = (int) $id;
+            if ($id > 0 && !in_array($id, $idsAtuais, true)) {
+                $atual = $model->findById($id);
+                if ($atual) {
+                    $atual['inativa'] = true;
+                    $matrizes[] = $atual;
+                    $idsAtuais[] = $id;
+                }
+            }
+        }
+
+        $porSerie = [];
+        foreach ($matrizes as $m) {
+            $porSerie[(int) $m['serie_id']][] = $m;
+        }
+        return $porSerie;
+    }
+
+    /**
+     * Garante que a Matriz Curricular enviada no form de turma pertence à
+     * série selecionada — o dropdown já filtra isso no cliente, mas o
+     * servidor precisa validar (POST forjado ou bug de JS não devem gravar
+     * uma turma com a matriz de outra série).
+     */
+    private function validarMatrizDaSerie(?int $matrizCurricularId, ?int $serieId): void
+    {
+        if (!$matrizCurricularId) {
+            return;
+        }
+        $matriz = (new MatrizCurricular())->findById($matrizCurricularId);
+        if (!$matriz) {
+            throw new Exception('Matriz Curricular inválida');
+        }
+        if ((int) $matriz['serie_id'] !== (int) $serieId) {
+            throw new Exception('A Matriz Curricular selecionada não pertence à série da turma');
+        }
+    }
+
+    /**
+     * Resolve o ano letivo (int, coluna legada `ano_letivo`) e o
+     * `ano_letivo_id` a persistir na turma. Se o form enviou um
+     * `ano_letivo_id` (dropdown do fluxo "nova estrutura"), usa o ano civil
+     * daquele registro — permite cadastrar turma pra um ano diferente do
+     * calendário atual (ex.: preparar turmas do ano seguinte). Sem valor
+     * enviado, mantém o comportamento anterior (ano corrente).
+     * @return array{0:int,1:?int} [ano_letivo, ano_letivo_id]
+     */
+    private function resolverAnoLetivo($anoLetivoIdRaw): array
+    {
+        $anoLetivoIdPost = ($anoLetivoIdRaw !== null && $anoLetivoIdRaw !== '') ? (int) $anoLetivoIdRaw : null;
+        if ($anoLetivoIdPost) {
+            $ano = $this->turmaModel->getAnoById($anoLetivoIdPost);
+            if ($ano) {
+                return [$ano, $anoLetivoIdPost];
+            }
+        }
+        $anoAtual = (int) date('Y');
+        return [$anoAtual, $this->turmaModel->getAnoLetivoIdByAno($anoAtual)];
+    }
+
+    /**
+     * Valida que a Sala Padrão enviada existe — retorna o id (ou null se
+     * não informada).
+     */
+    private function validarSalaPadrao($salaPadraoIdRaw): ?int
+    {
+        $salaPadraoId = ($salaPadraoIdRaw !== null && $salaPadraoIdRaw !== '') ? (int) $salaPadraoIdRaw : null;
+        if (!$salaPadraoId) {
+            return null;
+        }
+        if (!(new Sala())->exists($salaPadraoId)) {
+            throw new Exception('Sala/Ambiente inválida');
+        }
+        return $salaPadraoId;
+    }
+
     /**
      * Obtém séries disponíveis
      */

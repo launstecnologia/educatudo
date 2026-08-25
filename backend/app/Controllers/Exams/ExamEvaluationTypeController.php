@@ -46,6 +46,8 @@ class ExamEvaluationTypeController extends BaseController
             'title' => 'Tipos de Avaliação - EducaTudo',
             'user' => $user,
             'tipos' => $tipos,
+            'chaves_quadro' => ExamEvaluationType::chavesQuadro(),
+            'tem_chave_quadro' => $this->tipoModel->temColunaChaveQuadro(),
         ]);
     }
 
@@ -55,6 +57,8 @@ class ExamEvaluationTypeController extends BaseController
         $this->viewWithLayout('admin', 'admin/exams/evaluation-types/create', [
             'title' => 'Novo Tipo de Avaliação - EducaTudo',
             'user' => $user,
+            'chaves_quadro' => ExamEvaluationType::chavesQuadro(),
+            'tem_chave_quadro' => $this->tipoModel->temColunaChaveQuadro(),
         ]);
     }
 
@@ -82,6 +86,7 @@ class ExamEvaluationTypeController extends BaseController
                 'descricao' => $descricao !== '' ? $descricao : null,
                 'ordem' => $ordem,
                 'ativo' => $ativo,
+                'chave_quadro' => $_POST['chave_quadro'] ?? null,
             ]);
 
             $this->setFlashMessage('Tipo de avaliação criado com sucesso.', 'success');
@@ -107,6 +112,8 @@ class ExamEvaluationTypeController extends BaseController
             'title' => 'Editar Tipo de Avaliação - EducaTudo',
             'user' => $user,
             'tipo' => $tipo,
+            'chaves_quadro' => ExamEvaluationType::chavesQuadro(),
+            'tem_chave_quadro' => $this->tipoModel->temColunaChaveQuadro(),
         ]);
     }
 
@@ -142,6 +149,7 @@ class ExamEvaluationTypeController extends BaseController
                 'descricao' => $descricao !== '' ? $descricao : null,
                 'ordem' => $ordem,
                 'ativo' => $ativo,
+                'chave_quadro' => $_POST['chave_quadro'] ?? null,
             ]);
 
             $this->setFlashMessage('Tipo de avaliação atualizado com sucesso.', 'success');

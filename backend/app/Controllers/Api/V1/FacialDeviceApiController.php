@@ -261,6 +261,12 @@ class FacialDeviceApiController extends BaseController
         } catch (Throwable $e) {
             Logger::error('Push do evento Lovable falhou', ['event_id' => $eventId, 'exception' => $e], 'facial');
         }
+        try {
+            require_once __DIR__ . '/../../../Modulos/presenca/Services/PresencaEventoService.php';
+            PresencaEventoService::fromFacial($studentId, $kind, $eventAt, $providerId, isset($device['paired_by_user_id']) ? (int) $device['paired_by_user_id'] : null);
+        } catch (Throwable $presencaError) {
+            Logger::error('Presença (diário) a partir do dispositivo falhou', ['event_id' => $eventId, 'exception' => $presencaError], 'facial');
+        }
         $this->json(['success' => true, 'data' => [
             'registered' => true, 'event_id' => $eventId, 'student_id' => $studentId,
             'kind' => $kind, 'date' => $eventAt->format('Y-m-d'), 'time' => $eventAt->format('H:i'),
@@ -297,6 +303,12 @@ class FacialDeviceApiController extends BaseController
                 $this->db->update('UPDATE student_access_events SET notified_at = NOW() WHERE id = :id', ['id' => $eventId]);
             } catch (Throwable $notifyError) {
                 Logger::error('Push de presença do dispositivo falhou', ['event_id' => $eventId, 'exception' => $notifyError], 'facial');
+            }
+            try {
+                require_once __DIR__ . '/../../../Modulos/presenca/Services/PresencaEventoService.php';
+                PresencaEventoService::fromFacial((int) $profile['student_id'], $kind, $now, $providerId, isset($device['paired_by_user_id']) ? (int) $device['paired_by_user_id'] : null);
+            } catch (Throwable $presencaError) {
+                Logger::error('Presença (diário) a partir do reconhecimento falhou', ['event_id' => $eventId, 'exception' => $presencaError], 'facial');
             }
             $this->json(['data' => ['match' => true, 'registered' => true, 'student' => ['id' => (int) $profile['student_id'], 'name' => $profile['nome'], 'class_name' => $profile['class_name']], 'event' => ['id' => $eventId, 'kind' => $kind, 'date' => $now->format('Y-m-d'), 'time' => $now->format('H:i'), 'notified_parents' => ($notification['parents'] ?? 0) > 0]]]);
         } catch (InvalidArgumentException $e) {

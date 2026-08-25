@@ -1,7 +1,18 @@
 -- Lista de chamada por turma: sexo do aluno, configuração e numeração
 
-ALTER TABLE `alunos`
-  ADD COLUMN `sexo` ENUM('M','F','N') NULL DEFAULT NULL;
+SET @db := DATABASE();
+SET @col_sexo := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'alunos' AND COLUMN_NAME = 'sexo'
+);
+SET @sql_sexo := IF(
+  @col_sexo > 0,
+  'SELECT 1',
+  "ALTER TABLE `alunos` ADD COLUMN `sexo` ENUM('M','F','N') NULL DEFAULT NULL"
+);
+PREPARE stmt_sexo FROM @sql_sexo;
+EXECUTE stmt_sexo;
+DEALLOCATE PREPARE stmt_sexo;
 
 CREATE TABLE IF NOT EXISTS `turmas_lista_config` (
   `turma_id` int(11) NOT NULL,

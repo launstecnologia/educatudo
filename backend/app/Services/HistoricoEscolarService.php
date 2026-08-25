@@ -8,6 +8,7 @@ use HistoricoDocumento;
 require_once __DIR__ . '/../Models/Education/HistoricoDocumento.php';
 require_once __DIR__ . '/../Models/Education/SchoolUnit.php';
 require_once __DIR__ . '/DeclarationService.php';
+require_once __DIR__ . '/ResultadoAcademicoService.php';
 
 /**
  * Histórico Escolar oficial (Fundamental/Médio): consolidação, workflow,
@@ -654,6 +655,9 @@ class HistoricoEscolarService
         $eventos = $this->declarations->getHistorico($alunoId);
         $itens = [];
         $seen = [];
+        $this->anexarItensHomologados($alunoId, $itens, $seen);
+        $motor = new \ResultadoAcademicoService();
+        $ctxAluno = $this->contextoAcademicoDoAluno($alunoId);
 
         foreach ($eventos as $ev) {
             $ano = (string) ((int) ($ev['ano_letivo_calc'] ?? $ev['ano_letivo'] ?? 0) ?: date('Y'));
@@ -665,6 +669,8 @@ class HistoricoEscolarService
             $linhas = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
             $finalCodes = $this->codigosColunaFinal($cols);
             $notaMin = (float) ($ev['nota_minima_aprovacao'] ?? 6);
+            $anoInt = (int) $ano;
+            $fallbackEv = $motor->regraFallbackDoBoletim(['nota_minima_aprovacao' => $notaMin]);
 
             foreach ($linhas as $lin) {
                 $materia = trim((string) ($lin['materia_nome'] ?? ''));
@@ -694,7 +700,19 @@ class HistoricoEscolarService
 
                 $resultadoAno = 'Cursando';
                 if (is_numeric($valor)) {
-                    $resultadoAno = ((float) $valor >= $notaMin) ? 'Aprovado' : 'Retido';
+                    $regraLinha = $motor->resolverRegra([
+                        'ano_letivo' => $anoInt,
+                        'periodo_tipo' => 'bimestre',
+                        'serie_id' => $ctxAluno['serie_id'],
+                        'curso_id' => $ctxAluno['curso_id'],
+                        'materia_id' => isset($lin['materia_id']) ? (int) $lin['materia_id'] : null,
+                    ]) ?? $fallbackEv;
+                    $avaliado = $motor->avaliar([
+                        'media' => (float) $valor,
+                        'tem_nota' => true,
+                    ], $regraLinha);
+                    $sit = (string) ($avaliado['situacao'] ?? '');
+                    $resultadoAno = $this->mapearSituacaoHistorico($sit);
                 }
 
                 $ch = null;
@@ -716,6 +734,86 @@ class HistoricoEscolarService
         }
 
         return ['itens' => $itens];
+    }
+
+    /**
+     * Prefere o snapshot homologado (resultado_academico) em vez de reavaliar o boletim.
+     *
+     * @param list<array<string, mixed>> $itens
+     * @param array<string, true> $seen
+     */
+    private function anexarItensHomologados(int $alunoId, array &$itens, array &$seen): void
+    {
+        try {
+            require_once __DIR__ . '/../Models/Education/ResultadoAcademico.php';
+            $model = new \ResultadoAcademico();
+            if (!$model->schemaPronto()) {
+                return;
+            }
+            $docs = $model->listarPorAluno($alunoId);
+            usort($docs, static function ($a, $b) {
+                return strcmp((string) ($b['homologado_em'] ?? ''), (string) ($a['homologado_em'] ?? ''));
+            });
+            foreach ($docs as $doc) {
+                if ((string) ($doc['status'] ?? '') !== 'homologado') {
+                    continue;
+                }
+                if ((string) ($doc['periodo_tipo'] ?? '') !== 'ano') {
+                    continue;
+                }
+                $ano = (string) ((int) ($doc['ano_letivo'] ?? 0));
+                if ($ano === '0') {
+                    continue;
+                }
+                $serie = trim((string) ($doc['turma_serie'] ?? ''));
+                if ($serie === '') {
+                    $serie = 'Série não informada';
+                }
+                $resultadoAno = $this->mapearSituacaoHistorico((string) ($doc['situacao'] ?? ''));
+                foreach ($model->listarItens((int) $doc['id']) as $item) {
+                    $materia = trim((string) ($item['materia_nome'] ?? ''));
+                    if ($materia === '') {
+                        continue;
+                    }
+                    $materiaKey = function_exists('mb_strtolower')
+                        ? mb_strtolower($materia, 'UTF-8')
+                        : strtolower($materia);
+                    $key = $ano . '|' . $materiaKey;
+                    if (isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+                    $valor = $item['media_final'] ?? $item['media'] ?? null;
+                    $itens[] = [
+                        'ano_letivo' => $ano,
+                        'serie_ano' => $serie,
+                        'componente' => $materia,
+                        'materia_id' => isset($item['materia_id']) ? (int) $item['materia_id'] : null,
+                        'resultado_valor' => $valor !== null && $valor !== '' ? (string) $valor : null,
+                        'carga_horaria' => isset($item['carga_horaria']) && $item['carga_horaria'] !== '' && $item['carga_horaria'] !== null
+                            ? (int) $item['carga_horaria']
+                            : null,
+                        'frequencia_percentual' => $item['frequencia_percentual'] ?? ($doc['frequencia_percentual'] ?? null),
+                        '_resultado_ano' => $resultadoAno,
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            // schema ainda não aplicado — cai no boletim gerado
+        }
+    }
+
+    private function mapearSituacaoHistorico(string $sit): string
+    {
+        return match ($sit) {
+            'aprovado', 'aprovado_recuperacao', 'aproveitamento', 'dispensado', 'progressao_parcial' => 'Aprovado',
+            'aprovado_conselho' => 'Aprovado_Conselho',
+            'reprovado_rendimento', 'reprovado_frequencia',
+            'recuperacao', 'exame_final', 'resultado_pendente', 'dependencia' => 'Retido',
+            'transferido' => 'Transferido',
+            'desistente' => 'Evadido',
+            default => 'Cursando',
+        };
     }
 
     /**
@@ -768,6 +866,38 @@ class HistoricoEscolarService
             // opcional
         }
         return null;
+    }
+
+    /**
+     * @return array{serie_id:?int,curso_id:?int}
+     */
+    private function contextoAcademicoDoAluno(int $alunoId): array
+    {
+        $vazio = ['serie_id' => null, 'curso_id' => null];
+        if ($alunoId <= 0) {
+            return $vazio;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT t.serie_id, t.curso_novo_id
+                 FROM alunos a
+                 LEFT JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.id = :id
+                 LIMIT 1",
+                ['id' => $alunoId]
+            );
+            if (!$row) {
+                return $vazio;
+            }
+            $serie = (int) ($row['serie_id'] ?? 0);
+            $curso = (int) ($row['curso_novo_id'] ?? 0);
+            return [
+                'serie_id' => $serie > 0 ? $serie : null,
+                'curso_id' => $curso > 0 ? $curso : null,
+            ];
+        } catch (\Throwable $e) {
+            return $vazio;
+        }
     }
 
     /**

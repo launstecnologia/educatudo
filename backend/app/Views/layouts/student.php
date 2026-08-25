@@ -1465,7 +1465,7 @@
         <!-- Main Content -->
         <main id="student-main-content" class="flex-1 w-full md:w-auto flex flex-col min-h-0 <?= isset($current_page) && $current_page === 'chat' ? 'overflow-hidden' : 'overflow-y-auto' ?> mobile-content">
             <!-- Header: menu hamburger, título, notificações e avatar (padrão Professor) -->
-            <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky -top-2 z-30">
+            <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky -top-2 z-30 shrink-0">
                 <div class="flex justify-between items-center gap-2">
                     <!-- Botão menu mobile -->
                     <button id="mobileMenuToggle" type="button" class="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Abrir menu">
@@ -1581,24 +1581,16 @@
             </header>
             
             <?php $isChatPage = (isset($current_page) && $current_page === 'chat'); ?>
-            <div class="<?= $isChatPage ? 'chat-content-wrap p-0 flex flex-col flex-1 min-h-0 h-full' : 'p-6' ?>">
+            <div class="plataforma-pagina<?= $isChatPage ? ' plataforma-pagina-chat' : '' ?>">
+            <div class="<?= $isChatPage ? 'chat-content-wrap p-0 flex flex-col flex-1 min-h-0 h-full' : 'p-6 plataforma-conteudo' ?>">
                 <div id="student-page-reader-content" data-ei-reader-source="1" class="<?= $isChatPage ? 'flex flex-col flex-1 min-h-0 overflow-hidden h-full' : '' ?>">
                     <?= $content ?>
                 </div>
-                <!-- Footer: oculto na página do chat para dar altura total à área de mensagens + caixa de escrever -->
-                <footer class="mt-8 pt-4 border-t border-gray-200 flex-shrink-0 <?= $isChatPage ? 'hidden' : '' ?>">
-                    <div class="text-center">
-                        <p class="text-xs mb-1 text-gray-600">Todos os direitos reservados Educatudo</p>
-                        <p class="text-xs text-gray-600">
-                            Feito com carinho por <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 underline">Launs</a>
-                        </p>
-                        <p class="text-xs mt-2 text-gray-600">
-                            <a href="<?= URL ?>/termos-de-uso" class="hover:underline text-gray-600 hover:text-gray-800">Termos de Uso</a> •
-                            <a href="<?= URL ?>/politica-privacidade" class="hover:underline text-gray-600 hover:text-gray-800">Política de Privacidade</a> •
-                            <a href="<?= URL ?>/politica-retencao" class="hover:underline text-gray-600 hover:text-gray-800">Política de Retenção de Dados</a>
-                        </p>
-                    </div>
-                </footer>
+            </div>
+            <?php
+            $plataforma_footer_oculto = $isChatPage;
+            include __DIR__ . '/components/plataforma_footer.php';
+            ?>
             </div>
         </main>
         <?php if (empty($preview)): ?>

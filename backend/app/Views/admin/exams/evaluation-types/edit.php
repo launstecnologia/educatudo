@@ -25,6 +25,20 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Ordem</label>
                 <input type="number" name="ordem" value="<?= (int)($tipo['ordem'] ?? 0) ?>" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
             </div>
+            <?php if (!empty($tem_chave_quadro)): ?>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Coluna no quadro de notas</label>
+                <select name="chave_quadro" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="">Não entra no quadro</option>
+                    <?php foreach (($chaves_quadro ?? []) as $chave => $label): ?>
+                        <option value="<?= htmlspecialchars((string) $chave, ENT_QUOTES, 'UTF-8') ?>" <?= (($tipo['chave_quadro'] ?? '') === $chave) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string) $label, ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Define se a nota deste tipo cai em S1–S8, Prova Bim, ENAC, etc.</p>
+            </div>
+            <?php endif; ?>
             <div class="flex items-center pt-8">
                 <label class="flex items-center cursor-pointer">
                     <input type="checkbox" name="ativo" value="1" <?= !empty($tipo['ativo']) ? 'checked' : '' ?> class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">

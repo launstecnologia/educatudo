@@ -81,6 +81,7 @@ class SerieController extends BaseController
             'total_pages' => $perPage > 0 ? (int)ceil($totalGeral / $perPage) : 1,
         ];
 
+        $cursos = $this->db->fetchAll("SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC");
         $this->viewWithLayout('admin', 'admin/serie/index', [
             'title' => 'Séries - EducaTudo',
             'user' => $user,
@@ -91,35 +92,35 @@ class SerieController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
             'status' => $_GET['status'] ?? '',
             'message' => $_GET['message'] ?? '',
+            'cursos' => $cursos,
         ]);
     }
 
-    public function create()
+    /**
+     * Dados de uma série (JSON) para popular o offcanvas de edição
+     */
+    public function dados($id)
     {
-        $user = $this->auth->getUser();
         if (!$this->schemaReady()) {
-            $this->redirect('/admin/serie?status=error&message=' . rawurlencode('Execute as migrations 022-026 para habilitar séries.'));
+            $this->json(['error' => 'Estrutura não disponível.'], 400);
             return;
         }
-
-        $cursos = $this->db->fetchAll("SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC");
-        $this->viewWithLayout('admin', 'admin/serie/create', [
-            'title' => 'Cadastrar Série - EducaTudo',
-            'user' => $user,
-            'current_page' => 'serie',
-            'cursos' => $cursos,
-            'csrf_token' => $this->generateCsrfToken(),
-        ]);
+        $item = $this->db->fetch("SELECT * FROM serie WHERE id = :id", ['id' => $id]);
+        if (!$item) {
+            $this->json(['error' => 'Série não encontrada.'], 404);
+            return;
+        }
+        $this->json(['success' => true, 'item' => $item]);
     }
 
     public function store()
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->redirect('/admin/serie?status=error&message=' . rawurlencode('Token inválido.'));
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
         if (!$this->schemaReady()) {
-            $this->redirect('/admin/serie');
+            $this->json(['error' => 'Estrutura não disponível.'], 400);
             return;
         }
 
@@ -154,45 +155,20 @@ class SerieController extends BaseController
                 ['curso_id' => $cursoId, 'nome' => $nome, 'ordem' => $ordem, 'ativo' => $ativo]
             );
 
-            $this->redirect('/admin/serie?status=success&message=' . rawurlencode('Série cadastrada com sucesso.'));
+            $this->json(['success' => true, 'message' => 'Série cadastrada com sucesso.']);
         } catch (Exception $e) {
-            $this->redirect('/admin/serie?status=error&message=' . rawurlencode($e->getMessage()));
+            $this->json(['error' => $e->getMessage()], 400);
         }
-    }
-
-    public function edit($id)
-    {
-        $user = $this->auth->getUser();
-        if (!$this->schemaReady()) {
-            $this->redirect('/admin/serie');
-            return;
-        }
-
-        $item = $this->db->fetch("SELECT * FROM serie WHERE id = :id", ['id' => $id]);
-        if (!$item) {
-            $this->redirect('/admin/serie');
-            return;
-        }
-
-        $cursos = $this->db->fetchAll("SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC");
-        $this->viewWithLayout('admin', 'admin/serie/edit', [
-            'title' => 'Editar Série - EducaTudo',
-            'user' => $user,
-            'current_page' => 'serie',
-            'item' => $item,
-            'cursos' => $cursos,
-            'csrf_token' => $this->generateCsrfToken(),
-        ]);
     }
 
     public function update($id)
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->redirect('/admin/serie?status=error&message=' . rawurlencode('Token inválido.'));
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
         if (!$this->schemaReady()) {
-            $this->redirect('/admin/serie');
+            $this->json(['error' => 'Estrutura não disponível.'], 400);
             return;
         }
 
@@ -227,9 +203,9 @@ class SerieController extends BaseController
                 ['curso_id' => $cursoId, 'nome' => $nome, 'ordem' => $ordem, 'ativo' => $ativo, 'id' => $id]
             );
 
-            $this->redirect('/admin/serie?status=success&message=' . rawurlencode('Série atualizada com sucesso.'));
+            $this->json(['success' => true, 'message' => 'Série atualizada com sucesso.']);
         } catch (Exception $e) {
-            $this->redirect('/admin/serie?status=error&message=' . rawurlencode($e->getMessage()));
+            $this->json(['error' => $e->getMessage()], 400);
         }
     }
 

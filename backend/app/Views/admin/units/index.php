@@ -263,9 +263,23 @@ include __DIR__ . '/../_partials/flash_message.php';
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
                     <div class="sm:col-span-2">
-                        <label for="unit_logo_url" class="block text-sm font-medium text-gray-700 mb-1">URL do logo (opcional)</label>
-                        <input type="text" id="unit_logo_url" name="logo_url" placeholder="Deixe em branco para usar o logo padrão da escola"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <label for="unit_logo" class="block text-sm font-medium text-gray-700 mb-1">Logo da unidade (opcional)</label>
+                        <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+                            <div id="unit_logo_preview_box" class="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden">
+                                <img id="unit_logo_preview_img" src="" alt="Logo da unidade" class="max-w-full max-h-full object-contain hidden">
+                                <i id="unit_logo_preview_placeholder" class="fa-solid fa-image text-gray-400 text-xl"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <input type="file" id="unit_logo" name="logo" accept="image/png,image/jpeg,image/webp,image/gif"
+                                       class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+                                <p class="text-xs text-gray-500 mt-1.5">PNG, JPG, WEBP ou GIF. Máx. 5MB. Sem arquivo, o logo atual é mantido. Em branco, usa o logo padrão da escola.</p>
+                                <label id="unit_logo_remover_wrap" class="hidden mt-2 items-center gap-2 text-sm text-gray-700">
+                                    <input type="checkbox" id="unit_remover_logo" name="remover_logo" value="1"
+                                           class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50">
+                                    Remover logo (usar o padrão da escola)
+                                </label>
+                            </div>
+                        </div>
                     </div>
                     <div class="sm:col-span-2">
                         <label class="flex items-start gap-3">
@@ -296,7 +310,70 @@ include __DIR__ . '/../_partials/flash_message.php';
 
 <script>
 const URL_BASE = <?= json_encode(URL) ?>;
-const unitFields = ['nome', 'tipo', 'razao_social', 'cnpj', 'inep', 'dependencia_administrativa', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'uf', 'cep', 'telefone', 'email', 'diretor_nome', 'secretario_nome', 'ato_autorizacao', 'ato_credenciamento', 'ato_reconhecimento', 'diretor_registro', 'secretario_registro', 'logo_url'];
+const unitFields = ['nome', 'tipo', 'razao_social', 'cnpj', 'inep', 'dependencia_administrativa', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'uf', 'cep', 'telefone', 'email', 'diretor_nome', 'secretario_nome', 'ato_autorizacao', 'ato_credenciamento', 'ato_reconhecimento', 'diretor_registro', 'secretario_registro'];
+
+function resetLogoPreview() {
+    const img = document.getElementById('unit_logo_preview_img');
+    const placeholder = document.getElementById('unit_logo_preview_placeholder');
+    const removeWrap = document.getElementById('unit_logo_remover_wrap');
+    const fileInput = document.getElementById('unit_logo');
+    const remover = document.getElementById('unit_remover_logo');
+    if (fileInput) fileInput.value = '';
+    if (remover) remover.checked = false;
+    if (img) {
+        img.src = '';
+        img.classList.add('hidden');
+    }
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (removeWrap) {
+        removeWrap.classList.add('hidden');
+        removeWrap.classList.remove('flex');
+    }
+}
+
+function showLogoPreview(url) {
+    const img = document.getElementById('unit_logo_preview_img');
+    const placeholder = document.getElementById('unit_logo_preview_placeholder');
+    const removeWrap = document.getElementById('unit_logo_remover_wrap');
+    if (!url) {
+        resetLogoPreview();
+        return;
+    }
+    if (img) {
+        img.src = url;
+        img.classList.remove('hidden');
+    }
+    if (placeholder) placeholder.classList.add('hidden');
+    if (removeWrap) {
+        removeWrap.classList.remove('hidden');
+        removeWrap.classList.add('flex');
+    }
+}
+
+document.getElementById('unit_logo').addEventListener('change', function () {
+    const file = this.files && this.files[0];
+    const remover = document.getElementById('unit_remover_logo');
+    if (remover) remover.checked = false;
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+        showLogoPreview(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+});
+
+document.getElementById('unit_remover_logo').addEventListener('change', function () {
+    if (!this.checked) return;
+    const fileInput = document.getElementById('unit_logo');
+    if (fileInput) fileInput.value = '';
+    const img = document.getElementById('unit_logo_preview_img');
+    const placeholder = document.getElementById('unit_logo_preview_placeholder');
+    if (img) {
+        img.src = '';
+        img.classList.add('hidden');
+    }
+    if (placeholder) placeholder.classList.remove('hidden');
+});
 
 function showUnitDrawer() {
     document.getElementById('unitDrawerBackdrop').classList.remove('hidden');
@@ -319,6 +396,7 @@ function openUnitDrawer(id) {
     document.getElementById('unit_id').value = '';
     document.getElementById('unit_method').value = '';
     document.getElementById('unit_method').disabled = true;
+    resetLogoPreview();
 
     if (!id) {
         form.dataset.mode = 'create';
@@ -352,6 +430,7 @@ function openUnitDrawer(id) {
                 if (el) el.value = unit[field] || '';
             });
             document.getElementById('unit_ativo').checked = !!parseInt(unit.ativo, 10);
+            showLogoPreview(unit.logo_url || '');
         })
         .catch(() => {
             alert('Erro de conexão ao carregar unidade.');

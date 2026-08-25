@@ -137,10 +137,42 @@ $ui_wizard_current = 1;
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 <option value="">Selecione</option>
                 <?php foreach (($tiposAvaliacao ?? []) as $tipo): ?>
-                    <option value="<?= (int)$tipo['id'] ?>"><?= htmlspecialchars($tipo['nome']) ?></option>
+                    <option value="<?= (int)$tipo['id'] ?>" data-chave-quadro="<?= htmlspecialchars((string) ($tipo['chave_quadro'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($tipo['nome']) ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
         </div>
+
+        <div class="mb-6" id="campo-semana-evento">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Semana no quadro
+            </label>
+            <select id="semana" name="semana" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">Não se aplica</option>
+                <?php for ($s = 1; $s <= 8; $s++): ?>
+                    <option value="<?= $s ?>">S<?= $s ?></option>
+                <?php endfor; ?>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Para prova semanal, escolha S1 a S8. Bloco A costuma ser S1/S3/S5/S7; Bloco B, S2/S4/S6/S8.</p>
+        </div>
+        <script>
+        (function () {
+            var sel = document.getElementById('tipo_avaliacao_id');
+            var wrap = document.getElementById('campo-semana-evento');
+            var semana = document.getElementById('semana');
+            if (!sel || !wrap) return;
+            function syncSemana() {
+                var opt = sel.options[sel.selectedIndex];
+                var chave = (opt && opt.getAttribute('data-chave-quadro')) || '';
+                var hide = chave !== '' && chave !== 'semanal';
+                wrap.classList.toggle('hidden', hide);
+                if (hide && semana) semana.value = '';
+            }
+            sel.addEventListener('change', syncSemana);
+            syncSemana();
+        })();
+        </script>
 
         <div class="flex justify-end pt-2">
             <button type="button"
@@ -640,6 +672,7 @@ function atualizarResumoWizard() {
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Título</dt><dd class="font-semibold text-gray-900">${escapeResumo(document.getElementById('titulo')?.value)}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Ano/Bimestre</dt><dd>${escapeResumo(document.getElementById('ano_letivo')?.value)} · ${escapeResumo(selectedText('#bimestre'))}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de avaliação</dt><dd>${escapeResumo(selectedText('#tipo_avaliacao_id'))}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Semana</dt><dd>${escapeResumo(selectedText('#semana') || '—')}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Turmas do evento</dt><dd>${getTurmasBlocoSelecionadas().length} turma(s)</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Formato</dt><dd>${escapeResumo(document.querySelector('input[name="formato_evento"]:checked')?.parentElement?.textContent?.trim() || '')}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Portal do aluno</dt><dd>${document.getElementById('visivel_no_portal_aluno')?.checked ? 'Visível' : 'Oculto'}</dd></div>
@@ -672,6 +705,7 @@ function coletarRascunhoEvento() {
             ano_letivo: document.getElementById('ano_letivo')?.value || '',
             bimestre: document.getElementById('bimestre')?.value || '',
             tipo_avaliacao_id: document.getElementById('tipo_avaliacao_id')?.value || '',
+            semana: document.getElementById('semana')?.value || '',
             bloco_modelo_id: document.getElementById('bloco_modelo_id')?.value || '',
             tipo_prova: getRadioValue('tipo_prova'),
             formato_evento: getRadioValue('formato_evento'),
@@ -753,6 +787,7 @@ function restaurarRascunhoEvento() {
     preencherCampo('ano_letivo', campos.ano_letivo);
     preencherCampo('bimestre', campos.bimestre);
     preencherCampo('tipo_avaliacao_id', campos.tipo_avaliacao_id);
+    preencherCampo('semana', campos.semana);
     preencherCampo('bloco_modelo_id', campos.bloco_modelo_id);
     preencherCampo('data_prova', campos.data_prova);
     preencherCampo('hora_inicio', campos.hora_inicio);
@@ -1378,6 +1413,7 @@ function salvarBloco(event) {
         ano_letivo: formData.get('ano_letivo') ? parseInt(formData.get('ano_letivo'), 10) : null,
         bimestre: bimestreVal,
         tipo_avaliacao_id: formData.get('tipo_avaliacao_id') ? parseInt(formData.get('tipo_avaliacao_id'), 10) : null,
+        semana: formData.get('semana') ? parseInt(formData.get('semana'), 10) : null,
         professores: professores,
         turmas: turmasIds, // Turmas do bloco (não por professor)
         data_prova: formData.get('data_prova') || null,

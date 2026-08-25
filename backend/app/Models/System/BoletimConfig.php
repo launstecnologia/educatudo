@@ -1208,6 +1208,11 @@ class BoletimConfig
                     $mediaFinal = null;
                     if (isset($notas['media_final']) && is_numeric($notas['media_final'])) {
                         $mediaFinal = (float) $notas['media_final'];
+                    } elseif (isset($lin['nota_resumo']) && is_numeric($lin['nota_resumo'])) {
+                        $mediaFinal = (float) $lin['nota_resumo'];
+                    }
+                    if ($mediaFinal !== null && !isset($notas['media_final'])) {
+                        $notas['media_final'] = $mediaFinal;
                     }
                     $materiaRef = (string) $alunoId;
                     $this->db->insert(

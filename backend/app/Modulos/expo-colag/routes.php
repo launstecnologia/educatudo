@@ -24,6 +24,7 @@ $router->get('/professor/expo-colag/projetos/{id}/preview', 'Modulos/expo-colag/
 $router->get('/professor/expo-colag/projetos/{id}/acompanhar', 'Modulos/expo-colag/ExpoColagProfessorController@acompanhar');
 $router->post('/professor/expo-colag/projetos/salvar', 'Modulos/expo-colag/ExpoColagProfessorController@salvar');
 $router->post('/professor/expo-colag/projetos/{id}/publicar', 'Modulos/expo-colag/ExpoColagProfessorController@publicar');
+$router->post('/professor/expo-colag/projetos/{id}/excluir', 'Modulos/expo-colag/ExpoColagProfessorController@excluir');
 $router->post('/professor/expo-colag/projetos/{id}/inscricoes/decidir', 'Modulos/expo-colag/ExpoColagProfessorController@decidirInscricao');
 $router->post('/professor/expo-colag/projetos/{id}/tarefas', 'Modulos/expo-colag/ExpoColagProfessorController@criarTarefa');
 $router->post('/professor/expo-colag/projetos/{id}/tarefas/excluir', 'Modulos/expo-colag/ExpoColagProfessorController@excluirTarefa');

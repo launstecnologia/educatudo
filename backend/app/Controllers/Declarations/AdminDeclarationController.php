@@ -122,14 +122,28 @@ class AdminDeclarationController extends AdminBaseController
             // auditoria é best-effort
         }
 
-        $html = $this->renderTemplate($tipo, $viewData);
+        $viaModelo = $this->renderViaModelo($tipo, $viewData);
         $slug = $this->slug((string) ($aluno['nome'] ?? 'aluno'), $alunoId);
         $prefixo = in_array($tipo, DeclarationService::TIPOS, true) ? 'declaracao' : 'documento';
         $filename = $prefixo . '_' . $tipo . '_' . $slug . '_' . date('Ymd_His') . '.pdf';
-        $this->outputPdf($html, $filename, DeclarationService::isLandscape($tipo) ? 'landscape' : 'portrait');
+        if (is_array($viaModelo) && ($viaModelo['html'] ?? '') !== '') {
+            // HTML editável pelo admin: sem fetch remoto (SSRF). Logos já entram como data-URI.
+            $this->outputPdf(
+                (string) $viaModelo['html'],
+                $filename,
+                (string) ($viaModelo['orientacao'] ?? 'portrait'),
+                false,
+                (string) ($viaModelo['papel'] ?? 'A4')
+            );
+            return;
+        }
+        $html = $this->renderTemplatePhp($tipo, $viewData);
+        $orientacao = DeclarationService::isLandscape($tipo) ? 'landscape' : 'portrait';
+        $this->outputPdf($html, $filename, $orientacao, true);
     }
 
-    private function renderTemplate(string $tipo, array $viewData): string
+    /** Template PHP legado (quando não há modelo HTML ativo). */
+    private function renderTemplatePhp(string $tipo, array $viewData): string
     {
         $templateFile = __DIR__ . '/../../Views/admin/declarations/templates/' . $tipo . '.php';
         if (!is_file($templateFile)) {
@@ -141,9 +155,46 @@ class AdminDeclarationController extends AdminBaseController
         return (string) ob_get_clean();
     }
 
-    private function outputPdf(string $html, string $filename, string $orientation = 'portrait'): void
+    /**
+     * Usa o HTML cadastrado em Modelos de documentos (declaracao_{tipo}) quando existir.
+     *
+     * @return array{html:string,orientacao:string,papel:string}|null
+     */
+    private function renderViaModelo(string $tipo, array $viewData): ?array
+    {
+        // Histórico escolar tem layout complexo (bimestres agrupados); permanece no template PHP.
+        if ($tipo === 'historico') {
+            return null;
+        }
+        $svcPath = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 3))
+            . '/app/Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
+        if (!is_file($svcPath)) {
+            return null;
+        }
+        require_once $svcPath;
+        try {
+            $svc = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
+            $codigo = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::codigoParaDeclaracao($tipo);
+            $modelo = $svc->findByCodigo($codigo);
+            if (!$modelo || trim((string) ($modelo['corpo_html'] ?? '')) === '') {
+                return null;
+            }
+            $vars = $svc->varsFromDeclaracao($viewData);
+            return [
+                'html' => $svc->renderHtml($modelo, $vars, 'declaracao', $this->config),
+                'orientacao' => $svc->orientacaoDompdf($modelo),
+                'papel' => $svc->papelDompdf($modelo),
+            ];
+        } catch (\Throwable $e) {
+            error_log('AdminDeclarationController renderViaModelo: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private function outputPdf(string $html, string $filename, string $orientation = 'portrait', bool $allowRemote = false, string $paper = 'A4'): void
     {
         $orientation = $orientation === 'landscape' ? 'landscape' : 'portrait';
+        $paper = strtoupper($paper) === 'A5' ? 'A5' : 'A4';
         $oldDisplayErrors = ini_get('display_errors');
         ini_set('display_errors', '0');
         try {
@@ -152,12 +203,18 @@ class AdminDeclarationController extends AdminBaseController
             }
             $options = new \Dompdf\Options();
             $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
+            $options->set('isRemoteEnabled', $allowRemote);
             $options->set('defaultFont', 'DejaVu Sans');
+            if (!$allowRemote) {
+                $chroot = defined('BASE_PATH') ? (BASE_PATH . '/storage') : null;
+                if (is_string($chroot) && is_dir($chroot)) {
+                    $options->setChroot($chroot);
+                }
+            }
 
             $dompdf = new \Dompdf\Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4', $orientation);
+            $dompdf->setPaper($paper, $orientation);
             $dompdf->render();
 
             while (ob_get_level() > 0) {
@@ -183,7 +240,13 @@ class AdminDeclarationController extends AdminBaseController
     {
         $unidadeLogo = trim((string) ($unidade['logo_url'] ?? ''));
         if ($unidadeLogo !== '') {
-            return $unidadeLogo;
+            if (str_starts_with($unidadeLogo, 'data:')) {
+                return $unidadeLogo;
+            }
+            $dataUri = $this->urlLocalParaDataUri($unidadeLogo);
+            if ($dataUri !== '') {
+                return $dataUri;
+            }
         }
         return $this->resolveSchoolLogoForPdf();
     }
@@ -192,27 +255,40 @@ class AdminDeclarationController extends AdminBaseController
     {
         try {
             $url = (string) LayoutHelper::getNavbarLogoUrl();
-            if ($url === '') {
-                return '';
+            return $url !== '' ? $this->urlLocalParaDataUri($url) : '';
+        } catch (\Throwable $e) {
+            error_log('AdminDeclarationController resolveSchoolLogoForPdf: ' . $e->getMessage());
+            return '';
+        }
+    }
+
+    /**
+     * Converte URL/path local (media, public) em data-URI. Não faz fetch HTTP (evita SSRF).
+     */
+    private function urlLocalParaDataUri(string $url): string
+    {
+        if (str_starts_with($url, 'data:')) {
+            return $url;
+        }
+        $parts = parse_url($url) ?: [];
+        $query = [];
+        if (!empty($parts['query'])) {
+            parse_str((string) $parts['query'], $query);
+        }
+        $filePath = '';
+        $key = isset($query['key']) ? (string) $query['key'] : '';
+        $type = isset($query['type']) ? (string) $query['type'] : 'layout';
+        if ($key !== '') {
+            require_once __DIR__ . '/../../Services/MediaStorageService.php';
+            $media = new MediaStorageService($this->config);
+            $localPath = $media->getLocalPath($type, $key);
+            if ($localPath !== null && is_file($localPath) && is_readable($localPath)) {
+                $filePath = $localPath;
             }
-            $parts = parse_url($url) ?: [];
-            $query = [];
-            if (!empty($parts['query'])) {
-                parse_str((string) $parts['query'], $query);
-            }
-            $filePath = '';
-            $key = isset($query['key']) ? (string) $query['key'] : '';
-            $type = isset($query['type']) ? (string) $query['type'] : 'layout';
-            if ($key !== '') {
-                require_once __DIR__ . '/../../Services/MediaStorageService.php';
-                $media = new MediaStorageService($this->config);
-                $localPath = $media->getLocalPath($type, $key);
-                if ($localPath !== null && is_file($localPath) && is_readable($localPath)) {
-                    $filePath = $localPath;
-                }
-            }
-            if ($filePath === '' && !empty($parts['path'])) {
-                $relative = ltrim((string) $parts['path'], '/');
+        }
+        if ($filePath === '' && !empty($parts['path'])) {
+            $relative = ltrim((string) $parts['path'], '/');
+            if (!str_contains($relative, '..')) {
                 foreach ([__DIR__ . '/../../../public/' . $relative, __DIR__ . '/../../../' . $relative] as $cand) {
                     if (is_file($cand) && is_readable($cand)) {
                         $filePath = $cand;
@@ -220,21 +296,32 @@ class AdminDeclarationController extends AdminBaseController
                     }
                 }
             }
-            if ($filePath === '') {
-                return '';
+        }
+        if ($filePath === '' && !str_contains($url, '://') && !str_starts_with($url, '/') && !str_contains($url, '..')) {
+            $base = defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 3);
+            foreach ([$base . '/public/' . ltrim($url, '/'), $base . '/' . ltrim($url, '/')] as $cand) {
+                if (is_file($cand) && is_readable($cand)) {
+                    $filePath = $cand;
+                    break;
+                }
             }
-            $bin = @file_get_contents($filePath);
-            if (!is_string($bin) || $bin === '') {
-                return '';
-            }
-            $ext = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
-            $mimeMap = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml'];
-            $mime = $mimeMap[$ext] ?? 'image/png';
-            return 'data:' . $mime . ';base64,' . base64_encode($bin);
-        } catch (\Throwable $e) {
-            error_log('AdminDeclarationController resolveSchoolLogoForPdf: ' . $e->getMessage());
+        }
+        if ($filePath === '') {
             return '';
         }
+        $real = realpath($filePath);
+        $base = defined('BASE_PATH') ? realpath(BASE_PATH) : false;
+        if ($real === false || ($base !== false && !str_starts_with($real, $base . DIRECTORY_SEPARATOR) && $real !== $base)) {
+            return '';
+        }
+        $bin = @file_get_contents($real);
+        if (!is_string($bin) || $bin === '') {
+            return '';
+        }
+        $ext = strtolower((string) pathinfo($real, PATHINFO_EXTENSION));
+        $mimeMap = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp'];
+        $mime = $mimeMap[$ext] ?? 'image/png';
+        return 'data:' . $mime . ';base64,' . base64_encode($bin);
     }
 
     /**

@@ -353,6 +353,46 @@ if (!class_exists('StudentController')) {
         ];
     }
 
+    /**
+     * Quadro S1–S8 do módulo notas-semanais (opcional por escola).
+     *
+     * @return array<string, mixed>
+     */
+    private function montarQuadroNotasSemanais(int $alunoId): array
+    {
+        $vazio = ['modulo_ativo' => false, 'tem_dados' => false, 'tabelas' => []];
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once __DIR__ . '/../../Core/LayoutHelper.php';
+            }
+            if (!LayoutHelper::isModuleEnabled('notas_semanais')) {
+                return $vazio;
+            }
+            $serviceFile = __DIR__ . '/../../Modulos/notas-semanais/Services/NotasSemanaisService.php';
+            if (!is_file($serviceFile)) {
+                return $vazio;
+            }
+            require_once $serviceFile;
+            $bimestre = isset($_GET['bimestre']) ? (int) $_GET['bimestre'] : null;
+            $ano = isset($_GET['ano']) ? (int) $_GET['ano'] : null;
+            return (new NotasSemanaisService())->montarQuadroAluno(
+                $alunoId,
+                ($bimestre !== null && $bimestre >= 1 && $bimestre <= 4) ? $bimestre : null,
+                ($ano !== null && $ano > 2000) ? $ano : null
+            );
+        } catch (\Throwable $e) {
+            if (class_exists('Logger', false)) {
+                Logger::error('Quadro notas semanais: ' . $e->getMessage(), [
+                    'aluno_id' => $alunoId,
+                    'exception' => $e,
+                ]);
+            } else {
+                error_log('Quadro notas semanais: ' . $e->getMessage());
+            }
+            return $vazio;
+        }
+    }
+
     private function getProvasRealizadasAlunoComBloco(int $alunoId): array
     {
         $hasProvasMateriaId = false;
@@ -1522,6 +1562,7 @@ if (!class_exists('StudentController')) {
             'primary_color' => $primaryColor,
             'current_page' => 'notas_boletins',
             'csrf_token' => $this->generateCsrfToken(),
+            'quadro_notas_semanais' => $this->montarQuadroNotasSemanais((int) $aluno['id']),
         ];
 
         $this->viewWithLayout('student', 'student/notas-boletins', $data);
@@ -1596,6 +1637,7 @@ if (!class_exists('StudentController')) {
             'primary_color' => $primaryColor,
             'current_page' => 'notas',
             'csrf_token' => $this->generateCsrfToken(),
+            'quadro_notas_semanais' => $this->montarQuadroNotasSemanais((int) $aluno['id']),
         ];
 
         $this->viewWithLayout('student', 'student/notas', $data);

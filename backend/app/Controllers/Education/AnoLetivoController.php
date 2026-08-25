@@ -60,6 +60,96 @@ class AnoLetivoController extends BaseController
         ]);
     }
 
+    public function gestaoEscolar()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/gestao-escolar/index', [
+            'title'        => 'Gestão Escolar - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'gestao_escolar',
+        ]);
+    }
+
+    public function comunicacao()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/comunicacao/index', [
+            'title'        => 'Comunicação - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'comunicacao',
+        ]);
+    }
+
+    public function conteudo()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/conteudo/index', [
+            'title'        => 'Conteúdo - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'conteudo',
+        ]);
+    }
+
+    public function financeiroEscolar()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/financeiro-escolar/index', [
+            'title'        => 'Financeiro - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'financeiro',
+        ]);
+    }
+
+    public function monitoramento()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/monitoramento/index', [
+            'title'        => 'Monitoramento - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'monitoramento',
+        ]);
+    }
+
+    public function relatorios()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/relatorios/index', [
+            'title'        => 'Relatórios - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'relatorios',
+        ]);
+    }
+
+    public function sistema()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/sistema/index', [
+            'title'        => 'Sistema - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'sistema',
+        ]);
+    }
+
+    public function gestaoUsuarios()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/gestao-usuarios/index', [
+            'title'        => 'Usuários - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'gestao_usuarios',
+        ]);
+    }
+
+    public function zConfiguracao()
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/z-configuracao/index', [
+            'title'        => 'Z-Configuração - EducaTudo',
+            'user'         => $user,
+            'current_page' => 'z_configuracao',
+        ]);
+    }
+
     public function index()
     {
         $user = $this->auth->getUser();
@@ -105,30 +195,31 @@ class AnoLetivoController extends BaseController
         $this->viewWithLayout('admin', 'admin/ano-letivo/index', $data);
     }
 
-    public function create()
+    /**
+     * Dados de um ano letivo (JSON) para popular o offcanvas de edição
+     */
+    public function dados($id)
     {
-        $user = $this->auth->getUser();
         if (!$this->tableExists()) {
-            $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode('Execute as migrations 022-026 para habilitar anos letivos.'));
+            $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
-        $data = [
-            'title' => 'Cadastrar Ano Letivo - EducaTudo',
-            'user' => $user,
-            'current_page' => 'ano_letivo',
-            'csrf_token' => $this->generateCsrfToken()
-        ];
-        $this->viewWithLayout('admin', 'admin/ano-letivo/create', $data);
+        $item = $this->db->fetch("SELECT * FROM ano_letivo WHERE id = :id", ['id' => $id]);
+        if (!$item) {
+            $this->json(['error' => 'Ano letivo não encontrado.'], 404);
+            return;
+        }
+        $this->json(['success' => true, 'item' => $item]);
     }
 
     public function store()
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode('Token inválido.'));
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
         if (!$this->tableExists()) {
-            $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode('Tabela não disponível.'));
+            $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
         try {
@@ -152,42 +243,20 @@ class AnoLetivoController extends BaseController
                     'ativo' => $ativo
                 ]
             );
-            $this->redirect('/admin/ano-letivo?status=success&message=' . rawurlencode('Ano letivo cadastrado com sucesso.'));
+            $this->json(['success' => true, 'message' => 'Ano letivo cadastrado com sucesso.']);
         } catch (Exception $e) {
-            $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode($e->getMessage()));
+            $this->json(['error' => $e->getMessage()], 400);
         }
-    }
-
-    public function edit($id)
-    {
-        $user = $this->auth->getUser();
-        if (!$this->tableExists()) {
-            $this->redirect('/admin/ano-letivo');
-            return;
-        }
-        $item = $this->db->fetch("SELECT * FROM ano_letivo WHERE id = :id", ['id' => $id]);
-        if (!$item) {
-            $this->redirect('/admin/ano-letivo');
-            return;
-        }
-        $data = [
-            'title' => 'Editar Ano Letivo - EducaTudo',
-            'user' => $user,
-            'current_page' => 'ano_letivo',
-            'item' => $item,
-            'csrf_token' => $this->generateCsrfToken()
-        ];
-        $this->viewWithLayout('admin', 'admin/ano-letivo/edit', $data);
     }
 
     public function update($id)
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode('Token inválido.'));
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
         if (!$this->tableExists()) {
-            $this->redirect('/admin/ano-letivo');
+            $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
         try {
@@ -206,9 +275,9 @@ class AnoLetivoController extends BaseController
                 "UPDATE ano_letivo SET ano = :ano, data_inicio = :data_inicio, data_fim = :data_fim, ativo = :ativo WHERE id = :id",
                 ['ano' => $ano, 'data_inicio' => $dataInicio, 'data_fim' => $dataFim, 'ativo' => $ativo, 'id' => $id]
             );
-            $this->redirect('/admin/ano-letivo?status=success&message=' . rawurlencode('Ano letivo atualizado com sucesso.'));
+            $this->json(['success' => true, 'message' => 'Ano letivo atualizado com sucesso.']);
         } catch (Exception $e) {
-            $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode($e->getMessage()));
+            $this->json(['error' => $e->getMessage()], 400);
         }
     }
 

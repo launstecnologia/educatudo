@@ -117,10 +117,78 @@ if (file_exists(BASE_PATH . '/.env')) {
     }
 }
 
+// ─── Sessão compartilhada via Redis (mesmo Redis já usado no cache de tenant) ───
+// Sem isto, a sessão fica em arquivo no disco local do processo/container que atendeu a
+// requisição. Em produção com mais de uma instância (ou durante um deploy/restart do
+// container), a próxima requisição do usuário pode cair noutro processo sem esse arquivo
+// e ele é deslogado no meio de uma tarefa — visto em produção com alunos derrubados de
+// provas em andamento. Ver .claude/docs/architecture.md ("Redis obrigatório em produção
+// multi-instância... sessão quebra atrás de load balancer").
+// Timeout de conexão bem curto e fallback silencioso pro handler padrão (arquivo) — nunca
+// bloqueia login/sessão se o Redis estiver indisponível no momento do boot da sessão.
+if (session_status() === PHP_SESSION_NONE && extension_loaded('redis')) {
+    $sessionEnvLines = $envLines ?? [];
+    $readSessionEnv = static function (string $name, string $default) use ($sessionEnvLines): string {
+        $fromEnv = getenv($name);
+        if ($fromEnv !== false && $fromEnv !== '') {
+            return trim((string) $fromEnv);
+        }
+        foreach ($sessionEnvLines as $line) {
+            if (stripos($line, $name . '=') === 0) {
+                return trim(substr($line, strlen($name) + 1), " \t\"'");
+            }
+        }
+        return $default;
+    };
+    $redisHostSess = $readSessionEnv('REDIS_HOST', '127.0.0.1');
+    $redisPortRaw = $readSessionEnv('REDIS_PORT', '6379');
+    $redisPortSess = ctype_digit($redisPortRaw) ? (int) $redisPortRaw : 6379;
+    $redisPassSess = $readSessionEnv('REDIS_PASSWORD', '');
+
+    try {
+        $sessionRedisProbe = new Redis();
+        // connect()/auth() podem devolver false silenciosamente (ex.: senha errada em auth())
+        // em vez de lançar exceção — checar o retorno explicitamente é obrigatório aqui,
+        // senão a sessão pode ser trocada pro handler Redis mesmo sem uma conexão válida,
+        // derrubando login de toda a plataforma. Mesmo padrão de app/Core/RedisCache.php.
+        $conectou = @$sessionRedisProbe->connect($redisHostSess, $redisPortSess, 0.3);
+        if ($conectou !== true) {
+            throw new \RuntimeException('Redis session probe: connect falhou');
+        }
+        if ($redisPassSess !== '' && @$sessionRedisProbe->auth($redisPassSess) !== true) {
+            throw new \RuntimeException('Redis session probe: auth falhou');
+        }
+        $pong = @$sessionRedisProbe->ping();
+        if ($pong !== true && $pong !== '+PONG' && $pong !== 'PONG') {
+            throw new \RuntimeException('Redis session probe: ping falhou');
+        }
+        $sessionRedisProbe->close();
+
+        $sessionSavePath = 'tcp://' . $redisHostSess . ':' . $redisPortSess . '?timeout=1.0&read_timeout=1.0';
+        if ($redisPassSess !== '') {
+            $sessionSavePath .= '&auth=' . rawurlencode($redisPassSess);
+        }
+        ini_set('session.save_handler', 'redis');
+        ini_set('session.save_path', $sessionSavePath);
+    } catch (\Throwable $e) {
+        // Redis indisponível/credencial inválida no boot da sessão: mantém o handler padrão
+        // (arquivo). Não interrompe a requisição — login/sessão continuam funcionando
+        // localmente, só sem o compartilhamento entre instâncias.
+    }
+    unset($sessionRedisProbe, $sessionEnvLines, $readSessionEnv, $redisHostSess, $redisPortRaw, $redisPortSess, $redisPassSess);
+}
+
 // ─── Configuração segura de sessão (antes de session_start) ───
 if (session_status() === PHP_SESSION_NONE) {
     if (!headers_sent()) {
         $sessionDomain = (string) ($bootstrapEnv['SESSION_DOMAIN'] ?? '');
+        // Chrome/Chromium rejeitam cookies com Domain=localhost ou Domain=.localhost
+        // (host reservado). Em local isso quebra a sessão → CSRF falha no login Master.
+        // Usar cookie host-only (domain vazio) quando o domínio configurado for localhost.
+        $sessionDomainNorm = strtolower(ltrim($sessionDomain, '.'));
+        if ($sessionDomainNorm === 'localhost') {
+            $sessionDomain = '';
+        }
         // SESSION_SECURE explícito no .env tem prioridade; senão detecta HTTPS (proxy-aware).
         if ($bootstrapEnv['SESSION_SECURE'] !== null && $bootstrapEnv['SESSION_SECURE'] !== '') {
             $isSecure = strtolower((string) $bootstrapEnv['SESSION_SECURE']) === 'true'
@@ -376,7 +444,7 @@ if (!function_exists('deveExibirDetalheErroNaTela')) {
         if (!empty($_SESSION['master_user_id'])) {
             return true;
         }
-        $tipo = strtolower((string) ($_SESSION['user_type'] ?? ''));
+        $tipo = strtolower((string) inferUserTypeForErrorLog());
         return in_array($tipo, ['admin', 'admin_escola', 'professor', 'monitor'], true);
     }
 }

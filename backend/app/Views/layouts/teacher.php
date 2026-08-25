@@ -60,23 +60,8 @@
     </nav>
 
     <!-- Main Content -->
-    <main class="flex-1 p-6">
+    <main class="flex-1 p-6 plataforma-conteudo">
         <?= $content ?>
-        
-        <!-- Footer -->
-        <footer class="mt-8 pt-4 border-t border-gray-200">
-            <div class="text-center">
-                <p class="text-xs text-gray-600 mb-1">Todos os direitos reservados Educatudo</p>
-                <p class="text-xs text-gray-600">
-                    Feito com carinho por <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 underline">Launs</a>
-                </p>
-                <p class="text-xs text-gray-600 mt-2">
-                    <a href="<?= URL ?>/termos-de-uso" class="hover:underline">Termos de Uso</a> •
-                    <a href="<?= URL ?>/politica-privacidade" class="hover:underline">Política de Privacidade</a> •
-                    <a href="<?= URL ?>/politica-retencao" class="hover:underline">Política de Retenção de Dados</a>
-                </p>
-            </div>
-        </footer>
     </main>
 
     <!-- Botão Flutuante WhatsApp Suporte -->
@@ -119,21 +104,6 @@
         <?= $additional_js ?>
     <?php endif; ?>
 
-    <!-- Footer -->
-    <footer class="py-6 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center">
-                <p class="text-sm text-gray-900 mb-2">Todos os direitos reservados Educatudo</p>
-                <p class="text-sm text-gray-900">
-                    Feito com carinho por <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="text-gray-900 hover:text-gray-700 underline">Launs</a>
-                </p>
-                <p class="text-sm text-gray-900 mt-2">
-                    <a href="<?= URL ?>/termos-de-uso" class="hover:underline">Termos de Uso</a> •
-                    <a href="<?= URL ?>/politica-privacidade" class="hover:underline">Política de Privacidade</a> •
-                    <a href="<?= URL ?>/politica-retencao" class="hover:underline">Política de Retenção de Dados</a>
-                </p>
-            </div>
-        </div>
-    </footer>
+    <?php include __DIR__ . '/components/plataforma_footer.php'; ?>
 </body>
 </html>

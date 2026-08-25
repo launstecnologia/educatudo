@@ -10,61 +10,70 @@ $anos_letivo_para_vinculo = is_array($anos_letivo_para_vinculo ?? null) ? $anos_
 $cursoExtra = (($turma['curso_tipo'] ?? 'regular') === 'extra');
 $cursoId = (int)($turma['curso_id'] ?? 0);
 $turmaId = (int)($turma['id'] ?? 0);
+$vagas_resumo = $vagas_resumo ?? null;
+$fila_espera = $fila_espera ?? [];
+$totalAlunos = (int) ($turma['total_alunos'] ?? count($alunos));
+$alunosAtivos = count(array_filter($alunos, static fn ($a) => !empty($a['ativo'])));
+$alunosInativos = count(array_filter($alunos, static fn ($a) => empty($a['ativo'])));
+$vagasLabel = 'Ilimitado';
+if (is_array($vagas_resumo) && empty($vagas_resumo['ilimitado'])) {
+    $vagasLabel = (int) ($vagas_resumo['ocupadas'] ?? 0) . '/' . (int) ($vagas_resumo['vagas'] ?? 0);
+}
+
+$page_header_title = 'Detalhes da Turma';
+$page_header_subtitle = (string) ($turma['nome'] ?? '');
+ob_start();
+?>
+<a href="<?= URL ?>/admin/turmas"
+   class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-arrow-left mr-2 text-gray-500"></i>
+    Voltar
+</a>
+<a href="<?= URL ?>/admin/turmas/<?= $turmaId ?>/lista-chamada"
+   class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-clipboard-list mr-2 text-gray-500"></i>
+    Lista de chamada
+</a>
+<a href="<?= URL ?>/admin/turmas?edit=<?= $turmaId ?>"
+   class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+    <i class="fa-solid fa-pen mr-2"></i>
+    Editar
+</a>
+<?php
+$page_header_actions = ob_get_clean();
+include __DIR__ . '/../_partials/page_header_list.php';
 ?>
 
-<div class="min-h-screen bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50">
-    <!-- Header -->
-    <div class="bg-white/80 backdrop-blur-sm border-b border-purple-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-6">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Detalhes da Turma</h1>
-                    <p class="mt-2 text-gray-600">Informações completas da turma <?= htmlspecialchars($turma['nome'] ?? '') ?></p>
-                </div>
-                <div class="flex space-x-3">
-                    <a href="<?= URL ?>/admin/turmas/<?= $turma['id'] ?? '' ?>/lista-chamada"
-                       class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center">
-                        Lista de chamada
-                    </a>
-                    <a href="<?= URL ?>/admin/turmas/<?= $turma['id'] ?? '' ?>/edit" 
-                       class="btn-primary-custom px-4 py-2 rounded-lg transition-colors flex items-center hover:opacity-90">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                        </svg>
-                        Editar
-                    </a>
-                    <a href="<?= URL ?>/admin/turmas" 
-                       class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                        </svg>
-                        Voltar
-                    </a>
-                </div>
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+    <?php
+    $resumoCards = [
+        ['label' => 'Total de alunos', 'value' => (string) $totalAlunos, 'icon' => 'fa-users', 'valueClass' => 'text-gray-900', 'iconClass' => 'bg-slate-100 text-slate-600'],
+        ['label' => 'Alunos ativos', 'value' => (string) $alunosAtivos, 'icon' => 'fa-user-check', 'valueClass' => 'text-green-700', 'iconClass' => 'bg-green-50 text-green-600'],
+        ['label' => 'Alunos inativos', 'value' => (string) $alunosInativos, 'icon' => 'fa-user-xmark', 'valueClass' => 'text-red-700', 'iconClass' => 'bg-red-50 text-red-600'],
+        ['label' => 'Vagas', 'value' => $vagasLabel, 'icon' => 'fa-door-open', 'valueClass' => 'text-gray-900', 'iconClass' => 'bg-slate-100 text-slate-600'],
+    ];
+    foreach ($resumoCards as $card):
+    ?>
+    <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500"><?= htmlspecialchars($card['label']) ?></p>
+                <p class="mt-1 text-2xl font-bold leading-none <?= htmlspecialchars($card['valueClass']) ?>"><?= htmlspecialchars($card['value']) ?></p>
+            </div>
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl <?= htmlspecialchars($card['iconClass']) ?>">
+                <i class="fa-solid <?= htmlspecialchars($card['icon']) ?> text-sm"></i>
             </div>
         </div>
     </div>
+    <?php endforeach; ?>
+</div>
 
-    <!-- Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Turma Info Card -->
             <div class="lg:col-span-2">
-                <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200">
-                    <div class="p-6 border-b border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-semibold text-gray-900">Informações da Turma</h3>
-                            <div class="flex space-x-2">
-                                <a href="<?= URL ?>/admin/turmas/<?= $turma['id'] ?? '' ?>/edit" 
-                                   class="btn-primary-custom px-4 py-2 rounded-lg transition-colors text-sm hover:opacity-90">
-                                    Editar
-                                </a>
-                                <button onclick="toggleStatus(<?= $turma['id'] ?? 0 ?>, <?= ($turma['ativo'] ?? 0) ? 'false' : 'true' ?>)" 
-                                        class="px-4 py-2 <?= ($turma['ativo'] ?? 0) ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700' ?> text-white rounded-lg transition-colors text-sm">
-                                    <?= ($turma['ativo'] ?? 0) ? 'Desativar' : 'Ativar' ?>
-                                </button>
-                            </div>
-                        </div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Informações da turma</h3>
                     </div>
                     
                     <div class="p-6">
@@ -99,6 +108,22 @@ $turmaId = (int)($turma['id'] ?? 0);
                             </div>
                             
                             <div>
+                                <label class="block text-sm font-medium text-gray-500 mb-1">Vagas</label>
+                                <?php
+                                if (!is_array($vagas_resumo) || !empty($vagas_resumo['ilimitado'])) {
+                                    echo '<p class="text-lg text-gray-900">Ilimitado</p>';
+                                } else {
+                                    $ocup = (int) ($vagas_resumo['ocupadas'] ?? 0);
+                                    $res = (int) ($vagas_resumo['reservadas'] ?? 0);
+                                    $tot = (int) ($vagas_resumo['vagas'] ?? 0);
+                                    $fila = (int) ($vagas_resumo['fila'] ?? 0);
+                                    echo '<p class="text-lg font-semibold text-gray-900">' . $ocup . '/' . $tot . '</p>';
+                                    echo '<p class="text-xs text-gray-500">Reservadas: ' . $res . ($fila > 0 ? ' · Fila: ' . $fila : '') . '</p>';
+                                }
+                                ?>
+                            </div>
+
+                            <div>
                                 <label class="block text-sm font-medium text-gray-500 mb-1">Data de Criação</label>
                                 <p class="text-lg text-gray-900"><?= isset($turma['created_at']) ? date('d/m/Y H:i', strtotime($turma['created_at'])) : 'N/A' ?></p>
                             </div>
@@ -112,7 +137,7 @@ $turmaId = (int)($turma['id'] ?? 0);
                 </div>
 
                 <!-- Alunos da Turma -->
-                <div class="mt-8 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200">
+                <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200">
                     <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
                         <h3 class="text-lg font-semibold text-gray-900">Alunos da Turma</h3>
                         <?php if ($matriculas_schema_ready): ?>
@@ -125,9 +150,7 @@ $turmaId = (int)($turma['id'] ?? 0);
                     <div class="p-6">
                         <?php if (empty($alunos)): ?>
                             <div class="text-center py-8">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                                </svg>
+                                <i class="fa-solid fa-user-graduate text-4xl text-gray-300 mb-4"></i>
                                 <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum aluno nesta turma</h3>
                                 <p class="mt-1 text-sm text-gray-500">Os alunos serão exibidos aqui quando forem vinculados à turma.</p>
                             </div>
@@ -150,8 +173,8 @@ $turmaId = (int)($turma['id'] ?? 0);
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <div class="flex-shrink-0 h-10 w-10">
-                                                        <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                                            <span class="text-sm font-medium text-blue-600"><?= strtoupper(substr($aluno['nome'] ?? '', 0, 2)) ?></span>
+                                                        <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
+                                                            <span class="text-sm font-medium text-slate-600"><?= strtoupper(substr($aluno['nome'] ?? '', 0, 2)) ?></span>
                                                         </div>
                                                     </div>
                                                     <div class="ml-4">
@@ -177,8 +200,8 @@ $turmaId = (int)($turma['id'] ?? 0);
                                                 </span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <a href="<?= URL ?>/admin/students/<?= $aluno['id'] ?? '' ?>" 
-                                                   class="text-blue-600 hover:text-blue-900 transition-colors">Ver</a>
+                                                <a href="<?= URL ?>/admin/students/<?= $aluno['id'] ?? '' ?>"
+                                                   class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100">Detalhes</a>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
@@ -188,87 +211,90 @@ $turmaId = (int)($turma['id'] ?? 0);
                         <?php endif; ?>
                     </div>
                 </div>
+
+                <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Lista de espera</h3>
+                        <p class="text-sm text-gray-500 mt-1">Processos na fila desta turma, por ordem de chegada.</p>
+                    </div>
+                    <div class="p-6">
+                        <?php if ($fila_espera === []): ?>
+                        <p class="text-sm text-gray-500">Ninguém na fila.</p>
+                        <?php else: ?>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Responsável</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Entrou</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <?php foreach ($fila_espera as $filaItem): ?>
+                                    <tr>
+                                        <td class="px-4 py-2"><?= (int) ($filaItem['fila_posicao'] ?? 0) ?: '—' ?></td>
+                                        <td class="px-4 py-2 font-medium text-gray-900"><?= htmlspecialchars($filaItem['aluno_nome'] ?? '') ?></td>
+                                        <td class="px-4 py-2 text-gray-600"><?= htmlspecialchars($filaItem['resp_nome'] ?? '—') ?></td>
+                                        <td class="px-4 py-2 text-gray-500"><?= !empty($filaItem['entrou_fila_em']) ? date('d/m/Y H:i', strtotime((string) $filaItem['entrou_fila_em'])) : '—' ?></td>
+                                        <td class="px-4 py-2 text-right">
+                                            <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int) $filaItem['id'] ?>/oferecer-vaga" class="inline">
+                                                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                                                <button type="submit" class="text-sm text-primary hover:underline">Oferecer vaga</button>
+                                            </form>
+                                            <a href="<?= URL ?>/admin/enrollment/<?= (int) $filaItem['id'] ?>" class="text-sm text-gray-500 hover:underline ml-2">Abrir</a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
 
-            <!-- Sidebar Info -->
             <div class="space-y-6">
-                <!-- Quick Actions -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200 p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Ações rápidas</h3>
                     <div class="space-y-3">
                         <?php if ($matriculas_schema_ready): ?>
                         <button type="button" onclick="abrirModalVincularAluno()"
-                                class="btn-primary-custom w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors hover:opacity-90">
+                                class="btn-primary-custom w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-user-plus mr-2"></i>
                             Vincular aluno
                         </button>
                         <?php endif; ?>
                         <?php if ($cursoExtra): ?>
                         <a href="<?= URL ?>/admin/turmas/<?= $turmaId ?>/export-alunos-csv"
-                           class="w-full flex items-center justify-center px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors">
-                            <i class="fa-solid fa-file-csv mr-2"></i>
+                           class="w-full inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <i class="fa-solid fa-file-csv mr-2 text-gray-500"></i>
                             Exportar alunos (CSV)
                         </a>
                         <?php endif; ?>
                         <?php if ($cursoId > 0): ?>
                         <a href="<?= URL ?>/admin/curso/<?= $cursoId ?>/importar-alunos?turma_id=<?= $turmaId ?>"
-                           class="btn-primary-custom w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors hover:opacity-90">
-                            <i class="fa-solid fa-file-import mr-2"></i>
+                           class="w-full inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <i class="fa-solid fa-file-import mr-2 text-gray-500"></i>
                             Importar / vincular (CSV)
                         </a>
                         <?php endif; ?>
-                        <a href="<?= URL ?>/admin/turmas/<?= $turma['id'] ?? '' ?>/edit" 
-                           class="btn-primary-custom w-full flex items-center justify-center px-4 py-2 rounded-lg transition-colors hover:opacity-90">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                            </svg>
-                            Editar Turma
-                        </a>
-                        
-                        <button onclick="toggleStatus(<?= $turma['id'] ?? 0 ?>, <?= ($turma['ativo'] ?? 0) ? 'false' : 'true' ?>)" 
-                                class="w-full flex items-center justify-center px-4 py-2 <?= ($turma['ativo'] ?? 0) ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700' ?> text-white rounded-lg transition-colors">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"></path>
-                            </svg>
+                        <button type="button" onclick="toggleStatus(<?= $turma['id'] ?? 0 ?>, <?= ($turma['ativo'] ?? 0) ? 'false' : 'true' ?>)"
+                                class="w-full inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <i class="fa-solid fa-power-off mr-2 text-gray-500"></i>
                             <?= ($turma['ativo'] ?? 0) ? 'Desativar' : 'Ativar' ?>
                         </button>
-                        
-                        <button onclick="deleteTurma(<?= $turma['id'] ?? 0 ?>)" 
-                                class="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                            Excluir Turma
+                        <button type="button" onclick="deleteTurma(<?= $turma['id'] ?? 0 ?>)"
+                                class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                            <i class="fa-solid fa-trash-can mr-2"></i>
+                            Excluir turma
                         </button>
-                    </div>
-                </div>
-
-                <!-- Turma Stats -->
-                <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200 p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Estatísticas</h3>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Total de Alunos</span>
-                            <span class="text-lg font-semibold text-blue-600"><?= $turma['total_alunos'] ?? 0 ?></span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Alunos Ativos</span>
-                            <span class="text-lg font-semibold text-green-600"><?= count(array_filter($alunos, fn($a) => $a['ativo'] ?? 0)) ?></span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Alunos Inativos</span>
-                            <span class="text-lg font-semibold text-red-600"><?= count(array_filter($alunos, fn($a) => !($a['ativo'] ?? 0))) ?></span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Capacidade Média</span>
-                            <span class="text-lg font-semibold text-purple-600">30</span>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
 <?php if ($matriculas_schema_ready): ?>
 <div id="modalVincularAluno" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

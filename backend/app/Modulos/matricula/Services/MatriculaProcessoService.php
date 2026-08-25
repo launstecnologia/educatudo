@@ -5,6 +5,8 @@ namespace App\Modulos\Matricula\Services;
 require_once __DIR__ . '/../Models/MatriculaProcesso.php';
 require_once __DIR__ . '/../../../Services/AlunoMovimentacaoService.php';
 require_once __DIR__ . '/../../../Models/User/Student.php';
+require_once __DIR__ . '/MatriculaVagaService.php';
+require_once __DIR__ . '/MatriculaChecklistService.php';
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
 use App\Services\AlunoMovimentacaoService;
@@ -136,6 +138,11 @@ class MatriculaProcessoService
             'turma_id_atual' => $aluno['turma_id_atual'] ?? null,
             'turma_nome' => $aluno['turma_nome'] ?? '',
             'anos_na_escola' => $anosNaEscola,
+            'aluno_nome_mae' => $aluno['nome_mae'] ?? null,
+            'aluno_nome_pai' => $aluno['nome_pai'] ?? null,
+            'aluno_codigo_inep' => $aluno['codigo_inep'] ?? null,
+            'aluno_cor_raca' => $aluno['cor_raca'] ?? null,
+            'aluno_nacionalidade' => $aluno['nacionalidade'] ?? null,
         ];
     }
 
@@ -360,7 +367,7 @@ class MatriculaProcessoService
         if (!$this->model->temTabelaDocumentos() || $filesField === []) {
             return 0;
         }
-        $tiposOk = ['rg', 'cpf', 'comprovante_residencia', 'historico', 'certidao', 'outro'];
+        $tiposOk = ['rg', 'cpf', 'comprovante_residencia', 'historico', 'certidao', 'declaracao_transferencia', 'outro'];
         $tiposLista = is_array($tipos) ? array_values($tipos) : [];
 
         $names = $filesField['name'] ?? [];
@@ -1349,15 +1356,14 @@ class MatriculaProcessoService
             $config,
             $codigoModelo
         );
-        $orientacao = 'portrait';
+        $svcModelo = null;
         if ($html === null) {
             $html = $this->renderContratoHtml($enrollment, $escola, $contrato, $itens);
         } elseif ($this->ultimoModeloContrato) {
             $svcPath = dirname(__DIR__, 2) . '/modelos-documentos/Services/ModeloDocumentoService.php';
             if (is_file($svcPath)) {
                 require_once $svcPath;
-                $orientacao = (new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db))
-                    ->orientacaoDompdf($this->ultimoModeloContrato);
+                $svcModelo = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
             }
         }
 
@@ -1373,7 +1379,11 @@ class MatriculaProcessoService
 
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', $orientacao === 'landscape' ? 'landscape' : 'portrait');
+        if ($svcModelo && $this->ultimoModeloContrato) {
+            $svcModelo->aplicarPapelDompdf($dompdf, $this->ultimoModeloContrato);
+        } else {
+            $dompdf->setPaper('A4', 'portrait');
+        }
         $dompdf->render();
 
         $slug = preg_replace('/[^a-z0-9]/i', '_', substr((string) ($enrollment['aluno_nome'] ?? 'aluno'), 0, 30));
@@ -2178,7 +2188,43 @@ HTML;
         if (trim((string) ($enrollment['resp_nome'] ?? '')) === '') {
             $faltando[] = 'Responsável: nome';
         }
+
+        $tipo = (string) ($enrollment['tipo'] ?? 'nova');
+        $checklist = new MatriculaChecklistService($this->db);
+        if ($checklist->schemaReady()) {
+            $docs = [];
+            $eid = (int) ($enrollment['id'] ?? 0);
+            if ($eid > 0) {
+                $docs = $this->model->listarDocumentos($eid);
+            }
+            foreach ($checklist->faltandoObrigatorios($tipo, $docs) as $rotulo) {
+                $faltando[] = 'Documento: ' . $rotulo;
+            }
+        }
+
+        if ($this->campanhaExigeCenso($enrollment)) {
+            if (trim((string) ($enrollment['aluno_nome_mae'] ?? '')) === '') {
+                $faltando[] = 'Censo: nome da mãe';
+            }
+            if (trim((string) ($enrollment['aluno_cor_raca'] ?? '')) === '') {
+                $faltando[] = 'Censo: cor/raça';
+            }
+        }
         return $faltando;
+    }
+
+    private function campanhaExigeCenso(array $enrollment): bool
+    {
+        $cid = (int) ($enrollment['campanha_id'] ?? 0);
+        if ($cid <= 0) {
+            return false;
+        }
+        try {
+            $c = $this->db->fetch('SELECT exige_censo FROM matricula_campanhas WHERE id = ?', [$cid]);
+            return $c && !empty($c['exige_censo']);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function enturmarProcesso(int $enrollmentId, ?array $user = null, ?string $origemStatus = null): array
@@ -2211,23 +2257,46 @@ HTML;
             );
         }
 
-        $criadoAluno = false;
-        $alunoId = $this->garantirAlunoDoProcesso($enrollment, $criadoAluno);
-        $this->vincularResponsavelDoProcesso($alunoId, $enrollment, ($enrollment['tipo'] ?? '') === 'nova' || $criadoAluno);
-
-        $mov = new AlunoMovimentacaoService();
+        $vagaSvc = new MatriculaVagaService($this->db);
+        $this->db->beginTransaction();
         try {
-            $mov->vincularAlunoTurma($alunoId, $turmaId, $anoLetivoId, true, date('Y-m-d'));
-        } catch (\Throwable $e) {
-            if (!str_contains(mb_strtolower($e->getMessage()), 'já possui matrícula')
-                && !str_contains(mb_strtolower($e->getMessage()), 'ja possui matricula')) {
-                throw $e;
+            $decisao = $vagaSvc->decidirDestino($turmaId);
+            if (($decisao['destino'] ?? '') === 'lista_espera') {
+                $pos = $vagaSvc->colocarNaFila($enrollmentId, $turmaId, $user);
+                $this->db->commit();
+                return [
+                    'ok' => true,
+                    'aluno_id' => (int) ($enrollment['aluno_id'] ?? 0) ?: null,
+                    'status' => 'lista_espera',
+                    'mensagem' => ($decisao['mensagem'] ?? 'Turma lotada.') . ' Posição ' . $pos . ' na fila.',
+                    'criado_aluno' => false,
+                    'fila_posicao' => $pos,
+                ];
             }
-        }
 
-        $this->model->update($enrollmentId, ['aluno_id' => $alunoId]);
-        $acao = $origemStatus === 'confirmada' ? 'confirmacao_e_enturmacao' : 'enturmacao_automatica';
-        $this->model->transition($enrollmentId, 'enturmada', $user, $acao);
+            $criadoAluno = false;
+            $alunoId = $this->garantirAlunoDoProcesso($enrollment, $criadoAluno);
+            $this->aplicarCensoNoAluno($alunoId, $enrollment);
+            $this->vincularResponsavelDoProcesso($alunoId, $enrollment, ($enrollment['tipo'] ?? '') === 'nova' || $criadoAluno);
+
+            $mov = new AlunoMovimentacaoService();
+            try {
+                $mov->vincularAlunoTurma($alunoId, $turmaId, $anoLetivoId, true, date('Y-m-d'));
+            } catch (\Throwable $e) {
+                if (!str_contains(mb_strtolower($e->getMessage()), 'já possui matrícula')
+                    && !str_contains(mb_strtolower($e->getMessage()), 'ja possui matricula')) {
+                    throw $e;
+                }
+            }
+
+            $this->model->update($enrollmentId, ['aluno_id' => $alunoId]);
+            $acao = $origemStatus === 'confirmada' ? 'confirmacao_e_enturmacao' : 'enturmacao_automatica';
+            $this->model->transition($enrollmentId, 'enturmada', $user, $acao);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
 
         return [
             'ok' => true,
@@ -2252,7 +2321,13 @@ HTML;
         }
 
         $cpfDigits = preg_replace('/\D+/', '', (string) ($enrollment['aluno_cpf'] ?? '')) ?? '';
-        if (strlen($cpfDigits) === 11) {
+        $temCpfAlunos = false;
+        try {
+            $temCpfAlunos = (bool) $this->db->fetch('SHOW COLUMNS FROM alunos LIKE ?', ['cpf']);
+        } catch (\Throwable $e) {
+            $temCpfAlunos = false;
+        }
+        if ($temCpfAlunos && strlen($cpfDigits) === 11) {
             $porCpf = $this->db->fetch(
                 "SELECT id FROM alunos
                  WHERE REPLACE(REPLACE(REPLACE(IFNULL(cpf,''), '.', ''), '-', ''), ' ', '') = ?
@@ -2285,12 +2360,56 @@ HTML;
             'senha' => bin2hex(random_bytes(8)),
             'ativo' => 1,
             'pagante' => 1,
+            'nome_mae' => $enrollment['aluno_nome_mae'] ?? null,
+            'nome_pai' => $enrollment['aluno_nome_pai'] ?? null,
+            'codigo_inep' => $enrollment['aluno_codigo_inep'] ?? null,
+            'cor_raca' => $enrollment['aluno_cor_raca'] ?? null,
+            'nacionalidade' => $enrollment['aluno_nacionalidade'] ?? null,
         ]);
         if ($alunoId <= 0) {
             throw new \RuntimeException('Falha ao cadastrar aluno a partir do processo.');
         }
         $criado = true;
         return $alunoId;
+    }
+
+    private function aplicarCensoNoAluno(int $alunoId, array $enrollment): void
+    {
+        if ($alunoId <= 0) {
+            return;
+        }
+        $mapa = [
+            'nome_mae' => 'aluno_nome_mae',
+            'nome_pai' => 'aluno_nome_pai',
+            'codigo_inep' => 'aluno_codigo_inep',
+            'cor_raca' => 'aluno_cor_raca',
+            'nacionalidade' => 'aluno_nacionalidade',
+        ];
+        $sets = [];
+        $params = [];
+        foreach ($mapa as $colAluno => $colProc) {
+            $val = trim((string) ($enrollment[$colProc] ?? ''));
+            if ($val === '') {
+                continue;
+            }
+            try {
+                if (!$this->db->fetch('SHOW COLUMNS FROM alunos LIKE ?', [$colAluno])) {
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $sets[] = '`' . $colAluno . '` = COALESCE(NULLIF(`' . $colAluno . '`, \'\'), ?)';
+            $params[] = $val;
+        }
+        if ($sets === []) {
+            return;
+        }
+        $params[] = $alunoId;
+        $this->db->update(
+            'UPDATE alunos SET ' . implode(', ', $sets) . ' WHERE id = ?',
+            $params
+        );
     }
 
     private function vincularResponsavelDoProcesso(int $alunoId, array $enrollment, bool $obrigatorio = false): void
@@ -2343,7 +2462,13 @@ HTML;
     private function resolverOuCriarResponsavel(array $enrollment, string $nome): int
     {
         $cpfDigits = preg_replace('/\D+/', '', (string) ($enrollment['resp_cpf'] ?? '')) ?? '';
-        if (strlen($cpfDigits) === 11) {
+        $temCpfResp = false;
+        try {
+            $temCpfResp = (bool) $this->db->fetch('SHOW COLUMNS FROM responsaveis LIKE ?', ['cpf']);
+        } catch (\Throwable $e) {
+            $temCpfResp = false;
+        }
+        if ($temCpfResp && strlen($cpfDigits) === 11) {
             $exist = $this->db->fetch(
                 "SELECT id FROM responsaveis
                  WHERE REPLACE(REPLACE(REPLACE(IFNULL(cpf,''), '.', ''), '-', ''), ' ', '') = ?
@@ -2359,10 +2484,18 @@ HTML;
         $cols = ['nome', 'senha_hash', 'ativo'];
         $params = [$nome, $senhaHash, 1];
         foreach (['cpf' => $enrollment['resp_cpf'] ?? null, 'email' => $enrollment['resp_email'] ?? null, 'telefone' => $enrollment['resp_telefone'] ?? null] as $col => $val) {
-            if ($this->db->fetch("SHOW COLUMNS FROM responsaveis LIKE '{$col}'")) {
-                $cols[] = $col;
-                $params[] = $val;
+            if (!preg_match('/^[a-z0-9_]+$/i', $col)) {
+                continue;
             }
+            try {
+                if (!$this->db->fetch('SHOW COLUMNS FROM responsaveis LIKE ?', [$col])) {
+                    continue;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $cols[] = $col;
+            $params[] = $val;
         }
         $placeholders = implode(',', array_fill(0, count($cols), '?'));
         $this->db->insert(
@@ -2413,14 +2546,28 @@ HTML;
 
     public function getTurmas(?int $anoLetivoId = null): array
     {
-        $sql = 'SELECT t.id, t.nome, t.serie FROM turmas t WHERE t.ativo = 1';
+        $sql = 'SELECT t.id, t.nome, t.serie';
+        try {
+            if ($this->db->fetch('SHOW COLUMNS FROM turmas LIKE ?', ['vagas'])) {
+                $sql .= ', t.vagas';
+            }
+        } catch (\Throwable $e) {
+            // ok
+        }
+        $sql .= ' FROM turmas t WHERE t.ativo = 1';
         $params = [];
         if ($anoLetivoId) {
             $sql .= ' AND t.ano_letivo_id = ?';
             $params[] = $anoLetivoId;
         }
         $sql .= ' ORDER BY t.serie, t.nome';
-        return $this->db->fetchAll($sql, $params) ?: [];
+        $turmas = $this->db->fetchAll($sql, $params) ?: [];
+        $vagaSvc = new MatriculaVagaService($this->db);
+        foreach ($turmas as &$t) {
+            $t['vagas_resumo'] = $vagaSvc->resumo((int) $t['id']);
+        }
+        unset($t);
+        return $turmas;
     }
 
     public function listarAlunosPorTurma(int $turmaId): array

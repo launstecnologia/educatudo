@@ -111,6 +111,17 @@ class ExpoColagInscricao
         return (int) ($row['total'] ?? 0);
     }
 
+    public function contarAtivasPorProjeto(int $projetoId): int
+    {
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total FROM expo_colag_inscricoes
+             WHERE projeto_id = :projeto_id
+               AND status IN ('Aguardando','Aprovada','Lista_espera')",
+            ['projeto_id' => $projetoId]
+        );
+        return (int) ($row['total'] ?? 0);
+    }
+
     /** Projetos em que o aluno está ativo (conta para limite simultâneo). */
     public function contarAtivasAluno(int $alunoId, ?int $excetoProjetoId = null): int
     {

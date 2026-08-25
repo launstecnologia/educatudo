@@ -31,6 +31,7 @@ class SchoolAbsence
         );
 
         $this->ensureFaltasEventosMateriasJsonColumn();
+        $this->ensureFaltasEventosOrigemColumn();
 
         $this->db->query(
             "CREATE TABLE IF NOT EXISTS faltas_lancamentos (
@@ -74,11 +75,45 @@ class SchoolAbsence
         }
     }
 
+    private function ensureFaltasEventosOrigemColumn(): void
+    {
+        if ($this->colunaOrigem()) {
+            return;
+        }
+        try {
+            $this->db->query(
+                "ALTER TABLE faltas_eventos ADD COLUMN origem ENUM('manual','diario') NOT NULL DEFAULT 'manual' AFTER materias_json"
+            );
+        } catch (Throwable $e) {
+            error_log('SchoolAbsence ensureFaltasEventosOrigemColumn: ' . $e->getMessage());
+        }
+    }
+
+    private function colunaOrigem(): bool
+    {
+        static $ok = null;
+        if ($ok !== null) {
+            return $ok;
+        }
+        $exists = $this->db->fetch(
+            "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'faltas_eventos' AND COLUMN_NAME = 'origem' LIMIT 1"
+        );
+        $ok = (bool) $exists;
+        return $ok;
+    }
+
+    private function origemValida(string $origem): string
+    {
+        return $origem === 'diario' ? 'diario' : 'manual';
+    }
+
     public function listEventos(int $limit = 200): array
     {
         $useLimit = $limit > 0;
         $limit = $useLimit ? max(1, min($limit, 1000)) : 0;
-        $sql = "SELECT id, nome, bimestre, ano_letivo, turmas_json, materias_json, created_at, updated_at
+        $origemSql = $this->colunaOrigem() ? ', origem' : '';
+        $sql = "SELECT id, nome, bimestre, ano_letivo, turmas_json, materias_json{$origemSql}, created_at, updated_at
                 FROM faltas_eventos
                 WHERE ativo = 1
                 ORDER BY ano_letivo DESC, updated_at DESC, id DESC";
@@ -92,6 +127,7 @@ class SchoolAbsence
         foreach ($rows as &$row) {
             $row['turmas_ids'] = $this->decodeIds((string) ($row['turmas_json'] ?? ''));
             $row['materias_ids'] = $this->decodeIds((string) ($row['materias_json'] ?? ''));
+            $row['origem'] = (string) ($row['origem'] ?? 'manual');
         }
         unset($row);
 
@@ -103,8 +139,9 @@ class SchoolAbsence
         if ($eventoId <= 0) {
             return null;
         }
+        $origemSql = $this->colunaOrigem() ? ', origem' : '';
         $row = $this->db->fetch(
-            "SELECT id, nome, bimestre, ano_letivo, turmas_json, materias_json, created_at, updated_at
+            "SELECT id, nome, bimestre, ano_letivo, turmas_json, materias_json{$origemSql}, created_at, updated_at
              FROM faltas_eventos
              WHERE id = :id AND ativo = 1
              LIMIT 1",
@@ -115,11 +152,12 @@ class SchoolAbsence
         }
         $row['turmas_ids'] = $this->decodeIds((string) ($row['turmas_json'] ?? ''));
         $row['materias_ids'] = $this->decodeIds((string) ($row['materias_json'] ?? ''));
+        $row['origem'] = (string) ($row['origem'] ?? 'manual');
 
         return $row;
     }
 
-    public function createEvento(string $nome, string $bimestre, int $anoLetivo, array $turmasIds, ?int $createdBy = null, array $materiasIds = []): int
+    public function createEvento(string $nome, string $bimestre, int $anoLetivo, array $turmasIds, ?int $createdBy = null, array $materiasIds = [], string $origem = 'manual'): int
     {
         $ids = $this->normalizeIds($turmasIds);
         if ($ids === []) {
@@ -128,6 +166,23 @@ class SchoolAbsence
 
         $materiasNorm = $this->normalizeIds($materiasIds);
         $materiasJson = $materiasNorm === [] ? null : json_encode($materiasNorm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $origem = $this->origemValida($origem);
+
+        if ($this->colunaOrigem()) {
+            return (int) $this->db->insert(
+                "INSERT INTO faltas_eventos (nome, bimestre, ano_letivo, turmas_json, materias_json, origem, created_by, ativo)
+                 VALUES (:nome, :bimestre, :ano_letivo, :turmas_json, :materias_json, :origem, :created_by, 1)",
+                [
+                    'nome' => trim($nome),
+                    'bimestre' => trim($bimestre),
+                    'ano_letivo' => $anoLetivo,
+                    'turmas_json' => json_encode($ids, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'materias_json' => $materiasJson,
+                    'origem' => $origem,
+                    'created_by' => $createdBy,
+                ]
+            );
+        }
 
         return (int) $this->db->insert(
             "INSERT INTO faltas_eventos (nome, bimestre, ano_letivo, turmas_json, materias_json, created_by, ativo)
@@ -149,7 +204,8 @@ class SchoolAbsence
         string $bimestre,
         int $anoLetivo,
         array $turmasIds,
-        array $materiasIds
+        array $materiasIds,
+        string $origem = 'manual'
     ): void {
         if ($eventoId <= 0) {
             throw new RuntimeException('Evento inválido.');
@@ -163,19 +219,25 @@ class SchoolAbsence
         }
         $materiasNorm = $this->normalizeIds($materiasIds);
         $materiasJson = $materiasNorm === [] ? null : json_encode($materiasNorm, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $params = [
+            'id' => $eventoId,
+            'nome' => trim($nome),
+            'bimestre' => trim($bimestre),
+            'ano_letivo' => $anoLetivo,
+            'turmas_json' => json_encode($ids, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'materias_json' => $materiasJson,
+        ];
+        $origemSql = '';
+        if ($this->colunaOrigem()) {
+            $origemSql = ', origem = :origem';
+            $params['origem'] = $this->origemValida($origem);
+        }
 
         $this->db->update(
             "UPDATE faltas_eventos
-             SET nome = :nome, bimestre = :bimestre, ano_letivo = :ano_letivo, turmas_json = :turmas_json, materias_json = :materias_json, updated_at = CURRENT_TIMESTAMP
+             SET nome = :nome, bimestre = :bimestre, ano_letivo = :ano_letivo, turmas_json = :turmas_json, materias_json = :materias_json{$origemSql}, updated_at = CURRENT_TIMESTAMP
              WHERE id = :id AND ativo = 1",
-            [
-                'id' => $eventoId,
-                'nome' => trim($nome),
-                'bimestre' => trim($bimestre),
-                'ano_letivo' => $anoLetivo,
-                'turmas_json' => json_encode($ids, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'materias_json' => $materiasJson,
-            ]
+            $params
         );
     }
 

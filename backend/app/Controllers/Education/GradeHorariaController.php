@@ -138,22 +138,65 @@ class GradeHorariaController extends BaseController
     public function index()
     {
         $user = $this->auth->getUser();
+        $filtros = $this->filtrosDaRequest();
 
-        $itens = $this->db->fetchAll(
-            "SELECT g.*, t.nome as turma_nome, p.nome as professor_nome, m.nome as materia_nome
-             FROM grade_horaria g
-             JOIN turmas t ON g.turma_id = t.id
-             JOIN professores p ON g.professor_id = p.id
-             JOIN materias m ON g.materia_id = m.id
-             ORDER BY g.dia_semana ASC, g.horario_de ASC"
-        );
+        $turmas = $this->db->fetchAll(
+            "SELECT id, nome, serie, tipo_ensino FROM turmas WHERE ativo = 1 ORDER BY nome"
+        ) ?: [];
+        $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
+        $materias = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome") ?: [];
+
+        $tiposEnsino = [];
+        $series = [];
+        foreach ($turmas as $turma) {
+            $tipo = trim((string) ($turma['tipo_ensino'] ?? ''));
+            $serie = trim((string) ($turma['serie'] ?? ''));
+            if ($tipo !== '') {
+                $tiposEnsino[$tipo] = $tipo;
+            }
+            if ($serie !== '') {
+                $series[$serie] = $serie;
+            }
+        }
+        ksort($tiposEnsino, SORT_NATURAL | SORT_FLAG_CASE);
+        ksort($series, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $turmasFiltro = $turmas;
+        if ($filtros['tipo_ensino'] !== '') {
+            $turmasFiltro = array_values(array_filter($turmasFiltro, static function ($turma) use ($filtros) {
+                return strcasecmp((string) ($turma['tipo_ensino'] ?? ''), $filtros['tipo_ensino']) === 0;
+            }));
+            $series = [];
+            foreach ($turmasFiltro as $turma) {
+                $serie = trim((string) ($turma['serie'] ?? ''));
+                if ($serie !== '') {
+                    $series[$serie] = $serie;
+                }
+            }
+            ksort($series, SORT_NATURAL | SORT_FLAG_CASE);
+            if ($filtros['serie'] !== '' && !isset($series[$filtros['serie']])) {
+                $filtros['serie'] = '';
+            }
+        }
+        if ($filtros['serie'] !== '') {
+            $turmasFiltro = array_values(array_filter($turmasFiltro, static function ($turma) use ($filtros) {
+                return strcasecmp((string) ($turma['serie'] ?? ''), $filtros['serie']) === 0;
+            }));
+        }
 
         $data = [
             'title' => 'Grade Horária de Aulas - EducaTudo',
             'user' => $user,
             'current_page' => 'grade_horaria',
-            'itens' => $itens,
+            'itens' => $this->listarItens($filtros),
             'dias_semana' => self::$DIAS_SEMANA,
+            'turmas' => $turmas,
+            'turmas_filtro' => $turmasFiltro,
+            'tipos_ensino' => array_values($tiposEnsino),
+            'series' => array_values($series),
+            'professores' => $professores,
+            'materias' => $materias,
+            'filtros' => $filtros,
             'csrf_token' => $this->generateCsrfToken(),
         ];
 
@@ -161,27 +204,56 @@ class GradeHorariaController extends BaseController
     }
 
     /**
-     * Formulário de nova aula
+     * PDF da grade na visão/filtros atuais (semana, dia ou lista).
      */
-    public function create()
+    public function pdf()
     {
-        $user = $this->auth->getUser();
-        $turmas = $this->db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome");
-        $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome");
-        $materias = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome");
+        $filtros = $this->filtrosDaRequest();
+        $turmas = $this->db->fetchAll(
+            "SELECT id, nome, serie, tipo_ensino FROM turmas WHERE ativo = 1 ORDER BY nome"
+        ) ?: [];
+        $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
+        $materias = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome") ?: [];
 
-        $data = [
-            'title' => 'Nova Aula na Grade - EducaTudo',
-            'user' => $user,
-            'current_page' => 'grade_horaria',
+        $html = $this->renderizarHtml('admin/grade-horaria/pdf', [
+            'itens' => $this->listarItens($filtros),
+            'filtros' => $filtros,
             'dias_semana' => self::$DIAS_SEMANA,
             'turmas' => $turmas,
+            'turmas_filtro' => $turmas,
             'professores' => $professores,
             'materias' => $materias,
-            'csrf_token' => $this->generateCsrfToken(),
-        ];
+            'gerado_em' => date('d/m/Y H:i'),
+        ]);
 
-        $this->viewWithLayout('admin', 'admin/grade-horaria/create', $data);
+        $orientacao = ($filtros['visao'] === 'dia') ? 'portrait' : 'landscape';
+        $this->outputPdf($html, 'grade-horaria.pdf', $orientacao);
+    }
+
+    /**
+     * Dados de uma aula (JSON) para popular o offcanvas de edição
+     */
+    public function dados($id)
+    {
+        $item = $this->db->fetch("SELECT * FROM grade_horaria WHERE id = :id", ['id' => (int) $id]);
+        if (!$item) {
+            $this->json(['error' => 'Registro não encontrado.'], 404);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'item' => [
+                'id' => (int) $item['id'],
+                'dia_semana' => (int) $item['dia_semana'],
+                'periodo' => $item['periodo'],
+                'horario_de' => substr((string) $item['horario_de'], 0, 5),
+                'horario_ate' => substr((string) $item['horario_ate'], 0, 5),
+                'turma_id' => (int) $item['turma_id'],
+                'professor_id' => (int) $item['professor_id'],
+                'materia_id' => (int) $item['materia_id'],
+            ],
+        ]);
     }
 
     /**
@@ -190,8 +262,7 @@ class GradeHorariaController extends BaseController
     public function store()
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $_SESSION['error_message'] = 'Token inválido.';
-            $this->redirect('/admin/grade-horaria/create');
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
 
@@ -204,8 +275,7 @@ class GradeHorariaController extends BaseController
         $periodo = in_array($_POST['periodo'] ?? '', ['manha', 'tarde']) ? $_POST['periodo'] : 'manha';
 
         if ($dia_semana < 1 || $dia_semana > 7 || !$horario_de || !$horario_ate || !$turma_id || !$professor_id || !$materia_id) {
-            $_SESSION['error_message'] = 'Preencha todos os campos obrigatórios.';
-            $this->redirect('/admin/grade-horaria/create');
+            $this->json(['error' => 'Preencha todos os campos obrigatórios.'], 400);
             return;
         }
 
@@ -223,49 +293,11 @@ class GradeHorariaController extends BaseController
                     'periodo' => $periodo,
                 ]
             );
-            $_SESSION['success_message'] = 'Aula adicionada à grade com sucesso.';
-            $this->redirect('/admin/grade-horaria');
+            $this->json(['success' => true, 'message' => 'Aula adicionada à grade com sucesso.']);
         } catch (Exception $e) {
             error_log("Erro ao salvar grade horária: " . $e->getMessage());
-            $_SESSION['error_message'] = 'Erro ao salvar: ' . $e->getMessage();
-            $this->redirect('/admin/grade-horaria/create');
+            $this->json(['error' => 'Erro ao salvar: ' . $e->getMessage()], 400);
         }
-    }
-
-    /**
-     * Formulário de edição
-     */
-    public function edit($id)
-    {
-        $user = $this->auth->getUser();
-        $item = $this->db->fetch(
-            "SELECT * FROM grade_horaria WHERE id = :id",
-            ['id' => $id]
-        );
-
-        if (!$item) {
-            $_SESSION['error_message'] = 'Registro não encontrado.';
-            $this->redirect('/admin/grade-horaria');
-            return;
-        }
-
-        $turmas = $this->db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome");
-        $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome");
-        $materias = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome");
-
-        $data = [
-            'title' => 'Editar Aula na Grade - EducaTudo',
-            'user' => $user,
-            'current_page' => 'grade_horaria',
-            'item' => $item,
-            'dias_semana' => self::$DIAS_SEMANA,
-            'turmas' => $turmas,
-            'professores' => $professores,
-            'materias' => $materias,
-            'csrf_token' => $this->generateCsrfToken(),
-        ];
-
-        $this->viewWithLayout('admin', 'admin/grade-horaria/edit', $data);
     }
 
     /**
@@ -274,15 +306,13 @@ class GradeHorariaController extends BaseController
     public function update($id)
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $_SESSION['error_message'] = 'Token inválido.';
-            $this->redirect('/admin/grade-horaria/' . $id . '/edit');
+            $this->json(['error' => 'Token inválido.'], 400);
             return;
         }
 
-        $item = $this->db->fetch("SELECT id FROM grade_horaria WHERE id = :id", ['id' => $id]);
+        $item = $this->db->fetch("SELECT id FROM grade_horaria WHERE id = :id", ['id' => (int) $id]);
         if (!$item) {
-            $_SESSION['error_message'] = 'Registro não encontrado.';
-            $this->redirect('/admin/grade-horaria');
+            $this->json(['error' => 'Registro não encontrado.'], 404);
             return;
         }
 
@@ -295,8 +325,7 @@ class GradeHorariaController extends BaseController
         $periodo = in_array($_POST['periodo'] ?? '', ['manha', 'tarde']) ? $_POST['periodo'] : 'manha';
 
         if ($dia_semana < 1 || $dia_semana > 7 || !$horario_de || !$horario_ate || !$turma_id || !$professor_id || !$materia_id) {
-            $_SESSION['error_message'] = 'Preencha todos os campos obrigatórios.';
-            $this->redirect('/admin/grade-horaria/' . $id . '/edit');
+            $this->json(['error' => 'Preencha todos os campos obrigatórios.'], 400);
             return;
         }
 
@@ -306,7 +335,7 @@ class GradeHorariaController extends BaseController
                  turma_id = :turma_id, professor_id = :professor_id, materia_id = :materia_id, periodo = :periodo
                  WHERE id = :id",
                 [
-                    'id' => $id,
+                    'id' => (int) $id,
                     'dia_semana' => $dia_semana,
                     'horario_de' => $horario_de,
                     'horario_ate' => $horario_ate,
@@ -316,12 +345,10 @@ class GradeHorariaController extends BaseController
                     'periodo' => $periodo,
                 ]
             );
-            $_SESSION['success_message'] = 'Aula atualizada com sucesso.';
-            $this->redirect('/admin/grade-horaria');
+            $this->json(['success' => true, 'message' => 'Aula atualizada com sucesso.']);
         } catch (Exception $e) {
             error_log("Erro ao atualizar grade horária: " . $e->getMessage());
-            $_SESSION['error_message'] = 'Erro ao atualizar: ' . $e->getMessage();
-            $this->redirect('/admin/grade-horaria/' . $id . '/edit');
+            $this->json(['error' => 'Erro ao atualizar: ' . $e->getMessage()], 400);
         }
     }
 
@@ -471,6 +498,151 @@ class GradeHorariaController extends BaseController
             'inseridos' => $inseridos,
             'message' => $inseridos . ' aula(s) adicionada(s) à grade.',
         ]);
+    }
+
+    /**
+     * @return array{tipo_ensino:string,serie:string,turma_id:int,periodo:string,professor_id:int,materia_id:int,visao:string,dia:int}
+     */
+    private function filtrosDaRequest(): array
+    {
+        $periodo = strtolower(trim((string) ($_GET['periodo'] ?? '')));
+        $visao = strtolower(trim((string) ($_GET['visao'] ?? 'semana')));
+        $dia = (int) ($_GET['dia'] ?? 0);
+
+        return [
+            'tipo_ensino' => mb_substr(trim((string) ($_GET['tipo_ensino'] ?? '')), 0, 80),
+            'serie' => mb_substr(trim((string) ($_GET['serie'] ?? '')), 0, 80),
+            'turma_id' => (int) ($_GET['turma_id'] ?? 0),
+            'periodo' => in_array($periodo, ['manha', 'tarde'], true) ? $periodo : '',
+            'professor_id' => (int) ($_GET['professor_id'] ?? 0),
+            'materia_id' => (int) ($_GET['materia_id'] ?? 0),
+            'visao' => in_array($visao, ['semana', 'dia', 'lista'], true) ? $visao : 'semana',
+            'dia' => ($dia >= 1 && $dia <= 7) ? $dia : 0,
+        ];
+    }
+
+    /**
+     * @param array{tipo_ensino:string,serie:string,turma_id:int,periodo:string,professor_id:int,materia_id:int,visao:string,dia:int} $filtros
+     * @return list<array<string,mixed>>
+     */
+    private function listarItens(array $filtros): array
+    {
+        $selectSala = ', NULL AS sala_nome';
+        $joinSala = '';
+        if ($this->colunaExiste('turmas', 'sala_padrao_id') && $this->tabelaExiste('school_locations')) {
+            $selectSala = ', sl.nome AS sala_nome';
+            $joinSala = ' LEFT JOIN school_locations sl ON sl.id = t.sala_padrao_id';
+        }
+
+        $where = [];
+        $params = [];
+
+        if ($filtros['turma_id'] > 0) {
+            $where[] = 'g.turma_id = :turma_id';
+            $params['turma_id'] = $filtros['turma_id'];
+        }
+        if ($filtros['periodo'] !== '') {
+            $where[] = 'g.periodo = :periodo';
+            $params['periodo'] = $filtros['periodo'];
+        }
+        if ($filtros['professor_id'] > 0) {
+            $where[] = 'g.professor_id = :professor_id';
+            $params['professor_id'] = $filtros['professor_id'];
+        }
+        if ($filtros['materia_id'] > 0) {
+            $where[] = 'g.materia_id = :materia_id';
+            $params['materia_id'] = $filtros['materia_id'];
+        }
+        if ($filtros['tipo_ensino'] !== '') {
+            $where[] = 't.tipo_ensino = :tipo_ensino';
+            $params['tipo_ensino'] = $filtros['tipo_ensino'];
+        }
+        if ($filtros['serie'] !== '') {
+            $where[] = 't.serie = :serie';
+            $params['serie'] = $filtros['serie'];
+        }
+
+        $sql = "SELECT g.*, t.nome AS turma_nome, t.serie AS turma_serie, t.tipo_ensino,
+                       p.nome AS professor_nome, m.nome AS materia_nome
+                       {$selectSala}
+                FROM grade_horaria g
+                JOIN turmas t ON g.turma_id = t.id
+                JOIN professores p ON g.professor_id = p.id
+                JOIN materias m ON g.materia_id = m.id
+                {$joinSala}";
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY g.horario_de ASC, g.horario_ate ASC, g.dia_semana ASC, t.nome ASC';
+
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool
+    {
+        if ($tabela !== 'turmas' || $coluna !== 'sala_padrao_id') {
+            return false;
+        }
+        try {
+            return $this->db->fetch('SHOW COLUMNS FROM turmas LIKE :c', ['c' => $coluna]) !== false;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    private function tabelaExiste(string $tabela): bool
+    {
+        if ($tabela !== 'school_locations') {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tabela LIMIT 1',
+                ['tabela' => $tabela]
+            );
+            return !empty($row);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    private function renderizarHtml(string $view, array $viewData): string
+    {
+        $arquivo = $this->resolveViewPath($view);
+        if ($arquivo === null) {
+            throw new Exception('View não encontrada: ' . $view);
+        }
+        ob_start();
+        extract($viewData, EXTR_SKIP);
+        require $arquivo;
+        return (string) ob_get_clean();
+    }
+
+    private function outputPdf(string $html, string $filename, string $orientation = 'landscape'): void
+    {
+        $orientation = $orientation === 'portrait' ? 'portrait' : 'landscape';
+        $old = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        try {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', false);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', $orientation);
+            $dompdf->render();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            echo $dompdf->output();
+            exit;
+        } finally {
+            ini_set('display_errors', (string) $old);
+        }
     }
 }
 }

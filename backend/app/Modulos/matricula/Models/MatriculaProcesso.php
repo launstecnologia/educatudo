@@ -186,6 +186,10 @@ class MatriculaProcesso
             $params[] = $like;
             $params[] = $like;
         }
+        if (!empty($filters['campanha_id']) && $this->temColuna('campanha_id')) {
+            $where[] = 'e.campanha_id = ?';
+            $params[] = (int) $filters['campanha_id'];
+        }
         return [$where, $params];
     }
 
@@ -204,6 +208,8 @@ class MatriculaProcesso
             'finance_plan_id', 'finance_cobrancas',
             'pagamento_status', 'pagante_modo', 'documento_assinatura_codigo',
             'contrato_assinado_path',
+            'campanha_id', 'fila_posicao', 'entrou_fila_em', 'reserva_ate',
+            'aluno_nome_mae', 'aluno_nome_pai', 'aluno_codigo_inep', 'aluno_cor_raca', 'aluno_nacionalidade',
         ];
         foreach ($optional as $col) {
             if (array_key_exists($col, $data) && $this->temColuna($col)) {
@@ -251,6 +257,8 @@ class MatriculaProcesso
             'zapsign_doc_token', 'zapsign_signer_token', 'zapsign_sign_url',
             'zapsign_status', 'zapsign_enviado_em',
             'observacoes', 'expira_em', 'origem', 'tipo',
+            'campanha_id', 'fila_posicao', 'entrou_fila_em', 'reserva_ate',
+            'aluno_nome_mae', 'aluno_nome_pai', 'aluno_codigo_inep', 'aluno_cor_raca', 'aluno_nacionalidade',
         ];
         $sets = [];
         $params = [];

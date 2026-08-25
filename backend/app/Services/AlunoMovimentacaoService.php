@@ -117,6 +117,7 @@ class AlunoMovimentacaoService
             }
             $first = false;
             $service->inactivate($alunoId, $itemPayload, $currentUser);
+            $this->registrarTransferenciaSaida($alunoId, $turmaOrigemId, $payload, $currentUser);
             if ($removerTurma) {
                 $this->db->query('UPDATE alunos SET turma_id = NULL WHERE id = :id', ['id' => $alunoId]);
                 $this->db->query(
@@ -126,6 +127,8 @@ class AlunoMovimentacaoService
                 );
             }
         }
+
+        $this->oferecerVagasLiberadas($turmaOrigemId, $currentUser, count($validIds));
 
         return [
             'processados' => count($validIds),
@@ -312,6 +315,89 @@ class AlunoMovimentacaoService
             }
         } catch (\Exception $e) {
             error_log('AlunoMovimentacaoService reconcileMatricula: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @param array<string,mixed> $currentUser
+     */
+    private function registrarTransferenciaSaida(int $alunoId, int $turmaOrigemId, array $payload, array $currentUser): void
+    {
+        try {
+            if (!$this->db->fetch('SHOW TABLES LIKE ?', ['matricula_transferencias'])) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        $data = trim((string) ($payload['data_transferencia'] ?? ''));
+        if ($data === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            $data = date('Y-m-d');
+        }
+        $uf = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) ($payload['escola_uf'] ?? '')) ?? '');
+        if (strlen($uf) > 2) {
+            $uf = substr($uf, 0, 2);
+        }
+
+        $this->db->insert(
+            'INSERT INTO matricula_transferencias
+             (protocolo, direcao, aluno_id, turma_origem_id, escola_nome, escola_cidade, escola_uf, escola_inep,
+              motivo, observacao, data_transferencia, criado_por)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            [
+                $this->proximoProtocoloTr(),
+                'saida',
+                $alunoId,
+                $turmaOrigemId > 0 ? $turmaOrigemId : null,
+                mb_substr(trim((string) ($payload['escola_nome'] ?? '')), 0, 255) ?: null,
+                mb_substr(trim((string) ($payload['escola_cidade'] ?? '')), 0, 120) ?: null,
+                $uf !== '' ? $uf : null,
+                mb_substr(trim((string) ($payload['escola_inep'] ?? '')), 0, 20) ?: null,
+                mb_substr(trim((string) ($payload['motivo'] ?? '')), 0, 255) ?: null,
+                trim((string) ($payload['observation'] ?? '')) ?: null,
+                $data,
+                (int) ($currentUser['id'] ?? 0) ?: null,
+            ]
+        );
+    }
+
+    private function proximoProtocoloTr(): string
+    {
+        $ano = date('Y');
+        $prefixo = 'TR-' . $ano . '-';
+        $row = $this->db->fetch(
+            'SELECT protocolo FROM matricula_transferencias WHERE protocolo LIKE ? ORDER BY id DESC LIMIT 1',
+            [$prefixo . '%']
+        );
+        $n = 1;
+        if ($row && preg_match('/(\d+)$/', (string) ($row['protocolo'] ?? ''), $m)) {
+            $n = (int) $m[1] + 1;
+        }
+        return $prefixo . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * @param array<string,mixed> $currentUser
+     */
+    private function oferecerVagasLiberadas(int $turmaId, array $currentUser, int $vezes): void
+    {
+        if ($turmaId <= 0 || $vezes <= 0) {
+            return;
+        }
+        $path = __DIR__ . '/../Modulos/matricula/Services/MatriculaVagaService.php';
+        if (!is_file($path)) {
+            return;
+        }
+        require_once $path;
+        try {
+            $svc = new \App\Modulos\Matricula\Services\MatriculaVagaService($this->db);
+            for ($i = 0; $i < $vezes; $i++) {
+                $svc->aoLiberarVaga($turmaId, $currentUser);
+            }
+        } catch (\Throwable $e) {
+            error_log('AlunoMovimentacaoService oferecerVagasLiberadas: ' . $e->getMessage());
         }
     }
 }

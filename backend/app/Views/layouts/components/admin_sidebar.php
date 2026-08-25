@@ -84,24 +84,24 @@
         $showDashboardMenu = $canViewSidebar(['dashboard']);
         $showAlunosMenu = $canViewSidebar(['alunos']);
         $showUsuariosGroup = $canViewSidebar(['administradores', 'professores', 'unidades']);
-        $showAcademicoGroup = $canViewSidebar(['ano_letivo', 'curso', 'series', 'turmas', 'transferencia']);
+        $showAcademicoGroup = $canViewSidebar(['ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'turmas', 'salas', 'transferencia']);
         $showInventoryGroup = $canViewSidebar(['almoxarifado', 'patrimonio']);
         $curMovimentacao = in_array($current_page ?? '', ['students_remanejamento', 'students_transferencia_escolar'], true);
         ?>
         <nav class="admin-sidebar-nav space-y-0.5">
             <?php if (($user['perfil_admin'] ?? '') === 'financeiro'): ?>
                 <div class="menu-group">
-                    <button type="button" onclick="toggleMenuGroup('financeiro')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
+                    <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'financeiro' ? 'bg-white/20' : '' ?>">
+                        <a href="<?= URL ?>/admin/financeiro-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                            <i class="fa-regular fa-money-bill-1 w-5 h-5 mr-3"></i>
                             <span class="sidebar-text">Financeiro</span>
-                        </div>
-                        <svg id="financeiro-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
+                        </a>
+                        <button type="button" onclick="toggleMenuGroup('financeiro')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                            <svg id="financeiro-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
                     <div id="financeiro-submenu" class="ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                         <?php
                         $finItemsFin = [
@@ -169,10 +169,6 @@
                 <i class="fa-solid fa-comments w-5 h-5 mr-3"></i>
                 <span class="sidebar-text">Assistente</span>
             </a>
-            <a href="<?= URL ?>/admin/doc-sistema" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'doc_sistema' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
-                <i class="fa-solid fa-book w-5 h-5 mr-3"></i>
-                <span class="sidebar-text">Doc do sistema</span>
-            </a>
             <?php endif; ?>
             
             <!-- Acadêmico (Menu Expansível) -->
@@ -198,26 +194,56 @@
                         <i class="fa-solid fa-graduation-cap w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Curso</span>
                     </a>
-                    <?php if ($canViewSidebar(['transferencia'])): ?>
-                    <a href="<?= URL ?>/admin/students/remanejamento" class="flex items-center px-4 py-2 <?= $curMovimentacao ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10M7 7l3-3M7 7l3 3M17 17H7m10 0l-3-3m3 3l-3 3"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Movimentação de alunos</span>
-                    </a>
-                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/serie" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'serie' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-layer-group w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Série</span>
                     </a>
+                    <a href="<?= URL ?>/admin/componentes-curriculares" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'componentes-curriculares' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-book w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Componentes Curriculares</span>
+                    </a>
+                    <?php if ($canViewSidebar(['matriz_curricular'])): ?>
+                    <a href="<?= URL ?>/admin/matrizes-curriculares" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'matriz-curricular' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-sitemap w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Matriz Curricular</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($canViewSidebar(['regras_academicas'])): ?>
+                    <a href="<?= URL ?>/admin/regras-academicas" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'regras-academicas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Regras Acadêmicas</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($canViewSidebar(['resultados_finais'])): ?>
+                    <a href="<?= URL ?>/admin/resultados-finais" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'resultados-finais' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Resultados Finais</span>
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/turmas" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'turmas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-school w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Turmas</span>
                     </a>
-                    <a href="<?= URL ?>/admin/subjects" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'subjects' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <i class="fa-solid fa-book w-4 h-4 mr-3 flex-shrink-0"></i>
-                        <span class="sidebar-text text-sm">Matérias</span>
+                    <?php if ($canViewSidebar(['salas'])): ?>
+                    <a href="<?= URL ?>/admin/salas" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'salas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Salas / Ambientes</span>
                     </a>
+                    <?php endif; ?>
+                    <a href="<?= URL ?>/admin/grade-horaria" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'grade_horaria' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Grade Horária</span>
+                    </a>
+                    <a href="<?= URL ?>/admin/calendario-escolar" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'school-calendar' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Calendário Escolar</span>
+                    </a>
+                    <?php if ($canViewSidebar(['transferencia'])): ?>
+                    <a href="<?= URL ?>/admin/students/remanejamento" class="flex items-center px-4 py-2 <?= $curMovimentacao ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-people-arrows w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Movimentação de alunos</span>
+                    </a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -226,7 +252,7 @@
             <div class="menu-group">
                 <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'pedagogico' ? 'bg-white/20' : '' ?>">
                     <a href="<?= URL ?>/admin/pedagogico" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                        <i class="fa-solid fa-chalkboard-user w-5 h-5 mr-3"></i>
+                        <i class="fa-regular fa-id-card w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Pedagógico</span>
                     </a>
                     <button type="button" onclick="toggleMenuGroup('pedagogico')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
@@ -263,13 +289,13 @@
 
             <!-- Avaliações (Menu Expansível) -->
             <div class="menu-group">
-                <div class="flex items-center">
-                    <a href="<?= URL ?>/admin/avaliacoes" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-l-xl transition-all duration-200">
-                        <i class="fa-solid fa-flask-vial w-5 h-5 mr-3"></i>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'avaliacoes' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/avaliacoes" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-clipboard w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Avaliações</span>
                     </a>
-                    <button type="button" onclick="toggleMenuGroup('avaliacoes')" class="px-3 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-r-xl transition-all duration-200">
-                        <svg id="avaliacoes-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="button" onclick="toggleMenuGroup('avaliacoes')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="avaliacoes-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
@@ -332,15 +358,17 @@
             
             <!-- Comunicação (Menu Expansível) -->
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('comunicacao')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <i class="fa-solid fa-comments w-5 h-5 mr-3"></i>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'comunicacao' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/comunicacao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-comments w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Comunicação</span>
-                    </div>
-                    <svg id="comunicacao-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('comunicacao')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="comunicacao-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="comunicacao-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <a href="<?= URL ?>/forum/moderation/reports" class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/forum/moderation') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-triangle-exclamation w-4 h-4 mr-3"></i>
@@ -358,10 +386,6 @@
                         <i class="fa-solid fa-envelope-open-text w-4 h-4 mr-3"></i>
                         <span class="sidebar-text text-sm">Comunicação Escolar</span>
                     </a>
-                    <a href="<?= URL ?>/admin/calendario-escolar" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'school-calendar' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <i class="fa-regular fa-calendar-days w-4 h-4 mr-3"></i>
-                        <span class="sidebar-text text-sm">Calendário Escolar</span>
-                    </a>
                     <a href="<?= URL ?>/admin/notifications" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'notifications' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-regular fa-bell w-4 h-4 mr-3"></i>
                         <span class="sidebar-text text-sm">Notificações</span>
@@ -375,15 +399,17 @@
             
             <!-- Conteúdo (Menu Expansível) -->
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('conteudo')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <i class="fa-solid fa-folder-open w-5 h-5 mr-3"></i>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'conteudo' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/conteudo" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-folder w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Conteúdo</span>
-                    </div>
-                    <svg id="conteudo-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('conteudo')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="conteudo-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="conteudo-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <!-- Meu Material substitui as antigas entradas separadas "IA da Apostila" e
                          "Apostilas" no menu. O módulo "Apostilas" simples continua existindo
@@ -416,15 +442,17 @@
             
             <!-- Gestão Escolar (Menu Expansível) -->
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('gestao-escolar')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <i class="fa-solid fa-chart-column w-5 h-5 mr-3"></i>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'gestao_escolar' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-chart-bar w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Gestão Escolar</span>
-                    </div>
-                    <svg id="gestao-escolar-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('gestao-escolar')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="gestao-escolar-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="gestao-escolar-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <?php if (LayoutHelper::isModuleEnabled('processo_matricula')): ?>
                     <a href="<?= URL ?>/admin/enrollment" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'enrollment' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -436,10 +464,30 @@
                         <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Faltas</span>
                     </a>
+                    <?php if ($canViewSidebar(['presenca']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca'))): ?>
+                    <a href="<?= URL ?>/admin/presenca" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'presenca' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-right-to-bracket w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Presença</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($canViewSidebar(['diario_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))): ?>
                     <a href="<?= URL ?>/admin/diario" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'diario_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 12h6m-6 4h6"></path></svg>
                         <span class="sidebar-text">Diário de Classe</span>
                     </a>
+                    <?php endif; ?>
+                    <?php if ($canViewSidebar(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
+                    <a href="<?= URL ?>/admin/conselhos" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'conselho_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Conselho de Classe</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($canViewSidebar(['censo_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('censo_escolar'))): ?>
+                    <a href="<?= URL ?>/admin/censo" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'censo_escolar' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-school-flag w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text text-sm">Censo Escolar</span>
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/conformidade" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'conformidade' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Conformidade</span>
@@ -459,17 +507,15 @@
                     <?php if ($canViewSidebar(['modelos_documentos'])): ?>
                     <a href="<?= URL ?>/admin/modelos-documentos" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'modelos_documentos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-file-contract w-4 h-4 mr-3 flex-shrink-0"></i>
-                        <span class="sidebar-text text-sm">Modelos de documentos</span>
+                        <span class="sidebar-text text-sm">Layout de documentos</span>
                     </a>
                     <?php endif; ?>
-                    <a href="<?= URL ?>/admin/grade-horaria" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'grade_horaria' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
-                        <span class="sidebar-text text-sm">Grade Horária</span>
-                    </a>
+                    <?php if ($canViewSidebar(['ocorrencias']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
                     <a href="<?= URL ?>/admin/ocorrencias" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'ocorrencias' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-regular fa-clock w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Ocorrências</span>
                     </a>
+                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/reunioes/geral" class="flex items-center px-4 py-2 <?= in_array($current_page ?? '', ['reunioes_geral','reunioes']) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-people-group w-4 h-4 mr-3 flex-shrink-0"></i>
                         <span class="sidebar-text text-sm">Reuniões</span>
@@ -533,15 +579,17 @@
             $cpFin = $current_page ?? '';
             ?>
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('financeiro-escolar')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <i class="fa-solid fa-dollar-sign w-5 h-5 mr-3"></i>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'financeiro' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/financeiro-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-money-bill-1 w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Financeiro</span>
-                    </div>
-                    <svg id="financeiro-escolar-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('financeiro-escolar')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="financeiro-escolar-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="financeiro-escolar-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <?php foreach ($finItems as $fi): ?>
                     <a href="<?= URL . $fi['url'] ?>" class="flex items-center px-4 py-2 text-sm <?= $cpFin === $fi['page'] ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -554,17 +602,17 @@
 
             <!-- Monitoramento (Menu Expansível) -->
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('monitoramento')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'monitoramento' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/monitoramento-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-circle-check w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Monitoramento</span>
-                    </div>
-                    <svg id="monitoramento-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('monitoramento')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="monitoramento-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="monitoramento-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <?php if ($podeVerAlertas): ?>
                         <a href="<?= URL ?>/admin/monitoramento/alertas" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'monitoramento_alertas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -591,25 +639,21 @@
             
             <!-- Relatórios (Menu Expansível) -->
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('relatorios')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'relatorios' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/relatorios" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-chart-bar w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Relatórios</span>
-                    </div>
-                    <svg id="relatorios-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('relatorios')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="relatorios-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="relatorios-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <a href="<?= URL ?>/admin/reports/boletim-coordenacao" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'reports_boletim_coordenacao' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-file-signature w-4 h-4 mr-3"></i>
                         <span class="sidebar-text text-sm">Notas da Coordenação</span>
-                    </a>
-                    <a href="<?= URL ?>/admin/reports/censo" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'reports_censo' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <i class="fa-solid fa-school-flag w-4 h-4 mr-3"></i>
-                        <span class="sidebar-text text-sm">Censo / INEP</span>
                     </a>
                     <a href="<?= URL ?>/admin/reports" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'reports' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -622,15 +666,17 @@
             
             <!-- Sistema (Menu Expansível) -->
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('sistema')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'sistema' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/sistema" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
                         <i class="fa-solid fa-gear w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Sistema</span>
-                    </div>
-                    <svg id="sistema-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('sistema')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="sistema-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="sistema-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <a href="<?= URL ?>/admin/redacao-configuravel" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'essays_config' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <i class="fa-solid fa-sliders w-4 h-4 mr-3"></i>
@@ -646,17 +692,17 @@
             <!-- Usuários (Menu Expansível) -->
             <?php if ($showUsuariosGroup): ?>
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('usuarios')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                        </svg>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'gestao_usuarios' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/gestao-usuarios" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-regular fa-user w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Usuários</span>
-                    </div>
-                    <svg id="usuarios-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('usuarios')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="usuarios-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="usuarios-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <a href="<?= URL ?>/admin/usuarios" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'usuarios' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -698,22 +744,22 @@
             $zConfigPages = [
                 'boletim_config', 'boletim_guia', 'dev', 'dev_tickets', 'maintenance_panel',
                 'settings', 'enrollment_config', 'assinatura_digital', 'ui_modelos',
+                'notas_semanais',
             ];
             $zConfigOpen = in_array(($current_page ?? ''), $zConfigPages, true);
             ?>
             <div class="menu-group">
-                <button type="button" onclick="toggleMenuGroup('z-configuracao')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
+                <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'z_configuracao' ? 'bg-white/20' : '' ?>">
+                    <a href="<?= URL ?>/admin/z-configuracao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+                        <i class="fa-solid fa-sliders w-5 h-5 mr-3"></i>
                         <span class="sidebar-text">Z-Configuração</span>
-                    </div>
-                    <svg id="z-configuracao-arrow" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
+                    </a>
+                    <button type="button" onclick="toggleMenuGroup('z-configuracao')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <svg id="z-configuracao-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div id="z-configuracao-submenu" class="<?= $zConfigOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                     <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
                     <a href="<?= URL ?>/admin/enrollment/config" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'enrollment_config' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -733,6 +779,12 @@
                         </svg>
                         <span class="sidebar-text text-sm">Notas e Boletim</span>
                     </a>
+                    <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('notas_semanais') && $canViewSidebar(['notas_semanais'])): ?>
+                    <a href="<?= URL ?>/admin/notas-semanais" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'notas_semanais' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid fa-table w-4 h-4 mr-3"></i>
+                        <span class="sidebar-text text-sm">Quadro semanal</span>
+                    </a>
+                    <?php endif; ?>
                     <a href="<?= URL ?>/admin/boletim-guia" class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'boletim_guia' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
@@ -809,100 +861,111 @@
     flex-shrink: 0;
 }
 
+/* Itens de 1º nível: mais compactos, ícones menores */
+.admin-sidebar-nav > a,
+.admin-sidebar-nav .menu-group > button {
+    min-height: 2.125rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+}
+
+.admin-sidebar-nav .menu-group > div.flex > a,
+.admin-sidebar-nav .menu-group > div.flex > button {
+    min-height: 2.125rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+}
+
+.admin-sidebar-nav > a > i[class*="fa-"],
+.admin-sidebar-nav .menu-group > button i[class*="fa-"],
+.admin-sidebar-nav .menu-group > div.flex > a > i[class*="fa-"] {
+    font-size: 0.95rem;
+    width: 1.125rem;
+    text-align: center;
+}
+
+.admin-sidebar-nav > a > svg,
+.admin-sidebar-nav .menu-group > button > div > svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.admin-sidebar-nav .menu-group > button svg[id$="-arrow"],
+.admin-sidebar-nav .menu-group > div.flex > button svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
 /* Sidebar Collapsed Styles (desktop only) */
 @media (min-width: 768px) {
     #sidebar.collapsed {
-        width: 4rem !important; /* 64px */
+        width: 3.5rem !important; /* 56px */
     }
 
-    #sidebar.collapsed .sidebar-text {
-        opacity: 0 !important;
-        transform: translateX(-10px);
-        pointer-events: none;
-        width: 0;
-        overflow: hidden;
-    }
-
+    /* Texto some de verdade: width:0 + word-break empilhava letras e alongava os itens */
+    #sidebar.collapsed .sidebar-text,
     #sidebar.collapsed .sidebar-text-container {
-        width: 0 !important;
-        overflow: hidden;
-        margin: 0;
-        padding: 0;
+        display: none !important;
     }
 
     /* Header adjustments */
     #sidebar.collapsed .sidebar-header {
         justify-content: center !important;
         flex-direction: column !important;
-        gap: 0.5rem;
+        gap: 0;
+        margin-bottom: 0.5rem !important;
+        position: relative;
     }
 
     #sidebar.collapsed .sidebar-logo-container {
         justify-content: center !important;
+        width: 100%;
     }
 
     #sidebar.collapsed .sidebar-icon {
         margin-right: 0 !important;
+        width: 2rem;
+        height: 2rem;
     }
 
     #sidebar.collapsed .sidebar-toggle {
-        position: absolute !important;
-        top: 0.5rem !important;
-        right: 0.5rem !important;
-    }
-
-    /* User info adjustments */
-    #sidebar.collapsed .sidebar-user-info {
-        padding: 0.5rem !important;
-    }
-
-    #sidebar.collapsed .sidebar-user-info .flex {
-        justify-content: center !important;
-    }
-
-    #sidebar.collapsed .sidebar-user-info .mr-3 {
-        margin-right: 0 !important;
+        display: none !important;
     }
 
     /* Navigation adjustments */
-    #sidebar.collapsed nav a {
+    #sidebar.collapsed nav a,
+    #sidebar.collapsed .menu-group > button {
         justify-content: center !important;
-        padding: 0.75rem !important;
-        min-height: 44px;
+        align-items: center !important;
+        padding: 0.4rem !important;
+        min-height: 2.25rem;
+        width: 100%;
     }
 
-    #sidebar.collapsed nav a .mr-3 {
+    #sidebar.collapsed nav a .mr-3,
+    #sidebar.collapsed nav a [class*="mr-3"],
+    #sidebar.collapsed .menu-group > button [class*="mr-3"] {
         margin-right: 0 !important;
     }
 
     /* Container adjustments */
     #sidebar.collapsed > div {
-        padding: 0.5rem !important;
+        padding: 0.4rem 0.3rem !important;
     }
 
     #sidebar.collapsed .mb-8 {
-        margin-bottom: 1rem !important;
+        margin-bottom: 0.5rem !important;
     }
 
     #sidebar.collapsed .mb-6 {
-        margin-bottom: 0.75rem !important;
+        margin-bottom: 0.5rem !important;
     }
 
     /* Keep compact mode clean: hide expandables details/arrows and nested menus */
-    #sidebar.collapsed .menu-group > button {
-        justify-content: center !important;
-        padding: 0.75rem !important;
-        min-height: 44px;
-    }
-
     #sidebar.collapsed .menu-group > button > div {
         justify-content: center !important;
         width: auto !important;
         flex: 0 0 auto !important;
-    }
-
-    #sidebar.collapsed .menu-group > button > div [class*="mr-3"] {
-        margin-right: 0 !important;
     }
 
     #sidebar.collapsed .menu-group > button > svg[id$='-arrow'],
@@ -922,7 +985,11 @@
     }
 
     #sidebar.collapsed nav {
-        gap: 0.375rem !important;
+        gap: 0.125rem !important;
+    }
+
+    #sidebar.collapsed nav > * + * {
+        margin-top: 0 !important;
     }
 
     #sidebar.collapsed .sidebar-user-info {
@@ -1080,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure compact mode always starts with closed groups (visual cleanliness)
     function closeAllMenuGroupsWhenCollapsed() {
         if (!sidebar.classList.contains('collapsed')) return;
-        const menuGroups = ['usuarios', 'academico', 'gestao-escolar', 'conteudo', 'avaliacoes', 'comunicacao', 'sistema', 'relatorios', 'monitoramento', 'z-configuracao', 'financeiro'];
+        const menuGroups = ['usuarios', 'academico', 'gestao-escolar', 'conteudo', 'avaliacoes', 'comunicacao', 'sistema', 'relatorios', 'monitoramento', 'z-configuracao', 'financeiro', 'financeiro-escolar'];
         menuGroups.forEach(group => {
             const submenu = document.getElementById(`${group}-submenu`);
             const arrow = document.getElementById(`${group}-arrow`);
@@ -1133,22 +1200,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const autoOpenMap = {
         'enrollment': 'gestao-escolar',
         'faltas': 'gestao-escolar',
+        'presenca': 'gestao-escolar',
         'diario_classe': 'gestao-escolar',
+        'conselho_classe': 'gestao-escolar',
+        'censo_escolar': 'gestao-escolar',
         'conformidade': 'gestao-escolar',
         'calendario_letivo': 'gestao-escolar',
         'grade_horaria': 'gestao-escolar',
         'ocorrencias': 'gestao-escolar',
         'reunioes': 'gestao-escolar',
         'saude_academica': 'gestao-escolar',
+        'regras-academicas': 'academico',
+        'resultados-finais': 'academico',
         'enrollment_config': 'z-configuracao',
         'assinatura_digital': 'z-configuracao',
         'boletim_config': 'z-configuracao',
         'boletim_guia': 'z-configuracao',
+        'notas_semanais': 'z-configuracao',
         'maintenance_panel': 'z-configuracao',
         'settings': 'z-configuracao',
         'ui_modelos': 'z-configuracao',
         'dev': 'z-configuracao',
         'dev_tickets': 'z-configuracao',
+        'monitoramento_alertas': 'monitoramento',
+        'monitoramento': 'monitoramento',
+        'tentativas_login': 'sistema',
+        'essays_config': 'sistema',
+        'reports': 'relatorios',
+        'reports_boletim_coordenacao': 'relatorios',
+        'reports_censo': 'relatorios',
+        'usuarios': 'usuarios',
+        'monitors': 'usuarios',
+        'teachers': 'usuarios',
+        'unidades': 'usuarios',
     };
     if (autoOpenMap[currentPage]) {
         localStorage.setItem(`menu-${autoOpenMap[currentPage]}-expanded`, 'true');

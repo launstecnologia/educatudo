@@ -343,6 +343,9 @@ class ExamBlockController extends BaseController
                 'ano_letivo' => isset($postData['ano_letivo']) ? (int)$postData['ano_letivo'] : null,
                 'bimestre' => isset($postData['bimestre']) ? (int)$postData['bimestre'] : null,
                 'tipo_avaliacao_id' => $tipoAvaliacaoId > 0 ? $tipoAvaliacaoId : null,
+                'semana' => (isset($postData['semana']) && (int) $postData['semana'] >= 1 && (int) $postData['semana'] <= 8)
+                    ? (int) $postData['semana']
+                    : null,
                 'data_prova' => $exigeDataHoraProva ? ($postData['data_prova'] ?? null) : null,
                 'hora_inicio' => $exigeDataHoraProva ? ($postData['hora_inicio'] ?? null) : null,
                 'hora_fim' => $exigeDataHoraProva ? ($postData['hora_fim'] ?? null) : null,
@@ -598,6 +601,9 @@ class ExamBlockController extends BaseController
                 'ano_letivo' => isset($postData['ano_letivo']) ? (int)$postData['ano_letivo'] : null,
                 'bimestre' => isset($postData['bimestre']) ? (int)$postData['bimestre'] : null,
                 'tipo_avaliacao_id' => $tipoAvaliacaoId > 0 ? $tipoAvaliacaoId : null,
+                'semana' => (isset($postData['semana']) && (int) $postData['semana'] >= 1 && (int) $postData['semana'] <= 8)
+                    ? (int) $postData['semana']
+                    : null,
                 'data_prova' => $exigeDataHoraProva ? ($postData['data_prova'] ?? null) : null,
                 'hora_inicio' => $exigeDataHoraProva ? ($postData['hora_inicio'] ?? null) : null,
                 'hora_fim' => $exigeDataHoraProva ? ($postData['hora_fim'] ?? null) : null,

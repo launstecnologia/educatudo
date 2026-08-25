@@ -29,17 +29,19 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
 </a>
 <?php endif; ?>
 
-<?php if ($secCan(['ano_letivo', 'curso', 'series', 'turmas', 'transferencia'])): ?>
+<?php if ($secCan(['ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'turmas', 'transferencia'])): ?>
 <div class="menu-group">
-    <button type="button" onclick="toggleMenuGroup('sec-academico')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-        <div class="flex items-center min-w-0">
+    <div class="flex items-center rounded-xl <?= $cur === 'academico' ? 'bg-white/20' : '' ?>">
+        <a href="<?= $urlBase ?>/admin/academico" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
             <i class="fa-solid fa-book-open w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Acadêmico</span>
-        </div>
-        <svg id="sec-academico-arrow" class="w-5 h-5 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </svg>
-    </button>
+        </a>
+        <button type="button" onclick="toggleMenuGroup('sec-academico')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <svg id="sec-academico-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
     <div id="sec-academico-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
         <?php if ($secCan(['ano_letivo'])): ?>
         <a href="<?= $urlBase ?>/admin/ano-letivo" class="flex items-center px-4 py-2 <?= $cur === 'ano_letivo' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -67,10 +69,34 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
             <span class="sidebar-text text-sm">Série</span>
         </a>
         <?php endif; ?>
+        <?php if ($secCan(['matriz_curricular'])): ?>
+        <a href="<?= $urlBase ?>/admin/matrizes-curriculares" class="flex items-center px-4 py-2 <?= $cur === 'matriz-curricular' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-sitemap w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Matriz Curricular</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['regras_academicas'])): ?>
+        <a href="<?= $urlBase ?>/admin/regras-academicas" class="flex items-center px-4 py-2 <?= $cur === 'regras-academicas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Regras Acadêmicas</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['resultados_finais'])): ?>
+        <a href="<?= $urlBase ?>/admin/resultados-finais" class="flex items-center px-4 py-2 <?= $cur === 'resultados-finais' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Resultados Finais</span>
+        </a>
+        <?php endif; ?>
         <?php if ($secCan(['turmas'])): ?>
         <a href="<?= $urlBase ?>/admin/turmas" class="flex items-center px-4 py-2 <?= $cur === 'turmas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
             <i class="fa-solid fa-school w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Turmas</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['salas'])): ?>
+        <a href="<?= $urlBase ?>/admin/salas" class="flex items-center px-4 py-2 <?= $cur === 'salas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Salas / Ambientes</span>
         </a>
         <?php endif; ?>
     </div>
@@ -79,15 +105,17 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
 
 <?php if ($secCan(['exercicios', 'provas_online', 'jornadas_aluno', 'redacao_professor'])): ?>
 <div class="menu-group">
-    <button type="button" onclick="toggleMenuGroup('sec-avaliacoes')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-        <div class="flex items-center min-w-0">
-            <i class="fa-solid fa-flask-vial w-5 h-5 mr-3 flex-shrink-0"></i>
+    <div class="flex items-center rounded-xl <?= $cur === 'avaliacoes' ? 'bg-white/20' : '' ?>">
+        <a href="<?= $urlBase ?>/admin/avaliacoes" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+            <i class="fa-regular fa-clipboard w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Avaliações</span>
-        </div>
-        <svg id="sec-avaliacoes-arrow" class="w-5 h-5 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </svg>
-    </button>
+        </a>
+        <button type="button" onclick="toggleMenuGroup('sec-avaliacoes')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <svg id="sec-avaliacoes-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
     <div id="sec-avaliacoes-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
         <?php if ($secCan(['provas_online'])): ?>
         <a href="<?= $urlBase ?>/admin/provas" class="flex items-center px-4 py-2 <?= ($cur === 'provas' || $cur === 'provas_blocos') ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -144,17 +172,19 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['grade_horaria', 'materias', 'ocorrencias', 'faltas', 'diario_classe', 'saude_academica', 'almoxarifado', 'patrimonio'])): ?>
+<?php if ($secCan(['grade_horaria', 'materias', 'ocorrencias', 'faltas', 'presenca', 'diario_classe', 'conselho_classe', 'censo_escolar', 'saude_academica', 'almoxarifado', 'patrimonio', 'modelos_documentos'])): ?>
 <div class="menu-group">
-    <button type="button" onclick="toggleMenuGroup('sec-gestao-escolar')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-        <div class="flex items-center min-w-0">
-            <i class="fa-solid fa-building-columns w-5 h-5 mr-3 flex-shrink-0"></i>
+    <div class="flex items-center rounded-xl <?= $cur === 'gestao_escolar' ? 'bg-white/20' : '' ?>">
+        <a href="<?= $urlBase ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+            <i class="fa-regular fa-chart-bar w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Gestão Escolar</span>
-        </div>
-        <svg id="sec-gestao-escolar-arrow" class="w-5 h-5 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </svg>
-    </button>
+        </a>
+        <button type="button" onclick="toggleMenuGroup('sec-gestao-escolar')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <svg id="sec-gestao-escolar-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
     <div id="sec-gestao-escolar-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
         <?php if ($secCan(['faltas'])): ?>
         <a href="<?= $urlBase ?>/admin/faltas" class="flex items-center px-4 py-2 <?= $cur === 'faltas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -162,10 +192,28 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
             <span class="sidebar-text text-sm">Faltas</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['diario_classe'])): ?>
+        <?php if ($secCan(['presenca']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca'))): ?>
+        <a href="<?= $urlBase ?>/admin/presenca" class="flex items-center px-4 py-2 <?= $cur === 'presenca' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-right-to-bracket w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Presença</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['diario_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))): ?>
         <a href="<?= $urlBase ?>/admin/diario" class="flex items-center px-4 py-2 <?= $cur === 'diario_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 12h6m-6 4h6"></path></svg>
             <span class="sidebar-text">Diário de Classe</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
+        <a href="<?= $urlBase ?>/admin/conselhos" class="flex items-center px-4 py-2 <?= $cur === 'conselho_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Conselho de Classe</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['censo_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('censo_escolar'))): ?>
+        <a href="<?= $urlBase ?>/admin/censo" class="flex items-center px-4 py-2 <?= $cur === 'censo_escolar' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-school-flag w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Censo Escolar</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['grade_horaria'])): ?>
@@ -175,9 +223,9 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
         </a>
         <?php endif; ?>
         <?php if ($secCan(['materias'])): ?>
-        <a href="<?= $urlBase ?>/admin/subjects" class="flex items-center px-4 py-2 <?= $cur === 'subjects' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+        <a href="<?= $urlBase ?>/admin/componentes-curriculares" class="flex items-center px-4 py-2 <?= $cur === 'componentes-curriculares' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
             <i class="fa-solid fa-book w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Matérias</span>
+            <span class="sidebar-text text-sm">Componentes Curriculares</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['unidades'])): ?>
@@ -186,7 +234,13 @@ $secCan = static function (array $keys) use ($adminPermissionsSidebar): bool {
             <span class="sidebar-text text-sm">Instituição</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['ocorrencias'])): ?>
+        <?php if ($secCan(['modelos_documentos'])): ?>
+        <a href="<?= $urlBase ?>/admin/modelos-documentos" class="flex items-center px-4 py-2 <?= $cur === 'modelos_documentos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+            <i class="fa-solid fa-file-contract w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Layout de documentos</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['ocorrencias']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
         <a href="<?= $urlBase ?>/admin/ocorrencias" class="flex items-center px-4 py-2 <?= $cur === 'ocorrencias' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
             <i class="fa-regular fa-clock w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Ocorrências</span>

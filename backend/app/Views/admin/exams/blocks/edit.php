@@ -69,12 +69,45 @@
                 <option value="">Selecione</option>
                 <?php $tipoAvaliacaoSel = (int)($bloco['tipo_avaliacao_id'] ?? 0); ?>
                 <?php foreach (($tiposAvaliacao ?? []) as $tipo): ?>
-                    <option value="<?= (int)$tipo['id'] ?>" <?= $tipoAvaliacaoSel === (int)$tipo['id'] ? 'selected' : '' ?>>
+                    <option value="<?= (int)$tipo['id'] ?>"
+                            data-chave-quadro="<?= htmlspecialchars((string) ($tipo['chave_quadro'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                            <?= $tipoAvaliacaoSel === (int)$tipo['id'] ? 'selected' : '' ?>>
                         <?= htmlspecialchars($tipo['nome']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
         </div>
+
+        <div class="mb-6" id="campo-semana-evento">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Semana no quadro
+            </label>
+            <?php $semanaSel = (int) ($bloco['semana'] ?? 0); ?>
+            <select id="semana" name="semana" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">Não se aplica</option>
+                <?php for ($s = 1; $s <= 8; $s++): ?>
+                    <option value="<?= $s ?>" <?= $semanaSel === $s ? 'selected' : '' ?>>S<?= $s ?></option>
+                <?php endfor; ?>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Para prova semanal, escolha S1 a S8. Bloco A costuma ser S1/S3/S5/S7; Bloco B, S2/S4/S6/S8.</p>
+        </div>
+        <script>
+        (function () {
+            var sel = document.getElementById('tipo_avaliacao_id');
+            var wrap = document.getElementById('campo-semana-evento');
+            var semana = document.getElementById('semana');
+            if (!sel || !wrap) return;
+            function syncSemana() {
+                var opt = sel.options[sel.selectedIndex];
+                var chave = (opt && opt.getAttribute('data-chave-quadro')) || '';
+                var hide = chave !== '' && chave !== 'semanal';
+                wrap.classList.toggle('hidden', hide);
+                if (hide && semana) semana.value = '';
+            }
+            sel.addEventListener('change', syncSemana);
+            syncSemana();
+        })();
+        </script>
 
         <!-- Descrição -->
         <div class="mb-6">
@@ -838,6 +871,7 @@ function atualizarBloco(event, blocoId) {
         ano_letivo: formData.get('ano_letivo') ? parseInt(formData.get('ano_letivo'), 10) : null,
         bimestre: bimestreVal,
         tipo_avaliacao_id: formData.get('tipo_avaliacao_id') ? parseInt(formData.get('tipo_avaliacao_id'), 10) : null,
+        semana: formData.get('semana') ? parseInt(formData.get('semana'), 10) : null,
         turmas: turmasIds,
         professores: professores,
         data_prova: formData.get('data_prova') || null,

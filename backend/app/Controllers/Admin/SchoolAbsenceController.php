@@ -712,7 +712,7 @@ class SchoolAbsenceController extends BaseController
         try {
             $user = $this->auth->getUser();
             $createdBy = isset($user['id']) ? (int) $user['id'] : null;
-            $eventoId = $this->absence->createEvento($nome, $bimestre, $anoLetivo, $turmasIds, $createdBy, $materiasIds);
+            $eventoId = $this->absence->createEvento($nome, $bimestre, $anoLetivo, $turmasIds, $createdBy, $materiasIds, (string) ($_POST['origem'] ?? 'manual'));
             $_SESSION['faltas_flash'] = 'Evento de faltas criado com sucesso.';
             $_SESSION['faltas_flash_type'] = 'success';
             $this->redirect('/admin/faltas/lancar?evento_id=' . $eventoId);
@@ -753,7 +753,7 @@ class SchoolAbsenceController extends BaseController
         }
 
         try {
-            $this->absence->updateEvento($eventoId, $nome, $bimestre, $anoLetivo, $turmasIds, $materiasIds);
+            $this->absence->updateEvento($eventoId, $nome, $bimestre, $anoLetivo, $turmasIds, $materiasIds, (string) ($_POST['origem'] ?? 'manual'));
             $_SESSION['faltas_flash'] = 'Evento atualizado com sucesso.';
             $_SESSION['faltas_flash_type'] = 'success';
             $this->redirect('/admin/faltas/lancar?evento_id=' . $eventoId);

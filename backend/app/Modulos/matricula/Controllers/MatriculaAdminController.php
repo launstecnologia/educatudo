@@ -10,11 +10,15 @@ require_once __DIR__ . '/../Models/MatriculaProcesso.php';
 require_once __DIR__ . '/../Services/MatriculaProcessoService.php';
 require_once __DIR__ . '/../Services/MatriculaScoreService.php';
 require_once __DIR__ . '/../Services/ZapSignService.php';
+require_once __DIR__ . '/../Services/MatriculaVagaService.php';
+require_once __DIR__ . '/../Services/MatriculaChecklistService.php';
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
 use App\Modulos\Matricula\Services\MatriculaProcessoService;
 use App\Modulos\Matricula\Services\MatriculaScoreService;
 use App\Modulos\Matricula\Services\ZapSignService;
+use App\Modulos\Matricula\Services\MatriculaVagaService;
+use App\Modulos\Matricula\Services\MatriculaChecklistService;
 
 if (!class_exists('MatriculaAdminController')) {
 class MatriculaAdminController extends BaseController
@@ -111,6 +115,7 @@ class MatriculaAdminController extends BaseController
             'tipos_contrato' => MatriculaProcessoService::TIPOS_CONTRATO,
             'regras_contrato' => $this->service->listarRegrasContrato(false),
             'schema_regras_ok' => $this->service->schemaContratoRegrasReady(),
+            'checklist_itens' => (new MatriculaChecklistService($this->db))->listarTodos(false),
             'csrf_token' => $this->generateCsrfToken(),
             'status_message' => $_GET['msg'] ?? '',
             'status_type' => $_GET['status_type'] ?? '',
@@ -174,6 +179,14 @@ class MatriculaAdminController extends BaseController
                 error_log('[MatriculaAdminController::configStore] regras: ' . $e->getMessage());
                 $this->redirectWithMsg('/admin/enrollment/config', 'Config salva, mas falha ao gravar regras de contrato: ' . mb_substr($e->getMessage(), 0, 120), 'error');
                 return;
+            }
+        }
+
+        $checklist = new MatriculaChecklistService($this->db);
+        if ($checklist->schemaReady()) {
+            $itensPost = $_POST['checklist'] ?? [];
+            if (is_array($itensPost)) {
+                $checklist->salvarLote($itensPost);
             }
         }
 
@@ -336,6 +349,16 @@ class MatriculaAdminController extends BaseController
         $focoContrato = ($_GET['foco'] ?? '') === 'contrato'
             || !in_array((string) ($enrollment['status'] ?? ''), ['enturmada', 'cancelada'], true);
 
+        $checklistSvc = new MatriculaChecklistService($this->db);
+        $tipoProc = (string) ($enrollment['tipo'] ?? 'nova');
+        $checklistItens = $checklistSvc->listarPorTipo($tipoProc);
+        $checklistFaltando = $checklistSvc->faltandoObrigatorios($tipoProc, $documentos);
+        $vagasResumo = null;
+        $turmaId = (int) ($enrollment['turma_id'] ?? 0);
+        if ($turmaId > 0) {
+            $vagasResumo = (new MatriculaVagaService($this->db))->resumo($turmaId);
+        }
+
         $this->viewWithLayout('admin', 'admin/matricula/show', [
             'title' => 'Matrícula #' . $id . ' — EducaTudo',
             'current_page' => 'enrollment',
@@ -349,6 +372,9 @@ class MatriculaAdminController extends BaseController
             'zapsign_ativo' => $zs->estaAtivo(),
             'contratos_processo' => $this->service->listarContratosDoProcesso($id),
             'faltando_enturmar' => $this->service->camposFaltandoParaEfetivar($enrollment),
+            'checklist_itens' => $checklistItens,
+            'checklist_faltando' => $checklistFaltando,
+            'vagas_resumo' => $vagasResumo,
             'csrf_token' => $this->generateCsrfToken(),
             'status_message' => $_GET['msg'] ?? '',
             'status_type' => $_GET['status_type'] ?? '',
@@ -698,13 +724,41 @@ class MatriculaAdminController extends BaseController
             $this->redirectWithMsg('/admin/enrollment/' . $id, 'Token inválido.', 'error');
             return;
         }
-        if (!$this->model->findById($id)) {
+        $proc = $this->model->findById($id);
+        if (!$proc) {
             $this->redirect('/admin/enrollment');
             return;
         }
         $user = $this->auth->getUser();
         $this->model->transition($id, 'cancelada', $user, 'cancelamento_secretaria');
+        $turmaId = (int) ($proc['turma_id'] ?? 0);
+        if ($turmaId > 0) {
+            (new MatriculaVagaService($this->db))->aoLiberarVaga($turmaId, $user);
+        }
         $this->redirectWithMsg('/admin/enrollment/' . $id, 'Processo cancelado.', 'success');
+    }
+
+    public function oferecerVaga(int $id): void
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->redirectWithMsg('/admin/enrollment/' . $id, 'Token inválido.', 'error');
+            return;
+        }
+        $proc = $this->model->findById($id);
+        if (!$proc) {
+            $this->redirect('/admin/enrollment');
+            return;
+        }
+        try {
+            $vaga = new MatriculaVagaService($this->db);
+            $vaga->oferecerVaga((int) ($proc['turma_id'] ?? 0), $id, $this->auth->getUser());
+            $this->redirectWithMsg('/admin/enrollment/' . $id, 'Vaga oferecida. O processo saiu da fila.', 'success');
+        } catch (\InvalidArgumentException $e) {
+            $this->redirectWithMsg('/admin/enrollment/' . $id, $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('MatriculaAdminController oferecerVaga: ' . $e->getMessage());
+            $this->redirectWithMsg('/admin/enrollment/' . $id, 'Não foi possível oferecer a vaga.', 'error');
+        }
     }
 
     public function rematriculaLoteForm(): void
@@ -834,6 +888,10 @@ class MatriculaAdminController extends BaseController
             return;
         }
         $tipoDoc = trim((string) ($_POST['tipo_documento'] ?? 'outro')) ?: 'outro';
+        $tiposOk = ['rg', 'cpf', 'comprovante_residencia', 'historico', 'certidao', 'declaracao_transferencia', 'contrato_assinado', 'outro'];
+        if (!in_array($tipoDoc, $tiposOk, true)) {
+            $tipoDoc = 'outro';
+        }
         if ($tipoDoc === 'contrato_assinado') {
             $this->uploadContratoAssinado($id);
             return;
@@ -1144,6 +1202,11 @@ class MatriculaAdminController extends BaseController
             'expira_em' => !empty($_POST['expira_em']) ? $_POST['expira_em'] . ' 23:59:59' : null,
             'criado_por' => $user['id'] ?? null,
             'documento_assinatura_codigo' => trim((string) ($_POST['documento_assinatura_codigo'] ?? '')) ?: null,
+            'aluno_nome_mae' => trim((string) ($_POST['aluno_nome_mae'] ?? '')) ?: null,
+            'aluno_nome_pai' => trim((string) ($_POST['aluno_nome_pai'] ?? '')) ?: null,
+            'aluno_codigo_inep' => trim((string) ($_POST['aluno_codigo_inep'] ?? '')) ?: null,
+            'aluno_cor_raca' => trim((string) ($_POST['aluno_cor_raca'] ?? '')) ?: null,
+            'aluno_nacionalidade' => trim((string) ($_POST['aluno_nacionalidade'] ?? '')) ?: null,
         ];
     }
 

@@ -843,6 +843,8 @@ class FinanceController extends AdminBaseController
             'anos_letivos'  => $anos,
             'ano_letivo_id' => $anoLetivoId,
             'csrf_token'    => $this->generateCsrfToken(),
+            'status_message' => $_GET['msg'] ?? '',
+            'status_type' => $_GET['status_type'] ?? '',
         ]);
     }
 

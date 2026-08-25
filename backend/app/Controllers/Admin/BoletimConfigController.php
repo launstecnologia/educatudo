@@ -7,12 +7,16 @@ require_once __DIR__ . '/../../Models/Education/JourneyBoletimLancamento.php';
 require_once __DIR__ . '/../../Models/Education/SchoolAbsence.php';
 require_once __DIR__ . '/../../Helpers/BoletimQuadroLayoutHelper.php';
 require_once __DIR__ . '/../../Services/BoletimAssistenteWizard.php';
+require_once __DIR__ . '/../../Services/ResultadoAcademicoService.php';
 
 class BoletimConfigController extends BaseController
 {
     private $auth;
     private $boletimConfig;
     private $materiasDisponiveisCache = null;
+    private ?ResultadoAcademicoService $resultadoAcademicoSvc = null;
+    /** @var array<int, ?int> */
+    private array $cursoPorTurmaCache = [];
 
     public function __construct()
     {
@@ -2798,7 +2802,18 @@ class BoletimConfigController extends BaseController
             $matrizPorCodigo,
             $materiaNomesPorId,
             $matrizPercentStatsPorCodigo,
-            $materiasAgrupadasHerdadas
+            $materiasAgrupadasHerdadas,
+            [
+                'aluno_id' => $alunoId,
+                'turma_id' => (int) ($aluno['turma_id'] ?? 0),
+                'serie_id' => (int) ($aluno['serie_id'] ?? 0),
+                'curso_id' => $this->cursoIdDaTurma((int) ($aluno['turma_id'] ?? 0)),
+                'ano_letivo' => isset($regra['ano_letivo']) ? (int) $regra['ano_letivo'] : null,
+                'periodo_numero' => isset($regra['bimestre']) ? (int) $regra['bimestre'] : null,
+                'periodo_tipo' => 'bimestre',
+                'data_inicio' => substr((string) ($range['inicio'] ?? ''), 0, 10),
+                'data_fim' => substr((string) ($range['fim'] ?? ''), 0, 10),
+            ]
         );
 
         return [
@@ -3136,7 +3151,8 @@ class BoletimConfigController extends BaseController
         array $matrizPorCodigo,
         array $materiaNomesPorId,
         array $matrizPercentStatsPorCodigo = [],
-        array $materiasAgrupadasHerdadas = []
+        array $materiasAgrupadasHerdadas = [],
+        array $contextoAluno = []
     ): ?array {
         // [DEBUG TEMPORARIO] Carimbo para confirmar que o codigo novo esta no ar.
         $this->debugBoletim('BOLETIM_DEBUG_V2 montarMatriz regra=' . (string) ($regra['codigo'] ?? '?') . ' exibir_em=' . (string) ($regra['exibir_em'] ?? '?'));
@@ -3423,7 +3439,15 @@ class BoletimConfigController extends BaseController
                 }
                 $resultadoTxt = '-';
                 if ($usarResultadoAprovacao && $mediaRef !== null) {
-                    $resultadoTxt = $mediaRef >= $notaMinimaAprovacao ? 'Aprovado' : 'Reprovado';
+                    $resultadoTxt = $this->rotuloResultadoAcademico(
+                        $regra,
+                        $contextoAluno,
+                        (int) $mid,
+                        $notasLinha,
+                        $colunas,
+                        $mediaRef,
+                        $notaMinimaAprovacao
+                    );
                 }
                 foreach ($resultadoCodigos as $codRes) {
                     $notasLinha[$codRes] = $resultadoTxt;
@@ -3899,28 +3923,12 @@ class BoletimConfigController extends BaseController
 
     private function normalizeRoundMode(string $value): string
     {
-        $v = strtolower(trim($value));
-        return in_array($v, ['none', 'half'], true) ? $v : 'none';
+        return $this->resultadoAcademico()->normalizeRoundMode($value);
     }
 
     private function applyRoundMode(?float $value, string $mode): ?float
     {
-        if (!is_numeric($value)) {
-            return null;
-        }
-        $v = (float) $value;
-        if ($mode !== 'half') {
-            return round($v, 2);
-        }
-        $base = floor($v);
-        $dec = $v - $base;
-        if ($dec < 0.25) {
-            return round($base, 2);
-        }
-        if ($dec < 0.75) {
-            return round($base + 0.5, 2);
-        }
-        return round($base + 1.0, 2);
+        return $this->resultadoAcademico()->applyRoundMode($value, $mode);
     }
 
     /**
@@ -3962,169 +3970,93 @@ class BoletimConfigController extends BaseController
 
     private function avaliarFormula(string $formula, array $valoresPorCodigo): array
     {
-        $valoresPorCodigoInsensitive = [];
-        $valoresPorCodigoNormalized = [];
-        $normKey = static function (string $s): string {
-            $s = strtolower(trim($s));
-            $s = str_replace('-', '_', $s);
-            $s = preg_replace('/_+/', '_', $s) ?? $s;
-            return trim($s, '_');
-        };
-        foreach ($valoresPorCodigo as $k => $v) {
-            $ks = (string) $k;
-            $valoresPorCodigoInsensitive[strtolower($ks)] = $v;
-            $valoresPorCodigoNormalized[$normKey($ks)] = $v;
+        return $this->resultadoAcademico()->avaliarFormula($formula, $valoresPorCodigo);
+    }
+
+    private function resultadoAcademico(): ResultadoAcademicoService
+    {
+        if ($this->resultadoAcademicoSvc === null) {
+            $this->resultadoAcademicoSvc = new ResultadoAcademicoService();
         }
-        // Preserve vírgula de argumentos em max/min e converte apenas vírgula decimal (ex.: 8,5 -> 8.5).
-        $expr = preg_replace('/(?<=\d),(?=\d)/', '.', $formula) ?? $formula;
+        return $this->resultadoAcademicoSvc;
+    }
 
-        // Suporta códigos de bloco que não são identificadores "puros" na expressão
-        // (ex.: com hífen ou iniciando com número, como "3serie_...").
-        // Sem esse passo, o parser lê hífen como subtração e ignora nomes iniciados por dígito.
-        $codeKeys = array_keys($valoresPorCodigo);
-        usort($codeKeys, static function ($a, $b) {
-            return strlen((string) $b) <=> strlen((string) $a);
-        });
-        $aliasMap = [];
-        $aliasValues = [];
-        $aliasSeq = 0;
-        foreach ($codeKeys as $codeKey) {
-            $code = (string) $codeKey;
-            if ($code === '') {
-                continue;
-            }
-            $isIdentificadorValido = (bool) preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/u', $code);
-            if ($isIdentificadorValido) {
-                continue;
-            }
-            $alias = '__codealias_' . $aliasSeq++;
-            $pattern = '/(?<![A-Za-z0-9_])' . preg_quote($code, '/') . '(?![A-Za-z0-9_])/u';
-            $exprNovo = preg_replace($pattern, $alias, $expr);
-            if ($exprNovo !== null && $exprNovo !== $expr) {
-                $expr = $exprNovo;
-                $aliasMap[$alias] = $code;
-                if (array_key_exists($code, $valoresPorCodigo)) {
-                    $aliasValues[$alias] = $valoresPorCodigo[$code];
-                }
-            }
+    private function cursoIdDaTurma(int $turmaId): ?int
+    {
+        if ($turmaId <= 0) {
+            return null;
         }
-        if (!empty($aliasValues)) {
-            foreach ($aliasValues as $ak => $av) {
-                $valoresPorCodigo[$ak] = $av;
-                $valoresPorCodigoInsensitive[strtolower((string) $ak)] = $av;
-            }
+        if (array_key_exists($turmaId, $this->cursoPorTurmaCache)) {
+            return $this->cursoPorTurmaCache[$turmaId];
         }
-
-        $expr = preg_replace_callback('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', function ($m) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey) {
-            $token = $m[0];
-            $tl = strtolower($token);
-            if ($tl === 'max' || $tl === 'min') {
-                return $token;
-            }
-            if (array_key_exists($token, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$token])) {
-                return (string) ((float) $valoresPorCodigo[$token]);
-            }
-            if (array_key_exists($tl, $valoresPorCodigoInsensitive) && is_numeric($valoresPorCodigoInsensitive[$tl])) {
-                return (string) ((float) $valoresPorCodigoInsensitive[$tl]);
-            }
-            $tn = $normKey($token);
-            if ($tn !== '' && array_key_exists($tn, $valoresPorCodigoNormalized) && is_numeric($valoresPorCodigoNormalized[$tn])) {
-                return (string) ((float) $valoresPorCodigoNormalized[$tn]);
-            }
-
-            return '0';
-        }, $expr);
-
         try {
-            $expr = preg_replace('/\s+/', '', $expr);
-            $resultado = $this->avaliarExpressaoComMaxMin($expr);
-            return ['ok' => true, 'valor' => round((float) $resultado, 2), 'expressao' => $expr];
+            $row = Database::getInstance()->fetch(
+                "SELECT curso_novo_id FROM turmas WHERE id = :id LIMIT 1",
+                ['id' => $turmaId]
+            );
+            $id = (int) ($row['curso_novo_id'] ?? 0);
+            $this->cursoPorTurmaCache[$turmaId] = $id > 0 ? $id : null;
         } catch (Throwable $e) {
-            return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $e->getMessage()];
+            $this->cursoPorTurmaCache[$turmaId] = null;
         }
+        return $this->cursoPorTurmaCache[$turmaId];
     }
 
     /**
-     * Avalia expressão após substituição dos códigos dos componentes; permite max(a,b) e min(a,b) aninhados.
+     * Situação acadêmica da linha do boletim — motor único, com fallback na mínima do evento.
+     *
+     * @param array<string,mixed> $regra
+     * @param array<string,mixed> $contextoAluno
+     * @param array<string,mixed> $notasLinha
+     * @param list<array<string,mixed>> $colunas
      */
-    private function avaliarExpressaoComMaxMin(string $expr): float
-    {
-        $expr = trim($expr);
-        $guard = 0;
-        while (preg_match('/\b(max|min)\s*\(/i', $expr)) {
-            if (++$guard > 200) {
-                throw new RuntimeException('Limite de aninhamento em max/min.');
+    private function rotuloResultadoAcademico(
+        array $regra,
+        array $contextoAluno,
+        int $materiaId,
+        array $notasLinha,
+        array $colunas,
+        float $mediaRef,
+        float $notaMinimaFallback
+    ): string {
+        $motor = $this->resultadoAcademico();
+        $contexto = $contextoAluno;
+        $contexto['materia_id'] = $materiaId > 0 ? $materiaId : null;
+        $regraAcad = $motor->resolverRegra($contexto);
+        if ($regraAcad === null) {
+            $regraAcad = $motor->regraFallbackDoBoletim($regra + ['nota_minima_aprovacao' => $notaMinimaFallback]);
+        }
+
+        $rec = null;
+        $mediaAntes = null;
+        foreach ($colunas as $col) {
+            $cod = (string) ($col['codigo'] ?? '');
+            if ($cod === '' || !isset($notasLinha[$cod]) || !is_numeric($notasLinha[$cod])) {
+                continue;
             }
-            $expr = $this->substituirPrimeiraFuncaoMaxMin($expr);
-        }
-        if ($expr === '' || !preg_match('/^[0-9\.\+\-\*\/\(\)]+$/', $expr)) {
-            throw new RuntimeException('Fórmula contém caracteres inválidos após max/min.');
-        }
-
-        return $this->safeEval($expr);
-    }
-
-    private function substituirPrimeiraFuncaoMaxMin(string $expr): string
-    {
-        if (!preg_match('/\b(max|min)\s*\(/i', $expr, $m, PREG_OFFSET_CAPTURE)) {
-            return $expr;
-        }
-        $fn = strtolower($m[1][0]);
-        $startFn = (int) $m[0][1];
-        $openParen = $startFn + strlen($m[0][0]) - 1;
-        [$commaPos, $closePos] = $this->localizarArgumentosMaxMin($expr, $openParen);
-        if ($commaPos === null) {
-            throw new RuntimeException('Função max/min precisa de dois argumentos separados por vírgula.');
-        }
-        $left = substr($expr, $openParen + 1, $commaPos - $openParen - 1);
-        $right = substr($expr, $commaPos + 1, $closePos - $commaPos - 1);
-        $lv = $this->avaliarExpressaoComMaxMin($left);
-        $rv = $this->avaliarExpressaoComMaxMin($right);
-        $val = $fn === 'max' ? max($lv, $rv) : min($lv, $rv);
-
-        return substr($expr, 0, $startFn) . (string) $val . substr($expr, $closePos + 1);
-    }
-
-    /**
-     * @return array{0: ?int, 1: int} [commaPos or null, closeParenPos]
-     */
-    private function localizarArgumentosMaxMin(string $expr, int $openParenIdx): array
-    {
-        $n = strlen($expr);
-        $i = $openParenIdx + 1;
-        $depth = 1;
-        $commaPos = null;
-        for (; $i < $n; $i++) {
-            $c = $expr[$i];
-            if ($c === '(') {
-                $depth++;
-            } elseif ($c === ')') {
-                $depth--;
-                if ($depth === 0) {
-                    return [$commaPos, $i];
-                }
-            } elseif ($c === ',' && $depth === 1) {
-                $commaPos = $i;
+            $lt = strtolower((string) ($col['layout_type'] ?? ''));
+            $lg = strtolower((string) ($col['layout_group'] ?? ''));
+            if ($lt === 'rec' || $cod === 'rec' || $cod === 'rec_final' || str_contains($cod, 'recup')) {
+                $rec = (float) $notasLinha[$cod];
+            }
+            if ($lt === 'media' && ($lg === 'quadro_comum' || $cod === 'media_bim' || str_contains($cod, 'media_bim'))) {
+                $mediaAntes = (float) $notasLinha[$cod];
             }
         }
 
-        return [null, $n - 1];
-    }
+        $avaliado = $motor->avaliar([
+            'media' => $mediaRef,
+            'media_antes_rec' => $mediaAntes,
+            'recuperacao' => $rec,
+            'tem_nota' => true,
+            'aluno_id' => (int) ($contexto['aluno_id'] ?? 0),
+            'turma_id' => (int) ($contexto['turma_id'] ?? 0),
+            'materia_id' => $materiaId > 0 ? $materiaId : null,
+            'data_inicio' => $contexto['data_inicio'] ?? null,
+            'data_fim' => $contexto['data_fim'] ?? null,
+        ], $regraAcad);
 
-    private function safeEval(string $expr): float
-    {
-        set_error_handler(function ($severity, $message) {
-            throw new RuntimeException($message, $severity);
-        });
-
-        try {
-            $result = 0.0;
-            // Expressão sanitizada em avaliarFormula (somente números e operadores).
-            eval('$result = ' . $expr . ';');
-            return (float) $result;
-        } finally {
-            restore_error_handler();
-        }
+        return (string) ($avaliado['rotulo'] ?? '-');
     }
 
     private function extrairNotaDaProva(array $row, array $componente): ?float

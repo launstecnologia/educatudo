@@ -242,9 +242,10 @@
         <?php include __DIR__ . '/components/professor_sidebar.php'; ?>
 
         <!-- Main Content -->
-        <main class="flex-1 w-full md:w-auto">
+        <main class="flex-1 w-full md:w-auto flex flex-col">
+            <div class="plataforma-pagina plataforma-pagina-tela">
             <!-- Header com Notificações -->
-            <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-30">
+            <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-30 shrink-0">
                 <div class="flex justify-between items-center gap-2">
                     <!-- Botão menu mobile -->
                     <button id="mobileMenuToggle" class="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
@@ -355,23 +356,10 @@
                 </div>
             </header>
             
-            <div class="p-4 md:p-6">
+            <div class="p-4 md:p-6 plataforma-conteudo">
                 <?= $content ?>
-                
-                <!-- Footer -->
-                <footer class="mt-8 pt-4 border-t border-gray-200">
-                    <div class="text-center">
-                        <p class="text-xs text-gray-600 mb-1">Todos os direitos reservados Educatudo</p>
-                        <p class="text-xs text-gray-600">
-                            Feito com carinho por <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 underline">Launs</a>
-                        </p>
-                        <p class="text-xs text-gray-600 mt-2">
-                            <a href="<?= URL ?>/termos-de-uso" class="hover:underline">Termos de Uso</a> •
-                            <a href="<?= URL ?>/politica-privacidade" class="hover:underline">Política de Privacidade</a> •
-                            <a href="<?= URL ?>/politica-retencao" class="hover:underline">Política de Retenção de Dados</a>
-                        </p>
-                    </div>
-                </footer>
+            </div>
+            <?php include __DIR__ . '/components/plataforma_footer.php'; ?>
             </div>
         </main>
     </div>

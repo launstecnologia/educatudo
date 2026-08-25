@@ -283,6 +283,18 @@ class FacialRecognitionController extends AdminBaseController
             } catch (Throwable $notifyError) {
                 Logger::error('Push de presença falhou', ['event_id' => $eventId, 'exception' => $notifyError], 'facial');
             }
+            try {
+                require_once __DIR__ . '/../../Modulos/presenca/Services/PresencaEventoService.php';
+                PresencaEventoService::fromFacial(
+                    (int) $profile['student_id'],
+                    $kind,
+                    $eventAt,
+                    $providerPresenceId,
+                    isset($user['id']) ? (int) $user['id'] : null
+                );
+            } catch (Throwable $presencaError) {
+                Logger::error('Presença (diário) a partir do facial falhou', ['event_id' => $eventId, 'exception' => $presencaError], 'facial');
+            }
             $this->json([
                 'success' => true, 'match' => true, 'registered' => true,
                 'event_id' => $eventId, 'student_name' => $profile['nome'],

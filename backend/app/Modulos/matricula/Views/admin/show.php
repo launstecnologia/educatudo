@@ -29,6 +29,8 @@ $tiposDocumentoLabel = [
     'cpf' => 'CPF',
     'comprovante_residencia' => 'Comprovante de residência',
     'historico' => 'Histórico escolar',
+    'certidao' => 'Certidão de nascimento',
+    'declaracao_transferencia' => 'Declaração de transferência',
     'contrato_assinado' => 'Contrato assinado',
     'outro' => 'Outro',
 ];
@@ -113,6 +115,25 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
         <i class="fa-solid fa-pen mr-1.5"></i> Preencher no wizard
     </a>
     <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if (($enrollment['status'] ?? '') === 'lista_espera'): ?>
+<div class="mb-4 p-4 rounded-xl text-sm bg-purple-50 text-purple-900 border border-purple-200 flex flex-wrap items-center justify-between gap-3">
+    <p>
+        <i class="fa-solid fa-clock mr-1"></i>
+        Na lista de espera<?= !empty($enrollment['fila_posicao']) ? ' — posição ' . (int) $enrollment['fila_posicao'] : '' ?>.
+        <?php
+        $vr = $vagas_resumo ?? null;
+        if (is_array($vr) && empty($vr['ilimitado'])):
+        ?>
+        Turma: <?= (int) ($vr['ocupadas'] ?? 0) + (int) ($vr['reservadas'] ?? 0) ?>/<?= (int) ($vr['vagas'] ?? 0) ?>.
+        <?php endif; ?>
+    </p>
+    <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int) $enrollment['id'] ?>/oferecer-vaga">
+        <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
+        <button type="submit" class="btn-primary text-sm">Oferecer vaga</button>
+    </form>
 </div>
 <?php endif; ?>
 
@@ -362,6 +383,13 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
                 <div><dt class="text-gray-400 text-xs">Telefone</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_telefone'] ?? '—') ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">Turma</dt><dd class="text-gray-700"><?= $esc($enrollment['turma_nome'] ?? '—') ?> <?= $enrollment['turma_serie'] ? '— ' . $esc($enrollment['turma_serie']) : '' ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">Ano Letivo</dt><dd class="text-gray-700"><?= $esc($enrollment['ano_letivo_nome'] ?? '—') ?></dd></div>
+                <div><dt class="text-gray-400 text-xs">Nome da mãe</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_nome_mae'] ?? '—') ?></dd></div>
+                <div><dt class="text-gray-400 text-xs">Nome do pai</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_nome_pai'] ?? '—') ?></dd></div>
+                <div><dt class="text-gray-400 text-xs">Cor / raça</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_cor_raca'] ?? '—') ?></dd></div>
+                <div><dt class="text-gray-400 text-xs">Nacionalidade</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_nacionalidade'] ?? '—') ?></dd></div>
+                <?php if (!empty($enrollment['aluno_codigo_inep'])): ?>
+                <div><dt class="text-gray-400 text-xs">Código INEP</dt><dd class="text-gray-700"><?= $esc($enrollment['aluno_codigo_inep']) ?></dd></div>
+                <?php endif; ?>
             </dl>
         </div>
 
@@ -439,6 +467,27 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
         <!-- Documentos -->
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
             <h3 class="font-semibold text-gray-800 mb-4">Documentos</h3>
+            <?php
+            $checklist_itens = $checklist_itens ?? [];
+            $checklist_faltando = $checklist_faltando ?? [];
+            $anexadosTipo = [];
+            foreach ($documentos as $doc) {
+                $anexadosTipo[strtolower((string) ($doc['tipo'] ?? ''))] = true;
+            }
+            if ($checklist_itens !== []):
+            ?>
+            <ul class="mb-4 space-y-1.5 text-sm">
+                <?php foreach ($checklist_itens as $item):
+                    $okDoc = !empty($anexadosTipo[strtolower((string) ($item['codigo'] ?? ''))]);
+                ?>
+                <li class="flex items-center gap-2 <?= $okDoc ? 'text-green-700' : (!empty($item['obrigatorio']) ? 'text-red-700' : 'text-gray-500') ?>">
+                    <i class="fa-solid <?= $okDoc ? 'fa-circle-check' : 'fa-circle' ?> text-xs"></i>
+                    <?= $esc($item['rotulo'] ?? $item['codigo']) ?>
+                    <?php if (!empty($item['obrigatorio']) && !$okDoc): ?><span class="text-xs">(obrigatório)</span><?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
 
             <?php if (!empty($documentos)): ?>
             <ul class="space-y-2 mb-4">
@@ -479,8 +528,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
                     <select name="tipo_documento" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white">
                         <option value="rg">RG</option>
                         <option value="cpf">CPF</option>
+                        <option value="certidao">Certidão de nascimento</option>
                         <option value="comprovante_residencia">Comprovante de residência</option>
                         <option value="historico">Histórico escolar</option>
+                        <option value="declaracao_transferencia">Declaração de transferência</option>
                         <option value="outro" selected>Outro</option>
                     </select>
                 </div>

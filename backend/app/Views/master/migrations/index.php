@@ -73,7 +73,7 @@ $masterPendentes = $master_pendentes ?? [];
     <div class="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
         <div>
             <h3 class="text-lg font-semibold text-slate-900">Migrations do banco Master</h3>
-            <p class="text-sm text-slate-600 mt-0.5">Arquivos <code class="bg-slate-100 px-1 rounded text-xs">*_master.sql</code> sao executados no proprio banco master (igual aos tenants, mas no banco master).</p>
+            <p class="text-sm text-slate-600 mt-0.5">Somente arquivos <code class="bg-slate-100 px-1 rounded text-xs">*_master.sql</code>. As migrations das escolas (sem esse sufixo) ficam na seção seguinte e na tabela por escola.</p>
         </div>
         <?php if (!empty($masterPendentes)): ?>
         <div class="flex items-center gap-2 flex-wrap">
@@ -125,12 +125,41 @@ $masterPendentes = $master_pendentes ?? [];
                         <!-- preenchido via JS -->
                     </ul>
                 </div>
-                <div class="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                <div class="px-6 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-between">
+                    <div class="flex gap-2">
+                        <button type="button" id="modal-escolher-master-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
+                        <button type="button" id="modal-escolher-master-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
+                    </div>
+                    <div class="flex gap-2">
                     <button type="button" id="modal-escolher-master-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">Executar selecionadas</button>
+                    </div>
                 </div>
             </form>
         </div>
+    </div>
+</div>
+
+<!-- Migrations das escolas (tenant) -->
+<div class="mb-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200">
+        <h3 class="text-lg font-semibold text-slate-900">Migrations das escolas</h3>
+        <p class="text-sm text-slate-600 mt-0.5">
+            <?= (int) $totalMigrations ?> arquivo(s) em <code class="bg-slate-100 px-1 rounded text-xs">database/migrations</code>
+            (sem <code class="bg-slate-100 px-1 rounded text-xs">_master</code> e sem rollback).
+            Para rodar, use <strong>Escolher</strong> ou <strong>Executar todas</strong> na tabela de escolas abaixo.
+        </p>
+    </div>
+    <div class="px-6 py-4">
+        <?php if (empty($migrationFiles)): ?>
+        <p class="text-sm text-slate-500">Nenhum arquivo .sql de tenant na pasta database/migrations.</p>
+        <?php else: ?>
+        <ul class="max-h-56 overflow-y-auto space-y-1 font-mono text-xs text-slate-700">
+            <?php foreach (array_reverse($migrationFiles) as $f): ?>
+            <li><?= htmlspecialchars($f) ?></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -215,9 +244,15 @@ $masterPendentes = $master_pendentes ?? [];
                         <!-- preenchido via JS -->
                     </ul>
                 </div>
-                <div class="px-6 py-4 border-t border-slate-200 flex gap-2 justify-end">
+                <div class="px-6 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-between">
+                    <div class="flex gap-2">
+                        <button type="button" id="modal-escolher-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
+                        <button type="button" id="modal-escolher-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
+                    </div>
+                    <div class="flex gap-2">
                     <button type="button" id="modal-escolher-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Executar selecionadas</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -337,6 +372,13 @@ $masterPendentes = $master_pendentes ?? [];
         });
     }
 
+    function marcarCheckboxesMigration(container, checked) {
+        if (!container) return;
+        container.querySelectorAll('input[name="migrations[]"]').forEach(function(cb) {
+            cb.checked = !!checked;
+        });
+    }
+
     var btnEscolherMaster = document.getElementById('btn-escolher-master');
     var modalEscolherMaster = document.getElementById('modal-escolher-master');
     var modalEscolherMasterBackdrop = document.getElementById('modal-escolher-master-backdrop');
@@ -376,6 +418,18 @@ $masterPendentes = $master_pendentes ?? [];
     }
     if (modalEscolherMasterBackdrop) modalEscolherMasterBackdrop.addEventListener('click', function() { modalEscolherMaster.classList.add('hidden'); });
     if (modalEscolherMasterFechar) modalEscolherMasterFechar.addEventListener('click', function() { modalEscolherMaster.classList.add('hidden'); });
+    var btnMasterMarcarTodos = document.getElementById('modal-escolher-master-marcar-todos');
+    var btnMasterDesmarcarTodos = document.getElementById('modal-escolher-master-desmarcar-todos');
+    if (btnMasterMarcarTodos) {
+        btnMasterMarcarTodos.addEventListener('click', function() {
+            marcarCheckboxesMigration(formEscolherMaster, true);
+        });
+    }
+    if (btnMasterDesmarcarTodos) {
+        btnMasterDesmarcarTodos.addEventListener('click', function() {
+            marcarCheckboxesMigration(formEscolherMaster, false);
+        });
+    }
     if (formEscolherMaster) {
         formEscolherMaster.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -530,6 +584,18 @@ $masterPendentes = $master_pendentes ?? [];
     if (modalBackdrop) modalBackdrop.addEventListener('click', closeModalEscolher);
     if (document.getElementById('modal-escolher-fechar')) {
         document.getElementById('modal-escolher-fechar').addEventListener('click', closeModalEscolher);
+    }
+    var btnMarcarTodos = document.getElementById('modal-escolher-marcar-todos');
+    var btnDesmarcarTodos = document.getElementById('modal-escolher-desmarcar-todos');
+    if (btnMarcarTodos) {
+        btnMarcarTodos.addEventListener('click', function() {
+            marcarCheckboxesMigration(formEscolher, true);
+        });
+    }
+    if (btnDesmarcarTodos) {
+        btnDesmarcarTodos.addEventListener('click', function() {
+            marcarCheckboxesMigration(formEscolher, false);
+        });
     }
 
     document.querySelectorAll('.btn-escolher-migrations').forEach(function(btn) {

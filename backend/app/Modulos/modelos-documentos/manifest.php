@@ -5,7 +5,7 @@
  */
 return [
     'chave' => 'modelos-documentos',
-    'label' => 'Modelos de Documentos',
+    'label' => 'Layout de documentos',
     'grupo' => 'secretaria',
     'feature_keys' => [],
     'feature_gate' => false,
@@ -15,7 +15,7 @@ return [
     'menu' => [
         'admin' => [
             [
-                'label' => 'Modelos de documentos',
+                'label' => 'Layout de documentos',
                 'path' => '/admin/modelos-documentos',
                 'feature_key' => null,
             ],

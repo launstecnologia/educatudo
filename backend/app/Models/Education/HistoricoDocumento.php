@@ -69,14 +69,36 @@ class HistoricoDocumento
         if ($id <= 0 || !$this->tableExists()) {
             return null;
         }
+        $codigoExpr = $this->alunoTemCodigoAluno() ? 'a.codigo_aluno' : 'a.ra';
         $row = $this->db->fetch(
-            "SELECT h.*, a.nome AS aluno_nome, a.codigo_aluno AS aluno_codigo
+            "SELECT h.*, a.nome AS aluno_nome, {$codigoExpr} AS aluno_codigo
              FROM historico_documentos h
              INNER JOIN alunos a ON a.id = h.aluno_id
              WHERE h.id = :id LIMIT 1",
             ['id' => $id]
         );
         return $row ?: null;
+    }
+
+    private function alunoTemCodigoAluno(): bool
+    {
+        static $ok = null;
+        if ($ok !== null) {
+            return $ok;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.columns
+                 WHERE table_schema = DATABASE()
+                   AND table_name = 'alunos'
+                   AND column_name = 'codigo_aluno'
+                 LIMIT 1"
+            );
+            $ok = !empty($row['ok']);
+        } catch (\Throwable $e) {
+            $ok = false;
+        }
+        return $ok;
     }
 
     public function findByHash(string $hash): ?array
