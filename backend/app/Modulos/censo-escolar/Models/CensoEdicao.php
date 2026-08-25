@@ -199,8 +199,11 @@ class CensoEdicao
         if (!$this->tabelaExiste('unidades')) {
             return [];
         }
+        $dep = $this->colunaExiste('unidades', 'dependencia_administrativa')
+            ? 'dependencia_administrativa'
+            : 'NULL AS dependencia_administrativa';
         return $this->db->fetchAll(
-            "SELECT id, nome, inep, dependencia_administrativa, cnpj, endereco, numero, complemento,
+            "SELECT id, nome, inep, {$dep}, cnpj, endereco, numero, complemento,
                     bairro, cidade, uf, cep, telefone, email, diretor_nome, secretario_nome, tipo
              FROM unidades WHERE ativo = 1 ORDER BY tipo = 'matriz' DESC, nome ASC"
         ) ?: [];

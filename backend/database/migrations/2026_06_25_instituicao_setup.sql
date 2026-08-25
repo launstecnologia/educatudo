@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `unidades` (
   `razao_social`    VARCHAR(255) NULL,
   `cnpj`            VARCHAR(18)  NULL,
   `inep`            VARCHAR(20)  NULL,
+  `dependencia_administrativa` VARCHAR(20) NULL,
   `endereco`        VARCHAR(255) NULL,
   `numero`          VARCHAR(20)  NULL,
   `complemento`     VARCHAR(120) NULL,
@@ -38,8 +39,26 @@ CREATE TABLE IF NOT EXISTS `unidades` (
   KEY `idx_unidades_ativo` (`ativo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Coluna alunos.unidade_id (só adiciona se não existir)
 SET @db := DATABASE();
+
+-- Coluna Censo: dependencia_administrativa (CREATE TABLE IF NOT EXISTS não altera tabela já existente)
+SET @has_dep := (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = @db
+    AND TABLE_NAME = 'unidades'
+    AND COLUMN_NAME = 'dependencia_administrativa'
+);
+SET @sql := IF(
+  @has_dep > 0,
+  'SELECT 1',
+  'ALTER TABLE unidades ADD COLUMN dependencia_administrativa VARCHAR(20) NULL AFTER inep'
+);
+PREPARE stmt_dep FROM @sql;
+EXECUTE stmt_dep;
+DEALLOCATE PREPARE stmt_dep;
+
+-- Coluna alunos.unidade_id (só adiciona se não existir)
 SET @has_col := (
   SELECT COUNT(*)
   FROM INFORMATION_SCHEMA.COLUMNS

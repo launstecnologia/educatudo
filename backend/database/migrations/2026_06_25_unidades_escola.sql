@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS `unidades` (
   `razao_social`    VARCHAR(255) NULL,
   `cnpj`            VARCHAR(18)  NULL,
   `inep`            VARCHAR(20)  NULL,
+  `dependencia_administrativa` VARCHAR(20) NULL,
   `endereco`        VARCHAR(255) NULL,
   `numero`          VARCHAR(20)  NULL,
   `complemento`     VARCHAR(120) NULL,

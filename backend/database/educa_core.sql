@@ -8498,6 +8498,7 @@ CREATE TABLE IF NOT EXISTS `unidades` (
   `razao_social` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `cnpj` varchar(18) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `inep` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dependencia_administrativa` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `endereco` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `numero` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `complemento` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
