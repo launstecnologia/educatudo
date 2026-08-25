@@ -85,6 +85,7 @@ $router->get('/master/escolas/{id}/detalhes', 'Master/MasterEscolaDetailControll
 $router->get('/master/escolas/{id}/provas-ao-vivo', 'Master/MasterEscolaDetailController@provasAoVivo');
 $router->get('/master/escolas/{id}/usuarios', 'Master/MasterEscolaDetailController@usuarios');
 $router->get('/master/escolas/{id}/professores', 'Master/MasterEscolaDetailController@professores');
+$router->post('/master/escolas/{id}/professores/{professorId}/tudicoins', 'Master/MasterEscolaDetailController@professorCreditarTudicoins');
 $router->get('/master/escolas/{id}/alunos', 'Master/MasterEscolaDetailController@alunos');
 $router->post('/master/escolas/{id}/usuarios/criar', 'Master/MasterEscolaDetailController@usuarioStore');
 $router->post('/master/escolas/{id}/usuarios/atualizar', 'Master/MasterEscolaDetailController@usuarioUpdate');

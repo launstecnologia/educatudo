@@ -113,7 +113,8 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
                 <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-800">Cota mensal</div>
                 <div class="px-4 py-4">
                     <p class="text-xs text-slate-600 mb-4">
-                        Quantidade creditada todo mês (renovação automática ou pelo botão Renovar).
+                        Quantidade creditada todo mês para <strong>todos</strong> os alunos, professores ou admins (renovação automática ou pelo botão Renovar).
+                        Para um professor específico, use o card <strong>Professores</strong> → Ações → Dar TudiCoins.
                         TudiCoins comprados não são apagados. Conversão: 1 TudiCoin = R$ 0,20.
                     </p>
                     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

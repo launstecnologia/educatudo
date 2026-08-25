@@ -281,6 +281,34 @@ class MasterEscolaDetailController extends BaseController
         )->execute([$saldoTotal, $saldoEscola, $saldoComprado, $userType, $userId]);
     }
 
+    private function creditarCortesiaUsuario(PDO $pdo, string $userType, int $userId, float $valor, string $observacao): void
+    {
+        require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
+        $valor = CreditosDecimalHelper::fromScalar($valor, 0.0);
+        if ($valor <= 0) {
+            return;
+        }
+        $this->ensureTenantWalletColumns($pdo);
+        $pdo->beginTransaction();
+        try {
+            $wallet = $this->getTenantWalletSaldos($pdo, $userType, $userId);
+            $saldoEscola = round((float) ($wallet['saldo_escola'] ?? 0.0) + $valor, CreditosDecimalHelper::SCALE);
+            $saldoComprado = (float) ($wallet['saldo_comprado'] ?? 0.0);
+            $this->saveTenantWalletSaldos($pdo, $userType, $userId, $saldoEscola, $saldoComprado);
+            $pdo->prepare(
+                "INSERT INTO carteira_movimentacoes
+                    (user_type, user_id, tipo, saldo_origem, valor, modulo_key, referencia_id, observacao)
+                 VALUES (?, ?, 'cortesia', 'escola', ?, NULL, NULL, ?)"
+            )->execute([$userType, $userId, $valor, $observacao]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     private function renovarSaldoEscolaUsuarios(
         PDO $pdo,
         string $userType,
@@ -841,35 +869,48 @@ class MasterEscolaDetailController extends BaseController
 
         $professores = [];
         $total = 0;
+        $creditosDisponiveis = false;
 
         if ($pdo) {
+            try {
+                $creditosDisponiveis = (bool) $pdo->query("SHOW TABLES LIKE 'carteira_usuarios'")->fetchColumn();
+            } catch (PDOException $e) {
+                $creditosDisponiveis = false;
+            }
+
             $where = '1=1';
             $params = [];
             if ($filtroStatus === 'ativo') {
-                $where .= ' AND ativo = 1';
+                $where .= ' AND p.ativo = 1';
             } elseif ($filtroStatus === 'inativo') {
-                $where .= ' AND ativo = 0';
+                $where .= ' AND p.ativo = 0';
             }
             if ($filtroBusca !== '') {
-                $where .= ' AND (nome LIKE ? OR email LIKE ?)';
+                $where .= ' AND (p.nome LIKE ? OR p.email LIKE ?)';
                 $like = '%' . $filtroBusca . '%';
                 $params[] = $like;
                 $params[] = $like;
             }
 
             try {
-                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM professores WHERE {$where}");
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM professores p WHERE {$where}");
                 $stmtCount->execute($params);
                 $total = (int) $stmtCount->fetchColumn();
             } catch (PDOException $e) {
             }
 
             $offset = ($page - 1) * $perPage;
+            $select = 'p.id, p.nome, p.email, p.ativo';
+            $join = '';
+            if ($creditosDisponiveis) {
+                $select .= ', COALESCE(cu.saldo, 0) AS saldo_creditos';
+                $join = "LEFT JOIN carteira_usuarios cu ON cu.user_type = 'professor' AND cu.user_id = p.id";
+            }
             try {
                 $stmt = $pdo->prepare(
-                    "SELECT id, nome, email, ativo FROM professores
+                    "SELECT {$select} FROM professores p {$join}
                      WHERE {$where}
-                     ORDER BY nome
+                     ORDER BY p.nome
                      LIMIT {$perPage} OFFSET {$offset}"
                 );
                 $stmt->execute($params);
@@ -890,7 +931,65 @@ class MasterEscolaDetailController extends BaseController
             'total_pages' => $totalPages,
             'filtro_busca' => $filtroBusca,
             'filtro_status' => $filtroStatus,
+            'creditos_disponiveis' => $creditosDisponiveis,
         ]);
+    }
+
+    public function professorCreditarTudicoins($id, $professorId)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $professorId = (int) $professorId;
+        $voltar = URL . '/master/escolas/' . $id . '/professores';
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Recarregue a página e tente novamente.', 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+        $this->getEscolaOrFail($id);
+        require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
+        $valor = CreditosDecimalHelper::parsePost($_POST['valor'] ?? 0);
+        if ($valor <= 0 || $valor > 100000) {
+            $this->setFlashMessage('Informe um valor de TudiCoins maior que zero (máx. 100.000).', 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+
+        $pdo = $this->getTenantPdo($id);
+        if (!$pdo) {
+            $this->setFlashMessage('Não foi possível conectar ao banco da escola.', 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+
+        try {
+            $st = $pdo->prepare('SELECT id, nome FROM professores WHERE id = ? LIMIT 1');
+            $st->execute([$professorId]);
+            $professor = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$professor) {
+                $this->setFlashMessage('Professor não encontrado nesta escola.', 'error');
+                header('Location: ' . $voltar);
+                exit;
+            }
+            $nome = trim((string) ($professor['nome'] ?? 'Professor'));
+            $obs = 'Cortesia Master para ' . $nome . '.';
+            $this->creditarCortesiaUsuario($pdo, 'professor', $professorId, $valor, $obs);
+        } catch (Throwable $e) {
+            $this->setFlashMessage('Erro ao creditar TudiCoins: ' . $e->getMessage(), 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+
+        $this->setFlashMessage(
+            sprintf(
+                '%s creditados para %s.',
+                CreditosDecimalHelper::formatDisplay($valor),
+                $nome
+            ),
+            'success'
+        );
+        header('Location: ' . $voltar);
+        exit;
     }
 
     public function alunos($id)
