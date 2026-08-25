@@ -60,6 +60,28 @@ class MysqlProvisioningService
     }
 
     /**
+     * Mensagem amigável para falha de conexão do usuário admin (DB_ADMIN_*).
+     */
+    public static function formatarErroAdminMysql(Throwable $e, string $adminUser, string $adminHost): string
+    {
+        $msg = $e->getMessage();
+        $adminUser = trim($adminUser) !== '' ? $adminUser : 'root';
+        $adminHost = trim($adminHost) !== '' ? $adminHost : 'MySQL';
+        if (strpos($msg, '1045') !== false || stripos($msg, 'Access denied') !== false) {
+            return 'O MySQL recusou o usuário admin "' . $adminUser . '" em ' . $adminHost
+                . '. O PHP da VPS não conecta como localhost — o servidor enxerga o cliente como o host da VPS '
+                . '(ex.: proxy da Oracle). O root costuma existir só em localhost. '
+                . 'Crie um usuário admin com acesso remoto (\'usuario\'@\'%\') com CREATE DATABASE/USER e GRANT, '
+                . 'atualize DB_ADMIN_USER e DB_ADMIN_PASS no .env da VPS e recrie o container PHP. '
+                . 'Enquanto isso, desmarque "criar automaticamente", crie banco e usuário no MySQL e salve de novo para aplicar o schema.';
+        }
+        if (strpos($msg, '2002') !== false || stripos($msg, 'Connection refused') !== false) {
+            return 'Não foi possível conectar em ' . $adminHost . ' com DB_ADMIN_*. Confira DB_ADMIN_HOST/DB_ADMIN_PORT no .env. Detalhe: ' . $msg;
+        }
+        return $msg;
+    }
+
+    /**
      * Permite apenas caracteres seguros para identificadores MySQL (banco e usuário).
      */
     private static function validateIdentifier(string $value, string $label): void
@@ -114,8 +136,11 @@ class MysqlProvisioningService
     public static function tenantTemSchemaBase(PDO $tenantPdo): bool
     {
         try {
-            $st = $tenantPdo->query("SHOW TABLES LIKE 'alunos'");
-            return $st !== false && $st->rowCount() > 0;
+            $n = (int) $tenantPdo->query(
+                "SELECT COUNT(*) FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
+            )->fetchColumn();
+            return $n >= 350;
         } catch (PDOException $e) {
             return false;
         }
@@ -139,6 +164,11 @@ class MysqlProvisioningService
         $sql = file_get_contents($path);
         if ($sql === false || trim($sql) === '') {
             throw new Exception('Schema base educa_core.sql está vazio.');
+        }
+        try {
+            $tenantPdo->exec('SET SESSION sql_require_primary_key = 0');
+        } catch (PDOException $ignored) {
+            // MySQL sem a variável (ambiente local)
         }
         $tenantPdo->exec('SET FOREIGN_KEY_CHECKS=0');
         $tenantPdo->exec('SET UNIQUE_CHECKS=0');

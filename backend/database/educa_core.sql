@@ -4,6 +4,7 @@
 
 SET NAMES utf8mb4;
 SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
+SET SESSION sql_require_primary_key = 0;
 SET FOREIGN_KEY_CHECKS = 0;
 SET UNIQUE_CHECKS = 0;
 
@@ -1214,23 +1215,6 @@ CREATE TABLE IF NOT EXISTS `avatares_alunos` (
   KEY `idx_avatar_url` (`avatar_url`),
   KEY `idx_avatar_seed` (`avatar_seed`),
   CONSTRAINT `avatares_alunos_ibfk_1` FOREIGN KEY (`aluno_id`) REFERENCES `alunos` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
-
---
--- backup_enem_questions_20251028
---
-CREATE TABLE IF NOT EXISTS `backup_enem_questions_20251028` (
-  `id` int NOT NULL DEFAULT '0',
-  `exam_id` int NOT NULL,
-  `discipline` varchar(150) CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci DEFAULT NULL,
-  `language` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci DEFAULT NULL,
-  `question_index` int DEFAULT NULL,
-  `title` varchar(255) CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci DEFAULT NULL,
-  `context` longtext CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci,
-  `correct_alternative` char(1) CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci DEFAULT NULL,
-  `alternatives_introduction` text CHARACTER SET utf8mb3 COLLATE utf8mb3_unicode_ci,
-  `year` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 
 --
