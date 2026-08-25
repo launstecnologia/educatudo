@@ -174,7 +174,14 @@ class MysqlProvisioningService
         $tenantPdo->exec('SET UNIQUE_CHECKS=0');
         try {
             foreach (self::splitSqlStatements($sql) as $q) {
-                self::executeStatementAndConsumeResult($tenantPdo, $q);
+                try {
+                    self::executeStatementAndConsumeResult($tenantPdo, $q);
+                } catch (PDOException $e) {
+                    if (stripos($q, 'sql_require_primary_key') !== false) {
+                        continue;
+                    }
+                    throw $e;
+                }
             }
         } catch (PDOException $e) {
             throw new Exception('Erro ao aplicar schema base (educa_core.sql): ' . $e->getMessage());
