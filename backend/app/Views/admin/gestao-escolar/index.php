@@ -2,9 +2,6 @@
 if (!class_exists('AdminPermissionMatrix')) {
     require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
-if (!class_exists('AdminSecretariaAccess')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminSecretariaAccess.php';
-}
 
 $hub_title = 'Gestão Escolar';
 $hub_subtitle = 'Acompanhe matrícula, frequência, documentos e a rotina da escola.';
@@ -178,16 +175,5 @@ $hub_cards[] = [
     'description' => 'Pacotes de créditos disponíveis para a escola.',
     'icon' => 'fa-solid fa-coins',
 ];
-
-if (class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::isSecretaria($user ?? [])) {
-    $hub_cards = array_values(array_filter($hub_cards, static function (array $card): bool {
-        $href = (string) ($card['href'] ?? '');
-        $path = parse_url($href, PHP_URL_PATH);
-        if (!is_string($path) || $path === '') {
-            $path = $href;
-        }
-        return AdminSecretariaAccess::requestPathIsAllowed($path);
-    }));
-}
 
 include __DIR__ . '/../_partials/hub_modulos.php';

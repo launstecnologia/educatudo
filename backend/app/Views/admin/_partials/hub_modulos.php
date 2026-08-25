@@ -10,6 +10,20 @@
 $hub_title = (string) ($hub_title ?? '');
 $hub_subtitle = (string) ($hub_subtitle ?? '');
 $hub_cards = is_array($hub_cards ?? null) ? $hub_cards : [];
+
+if (!class_exists('AdminSecretariaAccess')) {
+    require_once dirname(__DIR__, 3) . '/Core/AdminSecretariaAccess.php';
+}
+if (class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::isSecretaria($user ?? [])) {
+    $hub_cards = array_values(array_filter($hub_cards, static function (array $card): bool {
+        $href = (string) ($card['href'] ?? '');
+        $path = parse_url($href, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            $path = $href;
+        }
+        return AdminSecretariaAccess::requestPathIsAllowed($path);
+    }));
+}
 ?>
 <style>
 .hub-page-header {

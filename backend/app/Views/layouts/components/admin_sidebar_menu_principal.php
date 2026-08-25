@@ -144,11 +144,18 @@ $linkCls = static function (bool $ativo): string {
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
         </a>
         <?php endif; ?>
-        <a href="<?= URL ?>/admin/boletim" class="<?= $linkCls($cp === 'boletim_config') ?>">
-            <i class="fa-regular fa-file-lines w-4 h-4 mr-3"></i>
-            <span class="sidebar-text text-sm">Notas e Boletim</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $cp === 'boletim_config' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/boletim" class="flex-1 <?= $linkCls($cp === 'boletim_config') ?>">
+                <i class="fa-regular fa-file-lines w-4 h-4 mr-3"></i>
+                <span class="sidebar-text text-sm">Notas e Boletim</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('boletim')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="boletim-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="boletim-nested" class="<?= $boletimNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <a href="<?= URL ?>/admin/boletim-guia" class="<?= $linkCls($cp === 'boletim_guia') ?>">
                 <span class="sidebar-text text-sm">Guia do Boletim</span>
             </a>
@@ -174,11 +181,18 @@ $linkCls = static function (bool $ativo): string {
             <i class="fa-solid fa-envelope-open-text w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Comunicação Escolar</span>
         </a>
-        <a href="<?= URL ?>/forum" class="<?= $linkCls($forumAtivo) ?>">
-            <i class="fa-regular fa-comments w-4 h-4 mr-3"></i>
-            <span class="sidebar-text text-sm">Fórum</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $forumAtivo ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/forum" class="flex-1 <?= $linkCls($forumAtivo) ?>">
+                <i class="fa-regular fa-comments w-4 h-4 mr-3"></i>
+                <span class="sidebar-text text-sm">Fórum</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('forum')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="forum-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="forum-nested" class="<?= $forumNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <a href="<?= URL ?>/forum/moderation/reports" class="<?= $linkCls($forumDenunciasAtivo) ?>">
                 <span class="sidebar-text text-sm">Denúncias Fórum</span>
             </a>
@@ -187,11 +201,18 @@ $linkCls = static function (bool $ativo): string {
             <i class="fa-solid fa-bullhorn w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Mural de Recados</span>
         </a>
-        <a href="<?= URL ?>/admin/notifications" class="<?= $linkCls($cp === 'notifications') ?>">
-            <i class="fa-regular fa-bell w-4 h-4 mr-3"></i>
-            <span class="sidebar-text text-sm">Notificações</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $cp === 'notifications' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/notifications" class="flex-1 <?= $linkCls($cp === 'notifications') ?>">
+                <i class="fa-regular fa-bell w-4 h-4 mr-3"></i>
+                <span class="sidebar-text text-sm">Notificações</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('notificacoes')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="notificacoes-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="notificacoes-nested" class="<?= $notificacoesNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <a href="<?= URL ?>/admin/notificacoes-push" class="<?= $linkCls($cp === 'notificacoes-push') ?>">
                 <span class="sidebar-text text-sm">Notificações Push</span>
             </a>
@@ -284,11 +305,18 @@ $linkCls = static function (bool $ativo): string {
         </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['diario_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))): ?>
-        <a href="<?= URL ?>/admin/diario" class="<?= $linkCls($cp === 'diario_classe') ?>">
-            <i class="fa-regular fa-address-book w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Diário de Classe</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $cp === 'diario_classe' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/diario" class="flex-1 <?= $linkCls($cp === 'diario_classe') ?>">
+                <i class="fa-regular fa-address-book w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Diário de Classe</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('diario-classe')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="diario-classe-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="diario-classe-nested" class="<?= $diarioNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <a href="<?= URL ?>/admin/faltas" class="<?= $linkCls($cp === 'faltas') ?>">
                 <span class="sidebar-text text-sm">Faltas</span>
             </a>
@@ -310,12 +338,21 @@ $linkCls = static function (bool $ativo): string {
         </a>
         <?php endif; ?>
         <?php endif; ?>
-        <a href="<?= URL ?>/admin/documentos-institucionais" class="<?= $linkCls($cp === 'documentos_institucionais') ?>">
-            <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Documentos Institucionais</span>
-        </a>
+        <div class="flex items-center rounded-lg <?= $cp === 'documentos_institucionais' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/documentos-institucionais" class="flex-1 <?= $linkCls($cp === 'documentos_institucionais') ?>">
+                <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Documentos Institucionais</span>
+            </a>
+            <?php if ((class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
+            <button type="button" onclick="toggleNestedMenu('documentos-institucionais')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="documentos-institucionais-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+            <?php endif; ?>
+        </div>
         <?php if ((class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div id="documentos-institucionais-nested" class="<?= $documentosNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
             <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="<?= $linkCls($cp === 'assinatura_digital') ?>">
                 <span class="sidebar-text text-sm">Assinatura Digital</span>
@@ -329,11 +366,18 @@ $linkCls = static function (bool $ativo): string {
         </div>
         <?php endif; ?>
         <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula')): ?>
-        <a href="<?= URL ?>/admin/enrollment" class="<?= $linkCls($cp === 'enrollment') ?>">
-            <i class="fa-solid fa-file-signature w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Matrículas</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $cp === 'enrollment' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/enrollment" class="flex-1 <?= $linkCls($cp === 'enrollment') ?>">
+                <i class="fa-solid fa-file-signature w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Matrículas</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('matriculas')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="matriculas-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="matriculas-nested" class="<?= $matriculasNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <?php if ($canViewSidebar(['processos_matricula'])): ?>
             <a href="<?= URL ?>/admin/enrollment/config" class="<?= $linkCls($cp === 'enrollment_config') ?>">
                 <span class="sidebar-text text-sm">Configuração de Matrícula</span>
@@ -358,11 +402,14 @@ $linkCls = static function (bool $ativo): string {
         </a>
         <?php endif; ?>
         <?php if ($showInventoryGroup): ?>
-        <div class="flex items-center px-4 py-2 text-purple-100">
+        <button type="button" onclick="toggleNestedMenu('recursos-fisicos')" class="w-full flex items-center px-4 py-2 <?= $recursosNestedOpen ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-left">
             <i class="fa-solid fa-boxes-stacked w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Recursos Físicos</span>
-        </div>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <span class="sidebar-text text-sm flex-1">Recursos Físicos</span>
+            <svg id="recursos-fisicos-arrow" class="w-3 h-3 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        <div id="recursos-fisicos-nested" class="<?= $recursosNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <?php if ($canViewSidebar(['almoxarifado'])): ?>
             <a href="<?= URL ?>/admin/almoxarifado" class="<?= $linkCls($cp === 'almoxarifado') ?>">
                 <span class="sidebar-text text-sm">Almoxarifado</span>
@@ -385,11 +432,18 @@ $linkCls = static function (bool $ativo): string {
             <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>
         </a>
-        <a href="<?= URL ?>/admin/tudicoins" class="<?= $linkCls($cp === 'tudicoins_escola') ?>">
-            <i class="fa-solid fa-wallet w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">TudiCoins da Escola</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $cp === 'tudicoins_escola' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/tudicoins" class="flex-1 <?= $linkCls($cp === 'tudicoins_escola') ?>">
+                <i class="fa-solid fa-wallet w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">TudiCoins da Escola</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('tudicoins')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="tudicoins-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="tudicoins-nested" class="<?= $tudicoinsNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <a href="<?= URL ?>/admin/creditos/pacotes" class="<?= $linkCls($cp === 'creditos_pacotes') ?>">
                 <span class="sidebar-text text-sm">Pacotes de TudiCoins</span>
             </a>

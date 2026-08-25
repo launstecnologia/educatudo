@@ -46,6 +46,8 @@ class AdminSecretariaAccess
             '/admin/serie',
             '/admin/grade-horaria',
             '/admin/componentes-curriculares',
+            '/admin/matrizes-curriculares',
+            '/admin/salas',
             '/admin/regras-academicas',
             '/admin/resultados-finais',
             '/admin/modelos-documentos',

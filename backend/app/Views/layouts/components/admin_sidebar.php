@@ -129,6 +129,15 @@
         $sistemaOpen = in_array($cp, ['sistema', 'essays_config', 'dev_tickets'], true);
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
         $zConfigOpen = in_array($cp, ['z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos'], true);
+        $boletimNestedOpen = in_array($cp, ['boletim_config', 'boletim_guia'], true);
+        $forumNestedOpen = $forumDenunciasAtivo;
+        $notificacoesNestedOpen = in_array($cp, ['notifications', 'notificacoes-push'], true);
+        $diarioNestedOpen = in_array($cp, ['diario_classe', 'faltas', 'presenca'], true);
+        $documentosNestedOpen = in_array($cp, ['documentos_institucionais', 'assinatura_digital', 'modelos_documentos'], true);
+        $matriculasNestedOpen = in_array($cp, ['enrollment', 'enrollment_config'], true) || $curMovimentacao;
+        $recursosNestedOpen = in_array($cp, ['almoxarifado', 'patrimonio'], true);
+        $tudicoinsNestedOpen = in_array($cp, ['tudicoins_escola', 'creditos_pacotes'], true);
+        $cobrancasNestedOpen = in_array($cp, ['finance_charges', 'finance_charge_batch'], true);
         $finPages = [
             'finance', 'finance_contracts', 'finance_plans', 'finance_charges', 'finance_charge_batch',
             'finance_bills', 'finance_cashflow', 'finance_dre', 'finance_dfc', 'finance_balanco',
@@ -159,24 +168,48 @@
             ['url' => '/admin/finance/report/inadimplencia', 'label' => 'Inadimplência', 'page' => 'finance_inadimplencia', 'icon' => 'fa-chart-line'],
             ['url' => '/admin/finance/plans', 'label' => 'Planos e Preços', 'page' => 'finance_plans', 'icon' => 'fa-layer-group'],
         ];
-        $renderFinNav = static function (array $items, string $cpFin): void {
+        $renderFinNav = static function (array $items, string $cpFin) use ($cobrancasNestedOpen): void {
             foreach ($items as $fi) {
                 $active = $cpFin === $fi['page'];
-                ?>
-                    <a href="<?= URL . $fi['url'] ?>" class="flex items-center px-4 py-2 text-sm <?= $active ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
-                        <i class="fa-solid <?= $fi['icon'] ?> w-4 h-4 mr-3 flex-shrink-0"></i>
-                        <span class="sidebar-text"><?= $fi['label'] ?></span>
-                    </a>
-                    <?php if (!empty($fi['children'])): ?>
-                    <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-                        <?php foreach ($fi['children'] as $ch): ?>
+                $children = $fi['children'] ?? [];
+                $childActive = false;
+                foreach ($children as $ch) {
+                    if ($cpFin === ($ch['page'] ?? '')) {
+                        $childActive = true;
+                        break;
+                    }
+                }
+                $nestedId = 'fin-' . preg_replace('/[^a-z0-9]+/i', '-', (string) $fi['page']);
+                $nestedOpen = $active || $childActive || ($fi['page'] === 'finance_charges' && $cobrancasNestedOpen);
+                if ($children !== []) {
+                    ?>
+                    <div class="flex items-center rounded-lg <?= $active ? 'bg-white/20' : '' ?>">
+                        <a href="<?= URL . $fi['url'] ?>" class="flex-1 flex items-center px-4 py-2 text-sm <?= $active ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                            <i class="fa-solid <?= $fi['icon'] ?> w-4 h-4 mr-3 flex-shrink-0"></i>
+                            <span class="sidebar-text"><?= $fi['label'] ?></span>
+                        </a>
+                        <button type="button" onclick="toggleNestedMenu('<?= htmlspecialchars($nestedId, ENT_QUOTES) ?>')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                            <svg id="<?= htmlspecialchars($nestedId) ?>-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="<?= htmlspecialchars($nestedId) ?>-nested" class="<?= $nestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+                        <?php foreach ($children as $ch): ?>
                         <a href="<?= URL . $ch['url'] ?>" class="flex items-center px-4 py-2 text-sm <?= $cpFin === $ch['page'] ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                             <span class="sidebar-text"><?= $ch['label'] ?></span>
                         </a>
                         <?php endforeach; ?>
                     </div>
-                    <?php endif; ?>
-                <?php
+                    <?php
+                } else {
+                    ?>
+                    <a href="<?= URL . $fi['url'] ?>" class="flex items-center px-4 py-2 text-sm <?= $active ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <i class="fa-solid <?= $fi['icon'] ?> w-4 h-4 mr-3 flex-shrink-0"></i>
+                        <span class="sidebar-text"><?= $fi['label'] ?></span>
+                    </a>
+                    <?php
+                }
             }
         };
         ?>
@@ -678,10 +711,17 @@ document.addEventListener('DOMContentLoaded', function() {
         'ui_modelos': 'z-configuracao',
     };
     if (autoOpenMap[currentPage]) {
-        localStorage.setItem(`menu-${autoOpenMap[currentPage]}-expanded`, 'true');
+        let group = autoOpenMap[currentPage];
+        if (document.getElementById(`sec-${group}-submenu`)) {
+            group = `sec-${group}`;
+        }
+        localStorage.setItem(`menu-${group}-expanded`, 'true');
     }
     if (financePages.includes(currentPage)) {
-        localStorage.setItem('menu-financeiro-escolar-expanded', 'true');
+        const finGroup = document.getElementById('financeiro-submenu') && !document.getElementById('financeiro-escolar-submenu')
+            ? 'financeiro'
+            : 'financeiro-escolar';
+        localStorage.setItem(`menu-${finGroup}-expanded`, 'true');
     }
 
     // Restore expanded state from localStorage
@@ -704,6 +744,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const submenu = document.getElementById(`${group}-submenu`);
         const arrow = document.getElementById(`${group}-arrow`);
         if (submenu && !submenu.classList.contains('hidden') && arrow) {
+            arrow.style.transform = 'rotate(180deg)';
+        }
+    });
+
+    document.querySelectorAll('[id$="-nested"]').forEach(el => {
+        const nestedId = el.id.replace(/-nested$/, '');
+        const arrow = document.getElementById(`${nestedId}-arrow`);
+        if (localStorage.getItem(`menu-${nestedId}-expanded`) === 'true') {
+            el.classList.remove('hidden');
+        }
+        if (!el.classList.contains('hidden') && arrow) {
             arrow.style.transform = 'rotate(180deg)';
         }
     });
@@ -743,6 +794,28 @@ function toggleMenuGroup(groupId) {
             }
             localStorage.setItem(`menu-${groupId}-expanded`, 'false');
         }
+    }
+}
+
+function toggleNestedMenu(groupId) {
+    const submenu = document.getElementById(`${groupId}-nested`);
+    const arrow = document.getElementById(`${groupId}-arrow`);
+    if (!submenu) {
+        return;
+    }
+    const isHidden = submenu.classList.contains('hidden');
+    if (isHidden) {
+        submenu.classList.remove('hidden');
+        if (arrow) {
+            arrow.style.transform = 'rotate(180deg)';
+        }
+        localStorage.setItem(`menu-${groupId}-expanded`, 'true');
+    } else {
+        submenu.classList.add('hidden');
+        if (arrow) {
+            arrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem(`menu-${groupId}-expanded`, 'false');
     }
 }
 </script>

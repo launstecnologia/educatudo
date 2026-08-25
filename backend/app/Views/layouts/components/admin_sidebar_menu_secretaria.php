@@ -1,5 +1,8 @@
 <?php
 /** Menu lateral reduzido: perfil Secretaria (@see AdminSecretariaAccess) */
+if (!class_exists('AdminSecretariaAccess')) {
+    require_once __DIR__ . '/../../../Core/AdminSecretariaAccess.php';
+}
 $urlBase = defined('URL') ? rtrim((string) URL, '/') : '';
 $cur = $current_page ?? '';
 $curMovimentacao = in_array($cur, ['students_remanejamento', 'students_transferencia_escolar'], true);
@@ -30,7 +33,6 @@ $gestaoOpen = in_array($cur, [
     'faltas', 'presenca', 'modelos_documentos', 'ocorrencias',
     'almoxarifado', 'patrimonio', 'resultados-finais', 'saude_academica',
 ], true) || $curMovimentacao;
-$zConfigOpen = $cur === 'unidades';
 ?>
 <?php if ($secCan(['dashboard'])): ?>
 <a href="<?= $urlBase ?>/admin/dashboard" class="flex items-center px-4 py-3 <?= $cur === 'dashboard' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
@@ -103,7 +105,7 @@ $zConfigOpen = $cur === 'unidades';
             <span class="sidebar-text text-sm">Regras Acadêmicas</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['salas'])): ?>
+        <?php if ($secCan(['salas']) && AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
         <a href="<?= $urlBase ?>/admin/salas" class="<?= $linkCls($cur === 'salas') ?>">
             <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Salas / Ambientes</span>
@@ -189,11 +191,18 @@ $zConfigOpen = $cur === 'unidades';
         </a>
         <?php endif; ?>
         <?php if ($secCan(['diario_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))): ?>
-        <a href="<?= $urlBase ?>/admin/diario" class="<?= $linkCls($cur === 'diario_classe') ?>">
-            <i class="fa-regular fa-address-book w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Diário de Classe</span>
-        </a>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+        <div class="flex items-center rounded-lg <?= $cur === 'diario_classe' ? 'bg-white/20' : '' ?>">
+            <a href="<?= $urlBase ?>/admin/diario" class="flex-1 <?= $linkCls($cur === 'diario_classe') ?>">
+                <i class="fa-regular fa-address-book w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Diário de Classe</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('diario-classe')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="diario-classe-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="diario-classe-nested" class="<?= !empty($diarioNestedOpen) ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <?php if ($secCan(['faltas'])): ?>
             <a href="<?= $urlBase ?>/admin/faltas" class="<?= $linkCls($cur === 'faltas') ?>">
                 <span class="sidebar-text text-sm">Faltas</span>
@@ -237,18 +246,25 @@ $zConfigOpen = $cur === 'unidades';
             <span class="sidebar-text text-sm">Ocorrências</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['almoxarifado']) || $secCan(['patrimonio'])): ?>
-        <div class="flex items-center px-4 py-2 text-purple-100">
+        <?php
+        $secAlmoxarifadoOk = $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
+        $secPatrimonioOk = $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
+        if ($secAlmoxarifadoOk || $secPatrimonioOk):
+        ?>
+        <button type="button" onclick="toggleNestedMenu('recursos-fisicos')" class="w-full flex items-center px-4 py-2 <?= !empty($recursosNestedOpen) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-left">
             <i class="fa-solid fa-boxes-stacked w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Recursos Físicos</span>
-        </div>
-        <div class="ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <?php if ($secCan(['almoxarifado'])): ?>
+            <span class="sidebar-text text-sm flex-1">Recursos Físicos</span>
+            <svg id="recursos-fisicos-arrow" class="w-3 h-3 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        <div id="recursos-fisicos-nested" class="<?= !empty($recursosNestedOpen) ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <?php if ($secAlmoxarifadoOk): ?>
             <a href="<?= $urlBase ?>/admin/almoxarifado" class="<?= $linkCls($cur === 'almoxarifado') ?>">
                 <span class="sidebar-text text-sm">Almoxarifado</span>
             </a>
             <?php endif; ?>
-            <?php if ($secCan(['patrimonio'])): ?>
+            <?php if ($secPatrimonioOk): ?>
             <a href="<?= $urlBase ?>/admin/patrimonio" class="<?= $linkCls($cur === 'patrimonio') ?>">
                 <span class="sidebar-text text-sm">Patrimônio</span>
             </a>
@@ -261,34 +277,12 @@ $zConfigOpen = $cur === 'unidades';
             <span class="sidebar-text text-sm">Resultados Finais</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['saude_academica'])): ?>
+        <?php if ($secCan(['saude_academica']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
         <a href="<?= $urlBase ?>/admin/saude-academica" class="<?= $linkCls($cur === 'saude_academica') ?>">
             <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>
         </a>
         <?php endif; ?>
-    </div>
-</div>
-<?php endif; ?>
-
-<?php if ($secCan(['unidades'])): ?>
-<div class="menu-group">
-    <div class="flex items-center rounded-xl <?= $cur === 'z_configuracao' ? 'bg-white/20' : '' ?>">
-        <a href="<?= $urlBase ?>/admin/z-configuracao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-            <i class="fa-solid fa-sliders w-5 h-5 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text">Z-Configuração</span>
-        </a>
-        <button type="button" onclick="toggleMenuGroup('z-configuracao')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
-            <svg id="z-configuracao-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-        </button>
-    </div>
-    <div id="z-configuracao-submenu" class="<?= $zConfigOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <a href="<?= $urlBase ?>/admin/unidades" class="<?= $linkCls($cur === 'unidades') ?>">
-            <i class="fa-solid fa-building w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Instituição</span>
-        </a>
     </div>
 </div>
 <?php endif; ?>
