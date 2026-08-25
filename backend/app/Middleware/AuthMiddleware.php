@@ -65,11 +65,24 @@ class AuthMiddleware
             && ($user['perfil_admin'] ?? '') === 'financeiro'
         ) {
             $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
-            $allowedPrefix = '/admin/financeiro';
-            if (strpos($path, $allowedPrefix) !== 0 && $path !== '/logout') {
-                http_response_code(302);
-                header('Location: ' . URL . $allowedPrefix);
-                exit;
+            $isLogout = ($path === '/logout' || strpos($path, '/logout') === 0);
+            $isFinanceiroPath = strpos($path, '/admin/financeiro') === 0
+                || strpos($path, '/admin/finance') === 0;
+            if (!class_exists('LayoutHelper', false)) {
+                require_once __DIR__ . '/../Core/LayoutHelper.php';
+            }
+            $financeiroLigado = LayoutHelper::isModuleEnabled('financeiro');
+            if (!$isLogout) {
+                if ($financeiroLigado && !$isFinanceiroPath) {
+                    http_response_code(302);
+                    header('Location: ' . URL . '/admin/financeiro-escolar');
+                    exit;
+                }
+                if (!$financeiroLigado && strpos($path, '/admin/dashboard') !== 0) {
+                    http_response_code(302);
+                    header('Location: ' . URL . '/admin/dashboard');
+                    exit;
+                }
             }
         }
 

@@ -32,7 +32,7 @@ $hub_cards[] = [
     'icon' => 'fa-solid fa-list-check',
 ];
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('aluno_minicursos')) {
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_minicursos')) {
     $hub_cards[] = [
         'href' => URL . '/admin/minicursos',
         'title' => 'EducaCursos',
@@ -41,11 +41,13 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('aluno_minicu
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/planos-aula',
-    'title' => 'Plano de Aula',
-    'description' => 'Visualize e aprove os planos de aula dos professores.',
-    'icon' => 'fa-regular fa-file-lines',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_planos_aula')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/planos-aula',
+        'title' => 'Plano de Aula',
+        'description' => 'Visualize e aprove os planos de aula dos professores.',
+        'icon' => 'fa-regular fa-file-lines',
+    ];
+}
 
 include __DIR__ . '/../_partials/hub_modulos.php';

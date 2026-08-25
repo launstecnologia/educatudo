@@ -123,20 +123,24 @@ $linkCls = static function (bool $ativo): string {
         </button>
     </div>
     <div id="avaliacoes-submenu" class="<?= $avaliacoesOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($canViewSidebar(['inclusao']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('inclusao'))): ?>
+        <?php if ($canViewSidebar(['inclusao']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao'))): ?>
         <a href="<?= URL ?>/admin/inclusao/versoes" class="<?= $linkCls($cp === 'inclusao') ?>">
             <i class="fa-solid fa-universal-access w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Avaliação Adaptativa</span>
         </a>
         <?php endif; ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_provas') || LayoutHelper::isModuleEnabled('professor_provas')): ?>
         <a href="<?= URL ?>/admin/provas" class="<?= $linkCls($cp === 'provas' || $cp === 'provas_blocos') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Avaliações/Notas</span>
         </a>
+        <?php endif; ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel')): ?>
         <a href="<?= URL ?>/admin/redacao-professor" class="<?= $linkCls(in_array($cp, ['essays_teacher', 'essays_teacher_report'], true)) ?>">
             <i class="fa-solid fa-pen-to-square w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Jornada da Redação</span>
         </a>
+        <?php endif; ?>
         <?php require_once __DIR__ . '/../../../Core/LayoutHelper.php'; require_once __DIR__ . '/../../../Core/FeatureGate.php'; ?>
         <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
         <a href="<?= URL ?>/admin/jornadas" class="<?= $linkCls(in_array($cp, ['journeys', 'journeys_relatorio'], true)) ?>">
@@ -181,6 +185,7 @@ $linkCls = static function (bool $ativo): string {
             <i class="fa-solid fa-envelope-open-text w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Comunicação Escolar</span>
         </a>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('forum')): ?>
         <div class="flex items-center rounded-lg <?= $forumAtivo ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/forum" class="flex-1 <?= $linkCls($forumAtivo) ?>">
                 <i class="fa-regular fa-comments w-4 h-4 mr-3"></i>
@@ -197,6 +202,7 @@ $linkCls = static function (bool $ativo): string {
                 <span class="sidebar-text text-sm">Denúncias Fórum</span>
             </a>
         </div>
+        <?php endif; ?>
         <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('mural_recados')): ?>
         <a href="<?= URL ?>/admin/mural-recados" class="<?= $linkCls($cp === 'mural-recados') ?>">
             <i class="fa-solid fa-bullhorn w-4 h-4 mr-3"></i>
@@ -227,6 +233,12 @@ $linkCls = static function (bool $ativo): string {
 </div>
 
 <!-- Conteúdo -->
+<?php
+$conteudoArquivosOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_arquivos');
+$conteudoHitsOn = class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits');
+$conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas');
+?>
+<?php if ($conteudoArquivosOn || $conteudoHitsOn || $conteudoMaterialOn): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'conteudo' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/conteudo" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -240,25 +252,31 @@ $linkCls = static function (bool $ativo): string {
         </button>
     </div>
     <div id="conteudo-submenu" class="<?= $conteudoOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <?php if ($conteudoArquivosOn): ?>
         <a href="<?= URL ?>/admin/arquivos" class="<?= $linkCls($cp === 'arquivos') ?>">
             <i class="fa-regular fa-folder w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Arquivos</span>
         </a>
-        <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleVisible('educa_hits')): ?>
+        <?php endif; ?>
+        <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits')): ?>
         <?php require_once __DIR__ . '/../../../Core/EducaHitsConfig.php'; ?>
         <a href="<?= htmlspecialchars(EducaHitsConfig::portalLoginUrl()) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-2 text-purple-100 hover:bg-white/20 hover:text-white rounded-lg transition-all duration-200">
             <i class="fa-solid fa-music w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">EducaHits (portal)</span>
         </a>
         <?php endif; ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
         <a href="<?= URL ?>/admin/apostilas-ia" class="<?= $linkCls($cp === 'apostilas-ia') ?>">
             <i class="fa-solid fa-wand-magic-sparkles w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Meu Material</span>
         </a>
+        <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Financeiro -->
+<?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('financeiro')): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'financeiro' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/financeiro-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -275,6 +293,7 @@ $linkCls = static function (bool $ativo): string {
         <?php $renderFinNav($finItems, $cp); ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Gestão Escolar -->
 <div class="menu-group">
@@ -518,16 +537,18 @@ $linkCls = static function (bool $ativo): string {
             <i class="fa-solid fa-list-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">BNCC / Plano de Curso</span>
         </a>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('aluno_minicursos')): ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_minicursos')): ?>
         <a href="<?= URL ?>/admin/minicursos" class="<?= $linkCls($cp === 'minicursos') ?>">
             <i class="fa-solid fa-play-circle w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">EducaCursos</span>
         </a>
         <?php endif; ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_planos_aula')): ?>
         <a href="<?= URL ?>/admin/planos-aula" class="<?= $linkCls($cp === 'planos-aula') ?>">
             <i class="fa-regular fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Plano de Aula</span>
         </a>
+        <?php endif; ?>
     </div>
 </div>
 

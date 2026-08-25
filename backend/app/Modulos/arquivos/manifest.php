@@ -29,6 +29,7 @@ return [
         '/aluno/arquivos' => 'aluno_arquivos',
         '/aluno/recuperacao' => 'aluno_recuperacao',
         '/professor/arquivos' => 'professor_arquivos',
+        '/admin/arquivos' => 'aluno_arquivos',
     ],
     'menu' => [
         'aluno' => [
@@ -39,7 +40,7 @@ return [
             ['label' => 'Arquivos', 'path' => '/professor/arquivos', 'feature_key' => 'professor_arquivos'],
         ],
         'admin' => [
-            ['label' => 'Arquivos', 'path' => '/admin/arquivos', 'feature_key' => null],
+            ['label' => 'Arquivos', 'path' => '/admin/arquivos', 'feature_key' => 'aluno_arquivos'],
         ],
         'pais' => [
             ['label' => 'Arquivos', 'path' => '/pais/filhos/{id}/arquivos', 'feature_key' => 'aluno_arquivos'],

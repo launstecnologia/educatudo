@@ -215,9 +215,8 @@ class MasterEscolasController extends BaseController
                 continue;
             }
         }
-        require_once __DIR__ . '/../../Core/RedisCache.php';
-        RedisCache::delete('config_layout_' . $escolaId);
-        RedisCache::delete('config_layout');
+        require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        LayoutHelper::invalidateCacheDaEscola($escolaId);
     }
 
     /**
@@ -264,9 +263,8 @@ class MasterEscolasController extends BaseController
 
         $this->setLayoutConfig($escolaId, ['maintenance_mode' => $value]);
 
-        require_once __DIR__ . '/../../Core/RedisCache.php';
-        RedisCache::delete('config_layout_' . $escolaId);
-        RedisCache::delete('config_layout');
+        require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        LayoutHelper::invalidateCacheDaEscola($escolaId);
     }
 
     private function getTenantMaintenanceMode(int $escolaId): ?string

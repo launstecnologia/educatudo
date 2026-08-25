@@ -58,6 +58,8 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
                 <?php
                     $chave = (string) ($mod['chave'] ?? '');
                     $nome = (string) ($mod['nome'] ?? $chave);
+                    $aliases = is_array($mod['aliases'] ?? null) ? $mod['aliases'] : [];
+                    $busca = mb_strtolower(trim($nome . ' ' . implode(' ', array_map('strval', $aliases))));
                     $featureKeys = is_array($mod['feature_keys'] ?? null) ? $mod['feature_keys'] : [];
                     $firstKey = (string) ($featureKeys[0] ?? '');
                     $defaultMod = $firstKey !== '' ? ModuloCatalogo::valorPadrao($mod) : '1';
@@ -72,7 +74,7 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
                         }
                     }
                 ?>
-                <div class="flex items-center justify-between gap-4 py-2.5 px-2 js-modulo-row" data-nome="<?= htmlspecialchars(mb_strtolower($nome)) ?>">
+                <div class="flex items-center justify-between gap-4 py-2.5 px-2 js-modulo-row" data-nome="<?= htmlspecialchars($busca) ?>">
                     <span class="text-sm text-slate-700">
                         <?= htmlspecialchars($nome) ?>
                         <?php if ($locked): ?><span class="text-xs text-amber-700 ml-1">(exige TudiCoins)</span><?php endif; ?>

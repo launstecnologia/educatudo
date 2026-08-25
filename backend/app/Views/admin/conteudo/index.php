@@ -10,7 +10,11 @@ $hub_cards = [
     ],
 ];
 
-if (class_exists('LayoutHelper') && LayoutHelper::isModuleVisible('educa_hits')) {
+if (class_exists('LayoutHelper') && !LayoutHelper::isModuleEnabled('aluno_arquivos')) {
+    $hub_cards = [];
+}
+
+if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits')) {
     if (!class_exists('EducaHitsConfig')) {
         require_once dirname(__DIR__, 3) . '/Core/EducaHitsConfig.php';
     }
@@ -23,11 +27,13 @@ if (class_exists('LayoutHelper') && LayoutHelper::isModuleVisible('educa_hits'))
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/apostilas-ia',
-    'title' => 'Meu Material',
-    'description' => 'Crie e organize materiais didáticos com apoio de IA.',
-    'icon' => 'fa-solid fa-wand-magic-sparkles',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/apostilas-ia',
+        'title' => 'Meu Material',
+        'description' => 'Crie e organize materiais didáticos com apoio de IA.',
+        'icon' => 'fa-solid fa-wand-magic-sparkles',
+    ];
+}
 
 include __DIR__ . '/../_partials/hub_modulos.php';

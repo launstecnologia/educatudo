@@ -83,12 +83,23 @@ class LayoutHelper
      */
     public static function invalidateCache(): void
     {
+        self::invalidateCacheDaEscola(0);
+    }
+
+    /**
+     * Invalida o cache de layout da escola (Master acabou de sincronizar módulos).
+     */
+    public static function invalidateCacheDaEscola(int $escolaId): void
+    {
         self::$config = null;
         if (!class_exists('RedisCache', false)) {
             require_once __DIR__ . '/RedisCache.php';
         }
         RedisCache::delete('config_layout');
         RedisCache::delete('config_layout_single');
+        if ($escolaId > 0) {
+            RedisCache::delete('config_layout_' . $escolaId);
+        }
         if (defined('TENANT_ID') && (int) TENANT_ID > 0) {
             RedisCache::delete('config_layout_' . (int) TENANT_ID);
         }

@@ -437,10 +437,9 @@ class MasterEscolaDetailController extends BaseController
                 continue;
             }
         }
-        // Invalidar cache de layout do tenant para o professor ver módulos atualizados
-        require_once __DIR__ . '/../../Core/RedisCache.php';
-        RedisCache::delete('config_layout_' . $escolaId);
-        RedisCache::delete('config_layout');
+        // Invalidar cache de layout do tenant para o admin/professor ver módulos atualizados
+        require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        LayoutHelper::invalidateCacheDaEscola($escolaId);
     }
 
     private function renderDetail(int $escolaId, string $section, string $sectionView, array $extraData = []): void

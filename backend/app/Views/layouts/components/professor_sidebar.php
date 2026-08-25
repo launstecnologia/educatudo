@@ -92,7 +92,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 <div class="relative group">
                     <div id="btnTrocarFoto" class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 overflow-hidden cursor-pointer hover:bg-white/30 transition-colors">
                     <?php if (!empty($user['avatar_url'])): ?>
-                            <img src="<?= htmlspecialchars($user['avatar_url']) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-full h-full object-cover rounded-full pointer-events-none" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/uploads/','/uploads/');}">
+                            <img src="<?= htmlspecialchars($user['avatar_url']) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" width="40" height="40" class="w-full h-full object-cover rounded-full pointer-events-none" style="width:40px;height:40px;object-fit:cover;border-radius:50%" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/uploads/','/uploads/');}">
                     <?php else: ?>
                             <span class="text-white font-semibold text-sm pointer-events-none"><?= strtoupper(substr($user['nome'] ?? '', 0, 2)) ?></span>
                     <?php endif; ?>
@@ -347,23 +347,22 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     <?php endif; ?>
                     
                     <!-- Provas Online -->
-                    <?php $provasEnabled = $modulosProfessor['professor_provas']; ?>
-                    <a href="<?= $provasEnabled ? URL . '/professor/provas' : '#' ?>" 
-                       onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Provas Online\'); return false;' ?>"
-                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'provas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$provasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                    <?php if (!empty($modulosProfessor['professor_provas'])): ?>
+                    <a href="<?= URL ?>/professor/provas"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'provas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
                         </svg>
                         <span class="sidebar-text text-sm">Provas Online</span>
                     </a>
-                    <a href="<?= $provasEnabled ? URL . '/professor/provas-bimestral' : '#' ?>" 
-                       onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Provas Bimestral\'); return false;' ?>"
-                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'provas_bimestral' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$provasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                    <a href="<?= URL ?>/professor/provas-bimestral"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'provas_bimestral' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path>
                         </svg>
                         <span class="sidebar-text text-sm">Provas Bimestral</span>
                     </a>
+                    <?php endif; ?>
 
                     <a href="<?= URL ?>/professor/questoes"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'questoes' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -374,15 +373,15 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </a>
                     
                     <!-- Módulo de Arquivos -->
-                    <?php $arquivosEnabled = $modulosProfessor['professor_arquivos']; ?>
-                    <a href="<?= $arquivosEnabled ? URL . '/professor/arquivos' : '#' ?>"
-                       onclick="<?= $arquivosEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Arquivos\'); return false;' ?>"
-                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'arquivos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$arquivosEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                    <?php if (!empty($modulosProfessor['professor_arquivos'])): ?>
+                    <a href="<?= URL ?>/professor/arquivos"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'arquivos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <span class="sidebar-text text-sm">Arquivos</span>
                     </a>
+                    <?php endif; ?>
 
                     <?php if (!empty($modulosProfessor['professor_apostilas'])): ?>
                     <a href="<?= URL ?>/professor/apostilas-ia"
@@ -394,22 +393,20 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </a>
                     <?php endif; ?>
 
-                    <!-- Apostilas -->
-                    <?php $apostilasEnabled = $modulosProfessor['professor_apostilas']; ?>
-                    <a href="<?= $apostilasEnabled ? URL . '/professor/apostilas' : '#' ?>"
-                       onclick="<?= $apostilasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Minha Apostila\'); return false;' ?>"
-                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'apostilas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$apostilasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                    <?php if (!empty($modulosProfessor['professor_apostilas'])): ?>
+                    <a href="<?= URL ?>/professor/apostilas"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'apostilas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13"></path>
                         </svg>
                         <span class="sidebar-text text-sm">Minha Apostila</span>
                     </a>
+                    <?php endif; ?>
 
                     <!-- Propostas de Redação (Redação Configurável) -->
-                    <?php $redacaoConfigEnabled = $modulosProfessor['professor_redacao_configuravel']; ?>
+                    <?php if (!empty($modulosProfessor['professor_redacao_configuravel'])): ?>
                     <details class="sidebar-nav-item" <?= in_array(($current_page ?? ''), ['essays', 'essays-report'], true) ? 'open' : '' ?>>
-                        <summary class="flex items-center px-4 py-2 <?= in_array(($current_page ?? ''), ['essays', 'essays-report'], true) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 list-none cursor-pointer <?= !$redacaoConfigEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>"
-                            <?= !$redacaoConfigEnabled ? 'onclick="event.preventDefault(); mostrarModalModuloDesabilitado(\'Propostas de Redação\'); return false;"' : '' ?>>
+                        <summary class="flex items-center px-4 py-2 <?= in_array(($current_page ?? ''), ['essays', 'essays-report'], true) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 list-none cursor-pointer">
                             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                             </svg>
@@ -419,29 +416,28 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                             </svg>
                         </summary>
                         <div class="mt-1 ml-4 border-l border-white/20 space-y-1">
-                            <a href="<?= $redacaoConfigEnabled ? URL . '/professor/redacao-configuravel' : '#' ?>"
-                               onclick="<?= $redacaoConfigEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Propostas de Redação\'); return false;' ?>"
-                               class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'essays' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-sm <?= !$redacaoConfigEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                            <a href="<?= URL ?>/professor/redacao-configuravel"
+                               class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'essays' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-sm">
                                 <span class="sidebar-text text-sm">Listagem</span>
                             </a>
-                            <a href="<?= $redacaoConfigEnabled ? URL . '/professor/redacao-configuravel/relatorio' : '#' ?>"
-                               onclick="<?= $redacaoConfigEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Relatório de Redações\'); return false;' ?>"
-                               class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'essays-report' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-sm <?= !$redacaoConfigEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                            <a href="<?= URL ?>/professor/redacao-configuravel/relatorio"
+                               class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'essays-report' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-sm">
                                 <span class="sidebar-text text-sm">Relatório</span>
                             </a>
                         </div>
                     </details>
+                    <?php endif; ?>
 
                     <!-- Redação Livre -->
-                    <?php $redacaoLivreEnabled = $modulosProfessor['professor_redacao_livre']; ?>
-                    <a href="<?= $redacaoLivreEnabled ? URL . '/professor/redacao-livre' : '#' ?>"
-                       onclick="<?= $redacaoLivreEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Redação Livre\'); return false;' ?>"
-                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'redacao-livre' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$redacaoLivreEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                    <?php if (!empty($modulosProfessor['professor_redacao_livre'])): ?>
+                    <a href="<?= URL ?>/professor/redacao-livre"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'redacao-livre' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <span class="sidebar-text text-sm">Redação Livre</span>
                     </a>
+                    <?php endif; ?>
 
                     <?php if (LayoutHelper::isModuleEnabled('mural_recados')): ?>
                     <a href="<?= URL ?>/professor/mural-recados"
@@ -453,7 +449,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </a>
                     <?php endif; ?>
 
-                    <?php if (LayoutHelper::isModuleVisible('professor_links_uteis')): ?>
+                    <?php if (LayoutHelper::isModuleEnabled('professor_links_uteis')): ?>
                     <?php
                     $linksUteisProfessorEnabled = LayoutHelper::isModuleEnabled('professor_links_uteis');
                     $customMenuLinks = json_decode(LayoutHelper::get('menu_links_submenu', '[]'), true);
@@ -505,7 +501,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </div>
             
             <!-- Gerar Slides -->
-            <?php if (LayoutHelper::isModuleVisible('professor_gerar_slides')): ?>
+            <?php if (LayoutHelper::isModuleEnabled('professor_gerar_slides')): ?>
             <?php $gerarSlidesEnabled = $modulosProfessor['professor_gerar_slides']; ?>
             <a href="<?= $gerarSlidesEnabled ? URL . '/professor/gerar-slides' : '#' ?>" 
                onclick="<?= $gerarSlidesEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Gerar Slides\'); return false;' ?>"

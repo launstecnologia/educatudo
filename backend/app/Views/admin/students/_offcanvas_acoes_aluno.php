@@ -2,7 +2,7 @@
 $alunoIdAcoes = (int) ($student['id'] ?? 0);
 $alunoNomeAcoes = (string) ($student['nome'] ?? 'Aluno');
 $alunoRaAcoes = (string) ($student['ra'] ?? '-');
-$inclusaoVisivel = !class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('inclusao');
+$inclusaoVisivel = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao');
 $alunoAtivoAcoes = (int) ($student['ativo'] ?? 0) === 1;
 $semResponsaveis = empty($responsaveis_aluno);
 
@@ -77,13 +77,13 @@ $gruposAcoesAluno = [
                 'perm_action' => 'visualizar',
                 'onclick' => "abrirModalDoc('Autorizacoes')",
             ],
-            [
+            (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('financeiro')) ? [
                 'id' => 'financeiro',
                 'label' => 'Financeiro',
                 'descricao' => 'Ver saldo, faturas e extrato do aluno',
                 'icon' => 'fa-dollar-sign',
                 'onclick' => 'abrirFinanceiro(' . $alunoIdAcoes . ')',
-            ],
+            ] : null,
         ])),
     ],
     'documentos' => [

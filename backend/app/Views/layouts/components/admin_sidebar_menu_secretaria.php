@@ -141,13 +141,13 @@ $gestaoOpen = in_array($cur, [
         </button>
     </div>
     <div id="sec-avaliacoes-submenu" class="<?= $avaliacoesOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($secCan(['provas_online'])): ?>
+        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_provas'))): ?>
         <a href="<?= $urlBase ?>/admin/provas" class="<?= $linkCls($cur === 'provas' || $cur === 'provas_blocos') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Avaliações/Notas</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['redacao_professor'])): ?>
+        <?php if ($secCan(['redacao_professor']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel'))): ?>
         <a href="<?= $urlBase ?>/admin/redacao-professor" class="<?= $linkCls(in_array($cur, ['essays_teacher', 'essays_teacher_report'], true)) ?>">
             <i class="fa-solid fa-pen-to-square w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada da Redação</span>

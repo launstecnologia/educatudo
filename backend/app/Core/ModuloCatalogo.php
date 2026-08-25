@@ -16,6 +16,7 @@ class ModuloCatalogo
      * @return list<array{
      *   chave: string,
      *   nome: string,
+     *   aliases: list<string>,
      *   feature_keys: list<string>,
      *   rotas: array<string, string>,
      *   rotas_pais: list<array{pattern: string, feature_key: string}>
@@ -257,6 +258,19 @@ class ModuloCatalogo
                 ],
             ],
             [
+                'chave' => 'geral_financeiro',
+                'nome' => 'Financeiro',
+                'feature_keys' => ['financeiro'],
+                'rotas' => [
+                    '/admin/finance' => 'financeiro',
+                    '/admin/financeiro-escolar' => 'financeiro',
+                    '/admin/financeiro' => 'financeiro',
+                ],
+                'rotas_pais' => [
+                    ['pattern' => '#/pais/filhos/\d+/financeiro(?:/|$)#', 'feature_key' => 'financeiro'],
+                ],
+            ],
+            [
                 'chave' => 'exercicios',
                 'nome' => 'Exercícios por Banco de Dados',
                 'feature_keys' => ['exercicios'],
@@ -328,6 +342,7 @@ class ModuloCatalogo
                     '/jornada-redacao' => 'redacao_configuravel',
                     '/professor/redacao-configuravel' => 'professor_redacao_configuravel',
                     '/admin/redacao-configuravel' => 'redacao_configuravel',
+                    '/admin/redacao-professor' => 'redacao_configuravel',
                 ],
                 'rotas_pais' => [
                     ['pattern' => '#/pais/filhos/\d+/redacoes(?:/|$)#', 'feature_key' => 'redacao_configuravel'],
@@ -354,17 +369,21 @@ class ModuloCatalogo
                 'feature_keys' => ['aluno_minicursos'],
                 'rotas' => [
                     '/minicursos' => 'aluno_minicursos',
+                    '/admin/minicursos' => 'aluno_minicursos',
                 ],
             ],
             [
                 'chave' => 'geral_apostilas',
-                'nome' => 'Minha Apostila',
+                'nome' => 'Meu Material',
+                'aliases' => ['Minha Apostila', 'Apostilas'],
                 'feature_keys' => ['aluno_apostilas', 'professor_apostilas'],
                 'rotas' => [
                     '/aluno/apostilas' => 'aluno_apostilas',
                     '/aluno/apostilas-ia' => 'aluno_apostilas',
                     '/professor/apostilas' => 'professor_apostilas',
                     '/professor/apostilas-ia' => 'professor_apostilas',
+                    '/admin/apostilas' => 'aluno_apostilas',
+                    '/admin/apostilas-ia' => 'aluno_apostilas',
                 ],
             ],
             [
@@ -474,6 +493,7 @@ class ModuloCatalogo
      * @return array{
      *   chave: string,
      *   nome: string,
+     *   aliases: list<string>,
      *   feature_keys: list<string>,
      *   rotas: array<string, string>,
      *   rotas_pais: list<array{pattern: string, feature_key: string}>
@@ -507,9 +527,17 @@ class ModuloCatalogo
                 $keys[] = $key;
             }
         }
+        $aliases = [];
+        foreach (($mod['aliases'] ?? []) as $alias) {
+            $alias = trim((string) $alias);
+            if ($alias !== '') {
+                $aliases[] = $alias;
+            }
+        }
         return [
             'chave' => (string) ($mod['chave'] ?? ''),
             'nome' => (string) ($mod['nome'] ?? ''),
+            'aliases' => $aliases,
             'feature_keys' => $keys,
             'rotas' => $rotas,
             'rotas_pais' => $rotasPais,
