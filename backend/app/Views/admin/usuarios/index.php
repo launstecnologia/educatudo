@@ -438,29 +438,48 @@ include __DIR__ . '/../_partials/page_header_list.php';
     </form>
 </aside>
 
-<input type="file" id="admin-usuario-avatar-input" accept="image/jpeg,image/png,image/gif,image/webp,image/*"
-       tabindex="-1" aria-hidden="true"
-       style="position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;overflow:hidden;">
+<form id="admin-usuario-avatar-form" enctype="multipart/form-data" onsubmit="return false;"
+      style="position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;overflow:hidden;">
+    <input type="hidden" name="_token" id="admin-usuario-avatar-token"
+           value="<?= htmlspecialchars((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>">
+    <input type="file" name="avatar" id="admin-usuario-avatar-input"
+           accept="image/jpeg,image/png,image/gif,image/webp,image/*"
+           tabindex="-1" aria-hidden="true">
+</form>
 
 <script>
 const URL_BASE = <?= json_encode(URL) ?>;
-const csrfToken = <?= json_encode((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>;
+let csrfToken = <?= json_encode((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>;
 var pendingAvatarUserId = null;
 
 function resolveCsrfToken() {
-    if (typeof csrfToken === 'string' && csrfToken !== '') {
-        return csrfToken;
-    }
-    const fromInput = document.getElementById('csrf_token')?.value
+    const fromDom = document.getElementById('admin-usuario-avatar-token')?.value
+        || document.getElementById('csrf_token')?.value
         || document.querySelector('#user-form input[name="_token"]')?.value
+        || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
         || '';
-    if (fromInput) {
-        return fromInput;
+    if (fromDom) {
+        return fromDom;
     }
-    if (typeof getCsrfToken === 'function') {
-        return getCsrfToken() || '';
+    return typeof csrfToken === 'string' ? csrfToken : '';
+}
+
+function atualizarTokensCsrfNaPagina(token) {
+    if (!token) {
+        return;
     }
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    csrfToken = token;
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) {
+        meta.setAttribute('content', token);
+    }
+    ['csrf_token', 'admin-usuario-avatar-token'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = token;
+        }
+    });
 }
 const permissionsDefaultsByType = <?= json_encode($permissions_defaults_by_type, JSON_UNESCAPED_UNICODE) ?>;
 const permissionProfiles = <?= json_encode($permission_profiles, JSON_UNESCAPED_UNICODE) ?>;
@@ -766,10 +785,10 @@ function changePassword(id) {
     formData.append('confirmar_senha', confirmarSenha);
     formData.append('motivo', motivo);
 
-    fetch(URL_BASE + '/admin/usuarios/' + id + '/senha', {
+    fetch(URL_BASE + '/admin/usuarios/' + id + '/senha?_token=' + encodeURIComponent(token), {
         method: 'POST',
         body: formData,
-        headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' }
+        credentials: 'same-origin'
     })
         .then((response) => response.json())
         .then((data) => {
@@ -804,6 +823,51 @@ function uploadAvatar(id, ev) {
         return;
     }
     input.dataset.bound = '1';
+
+    function enviarAvatar(id, file, tentativa) {
+        const token = resolveCsrfToken();
+        if (!token) {
+            alert('Sessão expirada. Recarregue a página e tente novamente.');
+            return;
+        }
+        atualizarTokensCsrfNaPagina(token);
+        const form = document.getElementById('admin-usuario-avatar-form');
+        const formData = form ? new FormData(form) : new FormData();
+        formData.set('_token', token);
+        if (!formData.get('avatar')) {
+            formData.set('avatar', file, file.name || 'avatar.jpg');
+        }
+        const url = URL_BASE + '/admin/usuarios/' + id + '/avatar?_token=' + encodeURIComponent(token);
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.csrf_token) {
+                    atualizarTokensCsrfNaPagina(data.csrf_token);
+                }
+                if (data.success) {
+                    alert('Avatar enviado com sucesso!');
+                    location.reload();
+                    return;
+                }
+                const erro = String(data.error || '');
+                if (!tentativa && /token inválido/i.test(erro) && data.csrf_token) {
+                    enviarAvatar(id, file, true);
+                    return;
+                }
+                alert('Erro: ' + (data.error || 'Falha no upload'));
+            })
+            .catch(() => alert('Erro de conexão'))
+            .finally(function () {
+                if (!tentativa) {
+                    input.value = '';
+                }
+            });
+    }
+
     input.addEventListener('change', function () {
         const file = input.files && input.files[0];
         const id = pendingAvatarUserId;
@@ -818,32 +882,7 @@ function uploadAvatar(id, ev) {
             input.value = '';
             return;
         }
-        const token = resolveCsrfToken();
-        if (!token) {
-            alert('Sessão expirada. Recarregue a página e tente novamente.');
-            return;
-        }
-        const formData = new FormData();
-        formData.append('_token', token);
-        formData.append('avatar', file, file.name || 'avatar.jpg');
-        fetch(URL_BASE + '/admin/usuarios/' + id + '/avatar', {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin'
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                if (data.success) {
-                    alert('Avatar enviado com sucesso!');
-                    location.reload();
-                } else {
-                    alert('Erro: ' + (data.error || 'Falha no upload'));
-                }
-            })
-            .catch(() => alert('Erro de conexão'))
-            .finally(function () {
-                input.value = '';
-            });
+        enviarAvatar(id, file, false);
     });
     input.addEventListener('cancel', function () {
         document.documentElement.removeAttribute('data-native-file-picker');

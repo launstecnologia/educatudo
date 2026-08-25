@@ -309,17 +309,17 @@ class UsuarioController extends BaseController
             $this->json(['error' => 'Acesso negado'], 403);
         }
 
-        $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? $_SERVER['HTTP_CONTENT_LENGTH'] ?? 0);
         if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
             $this->json(['error' => 'Arquivo muito grande. Use uma imagem de até 2MB.'], 400);
         }
 
-        $csrfToken = (string) ($_POST['_token'] ?? '');
-        if ($csrfToken === '') {
-            $csrfToken = (string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['HTTP_X_CSRFTOKEN'] ?? '');
-        }
-        if (!$this->verifyCsrfToken($csrfToken)) {
-            $this->json(['error' => 'Token inválido. Recarregue a página e tente novamente.'], 400);
+        $csrfToken = $this->tokenCsrfDaRequisicao();
+        if ($csrfToken === '' || !$this->verifyCsrfToken($csrfToken)) {
+            $this->json([
+                'error' => 'Token inválido. Recarregue a página e tente novamente.',
+                'csrf_token' => $this->generateCsrfToken(),
+            ], 400);
         }
 
         try {
@@ -419,6 +419,30 @@ class UsuarioController extends BaseController
         }
     }
 
+    private function tokenCsrfDaRequisicao(): string
+    {
+        $candidatos = [
+            $_POST['_token'] ?? '',
+            $_POST['csrf_token'] ?? '',
+            $_GET['_token'] ?? '',
+            $_GET['csrf_token'] ?? '',
+        ];
+        foreach ($candidatos as $candidato) {
+            $token = trim((string) $candidato);
+            if ($token !== '') {
+                return $token;
+            }
+        }
+        if (function_exists('getallheaders')) {
+            $headers = array_change_key_case(getallheaders() ?: [], CASE_LOWER);
+            $token = trim((string) ($headers['x-csrf-token'] ?? ''));
+            if ($token !== '') {
+                return $token;
+            }
+        }
+        return trim((string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['HTTP_X_CSRFTOKEN'] ?? ''));
+    }
+
     private function mensagemErroUploadAvatar(int $code): string
     {
         switch ($code) {
@@ -448,8 +472,7 @@ class UsuarioController extends BaseController
             $this->json(['error' => 'Acesso negado'], 403);
         }
 
-        // Verificar CSRF token
-        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+        if (!$this->verifyCsrfToken($this->tokenCsrfDaRequisicao())) {
             $this->json(['error' => 'Token inválido'], 400);
         }
 
