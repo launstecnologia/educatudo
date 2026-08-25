@@ -197,10 +197,12 @@ $linkCls = static function (bool $ativo): string {
                 <span class="sidebar-text text-sm">Denúncias Fórum</span>
             </a>
         </div>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('mural_recados')): ?>
         <a href="<?= URL ?>/admin/mural-recados" class="<?= $linkCls($cp === 'mural-recados') ?>">
             <i class="fa-solid fa-bullhorn w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Mural de Recados</span>
         </a>
+        <?php endif; ?>
         <div class="flex items-center rounded-lg <?= $cp === 'notifications' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/notifications" class="flex-1 <?= $linkCls($cp === 'notifications') ?>">
                 <i class="fa-regular fa-bell w-4 h-4 mr-3"></i>

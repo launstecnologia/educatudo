@@ -5,92 +5,16 @@ if (!class_exists('MasterEscolaDetailController')) {
 class MasterEscolaDetailController extends BaseController
 {
     private const SESSION_MASTER_USER_ID = 'master_user_id';
-
-    private static $MODULOS_GERAL_MAP = [
-        'geral_planos_aula'       => ['aluno_planos_aula', 'professor_planos_aula'],
-        'geral_apostilas'         => ['aluno_apostilas', 'professor_apostilas'],
-        // geral_arquivos: vem do ModuloRegistry (app/Modulos/arquivos/manifest.php)
-        'geral_jornada'           => ['jornadas', 'professor_jornadas'],
-        'geral_redacao_orientada' => ['redacao_configuravel', 'aluno_redacao_configuravel', 'professor_redacao_configuravel'],
-        'geral_provas'            => ['aluno_provas', 'professor_provas'],
-        'geral_mural_recados'     => ['mural_recados'],
-        'geral_links_uteis'       => ['aluno_links_uteis', 'professor_links_uteis'],
-        'geral_chat_professor'    => ['chat_professor'],
-        'geral_ead'               => ['ead'],
-        'geral_inclusao'          => ['inclusao'],
-        'geral_aulas_online'      => ['aulas_online'],
-        // Cadastro simples de aluno (sem processo de matrícula) — escolas só com IA
-        'geral_cadastro_aluno_simples' => ['cadastro_aluno_simples'],
-        // geral_processo_matricula: ModuloRegistry (app/Modulos/matricula/manifest.php)
-    ];
-
-    private static $MODULOS_GERAL_LABELS = [
-        'geral_planos_aula'       => 'Plano de Aula',
-        'geral_apostilas'         => 'Minha Apostila',
-        'geral_jornada'           => 'Jornada do Aluno',
-        'geral_redacao_orientada' => 'Jornada da Redação',
-        'geral_provas'            => 'Provas',
-        'geral_mural_recados'     => 'Mural de Recado',
-        'geral_links_uteis'       => 'Links Úteis',
-        'geral_chat_professor'    => 'Chat c/ Professor',
-        'geral_ead'               => 'EAD / AVA (Minicursos)',
-        'geral_inclusao'          => 'EducaInclui (Avaliação Adaptativa)',
-        'geral_aulas_online'      => 'Aulas Online',
-        'geral_cadastro_aluno_simples' => 'Cadastro simples de aluno (sem processo de matrícula)',
-    ];
-
-    private function getModulosGeralMap(): array
-    {
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        return array_merge(self::$MODULOS_GERAL_MAP, ModuloRegistry::masterGeralMap());
-    }
-
-    private function getModulosGeralLabels(): array
-    {
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        return array_merge(self::$MODULOS_GERAL_LABELS, ModuloRegistry::masterGeralLabels());
-    }
-
-    private function getModulosAluno(): array
-    {
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        return array_merge(self::$MODULOS_ALUNO, ModuloRegistry::masterAlunoExtras());
-    }
-
-    private static $MODULOS_PROFESSOR = [
-        'professor_ai_agents'       => 'Agente de IA',
-        'professor_gerar_slides'    => 'Slides',
-        'professor_redacao_livre'   => 'Redação Livre',
-        'professor_notifications'   => 'Notificações',
-    ];
-
-    private static $MODULOS_ALUNO = [
-        'aluno_minicursos'   => 'Mini Cursos',
-        'educa_livros'       => 'EducaLivro',
-        'aluno_flashcards'   => 'FlashCard',
-        'exercicios_ia'      => 'Exercícios por IA',
-        'exercicios'         => 'Exercícios por Banco de Dados',
-        'redacoes'           => 'Redação',
-        'chat'               => 'Tudinha (chat)',
-        'forum'              => 'Fórum',
-        'jogos'              => 'Games',
-        'educalabs'          => 'EducaLabs',
-        'ingles'             => 'Ingles',
-        'simulados'          => 'Simulados',
-        'aluno_caderno_novo' => 'Meu Caderno',
-        // drive: ModuloRegistry (app/Modulos/drive/manifest.php)
-        'educa_hits'         => 'EducaHits',
-        'vlibras'            => 'VLibras (Libras)',
-    ];
-
     private static $MODULE_VALID_VALUES = ['1', '0'];
     private static $RELEASE_CHANNEL_VALUES = ['stable', 'canary'];
+
+    private function getModulosCatalogo(): array
+    {
+        if (!class_exists('ModuloCatalogo', false)) {
+            require_once __DIR__ . '/../../Core/ModuloCatalogo.php';
+        }
+        return ModuloCatalogo::todos();
+    }
 
     private function getReleaseCatalog(): array
     {
@@ -1182,10 +1106,7 @@ class MasterEscolaDetailController extends BaseController
         $id = (int) $id;
 
         $this->renderDetail($id, 'modulos', 'modulos', [
-            'modulos_geral'        => $this->getModulosGeralMap(),
-            'modulos_geral_labels' => $this->getModulosGeralLabels(),
-            'modulos_professor'    => self::$MODULOS_PROFESSOR,
-            'modulos_aluno'        => $this->getModulosAluno(),
+            'modulos_catalogo'     => $this->getModulosCatalogo(),
             'release_channels'     => self::$RELEASE_CHANNEL_VALUES,
             'release_catalog'      => $this->getReleaseCatalog(),
         ]);
@@ -1214,25 +1135,10 @@ class MasterEscolaDetailController extends BaseController
         }
 
         $modules = $_POST['modules'] ?? [];
-        $config = [];
-
-        foreach ($this->getModulosGeralMap() as $formKey => $backendKeys) {
-            $raw = isset($modules[$formKey]) ? (string) $modules[$formKey] : '1';
-            $value = in_array($raw, self::$MODULE_VALID_VALUES, true) ? $raw : '1';
-            foreach ($backendKeys as $bk) {
-                $config['module_' . $bk] = $value;
-            }
+        if (!class_exists('ModuloCatalogo', false)) {
+            require_once __DIR__ . '/../../Core/ModuloCatalogo.php';
         }
-
-        $directKeys = array_merge(array_keys(self::$MODULOS_PROFESSOR), array_keys($this->getModulosAluno()));
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        foreach ($directKeys as $mod) {
-            $fallback = ModuloRegistry::featureDefault((string) $mod);
-            $raw = isset($modules[$mod]) ? (string) $modules[$mod] : $fallback;
-            $config['module_' . $mod] = in_array($raw, self::$MODULE_VALID_VALUES, true) ? $raw : $fallback;
-        }
+        $config = ModuloCatalogo::configFromPost(is_array($modules) ? $modules : [], self::$MODULE_VALID_VALUES);
 
         require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
         $layoutAtual = $this->getLayoutConfig($id);

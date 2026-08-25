@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/LayoutHelper.php';
 require_once __DIR__ . '/ModuloRegistry.php';
+require_once __DIR__ . '/ModuloCatalogo.php';
 
 class FeatureGate
 {
@@ -97,7 +98,7 @@ class FeatureGate
             }
         }
 
-        $module = self::matchModuleByUri($uri);
+        $module = self::matchModuleByUri($path);
         if ($module === null) {
             return null; // rota não mapeada a módulos
         }
@@ -108,14 +109,13 @@ class FeatureGate
         }
         // desabilitado, inativo ou bloqueado por TudiCoins: redireciona
 
-        // Redireciono para dashboard apropriado por prefixo
-        if (strpos($uri, '/admin') === 0) {
+        if (strpos($path, '/admin') === 0) {
             return URL . '/admin/dashboard';
         }
-        if (strpos($uri, '/professor') === 0) {
+        if (strpos($path, '/professor') === 0) {
             return URL . '/professor/dashboard';
         }
-        if (strpos($uri, '/pais') === 0) {
+        if (strpos($path, '/pais') === 0) {
             return URL . '/pais/dashboard';
         }
         return URL . '/dashboard';
@@ -186,28 +186,48 @@ class FeatureGate
         return null;
     }
 
-    private static function matchModuleByUri(string $uri): ?string
+    private static function matchModuleByUri(string $path): ?string
     {
-        $map = array_merge(self::$routeToModule, ModuloRegistry::routeToFeatureKey());
+        $map = array_merge(
+            self::$routeToModule,
+            ModuloCatalogo::rotasPrefixo(),
+            ModuloRegistry::routeToFeatureKey()
+        );
 
-        // Ordena prefixos por tamanho desc para casar o mais específico primeiro
         $prefixes = array_keys($map);
         usort($prefixes, function ($a, $b) {
             return strlen($b) <=> strlen($a);
         });
 
         foreach ($prefixes as $prefix) {
-            if (strpos($uri, $prefix) === 0) {
+            if (self::pathStartsWithPrefix($path, (string) $prefix)) {
                 return $map[$prefix];
             }
         }
 
-        // Pais: id do filho fica no meio da URI (/pais/filhos/{id}/arquivos)
-        if (preg_match('#/pais/filhos/\d+/arquivos(?:/|$)#', $uri)) {
-            return 'aluno_arquivos';
+        foreach (ModuloCatalogo::rotasPais() as $row) {
+            if (preg_match($row['pattern'], $path)) {
+                return $row['feature_key'];
+            }
         }
 
         return null;
+    }
+
+    /**
+     * Casa prefixo de rota sem pegar irmão com o mesmo começo
+     * (/chat não bloqueia /chat-professor).
+     */
+    private static function pathStartsWithPrefix(string $path, string $prefix): bool
+    {
+        $prefix = rtrim($prefix, '/');
+        if ($prefix === '') {
+            return false;
+        }
+        if ($path === $prefix) {
+            return true;
+        }
+        return strpos($path, $prefix . '/') === 0;
     }
 }
 

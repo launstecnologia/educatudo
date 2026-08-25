@@ -141,7 +141,7 @@
                         <input type="checkbox" name="criar_banco_automaticamente" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         <span class="text-sm text-slate-700">Criar banco e usuário MySQL automaticamente</span>
                     </label>
-                    <p class="text-xs text-slate-500 mt-1">Requer <code>DB_ADMIN_USER</code> e <code>DB_ADMIN_PASS</code> no .env. O sistema cria o banco, o usuário, aplica o schema atual (<code>educa_core.sql</code>) e roda as migrations.</p>
+                    <p class="text-xs text-slate-500 mt-1">Requer <code>DB_ADMIN_USER</code> e <code>DB_ADMIN_PASS</code> no .env. Esse usuário precisa ter permissão <strong>a partir da VPS</strong> (não vale só <code>root@localhost</code>). O sistema cria o banco, o usuário, aplica o schema e roda as migrations.</p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -221,68 +221,36 @@
             </div>
         </section>
 
-        <!-- Módulos do sistema (Geral, Professor, Aluno) -->
+        <!-- Módulos do sistema -->
         <section class="bg-white rounded-xl shadow border border-slate-200 p-6">
             <h3 class="text-lg font-semibold text-slate-800 mb-2">Módulos do sistema</h3>
-            <p class="text-sm text-slate-600 mb-4">1 = Habilitado, 0 = Desabilitado, 2 = Inativo (oculto). Configure por instância.</p>
+            <p class="text-sm text-slate-600 mb-4">1 = Habilitado, 0 = Desabilitado, 2 = Inativo (oculto). Desligar remove o acesso de aluno, professor e pais.</p>
             <div class="flex flex-wrap gap-2 mb-4">
                 <button type="button" class="js-master-modules-batch px-3 py-1.5 rounded-lg text-sm bg-green-100 text-green-800 hover:bg-green-200" data-value="1">Habilitar tudo</button>
                 <button type="button" class="js-master-modules-batch px-3 py-1.5 rounded-lg text-sm bg-amber-100 text-amber-800 hover:bg-amber-200" data-value="0">Desabilitar tudo</button>
                 <button type="button" class="js-master-modules-batch px-3 py-1.5 rounded-lg text-sm bg-gray-200 text-slate-700 hover:bg-gray-300" data-value="2">Inativar tudo</button>
             </div>
-            <?php $layout = $layout ?? []; ?>
-            <div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
-                <div class="px-4 py-2.5 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-800">Geral (aluno, professor e admin)</div>
-                <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <?php foreach ($modulos_geral ?? [] as $formKey => $backendKeys): ?>
-                    <?php
-                        $firstKey = (string) ($backendKeys[0] ?? '');
-                        if (!class_exists('ModuloRegistry', false)) {
-                            require_once dirname(__DIR__, 3) . '/Core/ModuloRegistry.php';
-                        }
-                        $defaultGeral = $firstKey !== '' ? ModuloRegistry::featureDefault($firstKey) : '1';
-                        $cur = $layout['module_' . $firstKey] ?? $defaultGeral;
-                    ?>
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-sm text-slate-700"><?= htmlspecialchars($modulos_geral_labels[$formKey] ?? $formKey) ?></span>
-                        <select name="modules[<?= htmlspecialchars($formKey) ?>]" class="master-module-select rounded border-slate-300 text-sm w-36 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="1" <?= $cur === '1' ? 'selected' : '' ?>>Habilitado</option>
-                            <option value="0" <?= $cur === '0' ? 'selected' : '' ?>>Desabilitado</option>
-                            <option value="2" <?= $cur === '2' ? 'selected' : '' ?>>Inativo</option>
-                        </select>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
-                <div class="px-4 py-2.5 bg-violet-50 border-b border-violet-100 text-sm font-semibold text-violet-800">Professor</div>
-                <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <?php foreach ($modulos_professor ?? [] as $key => $label): ?>
-                    <?php $cur = $layout['module_' . $key] ?? '1'; ?>
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-sm text-slate-700"><?= htmlspecialchars($label) ?></span>
-                        <select name="modules[<?= htmlspecialchars($key) ?>]" class="master-module-select rounded border-slate-300 text-sm w-36 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="1" <?= $cur === '1' ? 'selected' : '' ?>>Habilitado</option>
-                            <option value="0" <?= $cur === '0' ? 'selected' : '' ?>>Desabilitado</option>
-                            <option value="2" <?= $cur === '2' ? 'selected' : '' ?>>Inativo</option>
-                        </select>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+            <?php
+            $layout = $layout ?? [];
+            $modulos_catalogo = $modulos_catalogo ?? [];
+            if (!class_exists('ModuloCatalogo', false)) {
+                require_once dirname(__DIR__, 3) . '/Core/ModuloCatalogo.php';
+            }
+            ?>
             <div class="border border-slate-200 rounded-lg overflow-hidden">
-                <div class="px-4 py-2.5 bg-emerald-50 border-b border-emerald-100 text-sm font-semibold text-emerald-800">Aluno</div>
                 <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <?php foreach ($modulos_aluno ?? [] as $key => $label): ?>
+                    <?php foreach ($modulos_catalogo as $mod): ?>
                     <?php
-                        if (!class_exists('ModuloRegistry', false)) {
-                            require_once dirname(__DIR__, 3) . '/Core/ModuloRegistry.php';
-                        }
-                        $cur = $layout['module_' . $key] ?? ModuloRegistry::featureDefault((string) $key);
+                        $chave = (string) ($mod['chave'] ?? '');
+                        $nome = (string) ($mod['nome'] ?? $chave);
+                        $featureKeys = is_array($mod['feature_keys'] ?? null) ? $mod['feature_keys'] : [];
+                        $firstKey = (string) ($featureKeys[0] ?? '');
+                        $defaultMod = $firstKey !== '' ? ModuloCatalogo::valorPadrao($mod) : '1';
+                        $cur = $firstKey !== '' ? ($layout['module_' . $firstKey] ?? $defaultMod) : $defaultMod;
                     ?>
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-sm text-slate-700"><?= htmlspecialchars($label) ?></span>
-                        <select name="modules[<?= htmlspecialchars($key) ?>]" class="master-module-select rounded border-slate-300 text-sm w-36 focus:ring-blue-500 focus:border-blue-500">
+                        <span class="text-sm text-slate-700"><?= htmlspecialchars($nome) ?></span>
+                        <select name="modules[<?= htmlspecialchars($chave) ?>]" class="master-module-select rounded border-slate-300 text-sm w-36 focus:ring-blue-500 focus:border-blue-500">
                             <option value="1" <?= $cur === '1' ? 'selected' : '' ?>>Habilitado</option>
                             <option value="0" <?= $cur === '0' ? 'selected' : '' ?>>Desabilitado</option>
                             <option value="2" <?= $cur === '2' ? 'selected' : '' ?>>Inativo</option>

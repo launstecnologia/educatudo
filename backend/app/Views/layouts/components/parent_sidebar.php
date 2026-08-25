@@ -90,24 +90,30 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 </svg>
                 <span class="sidebar-text">Notas</span>
             </a>
+            <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/jornadas" class="flex items-center px-4 py-3 <?= $current_page === 'jornadas' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                 </svg>
                 <span class="sidebar-text">Histórico de Jornadas</span>
             </a>
+            <?php endif; ?>
+            <?php if (FeatureGate::isModuleEnabled('aluno_planos_aula')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/plano-aula" class="flex items-center px-4 py-3 <?= $current_page === 'plano-aula' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                 </svg>
                 <span class="sidebar-text">Plano de Aula</span>
             </a>
+            <?php endif; ?>
+            <?php if (FeatureGate::isModuleEnabled('mural_recados')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/mural-recados" class="flex items-center px-4 py-3 <?= $current_page === 'mural-recados' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                 </svg>
                 <span class="sidebar-text">Recados</span>
             </a>
+            <?php endif; ?>
             <?php if (FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/arquivos" class="flex items-center px-4 py-3 <?= $current_page === 'arquivos' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,18 +127,24 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z"></path></svg>
                 <span class="text-sm">Notas (selecione um filho)</span>
             </span>
+            <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                 <span class="text-sm">Jornadas (selecione um filho)</span>
             </span>
+            <?php endif; ?>
+            <?php if (FeatureGate::isModuleEnabled('aluno_planos_aula')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
-                <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h.01M9 16h.01"></path></svg>
+                <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                 <span class="text-sm">Plano de Aula (selecione um filho)</span>
             </span>
+            <?php endif; ?>
+            <?php if (FeatureGate::isModuleEnabled('mural_recados')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                 <span class="text-sm">Recados (selecione um filho)</span>
             </span>
+            <?php endif; ?>
             <?php if (FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path></svg>

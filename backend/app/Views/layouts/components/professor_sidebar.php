@@ -384,7 +384,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         <span class="sidebar-text text-sm">Arquivos</span>
                     </a>
 
-                    <!-- Meu Material (módulo novo, sem feature flag dedicada ainda - ver FeatureGate.php) -->
+                    <?php if (!empty($modulosProfessor['professor_apostilas'])): ?>
                     <a href="<?= URL ?>/professor/apostilas-ia"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'apostilas-ia' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -392,6 +392,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         </svg>
                         <span class="sidebar-text text-sm">Meu Material</span>
                     </a>
+                    <?php endif; ?>
 
                     <!-- Apostilas -->
                     <?php $apostilasEnabled = $modulosProfessor['professor_apostilas']; ?>
@@ -442,7 +443,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         <span class="sidebar-text text-sm">Redação Livre</span>
                     </a>
 
-                    <!-- Mural de Recados -->
+                    <?php if (LayoutHelper::isModuleEnabled('mural_recados')): ?>
                     <a href="<?= URL ?>/professor/mural-recados"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'mural-recados' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,6 +451,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         </svg>
                         <span class="sidebar-text text-sm">Mural de Recados</span>
                     </a>
+                    <?php endif; ?>
 
                     <?php if (LayoutHelper::isModuleVisible('professor_links_uteis')): ?>
                     <?php

@@ -1,9 +1,6 @@
 <?php
 $layout_config = $layout_config ?? [];
-$modulos_geral = $modulos_geral ?? [];
-$modulos_geral_labels = $modulos_geral_labels ?? [];
-$modulos_professor = $modulos_professor ?? [];
-$modulos_aluno = $modulos_aluno ?? [];
+$modulos_catalogo = $modulos_catalogo ?? [];
 $release_channels = $release_channels ?? ['stable', 'canary'];
 $release_catalog = $release_catalog ?? [];
 $escola_id = $escola_id ?? 0;
@@ -15,18 +12,9 @@ $release_version = (string)($layout_config['release_version'] ?? '');
 $release_flags = (string)($layout_config['release_flags'] ?? '');
 $csrf_token = $csrf_token ?? '';
 require_once __DIR__ . '/../../../../Core/CreditosModuleRegistry.php';
+require_once __DIR__ . '/../../../../Core/ModuloCatalogo.php';
 $tudicoinsOn = ($layout_config['creditos_habilitado'] ?? '0') === '1';
 $modulosExigemTudiCoins = array_fill_keys(\CreditosModuleRegistry::getFeatureModulesQueExigemTudiCoins(), true);
-// Chaves do formulário "geral_*" que mapeiam para um feature module 100% IA
-$geralExigeTudiCoins = [];
-foreach ($modulos_geral as $formKey => $backendKeys) {
-    foreach ($backendKeys as $bk) {
-        if (isset($modulosExigemTudiCoins[$bk])) {
-            $geralExigeTudiCoins[$formKey] = true;
-            break;
-        }
-    }
-}
 
 $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) {
     $enabled = !$lockedOff && $cur !== '0';
@@ -43,7 +31,7 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
 
 <div class="bg-white rounded-xl shadow border border-slate-200 p-6">
     <h3 class="text-lg font-semibold text-slate-800 mb-2">Módulos do sistema</h3>
-    <p class="text-sm text-slate-600 mb-4">Habilitado ou Desativado para esta escola.</p>
+    <p class="text-sm text-slate-600 mb-4">Desligar um módulo remove o acesso de aluno, professor, pais e admin — inclusive pela URL.</p>
     <?php if (!$tudicoinsOn): ?>
     <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         TudiCoins está desligado nesta escola. Módulos 100% IA (FlashCard, Tudinha, Exercícios por IA, Slides, Agente de IA…) ficam bloqueados — habilite em <a class="underline font-medium" href="<?= URL ?>/master/escolas/<?= (int) $escola_id ?>/creditos">TudiCoins</a>.
@@ -53,51 +41,10 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
     <form method="post" id="form-modulos" action="<?= URL ?>/master/escolas/<?= (int) $escola_id ?>/modulos">
         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
         <input type="hidden" name="confirm_senha" id="modulos-confirm-senha" value="">
-        <div class="flex flex-wrap gap-2 mb-6">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
             <button type="button" class="js-mod-batch px-3 py-1.5 rounded-lg text-sm bg-green-100 text-green-800 hover:bg-green-200" data-value="1">Habilitar tudo</button>
             <button type="button" class="js-mod-batch px-3 py-1.5 rounded-lg text-sm bg-amber-100 text-amber-800 hover:bg-amber-200" data-value="0">Desativar tudo</button>
-        </div>
-
-        <div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
-            <div class="px-4 py-2.5 bg-emerald-50 border-b border-emerald-100 text-sm font-semibold text-emerald-800">Alunos</div>
-            <div class="px-2 divide-y divide-gray-100">
-                <?php foreach ($modulos_aluno as $key => $label): ?>
-                <?php
-                    if (!class_exists('ModuloRegistry', false)) {
-                        require_once dirname(__DIR__, 4) . '/Core/ModuloRegistry.php';
-                    }
-                    $defaultMod = ModuloRegistry::featureDefault((string) $key);
-                    $cur = $layout_config['module_' . $key] ?? $defaultMod;
-                    $locked = !$tudicoinsOn && isset($modulosExigemTudiCoins[$key]);
-                ?>
-                <div class="flex items-center justify-between gap-4 py-2.5">
-                    <span class="text-sm text-slate-700">
-                        <?= htmlspecialchars($label) ?>
-                        <?php if ($locked): ?><span class="text-xs text-amber-700 ml-1">(exige TudiCoins)</span><?php endif; ?>
-                    </span>
-                    <?php $renderModToggle($key, $cur, $locked); ?>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-
-        <div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
-            <div class="px-4 py-2.5 bg-violet-50 border-b border-violet-100 text-sm font-semibold text-violet-800">Professor</div>
-            <div class="px-2 divide-y divide-gray-100">
-                <?php foreach ($modulos_professor as $key => $label): ?>
-                <?php
-                    $cur = $layout_config['module_' . $key] ?? '1';
-                    $locked = !$tudicoinsOn && isset($modulosExigemTudiCoins[$key]);
-                ?>
-                <div class="flex items-center justify-between gap-4 py-2.5">
-                    <span class="text-sm text-slate-700">
-                        <?= htmlspecialchars($label) ?>
-                        <?php if ($locked): ?><span class="text-xs text-amber-700 ml-1">(exige TudiCoins)</span><?php endif; ?>
-                    </span>
-                    <?php $renderModToggle($key, $cur, $locked); ?>
-                </div>
-                <?php endforeach; ?>
-            </div>
+            <input type="search" id="modulos-busca" placeholder="Buscar módulo…" class="ml-auto rounded-lg border border-slate-300 text-sm px-3 py-1.5 w-full md:w-64 focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
         </div>
 
         <div class="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
@@ -106,26 +53,31 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
         </div>
 
         <div class="border border-slate-200 rounded-lg overflow-hidden mb-6">
-            <div class="px-4 py-2.5 bg-blue-50 border-b border-blue-100 text-sm font-semibold text-blue-800">Geral (aluno, professor e admin)</div>
-            <div class="px-2 divide-y divide-gray-100">
-                <?php foreach ($modulos_geral as $formKey => $backendKeys): ?>
+            <div class="px-2 divide-y divide-gray-100" id="modulos-lista">
+                <?php foreach ($modulos_catalogo as $mod): ?>
                 <?php
-                    $firstKey = (string) ($backendKeys[0] ?? '');
-                    // Respeita feature_defaults do módulo (ex.: expo_colag default off).
-                    // Antes: ?? '1' fazia o Master mostrar Habilitado sem nunca ter gravado a chave.
-                    if (!class_exists('ModuloRegistry', false)) {
-                        require_once dirname(__DIR__, 4) . '/Core/ModuloRegistry.php';
+                    $chave = (string) ($mod['chave'] ?? '');
+                    $nome = (string) ($mod['nome'] ?? $chave);
+                    $featureKeys = is_array($mod['feature_keys'] ?? null) ? $mod['feature_keys'] : [];
+                    $firstKey = (string) ($featureKeys[0] ?? '');
+                    $defaultMod = $firstKey !== '' ? ModuloCatalogo::valorPadrao($mod) : '1';
+                    $cur = $firstKey !== '' ? ($layout_config['module_' . $firstKey] ?? $defaultMod) : $defaultMod;
+                    $locked = false;
+                    if (!$tudicoinsOn) {
+                        foreach ($featureKeys as $bk) {
+                            if (isset($modulosExigemTudiCoins[(string) $bk])) {
+                                $locked = true;
+                                break;
+                            }
+                        }
                     }
-                    $defaultGeral = $firstKey !== '' ? ModuloRegistry::featureDefault($firstKey) : '1';
-                    $cur = $layout_config['module_' . $firstKey] ?? $defaultGeral;
-                    $locked = !$tudicoinsOn && isset($geralExigeTudiCoins[$formKey]);
                 ?>
-                <div class="flex items-center justify-between gap-4 py-2.5">
+                <div class="flex items-center justify-between gap-4 py-2.5 px-2 js-modulo-row" data-nome="<?= htmlspecialchars(mb_strtolower($nome)) ?>">
                     <span class="text-sm text-slate-700">
-                        <?= htmlspecialchars($modulos_geral_labels[$formKey] ?? $formKey) ?>
+                        <?= htmlspecialchars($nome) ?>
                         <?php if ($locked): ?><span class="text-xs text-amber-700 ml-1">(exige TudiCoins)</span><?php endif; ?>
                     </span>
-                    <?php $renderModToggle($formKey, $cur, $locked); ?>
+                    <?php $renderModToggle($chave, $cur, $locked); ?>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -220,6 +172,18 @@ document.querySelectorAll('.js-mod-batch').forEach(function(btn) {
         });
     });
 });
+
+(function() {
+    var busca = document.getElementById('modulos-busca');
+    if (!busca) return;
+    busca.addEventListener('input', function() {
+        var q = (busca.value || '').toLowerCase().trim();
+        document.querySelectorAll('.js-modulo-row').forEach(function(row) {
+            var nome = row.getAttribute('data-nome') || '';
+            row.classList.toggle('hidden', q !== '' && nome.indexOf(q) === -1);
+        });
+    });
+})();
 
 (function() {
     var form = document.getElementById('form-modulos');

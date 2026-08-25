@@ -11,87 +11,6 @@ class MasterEscolasController extends BaseController
     private const SESSION_MASTER_USER_ID = 'master_user_id';
     private const MODULE_VALID_VALUES = ['1', '0', '2'];
 
-    /** Módulos Geral: chave do form => lista de backend keys (config_layout: module_XXX) */
-    private static $MODULOS_GERAL_MAP = [
-        'geral_planos_aula'    => ['aluno_planos_aula', 'professor_planos_aula'],
-        // geral_arquivos: ModuloRegistry (app/Modulos/arquivos/manifest.php)
-        'geral_apostilas'      => ['aluno_apostilas', 'professor_apostilas'],
-        'geral_links_uteis'    => ['aluno_links_uteis', 'professor_links_uteis'],
-        'geral_jornada'        => ['jornadas', 'professor_jornadas'],
-        'geral_provas'         => ['aluno_provas', 'professor_provas'],
-        'geral_chat_professor' => ['chat_professor'],
-        'geral_redacao_orientada' => ['redacao_configuravel', 'aluno_redacao_configuravel', 'professor_redacao_configuravel'],
-        'geral_minicursos'     => ['aluno_minicursos'],
-    ];
-
-    private static $MODULOS_GERAL_LABELS = [
-        'geral_planos_aula'   => 'Plano de Aula',
-        'geral_apostilas'     => 'Apostilas',
-        'geral_links_uteis'   => 'Links Úteis',
-        'geral_jornada'       => 'Jornada do Aluno',
-        'geral_provas'        => 'Prova Online',
-        'geral_chat_professor'=> 'Chat com Professor',
-        'geral_redacao_orientada' => 'Redação Orientada',
-        'geral_minicursos'    => 'Mini Cursos',
-    ];
-
-    private function getModulosGeralMap(): array
-    {
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        return array_merge(self::$MODULOS_GERAL_MAP, ModuloRegistry::masterGeralMap());
-    }
-
-    private function getModulosGeralLabels(): array
-    {
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        return array_merge(self::$MODULOS_GERAL_LABELS, ModuloRegistry::masterGeralLabels());
-    }
-
-    private function getModulosAluno(): array
-    {
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        return array_merge(self::$MODULOS_ALUNO, ModuloRegistry::masterAlunoExtras());
-    }
-
-    /** Módulos Professor (backend key => label). Valores 1=Habilitado, 0=Desabilitado, 2=Inativo */
-    private static $MODULOS_PROFESSOR = [
-        'professor_alunos' => 'Alunos',
-        'professor_planos_aula' => 'Planos de Aula',
-        'professor_jornadas' => 'Jornadas',
-        'professor_provas' => 'Provas',
-        'professor_redacao_configuravel' => 'Redação Configurável',
-        'professor_redacao_livre' => 'Redação Livre',
-        'professor_gerar_slides' => 'Gerar Slides',
-        'professor_ai_agents' => 'Agentes de IA',
-        'professor_notifications' => 'Notificações',
-        'professor_arquivos' => 'Arquivos',
-    ];
-
-    /** Módulos Aluno (backend key => label) */
-    private static $MODULOS_ALUNO = [
-        'educa_livros'      => 'Educa Livros',
-        'educalabs'         => 'Educa Labs',
-        'aluno_flashcards'  => 'Flash Card',
-        'exercicios'        => 'Exercícios Banco de Dados',
-        'exercicios_ia'     => 'Exercícios Gerado por IA',
-        'ingles'            => 'Inglês',
-        'redacoes'          => 'Redação',
-        'simulados'         => 'Simulados',
-        'chat'              => 'Chat IA',
-        'aluno_caderno_novo'=> 'Meu Caderno (novo)',
-        'forum'             => 'Fórum',
-        // drive: ModuloRegistry (app/Modulos/drive/manifest.php)
-        'jogos'             => 'Games',
-        'educa_hits'        => 'EducaHits',
-        'vlibras'           => 'VLibras (Libras)',
-    ];
-
     /** Chaves de apps externos em config_layout */
     private static $APPS_EXTERNOS_KEYS = [
         'educalabs_external_url',
@@ -115,6 +34,14 @@ class MasterEscolasController extends BaseController
 
     /** Chaves de API em config_layout (em branco = não alterar) */
     private static $API_KEYS = ['openai_api_key', 'gamma_api_key', 'nanobanana_api_key'];
+
+    private function getModulosCatalogo(): array
+    {
+        if (!class_exists('ModuloCatalogo', false)) {
+            require_once __DIR__ . '/../../Core/ModuloCatalogo.php';
+        }
+        return ModuloCatalogo::todos();
+    }
 
     public function __construct()
     {
@@ -470,10 +397,7 @@ class MasterEscolasController extends BaseController
             'escola' => null,
             'banco' => null,
             'layout' => [],
-            'modulos_geral' => $this->getModulosGeralMap(),
-            'modulos_geral_labels' => $this->getModulosGeralLabels(),
-            'modulos_professor' => self::$MODULOS_PROFESSOR,
-            'modulos_aluno' => $this->getModulosAluno(),
+            'modulos_catalogo' => $this->getModulosCatalogo(),
             'criar_banco_disponivel' => MysqlProvisioningService::isAvailable(),
             'dominio_config' => $this->getDominioViewConfig(),
             'csrf_token' => $this->generateCsrfToken(),
@@ -543,6 +467,7 @@ class MasterEscolasController extends BaseController
         $criarBancoAuto = !empty($_POST['criar_banco_automaticamente']);
 
         if ($nomeBanco !== '' && $usuario !== '') {
+            $erroProvisionamento = '';
             if ($criarBancoAuto && $senha !== '') {
                 require_once __DIR__ . '/../../Core/MysqlProvisioningService.php';
                 if (MysqlProvisioningService::isAvailable()) {
@@ -550,21 +475,23 @@ class MasterEscolasController extends BaseController
                         $admin = MysqlProvisioningService::getAdminConnectionParams();
                         $adminUser = function_exists('env') ? env('DB_ADMIN_USER', '') : '';
                         $adminPass = function_exists('env') ? env('DB_ADMIN_PASS', '') : '';
-                        $host = $admin['host'];
-                        $porta = $admin['port'];
+                        $adminHost = (string) ($admin['host'] ?? $host);
+                        $adminPorta = (int) ($admin['port'] ?? $porta);
                         MysqlProvisioningService::createDatabaseAndUser(
-                            $host,
-                            $porta,
+                            $adminHost,
+                            $adminPorta,
                             $adminUser,
                             $adminPass,
                             $nomeBanco,
                             $usuario,
                             $senha
                         );
+                        $host = $adminHost;
+                        $porta = $adminPorta;
                     } catch (Exception $e) {
-                        $this->setFlashMessage('Erro ao criar banco/usuário: ' . $e->getMessage(), 'error');
-                        header('Location: ' . URL . '/master/escolas/editar?id=' . $escolaId);
-                        exit;
+                        $adminHostMsg = isset($adminHost) ? $adminHost : $host;
+                        $adminUserMsg = function_exists('env') ? (string) env('DB_ADMIN_USER', 'root') : 'root';
+                        $erroProvisionamento = MysqlProvisioningService::formatarErroAdminMysql($e, $adminUserMsg, $adminHostMsg);
                     }
                 }
             }
@@ -572,7 +499,13 @@ class MasterEscolasController extends BaseController
                 try {
                     $this->provisionarSchemaTenant($db->getPdo(), $host, $porta, $nomeBanco, $usuario, $senha, $escolaId);
                 } catch (Exception $e) {
-                    $this->setFlashMessage('Erro ao aplicar schema/migrations no banco da escola: ' . $e->getMessage(), 'error');
+                    $msgSchema = $e->getMessage();
+                    $this->setFlashMessage(
+                        $erroProvisionamento !== ''
+                            ? $erroProvisionamento
+                            : ('Erro ao aplicar schema/migrations no banco da escola: ' . $msgSchema),
+                        'error'
+                    );
                     header('Location: ' . URL . '/master/escolas/editar?id=' . $escolaId);
                     exit;
                 }
@@ -581,6 +514,11 @@ class MasterEscolasController extends BaseController
                 "INSERT INTO config_escolas_banco (escola_id, host, porta, nome_banco, usuario, senha_criptografada) VALUES (?, ?, ?, ?, ?, ?)",
                 [$escolaId, $host, $porta, $nomeBanco, $usuario, MasterSecretVault::encryptDbPassword($senha)]
             );
+            if ($erroProvisionamento !== '') {
+                $this->setFlashMessage($erroProvisionamento, 'error');
+                header('Location: ' . URL . '/master/escolas/editar?id=' . $escolaId);
+                exit;
+            }
         }
 
         $this->saveLayoutFromPost($escolaId);
@@ -637,10 +575,7 @@ class MasterEscolasController extends BaseController
             'escola' => $escola,
             'banco' => $banco,
             'layout' => $layout,
-            'modulos_geral' => $this->getModulosGeralMap(),
-            'modulos_geral_labels' => $this->getModulosGeralLabels(),
-            'modulos_professor' => self::$MODULOS_PROFESSOR,
-            'modulos_aluno' => $this->getModulosAluno(),
+            'modulos_catalogo' => $this->getModulosCatalogo(),
             'criar_banco_disponivel' => MysqlProvisioningService::isAvailable(),
             'dominio_config' => $this->getDominioViewConfig(),
             'csrf_token' => $this->generateCsrfToken(),
@@ -713,6 +648,7 @@ class MasterEscolasController extends BaseController
         $senha = trim($_POST['db_senha'] ?? '');
         $criarBancoAuto = !empty($_POST['criar_banco_automaticamente']);
         $banco = $db->query("SELECT id, senha_criptografada FROM config_escolas_banco WHERE escola_id = ?", [$id])->fetch(PDO::FETCH_ASSOC);
+        $erroAdmin = '';
         if ($nomeBanco !== '' && $usuario !== '') {
             if (!$banco && $criarBancoAuto && $senha !== '') {
                 require_once __DIR__ . '/../../Core/MysqlProvisioningService.php';
@@ -721,21 +657,26 @@ class MasterEscolasController extends BaseController
                         $admin = MysqlProvisioningService::getAdminConnectionParams();
                         $adminUser = function_exists('env') ? env('DB_ADMIN_USER', '') : '';
                         $adminPass = function_exists('env') ? env('DB_ADMIN_PASS', '') : '';
-                        $host = $admin['host'];
-                        $porta = $admin['port'];
+                        $adminHost = (string) ($admin['host'] ?? $host);
+                        $adminPorta = (int) ($admin['port'] ?? $porta);
                         MysqlProvisioningService::createDatabaseAndUser(
-                            $host,
-                            $porta,
+                            $adminHost,
+                            $adminPorta,
                             $adminUser,
                             $adminPass,
                             $nomeBanco,
                             $usuario,
                             $senha
                         );
+                        $host = $adminHost;
+                        $porta = $adminPorta;
                     } catch (Exception $e) {
-                        $this->setFlashMessage('Erro ao criar banco/usuário: ' . $e->getMessage(), 'error');
-                        header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
-                        exit;
+                        $adminUserMsg = function_exists('env') ? (string) env('DB_ADMIN_USER', 'root') : 'root';
+                        $erroAdmin = MysqlProvisioningService::formatarErroAdminMysql(
+                            $e,
+                            $adminUserMsg,
+                            (string) ($admin['host'] ?? $host)
+                        );
                     }
                 }
             }
@@ -748,7 +689,10 @@ class MasterEscolasController extends BaseController
                 try {
                     $this->provisionarSchemaTenant($db->getPdo(), $host, $porta, $nomeBanco, $usuario, $senhaProvisionar, $id);
                 } catch (Exception $e) {
-                    $this->setFlashMessage('Erro ao aplicar schema/migrations no banco da escola: ' . $e->getMessage(), 'error');
+                    $this->setFlashMessage(
+                        $erroAdmin !== '' ? $erroAdmin : ('Erro ao aplicar schema/migrations no banco da escola: ' . $e->getMessage()),
+                        'error'
+                    );
                     header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
                     exit;
                 }
@@ -770,6 +714,11 @@ class MasterEscolasController extends BaseController
                     "INSERT INTO config_escolas_banco (escola_id, host, porta, nome_banco, usuario, senha_criptografada) VALUES (?, ?, ?, ?, ?, ?)",
                     [$id, $host, $porta, $nomeBanco, $usuario, MasterSecretVault::encryptDbPassword($senha)]
                 );
+            }
+            if ($erroAdmin !== '') {
+                $this->setFlashMessage($erroAdmin, 'error');
+                header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
+                exit;
             }
         }
 
@@ -900,26 +849,14 @@ class MasterEscolasController extends BaseController
             }
         }
 
-        // Módulos: Geral (mapeamento form -> várias backend keys)
         $modules = $_POST['modules'] ?? [];
-        foreach ($this->getModulosGeralMap() as $formKey => $backendKeys) {
-            $raw = isset($modules[$formKey]) ? (string) $modules[$formKey] : '1';
-            $value = in_array($raw, self::MODULE_VALID_VALUES, true) ? $raw : '1';
-            foreach ($backendKeys as $bk) {
-                $config['module_' . $bk] = $value;
-            }
+        if (!class_exists('ModuloCatalogo', false)) {
+            require_once __DIR__ . '/../../Core/ModuloCatalogo.php';
         }
-
-        // Módulos: Professor e Aluno (chave direta)
-        $directModuleKeys = array_merge(array_keys(self::$MODULOS_PROFESSOR), array_keys($this->getModulosAluno()));
-        if (!class_exists('ModuloRegistry', false)) {
-            require_once __DIR__ . '/../../Core/ModuloRegistry.php';
-        }
-        foreach ($directModuleKeys as $mod) {
-            $fallback = ModuloRegistry::featureDefault((string) $mod);
-            $raw = isset($modules[$mod]) ? (string) $modules[$mod] : $fallback;
-            $config['module_' . $mod] = in_array($raw, self::MODULE_VALID_VALUES, true) ? $raw : $fallback;
-        }
+        $config = array_merge(
+            $config,
+            ModuloCatalogo::configFromPost(is_array($modules) ? $modules : [], self::MODULE_VALID_VALUES)
+        );
 
         // Links no submenu (JSON)
         $menuLinksRaw = trim((string) ($_POST['layout_menu_links_submenu'] ?? ''));
