@@ -16,13 +16,6 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aulas_online
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/planos-aula',
-    'title' => 'Plano de Aula',
-    'description' => 'Visualize e aprove os planos de aula dos professores.',
-    'icon' => 'fa-regular fa-file-lines',
-];
-
 if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('ead')) {
     $hub_cards[] = [
         'href' => URL . '/admin/ava',
@@ -32,6 +25,13 @@ if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('ead')) {
     ];
 }
 
+$hub_cards[] = [
+    'href' => URL . '/admin/bncc',
+    'title' => 'BNCC / Plano de Curso',
+    'description' => 'Habilidades da BNCC e plano de curso da escola.',
+    'icon' => 'fa-solid fa-list-check',
+];
+
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('aluno_minicursos')) {
     $hub_cards[] = [
         'href' => URL . '/admin/minicursos',
@@ -40,5 +40,12 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleVisible('aluno_minicu
         'icon' => 'fa-solid fa-circle-play',
     ];
 }
+
+$hub_cards[] = [
+    'href' => URL . '/admin/planos-aula',
+    'title' => 'Plano de Aula',
+    'description' => 'Visualize e aprove os planos de aula dos professores.',
+    'icon' => 'fa-regular fa-file-lines',
+];
 
 include __DIR__ . '/../_partials/hub_modulos.php';

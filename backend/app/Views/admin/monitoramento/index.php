@@ -24,4 +24,11 @@ $hub_cards[] = [
     'onclick' => 'abrirModalAlunosOnline(); return false;',
 ];
 
+$hub_cards[] = [
+    'href' => URL . '/admin/tentativas-login',
+    'title' => 'Tentativas de login',
+    'description' => 'Audite tentativas de acesso à plataforma.',
+    'icon' => 'fa-solid fa-lock',
+];
+
 include __DIR__ . '/../_partials/hub_modulos.php';

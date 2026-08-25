@@ -172,21 +172,37 @@ class AdminPermissionMatrix
     public static function permissionSections(): array
     {
         return [
-            'dashboard' => ['label' => 'Dashboard', 'items' => ['dashboard']],
-            'alunos' => ['label' => 'Alunos', 'items' => ['alunos', 'assistente']],
-            'academico' => ['label' => 'Acadêmico', 'items' => ['ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'salas', 'turmas', 'transferencia']],
-            'avaliacoes' => ['label' => 'Avaliações', 'items' => ['exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor', 'inclusao', 'listagem_avaliacoes', 'relatorio_avaliacoes']],
-            'comunicacao' => ['label' => 'Comunicação', 'items' => ['denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push']],
-            'configuracoes' => ['label' => 'Configurações', 'items' => ['configuracao_boletim', 'notas_semanais', 'guia_boletim', 'modo_manutencao', 'slider_dashboard', 'dev_settings', 'tickets_dev']],
-            'conteudo' => ['label' => 'Conteúdo', 'items' => ['apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'educahits_portal', 'minicursos', 'planos_aula', 'ava']],
+            'dashboard' => ['label' => 'Dashboard', 'items' => ['dashboard', 'assistente']],
+            'academico' => ['label' => 'Acadêmico', 'items' => [
+                'alunos', 'ano_letivo', 'calendario_escolar', 'calendario_letivo', 'materias',
+                'curso', 'grade_horaria', 'matriz_curricular', 'professores', 'notas_semanais',
+                'regras_academicas', 'salas', 'series', 'turmas',
+            ]],
+            'avaliacoes' => ['label' => 'Avaliações', 'items' => [
+                'inclusao', 'provas_online', 'redacao_professor', 'jornadas_aluno',
+                'configuracao_boletim', 'guia_boletim', 'exercicios', 'listagem_avaliacoes', 'relatorio_avaliacoes', 'relatorios_gerais',
+            ]],
+            'comunicacao' => ['label' => 'Comunicação', 'items' => [
+                'comunicacao_escolar', 'forum', 'denuncias_forum', 'mural_recados',
+                'notificacoes', 'notificacoes_push',
+            ]],
+            'conteudo' => ['label' => 'Conteúdo', 'items' => ['arquivos', 'educahits_portal', 'apostilas_ia', 'apostilas', 'expo_colag']],
             'financeiro' => ['label' => 'Financeiro', 'items' => ['financeiro_dashboard', 'financeiro_relatorio_pagantes']],
-            'gestao_escolar' => ['label' => 'Gestão Escolar', 'items' => ['faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'unidades', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos']],
-            'monitoramento' => ['label' => 'Monitoramento', 'items' => ['alertas_sensiveis', 'alunos_online', 'reconhecimento_facial']],
-            'relatorios' => ['label' => 'Relatórios', 'items' => ['relatorios_gerais']],
-            'sistema' => ['label' => 'Sistema', 'items' => ['configuracao_prompt', 'tentativas_login']],
-            'usuarios' => ['label' => 'Usuários', 'items' => ['administradores', 'professores', 'lista_chamada']],
+            'gestao_escolar' => ['label' => 'Gestão Escolar', 'items' => [
+                'censo_escolar', 'conformidade', 'conselho_classe', 'diario_classe', 'faltas', 'presenca',
+                'documentos_institucionais', 'modelos_documentos', 'documentos_professor',
+                'processos_matricula', 'transferencia', 'ocorrencias', 'almoxarifado', 'patrimonio',
+                'resultados_finais', 'saude_academica', 'pacotes_creditos',
+            ]],
+            'monitoramento' => ['label' => 'Monitoramento', 'items' => ['alertas_sensiveis', 'alunos_online', 'tentativas_login', 'reconhecimento_facial']],
+            'pedagogico' => ['label' => 'Pedagógico', 'items' => ['planos_aula', 'ava', 'bncc', 'minicursos']],
+            'sistema' => ['label' => 'Sistema', 'items' => ['configuracao_prompt', 'tickets_dev']],
+            'usuarios' => ['label' => 'Usuários', 'items' => ['administradores', 'lista_chamada']],
+            'configuracoes' => ['label' => 'Z-Configuração', 'items' => [
+                'dev_settings', 'unidades', 'modo_manutencao', 'slider_dashboard',
+            ]],
             'acoes_rapidas_aluno' => ['label' => 'Aluno • Ações Rápidas', 'items' => ['acao_rapida_editar_aluno', 'acao_rapida_acessar_aluno', 'acao_rapida_acessar_pai', 'acao_rapida_ativar_desativar', 'acao_rapida_resetar_senha', 'acao_rapida_cadastrar_responsavel', 'acao_rapida_analise_tudinha', 'acao_rapida_excluir_aluno']],
-            'aluno_complementares' => ['label' => 'Aluno • Responsáveis e Matrículas', 'items' => ['responsaveis_vinculados', 'matriculas_aluno', 'processos_matricula', 'declaracoes_aluno', 'documentos_aluno']],
+            'aluno_complementares' => ['label' => 'Aluno • Responsáveis e Matrículas', 'items' => ['responsaveis_vinculados', 'matriculas_aluno', 'declaracoes_aluno', 'documentos_aluno']],
             'aluno_tabs' => ['label' => 'Aluno • Abas Internas', 'items' => ['tab_relatorio', 'tab_exercicios_bd', 'tab_exercicios_ia', 'tab_redacao', 'tab_ocorrencias', 'tab_jornadas', 'tab_provas', 'tab_notas', 'tab_boletim', 'tab_acessos']],
         ];
     }
