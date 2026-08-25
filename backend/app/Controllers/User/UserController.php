@@ -309,9 +309,17 @@ class UsuarioController extends BaseController
             $this->json(['error' => 'Acesso negado'], 403);
         }
 
-        // Verificar CSRF token
-        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->json(['error' => 'Token inválido'], 400);
+        $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
+            $this->json(['error' => 'Arquivo muito grande. Use uma imagem de até 2MB.'], 400);
+        }
+
+        $csrfToken = (string) ($_POST['_token'] ?? '');
+        if ($csrfToken === '') {
+            $csrfToken = (string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['HTTP_X_CSRFTOKEN'] ?? '');
+        }
+        if (!$this->verifyCsrfToken($csrfToken)) {
+            $this->json(['error' => 'Token inválido. Recarregue a página e tente novamente.'], 400);
         }
 
         try {
@@ -325,6 +333,10 @@ class UsuarioController extends BaseController
             }
 
             if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
+                $uploadError = (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
+                if (in_array($uploadError, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                    throw new Exception('Arquivo muito grande. Use uma imagem de até 2MB.');
+                }
                 throw new Exception('Erro no upload da imagem');
             }
 
@@ -341,12 +353,28 @@ class UsuarioController extends BaseController
                 throw new Exception('Arquivo muito grande. Máximo 2MB');
             }
 
+            $mimePermitidos = ['image/jpeg', 'image/png', 'image/gif'];
+            $mimeReal = '';
+            if (function_exists('finfo_open') && is_uploaded_file($file['tmp_name'])) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $detected = finfo_file($finfo, $file['tmp_name']);
+                    finfo_close($finfo);
+                    if (is_string($detected) && $detected !== '') {
+                        $mimeReal = $detected;
+                    }
+                }
+            }
+            if (!in_array($mimeReal, $mimePermitidos, true)) {
+                throw new Exception('Tipo de arquivo não permitido. Use: ' . implode(', ', $allowedExtensions));
+            }
+
             require_once __DIR__ . '/../../Services/MediaStorageService.php';
             $media = new MediaStorageService($this->config);
 
             // Gerar nome único para o arquivo
             $fileName = 'avatar_' . $id . '_' . time() . '.' . $fileExtension;
-            $contentType = $file['type'] ?? 'application/octet-stream';
+            $contentType = $mimeReal;
             if (!$media->put('avatars', $fileName, $file['tmp_name'], $contentType)) {
                 throw new Exception('Erro ao salvar arquivo');
             }
@@ -378,7 +406,7 @@ class UsuarioController extends BaseController
             ]);
 
         } catch (Exception $e) {
-            $this->json(['error' => $e->getMessage()], 500);
+            $this->json(['error' => $e->getMessage()], 400);
         }
     }
 

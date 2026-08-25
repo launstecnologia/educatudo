@@ -246,7 +246,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
     </div>
 
     <form id="user-form" class="flex flex-col flex-1 overflow-hidden" data-mode="create">
-        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <input type="hidden" id="csrf_token" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>">
         <input type="hidden" id="user_id" value="">
 
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
@@ -439,7 +439,23 @@ include __DIR__ . '/../_partials/page_header_list.php';
 
 <script>
 const URL_BASE = <?= json_encode(URL) ?>;
-const csrfToken = <?= json_encode($csrf_token) ?>;
+const csrfToken = <?= json_encode((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>;
+
+function resolveCsrfToken() {
+    if (typeof csrfToken === 'string' && csrfToken !== '') {
+        return csrfToken;
+    }
+    const fromInput = document.getElementById('csrf_token')?.value
+        || document.querySelector('#user-form input[name="_token"]')?.value
+        || '';
+    if (fromInput) {
+        return fromInput;
+    }
+    if (typeof getCsrfToken === 'function') {
+        return getCsrfToken() || '';
+    }
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
 const permissionsDefaultsByType = <?= json_encode($permissions_defaults_by_type, JSON_UNESCAPED_UNICODE) ?>;
 const permissionProfiles = <?= json_encode($permission_profiles, JSON_UNESCAPED_UNICODE) ?>;
 const permissionCheckboxes = Array.from(document.querySelectorAll('input[name^="permissions["]'));
@@ -734,13 +750,18 @@ function changePassword(id) {
         return;
     }
 
+    const token = resolveCsrfToken();
     const formData = new FormData();
-    formData.append('_token', csrfToken);
+    formData.append('_token', token);
     formData.append('nova_senha', novaSenha);
     formData.append('confirmar_senha', confirmarSenha);
     formData.append('motivo', motivo);
 
-    fetch(URL_BASE + '/admin/usuarios/' + id + '/senha', { method: 'POST', body: formData })
+    fetch(URL_BASE + '/admin/usuarios/' + id + '/senha', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' }
+    })
         .then((response) => response.json())
         .then((data) => {
             if (data.success) {
@@ -755,24 +776,39 @@ function changePassword(id) {
 function uploadAvatar(id) {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = 'image/jpeg,image/png,image/gif';
 
     input.onchange = function (e) {
         const file = e.target.files[0];
         if (!file) return;
 
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Arquivo muito grande. Máximo 2MB.');
+            return;
+        }
+
+        const token = resolveCsrfToken();
+        if (!token) {
+            alert('Sessão expirada. Recarregue a página e tente novamente.');
+            return;
+        }
+
         const formData = new FormData();
-        formData.append('_token', csrfToken);
+        formData.append('_token', token);
         formData.append('avatar', file);
 
-        fetch(URL_BASE + '/admin/usuarios/' + id + '/avatar', { method: 'POST', body: formData })
+        fetch(URL_BASE + '/admin/usuarios/' + id + '/avatar', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' }
+        })
             .then((response) => response.json())
             .then((data) => {
                 if (data.success) {
                     alert('Avatar enviado com sucesso!');
                     location.reload();
                 } else {
-                    alert('Erro: ' + data.error);
+                    alert('Erro: ' + (data.error || 'Falha no upload'));
                 }
             })
             .catch(() => alert('Erro de conexão'));
