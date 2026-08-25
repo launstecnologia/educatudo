@@ -4,7 +4,6 @@
 
 SET NAMES utf8mb4;
 SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
-SET SESSION sql_require_primary_key = 0;
 SET FOREIGN_KEY_CHECKS = 0;
 SET UNIQUE_CHECKS = 0;
 
