@@ -161,8 +161,8 @@ class MysqlProvisioningService
         if (!is_file($path)) {
             throw new Exception('Arquivo de schema base não encontrado: database/educa_core.sql');
         }
-        $sql = file_get_contents($path);
-        if ($sql === false || trim($sql) === '') {
+        $sql = self::lerSqlMigration($path);
+        if (trim($sql) === '') {
             throw new Exception('Schema base educa_core.sql está vazio.');
         }
         try {
@@ -256,6 +256,11 @@ class MysqlProvisioningService
         if (strpos($lower, '_seed_') !== false && strpos($lower, 'catalogo') === false) {
             return true;
         }
+        // Carga pontual de uma escola (ex.: SEB Ribeirânia). Só roda se o Master
+        // escolher o arquivo explicitamente — nunca no bootstrap nem em "Executar todas".
+        if (strpos($lower, 'importar_dados_') !== false) {
+            return true;
+        }
         return false;
     }
 
@@ -299,8 +304,8 @@ class MysqlProvisioningService
             if (isset($executadas[$m['file']])) {
                 continue;
             }
-            $sql = @file_get_contents($m['path']);
-            if ($sql === false || trim($sql) === '') {
+            $sql = self::lerSqlMigration($m['path']);
+            if (trim($sql) === '') {
                 continue;
             }
             $queries = self::splitSqlStatements($sql);
@@ -358,16 +363,13 @@ class MysqlProvisioningService
         if (empty($selectedFiles)) {
             return;
         }
-        $fullList = self::listarArquivosMigrationTenant();
-        if ($fullList === []) {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+        $list = self::resolverArquivosMigrationSelecionados($selectedFiles);
+        if ($list === []) {
             return;
         }
-
-        $selectedSet = array_flip(array_values($selectedFiles));
-        $list = array_filter($fullList, function ($m) use ($selectedSet) {
-            return isset($selectedSet[$m['file']]);
-        });
-        $list = array_values($list);
 
         $executadas = [];
         try {
@@ -386,8 +388,8 @@ class MysqlProvisioningService
             if (isset($executadas[$m['file']])) {
                 continue;
             }
-            $sql = @file_get_contents($m['path']);
-            if ($sql === false || trim($sql) === '') {
+            $sql = self::lerSqlMigration($m['path']);
+            if (trim($sql) === '') {
                 continue;
             }
             $queries = self::splitSqlStatements($sql);
@@ -473,8 +475,8 @@ class MysqlProvisioningService
             if (isset($executadas[$m['file']])) {
                 continue;
             }
-            $sql = @file_get_contents($m['path']);
-            if ($sql === false || trim($sql) === '') {
+            $sql = self::lerSqlMigration($m['path']);
+            if (trim($sql) === '') {
                 continue;
             }
             $queries = self::splitSqlStatements($sql);
@@ -558,8 +560,8 @@ class MysqlProvisioningService
         $executed = [];
         foreach ($list as $m) {
             if (isset($executadas[$m['file']])) continue;
-            $sql = @file_get_contents($m['path']);
-            if ($sql === false || trim($sql) === '') continue;
+            $sql = self::lerSqlMigration($m['path']);
+            if (trim($sql) === '') continue;
             $queries = self::splitSqlStatements($sql);
             $hasOwnTransaction = (
                 stripos($sql, 'START TRANSACTION') !== false ||
@@ -611,6 +613,69 @@ class MysqlProvisioningService
         } finally {
             $stmt->closeCursor();
         }
+    }
+
+    /**
+     * Lê SQL em UTF-8 (remove BOM; se o arquivo veio em Windows-1252, converte).
+     */
+    private static function lerSqlMigration(string $path): string
+    {
+        $sql = @file_get_contents($path);
+        if ($sql === false || $sql === '') {
+            return '';
+        }
+        if (strncmp($sql, "\xEF\xBB\xBF", 3) === 0) {
+            $sql = substr($sql, 3);
+        }
+        if (function_exists('mb_check_encoding') && !mb_check_encoding($sql, 'UTF-8')) {
+            $converted = @mb_convert_encoding($sql, 'UTF-8', 'Windows-1252');
+            if (is_string($converted) && $converted !== '') {
+                $sql = $converted;
+            }
+        }
+        return $sql;
+    }
+
+    /**
+     * Arquivos escolhidos no Master (inclui importar_dados_* pulados no bootstrap).
+     * Só aceita .sql da pasta de migrations, sem rollback e sem *_master.sql.
+     *
+     * @param string[] $selectedFiles
+     * @return array<int, array{file: string, path: string}>
+     */
+    private static function resolverArquivosMigrationSelecionados(array $selectedFiles): array
+    {
+        $migrationsDir = dirname(dirname(__DIR__)) . '/database/migrations';
+        $list = [];
+        $vistos = [];
+        foreach ($selectedFiles as $raw) {
+            $file = basename(str_replace('\\', '/', (string) $raw));
+            if ($file === '' || isset($vistos[$file])) {
+                continue;
+            }
+            if (pathinfo($file, PATHINFO_EXTENSION) !== 'sql') {
+                continue;
+            }
+            $lower = strtolower($file);
+            if (strpos($lower, '_rollback') !== false || strpos($lower, 'master') !== false) {
+                continue;
+            }
+            $path = $migrationsDir . '/' . $file;
+            if (!is_file($path)) {
+                continue;
+            }
+            $realDir = realpath($migrationsDir);
+            $realFile = realpath($path);
+            if ($realDir === false || $realFile === false || strpos($realFile, $realDir) !== 0) {
+                continue;
+            }
+            $vistos[$file] = true;
+            $list[] = ['file' => $file, 'path' => $path];
+        }
+        usort($list, static function ($a, $b) {
+            return strcmp($a['file'], $b['file']);
+        });
+        return $list;
     }
 
     /**
