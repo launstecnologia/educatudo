@@ -41,7 +41,7 @@
             <div class="flex items-center">
                 <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 overflow-hidden">
                     <?php if (!empty($user['avatar_url'])): ?>
-                        <img src="<?= htmlspecialchars($user['avatar_url']) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-full h-full object-cover rounded-full" onerror="this.remove(); this.parentElement.querySelector('[data-avatar-initials]')?.classList.remove('hidden');">
+                        <img src="<?= htmlspecialchars($user['avatar_url']) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" width="40" height="40" class="w-full h-full object-cover rounded-full" style="width:40px;height:40px;object-fit:cover;border-radius:50%" onerror="this.remove(); this.parentElement.querySelector('[data-avatar-initials]')?.classList.remove('hidden');">
                         <span data-avatar-initials class="hidden text-white font-semibold text-sm pointer-events-none"><?= strtoupper(substr($user['nome'] ?? '', 0, 2)) ?></span>
                     <?php else: ?>
                         <span class="text-white font-semibold text-sm"><?= strtoupper(substr($user['nome'] ?? '', 0, 2)) ?></span>
@@ -215,6 +215,7 @@
         ?>
         <nav class="admin-sidebar-nav space-y-0.5">
             <?php if (($user['perfil_admin'] ?? '') === 'financeiro'): ?>
+                <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('financeiro')): ?>
                 <div class="menu-group">
                     <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'financeiro' ? 'bg-white/20' : '' ?>">
                         <a href="<?= URL ?>/admin/financeiro-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -231,6 +232,7 @@
                         <?php $renderFinNav($finItems, $cp); ?>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Logout Button -->
                 <a href="<?= URL ?>/logout?portal=admin" class="flex items-center px-4 py-3 text-red-200 hover:bg-red-500/20 hover:text-red-100 rounded-xl transition-all duration-200 mt-4">

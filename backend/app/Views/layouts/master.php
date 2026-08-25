@@ -3,22 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <title><?= htmlspecialchars($title ?? 'Painel Admin Master') ?></title>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-        theme: {
-            extend: {
-                fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
-            }
-        }
-    };
-    </script>
     <?php include __DIR__ . '/components/form_control_safari.php'; ?>
 </head>
 <body class="h-screen overflow-hidden bg-slate-50 font-sans antialiased text-slate-900 flex flex-col">
@@ -61,7 +52,7 @@ $master_iniciais = MasterAvatarService::iniciais($master_nome);
                                 class="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all duration-200">
                             <?php if (!empty($master_avatar_url)): ?>
                             <img src="<?= htmlspecialchars($master_avatar_url) ?>" alt="<?= htmlspecialchars($master_nome) ?>"
-                                 class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                                 width="32" height="32" class="w-8 h-8 rounded-full object-cover border border-slate-200" style="width:32px;height:32px;object-fit:cover;border-radius:50%">
                             <?php else: ?>
                             <div class="w-8 h-8 bg-slate-800 rounded-full flex items-center justify-center text-white text-xs font-semibold">
                                 <?= htmlspecialchars($master_iniciais) ?>

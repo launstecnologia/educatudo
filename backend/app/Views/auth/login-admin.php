@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Login Administração - EducaTudo</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
     <?php 
     // Incluir LayoutHelper
     require_once __DIR__ . '/../../Core/LayoutHelper.php';

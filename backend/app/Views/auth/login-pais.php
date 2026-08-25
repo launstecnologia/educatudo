@@ -8,7 +8,7 @@
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>
     <meta name="theme-color" content="<?= htmlspecialchars(LayoutHelper::get('primary_color', '#a855f7')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
     <style>
         <?= LayoutHelper::generateCustomCSS() ?>
     </style>

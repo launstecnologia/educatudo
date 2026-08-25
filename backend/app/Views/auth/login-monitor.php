@@ -10,7 +10,7 @@ $system_title = LayoutHelper::getSystemTitle();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal do Monitor - <?= htmlspecialchars($system_title) ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
 </head>
 <body class="min-h-screen flex flex-col bg-gray-50">
     <div class="flex flex-1">

@@ -21,7 +21,7 @@ $iconClass = static function (bool $active): string {
     <div class="p-6 pb-2 shrink-0">
         <div class="flex items-center justify-between mb-6">
             <div class="flex-1 min-w-0 flex items-center">
-                <img src="<?= defined('URL') ? URL : '' ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="max-h-12 w-auto object-contain">
+                <img src="<?= defined('URL') ? URL : '' ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="max-h-12 w-auto object-contain" style="max-height:3rem;width:auto;height:auto">
             </div>
             <button id="sidebarToggle" type="button" class="text-slate-500 hover:bg-slate-100 p-2 rounded-lg transition-colors md:hidden" aria-label="Menu">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -34,7 +34,7 @@ $iconClass = static function (bool $active): string {
             <div class="flex items-center gap-3 min-w-0">
                 <?php if (!empty($master_avatar_url)): ?>
                 <img src="<?= htmlspecialchars($master_avatar_url) ?>" alt="<?= htmlspecialchars($master_nome) ?>"
-                     class="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200">
+                     width="40" height="40" class="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-200" style="width:40px;height:40px;object-fit:cover;border-radius:50%">
                 <?php else: ?>
                 <div class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white text-sm font-semibold shrink-0">
                     <?= htmlspecialchars($master_iniciais) ?>

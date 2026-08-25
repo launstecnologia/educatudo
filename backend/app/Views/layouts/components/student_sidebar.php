@@ -38,7 +38,7 @@
                         }
                     }
                     if (!empty($sidebarAvatarUrl)): ?>
-                        <img src="<?= htmlspecialchars($sidebarAvatarUrl) ?>" alt="Avatar" class="w-full h-full object-cover" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
+                        <img src="<?= htmlspecialchars($sidebarAvatarUrl) ?>" alt="Avatar" width="48" height="48" class="w-full h-full object-cover" style="width:48px;height:48px;object-fit:cover;border-radius:50%" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
                     <?php else: ?>
                         <span class="text-white font-semibold text-sm"><?= strtoupper(substr($aluno['nome_aluno'] ?? '', 0, 2)) ?></span>
                     <?php endif; ?>
@@ -140,12 +140,14 @@
             </a>
             <?php endif; ?>
             
+            <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
             <a href="<?= URL ?>/aluno/apostilas-ia" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'apostilas-ia' ? 'text-white bg-white/20' : 'text-green-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                 </svg>
                 <span class="sidebar-text">Meu Material</span>
             </a>
+            <?php endif; ?>
 
             <a href="<?= URL ?>/livros" class="flex items-center px-4 py-3 <?= $current_page === 'livros' ? 'text-white bg-white/20' : 'text-green-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">

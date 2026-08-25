@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= htmlspecialchars($nomeEscola ?? 'EducaTudo') ?> — Matrícula</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <?php include __DIR__ . '/components/form_control_safari.php'; ?>
 </head>

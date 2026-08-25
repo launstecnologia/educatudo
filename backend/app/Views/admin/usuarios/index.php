@@ -72,7 +72,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
                             <div class="flex-shrink-0 h-10 w-10">
                                 <?php if (!empty($usuario['avatar_url'])): ?>
                                     <div class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden relative">
-                                        <img class="h-10 w-10 rounded-full object-cover absolute inset-0" src="<?= htmlspecialchars($usuario['avatar_url']) ?>" alt="<?= htmlspecialchars($usuario['nome']) ?>" onerror="this.classList.add('hidden'); this.nextElementSibling?.classList.remove('hidden');">
+                                        <img class="h-10 w-10 rounded-full object-cover absolute inset-0" width="40" height="40" style="width:40px;height:40px;object-fit:cover;border-radius:50%" src="<?= htmlspecialchars($usuario['avatar_url']) ?>" alt="<?= htmlspecialchars($usuario['nome']) ?>" onerror="this.classList.add('hidden'); this.nextElementSibling?.classList.remove('hidden');">
                                         <span class="hidden text-sm font-medium text-gray-700"><?= strtoupper(substr($usuario['nome'], 0, 2)) ?></span>
                                     </div>
                                 <?php else: ?>

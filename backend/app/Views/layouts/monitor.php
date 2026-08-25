@@ -4,22 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title ?? 'Monitor - EducaTudo') ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            500: '#14b8a6',
-                            600: '#0d9488',
-                            700: '#0f766e',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <?php include __DIR__ . '/components/form_control_safari.php'; ?>
     <?php if (!empty($additional_css)): ?><?= $additional_css ?><?php endif; ?>
 </head>

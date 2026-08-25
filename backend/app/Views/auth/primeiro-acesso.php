@@ -15,7 +15,7 @@ $tem_matches = count($matches) > 0;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Primeiro acesso - <?= htmlspecialchars($system_title) ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
 </head>
 <body class="min-h-screen bg-gray-50 flex items-center justify-center p-6">
     <div class="w-full max-w-xl bg-white rounded-xl shadow-lg p-8">

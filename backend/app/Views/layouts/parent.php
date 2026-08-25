@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="mobile-web-app-capable" content="yes">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <?php
     $filhos = $filhos ?? [];
     $filho = $filho ?? null;

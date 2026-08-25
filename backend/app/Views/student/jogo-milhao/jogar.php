@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? 'Tudinha do Milhão - Jogando' ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/../../layouts/components/estilos_plataforma.php'; ?>
     <link rel="stylesheet" href="<?= URL ?>/assets/css/jogo-milhao.css">
     <!-- Game Security Script -->
     <script src="<?= URL ?>/app/Views/student/jogo-milhao/game-security.js?v=<?= time() ?>"></script>

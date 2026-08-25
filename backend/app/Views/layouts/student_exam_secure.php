@@ -6,7 +6,7 @@
     <meta name="robots" content="noindex, nofollow">
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <title><?= htmlspecialchars($title ?? 'Prova - EducaTudo') ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <style>
         html, body { height: 100%; margin: 0; overflow: auto; }
         #exam-secure-root { min-height: 100%; }

@@ -720,6 +720,8 @@ class EducaLabsController extends BaseController
             return $html;
         }
 
+        // Play CDN permanece: o HTML gerado pela IA usa classes Tailwind
+        // arbitrárias que o CSS compilado da plataforma não cobre.
         return "<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<link rel=\"stylesheet\" href=\"styles.css\">\n<script src=\"https://cdn.tailwindcss.com\"></script>\n<title>EducaLabs</title>\n</head>\n<body>\n{$html}\n<script src=\"script.js\"></script>\n</body>\n</html>";
     }
 

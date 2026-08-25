@@ -23,29 +23,7 @@ $system_subtitle = LayoutHelper::getSystemSubtitle();
     <?php if (!empty($pwaIcon192)): ?>
         <link rel="apple-touch-icon" href="<?= htmlspecialchars($pwaIcon192) ?>">
     <?php endif; ?>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
 </head>
 <body class="min-h-screen flex flex-col bg-gray-50">
     <div class="flex flex-1">

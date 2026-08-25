@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <?php
     // Avatar do aluno via ContextoAluno (sessão — sem query extra por página)
@@ -37,7 +38,6 @@
         <?php endif; ?>
     <?php endif; ?>
     <link rel="manifest" href="<?= URL ?>/manifest-aluno.json">
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;500;600;700&display=swap">
@@ -562,7 +562,7 @@
                 <div class="flex items-center">
                     <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center mr-3 overflow-hidden">
                         <?php if (!empty($avatar_url)): ?>
-                            <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-full h-full object-cover rounded-full" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
+                            <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" width="40" height="40" class="w-full h-full object-cover rounded-full" style="width:40px;height:40px;object-fit:cover;border-radius:50%" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
                         <?php else: ?>
                             <span class="text-white font-semibold text-sm"><?= strtoupper(substr($user['nome'] ?? 'Aluno', 0, 2)) ?></span>
                         <?php endif; ?>
@@ -1553,7 +1553,7 @@
                         <div class="relative">
                             <button onclick="toggleUserDropdown()" class="flex items-center space-x-2 md:space-x-3 hover:bg-gray-50 px-2 md:px-3 py-2 rounded-lg transition-colors cursor-pointer">
                                 <?php if (!empty($avatar_url)): ?>
-                                    <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" class="w-8 h-8 object-cover rounded-full" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
+                                    <img src="<?= htmlspecialchars($avatar_url) ?>" alt="<?= htmlspecialchars($user['nome'] ?? '') ?>" width="32" height="32" class="w-8 h-8 object-cover rounded-full" style="width:32px;height:32px;object-fit:cover;border-radius:50%" onerror="if(!this.dataset.avatarFallback){this.dataset.avatarFallback='1';this.src=this.src.replace('/public/assets/','/assets/').replace('/public/uploads/','/uploads/');}">
                                 <?php else: ?>
                                     <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden">
                                         <?= strtoupper(substr($user['nome'] ?? 'A', 0, 1)) ?>

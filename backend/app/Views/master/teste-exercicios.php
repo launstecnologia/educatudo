@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title ?? 'Teste de exercícios') ?></title>
     <meta name="csrf-token" content="<?= htmlspecialchars($csrf_token ?? '') ?>">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
 </head>
 <body class="bg-slate-100 min-h-screen p-6">
     <div class="max-w-5xl mx-auto">

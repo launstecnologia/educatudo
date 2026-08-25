@@ -24,7 +24,7 @@ $cor = !$encontrado || (!$valido && $status !== 'Cancelado') ? 'bg-red-600' : ($
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <title>Validação de Histórico Escolar · <?= $e($escolaSistema) ?></title>
-<script src="https://cdn.tailwindcss.com"></script>
+<?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-lg bg-white rounded-2xl shadow-lg overflow-hidden">
