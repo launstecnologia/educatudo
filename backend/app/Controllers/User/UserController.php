@@ -332,60 +332,63 @@ class UsuarioController extends BaseController
                 throw new Exception('Sem permissão para editar este usuário');
             }
 
-            if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
-                $uploadError = (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
-                throw new Exception($this->mensagemErroUploadAvatar($uploadError));
-            }
+            $arquivoAvatar = $this->resolverArquivoAvatar();
+            $tmpPath = $arquivoAvatar['path'];
+            $nomeOriginal = $arquivoAvatar['name'];
+            $tamanho = $arquivoAvatar['size'];
+            $apagarTmp = $arquivoAvatar['unlink'];
 
-            $file = $_FILES['avatar'];
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-            $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            try {
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+                $fileExtension = strtolower(pathinfo($nomeOriginal, PATHINFO_EXTENSION));
 
-            // Verificar tamanho (máximo 2MB)
-            if ($file['size'] > 2 * 1024 * 1024) {
-                throw new Exception('Arquivo muito grande. Máximo 2MB');
-            }
+                if ($tamanho > 2 * 1024 * 1024) {
+                    throw new Exception('Arquivo muito grande. Máximo 2MB');
+                }
 
-            $mimePermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            $mimeReal = '';
-            if (function_exists('finfo_open') && is_uploaded_file($file['tmp_name'])) {
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                if ($finfo) {
-                    $detected = finfo_file($finfo, $file['tmp_name']);
-                    finfo_close($finfo);
-                    if (is_string($detected) && $detected !== '') {
-                        $mimeReal = $detected;
+                $mimePermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                $mimeReal = '';
+                if (function_exists('finfo_open') && is_file($tmpPath)) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    if ($finfo) {
+                        $detected = finfo_file($finfo, $tmpPath);
+                        finfo_close($finfo);
+                        if (is_string($detected) && $detected !== '') {
+                            $mimeReal = $detected;
+                        }
                     }
                 }
-            }
-            if (in_array($mimeReal, ['image/heic', 'image/heif'], true)) {
-                throw new Exception('Este formato (HEIC) não é suportado. Salve a foto como JPG ou PNG e envie de novo.');
-            }
-            $extPorMime = [
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-                'image/gif' => 'gif',
-                'image/webp' => 'webp',
-            ];
-            if (!in_array($fileExtension, $allowedExtensions, true)) {
-                if (isset($extPorMime[$mimeReal])) {
-                    $fileExtension = $extPorMime[$mimeReal];
-                } else {
+                if (in_array($mimeReal, ['image/heic', 'image/heif'], true)) {
+                    throw new Exception('Este formato (HEIC) não é suportado. Salve a foto como JPG ou PNG e envie de novo.');
+                }
+                $extPorMime = [
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                ];
+                if (!in_array($fileExtension, $allowedExtensions, true)) {
+                    if (isset($extPorMime[$mimeReal])) {
+                        $fileExtension = $extPorMime[$mimeReal];
+                    } else {
+                        throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
+                    }
+                }
+                if (!in_array($mimeReal, $mimePermitidos, true)) {
                     throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
                 }
-            }
-            if (!in_array($mimeReal, $mimePermitidos, true)) {
-                throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
-            }
 
-            require_once __DIR__ . '/../../Services/MediaStorageService.php';
-            $media = new MediaStorageService($this->config);
+                require_once __DIR__ . '/../../Services/MediaStorageService.php';
+                $media = new MediaStorageService($this->config);
 
-            // Gerar nome único para o arquivo
-            $fileName = 'avatar_' . $id . '_' . time() . '.' . $fileExtension;
-            $contentType = $mimeReal;
-            if (!$media->put('avatars', $fileName, $file['tmp_name'], $contentType)) {
-                throw new Exception('Erro ao salvar arquivo');
+                $fileName = 'avatar_' . $id . '_' . time() . '.' . $fileExtension;
+                if (!$media->put('avatars', $fileName, $tmpPath, $mimeReal)) {
+                    throw new Exception('Erro ao salvar arquivo');
+                }
+            } finally {
+                if ($apagarTmp && is_file($tmpPath)) {
+                    @unlink($tmpPath);
+                }
             }
 
             // Remover avatar anterior se existir
@@ -417,6 +420,58 @@ class UsuarioController extends BaseController
         } catch (Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * @return array{path: string, name: string, size: int, unlink: bool}
+     */
+    private function resolverArquivoAvatar(): array
+    {
+        if (isset($_FILES['avatar']) && (int) $_FILES['avatar']['error'] === UPLOAD_ERR_OK && is_uploaded_file($_FILES['avatar']['tmp_name'])) {
+            return [
+                'path' => (string) $_FILES['avatar']['tmp_name'],
+                'name' => (string) $_FILES['avatar']['name'],
+                'size' => (int) $_FILES['avatar']['size'],
+                'unlink' => false,
+            ];
+        }
+
+        $dataUrl = trim((string) ($_POST['avatar_base64'] ?? ''));
+        if ($dataUrl === '' || strncmp($dataUrl, 'data:', 5) !== 0 || strpos($dataUrl, 'base64,') === false) {
+            $uploadError = (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
+            throw new Exception($this->mensagemErroUploadAvatar($uploadError));
+        }
+        if (preg_match('#^data:image/(heic|heif)#i', $dataUrl)) {
+            throw new Exception('Este formato (HEIC) não é suportado. Salve a foto como JPG ou PNG e envie de novo.');
+        }
+        if (strlen($dataUrl) > 4 * 1024 * 1024) {
+            throw new Exception('Arquivo muito grande. Máximo 2MB');
+        }
+
+        $encoded = substr($dataUrl, (int) strpos($dataUrl, ',') + 1);
+        $bin = base64_decode($encoded, true);
+        if ($bin === false || $bin === '') {
+            throw new Exception('Nenhuma imagem foi recebida. Tente novamente.');
+        }
+        if (strlen($bin) > 2 * 1024 * 1024) {
+            throw new Exception('Arquivo muito grande. Máximo 2MB');
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'avatar_');
+        if ($tmp === false) {
+            throw new Exception('Não foi possível salvar a imagem no servidor.');
+        }
+        if (file_put_contents($tmp, $bin) === false) {
+            @unlink($tmp);
+            throw new Exception('Não foi possível salvar a imagem no servidor.');
+        }
+
+        return [
+            'path' => $tmp,
+            'name' => (string) ($_POST['avatar_nome'] ?? 'avatar.jpg'),
+            'size' => strlen($bin),
+            'unlink' => true,
+        ];
     }
 
     private function tokenCsrfDaRequisicao(): string
