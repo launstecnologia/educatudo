@@ -133,6 +133,7 @@
                     <input type="password" name="db_senha" value=""
                            placeholder="<?= $banco ? 'Deixe em branco para não alterar' : 'Senha do banco' ?>"
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <p class="text-xs text-slate-500 mt-1">Ao salvar com host, banco, usuário e senha, o sistema aplica o schema atual e as migrations no banco informado — mesmo se ele já existir e estiver vazio.</p>
                 </div>
                 <?php if (!empty($criar_banco_disponivel)): ?>
                 <div class="md:col-span-2">
@@ -140,7 +141,7 @@
                         <input type="checkbox" name="criar_banco_automaticamente" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         <span class="text-sm text-slate-700">Criar banco e usuário MySQL automaticamente</span>
                     </label>
-                    <p class="text-xs text-slate-500 mt-1">Requer <code>DB_ADMIN_USER</code> e <code>DB_ADMIN_PASS</code> no .env. O sistema criará o banco, o usuário e rodará as migrations.</p>
+                    <p class="text-xs text-slate-500 mt-1">Requer <code>DB_ADMIN_USER</code> e <code>DB_ADMIN_PASS</code> no .env. O sistema cria o banco, o usuário, aplica o schema atual (<code>educa_core.sql</code>) e roda as migrations.</p>
                 </div>
                 <?php endif; ?>
             </div>

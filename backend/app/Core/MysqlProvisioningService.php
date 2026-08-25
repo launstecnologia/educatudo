@@ -75,17 +75,6 @@ class MysqlProvisioningService
         }
     }
 
-    private static function isSchemaConflict(PDOException $e): bool
-    {
-        $msg = $e->getMessage();
-        if (preg_match('/SQLSTATE\[(42S01|42S21|1060|1050)\]/', $msg)) {
-            return true;
-        }
-        return stripos($msg, 'Duplicate column') !== false
-            || stripos($msg, 'already exists') !== false
-            || stripos($msg, 'Duplicate key name') !== false;
-    }
-
     private static function dsnEscape(string $host): string
     {
         return str_replace([':', ';', ' '], '', $host);
@@ -112,6 +101,128 @@ class MysqlProvisioningService
     }
 
     /**
+     * Caminho do dump de estrutura do tenant (sem dados de alunos).
+     */
+    public static function caminhoSchemaBaseTenant(): string
+    {
+        return dirname(dirname(__DIR__)) . '/database/educa_core.sql';
+    }
+
+    /**
+     * Indica se o banco da escola já tem o schema mínimo (tabela alunos).
+     */
+    public static function tenantTemSchemaBase(PDO $tenantPdo): bool
+    {
+        try {
+            $st = $tenantPdo->query("SHOW TABLES LIKE 'alunos'");
+            return $st !== false && $st->rowCount() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Importa educa_core.sql no banco vazio da escola (somente estrutura).
+     *
+     * @return bool true se importou, false se o schema já existia
+     * @throws Exception
+     */
+    public static function aplicarSchemaBaseTenant(PDO $tenantPdo): bool
+    {
+        if (self::tenantTemSchemaBase($tenantPdo)) {
+            return false;
+        }
+        $path = self::caminhoSchemaBaseTenant();
+        if (!is_file($path)) {
+            throw new Exception('Arquivo de schema base não encontrado: database/educa_core.sql');
+        }
+        $sql = file_get_contents($path);
+        if ($sql === false || trim($sql) === '') {
+            throw new Exception('Schema base educa_core.sql está vazio.');
+        }
+        $tenantPdo->exec('SET FOREIGN_KEY_CHECKS=0');
+        $tenantPdo->exec('SET UNIQUE_CHECKS=0');
+        try {
+            foreach (self::splitSqlStatements($sql) as $q) {
+                self::executeStatementAndConsumeResult($tenantPdo, $q);
+            }
+        } catch (PDOException $e) {
+            throw new Exception('Erro ao aplicar schema base (educa_core.sql): ' . $e->getMessage());
+        } finally {
+            try { $tenantPdo->exec('SET UNIQUE_CHECKS=1'); } catch (PDOException $ignored) {}
+            try { $tenantPdo->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (PDOException $ignored) {}
+        }
+        if (!self::tenantTemSchemaBase($tenantPdo)) {
+            throw new Exception('Schema base aplicado, mas a tabela alunos não foi criada.');
+        }
+        return true;
+    }
+
+    /**
+     * Provisiona o banco da escola: schema base (se vazio) + migrations tenant.
+     * Usado ao criar/conectar uma escola no painel Master.
+     */
+    public static function provisionarBancoEscola(PDO $masterPdo, PDO $tenantPdo, int $escolaId): void
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(180);
+        }
+        self::aplicarSchemaBaseTenant($tenantPdo);
+        self::runTenantMigrations($masterPdo, $tenantPdo, $escolaId, true);
+    }
+
+    /**
+     * Lista arquivos SQL de migration do tenant, em ordem de execução.
+     *
+     * @return array<int, array{file: string, path: string}>
+     */
+    public static function listarArquivosMigrationTenant(): array
+    {
+        $migrationsDir = dirname(dirname(__DIR__)) . '/database/migrations';
+        if (!is_dir($migrationsDir)) {
+            return [];
+        }
+        $list = [];
+        foreach (scandir($migrationsDir) ?: [] as $file) {
+            if (self::arquivoMigrationTenantDeveSerIgnorado($file)) {
+                continue;
+            }
+            $list[] = ['file' => $file, 'path' => $migrationsDir . '/' . $file];
+        }
+        usort($list, function ($a, $b) {
+            return strcmp($a['file'], $b['file']);
+        });
+        return $list;
+    }
+
+    /**
+     * Dumps, rollbacks, master e seeds de demo não entram no bootstrap de escola nova.
+     */
+    private static function arquivoMigrationTenantDeveSerIgnorado(string $file): bool
+    {
+        if (pathinfo($file, PATHINFO_EXTENSION) !== 'sql') {
+            return true;
+        }
+        $lower = strtolower($file);
+        if (strpos($lower, '_rollback') !== false) {
+            return true;
+        }
+        if (strpos($lower, 'master') !== false) {
+            return true;
+        }
+        if ($lower === 'educatudo.sql') {
+            return true;
+        }
+        if (strpos($lower, 'seed_demo') !== false || strpos($lower, '_demo_seed') !== false) {
+            return true;
+        }
+        if (strpos($lower, '_seed_') !== false && strpos($lower, 'catalogo') === false) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Executa as migrations do tenant no banco novo (exclui multi_tenant_master.sql).
      * Registra em migrations_escolas no banco master.
      *
@@ -128,27 +239,10 @@ class MysqlProvisioningService
         bool $ignorarConflitosSchema = false
     ): void
     {
-        $migrationsDir = dirname(dirname(__DIR__)) . '/database/migrations';
-        if (!is_dir($migrationsDir)) {
+        $list = self::listarArquivosMigrationTenant();
+        if ($list === []) {
             return;
         }
-        $files = scandir($migrationsDir);
-        $list = [];
-        foreach ($files as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) !== 'sql') {
-                continue;
-            }
-            if (stripos($file, '_rollback') !== false) {
-                continue; // arquivos de rollback nunca são aplicados como migration
-            }
-            if (stripos($file, 'master') !== false) {
-                continue;
-            }
-            $list[] = ['file' => $file, 'path' => $migrationsDir . '/' . $file];
-        }
-        usort($list, function ($a, $b) {
-            return strcmp($a['file'], $b['file']);
-        });
 
         $executadas = [];
         try {
@@ -172,15 +266,24 @@ class MysqlProvisioningService
             if ($sql === false || trim($sql) === '') {
                 continue;
             }
-            if ($ignorarConflitosSchema && stripos($sql, 'DELIMITER') !== false) {
-                $stmt->execute([$escolaId, $m['file']]);
-                continue;
-            }
             $queries = self::splitSqlStatements($sql);
             $hasOwnTransaction = (
                 stripos($sql, 'START TRANSACTION') !== false ||
                 stripos($sql, 'BEGIN;') !== false
             );
+            if ($ignorarConflitosSchema) {
+                // Bootstrap (escola nova / educa_core): um UPDATE/collation no meio
+                // do arquivo não pode abortar o CREATE TABLE que vem depois.
+                foreach ($queries as $q) {
+                    try {
+                        self::executeStatementAndConsumeResult($tenantPdo, $q);
+                    } catch (PDOException $e) {
+                        continue;
+                    }
+                }
+                $stmt->execute([$escolaId, $m['file']]);
+                continue;
+            }
             if (!$hasOwnTransaction) {
                 $tenantPdo->beginTransaction();
             }
@@ -194,10 +297,6 @@ class MysqlProvisioningService
             } catch (PDOException $e) {
                 if (!$hasOwnTransaction && $tenantPdo->inTransaction()) {
                     try { $tenantPdo->rollBack(); } catch (PDOException $ignored) {}
-                }
-                if ($ignorarConflitosSchema && self::isSchemaConflict($e)) {
-                    $stmt->execute([$escolaId, $m['file']]);
-                    continue;
                 }
                 throw new Exception(
                     "Erro ao executar migration {$m['file']} no banco da escola: " . $e->getMessage()
@@ -222,27 +321,10 @@ class MysqlProvisioningService
         if (empty($selectedFiles)) {
             return;
         }
-        $migrationsDir = dirname(dirname(__DIR__)) . '/database/migrations';
-        if (!is_dir($migrationsDir)) {
+        $fullList = self::listarArquivosMigrationTenant();
+        if ($fullList === []) {
             return;
         }
-        $allFiles = scandir($migrationsDir);
-        $fullList = [];
-        foreach ($allFiles as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) !== 'sql') {
-                continue;
-            }
-            if (stripos($file, '_rollback') !== false) {
-                continue; // arquivos de rollback nunca são aplicados como migration
-            }
-            if (stripos($file, 'master') !== false) {
-                continue;
-            }
-            $fullList[] = ['file' => $file, 'path' => $migrationsDir . '/' . $file];
-        }
-        usort($fullList, function ($a, $b) {
-            return strcmp($a['file'], $b['file']);
-        });
 
         $selectedSet = array_flip(array_values($selectedFiles));
         $list = array_filter($fullList, function ($m) use ($selectedSet) {
@@ -495,19 +577,40 @@ class MysqlProvisioningService
     }
 
     /**
-     * Divide SQL em statements respeitando strings, comentarios e conditional comments.
+     * Divide SQL em statements respeitando strings, comentarios, conditional comments
+     * e o comando de cliente DELIMITER (necessário para triggers em educa_core.sql).
      *
      * @return string[] Lista de statements SQL executaveis
      */
-    private static function splitSqlStatements(string $sql): array
+    public static function splitSqlStatements(string $sql): array
     {
         $statements = [];
         $current = '';
         $len = strlen($sql);
         $i = 0;
+        $delimiter = ';';
 
         while ($i < $len) {
             $char = $sql[$i];
+
+            // Comando de cliente DELIMITER (não é SQL) — só no início de um statement
+            if (trim($current) === '' && self::matchKeywordAt($sql, $i, 'DELIMITER')) {
+                $i += 9;
+                while ($i < $len && ($sql[$i] === ' ' || $sql[$i] === "\t")) {
+                    $i++;
+                }
+                $newDelim = '';
+                while ($i < $len && $sql[$i] !== "\n" && $sql[$i] !== "\r") {
+                    $newDelim .= $sql[$i];
+                    $i++;
+                }
+                $delimiter = trim($newDelim);
+                if ($delimiter === '') {
+                    $delimiter = ';';
+                }
+                $current = '';
+                continue;
+            }
 
             // -- single-line comment: skip to end of line
             if ($char === '-' && $i + 1 < $len && $sql[$i + 1] === '-') {
@@ -574,14 +677,14 @@ class MysqlProvisioningService
                 continue;
             }
 
-            // Statement separator
-            if ($char === ';') {
+            $dlen = strlen($delimiter);
+            if ($dlen > 0 && substr($sql, $i, $dlen) === $delimiter) {
                 $trimmed = trim($current);
                 if ($trimmed !== '') {
                     $statements[] = $trimmed;
                 }
                 $current = '';
-                $i++;
+                $i += $dlen;
                 continue;
             }
 
@@ -595,5 +698,15 @@ class MysqlProvisioningService
         }
 
         return $statements;
+    }
+
+    private static function matchKeywordAt(string $sql, int $i, string $keyword): bool
+    {
+        $klen = strlen($keyword);
+        if (strncasecmp(substr($sql, $i, $klen), $keyword, $klen) !== 0) {
+            return false;
+        }
+        $next = $sql[$i + $klen] ?? '';
+        return $next === '' || $next === ' ' || $next === "\t" || $next === "\n" || $next === "\r";
     }
 }

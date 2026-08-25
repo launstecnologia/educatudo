@@ -293,6 +293,32 @@ class MasterEscolasController extends BaseController
         RedisCache::delete('config_layout');
     }
 
+    /**
+     * Aplica educa_core.sql (se o banco estiver vazio) e as migrations tenant no banco da escola.
+     */
+    private function provisionarSchemaTenant(
+        PDO $masterPdo,
+        string $host,
+        int $porta,
+        string $nomeBanco,
+        string $usuario,
+        string $senha,
+        int $escolaId
+    ): void {
+        require_once __DIR__ . '/../../Core/MysqlProvisioningService.php';
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $nomeBanco) || strlen($nomeBanco) > 64) {
+            throw new Exception('Nome do banco inválido.');
+        }
+        $dsn = 'mysql:host=' . str_replace([':', ';', ' '], '', $host) . ';port=' . $porta
+            . ';dbname=' . $nomeBanco . ';charset=utf8mb4';
+        $tenantPdo = new PDO($dsn, $usuario, $senha, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        $tenantPdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+        MysqlProvisioningService::provisionarBancoEscola($masterPdo, $tenantPdo, $escolaId);
+    }
+
     private function setMaintenanceMode(int $escolaId, bool $enabled): void
     {
         require_once __DIR__ . '/../../Core/MasterTenantConnection.php';
@@ -535,18 +561,20 @@ class MasterEscolasController extends BaseController
                             $usuario,
                             $senha
                         );
-                        $dsn = "mysql:host={$host};port={$porta};dbname={$nomeBanco};charset=utf8mb4";
-                        $tenantPdo = new PDO($dsn, $usuario, $senha, [
-                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                        ]);
-                        $tenantPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
-                        MysqlProvisioningService::runTenantMigrations($db->getPdo(), $tenantPdo, $escolaId);
                     } catch (Exception $e) {
-                        $this->setFlashMessage('Erro ao criar banco/usuário ou rodar migrations: ' . $e->getMessage(), 'error');
+                        $this->setFlashMessage('Erro ao criar banco/usuário: ' . $e->getMessage(), 'error');
                         header('Location: ' . URL . '/master/escolas/editar?id=' . $escolaId);
                         exit;
                     }
+                }
+            }
+            if ($senha !== '') {
+                try {
+                    $this->provisionarSchemaTenant($db->getPdo(), $host, $porta, $nomeBanco, $usuario, $senha, $escolaId);
+                } catch (Exception $e) {
+                    $this->setFlashMessage('Erro ao aplicar schema/migrations no banco da escola: ' . $e->getMessage(), 'error');
+                    header('Location: ' . URL . '/master/escolas/editar?id=' . $escolaId);
+                    exit;
                 }
             }
             $db->query(
@@ -704,18 +732,25 @@ class MasterEscolasController extends BaseController
                             $usuario,
                             $senha
                         );
-                        $dsn = "mysql:host={$host};port={$porta};dbname={$nomeBanco};charset=utf8mb4";
-                        $tenantPdo = new PDO($dsn, $usuario, $senha, [
-                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                        ]);
-                        $tenantPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
-                        MysqlProvisioningService::runTenantMigrations($db->getPdo(), $tenantPdo, $id);
                     } catch (Exception $e) {
-                        $this->setFlashMessage('Erro ao criar banco/usuário ou rodar migrations: ' . $e->getMessage(), 'error');
+                        $this->setFlashMessage('Erro ao criar banco/usuário: ' . $e->getMessage(), 'error');
                         header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
                         exit;
                     }
+                }
+            }
+            $senhaProvisionar = $senha;
+            if ($senhaProvisionar === '' && $banco) {
+                $senhaProvisionar = MasterSecretVault::decryptDbPassword($banco['senha_criptografada'] ?? '');
+            }
+            $deveProvisionar = !$banco || $criarBancoAuto;
+            if ($deveProvisionar && $senhaProvisionar !== '') {
+                try {
+                    $this->provisionarSchemaTenant($db->getPdo(), $host, $porta, $nomeBanco, $usuario, $senhaProvisionar, $id);
+                } catch (Exception $e) {
+                    $this->setFlashMessage('Erro ao aplicar schema/migrations no banco da escola: ' . $e->getMessage(), 'error');
+                    header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
+                    exit;
                 }
             }
             if ($banco) {
