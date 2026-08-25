@@ -24,8 +24,11 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <?php if (LayoutHelper::getContextualLogo('navbar', 'h-8 w-auto', 'Logo')): ?>
-                            <?= LayoutHelper::getContextualLogo('navbar', 'h-8 w-auto', 'Logo') ?>
+                        <?php
+                        $logoNavbar = LayoutHelper::getContextualLogo('navbar', 'h-8 w-auto', 'Logo');
+                        if ($logoNavbar): ?>
+                            <?= $logoNavbar ?>
+                            <h1 class="sidebar-logo-fallback hidden text-white text-xl font-bold"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
                         <?php else: ?>
                             <h1 class="text-white text-xl font-bold"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
                         <?php endif; ?>

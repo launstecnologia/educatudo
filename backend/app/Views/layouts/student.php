@@ -536,8 +536,14 @@
                             </button>
                         </div>
                         <div class="sidebar-text-container logo-navbar-wrap">
-                            <?php if (LayoutHelper::getContextualLogo('sidebar', '', 'Logo')): ?>
-                                <?= LayoutHelper::getContextualLogo('sidebar', 'max-h-full w-auto', 'Logo') ?>
+                            <?php
+                            $logoSidebar = LayoutHelper::getContextualLogo('sidebar', 'max-h-full w-auto', 'Logo');
+                            if ($logoSidebar): ?>
+                                <?= $logoSidebar ?>
+                                <div class="sidebar-logo-fallback hidden">
+                                    <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                                    <p class="text-sm text-purple-100 sidebar-text">Ecossistema Educacional</p>
+                                </div>
                             <?php else: ?>
                                 <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
                                 <p class="text-sm text-purple-100 sidebar-text">Ecossistema Educacional</p>

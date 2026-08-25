@@ -460,13 +460,14 @@ function uploadImage(file, type) {
     .then(data => {
         if (data.success) {
             // Atualizar preview
-            const previewId = type.replace('-', '-') + '-preview';
+            const previewId = type + '-preview';
             const preview = document.getElementById(previewId);
             if (preview) {
                 preview.innerHTML = `<img src="${data.url}" alt="${type}" class="max-w-full max-h-full object-contain">`;
             }
             
             showNotification('Imagem enviada com sucesso!', 'success');
+            setTimeout(function () { window.location.reload(); }, 600);
         } else {
             showNotification('Erro ao enviar imagem: ' + data.error, 'error');
         }

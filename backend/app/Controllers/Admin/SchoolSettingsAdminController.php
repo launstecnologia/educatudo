@@ -291,11 +291,16 @@ class SchoolSettingsAdminController extends AdminBaseController
             $this->redirect('/admin/dashboard');
         }
         
-        // Buscar configurações atuais
+        // Buscar configurações atuais (URLs de mídia no host da escola, igual ao sidebar)
         $configs = $this->db->fetchAll("SELECT * FROM config_layout ORDER BY config_key");
         $layoutConfig = [];
         foreach ($configs as $config) {
-            $layoutConfig[$config['config_key']] = $config['config_value'];
+            $key = (string) ($config['config_key'] ?? '');
+            $value = $config['config_value'] ?? '';
+            if (is_string($value) && substr($key, -4) === '_url') {
+                $value = LayoutHelper::toTenantRelativeMediaUrl((string) $value);
+            }
+            $layoutConfig[$key] = $value;
         }
         
         $data = [
@@ -343,20 +348,14 @@ class SchoolSettingsAdminController extends AdminBaseController
                     continue;
                 }
                 $this->db->query(
-                    "INSERT INTO config_layout (config_key, config_value) VALUES (?, ?) 
+                    "INSERT INTO config_layout (config_key, config_value) VALUES (:config_key, :config_value)
                      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP",
-                    [$key, $value]
+                    ['config_key' => $key, 'config_value' => $value]
                 );
             }
 
-            require_once __DIR__ . '/../../Core/RedisCache.php';
-            RedisCache::delete('config_layout');
-            RedisCache::delete('config_layout_single');
-            if (defined('TENANT_ID') && (int) TENANT_ID > 0) {
-                RedisCache::delete('config_layout_' . (int) TENANT_ID);
-            }
-            RedisCache::delete('config_layout_' . ((int) ($_SESSION['tenant_id'] ?? 0)));
-            
+            LayoutHelper::invalidateCache();
+
             $this->json(['success' => true, 'message' => 'Configurações salvas com sucesso!']);
             
         } catch (Exception $e) {
@@ -450,9 +449,11 @@ class SchoolSettingsAdminController extends AdminBaseController
             if (!$media->put('layout', $fileName, $file['tmp_name'], $contentType)) {
                 throw new Exception('Erro ao salvar arquivo');
             }
-            $url = $media->isS3()
-                ? rtrim(defined('URL') ? URL : '', '/') . '/media/serve?type=layout&key=' . rawurlencode($fileName)
-                : $media->getDisplayUrl('layout', $fileName);
+            // layout sempre vai para storage local; getDisplayUrl inclui tenant quando necessário
+            $url = LayoutHelper::toTenantRelativeMediaUrl($media->getDisplayUrl('layout', $fileName));
+            if ($url === '') {
+                throw new Exception('Erro ao gerar URL da imagem');
+            }
             
             // pwa_icon: apenas retorna a URL (ícone PWA é salvo ao clicar em "Salvar PWA")
             if ($type === 'pwa_icon') {
@@ -473,10 +474,12 @@ class SchoolSettingsAdminController extends AdminBaseController
             $configKey = $configKeyMap[$type] ?? 'logo_url';
             
             $this->db->query(
-                "INSERT INTO config_layout (config_key, config_value) VALUES (?, ?) 
+                "INSERT INTO config_layout (config_key, config_value) VALUES (:config_key, :config_value)
                  ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP",
-                [$configKey, $url]
+                ['config_key' => $configKey, 'config_value' => $url]
             );
+
+            LayoutHelper::invalidateCache();
             
             $this->json([
                 'success' => true, 

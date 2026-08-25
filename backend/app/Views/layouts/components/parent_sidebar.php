@@ -19,8 +19,13 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                     <?php endif; ?>
                 </div>
                 <div class="sidebar-text-container min-w-0">
-                    <?php if (LayoutHelper::getContextualLogo('sidebar', 'h-8 w-auto max-w-full', 'Logo')): ?>
-                        <?= LayoutHelper::getContextualLogo('sidebar', 'h-8 w-auto max-w-full', 'Logo') ?>
+                    <?php
+                    $logoSidebar = LayoutHelper::getContextualLogo('sidebar', 'h-8 w-auto max-w-full', 'Logo');
+                    if ($logoSidebar): ?>
+                        <?= $logoSidebar ?>
+                        <div class="sidebar-logo-fallback hidden">
+                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                        </div>
                         <p class="text-sm text-white/80 sidebar-text mt-0.5">Portal dos Pais</p>
                     <?php else: ?>
                         <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>

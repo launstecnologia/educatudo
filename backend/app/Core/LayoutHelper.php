@@ -77,6 +77,26 @@ class LayoutHelper
 
         return self::$config;
     }
+
+    /**
+     * Invalida o cache em memória e no Redis após gravar config_layout.
+     */
+    public static function invalidateCache(): void
+    {
+        self::$config = null;
+        if (!class_exists('RedisCache', false)) {
+            require_once __DIR__ . '/RedisCache.php';
+        }
+        RedisCache::delete('config_layout');
+        RedisCache::delete('config_layout_single');
+        if (defined('TENANT_ID') && (int) TENANT_ID > 0) {
+            RedisCache::delete('config_layout_' . (int) TENANT_ID);
+        }
+        $sessionTenant = (int) ($_SESSION['tenant_id'] ?? 0);
+        if ($sessionTenant > 0) {
+            RedisCache::delete('config_layout_' . $sessionTenant);
+        }
+    }
     
     /**
      * Obter uma configuração específica
@@ -97,7 +117,7 @@ class LayoutHelper
      * Converte URL absoluta de /media/serve (ex.: master.educatudo.com) em path relativo
      * no host atual, preservando type/key/tenant.
      */
-    private static function toTenantRelativeMediaUrl(string $url): string
+    public static function toTenantRelativeMediaUrl(string $url): string
     {
         $url = trim($url);
         if ($url === '' || stripos($url, 'media/serve') === false) {
@@ -303,7 +323,8 @@ class LayoutHelper
         }
         
         .logo-login-wrap img { max-height: var(--logo-login-size) !important; height: auto !important; width: auto !important; object-fit: contain; }
-        .logo-navbar-wrap img { max-height: var(--logo-navbar-size) !important; height: var(--logo-navbar-size) !important; width: auto !important; object-fit: contain; }
+        .logo-navbar-wrap { max-width: 100%; min-width: 0; }
+        .logo-navbar-wrap img { max-height: var(--logo-navbar-size) !important; height: var(--logo-navbar-size) !important; width: auto !important; max-width: 100% !important; object-fit: contain; }
         
         /* Aplicar cores customizadas */
         .bg-primary { background-color: var(--primary-color) !important; }
@@ -655,6 +676,7 @@ class LayoutHelper
 
     /**
      * URL da logo exibida na navbar/sidebar (respeita logo_use_navbar).
+     * Em fundo escuro prefere a variante branca, mas cai na colorida se a branca não existir.
      */
     public static function getNavbarLogoUrl()
     {
@@ -666,19 +688,16 @@ class LayoutHelper
             }
         }
         $primaryColor = (string) self::get('primary_color', '#a855f7');
-        if (self::isColorDark($primaryColor)) {
-            if (self::getLogoHorizontalWhiteUrl() !== '') {
-                return self::getLogoHorizontalWhiteUrl();
-            }
-            if (self::getLogoWhiteUrl() !== '') {
-                return self::getLogoWhiteUrl();
-            }
-        } else {
-            if (self::getLogoHorizontalUrl() !== '') {
-                return self::getLogoHorizontalUrl();
+        $order = self::isColorDark($primaryColor)
+            ? ['logo_horizontal_white', 'logo_white', 'logo_horizontal', 'logo', 'logo_1x1']
+            : ['logo_horizontal', 'logo', 'logo_1x1', 'logo_horizontal_white', 'logo_white'];
+        foreach ($order as $key) {
+            $url = self::getLogoUrlByKey($key);
+            if ($url !== '') {
+                return $url;
             }
         }
-        return self::getLogoUrl();
+        return '';
     }
     
     /**
@@ -873,9 +892,9 @@ class LayoutHelper
             case 'sidebar':
                 $url = self::getNavbarLogoUrl();
                 if ($url !== '') {
-                    return '<img src="' . htmlspecialchars($url) . '" alt="' . htmlspecialchars($alt) . '" class="' . htmlspecialchars($class) . '">';
+                    return '<img src="' . htmlspecialchars($url) . '" alt="' . htmlspecialchars($alt) . '" class="' . htmlspecialchars($class) . '" onerror="this.style.display=\'none\';var f=this.nextElementSibling;if(f&&f.classList.contains(\'sidebar-logo-fallback\')){f.classList.remove(\'hidden\');}">';
                 }
-                return self::getLogoTag($class, $alt);
+                return '';
                 
             case 'favicon':
                 if (self::getLogo1x1Url()) {
