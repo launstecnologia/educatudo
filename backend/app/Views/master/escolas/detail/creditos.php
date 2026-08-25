@@ -12,6 +12,7 @@ $creditosAlunoPodeComprar = ($layout_config['creditos_aluno_pode_comprar'] ?? '0
 require_once __DIR__ . '/../../../../Core/CreditosDecimalHelper.php';
 $creditosMensalAluno = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_aluno'] ?? 0, 0.0);
 $creditosMensalProfessor = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_professor'] ?? 0, 0.0);
+$creditosMensalAdmin = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_admin'] ?? 0, 0.0);
 $creditosMensalEscola = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_escola'] ?? 0, 0.0);
 
 $renderFlagToggle = static function (string $name, bool $enabled, bool $locked = false): void {
@@ -58,7 +59,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3">
                         <div class="min-w-0">
                             <p class="text-sm font-medium text-slate-700">Escola paga o consumo</p>
-                            <p class="text-xs text-slate-500 mt-0.5">Quando ligado, o uso de alunos e professores sai do saldo da escola. Use “Minha Carteira” abaixo se quiser esconder o saldo do aluno.</p>
+                            <p class="text-xs text-slate-500 mt-0.5">Quando ligado, o uso de alunos, professores e usuários admin sai do saldo da escola. Use “Minha Carteira” abaixo se quiser esconder o saldo do aluno.</p>
                         </div>
                         <?php $renderFlagToggle('creditos_modo_pool_escola', $creditosModoPoolEscola); ?>
                     </div>
@@ -115,11 +116,12 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
                         Quantidade creditada todo mês (renovação automática ou pelo botão Renovar).
                         TudiCoins comprados não são apagados. Conversão: 1 TudiCoin = R$ 0,20.
                     </p>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                         <?php
                         $camposCota = [
                             ['id' => 'creditos_mensal_aluno', 'label' => 'Aluno', 'valor' => $creditosMensalAluno, 'hint' => ''],
                             ['id' => 'creditos_mensal_professor', 'label' => 'Professor', 'valor' => $creditosMensalProfessor, 'hint' => ''],
+                            ['id' => 'creditos_mensal_admin', 'label' => 'Usuário admin', 'valor' => $creditosMensalAdmin, 'hint' => 'Cota por administrador da escola.'],
                             ['id' => 'creditos_mensal_escola', 'label' => 'Escola', 'valor' => $creditosMensalEscola, 'hint' => 'Saldo da escola (quando ela paga o consumo).'],
                         ];
                         foreach ($camposCota as $campo):
@@ -149,7 +151,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
             <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
                 <button type="submit" form="form-creditos-renovar"
                         class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm w-full sm:w-auto"
-                        onclick="return confirm('Isso renova a cota mensal de alunos, professores e da escola (conforme os valores salvos). TudiCoins comprados continuam no saldo. Deseja continuar?');">
+                        onclick="return confirm('Isso renova a cota mensal de alunos, professores, usuários admin e da escola (conforme os valores salvos). TudiCoins comprados continuam no saldo. Deseja continuar?');">
                     Renovar todos
                 </button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm w-full sm:w-auto">Salvar</button>
@@ -398,7 +400,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
                 <h5 class="font-semibold text-slate-900 mb-1">Quem paga o consumo?</h5>
                 <ul class="list-disc list-inside space-y-1.5 text-slate-600">
                     <li><strong>Escola paga o consumo</strong> — o saldo sai da carteira da escola. Ideal quando a instituição cobre a IA para todos.</li>
-                    <li><strong>Desligado</strong> — cada aluno ou professor gasta do próprio saldo.</li>
+                    <li><strong>Desligado</strong> — cada aluno, professor ou usuário admin gasta do próprio saldo.</li>
                 </ul>
             </section>
             <section>
@@ -417,7 +419,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
             </section>
             <section>
                 <h5 class="font-semibold text-slate-900 mb-1">Cota mensal</h5>
-                <p>É a quantidade que a escola recebe todo mês para alunos, professores e para a própria instituição. Ao renovar, só a cota mensal é refeita — TudiCoins comprados continuam no saldo.</p>
+                <p>É a quantidade creditada todo mês para alunos, professores, usuários admin e para a própria instituição. Ao renovar, só a cota mensal é refeita — TudiCoins comprados continuam no saldo.</p>
             </section>
             <section>
                 <h5 class="font-semibold text-slate-900 mb-1">Preços e pacotes</h5>

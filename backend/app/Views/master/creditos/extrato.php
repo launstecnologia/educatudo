@@ -57,7 +57,7 @@ $limparDetalhe = static function (string $texto): string {
     <div class="flex justify-between items-center gap-4">
         <div>
             <h2 class="text-2xl font-bold text-slate-900 mb-1">Extrato de TudiCoins</h2>
-            <p class="text-slate-600 text-sm">Consumo de alunos e professores por escola. 1 TudiCoin = R$ 0,20.</p>
+            <p class="text-slate-600 text-sm">Consumo de alunos, professores e usuários admin por escola. 1 TudiCoin = R$ 0,20.</p>
         </div>
         <button type="button" onclick="openFilterDrawer()"
                 class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors flex-shrink-0">
@@ -124,7 +124,7 @@ $limparDetalhe = static function (string $texto): string {
                     $detalhe = $limparDetalhe($detalheBruto);
                     $valor = (float) ($mov['valor_consumido'] ?? 0);
                     $tipoUser = (string) ($mov['user_type'] ?? '');
-                    $tipoLabel = $tipoUser === 'aluno' ? 'Aluno' : ($tipoUser === 'professor' ? 'Professor' : $tipoUser);
+                    $tipoLabel = $tipoUser === 'aluno' ? 'Aluno' : ($tipoUser === 'professor' ? 'Professor' : ($tipoUser === 'admin' ? 'Admin' : $tipoUser));
                 ?>
                 <tr class="hover:bg-slate-50">
                     <td class="px-6 py-4 text-sm text-slate-700 whitespace-nowrap">
@@ -213,6 +213,7 @@ $limparDetalhe = static function (string $texto): string {
                     <option value="">Todos</option>
                     <option value="aluno" <?= $filtro_user_type === 'aluno' ? 'selected' : '' ?>>Aluno</option>
                     <option value="professor" <?= $filtro_user_type === 'professor' ? 'selected' : '' ?>>Professor</option>
+                    <option value="admin" <?= $filtro_user_type === 'admin' ? 'selected' : '' ?>>Admin</option>
                 </select>
             </div>
             <div>

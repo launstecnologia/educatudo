@@ -27,7 +27,7 @@ class CreditosService
         return $v === '1' || $v === 1 || $v === true;
     }
 
-    /** Consumo do aluno/professor debita a carteira institucional da escola. */
+    /** Consumo do aluno/professor/admin debita a carteira institucional da escola. */
     public function isModoPoolEscola(): bool
     {
         $v = \LayoutHelper::get('creditos_modo_pool_escola', '0');
@@ -52,10 +52,31 @@ class CreditosService
         if (\CreditosModuleRegistry::getPagador($moduloKey) === 'escola') {
             return ['escola', \CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID];
         }
-        if ($this->isModoPoolEscola() && ($userType === 'aluno' || $userType === 'professor')) {
+        if ($this->isModoPoolEscola() && in_array($userType, ['aluno', 'professor', 'admin'], true)) {
             return ['escola', \CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID];
         }
         return [$userType, $userId];
+    }
+
+    /**
+     * Mapeia o tipo de sessão/cadastro para o user_type da carteira TudiCoins.
+     */
+    public static function tipoCarteiraDoUsuario(string $tipoUsuario): string
+    {
+        $t = strtolower(trim($tipoUsuario));
+        if ($t === 'aluno') {
+            return 'aluno';
+        }
+        if ($t === 'professor') {
+            return 'professor';
+        }
+        if ($t === 'admin' || $t === 'admin_escola') {
+            return 'admin';
+        }
+        if ($t === 'escola') {
+            return 'escola';
+        }
+        throw new \InvalidArgumentException('Tipo de usuário sem carteira TudiCoins.');
     }
 
     public function getCustoModulo(string $moduloKey): float
@@ -402,7 +423,15 @@ class CreditosService
         if (!$this->isCreditosHabilitado()) {
             return;
         }
-        $key = $userType === 'aluno' ? 'creditos_mensal_aluno' : 'creditos_mensal_professor';
+        $keyPorTipo = [
+            'aluno' => 'creditos_mensal_aluno',
+            'professor' => 'creditos_mensal_professor',
+            'admin' => 'creditos_mensal_admin',
+        ];
+        $key = $keyPorTipo[$userType] ?? '';
+        if ($key === '') {
+            return;
+        }
         $raw = \LayoutHelper::get($key, 0);
         $valor = is_numeric($raw) ? round((float) $raw, \CreditosDecimalHelper::SCALE) : 0.0;
         if ($valor <= 0) {
@@ -630,14 +659,14 @@ class CreditosService
                  LIMIT 1"
             );
             $colType = strtolower((string) ($enumRow['COLUMN_TYPE'] ?? ''));
-            if ($colType !== '' && strpos($colType, 'escola') === false) {
+            if ($colType !== '' && (strpos($colType, "'escola'") === false || strpos($colType, "'admin'") === false)) {
                 $this->db->query(
                     "ALTER TABLE carteira_usuarios
-                     MODIFY COLUMN user_type ENUM('aluno','professor','escola') NOT NULL"
+                     MODIFY COLUMN user_type ENUM('aluno','professor','escola','admin') NOT NULL"
                 );
                 $this->db->query(
                     "ALTER TABLE carteira_movimentacoes
-                     MODIFY COLUMN user_type ENUM('aluno','professor','escola') NOT NULL"
+                     MODIFY COLUMN user_type ENUM('aluno','professor','escola','admin') NOT NULL"
                 );
             }
             $existe = $this->db->fetch(
@@ -660,9 +689,12 @@ class CreditosService
      */
     private function assertUserType(string $userType, bool $allowEscola = false): void
     {
-        $ok = $userType === 'aluno' || $userType === 'professor' || ($allowEscola && $userType === 'escola');
+        $ok = in_array($userType, ['aluno', 'professor', 'admin'], true)
+            || ($allowEscola && $userType === 'escola');
         if (!$ok) {
-            throw new \InvalidArgumentException('userType deve ser aluno, professor' . ($allowEscola ? ' ou escola' : '') . '.');
+            throw new \InvalidArgumentException(
+                'userType deve ser aluno, professor, admin' . ($allowEscola ? ' ou escola' : '') . '.'
+            );
         }
     }
 }

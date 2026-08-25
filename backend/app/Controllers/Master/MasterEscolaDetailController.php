@@ -233,6 +233,19 @@ class MasterEscolaDetailController extends BaseController
         if (!$observacao) {
             $pdo->exec("ALTER TABLE carteira_movimentacoes ADD COLUMN observacao TEXT NULL AFTER referencia_id");
         }
+
+        $enumRow = $pdo->query(
+            "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'carteira_usuarios'
+               AND COLUMN_NAME = 'user_type'
+             LIMIT 1"
+        )->fetch(PDO::FETCH_ASSOC);
+        $colType = strtolower((string) ($enumRow['COLUMN_TYPE'] ?? ''));
+        if ($colType !== '' && (strpos($colType, "'escola'") === false || strpos($colType, "'admin'") === false)) {
+            $pdo->exec("ALTER TABLE carteira_usuarios MODIFY COLUMN user_type ENUM('aluno','professor','escola','admin') NOT NULL");
+            $pdo->exec("ALTER TABLE carteira_movimentacoes MODIFY COLUMN user_type ENUM('aluno','professor','escola','admin') NOT NULL");
+        }
     }
 
     private function getTenantWalletSaldos(PDO $pdo, string $userType, int $userId): array
@@ -273,12 +286,15 @@ class MasterEscolaDetailController extends BaseController
         string $userType,
         ?string $tableName,
         float $novoSaldoEscola,
-        ?int $userIdUnico = null
+        ?int $userIdUnico = null,
+        ?array $idsInformados = null
     ): int {
         require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
         $novoSaldoEscola = CreditosDecimalHelper::fromScalar($novoSaldoEscola, 0.0);
 
-        if ($userIdUnico !== null) {
+        if ($idsInformados !== null) {
+            $ids = array_values(array_filter(array_map('intval', $idsInformados)));
+        } elseif ($userIdUnico !== null) {
             $ids = [$userIdUnico];
         } elseif ($tableName !== null && $tableName !== '') {
             $ids = $pdo->query("SELECT id FROM {$tableName} WHERE ativo = 1")->fetchAll(PDO::FETCH_COLUMN);
@@ -1385,6 +1401,7 @@ class MasterEscolaDetailController extends BaseController
         $layoutConfig = $this->getMergedLayoutConfig($id, $escola);
         $creditosMensalAluno = max(0, (float) ($layoutConfig['creditos_mensal_aluno'] ?? 0));
         $creditosMensalProfessor = max(0, (float) ($layoutConfig['creditos_mensal_professor'] ?? 0));
+        $creditosMensalAdmin = max(0, (float) ($layoutConfig['creditos_mensal_admin'] ?? 0));
         $creditosMensalEscola = max(0, (float) ($layoutConfig['creditos_mensal_escola'] ?? 0));
         $modoPool = ($layoutConfig['creditos_modo_pool_escola'] ?? '0') === '1';
 
@@ -1401,12 +1418,20 @@ class MasterEscolaDetailController extends BaseController
             $this->ensureTenantWalletColumns($pdo);
             $renovadosAlunos = 0;
             $renovadosProfessores = 0;
+            $renovadosAdmins = 0;
             $renovadaEscola = 0;
+            $idsAdmins = $pdo->query(
+                "SELECT id FROM usuarios WHERE ativo = 1 AND tipo IN ('admin','admin_escola')"
+            )->fetchAll(PDO::FETCH_COLUMN);
             if ($modoPool) {
                 $qAlunos = (int) $pdo->query('SELECT COUNT(*) FROM alunos WHERE ativo = 1')->fetchColumn();
                 $qProfs = (int) $pdo->query('SELECT COUNT(*) FROM professores WHERE ativo = 1')->fetchColumn();
+                $qAdmins = count($idsAdmins);
                 $cotaPool = round(
-                    ($qAlunos * $creditosMensalAluno) + ($qProfs * $creditosMensalProfessor) + $creditosMensalEscola,
+                    ($qAlunos * $creditosMensalAluno)
+                    + ($qProfs * $creditosMensalProfessor)
+                    + ($qAdmins * $creditosMensalAdmin)
+                    + $creditosMensalEscola,
                     4
                 );
                 $renovadaEscola = $this->renovarSaldoEscolaUsuarios(
@@ -1418,9 +1443,18 @@ class MasterEscolaDetailController extends BaseController
                 );
                 $renovadosAlunos = $qAlunos;
                 $renovadosProfessores = $qProfs;
+                $renovadosAdmins = $qAdmins;
             } else {
                 $renovadosAlunos = $this->renovarSaldoEscolaUsuarios($pdo, 'aluno', 'alunos', $creditosMensalAluno);
                 $renovadosProfessores = $this->renovarSaldoEscolaUsuarios($pdo, 'professor', 'professores', $creditosMensalProfessor);
+                $renovadosAdmins = $this->renovarSaldoEscolaUsuarios(
+                    $pdo,
+                    'admin',
+                    null,
+                    $creditosMensalAdmin,
+                    null,
+                    $idsAdmins
+                );
                 $renovadaEscola = $this->renovarSaldoEscolaUsuarios(
                     $pdo,
                     'escola',
@@ -1441,9 +1475,10 @@ class MasterEscolaDetailController extends BaseController
 
         $this->setFlashMessage(
             sprintf(
-                'Renovação concluída. Alunos: %d. Professores: %d. Escola: %s. Créditos comprados foram preservados.',
+                'Renovação concluída. Alunos: %d. Professores: %d. Admins: %d. Escola: %s. Créditos comprados foram preservados.',
                 $renovadosAlunos,
                 $renovadosProfessores,
+                $renovadosAdmins,
                 $renovadaEscola > 0 ? 'sim' : 'não'
             ),
             'success'
@@ -1510,6 +1545,7 @@ class MasterEscolaDetailController extends BaseController
         require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
         $config['creditos_mensal_aluno'] = (string) CreditosDecimalHelper::parsePost($_POST['creditos_mensal_aluno'] ?? 0);
         $config['creditos_mensal_professor'] = (string) CreditosDecimalHelper::parsePost($_POST['creditos_mensal_professor'] ?? 0);
+        $config['creditos_mensal_admin'] = (string) CreditosDecimalHelper::parsePost($_POST['creditos_mensal_admin'] ?? 0);
         $config['creditos_mensal_escola'] = (string) CreditosDecimalHelper::parsePost($_POST['creditos_mensal_escola'] ?? 0);
         // Custos/cobra por ação vêm da tabela de preço vinculada (não editados aqui).
         // Com TudiCoins off, força off módulos 100% IA no layout da escola.

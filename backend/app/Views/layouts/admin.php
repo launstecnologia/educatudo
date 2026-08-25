@@ -64,6 +64,19 @@
             $user['avatar_url'] = $resolvedAvatar;
             $_SESSION['avatar_url'] = $resolvedAvatar;
         }
+        try {
+            $creditosSvcPath = __DIR__ . '/../../Services/CreditosService.php';
+            if (is_file($creditosSvcPath)) {
+                require_once $creditosSvcPath;
+                $svcCredAdmin = new \App\Services\CreditosService();
+                $adminIdCarteira = (int) ($user['id'] ?? 0);
+                if ($adminIdCarteira > 0) {
+                    $svcCredAdmin->aplicarRecargaInicialSeAplicavel('admin', $adminIdCarteira);
+                }
+            }
+        } catch (Throwable $e) {
+            // Carteira indisponível não deve quebrar o painel admin.
+        }
     }
 
     $mobileDefaults = [

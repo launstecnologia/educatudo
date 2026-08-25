@@ -44,7 +44,7 @@ class GeradorQuestaoService
      *   - contexto_adicional (string, opcional)
      *   - origem (prova|jornada|exercicio_ia, obrigatório — define módulo de crédito)
      *   - usuario_id (int, obrigatório)
-     *   - papel (aluno|professor, obrigatório — passado ao CreditosService/AIJobService)
+     *   - papel (aluno|professor|admin, obrigatório — passado ao CreditosService/AIJobService)
      *   - config (array, obrigatório — config global da app, usado se houver recurso visual)
      * @return int job_id (pra o caller iniciar o polling via AIJobPoller)
      */

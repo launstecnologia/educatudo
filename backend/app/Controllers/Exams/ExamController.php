@@ -6298,12 +6298,13 @@ class ExamController extends BaseController
 
             require_once __DIR__ . '/../../Services/CreditosService.php';
             $creditosService = new \App\Services\CreditosService();
+            $papelCarteira = \App\Services\CreditosService::tipoCarteiraDoUsuario((string) ($user['tipo'] ?? 'professor'));
             $moduloCreditoSelecionado = null;
             if ($creditosService->moduloCobraCredito('gerar_exercicio_ia_professor') && $creditosService->getCustoModulo('gerar_exercicio_ia_professor') > 0) {
                 $moduloCreditoSelecionado = 'gerar_exercicio_ia_professor';
             }
 
-            if ($moduloCreditoSelecionado !== null && !$creditosService->podeConsumir('professor', (int) $user['id'], $moduloCreditoSelecionado)) {
+            if ($moduloCreditoSelecionado !== null && !$creditosService->podeConsumir($papelCarteira, (int) $user['id'], $moduloCreditoSelecionado)) {
                 throw new Exception('Créditos insuficientes para gerar questões da prova por IA.');
             }
             
@@ -6467,7 +6468,7 @@ class ExamController extends BaseController
             }
 
             if ($moduloCreditoSelecionado !== null) {
-                $creditosService->consumir('professor', (int) $user['id'], $moduloCreditoSelecionado, (string) $id);
+                $creditosService->consumir($papelCarteira, (int) $user['id'], $moduloCreditoSelecionado, (string) $id);
             }
             
             $this->json([

@@ -7,7 +7,7 @@
  *   - modulo_inteiro → some o módulo do menu/rota se TudiCoins off
  *   - acao           → some só o botão/ação; o módulo pai continua
  * pagador:
- *   - usuario → debita carteira do aluno/professor (ou pool da escola se modo pool)
+ *   - usuario → debita carteira do aluno/professor/admin (ou pool da escola se modo pool)
  *   - escola  → debita sempre a carteira da escola (ex.: EducaInclui)
  */
 

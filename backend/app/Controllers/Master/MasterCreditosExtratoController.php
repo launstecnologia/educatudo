@@ -27,6 +27,9 @@ class MasterCreditosExtratoController extends BaseController
 
         $fEscola = (int) ($_GET['escola_id'] ?? 0);
         $fUserType = trim((string) ($_GET['user_type'] ?? ''));
+        if (!in_array($fUserType, ['aluno', 'professor', 'admin'], true)) {
+            $fUserType = '';
+        }
         $fModuloKey = trim((string) ($_GET['modulo_key'] ?? ''));
         $fTipo = trim((string) ($_GET['tipo'] ?? ''));
         if (!in_array($fTipo, ['plataforma', 'app_externo'], true)) {
@@ -72,7 +75,7 @@ class MasterCreditosExtratoController extends BaseController
                 $totalRow = $tenantPdo->query(
                     "SELECT COALESCE(SUM(ABS(valor)), 0) AS total
                      FROM carteira_movimentacoes
-                     WHERE tipo = 'consumo' AND user_type IN ('aluno', 'professor')"
+                     WHERE tipo = 'consumo' AND user_type IN ('aluno', 'professor', 'admin')"
                 )->fetch(PDO::FETCH_ASSOC);
                 $totalConsumidoGeral += (float) ($totalRow['total'] ?? 0);
 
@@ -82,14 +85,16 @@ class MasterCreditosExtratoController extends BaseController
                 $sql .= ",
                     CASE
                         WHEN m.user_type = 'aluno' THEN (SELECT nome FROM alunos WHERE id = m.user_id LIMIT 1)
+                        WHEN m.user_type = 'admin' THEN (SELECT nome FROM usuarios WHERE id = m.user_id LIMIT 1)
                         ELSE (SELECT nome FROM professores WHERE id = m.user_id LIMIT 1)
                     END AS usuario_nome,
                     CASE
                         WHEN m.user_type = 'aluno' THEN (SELECT email FROM alunos WHERE id = m.user_id LIMIT 1)
+                        WHEN m.user_type = 'admin' THEN (SELECT email FROM usuarios WHERE id = m.user_id LIMIT 1)
                         ELSE (SELECT email FROM professores WHERE id = m.user_id LIMIT 1)
                     END AS usuario_email
                     FROM carteira_movimentacoes m
-                    WHERE m.tipo = 'consumo' AND m.user_type IN ('aluno', 'professor')";
+                    WHERE m.tipo = 'consumo' AND m.user_type IN ('aluno', 'professor', 'admin')";
 
                 $params = [];
                 if ($fUserType !== '') {
