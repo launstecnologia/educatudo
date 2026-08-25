@@ -271,7 +271,7 @@ $gestaoOpen = in_array($cur, [
             <?php endif; ?>
         </div>
         <?php endif; ?>
-        <?php if ($secCan(['resultados_finais'])): ?>
+        <?php if ($secCan(['resultados_finais']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('resultados_finais'))): ?>
         <a href="<?= $urlBase ?>/admin/resultados-finais" class="<?= $linkCls($cur === 'resultados-finais') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Resultados Finais</span>

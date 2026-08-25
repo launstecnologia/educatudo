@@ -168,6 +168,7 @@ $linkCls = static function (bool $ativo): string {
 </div>
 
 <!-- Comunicação -->
+<?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('comunicacao')): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'comunicacao' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/comunicacao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -231,6 +232,7 @@ $linkCls = static function (bool $ativo): string {
         </a>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Conteúdo -->
 <?php
@@ -315,10 +317,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">Censo Escolar</span>
         </a>
         <?php endif; ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade')): ?>
         <a href="<?= URL ?>/admin/conformidade" class="<?= $linkCls($cp === 'conformidade') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conformidade</span>
         </a>
+        <?php endif; ?>
         <?php if ($canViewSidebar(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
         <a href="<?= URL ?>/admin/conselhos" class="<?= $linkCls($cp === 'conselho_classe') ?>">
             <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -359,6 +363,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </a>
         <?php endif; ?>
         <?php endif; ?>
+        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('documentos_institucionais')): ?>
         <div class="flex items-center rounded-lg <?= $cp === 'documentos_institucionais' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/documentos-institucionais" class="flex-1 <?= $linkCls($cp === 'documentos_institucionais') ?>">
                 <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -385,6 +390,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             </a>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
         <?php endif; ?>
         <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula')): ?>
         <div class="flex items-center rounded-lg <?= $cp === 'enrollment' ? 'bg-white/20' : '' ?>">
@@ -443,7 +449,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <?php endif; ?>
         </div>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['resultados_finais'])): ?>
+        <?php if ($canViewSidebar(['resultados_finais']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('resultados_finais'))): ?>
         <a href="<?= URL ?>/admin/resultados-finais" class="<?= $linkCls($cp === 'resultados-finais') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Resultados Finais</span>

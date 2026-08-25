@@ -216,6 +216,33 @@ class ModuloCatalogo
                 ],
             ],
             [
+                'chave' => 'geral_comunicacao',
+                'nome' => 'Comunicação',
+                'aliases' => ['Comunicação Escolar', 'Reuniões', 'Comunidade'],
+                'feature_keys' => ['comunicacao'],
+                'rotas' => [
+                    '/admin/comunicacao' => 'comunicacao',
+                    '/admin/comunicacao-escolar' => 'comunicacao',
+                    '/admin/reunioes' => 'comunicacao',
+                ],
+            ],
+            [
+                'chave' => 'geral_conformidade',
+                'nome' => 'Conformidade',
+                'feature_keys' => ['conformidade'],
+                'rotas' => [
+                    '/admin/conformidade' => 'conformidade',
+                ],
+            ],
+            [
+                'chave' => 'geral_documentos_institucionais',
+                'nome' => 'Documentos Institucionais',
+                'feature_keys' => ['documentos_institucionais'],
+                'rotas' => [
+                    '/admin/documentos-institucionais' => 'documentos_institucionais',
+                ],
+            ],
+            [
                 'chave' => 'geral_ead',
                 'nome' => 'EAD / AVA',
                 'feature_keys' => ['ead'],
@@ -431,6 +458,15 @@ class ModuloCatalogo
                     '/professor/provas-professor' => 'professor_provas',
                     '/admin/provas' => 'professor_provas',
                     '/admin/provas-professor' => 'professor_provas',
+                ],
+            ],
+            [
+                'chave' => 'geral_resultados_finais',
+                'nome' => 'Resultados Finais',
+                'aliases' => ['Resultado visual', 'Fechamento'],
+                'feature_keys' => ['resultados_finais'],
+                'rotas' => [
+                    '/admin/resultados-finais' => 'resultados_finais',
                 ],
             ],
             [

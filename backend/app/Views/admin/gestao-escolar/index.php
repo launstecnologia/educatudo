@@ -27,12 +27,14 @@ if ($podeHub('censo_escolar') && (!class_exists('LayoutHelper') || LayoutHelper:
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/conformidade',
-    'title' => 'Conformidade',
-    'description' => 'Painel de pendências e conformidade operacional da escola.',
-    'icon' => 'fa-solid fa-clipboard-check',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/conformidade',
+        'title' => 'Conformidade',
+        'description' => 'Painel de pendências e conformidade operacional da escola.',
+        'icon' => 'fa-solid fa-clipboard-check',
+    ];
+}
 
 if ($podeHub('conselho_classe') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))) {
     $hub_cards[] = [
@@ -68,12 +70,14 @@ if ($podeHub('presenca') && (!class_exists('LayoutHelper') || LayoutHelper::isMo
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/documentos-institucionais',
-    'title' => 'Documentos Institucionais',
-    'description' => 'Regimento, PPP e demais documentos oficiais da escola.',
-    'icon' => 'fa-solid fa-file-shield',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('documentos_institucionais')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/documentos-institucionais',
+        'title' => 'Documentos Institucionais',
+        'description' => 'Regimento, PPP e demais documentos oficiais da escola.',
+        'icon' => 'fa-solid fa-file-shield',
+    ];
+}
 
 if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $podeHub('processos_matricula')) {
     $hub_cards[] = [
@@ -146,7 +150,7 @@ if ($podeHub('patrimonio')) {
     ];
 }
 
-if ($podeHub('resultados_finais')) {
+if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('resultados_finais'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/resultados-finais',
         'title' => 'Resultados Finais',

@@ -1,11 +1,11 @@
 <?php
 /**
- * Manifest do módulo Gestão de Presença (catraca, secretaria, consolidado de faltas).
+ * Manifest do módulo Presença (catraca, secretaria, consolidado de faltas).
  * Opcional por escola (Master). Default ligado.
  */
 return [
     'chave' => 'presenca',
-    'label' => 'Gestão de Presença',
+    'label' => 'Presença',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [
         'admin' => 'presenca',
@@ -22,7 +22,7 @@ return [
     'menu' => [
         'admin' => [
             [
-                'label' => 'Gestão de Presença',
+                'label' => 'Presença',
                 'path' => '/admin/presenca',
                 'feature_key' => 'presenca',
             ],
