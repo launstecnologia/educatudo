@@ -310,7 +310,11 @@ class UsuarioController extends BaseController
         }
 
         $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? $_SERVER['HTTP_CONTENT_LENGTH'] ?? 0);
-        if ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
+        if ($this->requisicaoEhJson()) {
+            if ($contentLength > 5 * 1024 * 1024) {
+                $this->json(['error' => 'Arquivo muito grande. Use uma imagem de até 2MB.'], 400);
+            }
+        } elseif ($contentLength > 0 && empty($_POST) && empty($_FILES)) {
             $this->json(['error' => 'Arquivo muito grande. Use uma imagem de até 2MB.'], 400);
         }
 
@@ -422,6 +426,31 @@ class UsuarioController extends BaseController
         }
     }
 
+    private function requisicaoEhJson(): bool
+    {
+        $contentType = strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? ''));
+        return strpos($contentType, 'application/json') !== false;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function corpoJsonAvatar(): array
+    {
+        static $lido = false;
+        static $payload = [];
+        if ($lido) {
+            return $payload;
+        }
+        $lido = true;
+        if (!$this->requisicaoEhJson()) {
+            return $payload;
+        }
+        $json = json_decode((string) file_get_contents('php://input'), true);
+        $payload = is_array($json) ? $json : [];
+        return $payload;
+    }
+
     /**
      * @return array{path: string, name: string, size: int, unlink: bool}
      */
@@ -436,7 +465,9 @@ class UsuarioController extends BaseController
             ];
         }
 
-        $dataUrl = trim((string) ($_POST['avatar_base64'] ?? ''));
+        $payload = $this->corpoJsonAvatar();
+        $dataUrl = trim((string) ($payload['avatar_base64'] ?? $_POST['avatar_base64'] ?? ''));
+        $nomeOriginal = (string) ($payload['avatar_nome'] ?? $_POST['avatar_nome'] ?? 'avatar.jpg');
         if ($dataUrl === '' || strncmp($dataUrl, 'data:', 5) !== 0 || strpos($dataUrl, 'base64,') === false) {
             $uploadError = (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
             throw new Exception($this->mensagemErroUploadAvatar($uploadError));
@@ -448,7 +479,7 @@ class UsuarioController extends BaseController
             throw new Exception('Arquivo muito grande. Máximo 2MB');
         }
 
-        $encoded = substr($dataUrl, (int) strpos($dataUrl, ',') + 1);
+        $encoded = preg_replace('/\s+/', '', substr($dataUrl, (int) strpos($dataUrl, ',') + 1)) ?? '';
         $bin = base64_decode($encoded, true);
         if ($bin === false || $bin === '') {
             throw new Exception('Nenhuma imagem foi recebida. Tente novamente.');
@@ -468,7 +499,7 @@ class UsuarioController extends BaseController
 
         return [
             'path' => $tmp,
-            'name' => (string) ($_POST['avatar_nome'] ?? 'avatar.jpg'),
+            'name' => $nomeOriginal !== '' ? $nomeOriginal : 'avatar.jpg',
             'size' => strlen($bin),
             'unlink' => true,
         ];
@@ -476,7 +507,10 @@ class UsuarioController extends BaseController
 
     private function tokenCsrfDaRequisicao(): string
     {
+        $json = $this->corpoJsonAvatar();
         $candidatos = [
+            $json['_token'] ?? '',
+            $json['csrf_token'] ?? '',
             $_POST['_token'] ?? '',
             $_POST['csrf_token'] ?? '',
             $_GET['_token'] ?? '',

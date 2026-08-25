@@ -122,11 +122,10 @@ include __DIR__ . '/../_partials/page_header_list.php';
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-key text-gray-400 w-4 text-center"></i> Alterar Senha
                         </button>
-                        <label for="admin-usuario-avatar-input"
-                               onclick="pendingAvatarUserId = <?= (int) $usuario['id'] ?>; document.documentElement.setAttribute('data-native-file-picker', '1');"
-                               class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        <button type="button" onclick="uploadAvatar(<?= (int) $usuario['id'] ?>, event)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-camera text-gray-400 w-4 text-center"></i> Alterar Avatar
-                        </label>
+                        </button>
                         <?php
                         $row_actions_dropdown_items = ob_get_clean();
                         $row_actions_dropdown_id = 'row-actions-usuario-' . (int) $usuario['id'];
@@ -438,15 +437,9 @@ include __DIR__ . '/../_partials/page_header_list.php';
     </form>
 </aside>
 
-<input type="file" id="admin-usuario-avatar-input"
-       accept="image/jpeg,image/png,image/gif,image/webp,image/*"
-       tabindex="-1" aria-hidden="true"
-       style="position:absolute;left:-9999px;width:220px;height:40px;">
-
 <script>
 const URL_BASE = <?= json_encode(URL) ?>;
 let csrfToken = <?= json_encode((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>;
-var pendingAvatarUserId = null;
 
 function resolveCsrfToken() {
     const fromDom = document.getElementById('csrf_token')?.value
@@ -801,106 +794,91 @@ function uploadAvatar(id, ev) {
         ev.preventDefault();
         ev.stopPropagation();
     }
-    pendingAvatarUserId = id;
     document.documentElement.setAttribute('data-native-file-picker', '1');
-    const input = document.getElementById('admin-usuario-avatar-input');
-    if (!input) {
-        alert('Não foi possível abrir o seletor de imagem. Recarregue a página.');
-        return;
-    }
-    input.value = '';
-    input.click();
-}
-
-(function bindAvatarFileInput() {
-    const input = document.getElementById('admin-usuario-avatar-input');
-    if (!input || input.dataset.bound === '1') {
-        return;
-    }
-    input.dataset.bound = '1';
-
-    function enviarAvatar(id, file, tentativa) {
-        const token = resolveCsrfToken();
-        if (!token) {
-            alert('Sessão expirada. Recarregue a página e tente novamente.');
-            return;
-        }
-        atualizarTokensCsrfNaPagina(token);
-
-        const postar = function (dataUrl) {
-            const formData = new FormData();
-            formData.append('_token', token);
-            formData.append('avatar', file, file.name || 'avatar.jpg');
-            formData.append('avatar_nome', file.name || 'avatar.jpg');
-            if (dataUrl) {
-                formData.append('avatar_base64', dataUrl);
-            }
-            const url = URL_BASE + '/admin/usuarios/' + id + '/avatar?_token=' + encodeURIComponent(token);
-            fetch(url, {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin'
-            })
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.csrf_token) {
-                        atualizarTokensCsrfNaPagina(data.csrf_token);
-                    }
-                    if (data.success) {
-                        alert('Avatar enviado com sucesso!');
-                        location.reload();
-                        return;
-                    }
-                    const erro = String(data.error || '');
-                    if (!tentativa && /token inválido/i.test(erro) && data.csrf_token) {
-                        enviarAvatar(id, file, true);
-                        return;
-                    }
-                    alert('Erro: ' + (data.error || 'Falha no upload'));
-                })
-                .catch(() => alert('Erro de conexão'));
-        };
-
-        const reader = new FileReader();
-        reader.onload = function () {
-            postar(String(reader.result || ''));
-        };
-        reader.onerror = function () {
-            postar('');
-        };
-        reader.readAsDataURL(file);
-    }
-
-    input.addEventListener('change', function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/gif,image/webp,image/*';
+    input.onchange = function () {
+        document.documentElement.removeAttribute('data-native-file-picker');
         const file = input.files && input.files[0];
-        const id = pendingAvatarUserId;
-        setTimeout(function () {
-            document.documentElement.removeAttribute('data-native-file-picker');
-        }, 1500);
-        if (!file || !id) {
+        if (!file) {
             return;
         }
         if (file.size > 2 * 1024 * 1024) {
             alert('Arquivo muito grande. Máximo 2MB.');
-            input.value = '';
             return;
         }
         enviarAvatar(id, file, false);
-    });
+    };
     input.addEventListener('cancel', function () {
         document.documentElement.removeAttribute('data-native-file-picker');
     });
-    window.addEventListener('focus', function () {
-        setTimeout(function () {
-            document.documentElement.removeAttribute('data-native-file-picker');
-        }, 2000);
-    });
-})();
+    input.click();
+}
+
+function enviarAvatar(id, file, tentativa) {
+    const token = resolveCsrfToken();
+    if (!token) {
+        alert('Sessão expirada. Recarregue a página e tente novamente.');
+        return;
+    }
+    atualizarTokensCsrfNaPagina(token);
+
+    const reader = new FileReader();
+    reader.onload = function () {
+        const dataUrl = String(reader.result || '');
+        if (dataUrl.indexOf('base64,') === -1) {
+            alert('Não foi possível ler a imagem. Tente outro arquivo (JPG ou PNG).');
+            return;
+        }
+        fetch(URL_BASE + '/admin/usuarios/' + id + '/avatar', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': token
+            },
+            body: JSON.stringify({
+                _token: token,
+                avatar_nome: file.name || 'avatar.jpg',
+                avatar_base64: dataUrl
+            })
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.csrf_token) {
+                    atualizarTokensCsrfNaPagina(data.csrf_token);
+                }
+                if (data.success) {
+                    alert('Avatar enviado com sucesso!');
+                    location.reload();
+                    return;
+                }
+                const erro = String(data.error || '');
+                if (!tentativa && /token inválido/i.test(erro) && data.csrf_token) {
+                    enviarAvatar(id, file, true);
+                    return;
+                }
+                alert('Erro: ' + (data.error || 'Falha no upload'));
+            })
+            .catch(() => alert('Erro de conexão'));
+    };
+    reader.onerror = function () {
+        alert('Não foi possível ler a imagem. Tente outro arquivo (JPG ou PNG).');
+    };
+    reader.readAsDataURL(file);
+}
 
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         closeFilterDrawer();
         closeUserDrawer();
     }
+});
+window.addEventListener('focus', function () {
+    setTimeout(function () {
+        document.documentElement.removeAttribute('data-native-file-picker');
+    }, 2000);
 });
 </script>
