@@ -19,6 +19,9 @@ $linkCls = static function (bool $ativo): string {
         ? 'text-white bg-white/20'
         : 'text-purple-100 hover:bg-white/20 hover:text-white') . ' rounded-lg transition-all duration-200';
 };
+$modOn = is_callable($modOn ?? null) ? $modOn : static function (string $key): bool {
+    return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+};
 $academicoOpen = in_array($cur, [
     'academico', 'students', 'ano_letivo', 'componentes-curriculares', 'curso',
     'grade_horaria', 'matriz-curricular', 'teachers', 'regras-academicas',
@@ -69,7 +72,7 @@ $gestaoOpen = in_array($cur, [
             <span class="sidebar-text text-sm">Ano Letivo</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['materias'])): ?>
+        <?php if ($secCan(['materias']) && $modOn('componentes_curriculares')): ?>
         <a href="<?= $urlBase ?>/admin/componentes-curriculares" class="<?= $linkCls($cur === 'componentes-curriculares') ?>">
             <i class="fa-solid fa-book w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Componentes Curriculares</span>
@@ -81,13 +84,13 @@ $gestaoOpen = in_array($cur, [
             <span class="sidebar-text text-sm">Curso</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['grade_horaria'])): ?>
+        <?php if ($secCan(['grade_horaria']) && $modOn('grade_horaria')): ?>
         <a href="<?= $urlBase ?>/admin/grade-horaria" class="<?= $linkCls($cur === 'grade_horaria') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Grade Horária</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['matriz_curricular'])): ?>
+        <?php if ($secCan(['matriz_curricular']) && $modOn('matriz_curricular')): ?>
         <a href="<?= $urlBase ?>/admin/matrizes-curriculares" class="<?= $linkCls($cur === 'matriz-curricular') ?>">
             <i class="fa-solid fa-sitemap w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Matriz Curricular</span>
@@ -99,13 +102,13 @@ $gestaoOpen = in_array($cur, [
             <span class="sidebar-text text-sm">Professores</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['regras_academicas'])): ?>
+        <?php if ($secCan(['regras_academicas']) && $modOn('regras_academicas')): ?>
         <a href="<?= $urlBase ?>/admin/regras-academicas" class="<?= $linkCls($cur === 'regras-academicas') ?>">
             <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Regras Acadêmicas</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['salas']) && AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
+        <?php if ($secCan(['salas']) && $modOn('salas') && AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
         <a href="<?= $urlBase ?>/admin/salas" class="<?= $linkCls($cur === 'salas') ?>">
             <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Salas / Ambientes</span>
@@ -203,7 +206,7 @@ $gestaoOpen = in_array($cur, [
             </button>
         </div>
         <div id="diario-classe-nested" class="<?= !empty($diarioNestedOpen) ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <?php if ($secCan(['faltas'])): ?>
+            <?php if ($secCan(['faltas']) && $modOn('faltas')): ?>
             <a href="<?= $urlBase ?>/admin/faltas" class="<?= $linkCls($cur === 'faltas') ?>">
                 <span class="sidebar-text text-sm">Faltas</span>
             </a>
@@ -215,7 +218,7 @@ $gestaoOpen = in_array($cur, [
             <?php endif; ?>
         </div>
         <?php else: ?>
-        <?php if ($secCan(['faltas'])): ?>
+        <?php if ($secCan(['faltas']) && $modOn('faltas')): ?>
         <a href="<?= $urlBase ?>/admin/faltas" class="<?= $linkCls($cur === 'faltas') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Faltas</span>
@@ -247,8 +250,8 @@ $gestaoOpen = in_array($cur, [
         </a>
         <?php endif; ?>
         <?php
-        $secAlmoxarifadoOk = $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
-        $secPatrimonioOk = $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
+        $secAlmoxarifadoOk = $modOn('recursos_fisicos') && $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
+        $secPatrimonioOk = $modOn('recursos_fisicos') && $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
         if ($secAlmoxarifadoOk || $secPatrimonioOk):
         ?>
         <button type="button" onclick="toggleNestedMenu('recursos-fisicos')" class="w-full flex items-center px-4 py-2 <?= !empty($recursosNestedOpen) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-left">
@@ -277,7 +280,7 @@ $gestaoOpen = in_array($cur, [
             <span class="sidebar-text text-sm">Resultados Finais</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['saude_academica']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
+        <?php if ($secCan(['saude_academica']) && $modOn('saude_academica') && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
         <a href="<?= $urlBase ?>/admin/saude-academica" class="<?= $linkCls($cur === 'saude_academica') ?>">
             <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>

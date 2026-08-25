@@ -1,14 +1,16 @@
 <?php
 $hub_title = 'Sistema';
 $hub_subtitle = 'Configurações de prompt de IA e tickets de suporte.';
-$hub_cards = [
-    [
+$hub_cards = [];
+
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel')) {
+    $hub_cards[] = [
         'href' => URL . '/admin/redacao-configuravel',
         'title' => 'Configuração de Prompt',
         'description' => 'Ajuste os prompts usados na correção de redação.',
         'icon' => 'fa-solid fa-sliders',
-    ],
-];
+    ];
+}
 
 if (($user['perfil_admin'] ?? '') === 'dev') {
     $hub_cards[] = [

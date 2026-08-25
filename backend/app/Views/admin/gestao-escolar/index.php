@@ -54,12 +54,14 @@ if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper:
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/faltas',
-    'title' => 'Faltas',
-    'description' => 'Registre e acompanhe as faltas dos alunos.',
-    'icon' => 'fa-regular fa-clipboard',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/faltas',
+        'title' => 'Faltas',
+        'description' => 'Registre e acompanhe as faltas dos alunos.',
+        'icon' => 'fa-regular fa-clipboard',
+    ];
+}
 
 if ($podeHub('presenca') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca'))) {
     $hub_cards[] = [
@@ -132,7 +134,7 @@ if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || LayoutHelper::i
     ];
 }
 
-if ($podeHub('almoxarifado')) {
+if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('almoxarifado')) {
     $hub_cards[] = [
         'href' => URL . '/admin/almoxarifado',
         'title' => 'Almoxarifado',
@@ -141,7 +143,7 @@ if ($podeHub('almoxarifado')) {
     ];
 }
 
-if ($podeHub('patrimonio')) {
+if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('patrimonio')) {
     $hub_cards[] = [
         'href' => URL . '/admin/patrimonio',
         'title' => 'Patrimônio',
@@ -159,12 +161,14 @@ if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || LayoutHel
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/saude-academica',
-    'title' => 'Saúde Acadêmica',
-    'description' => 'Indicadores de desempenho, frequência e risco pedagógico.',
-    'icon' => 'fa-solid fa-heart-pulse',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('saude_academica')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/saude-academica',
+        'title' => 'Saúde Acadêmica',
+        'description' => 'Indicadores de desempenho, frequência e risco pedagógico.',
+        'icon' => 'fa-solid fa-heart-pulse',
+    ];
+}
 
 $hub_cards[] = [
     'href' => URL . '/admin/tudicoins',

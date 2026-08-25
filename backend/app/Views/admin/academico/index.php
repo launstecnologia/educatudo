@@ -1,4 +1,8 @@
 <?php
+$modOn = static function (string $key): bool {
+    return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+};
+
 $hub_title = 'Acadêmico';
 $hub_subtitle = 'Gerencie a estrutura acadêmica da escola.';
 $hub_cards = [
@@ -14,48 +18,65 @@ $hub_cards = [
         'description' => 'Crie e gerencie os anos letivos da escola, períodos e datas.',
         'icon' => 'fa-regular fa-calendar-days',
     ],
-    [
+];
+
+if ($modOn('calendario_escolar')) {
+    $hub_cards[] = [
         'href' => URL . '/admin/calendario-escolar',
         'title' => 'Calendário Escolar',
         'description' => 'Eventos, feriados e datas comemorativas da escola.',
         'icon' => 'fa-regular fa-calendar-days',
-    ],
-    [
+    ];
+}
+
+if ($modOn('calendario_letivo')) {
+    $hub_cards[] = [
         'href' => URL . '/admin/calendario-letivo',
         'title' => 'Calendário Letivo',
         'description' => 'Dias letivos, recessos e organização do período escolar.',
         'icon' => 'fa-solid fa-calendar-check',
-    ],
-    [
+    ];
+}
+
+if ($modOn('componentes_curriculares')) {
+    $hub_cards[] = [
         'href' => URL . '/admin/componentes-curriculares',
         'title' => 'Componentes Curriculares',
         'description' => 'Gerencie os componentes curriculares oferecidos pela escola.',
         'icon' => 'fa-solid fa-book',
-    ],
-    [
-        'href' => URL . '/admin/curso',
-        'title' => 'Curso',
-        'description' => 'Configure os cursos oferecidos pela instituição.',
-        'icon' => 'fa-solid fa-book-open',
-    ],
-    [
+    ];
+}
+
+$hub_cards[] = [
+    'href' => URL . '/admin/curso',
+    'title' => 'Curso',
+    'description' => 'Configure os cursos oferecidos pela instituição.',
+    'icon' => 'fa-solid fa-book-open',
+];
+
+if ($modOn('grade_horaria')) {
+    $hub_cards[] = [
         'href' => URL . '/admin/grade-horaria',
         'title' => 'Grade Horária',
         'description' => 'Monte os horários das turmas, professores e ambientes.',
         'icon' => 'fa-regular fa-calendar-days',
-    ],
-    [
+    ];
+}
+
+if ($modOn('matriz_curricular')) {
+    $hub_cards[] = [
         'href' => URL . '/admin/matrizes-curriculares',
         'title' => 'Matriz Curricular',
         'description' => 'Defina o que cada série deve cursar: componentes, aulas por semana e carga horária.',
         'icon' => 'fa-solid fa-table',
-    ],
-    [
-        'href' => URL . '/admin/teachers',
-        'title' => 'Professores',
-        'description' => 'Cadastro de professores e vínculos com turmas.',
-        'icon' => 'fa-solid fa-chalkboard-user',
-    ],
+    ];
+}
+
+$hub_cards[] = [
+    'href' => URL . '/admin/teachers',
+    'title' => 'Professores',
+    'description' => 'Cadastro de professores e vínculos com turmas.',
+    'icon' => 'fa-solid fa-chalkboard-user',
 ];
 
 if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('notas_semanais')) {
@@ -67,18 +88,24 @@ if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('notas_semanai
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/regras-academicas',
-    'title' => 'Regras Acadêmicas',
-    'description' => 'Média mínima, frequência, recuperação e situação de aprovação — versionadas por ano letivo.',
-    'icon' => 'fa-solid fa-scale-balanced',
-];
-$hub_cards[] = [
-    'href' => URL . '/admin/salas',
-    'title' => 'Salas / Ambientes',
-    'description' => 'Cadastre salas de aula, laboratórios, quadra e outros ambientes para usar como Sala Padrão da turma.',
-    'icon' => 'fa-solid fa-door-open',
-];
+if ($modOn('regras_academicas')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/regras-academicas',
+        'title' => 'Regras Acadêmicas',
+        'description' => 'Média mínima, frequência, recuperação e situação de aprovação — versionadas por ano letivo.',
+        'icon' => 'fa-solid fa-scale-balanced',
+    ];
+}
+
+if ($modOn('salas')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/salas',
+        'title' => 'Salas / Ambientes',
+        'description' => 'Cadastre salas de aula, laboratórios, quadra e outros ambientes para usar como Sala Padrão da turma.',
+        'icon' => 'fa-solid fa-door-open',
+    ];
+}
+
 $hub_cards[] = [
     'href' => URL . '/admin/serie',
     'title' => 'Série',

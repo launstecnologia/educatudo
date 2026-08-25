@@ -87,6 +87,9 @@
             }
             return false;
         };
+        $modOn = static function (string $key): bool {
+            return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+        };
         $showDashboardMenu = $canViewSidebar(['dashboard']);
         $showAlunosMenu = $canViewSidebar(['alunos']);
         $showUsuariosGroup = $canViewSidebar(['administradores']);
@@ -95,7 +98,7 @@
             'curso', 'grade_horaria', 'matriz_curricular', 'professores', 'notas_semanais',
             'regras_academicas', 'salas', 'series', 'turmas',
         ]);
-        $showInventoryGroup = $canViewSidebar(['almoxarifado', 'patrimonio']);
+        $showInventoryGroup = $modOn('recursos_fisicos') && $canViewSidebar(['almoxarifado', 'patrimonio']);
         $cp = $current_page ?? '';
         $uriAtual = $_SERVER['REQUEST_URI'] ?? '';
         $curMovimentacao = in_array($cp, ['students_remanejamento', 'students_transferencia_escolar'], true);

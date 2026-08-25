@@ -192,12 +192,57 @@ class ModuloCatalogo
                 ],
             ],
             [
+                'chave' => 'geral_assistente',
+                'nome' => 'Assistente',
+                'feature_keys' => ['assistente'],
+                'rotas' => [
+                    '/admin/assistente' => 'assistente',
+                    '/admin/assistente-provas' => 'assistente',
+                    '/admin/consulta-assistente' => 'assistente',
+                ],
+            ],
+            [
                 'chave' => 'geral_aulas_online',
                 'nome' => 'Aulas Online',
                 'feature_keys' => ['aulas_online'],
                 'rotas' => [
                     '/aluno/aulas-online' => 'aulas_online',
                     '/admin/aulas-online' => 'aulas_online',
+                ],
+            ],
+            [
+                'chave' => 'geral_bncc',
+                'nome' => 'BNCC / Plano de Curso',
+                'aliases' => ['BNCC', 'Plano de Curso'],
+                'feature_keys' => ['bncc'],
+                'rotas' => [
+                    '/admin/bncc' => 'bncc',
+                    '/admin/plano-curso' => 'bncc',
+                ],
+            ],
+            [
+                'chave' => 'geral_calendario_escolar',
+                'nome' => 'Calendário Escolar',
+                'feature_keys' => ['calendario_escolar'],
+                'rotas' => [
+                    '/admin/calendario-escolar' => 'calendario_escolar',
+                ],
+            ],
+            [
+                'chave' => 'geral_calendario_letivo',
+                'nome' => 'Calendário Letivo',
+                'feature_keys' => ['calendario_letivo'],
+                'rotas' => [
+                    '/admin/calendario-letivo' => 'calendario_letivo',
+                ],
+            ],
+            [
+                'chave' => 'geral_componentes_curriculares',
+                'nome' => 'Componentes Curriculares',
+                'aliases' => ['Componentes'],
+                'feature_keys' => ['componentes_curriculares'],
+                'rotas' => [
+                    '/admin/componentes-curriculares' => 'componentes_curriculares',
                 ],
             ],
             [
@@ -323,11 +368,27 @@ class ModuloCatalogo
                 ],
             ],
             [
+                'chave' => 'geral_faltas',
+                'nome' => 'Faltas',
+                'feature_keys' => ['faltas'],
+                'rotas' => [
+                    '/admin/faltas' => 'faltas',
+                ],
+            ],
+            [
                 'chave' => 'forum',
                 'nome' => 'Fórum',
                 'feature_keys' => ['forum'],
                 'rotas' => [
                     '/forum' => 'forum',
+                ],
+            ],
+            [
+                'chave' => 'geral_grade_horaria',
+                'nome' => 'Grade Horária',
+                'feature_keys' => ['grade_horaria'],
+                'rotas' => [
+                    '/admin/grade-horaria' => 'grade_horaria',
                 ],
             ],
             [
@@ -414,6 +475,24 @@ class ModuloCatalogo
                 ],
             ],
             [
+                'chave' => 'geral_matriz_curricular',
+                'nome' => 'Matriz Curricular',
+                'feature_keys' => ['matriz_curricular'],
+                'rotas' => [
+                    '/admin/matrizes-curriculares' => 'matriz_curricular',
+                ],
+            ],
+            [
+                'chave' => 'geral_monitoramento',
+                'nome' => 'Monitoramento',
+                'feature_keys' => ['monitoramento'],
+                'rotas' => [
+                    '/admin/monitoramento' => 'monitoramento',
+                    '/admin/monitoramento-escolar' => 'monitoramento',
+                    '/admin/tentativas-login' => 'monitoramento',
+                ],
+            ],
+            [
                 'chave' => 'geral_mural_recados',
                 'nome' => 'Mural de Recados',
                 'feature_keys' => ['mural_recados'],
@@ -424,6 +503,18 @@ class ModuloCatalogo
                 ],
                 'rotas_pais' => [
                     ['pattern' => '#/pais/filhos/\d+/mural-recados(?:/|$)#', 'feature_key' => 'mural_recados'],
+                ],
+            ],
+            [
+                'chave' => 'geral_boletim',
+                'nome' => 'Notas e Boletim',
+                'aliases' => ['Boletim', 'Guia do Boletim'],
+                'feature_keys' => ['boletim'],
+                'rotas' => [
+                    '/admin/boletim' => 'boletim',
+                    '/admin/boletim-guia' => 'boletim',
+                    '/admin/boletim-configuracao' => 'boletim',
+                    '/admin/reports/boletim-coordenacao' => 'boletim',
                 ],
             ],
             [
@@ -458,6 +549,41 @@ class ModuloCatalogo
                     '/professor/provas-professor' => 'professor_provas',
                     '/admin/provas' => 'professor_provas',
                     '/admin/provas-professor' => 'professor_provas',
+                ],
+            ],
+            [
+                'chave' => 'geral_recursos_fisicos',
+                'nome' => 'Recursos Físicos',
+                'aliases' => ['Almoxarifado', 'Patrimônio'],
+                'feature_keys' => ['recursos_fisicos'],
+                'rotas' => [
+                    '/admin/almoxarifado' => 'recursos_fisicos',
+                    '/admin/patrimonio' => 'recursos_fisicos',
+                ],
+            ],
+            [
+                'chave' => 'geral_regras_academicas',
+                'nome' => 'Regras Acadêmicas',
+                'feature_keys' => ['regras_academicas'],
+                'rotas' => [
+                    '/admin/regras-academicas' => 'regras_academicas',
+                ],
+            ],
+            [
+                'chave' => 'geral_salas',
+                'nome' => 'Salas / Ambientes',
+                'aliases' => ['Salas'],
+                'feature_keys' => ['salas'],
+                'rotas' => [
+                    '/admin/salas' => 'salas',
+                ],
+            ],
+            [
+                'chave' => 'geral_saude_academica',
+                'nome' => 'Saúde Acadêmica',
+                'feature_keys' => ['saude_academica'],
+                'rotas' => [
+                    '/admin/saude-academica' => 'saude_academica',
                 ],
             ],
             [

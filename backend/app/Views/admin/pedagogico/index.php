@@ -25,12 +25,14 @@ if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('ead')) {
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/bncc',
-    'title' => 'BNCC / Plano de Curso',
-    'description' => 'Habilidades da BNCC e plano de curso da escola.',
-    'icon' => 'fa-solid fa-list-check',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('bncc')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/bncc',
+        'title' => 'BNCC / Plano de Curso',
+        'description' => 'Habilidades da BNCC e plano de curso da escola.',
+        'icon' => 'fa-solid fa-list-check',
+    ];
+}
 
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_minicursos')) {
     $hub_cards[] = [

@@ -43,17 +43,19 @@ if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('jornadas')) {
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/boletim',
-    'title' => 'Notas e Boletim',
-    'description' => 'Modelo de boletim, pesos e exibição de notas.',
-    'icon' => 'fa-regular fa-file-lines',
-];
-$hub_cards[] = [
-    'href' => URL . '/admin/boletim-guia',
-    'title' => 'Guia do Boletim',
-    'description' => 'Documentação de como o boletim é calculado e exibido.',
-    'icon' => 'fa-solid fa-book-open',
-];
+if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('boletim')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/boletim',
+        'title' => 'Notas e Boletim',
+        'description' => 'Modelo de boletim, pesos e exibição de notas.',
+        'icon' => 'fa-regular fa-file-lines',
+    ];
+    $hub_cards[] = [
+        'href' => URL . '/admin/boletim-guia',
+        'title' => 'Guia do Boletim',
+        'description' => 'Documentação de como o boletim é calculado e exibido.',
+        'icon' => 'fa-solid fa-book-open',
+    ];
+}
 
 include __DIR__ . '/../_partials/hub_modulos.php';

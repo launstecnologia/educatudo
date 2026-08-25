@@ -1,10 +1,24 @@
 <?php
 /** Menu lateral completo do admin (exceto perfis financeiro e secretaria). */
+if (!class_exists('FeatureGate')) {
+    require_once __DIR__ . '/../../../Core/FeatureGate.php';
+}
 $linkCls = static function (bool $ativo): string {
     return 'flex items-center px-4 py-2 ' . ($ativo
         ? 'text-white bg-white/20'
         : 'text-purple-100 hover:bg-white/20 hover:text-white') . ' rounded-lg transition-all duration-200';
 };
+$showAvaliacoesGroup = ($canViewSidebar(['inclusao']) && $modOn('inclusao'))
+    || $modOn('aluno_provas') || $modOn('professor_provas')
+    || $modOn('redacao_configuravel')
+    || FeatureGate::isModuleEnabled('jornadas')
+    || $modOn('boletim');
+$showPedagogicoGroup = $modOn('aulas_online')
+    || FeatureGate::isModuleEnabled('ead')
+    || $modOn('bncc')
+    || $modOn('aluno_minicursos')
+    || $modOn('professor_planos_aula');
+$showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ?? '') === 'dev');
 ?>
 <!-- Dashboard -->
 <?php if ($showDashboardMenu): ?>
@@ -15,7 +29,7 @@ $linkCls = static function (bool $ativo): string {
     <span class="sidebar-text">Dashboard</span>
 </a>
 <?php endif; ?>
-<?php if (in_array(($user['perfil_admin'] ?? ''), ['dev', 'diretor', 'coordenador'], true)): ?>
+<?php if ($modOn('assistente') && in_array(($user['perfil_admin'] ?? ''), ['dev', 'diretor', 'coordenador'], true)): ?>
 <a href="<?= URL ?>/admin/assistente" class="flex items-center px-4 py-3 <?= $cp === 'assistente' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
     <i class="fa-solid fa-comments w-5 h-5 mr-3"></i>
     <span class="sidebar-text">Assistente</span>
@@ -47,27 +61,35 @@ $linkCls = static function (bool $ativo): string {
             <i class="fa-regular fa-calendar w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Ano Letivo</span>
         </a>
+        <?php if ($modOn('calendario_escolar')): ?>
         <a href="<?= URL ?>/admin/calendario-escolar" class="<?= $linkCls($cp === 'school-calendar') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Calendário Escolar</span>
         </a>
+        <?php endif; ?>
+        <?php if ($modOn('calendario_letivo')): ?>
         <a href="<?= URL ?>/admin/calendario-letivo" class="<?= $linkCls($cp === 'calendario_letivo') ?>">
             <i class="fa-solid fa-calendar-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Calendário Letivo</span>
         </a>
+        <?php endif; ?>
+        <?php if ($modOn('componentes_curriculares')): ?>
         <a href="<?= URL ?>/admin/componentes-curriculares" class="<?= $linkCls($cp === 'componentes-curriculares') ?>">
             <i class="fa-solid fa-book w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Componentes Curriculares</span>
         </a>
+        <?php endif; ?>
         <a href="<?= URL ?>/admin/curso" class="<?= $linkCls($cp === 'curso') ?>">
             <i class="fa-solid fa-graduation-cap w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Curso</span>
         </a>
+        <?php if ($modOn('grade_horaria')): ?>
         <a href="<?= URL ?>/admin/grade-horaria" class="<?= $linkCls($cp === 'grade_horaria') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Grade Horária</span>
         </a>
-        <?php if ($canViewSidebar(['matriz_curricular'])): ?>
+        <?php endif; ?>
+        <?php if ($modOn('matriz_curricular') && $canViewSidebar(['matriz_curricular'])): ?>
         <a href="<?= URL ?>/admin/matrizes-curriculares" class="<?= $linkCls($cp === 'matriz-curricular') ?>">
             <i class="fa-solid fa-sitemap w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Matriz Curricular</span>
@@ -85,13 +107,13 @@ $linkCls = static function (bool $ativo): string {
             <span class="sidebar-text text-sm">Quadro semanal</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['regras_academicas'])): ?>
+        <?php if ($modOn('regras_academicas') && $canViewSidebar(['regras_academicas'])): ?>
         <a href="<?= URL ?>/admin/regras-academicas" class="<?= $linkCls($cp === 'regras-academicas') ?>">
             <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Regras Acadêmicas</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['salas'])): ?>
+        <?php if ($modOn('salas') && $canViewSidebar(['salas'])): ?>
         <a href="<?= URL ?>/admin/salas" class="<?= $linkCls($cp === 'salas') ?>">
             <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Salas / Ambientes</span>
@@ -110,6 +132,7 @@ $linkCls = static function (bool $ativo): string {
 <?php endif; ?>
 
 <!-- Avaliações -->
+<?php if ($showAvaliacoesGroup): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'avaliacoes' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/avaliacoes" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -141,13 +164,13 @@ $linkCls = static function (bool $ativo): string {
             <span class="sidebar-text text-sm">Jornada da Redação</span>
         </a>
         <?php endif; ?>
-        <?php require_once __DIR__ . '/../../../Core/LayoutHelper.php'; require_once __DIR__ . '/../../../Core/FeatureGate.php'; ?>
         <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
         <a href="<?= URL ?>/admin/jornadas" class="<?= $linkCls(in_array($cp, ['journeys', 'journeys_relatorio'], true)) ?>">
             <i class="fa-solid fa-route w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
         </a>
         <?php endif; ?>
+        <?php if ($modOn('boletim')): ?>
         <div class="flex items-center rounded-lg <?= $cp === 'boletim_config' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/boletim" class="flex-1 <?= $linkCls($cp === 'boletim_config') ?>">
                 <i class="fa-regular fa-file-lines w-4 h-4 mr-3"></i>
@@ -164,8 +187,10 @@ $linkCls = static function (bool $ativo): string {
                 <span class="sidebar-text text-sm">Guia do Boletim</span>
             </a>
         </div>
+        <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Comunicação -->
 <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('comunicacao')): ?>
@@ -342,9 +367,11 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             </button>
         </div>
         <div id="diario-classe-nested" class="<?= $diarioNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <?php if ($modOn('faltas')): ?>
             <a href="<?= URL ?>/admin/faltas" class="<?= $linkCls($cp === 'faltas') ?>">
                 <span class="sidebar-text text-sm">Faltas</span>
             </a>
+            <?php endif; ?>
             <?php if ($canViewSidebar(['presenca']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca'))): ?>
             <a href="<?= URL ?>/admin/presenca" class="<?= $linkCls($cp === 'presenca') ?>">
                 <span class="sidebar-text text-sm">Presença</span>
@@ -352,10 +379,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <?php endif; ?>
         </div>
         <?php else: ?>
+        <?php if ($modOn('faltas')): ?>
         <a href="<?= URL ?>/admin/faltas" class="<?= $linkCls($cp === 'faltas') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Faltas</span>
         </a>
+        <?php endif; ?>
         <?php if ($canViewSidebar(['presenca']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca'))): ?>
         <a href="<?= URL ?>/admin/presenca" class="<?= $linkCls($cp === 'presenca') ?>">
             <i class="fa-solid fa-right-to-bracket w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -455,10 +484,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">Resultados Finais</span>
         </a>
         <?php endif; ?>
+        <?php if ($modOn('saude_academica')): ?>
         <a href="<?= URL ?>/admin/saude-academica" class="<?= $linkCls($cp === 'saude_academica') ?>">
             <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>
         </a>
+        <?php endif; ?>
         <div class="flex items-center rounded-lg <?= $cp === 'tudicoins_escola' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/tudicoins" class="flex-1 <?= $linkCls($cp === 'tudicoins_escola') ?>">
                 <i class="fa-solid fa-wallet w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -479,6 +510,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
 </div>
 
 <!-- Monitoramento -->
+<?php if ($modOn('monitoramento')): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'monitoramento' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/monitoramento-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -512,8 +544,10 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </a>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Pedagógico -->
+<?php if ($showPedagogicoGroup): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'pedagogico' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/pedagogico" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -539,10 +573,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">AVA / EAD</span>
         </a>
         <?php endif; ?>
+        <?php if ($modOn('bncc')): ?>
         <a href="<?= URL ?>/admin/bncc" class="<?= $linkCls($cp === 'bncc') ?>">
             <i class="fa-solid fa-list-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">BNCC / Plano de Curso</span>
         </a>
+        <?php endif; ?>
         <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_minicursos')): ?>
         <a href="<?= URL ?>/admin/minicursos" class="<?= $linkCls($cp === 'minicursos') ?>">
             <i class="fa-solid fa-play-circle w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -557,8 +593,10 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Sistema -->
+<?php if ($showSistemaGroup): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'sistema' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/sistema" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -572,10 +610,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </button>
     </div>
     <div id="sistema-submenu" class="<?= $sistemaOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <?php if ($modOn('redacao_configuravel')): ?>
         <a href="<?= URL ?>/admin/redacao-configuravel" class="<?= $linkCls($cp === 'essays_config') ?>">
             <i class="fa-solid fa-sliders w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Configuração de Prompt</span>
         </a>
+        <?php endif; ?>
         <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
         <a href="<?= URL ?>/admin/dev/tickets" class="<?= $linkCls($cp === 'dev_tickets') ?>">
             <i class="fa-solid fa-ticket w-4 h-4 mr-3"></i>
@@ -587,6 +627,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Usuários -->
 <?php if ($showUsuariosGroup): ?>
