@@ -334,26 +334,19 @@ class UsuarioController extends BaseController
 
             if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
                 $uploadError = (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE);
-                if (in_array($uploadError, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
-                    throw new Exception('Arquivo muito grande. Use uma imagem de até 2MB.');
-                }
-                throw new Exception('Erro no upload da imagem');
+                throw new Exception($this->mensagemErroUploadAvatar($uploadError));
             }
 
             $file = $_FILES['avatar'];
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
             $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-            if (!in_array($fileExtension, $allowedExtensions)) {
-                throw new Exception('Tipo de arquivo não permitido. Use: ' . implode(', ', $allowedExtensions));
-            }
 
             // Verificar tamanho (máximo 2MB)
             if ($file['size'] > 2 * 1024 * 1024) {
                 throw new Exception('Arquivo muito grande. Máximo 2MB');
             }
 
-            $mimePermitidos = ['image/jpeg', 'image/png', 'image/gif'];
+            $mimePermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             $mimeReal = '';
             if (function_exists('finfo_open') && is_uploaded_file($file['tmp_name'])) {
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -365,8 +358,24 @@ class UsuarioController extends BaseController
                     }
                 }
             }
+            if (in_array($mimeReal, ['image/heic', 'image/heif'], true)) {
+                throw new Exception('Este formato (HEIC) não é suportado. Salve a foto como JPG ou PNG e envie de novo.');
+            }
+            $extPorMime = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+            ];
+            if (!in_array($fileExtension, $allowedExtensions, true)) {
+                if (isset($extPorMime[$mimeReal])) {
+                    $fileExtension = $extPorMime[$mimeReal];
+                } else {
+                    throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
+                }
+            }
             if (!in_array($mimeReal, $mimePermitidos, true)) {
-                throw new Exception('Tipo de arquivo não permitido. Use: ' . implode(', ', $allowedExtensions));
+                throw new Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
             }
 
             require_once __DIR__ . '/../../Services/MediaStorageService.php';
@@ -407,6 +416,24 @@ class UsuarioController extends BaseController
 
         } catch (Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    private function mensagemErroUploadAvatar(int $code): string
+    {
+        switch ($code) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                return 'Arquivo muito grande. Use uma imagem de até 2MB.';
+            case UPLOAD_ERR_PARTIAL:
+                return 'O envio da imagem foi interrompido. Tente novamente.';
+            case UPLOAD_ERR_NO_FILE:
+                return 'Nenhuma imagem foi recebida. Tente novamente.';
+            case UPLOAD_ERR_NO_TMP_DIR:
+            case UPLOAD_ERR_CANT_WRITE:
+                return 'Não foi possível salvar a imagem no servidor.';
+            default:
+                return 'Erro no upload da imagem.';
         }
     }
 

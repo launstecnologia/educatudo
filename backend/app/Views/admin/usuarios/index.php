@@ -122,10 +122,11 @@ include __DIR__ . '/../_partials/page_header_list.php';
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-key text-gray-400 w-4 text-center"></i> Alterar Senha
                         </button>
-                        <button type="button" onclick="uploadAvatar(<?= (int) $usuario['id'] ?>)"
-                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <label for="admin-usuario-avatar-input"
+                               onclick="pendingAvatarUserId = <?= (int) $usuario['id'] ?>; document.documentElement.setAttribute('data-native-file-picker', '1');"
+                               class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
                             <i class="fa-solid fa-camera text-gray-400 w-4 text-center"></i> Alterar Avatar
-                        </button>
+                        </label>
                         <?php
                         $row_actions_dropdown_items = ob_get_clean();
                         $row_actions_dropdown_id = 'row-actions-usuario-' . (int) $usuario['id'];
@@ -259,7 +260,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
                         <button type="button" id="btn-user-avatar" class="btn-secondary-custom px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-colors">
                             <i class="fa-solid fa-camera mr-2"></i> Alterar Avatar
                         </button>
-                        <p class="text-xs text-gray-500 mt-2">Formatos: JPG, PNG, GIF (máx. 2MB)</p>
+                        <p class="text-xs text-gray-500 mt-2">Formatos: JPG, PNG, GIF ou WebP (máx. 2MB)</p>
                     </div>
                 </div>
             </section>
@@ -437,9 +438,14 @@ include __DIR__ . '/../_partials/page_header_list.php';
     </form>
 </aside>
 
+<input type="file" id="admin-usuario-avatar-input" accept="image/jpeg,image/png,image/gif,image/webp,image/*"
+       tabindex="-1" aria-hidden="true"
+       style="position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;overflow:hidden;">
+
 <script>
 const URL_BASE = <?= json_encode(URL) ?>;
 const csrfToken = <?= json_encode((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>;
+var pendingAvatarUserId = null;
 
 function resolveCsrfToken() {
     if (typeof csrfToken === 'string' && csrfToken !== '') {
@@ -682,7 +688,10 @@ function openUserDrawer(id) {
             renderUserAvatarPreview(usuario);
             document.getElementById('user-created-at').textContent = formatDateTimeBR(usuario.created_at);
             document.getElementById('user-updated-at').textContent = formatDateTimeBR(usuario.updated_at);
-            document.getElementById('btn-user-avatar').onclick = function () { uploadAvatar(usuario.id); };
+            document.getElementById('btn-user-avatar').onclick = function (ev) {
+                ev.preventDefault();
+                uploadAvatar(usuario.id, ev);
+            };
             document.getElementById('btn-trocar-senha').onclick = function () { changePassword(usuario.id); };
 
             applyPermissionsMatrix(data.selected_permissions || {});
@@ -773,34 +782,54 @@ function changePassword(id) {
         .catch(() => alert('Erro de conexão'));
 }
 
-function uploadAvatar(id) {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/jpeg,image/png,image/gif';
+function uploadAvatar(id, ev) {
+    if (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+    }
+    pendingAvatarUserId = id;
+    document.documentElement.setAttribute('data-native-file-picker', '1');
+    const input = document.getElementById('admin-usuario-avatar-input');
+    if (!input) {
+        alert('Não foi possível abrir o seletor de imagem. Recarregue a página.');
+        return;
+    }
+    input.value = '';
+    input.click();
+}
 
-    input.onchange = function (e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > 2 * 1024 * 1024) {
-            alert('Arquivo muito grande. Máximo 2MB.');
+(function bindAvatarFileInput() {
+    const input = document.getElementById('admin-usuario-avatar-input');
+    if (!input || input.dataset.bound === '1') {
+        return;
+    }
+    input.dataset.bound = '1';
+    input.addEventListener('change', function () {
+        const file = input.files && input.files[0];
+        const id = pendingAvatarUserId;
+        setTimeout(function () {
+            document.documentElement.removeAttribute('data-native-file-picker');
+        }, 1500);
+        if (!file || !id) {
             return;
         }
-
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Arquivo muito grande. Máximo 2MB.');
+            input.value = '';
+            return;
+        }
         const token = resolveCsrfToken();
         if (!token) {
             alert('Sessão expirada. Recarregue a página e tente novamente.');
             return;
         }
-
         const formData = new FormData();
         formData.append('_token', token);
-        formData.append('avatar', file);
-
+        formData.append('avatar', file, file.name || 'avatar.jpg');
         fetch(URL_BASE + '/admin/usuarios/' + id + '/avatar', {
             method: 'POST',
             body: formData,
-            headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' }
+            credentials: 'same-origin'
         })
             .then((response) => response.json())
             .then((data) => {
@@ -811,11 +840,20 @@ function uploadAvatar(id) {
                     alert('Erro: ' + (data.error || 'Falha no upload'));
                 }
             })
-            .catch(() => alert('Erro de conexão'));
-    };
-
-    input.click();
-}
+            .catch(() => alert('Erro de conexão'))
+            .finally(function () {
+                input.value = '';
+            });
+    });
+    input.addEventListener('cancel', function () {
+        document.documentElement.removeAttribute('data-native-file-picker');
+    });
+    window.addEventListener('focus', function () {
+        setTimeout(function () {
+            document.documentElement.removeAttribute('data-native-file-picker');
+        }, 2000);
+    });
+})();
 
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {

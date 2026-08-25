@@ -57,7 +57,17 @@ $GLOBALS['__row_actions_dropdown_js_done'] = true;
             closeAllMenus();
         }
     });
-    window.addEventListener('resize', closeAllMenus);
-    window.addEventListener('scroll', closeAllMenus, true);
+    window.addEventListener('resize', function () {
+        if (document.documentElement.getAttribute('data-native-file-picker') === '1') {
+            return;
+        }
+        closeAllMenus();
+    });
+    window.addEventListener('scroll', function () {
+        if (document.documentElement.getAttribute('data-native-file-picker') === '1') {
+            return;
+        }
+        closeAllMenus();
+    }, true);
 })();
 </script>
