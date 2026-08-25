@@ -108,6 +108,16 @@ Processa a fila `ai_jobs` de cada escola (até 5 jobs por tenant por execução)
 * * * * * /usr/bin/php /caminho/projeto/backend/cron/process_ai_jobs.php >> /caminho/projeto/backend/storage/logs/ai_jobs_cron.log 2>&1
 ```
 
+### 2e. `presenca_corte.php`
+
+Gestão de Presença: após o horário de corte da 1ª aula da turma, marca falta nos alunos sem entrada no dia e recalcula `faltas_lancamentos` dos eventos de origem Diário (se a escola ligou a consolidação).
+
+**Frequência recomendada:** a cada 15 minutos no horário escolar
+
+```
+*/15 6-20 * * 1-6 /usr/bin/php /caminho/projeto/backend/cron/presenca_corte.php >> /caminho/projeto/backend/storage/logs/presenca_corte.log 2>&1
+```
+
 **Pré-requisito:** migration master `2026_08_10_cron_execucoes_master.sql`
 
 **Painel:** Master → **Fila IA** (`/master/fila-ia`) — fila multi-escola + detalhe do job (aluno/professor) + histórico do cron.

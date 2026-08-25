@@ -90,6 +90,9 @@ $healthData = [
     'server_time' => date('Y-m-d H:i:s'),
     'php_version' => PHP_VERSION,
     'server_name' => $_SERVER['SERVER_NAME'] ?? 'unknown',
+    'http_host' => $_SERVER['HTTP_HOST'] ?? 'unknown',
+    'forwarded_host' => $_SERVER['HTTP_X_FORWARDED_HOST'] ?? null,
+    'forwarded_proto' => $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? null,
     'request_method' => $requestMethod,
     'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
 ];
@@ -203,6 +206,75 @@ $healthData['database'] = [
 // Se banco falhou, marcar como erro crítico
 if ($dbStatus === 'error') {
     $healthData['status'] = 'error';
+}
+
+// Teste de Redis (crítico em multi-tenant para cache/sessão/config)
+$redisStartTime = microtime(true);
+$redisStatus = 'unknown';
+$redisError = null;
+$redisInfo = null;
+
+try {
+    $redisHost = function_exists('env') ? (string) env('REDIS_HOST', '127.0.0.1') : (getenv('REDIS_HOST') ?: '127.0.0.1');
+    $redisPort = function_exists('env') ? (int) env('REDIS_PORT', 6379) : (int) (getenv('REDIS_PORT') ?: 6379);
+    $redisPassword = function_exists('env') ? (string) env('REDIS_PASSWORD', '') : (getenv('REDIS_PASSWORD') ?: '');
+
+    if (!class_exists('Redis')) {
+        throw new Exception('Extensão Redis não carregada no PHP');
+    }
+
+    $redis = new Redis();
+    $ok = @$redis->connect($redisHost, $redisPort, 1.0);
+    if ($ok !== true) {
+        throw new Exception("Falha ao conectar no Redis em {$redisHost}:{$redisPort}");
+    }
+    if ($redisPassword !== '' && @$redis->auth($redisPassword) !== true) {
+        throw new Exception('Falha ao autenticar no Redis');
+    }
+
+    if (defined('Redis::OPT_READ_TIMEOUT')) {
+        $redis->setOption(Redis::OPT_READ_TIMEOUT, 1.0);
+    }
+
+    $pong = $redis->ping();
+    $pongOk = $pong === true || $pong === '+PONG' || $pong === 'PONG';
+    if (!$pongOk) {
+        throw new Exception('PING Redis retornou resposta inesperada');
+    }
+
+    $persistence = $redis->info('persistence') ?: [];
+    $memory = $redis->info('memory') ?: [];
+    $clients = $redis->info('clients') ?: [];
+
+    $redisStatus = 'connected';
+    $redisInfo = [
+        'host' => $redisHost,
+        'port' => $redisPort,
+        'auth_configured' => $redisPassword !== '',
+        'connection_time' => round(microtime(true) - $redisStartTime, 4),
+        'used_memory_human' => $memory['used_memory_human'] ?? null,
+        'connected_clients' => $clients['connected_clients'] ?? null,
+        'aof_enabled' => $persistence['aof_enabled'] ?? null,
+        'aof_last_write_status' => $persistence['aof_last_write_status'] ?? null,
+        'rdb_last_bgsave_status' => $persistence['rdb_last_bgsave_status'] ?? null,
+    ];
+
+    $redis->close();
+} catch (Throwable $e) {
+    $redisStatus = 'error';
+    $redisError = $e->getMessage();
+}
+
+$healthData['redis'] = [
+    'status' => $redisStatus,
+    'connection_time' => round(microtime(true) - $redisStartTime, 4),
+    'error' => $redisError,
+    'info' => $redisInfo
+];
+
+if ($redisStatus === 'error' && (($config['multi_tenant'] ?? false) === true || (function_exists('env') && env('MULTI_TENANT', false)))) {
+    $healthData['status'] = $healthData['status'] === 'error' ? 'error' : 'warning';
+    $healthData['warnings'][] = 'Redis indisponível em ambiente multi-tenant';
 }
 
 // Teste de sistema de arquivos (escrita)

@@ -272,12 +272,16 @@ class ExpoColagService
         if ((string) ($projeto['status'] ?? '') === 'Concluido') {
             return ['success' => false, 'error' => 'Projeto concluído não pode ser excluído.'];
         }
-        if ($this->inscricaoModel->contarAtivasPorProjeto($projetoId) > 0) {
-            return ['success' => false, 'error' => 'Há alunos inscritos neste projeto. Cancele as inscrições antes de excluir.'];
-        }
-
         try {
             $this->db->beginTransaction();
+            $this->db->fetch(
+                'SELECT id FROM expo_colag_projetos WHERE id = :id FOR UPDATE',
+                ['id' => $projetoId]
+            );
+            if ($this->inscricaoModel->contarAtivasPorProjeto($projetoId) > 0) {
+                $this->db->rollback();
+                return ['success' => false, 'error' => 'Há alunos inscritos neste projeto. Cancele as inscrições antes de excluir.'];
+            }
             $this->apagarDependenciasProjeto($projetoId);
             $this->projetoModel->excluir($projetoId);
             $this->db->commit();

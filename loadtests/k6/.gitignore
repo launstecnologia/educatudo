@@ -1,0 +1,4 @@
+.env
+data/alunos.json
+relatorios/*.html
+relatorios/*.json

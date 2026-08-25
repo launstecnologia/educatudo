@@ -6,7 +6,8 @@ set -u
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMPOSE=(docker compose -f "$ROOT/docker-compose.vps.yml")
-DOMAIN="${DIAG_DOMAIN:-master.educatudo.com}"
+ENV_MASTER_DOMAIN="$(grep -E '^MASTER_DOMAIN=' "$ROOT/backend/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d "\"'" | tr -d '\r' || true)"
+DOMAIN="${DIAG_DOMAIN:-${ENV_MASTER_DOMAIN:-master.educatudo.com}}"
 
 hr() { printf '\n%s\n' "════════════════════════════════════════"; }
 ok() { printf '✓ %s\n' "$1"; }
@@ -80,13 +81,23 @@ echo "7. Teste MySQL (container PHP → banco remoto)"
 if [[ -f "$ROOT/backend/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source <(grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASS|REDIS_HOST)=' "$ROOT/backend/.env" | sed 's/\r$//')
+  source <(grep -E '^(DB_HOST|DB_PORT|DB_NAME|DB_USER|DB_PASS|REDIS_HOST|REDIS_PORT|REDIS_PASSWORD)=' "$ROOT/backend/.env" | sed 's/\r$//')
   set +a
   echo "   DB_HOST=${DB_HOST:-?} REDIS_HOST=${REDIS_HOST:-?}"
   if "${COMPOSE[@]}" exec -T php php -r '
-    require "vendor/autoload.php";
-    Dotenv\Dotenv::createImmutable(__DIR__)->safeLoad();
-    $h=$_ENV["DB_HOST"]??""; $p=$_ENV["DB_PORT"]??3306; $n=$_ENV["DB_NAME"]??""; $u=$_ENV["DB_USER"]??""; $pw=$_ENV["DB_PASS"]??"";
+    $env = parse_ini_file("/var/www/html/.env", false, INI_SCANNER_RAW) ?: [];
+    $read = static function (string $key, $default = "") use ($env) {
+      $value = getenv($key);
+      if ($value === false || $value === "") {
+        $value = $env[$key] ?? $default;
+      }
+      if (!is_string($value)) {
+        return $value;
+      }
+      $value = trim($value);
+      return trim($value, chr(34) . chr(39));
+    };
+    $h=$read("DB_HOST"); $p=$read("DB_PORT", 3306); $n=$read("DB_NAME"); $u=$read("DB_USER"); $pw=$read("DB_PASS");
     if(!$h||!$n){fwrite(STDERR,"DB_* ausente no .env\n"); exit(2);}
     new PDO("mysql:host=$h;port=$p;dbname=$n;charset=utf8mb4",$u,$pw,[PDO::ATTR_TIMEOUT=>5]);
     echo "   MySQL OK\n";
@@ -100,7 +111,76 @@ else
 fi
 
 hr
-echo "8. Certificado SSL (Let's Encrypt)"
+echo "8. Redis (container e PHP)"
+if command -v docker >/dev/null 2>&1; then
+  REDIS_HOST_DIAG="${REDIS_HOST:-redis}"
+  REDIS_PORT_DIAG="${REDIS_PORT:-6379}"
+  REDIS_AUTH_EXEC_ENV=()
+  REDIS_AUTH_DOCKER_ENV=()
+  if [[ -n "${REDIS_PASSWORD:-}" ]]; then
+    REDIS_AUTH_EXEC_ENV=("REDISCLI_AUTH=${REDIS_PASSWORD}")
+    REDIS_AUTH_DOCKER_ENV=(-e "REDISCLI_AUTH=${REDIS_PASSWORD}")
+  fi
+  if [[ "$REDIS_HOST_DIAG" =~ ^(redis|127\.0\.0\.1|localhost)$ ]] && "${COMPOSE[@]}" ps redis >/dev/null 2>&1; then
+    REDIS_CLI=("${COMPOSE[@]}" exec -T redis env "${REDIS_AUTH_EXEC_ENV[@]}" redis-cli)
+  else
+    REDIS_CLI=(docker run --rm --network host "${REDIS_AUTH_DOCKER_ENV[@]}" redis:7-alpine redis-cli -h "$REDIS_HOST_DIAG" -p "$REDIS_PORT_DIAG")
+  fi
+
+  if "${REDIS_CLI[@]}" ping 2>/dev/null | grep -q PONG; then
+    ok "Redis respondeu PONG em ${REDIS_HOST_DIAG}:${REDIS_PORT_DIAG}"
+    "${REDIS_CLI[@]}" INFO server memory persistence clients 2>/dev/null \
+      | grep -E '^(redis_version|used_memory_human|connected_clients|maxmemory_human|appendonly|aof_enabled|aof_last_write_status|rdb_last_bgsave_status):' || true
+  else
+    fail "Redis não respondeu PONG em ${REDIS_HOST_DIAG}:${REDIS_PORT_DIAG}"
+  fi
+
+  if "${COMPOSE[@]}" exec -T php php -r '
+    $env = parse_ini_file("/var/www/html/.env", false, INI_SCANNER_RAW) ?: [];
+    $read = static function (string $key, $default = "") use ($env) {
+      $value = getenv($key);
+      if ($value === false || $value === "") {
+        $value = $env[$key] ?? $default;
+      }
+      if (!is_string($value)) {
+        return $value;
+      }
+      $value = trim($value);
+      return trim($value, chr(34) . chr(39));
+    };
+    $host = $read("REDIS_HOST", "127.0.0.1");
+    $port = (int) $read("REDIS_PORT", 6379);
+    $password = $read("REDIS_PASSWORD", "");
+    if (!class_exists("Redis")) {
+      fwrite(STDERR, "Extensão Redis ausente no PHP\n");
+      exit(2);
+    }
+    $redis = new Redis();
+    if (!$redis->connect($host, $port, 1.0)) {
+      fwrite(STDERR, "Falha ao conectar em Redis $host:$port\n");
+      exit(3);
+    }
+    if ($password !== "" && !$redis->auth($password)) {
+      fwrite(STDERR, "Falha ao autenticar no Redis\n");
+      exit(5);
+    }
+    $pong = $redis->ping();
+    if ($pong !== true && $pong !== "+PONG" && $pong !== "PONG") {
+      fwrite(STDERR, "PING inesperado: " . var_export($pong, true) . "\n");
+      exit(4);
+    }
+    echo "   PHP Redis OK em {$host}:{$port}\n";
+  ' 2>&1; then
+    ok "PHP conectou no Redis"
+  else
+    fail "PHP NÃO conectou no Redis — em Docker, REDIS_HOST deve ser redis"
+  fi
+else
+  fail "Docker não instalado"
+fi
+
+hr
+echo "9. Certificado SSL (Let's Encrypt)"
 CERT="/etc/letsencrypt/live/educatudo.com/fullchain.pem"
 if [[ -f "$CERT" ]]; then
   ok "Cert encontrado: $CERT"
@@ -111,7 +191,7 @@ else
 fi
 
 hr
-echo "9. Cloudflare (se proxy ativo)"
+echo "10. Cloudflare (se proxy ativo)"
 echo "   SSL/TLS recomendado:"
 echo "   - Sem cert na VPS: Flexible"
 echo "   - Com cert na VPS: Full (strict) + docker-compose.vps.ssl.yml"

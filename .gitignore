@@ -43,8 +43,13 @@ ws-server/node_modules/
 prompts/
 specs/
 tests/
+!tests/helpers/
+!tests/helpers/**
+!tests/*.spec.ts
 testes/
-loadtests/
+loadtests/*
+!loadtests/k6/
+!loadtests/k6/**
 familia/
 AGENTS.md
 CLAUDE.md

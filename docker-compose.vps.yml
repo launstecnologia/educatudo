@@ -41,7 +41,22 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis_educatudo
-    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    command:
+      [
+        "redis-server",
+        "--maxmemory", "256mb",
+        "--maxmemory-policy", "allkeys-lru",
+        "--appendonly", "yes",
+        "--appendfsync", "everysec",
+        "--save", "900", "1",
+        "--save", "300", "10",
+        "--save", "60", "10000"
+      ]
     ports:
       - "127.0.0.1:${REDIS_PUBLISH_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
+
+volumes:
+  redis_data:
