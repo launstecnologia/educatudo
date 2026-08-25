@@ -260,6 +260,7 @@ class ModeloDocumentoService
         'declaracao_aut_imagem',
         'declaracao_aut_passeio',
         'declaracao_ficha_matricula',
+        'declaracao_historico',
         'declaracao_bolsista_integral',
         'resultado_ficha_individual',
         'resultado_ata_finais',
