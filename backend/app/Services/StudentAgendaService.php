@@ -201,11 +201,16 @@ class StudentAgendaService
     private function eventosRedacao(int $alunoId, int $turmaId, string $inicio, string $fim): array
     {
         try {
+            if (!class_exists('EssayProposal')) {
+                require_once __DIR__ . '/../Models/Essays/EssayProposal.php';
+            }
+            // Coluna ativo só existe após a migration 2026_07_14_redacoes_orientadas_propostas_ativo.
+            $filtroAtivo = (new EssayProposal())->sqlFiltroPropostaAtiva('p');
             $rows = $this->db->fetchAll(
                 "SELECT DISTINCT p.id, p.title, DATE(p.ends_at) AS data_evento, p.ends_at
                  FROM redacoes_orientadas_propostas p
                  WHERE p.status = 'published'
-                   AND p.ativo = 1
+                   {$filtroAtivo}
                    AND p.ends_at IS NOT NULL
                    AND DATE(p.ends_at) BETWEEN :inicio AND :fim
                    AND (
