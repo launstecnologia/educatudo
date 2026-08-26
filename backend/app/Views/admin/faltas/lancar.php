@@ -6,6 +6,7 @@ $linhasFaltas = $linhas_faltas ?? [];
 $lancMap = $lancamentos_map ?? [];
 $turmaFiltroIds = array_map('intval', (array) ($turma_filtro_ids ?? []));
 $turmaFiltroSet = array_fill_keys($turmaFiltroIds, true);
+$buscaAluno = trim((string) ($busca_aluno ?? ''));
 $materiaFiltroIds = array_map('intval', (array) ($materia_filtro_ids ?? []));
 $materiaFiltroSet = array_fill_keys($materiaFiltroIds, true);
 $matrizMateriasTodas = $matriz_materias_todas ?? [];
@@ -71,10 +72,15 @@ foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
             <input type="hidden" name="evento_id" value="<?= $eventoAtualId ?>">
             <div class="px-5 py-4 border-b border-gray-100 bg-slate-50/80">
                 <h3 class="text-sm font-semibold text-gray-900">Filtros de exibição</h3>
-                <p class="text-xs text-gray-500 mt-1">Sem turmas marcadas = todos os alunos do evento. Sem matérias marcadas = todas as colunas de matérias.</p>
+                <p class="text-xs text-gray-500 mt-1">Ao filtrar, a lista permanece filtrada para você lançar as faltas até clicar em Salvar. Sem turmas marcadas = todos os alunos do evento. Sem matérias marcadas = todas as colunas de matérias.</p>
             </div>
             <div>
                 <div class="p-5 space-y-3">
+                    <label for="filtro_busca_aluno" class="text-sm font-medium text-gray-800">Pesquisar nome do aluno</label>
+                    <input type="search" id="filtro_busca_aluno" name="busca" value="<?= htmlspecialchars($buscaAluno, ENT_QUOTES, 'UTF-8') ?>" placeholder="Digite parte do nome..." autocomplete="off"
+                           class="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="p-5 space-y-3 border-t border-gray-200">
                     <div class="text-sm font-medium text-gray-800">Turmas</div>
                     <div class="grid sm:grid-cols-2 gap-x-4 gap-y-2.5">
                         <?php foreach ((array) ($eventoAtual['turmas_ids'] ?? []) as $tidOpt): ?>
@@ -120,8 +126,8 @@ foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
                 </div>
             </div>
             <div class="px-5 py-3 border-t border-gray-100 bg-gray-50/90 flex flex-wrap items-center justify-between gap-3">
-                <p class="text-xs text-gray-500">As alterações do filtro são aplicadas ao clicar em Filtrar.</p>
-                <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm" title="Aplicar filtros de turma e matéria na visualização">
+                <p class="text-xs text-gray-500">As alterações do filtro são aplicadas ao clicar em Filtrar. A lista permanece filtrada enquanto você lança as faltas; ao salvar, o filtro é mantido.</p>
+                <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm" title="Aplicar filtros de nome, turma e matéria na visualização">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
                     Filtrar
                 </button>
@@ -131,6 +137,9 @@ foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
         <form method="POST" action="<?= URL ?>/admin/faltas/salvar" class="space-y-4">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="evento_id" value="<?= $eventoAtualId ?>">
+            <?php if ($buscaAluno !== ''): ?>
+                <input type="hidden" name="busca" value="<?= htmlspecialchars($buscaAluno, ENT_QUOTES, 'UTF-8') ?>">
+            <?php endif; ?>
             <?php foreach ($turmaFiltroIds as $tfid): ?>
                 <?php if ($tfid > 0): ?>
                     <input type="hidden" name="turma_ids[]" value="<?= $tfid ?>">
@@ -149,15 +158,26 @@ foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
                 </button>
             </div>
 
+            <?php
+            $msgVazioAlunos = $buscaAluno !== ''
+                ? 'Nenhum aluno encontrado com esse nome (confira o filtro de turma, se houver).'
+                : 'Nenhum aluno nas turmas deste evento (ou filtro de turma sem correspondência).';
+            $qtdAlunosTabela = $faltasMatriz
+                ? count($matrizLinhas)
+                : count(array_unique(array_map(static fn (array $ln): int => (int) ($ln['aluno_id'] ?? 0), $linhasFaltas)));
+            ?>
             <?php if ($linhasFaltas === [] && !$faltasMatriz): ?>
-                <p class="text-sm text-gray-500">Nenhum aluno nas turmas deste evento (ou filtro de turma sem correspondência).</p>
+                <p class="text-sm text-gray-500"><?= htmlspecialchars($msgVazioAlunos, ENT_QUOTES, 'UTF-8') ?></p>
             <?php elseif ($faltasMatriz && $matrizLinhas === []): ?>
-                <p class="text-sm text-gray-500">Nenhum aluno nas turmas deste evento (ou filtro de turma sem correspondência).</p>
+                <p class="text-sm text-gray-500"><?= htmlspecialchars($msgVazioAlunos, ENT_QUOTES, 'UTF-8') ?></p>
             <?php elseif ($faltasMatriz && $matrizColunas === [] && $matrizMateriasTodas === []): ?>
                 <p class="text-sm text-amber-700">Este evento tem matérias configuradas, mas nenhuma foi encontrada no cadastro. Verifique os IDs ou recrie o evento.</p>
             <?php elseif ($faltasMatriz && $matrizColunas === [] && $matrizMateriasTodas !== [] && $materiaFiltroIds !== []): ?>
                 <p class="text-sm text-amber-700">Nenhuma matéria ficou selecionada no filtro. Marque ao menos uma matéria nos filtros acima e clique em Filtrar.</p>
             <?php elseif ($faltasMatriz): ?>
+            <?php if ($buscaAluno !== ''): ?>
+                <p class="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">Exibindo <?= (int) $qtdAlunosTabela ?> aluno(s) com “<?= htmlspecialchars($buscaAluno, ENT_QUOTES, 'UTF-8') ?>”. A lista permanece filtrada para você lançar as faltas; ao salvar, o filtro é mantido.</p>
+            <?php endif; ?>
             <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-slate-50">
@@ -204,6 +224,9 @@ foreach (array_merge($matrizLinhas, $linhasFaltas) as $_lnChk) {
                 </table>
             </div>
             <?php else: ?>
+            <?php if ($buscaAluno !== ''): ?>
+                <p class="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">Exibindo <?= (int) $qtdAlunosTabela ?> aluno(s) com “<?= htmlspecialchars($buscaAluno, ENT_QUOTES, 'UTF-8') ?>”. A lista permanece filtrada para você lançar as faltas; ao salvar, o filtro é mantido.</p>
+            <?php endif; ?>
             <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-slate-50">

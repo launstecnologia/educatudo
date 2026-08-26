@@ -98,6 +98,37 @@ class SchoolAbsenceController extends BaseController
         return array_values(array_unique($out));
     }
 
+    private function parseBuscaAlunoFromRequest(): string
+    {
+        $busca = trim((string) ($_GET['busca'] ?? ''));
+        if (mb_strlen($busca) > 80) {
+            $busca = mb_substr($busca, 0, 80);
+        }
+
+        return $busca;
+    }
+
+    private function nomeAlunoCorrespondeBusca(string $nome, string $busca): bool
+    {
+        $busca = trim($busca);
+        if ($busca === '') {
+            return true;
+        }
+        $normalizar = static function (string $s): string {
+            $s = mb_strtolower(trim($s), 'UTF-8');
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+            if (is_string($ascii) && $ascii !== '') {
+                $s = $ascii;
+            }
+            $s = str_replace(["'", '"', '`', '^', '~'], '', $s);
+            $s = preg_replace('/[^a-z0-9]+/', ' ', $s) ?? $s;
+
+            return trim($s);
+        };
+
+        return mb_stripos($normalizar($nome), $normalizar($busca)) !== false;
+    }
+
     /**
      * Dados da tela de lançamento (turmas, matriz ou linhas, mapas) para um evento já carregado.
      *
@@ -106,6 +137,7 @@ class SchoolAbsenceController extends BaseController
     private function dadosParaViewLancamentoFaltas(array $eventoAtual): array
     {
         $turmaFiltroIds = $this->parseTurmaFiltroIdsFromRequest((array) ($eventoAtual['turmas_ids'] ?? []));
+        $buscaAluno = $this->parseBuscaAlunoFromRequest();
         $materiaFiltroIds = [];
         $matrizMateriasTodas = [];
         $materiasFiltroOpcoes = [];
@@ -132,6 +164,11 @@ class SchoolAbsenceController extends BaseController
             $setTurma = array_fill_keys($turmaFiltroIds, true);
             $alunos = array_values(array_filter($alunos, static function (array $a) use ($setTurma): bool {
                 return isset($setTurma[(int) ($a['turma_id'] ?? 0)]);
+            }));
+        }
+        if ($buscaAluno !== '') {
+            $alunos = array_values(array_filter($alunos, function (array $a) use ($buscaAluno): bool {
+                return $this->nomeAlunoCorrespondeBusca((string) ($a['nome'] ?? ''), $buscaAluno);
             }));
         }
         $lancamentosMap = $this->absence->getLancamentosMapByEvento((int) $eventoAtual['id']);
@@ -250,6 +287,7 @@ class SchoolAbsenceController extends BaseController
         return [
             'evento_atual' => $eventoAtual,
             'turma_filtro_ids' => $turmaFiltroIds,
+            'busca_aluno' => $buscaAluno,
             'materia_filtro_ids' => $materiaFiltroIds,
             'matriz_materias_todas' => $matrizMateriasTodas,
             'materias_filtro_opcoes' => $materiasFiltroOpcoes,
@@ -852,6 +890,10 @@ class SchoolAbsenceController extends BaseController
             }
         }
         $materiaIdsFiltro = array_values(array_unique($materiaIdsFiltro));
+        $buscaAluno = trim((string) ($_POST['busca'] ?? ''));
+        if (mb_strlen($buscaAluno) > 80) {
+            $buscaAluno = mb_substr($buscaAluno, 0, 80);
+        }
         $url = '/admin/faltas/lancar?evento_id=' . $eventoId;
         foreach ($turmaIdsFiltro as $tid) {
             if ($tid > 0) {
@@ -862,6 +904,9 @@ class SchoolAbsenceController extends BaseController
             if ($mid > 0) {
                 $url .= '&materia_ids[]=' . $mid;
             }
+        }
+        if ($buscaAluno !== '') {
+            $url .= '&busca=' . rawurlencode($buscaAluno);
         }
         $this->redirect($url);
     }
