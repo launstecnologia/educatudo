@@ -3808,4 +3808,170 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         return trim((string) $html);
     }
 
+    /**
+     * Extrai JSON estruturado de um histórico escolar (texto já OCR/extraído).
+     *
+     * @return array{escola_origem:string,municipio:string,uf:string,data_transferencia:?string,anos_anteriores:list,bimestres_atuais:list}
+     */
+    public function estruturarHistoricoEscolar(string $texto): array
+    {
+        $texto = mb_substr(trim($texto), 0, 14000);
+        $system = 'Você extrai dados de histórico escolar brasileiro para conferência humana. '
+            . 'Não invente nota, falta, série ou escola. Se não encontrar, use string vazia. '
+            . 'Ignore faixas de teste, rodapés e "folha de conferência". Responda só JSON.';
+        $user = "Texto do documento:\n{$texto}\n\n"
+            . "Devolva um objeto JSON com:\n"
+            . "- escola_origem (string)\n"
+            . "- municipio (string)\n"
+            . "- uf (2 letras)\n"
+            . "- data_transferencia (YYYY-MM-DD ou vazio)\n"
+            . "- anos_anteriores: array de {ano_letivo, serie_ano, resultado, componentes: [{componente_original, nota_original, carga_horaria}]}\n"
+            . "- bimestres_atuais: array de {componente, periodo_numero (1-4), nota, faltas} só do ano letivo em curso/parcial (bimestres, não média anual)\n"
+            . "Anos concluídos (aprovado/reprovado) vão em anos_anteriores. "
+            . "Notas de 1º/2º/3º/4º bimestre do ano da transferência vão em bimestres_atuais.";
+
+        $response = $this->fazerRequisicao([
+            'model' => 'gpt-4o-mini',
+            'messages' => [
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => $user],
+            ],
+            'temperature' => 0.1,
+            'response_format' => ['type' => 'json_object'],
+        ], 3, 0, 'vida_escolar_historico');
+
+        $content = (string) ($response['choices'][0]['message']['content'] ?? '');
+        $decoded = json_decode($content, true);
+        if (!is_array($decoded)) {
+            $decoded = $this->extrairJsonDaResposta($content) ?? [];
+        }
+        if (!is_array($decoded) || $decoded === []) {
+            throw new \Exception('A IA não conseguiu estruturar o histórico. Confira o arquivo ou digite o rascunho.');
+        }
+
+        return $this->normalizarHistoricoExtraido($decoded);
+    }
+
+    /**
+     * Lê histórico escolar a partir de imagem (PDF escaneado convertido ou foto).
+     *
+     * @return array<string,mixed>
+     */
+    public function estruturarHistoricoEscolarImagem(string $imageBase64, string $mimeType = 'image/jpeg'): array
+    {
+        $mimeType = in_array($mimeType, ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'], true)
+            ? ($mimeType === 'image/jpg' ? 'image/jpeg' : $mimeType)
+            : 'image/jpeg';
+        $system = 'Você extrai dados de histórico escolar brasileiro visível na imagem. '
+            . 'Não invente nota, falta, série ou escola. Se não encontrar, use string vazia. '
+            . 'Responda só JSON.';
+        $userText = "Devolva um objeto JSON com:\n"
+            . "- escola_origem (string)\n"
+            . "- municipio (string)\n"
+            . "- uf (2 letras)\n"
+            . "- data_transferencia (YYYY-MM-DD ou vazio)\n"
+            . "- anos_anteriores: array de {ano_letivo, serie_ano, resultado, componentes: [{componente_original, nota_original, carga_horaria}]}\n"
+            . "- bimestres_atuais: array de {componente, periodo_numero (1-4), nota, faltas} só do ano letivo em curso/parcial\n"
+            . "Anos concluídos vão em anos_anteriores. Notas bimestrais do ano da transferência vão em bimestres_atuais.";
+
+        $response = $this->fazerRequisicao([
+            'model' => 'gpt-4o',
+            'messages' => [
+                ['role' => 'system', 'content' => $system],
+                [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $userText],
+                        [
+                            'type' => 'image_url',
+                            'image_url' => ['url' => 'data:' . $mimeType . ';base64,' . $imageBase64],
+                        ],
+                    ],
+                ],
+            ],
+            'temperature' => 0.1,
+            'max_tokens' => 4000,
+            'response_format' => ['type' => 'json_object'],
+        ], 3, 0, 'vida_escolar_historico');
+
+        $content = (string) ($response['choices'][0]['message']['content'] ?? '');
+        $decoded = json_decode($content, true);
+        if (!is_array($decoded)) {
+            $decoded = $this->extrairJsonDaResposta($content) ?? [];
+        }
+        if (!is_array($decoded) || $decoded === []) {
+            throw new \Exception('A IA não conseguiu ler o histórico na imagem. Envie um arquivo nítido ou digite o rascunho.');
+        }
+
+        return $this->normalizarHistoricoExtraido($decoded);
+    }
+
+    /**
+     * @param array<string,mixed> $decoded
+     * @return array<string,mixed>
+     */
+    private function normalizarHistoricoExtraido(array $decoded): array
+    {
+        $anos = [];
+        foreach (is_array($decoded['anos_anteriores'] ?? null) ? $decoded['anos_anteriores'] : [] as $ano) {
+            if (!is_array($ano)) {
+                continue;
+            }
+            $comps = [];
+            foreach (is_array($ano['componentes'] ?? null) ? $ano['componentes'] : [] as $c) {
+                if (!is_array($c)) {
+                    continue;
+                }
+                $nome = trim((string) ($c['componente_original'] ?? $c['componente'] ?? ''));
+                if ($nome === '') {
+                    continue;
+                }
+                $comps[] = [
+                    'componente_original' => mb_substr($nome, 0, 160),
+                    'nota_original' => trim((string) ($c['nota_original'] ?? $c['nota'] ?? '')),
+                    'carga_horaria' => trim((string) ($c['carga_horaria'] ?? '')),
+                ];
+            }
+            $anos[] = [
+                'ano_letivo' => trim((string) ($ano['ano_letivo'] ?? '')),
+                'serie_ano' => trim((string) ($ano['serie_ano'] ?? $ano['serie'] ?? '')),
+                'resultado' => trim((string) ($ano['resultado'] ?? '')),
+                'escola_nome' => trim((string) ($decoded['escola_origem'] ?? '')),
+                'componentes' => $comps,
+            ];
+        }
+
+        $bims = [];
+        foreach (is_array($decoded['bimestres_atuais'] ?? null) ? $decoded['bimestres_atuais'] : [] as $b) {
+            if (!is_array($b)) {
+                continue;
+            }
+            $comp = trim((string) ($b['componente'] ?? $b['componente_original'] ?? ''));
+            if ($comp === '') {
+                continue;
+            }
+            $bims[] = [
+                'componente' => mb_substr($comp, 0, 160),
+                'periodo_numero' => (int) ($b['periodo_numero'] ?? $b['bimestre'] ?? 1),
+                'nota' => trim((string) ($b['nota'] ?? '')),
+                'faltas' => trim((string) ($b['faltas'] ?? '')),
+            ];
+        }
+
+        $uf = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', (string) ($decoded['uf'] ?? '')) ?? '', 0, 2));
+        $data = trim((string) ($decoded['data_transferencia'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            $data = '';
+        }
+
+        return [
+            'escola_origem' => trim((string) ($decoded['escola_origem'] ?? '')),
+            'municipio' => trim((string) ($decoded['municipio'] ?? '')),
+            'uf' => $uf,
+            'data_transferencia' => $data,
+            'anos_anteriores' => $anos,
+            'bimestres_atuais' => $bims,
+        ];
+    }
+
 }

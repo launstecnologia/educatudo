@@ -144,8 +144,8 @@ class BoletimConfigController extends BaseController
         $eventosPagina = array_slice($eventos, ($page - 1) * $perPage, $perPage);
 
         $data = [
-            'title' => 'Notas e Boletim - EducaTudo',
-            'page_title' => 'Notas e Boletim',
+            'title' => 'Eventos de Notas - EducaTudo',
+            'page_title' => 'Eventos de Notas',
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
@@ -1666,6 +1666,13 @@ class BoletimConfigController extends BaseController
             );
             $_SESSION['boletim_flash'] = 'Boletim oficial gravado para este aluno neste período (visível no app como os demais gerados em lote).';
             $_SESSION['boletim_flash_type'] = 'success';
+            $userPub = $this->auth->getUser();
+            $this->sincronizarFichaVidaEscolar(
+                $alunoId,
+                is_array($userPub) ? $userPub : [],
+                $periodoRef,
+                $regraId
+            );
         } catch (Throwable $e) {
             error_log('publicarBoletimAlunoSimulado: ' . $e->getMessage());
             $_SESSION['boletim_flash'] = 'Não foi possível gravar o boletim oficial. Tente novamente ou verifique os logs.';
@@ -1800,6 +1807,8 @@ class BoletimConfigController extends BaseController
         $linhas = 0;
         $erros = 0;
         $errosAmostra = [];
+        $usuarioVidaRaw = $this->auth->getUser();
+        $usuarioVida = is_array($usuarioVidaRaw) ? $usuarioVidaRaw : [];
         foreach ($alunos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
             if ($alunoId <= 0) {
@@ -1822,6 +1831,9 @@ class BoletimConfigController extends BaseController
                 );
                 $gerados++;
                 $linhas += count($rows);
+                if (!$preview) {
+                    $this->sincronizarFichaVidaEscolar($alunoId, $usuarioVida, $periodoRef, $regraId);
+                }
             } catch (Throwable $e) {
                 $erros++;
                 if (count($errosAmostra) < 3) {
@@ -1838,6 +1850,26 @@ class BoletimConfigController extends BaseController
             'erros' => $erros,
             'errosAmostra' => $errosAmostra,
         ];
+    }
+
+    private function sincronizarFichaVidaEscolar(int $alunoId, array $usuario, ?string $periodoRef = null, ?int $regraId = null): void
+    {
+        if ($alunoId <= 0) {
+            return;
+        }
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once dirname(__DIR__, 2) . '/Core/LayoutHelper.php';
+            }
+            if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return;
+            }
+            require_once dirname(__DIR__, 2) . '/Modulos/vida-escolar/Services/VidaEscolarService.php';
+            $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $vida->sincronizarDeEventosGerados($alunoId, $usuario, $regraId, $periodoRef, null, true, false);
+        } catch (Throwable $e) {
+            error_log('Vida escolar sync aluno #' . $alunoId . ': ' . $e->getMessage());
+        }
     }
 
     public function simularRegraAluno(

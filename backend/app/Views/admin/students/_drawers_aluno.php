@@ -391,6 +391,14 @@
                     <div class="p-6 space-y-3">
                         <p class="text-xs text-slate-500">Os dados institucionais do cabeçalho vêm da unidade vinculada ao aluno.</p>
 
+                        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar')): ?>
+                        <a href="<?= URL ?>/admin/students/<?= (int) ($student['id'] ?? 0) ?>?tab=vida-escolar"
+                           class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
+                            <span class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-scroll"></i></span>
+                            <span><span class="block font-medium text-slate-800">Vida escolar</span><span class="block text-xs text-slate-500">Prontuário: boletim, histórico, documentos, SED e INEP</span></span>
+                        </a>
+                        <?php endif; ?>
+
                         <a href="<?= URL ?>/admin/students/<?= (int) ($student['id'] ?? 0) ?>/historico-escolar"
                            class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
                             <span class="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"><i class="fa-solid fa-clock-rotate-left"></i></span>

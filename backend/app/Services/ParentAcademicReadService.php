@@ -104,9 +104,11 @@ class ParentAcademicReadService
 
     public function reportCard(int $studentId): array
     {
-        if (!$this->db->tableExists('boletim_resultados_gerados') || !$this->db->tableExists('boletim_regras')) return [];
-        require_once __DIR__ . '/../Models/System/BoletimConfig.php';
-        try { $events=(new BoletimConfig())->getGeneratedBoletinsByAluno($studentId,'pais','boletim'); } catch (Throwable $e) { return []; }
+        $events = [];
+        if ($this->db->tableExists('boletim_resultados_gerados') && $this->db->tableExists('boletim_regras')) {
+            require_once __DIR__ . '/../Models/System/BoletimConfig.php';
+            try { $events=(new BoletimConfig())->getGeneratedBoletinsByAluno($studentId,'pais','boletim'); } catch (Throwable $e) { $events = []; }
+        }
         return array_map(function(array $event): array {
             return [
                 'rule_id'=>(int)$event['regra_id'],'title'=>$event['regra_nome'],'period'=>$event['periodo_ref'],
@@ -115,7 +117,7 @@ class ParentAcademicReadService
                 'subjects'=>array_map(fn($line)=>['subject_id'=>(int)($line['materia_id']??0),'subject_name'=>$line['materia_nome']??'Sem matéria','grades'=>$line['notas']??[]],$event['linhas']??[]),
                 'updated_at'=>$this->isoDate($event['updated_at']??null),
             ];
-        },$events);
+        }, $events);
     }
 
     private function recentActivity(int $studentId): array

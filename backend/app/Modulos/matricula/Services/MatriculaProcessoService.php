@@ -2298,6 +2298,13 @@ HTML;
             throw $e;
         }
 
+        try {
+            require_once dirname(__DIR__, 2) . '/vida-escolar/Services/ProntuarioVidaEscolarService.php';
+            (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())->reconhecerEntregasExternas($alunoId);
+        } catch (\Throwable $e) {
+            error_log('Checklist vida escolar após enturmar: ' . $e->getMessage());
+        }
+
         return [
             'ok' => true,
             'aluno_id' => $alunoId,

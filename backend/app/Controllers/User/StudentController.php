@@ -1220,13 +1220,21 @@ if (!class_exists('StudentController')) {
         $totalPendentes = $totalJornadas - $totalConcluidas;
         $pctConcluidas = $totalJornadas > 0 ? round(($totalConcluidas / $totalJornadas) * 100, 1) : 0;
 
+        $sqlAcertoBase = "CASE WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0 WHEN base.pontuacao > 0 THEN 1 ELSE 0 END";
+        $sqlErroBase = "CASE WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0 WHEN base.pontuacao > 0 THEN 0 ELSE 1 END";
+        $sqlInnerAgg = "MAX(jpa.pontuacao) as pontuacao,
+                                   MAX(me.tipo) as tipo,
+                                   MAX(CASE WHEN JSON_VALID(jpa.resposta) AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(jpa.resposta, '$.correcao_status')), '') = 'corrigida' THEN 1 ELSE 0 END) as corrigida";
+
         // Acertos/erros gerais (1 registro por exercício respondido)
         $geral = $this->db->fetch(
             "SELECT COUNT(*) as total,
-                    SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) as corretas
+                    SUM({$sqlAcertoBase}) as corretas,
+                    SUM({$sqlErroBase}) as erros
              FROM (
-                SELECT jpa.exercicio_modulo_id, MAX(COALESCE(jpa.pontuacao, 0)) as pontuacao
+                SELECT jpa.exercicio_modulo_id, {$sqlInnerAgg}
                 FROM jornadas_progresso_alunos jpa
+                LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
                 WHERE jpa.aluno_id = :aluno_id
                   AND jpa.atividade_tipo = 'exercicio_modulo'
                   AND jpa.resposta IS NOT NULL
@@ -1236,17 +1244,20 @@ if (!class_exists('StudentController')) {
         );
         $geralTotal = (int)($geral['total'] ?? 0);
         $geralCorretas = (int)($geral['corretas'] ?? 0);
-        $geralErros = $geralTotal - $geralCorretas;
-        $geralPct = $geralTotal > 0 ? round(($geralCorretas / $geralTotal) * 100, 1) : 0;
+        $geralErros = (int)($geral['erros'] ?? 0);
+        $geralAvaliadas = $geralCorretas + $geralErros;
+        $geralPct = $geralAvaliadas > 0 ? round(($geralCorretas / $geralAvaliadas) * 100, 1) : 0;
 
         // Acertos/erros por matéria
         $porMateria = $this->db->fetchAll(
             "SELECT m.nome as materia_nome,
                     COUNT(*) as total,
-                    SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) as corretas
+                    SUM({$sqlAcertoBase}) as corretas,
+                    SUM({$sqlErroBase}) as erros
              FROM (
-                SELECT jpa.jornada_id, jpa.exercicio_modulo_id, MAX(COALESCE(jpa.pontuacao, 0)) as pontuacao
+                SELECT jpa.jornada_id, jpa.exercicio_modulo_id, {$sqlInnerAgg}
                 FROM jornadas_progresso_alunos jpa
+                LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
                 WHERE jpa.aluno_id = :aluno_id
                   AND jpa.atividade_tipo = 'exercicio_modulo'
                   AND jpa.resposta IS NOT NULL
@@ -1261,8 +1272,9 @@ if (!class_exists('StudentController')) {
         foreach ($porMateria as &$row) {
             $row['total'] = (int)$row['total'];
             $row['corretas'] = (int)$row['corretas'];
-            $row['erros'] = $row['total'] - $row['corretas'];
-            $row['percentual'] = $row['total'] > 0 ? round(($row['corretas'] / $row['total']) * 100, 1) : 0;
+            $row['erros'] = (int)($row['erros'] ?? max(0, $row['total'] - $row['corretas']));
+            $avaliadas = $row['corretas'] + $row['erros'];
+            $row['percentual'] = $avaliadas > 0 ? round(($row['corretas'] / $avaliadas) * 100, 1) : 0;
             if (empty($row['materia_nome'])) $row['materia_nome'] = 'Sem matéria';
         }
         unset($row);
@@ -1276,12 +1288,14 @@ if (!class_exists('StudentController')) {
             $porJornada = $this->db->fetchAll(
                 "SELECT j.id, j.titulo, j.status, m.nome as materia_nome,
                         COUNT(base.exercicio_modulo_id) as total,
-                        SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) as corretas
+                        SUM({$sqlAcertoBase}) as corretas,
+                        SUM({$sqlErroBase}) as erros
                  FROM jornadas j
                  LEFT JOIN materias m ON j.materia_id = m.id
                  LEFT JOIN (
-                    SELECT jpa.jornada_id, jpa.exercicio_modulo_id, MAX(COALESCE(jpa.pontuacao, 0)) as pontuacao
+                    SELECT jpa.jornada_id, jpa.exercicio_modulo_id, {$sqlInnerAgg}
                     FROM jornadas_progresso_alunos jpa
+                    LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
                     WHERE jpa.aluno_id = ?
                       AND jpa.atividade_tipo = 'exercicio_modulo'
                       AND jpa.resposta IS NOT NULL
@@ -1297,8 +1311,9 @@ if (!class_exists('StudentController')) {
         foreach ($porJornada as &$row) {
             $row['total'] = (int)$row['total'];
             $row['corretas'] = (int)$row['corretas'];
-            $row['erros'] = $row['total'] - $row['corretas'];
-            $row['percentual'] = $row['total'] > 0 ? round(($row['corretas'] / $row['total']) * 100, 1) : 0;
+            $row['erros'] = (int)($row['erros'] ?? max(0, $row['total'] - $row['corretas']));
+            $avaliadas = $row['corretas'] + $row['erros'];
+            $row['percentual'] = $avaliadas > 0 ? round(($row['corretas'] / $avaliadas) * 100, 1) : 0;
             $row['concluida'] = in_array($row['id'], $jornadasConcluidasIds);
         }
         unset($row);
@@ -1686,6 +1701,15 @@ if (!class_exists('StudentController')) {
 
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
+        $quadroOficial = null;
+        try {
+            if (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('vida_escolar')) {
+                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+                $quadroOficial = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadroDoAluno((int) $aluno['id']);
+            }
+        } catch (\Throwable $e) {
+            $quadroOficial = null;
+        }
         $data = [
             'title' => 'Boletim - EducaTudo',
             'user' => $user,
@@ -1696,6 +1720,7 @@ if (!class_exists('StudentController')) {
             'boletins_gerados' => $boletinsGerados,
             'boletins_gerados_notas' => $boletinsGeradosNotas,
             'boletins_gerados_boletim' => $boletinsGeradosBoletim,
+            'quadro_oficial' => $quadroOficial,
             'default_notas_tab' => 'boletim',
             'primary_color' => $primaryColor,
             'current_page' => 'boletim',
@@ -5448,10 +5473,16 @@ if (!class_exists('StudentController')) {
         );
 
         $jornadaStats = $this->db->fetch(
-            "SELECT COUNT(*) as total, SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) as corretas
+            "SELECT COUNT(*) as total,
+                    SUM(CASE WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0 WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) as corretas,
+                    SUM(CASE WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0 WHEN base.pontuacao > 0 THEN 0 ELSE 1 END) as erros
              FROM (
-                SELECT jpa.exercicio_modulo_id, MAX(COALESCE(jpa.pontuacao, 0)) as pontuacao
+                SELECT jpa.exercicio_modulo_id,
+                       MAX(jpa.pontuacao) as pontuacao,
+                       MAX(me.tipo) as tipo,
+                       MAX(CASE WHEN JSON_VALID(jpa.resposta) AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(jpa.resposta, '$.correcao_status')), '') = 'corrigida' THEN 1 ELSE 0 END) as corrigida
                 FROM jornadas_progresso_alunos jpa
+                LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
                 WHERE jpa.aluno_id = :aluno_id
                   AND jpa.atividade_tipo = 'exercicio_modulo'
                   AND jpa.resposta IS NOT NULL
@@ -5471,7 +5502,9 @@ if (!class_exists('StudentController')) {
         $totalExerciciosIa = (int) ($row['total_exercicios_ia'] ?? 0);
         $jornadaTotal = (int) ($jornadaStats['total'] ?? 0);
         $jornadaCorretas = (int) ($jornadaStats['corretas'] ?? 0);
-        $jornadaPercentual = $jornadaTotal > 0 ? round(($jornadaCorretas / $jornadaTotal) * 100, 1) : 0;
+        $jornadaErros = (int) ($jornadaStats['erros'] ?? 0);
+        $jornadaAvaliadas = $jornadaCorretas + $jornadaErros;
+        $jornadaPercentual = $jornadaAvaliadas > 0 ? round(($jornadaCorretas / $jornadaAvaliadas) * 100, 1) : 0;
         $provaTotal = (int) ($provaStats['total'] ?? 0);
         $provaCorretas = (int) ($provaStats['corretas'] ?? 0);
         $provaPercentual = $provaTotal > 0 ? round(($provaCorretas / $provaTotal) * 100, 1) : 0;

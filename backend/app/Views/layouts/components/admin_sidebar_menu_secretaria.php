@@ -34,7 +34,7 @@ $avaliacoesOpen = in_array($cur, [
 $gestaoOpen = in_array($cur, [
     'gestao_escolar', 'censo_escolar', 'conselho_classe', 'diario_classe',
     'faltas', 'presenca', 'modelos_documentos', 'ocorrencias',
-    'almoxarifado', 'patrimonio', 'resultados-finais', 'saude_academica',
+    'almoxarifado', 'patrimonio', 'resultados-finais', 'vida_escolar', 'saude_academica',
 ], true) || $curMovimentacao;
 ?>
 <?php if ($secCan(['dashboard'])): ?>
@@ -167,7 +167,7 @@ $gestaoOpen = in_array($cur, [
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['faltas', 'presenca', 'diario_classe', 'conselho_classe', 'censo_escolar', 'ocorrencias', 'saude_academica', 'almoxarifado', 'patrimonio', 'modelos_documentos', 'resultados_finais', 'transferencia'])): ?>
+<?php if ($secCan(['faltas', 'presenca', 'diario_classe', 'conselho_classe', 'censo_escolar', 'ocorrencias', 'saude_academica', 'almoxarifado', 'patrimonio', 'modelos_documentos', 'resultados_finais', 'vida_escolar', 'transferencia'])): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cur === 'gestao_escolar' ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -278,6 +278,12 @@ $gestaoOpen = in_array($cur, [
         <a href="<?= $urlBase ?>/admin/resultados-finais" class="<?= $linkCls($cur === 'resultados-finais') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Resultados Finais</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['vida_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'))): ?>
+        <a href="<?= $urlBase ?>/admin/vida-escolar" class="<?= $linkCls($cur === 'vida_escolar') ?>">
+            <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Vida Escolar</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['saude_academica']) && $modOn('saude_academica') && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>

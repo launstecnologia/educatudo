@@ -851,6 +851,15 @@ class ParentController extends BaseController
 
         $boletinsGerados = [];
         $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
+        $quadroOficial = null;
+        try {
+            if (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('vida_escolar')) {
+                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+                $quadroOficial = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadroDoAluno((int) $filho['id']);
+            }
+        } catch (\Throwable $e) {
+            $quadroOficial = null;
+        }
         try {
             require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
             $boletimCfg = new BoletimConfig();
@@ -956,6 +965,7 @@ class ParentController extends BaseController
             'boletins_gerados_notas' => $boletinsNotas,
             'boletins_gerados_boletim' => $boletinsBoletim,
             'boletim_observacao' => $boletimObservacao,
+            'quadro_oficial' => $quadroOficial,
         ];
 
         $this->viewWithLayout('parent', 'parents/notas-filho', $data);

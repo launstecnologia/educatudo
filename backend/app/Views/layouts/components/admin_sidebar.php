@@ -125,6 +125,7 @@
             'diario_classe', 'faltas', 'presenca', 'documentos_institucionais',
             'assinatura_digital', 'modelos_documentos', 'enrollment', 'enrollment_config',
             'ocorrencias', 'almoxarifado', 'patrimonio', 'resultados-finais',
+            'vida_escolar',
             'saude_academica', 'tudicoins_escola', 'creditos_pacotes',
         ], true) || $curMovimentacao;
         $monitoramentoOpen = in_array($cp, ['monitoramento', 'monitoramento_alertas', 'tentativas_login'], true);
@@ -690,6 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'almoxarifado': 'gestao-escolar',
         'patrimonio': 'gestao-escolar',
         'resultados-finais': 'gestao-escolar',
+        'vida_escolar': 'gestao-escolar',
         'saude_academica': 'gestao-escolar',
         'tudicoins_escola': 'gestao-escolar',
         'creditos_pacotes': 'gestao-escolar',

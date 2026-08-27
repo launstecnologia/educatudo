@@ -23,8 +23,8 @@ $bimestreLabel = static function ($bimestre) {
 <div class="mb-8">
     <div class="flex justify-between items-center flex-wrap gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Notas e Boletim</h2>
-            <p class="text-gray-600">Gerencie os eventos de boletim configurados pela escola</p>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Eventos de Notas</h2>
+            <p class="text-gray-600">Configure os eventos do bimestre. Ao gerar, as médias entram no boletim da Vida Escolar.</p>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
             <button type="button" onclick="openFilterDrawer()"

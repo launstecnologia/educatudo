@@ -174,7 +174,7 @@ $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ??
         <div class="flex items-center rounded-lg <?= $cp === 'boletim_config' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/boletim" class="flex-1 <?= $linkCls($cp === 'boletim_config') ?>">
                 <i class="fa-regular fa-file-lines w-4 h-4 mr-3"></i>
-                <span class="sidebar-text text-sm">Notas e Boletim</span>
+                <span class="sidebar-text text-sm">Eventos de Notas</span>
             </a>
             <button type="button" onclick="toggleNestedMenu('boletim')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                 <svg id="boletim-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,6 +482,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         <a href="<?= URL ?>/admin/resultados-finais" class="<?= $linkCls($cp === 'resultados-finais') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Resultados Finais</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($canViewSidebar(['vida_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'))): ?>
+        <a href="<?= URL ?>/admin/vida-escolar" class="<?= $linkCls($cp === 'vida_escolar') ?>">
+            <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Vida Escolar</span>
         </a>
         <?php endif; ?>
         <?php if ($modOn('saude_academica')): ?>

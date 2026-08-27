@@ -68,10 +68,16 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                 <?php endif; ?>
 
                 <?php if ($secaoNotas === 'boletim'): ?>
+                    <?php
+                    $quadroFileOficial = dirname(__DIR__, 2) . '/Modulos/vida-escolar/Views/aluno/quadro.php';
+                    if (is_file($quadroFileOficial) && !empty($quadro_oficial['grid'])) {
+                        require $quadroFileOficial;
+                    }
+                    ?>
                     <?php $boletins_gerados = $boletins_gerados_boletim; ?>
                     <?php if (!empty($boletins_gerados)): ?>
                         <?php require __DIR__ . '/../partials/boletins_gerados.php'; ?>
-                    <?php else: ?>
+                    <?php elseif (empty($quadro_oficial['grid'])): ?>
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhum boletim disponível.</p>
                         </div>

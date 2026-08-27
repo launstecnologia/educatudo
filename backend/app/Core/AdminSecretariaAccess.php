@@ -50,6 +50,7 @@ class AdminSecretariaAccess
             '/admin/salas',
             '/admin/regras-academicas',
             '/admin/resultados-finais',
+            '/admin/vida-escolar',
             '/admin/modelos-documentos',
             '/admin/ocorrencias',
             '/admin/conselhos',

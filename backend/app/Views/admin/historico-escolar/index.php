@@ -120,7 +120,7 @@ $statusCores = [
                                     <a href="<?= URL ?>/admin/students/<?= $alunoId ?>/historico-escolar/<?= (int) $doc['id'] ?>"
                                        class="text-blue-600 hover:text-blue-800 font-medium">Abrir</a>
                                     <?php if (in_array($st, ['Emitido', 'Assinado', 'Entregue', 'Cancelado'], true)): ?>
-                                        <a href="<?= URL ?>/admin/students/<?= $alunoId ?>/historico-escolar/<?= (int) $doc['id'] ?>/pdf" target="_blank" rel="noopener"
+                                        <a href="<?= URL ?>/admin/students/<?= $alunoId ?>/historico-escolar/<?= (int) $doc['id'] ?>/pdf" download
                                            class="text-rose-600 hover:text-rose-800 font-medium">PDF</a>
                                     <?php endif; ?>
                                 </td>

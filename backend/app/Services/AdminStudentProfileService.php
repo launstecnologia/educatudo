@@ -40,8 +40,10 @@ class AdminStudentProfileService
     /**
      * Monta o array de dados completo para a view admin/students/show.
      * Lança Exception se o aluno não for encontrado (o controller decide o redirect).
+     *
+     * @param array<string,mixed> $opts ficha_id da vida escolar (query string)
      */
-    public function getStudentProfile(int $id, array $user): array
+    public function getStudentProfile(int $id, array $user, array $opts = []): array
     {
         $adminPermissions = \AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
 
@@ -748,7 +750,7 @@ class AdminStudentProfileService
             $boletinsGeradosNotasPorRegra = [];
         }
 
-        return [
+        return array_merge([
             'student' => $aluno,
             'stats' => $stats,
             'matriculas' => $matriculas,
@@ -781,7 +783,123 @@ class AdminStudentProfileService
             'boletim_pode_excluir' => $this->controller->coordenacaoPodeEditarBoletim($user),
             'admin_permissions' => $adminPermissions,
             'user' => $user,
+        ], $this->carregarVidaEscolar($id, (int) ($opts['ficha_id'] ?? 0), $adminPermissions));
+    }
+
+    /**
+     * Prontuário oficial + KPIs da ficha do ano. Falha silenciosa se o módulo
+     * estiver desligado ou a migration ainda não tiver sido aplicada.
+     *
+     * @param array<string,mixed> $adminPermissions
+     * @return array<string,mixed>
+     */
+    private function carregarVidaEscolar(int $alunoId, int $fichaId, array $adminPermissions): array
+    {
+        $vazio = [
+            'vida_escolar_prontuario' => [],
+            'vida_escolar_schema' => false,
+            'vida_escolar_kpis' => ['media' => null, 'frequencia' => null],
+            'vida_escolar_pode_ler_ia' => false,
         ];
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once __DIR__ . '/../Core/LayoutHelper.php';
+            }
+            if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return $vazio;
+            }
+            if (!\AdminPermissionMatrix::can($adminPermissions, 'vida_escolar', 'visualizar')) {
+                return $vazio;
+            }
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/ProntuarioVidaEscolarService.php';
+            $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $prontuario = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())->montar($alunoId, $svc, $fichaId);
+            if ($prontuario === []) {
+                return $vazio;
+            }
+            $schema = $svc->model()->schemaPronto();
+            $prontuario['importacoes'] = $schema ? $svc->model()->listarImportacoes($alunoId) : [];
+            $prontuario['materias'] = $svc->model()->materiasAtivas();
+            $prontuario['schema_pronto'] = $schema;
+            $prontuario['periodos'] = \App\Modulos\VidaEscolar\Services\VidaEscolarService::PERIODOS;
+
+            return [
+                'vida_escolar_prontuario' => $prontuario,
+                'vida_escolar_schema' => $schema,
+                'vida_escolar_kpis' => $this->kpisDoQuadro(is_array($prontuario['quadro'] ?? null) ? $prontuario['quadro'] : null),
+                'vida_escolar_pode_ler_ia' => $this->podeLerHistoricoIa(),
+            ];
+        } catch (\Throwable $e) {
+            \Logger::error('Vida escolar na ficha do aluno: ' . $e->getMessage(), [
+                'aluno_id' => $alunoId,
+            ], 'general');
+            return $vazio;
+        }
+    }
+
+    /**
+     * @param array<string,mixed>|null $quadro
+     * @return array{media: ?float, frequencia: ?float}
+     */
+    private function kpisDoQuadro(?array $quadro): array
+    {
+        $notas = [];
+        $faltas = 0;
+        $aulas = 0;
+        $freqs = [];
+        foreach ($quadro['grid'] ?? [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $cels = is_array($row['celulas'] ?? null) ? $row['celulas'] : [];
+            $final = $cels[0] ?? null;
+            if (is_array($final) && ($final['nota'] ?? null) !== null && $final['nota'] !== '') {
+                $notas[] = (float) $final['nota'];
+            }
+            if (is_array($final) && ($final['frequencia_percentual'] ?? null) !== null && $final['frequencia_percentual'] !== '') {
+                $freqs[] = (float) $final['frequencia_percentual'];
+            }
+            foreach ([1, 2, 3, 4] as $periodo) {
+                $c = $cels[$periodo] ?? null;
+                if (!is_array($c)) {
+                    continue;
+                }
+                if (($c['faltas'] ?? null) !== null && $c['faltas'] !== '') {
+                    $faltas += (int) $c['faltas'];
+                }
+                if (($c['aulas_dadas'] ?? null) !== null && $c['aulas_dadas'] !== '') {
+                    $aulas += (int) $c['aulas_dadas'];
+                }
+            }
+        }
+        $media = $notas !== [] ? round(array_sum($notas) / count($notas), 1) : null;
+        $frequencia = null;
+        if ($freqs !== []) {
+            $frequencia = round(array_sum($freqs) / count($freqs), 0);
+        } elseif ($aulas > 0) {
+            $frequencia = round(max(0, min(100, (1 - ($faltas / $aulas)) * 100)), 0);
+        }
+
+        return ['media' => $media, 'frequencia' => $frequencia];
+    }
+
+    private function podeLerHistoricoIa(): bool
+    {
+        require_once __DIR__ . '/../Core/CreditosModuleRegistry.php';
+        require_once __DIR__ . '/CreditosService.php';
+        if (!\CreditosModuleRegistry::acaoIaDisponivel('vida_escolar_ler_historico')) {
+            return false;
+        }
+        try {
+            return (new CreditosService())->podeConsumir(
+                'escola',
+                \CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID,
+                'vida_escolar_ler_historico'
+            );
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

@@ -344,6 +344,7 @@ usort($atividadeRecente, static function ($a, $b) {
 });
 $atividadeRecente = array_slice($atividadeRecente, 0, 5);
 
+$moduloVidaEscolar = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar');
 $abasAluno = [
     'visao-geral' => ['label' => 'Visão geral', 'count' => null],
     'dados-pessoais' => ['label' => 'Dados pessoais', 'count' => null],
@@ -351,8 +352,12 @@ $abasAluno = [
     'matriculas' => ['label' => 'Matrículas', 'count' => null, 'perm_key' => 'matriculas_aluno'],
     'saude' => ['label' => 'Saúde', 'count' => null],
     'documentos' => ['label' => 'Documentos', 'count' => $totalChecklist, 'perm_key' => 'documentos_aluno'],
-    'historico' => ['label' => 'Histórico', 'count' => null],
 ];
+if ($moduloVidaEscolar) {
+    $abasAluno['vida-escolar'] = ['label' => 'Vida escolar', 'count' => null];
+}
+$abasAluno['pedagogico'] = ['label' => 'Pedagógico', 'count' => null];
+$abasAluno['historico'] = ['label' => 'Histórico', 'count' => null];
 ?>
 
 <?php if ($flash_message !== ''): ?>
@@ -437,6 +442,14 @@ function voltarDetalheAluno() {
 <div id="aba-painel-documentos" class="aluno-aba-painel hidden" role="tabpanel" aria-labelledby="aba-btn-documentos" hidden>
     <?php include __DIR__ . '/_secao_documentos.php'; ?>
 </div>
+<?php if ($moduloVidaEscolar): ?>
+<div id="aba-painel-vida-escolar" class="aluno-aba-painel hidden" role="tabpanel" aria-labelledby="aba-btn-vida-escolar" hidden>
+    <?php include __DIR__ . '/_tab_vida_escolar.php'; ?>
+</div>
+<?php endif; ?>
+<div id="aba-painel-pedagogico" class="aluno-aba-painel hidden" role="tabpanel" aria-labelledby="aba-btn-pedagogico" hidden>
+    <?php include __DIR__ . '/_relatorio_detalhado.php'; ?>
+</div>
 <div id="aba-painel-historico" class="aluno-aba-painel hidden" role="tabpanel" aria-labelledby="aba-btn-historico" hidden>
     <?php include __DIR__ . '/_secao_auditoria.php'; ?>
     <div class="student-card mt-5">
@@ -466,6 +479,14 @@ function voltarDetalheAluno() {
 
 <?php include __DIR__ . '/_offcanvas_acoes_aluno.php'; ?>
 <?php include __DIR__ . '/_drawers_aluno.php'; ?>
+<?php
+if (!empty($moduloVidaEscolar) && !empty($modDir)) {
+    $offcanvasLancarEscola = $modDir . '/_offcanvas_lancar_escola.php';
+    if (is_file($offcanvasLancarEscola)) {
+        include $offcanvasLancarEscola;
+    }
+}
+?>
 <?php if ($matriculas_schema_ready): ?>
 <?php include __DIR__ . '/_modal_matricula_aluno.php'; ?>
 <?php endif; ?>
@@ -476,10 +497,18 @@ var ABA_ALUNO_HASH = {
     'section-documentos-aluno': 'documentos',
     'section-responsaveis-vinculados': 'responsaveis',
     'section-auditoria-aluno': 'historico',
-    'section-relatorio-detalhado': 'visao-geral'
+    'section-relatorio-detalhado': 'pedagogico'
 };
 
+function abrirAbaAlunoComSub(abaId, subTab) {
+    selecionarAbaAluno(abaId);
+    if (subTab && typeof showTab === 'function') {
+        setTimeout(function () { showTab(subTab); }, 60);
+    }
+}
+
 function selecionarAbaAluno(abaId, atualizarUrl) {
+    if (typeof veFecharLancarEscola === 'function') veFecharLancarEscola();
     if (!abaId) abaId = 'visao-geral';
     var paineis = document.querySelectorAll('.aluno-aba-painel');
     var botoes = document.querySelectorAll('.aluno-aba-btn');
@@ -535,6 +564,12 @@ function initAbasAluno() {
         tab = 'visao-geral';
     }
     selecionarAbaAluno(tab, false);
+    try {
+        var veAba = new URLSearchParams(window.location.search).get('ve_aba') || new URLSearchParams(window.location.search).get('aba');
+        if (tab === 'vida-escolar' && typeof selecionarVeAba === 'function') {
+            selecionarVeAba(veAba || 'boletim');
+        }
+    } catch (e) {}
     initCabecalhoCompactoAluno();
 }
 

@@ -7,7 +7,7 @@
         <div class="student-card-header">
             <div class="flex items-center gap-2">
                 <span class="aluno-card-icon"><i class="fa-solid fa-chart-column"></i></span>
-                <h3 class="text-base font-semibold text-slate-900">Relatório detalhado</h3>
+                <h3 class="text-base font-semibold text-slate-900">Pedagógico</h3>
             </div>
         </div>
         <div class="border-b border-slate-200 px-4 student-tabs-nav-scroll">
@@ -33,14 +33,6 @@
                 <button onclick="showTab('provas')" id="tab-provas" data-tab-perm-key="tab_provas" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Provas
-                </button>
-                <button onclick="showTab('notas-eventos')" id="tab-notas-eventos" data-tab-perm-key="tab_notas" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4V7m-9 8h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                    Notas
-                </button>
-                <button onclick="showTab('boletim-eventos')" id="tab-boletim-eventos" data-tab-perm-key="tab_boletim" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Boletim
                 </button>
                 <button onclick="showTab('acessos')" id="tab-acessos" data-tab-perm-key="tab_acessos" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -612,81 +604,6 @@
                 </div>
             </div>
 
-            <!-- Tab: Notas -->
-            <div id="content-notas-eventos" class="tab-content hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-gray-900">Eventos de Notas</h3>
-                    <span class="text-sm text-gray-500"><?= count($boletim_eventos_notas) ?> evento(s)</span>
-                </div>
-
-                <?php if (empty($boletim_eventos_notas)): ?>
-                    <div class="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-                        <p class="text-gray-500">Nenhum evento de notas visível para coordenação.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="space-y-3">
-                        <?php foreach ($boletim_eventos_notas as $ev): ?>
-                            <?php
-                                $ridNota = (int)($ev['id'] ?? 0);
-                                $geradoNota = $ridNota > 0 ? ($boletins_gerados_notas_por_regra[$ridNota] ?? null) : null;
-                                $updatedFmt = !empty($ev['updated_at']) ? date('d/m/Y H:i', strtotime((string)$ev['updated_at'])) : '-';
-                            ?>
-                            <div class="border border-gray-200 rounded-lg p-4 bg-white">
-                                <div class="flex items-center justify-between gap-3">
-                                    <div>
-                                        <div class="text-base font-semibold text-gray-900"><?= safe_htmlspecialchars($ev['nome'] ?? '', 'Evento') ?></div>
-                                        <div class="text-sm text-gray-600">
-                                            <?php $bimestreNota = $ev['bimestre'] ?? null; ?>
-                                            <?php $anoNota = $ev['ano_letivo'] ?? null; ?>
-                                            Bimestre: <?= $bimestreNota ? ((int) $bimestreNota . 'º') : 'N/A' ?>
-                                            | Ano: <?= $anoNota ? (int) $anoNota : 'N/A' ?>
-                                            | Atualizado: <?= safe_htmlspecialchars($updatedFmt, '-') ?>
-                                        </div>
-                                    </div>
-                                    <?php if (is_array($geradoNota) && !empty($geradoNota['linhas'])): ?>
-                                        <div class="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                class="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-                                                data-notas-title="<?= safe_htmlspecialchars($ev['nome'] ?? '', 'Evento de Notas') ?>"
-                                                onclick="abrirModalNotasEvento('modal-notas-evento-<?= $ridNota ?>', this)">
-                                                Abrir notas
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700"
-                                                data-notas-title="<?= safe_htmlspecialchars($ev['nome'] ?? '', 'Evento de Notas') ?>"
-                                                onclick="imprimirNotasEvento('modal-notas-evento-<?= $ridNota ?>', this)">
-                                                Imprimir
-                                            </button>
-                                        </div>
-                                    <?php else: ?>
-                                        <span class="text-xs text-amber-700">Sem tabela gerada no banco para este evento.</span>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            <?php if (is_array($geradoNota) && !empty($geradoNota['linhas'])): ?>
-                                <div id="modal-notas-evento-<?= $ridNota ?>" class="hidden">
-                                    <?php
-                                    $boletinsGeradosBackup = $boletins_gerados;
-                                    $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
-                                    $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
-                                    $boletins_gerados = [$geradoNota];
-                                    $boletim_pode_excluir = false;
-                                    $boletim_aluno_id = 0;
-                                    require __DIR__ . '/../../partials/boletins_gerados.php';
-                                    $boletins_gerados = $boletinsGeradosBackup;
-                                    $boletim_pode_excluir = $boletimPodeExcluirBackup;
-                                    $boletim_aluno_id = $boletimAlunoIdBackup;
-                                    ?>
-                                </div>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-
-            </div>
-
             <!-- Modal genérico de abrir/imprimir conteúdo (usado pelas abas Provas e Notas) -->
             <div id="modal-notas-evento" class="hidden fixed inset-0 z-50 p-4 sm:p-6">
                 <div class="absolute inset-0 bg-black/50" onclick="fecharModalNotasEvento()"></div>
@@ -700,157 +617,6 @@
                     </div>
                     <div id="modal-notas-evento-body" class="w-full flex-1 overflow-y-auto p-4 bg-gray-50"></div>
                 </div>
-            </div>
-
-            <!-- Tab: Boletim -->
-            <div id="content-boletim-eventos" class="tab-content hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-3xl font-bold text-gray-900">Boletim</h2>
-                    <?php if (!empty($boletins_gerados)): ?>
-                        <a href="<?= URL ?>/admin/students/<?= (int) ($student['id'] ?? 0) ?>/boletim/pdf"
-                           class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium text-sm shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
-                            </svg>
-                            Baixar PDF
-                        </a>
-                    <?php endif; ?>
-                </div>
-
-                <?php if (empty($boletins_gerados)): ?>
-                    <div class="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-                        <p class="text-gray-500">Nenhum boletim gerado para este aluno ainda.</p>
-                    </div>
-                <?php else: ?>
-                    <?php
-                    $boletim_pode_excluir = (bool) ($boletim_pode_excluir ?? false);
-                    $boletim_aluno_id = (int) ($student['id'] ?? 0);
-                    $boletim_csrf_token = (string) ($csrf_token ?? '');
-                    require __DIR__ . '/../../partials/boletins_gerados.php';
-                    ?>
-
-                    <?php
-                    $obsConteudo = (string) (($boletim_observacao['conteudo'] ?? '') ?: '');
-                    $obsTokenInit = htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8');
-                    ?>
-                    <div id="boletim-observacao-block"
-                         class="mt-6 rounded-xl border border-gray-200 bg-white p-5"
-                         data-aluno-id="<?= (int) ($student['id'] ?? 0) ?>"
-                         data-csrf-token="<?= $obsTokenInit ?>"
-                         data-endpoint="<?= URL ?>/admin/students/<?= (int) ($student['id'] ?? 0) ?>/boletim/observacao">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-base font-semibold text-gray-900">Observação</h3>
-                            <button type="button"
-                                    id="btn-editar-observacao"
-                                    class="<?= $obsConteudo === '' ? 'hidden' : '' ?> text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-                                Editar
-                            </button>
-                        </div>
-
-                        <div id="observacao-view" class="<?= $obsConteudo === '' ? 'hidden' : '' ?>">
-                            <p id="observacao-texto" class="text-sm text-gray-800 whitespace-pre-wrap break-words"><?= htmlspecialchars($obsConteudo, ENT_QUOTES, 'UTF-8') ?></p>
-                        </div>
-
-                        <div id="observacao-edit" class="<?= $obsConteudo === '' ? '' : 'hidden' ?> space-y-3">
-                            <textarea id="observacao-textarea"
-                                      rows="5"
-                                      maxlength="5000"
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                                      placeholder="Escreva uma observação que ficará no boletim e no PDF…"><?= htmlspecialchars($obsConteudo, ENT_QUOTES, 'UTF-8') ?></textarea>
-                            <div class="flex items-center gap-2">
-                                <button type="button"
-                                        id="btn-salvar-observacao"
-                                        class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
-                                    Salvar
-                                </button>
-                                <button type="button"
-                                        id="btn-cancelar-observacao"
-                                        class="<?= $obsConteudo === '' ? 'hidden' : '' ?> px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium">
-                                    Cancelar
-                                </button>
-                                <span id="observacao-status" class="text-xs text-gray-500"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <script>
-                    (function () {
-                        var block = document.getElementById('boletim-observacao-block');
-                        if (!block) return;
-                        var viewEl = document.getElementById('observacao-view');
-                        var editEl = document.getElementById('observacao-edit');
-                        var textoEl = document.getElementById('observacao-texto');
-                        var taEl = document.getElementById('observacao-textarea');
-                        var btnEditar = document.getElementById('btn-editar-observacao');
-                        var btnSalvar = document.getElementById('btn-salvar-observacao');
-                        var btnCancelar = document.getElementById('btn-cancelar-observacao');
-                        var statusEl = document.getElementById('observacao-status');
-                        var endpoint = block.getAttribute('data-endpoint') || '';
-                        var csrf = block.getAttribute('data-csrf-token') || '';
-                        var ultimoSalvo = (textoEl && textoEl.textContent) ? textoEl.textContent : '';
-
-                        function entrarEdicao() {
-                            if (viewEl) viewEl.classList.add('hidden');
-                            if (editEl) editEl.classList.remove('hidden');
-                            if (btnEditar) btnEditar.classList.add('hidden');
-                            if (btnCancelar) btnCancelar.classList.toggle('hidden', ultimoSalvo.trim() === '');
-                            if (taEl) {
-                                taEl.value = ultimoSalvo;
-                                taEl.focus();
-                            }
-                        }
-
-                        function sairEdicao() {
-                            if (textoEl) textoEl.textContent = ultimoSalvo;
-                            var temConteudo = ultimoSalvo.trim() !== '';
-                            if (viewEl) viewEl.classList.toggle('hidden', !temConteudo);
-                            if (editEl) editEl.classList.toggle('hidden', temConteudo);
-                            if (btnEditar) btnEditar.classList.toggle('hidden', !temConteudo);
-                            if (btnCancelar) btnCancelar.classList.toggle('hidden', !temConteudo);
-                        }
-
-                        function salvar() {
-                            if (!taEl) return;
-                            var conteudo = taEl.value || '';
-                            statusEl.textContent = 'Salvando…';
-                            statusEl.classList.remove('text-red-600');
-                            statusEl.classList.add('text-gray-500');
-                            var form = new FormData();
-                            form.append('_token', csrf);
-                            form.append('conteudo', conteudo);
-                            fetch(endpoint, {
-                                method: 'POST',
-                                credentials: 'same-origin',
-                                headers: { 'X-CSRF-Token': csrf, 'Accept': 'application/json' },
-                                body: form,
-                            }).then(function (resp) {
-                                return resp.json().then(function (data) { return { ok: resp.ok, data: data }; });
-                            }).then(function (res) {
-                                if (!res.ok || !res.data || res.data.success !== true) {
-                                    var msg = (res.data && res.data.error) ? res.data.error : 'Falha ao salvar.';
-                                    statusEl.textContent = msg;
-                                    statusEl.classList.remove('text-gray-500');
-                                    statusEl.classList.add('text-red-600');
-                                    return;
-                                }
-                                ultimoSalvo = (res.data.conteudo !== undefined ? String(res.data.conteudo) : conteudo);
-                                statusEl.textContent = 'Salvo.';
-                                sairEdicao();
-                                setTimeout(function () { statusEl.textContent = ''; }, 1800);
-                            }).catch(function (err) {
-                                statusEl.textContent = 'Falha de rede.';
-                                statusEl.classList.remove('text-gray-500');
-                                statusEl.classList.add('text-red-600');
-                                console.error(err);
-                            });
-                        }
-
-                        if (btnEditar) btnEditar.addEventListener('click', entrarEdicao);
-                        if (btnSalvar) btnSalvar.addEventListener('click', salvar);
-                        if (btnCancelar) btnCancelar.addEventListener('click', sairEdicao);
-                    })();
-                    </script>
-                <?php endif; ?>
             </div>
 
             <!-- Tab: Acessos -->

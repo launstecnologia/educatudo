@@ -233,13 +233,13 @@ class AlunoMovimentacaoService
         if (!$definirPrincipal) {
             // Turma paralela/extra: também recebe número na lista de chamada da própria turma.
             $this->listaChamada->atribuirProximoNumero($alunoId, $turmaId, $anoLetivoId, $dataEntrada);
-
+            $this->garantirFichaVidaEscolar($alunoId, $turmaId, (int) $anoLetivoAno);
             return;
         }
 
         if ($turmaAtualId === $turmaId) {
             $this->listaChamada->atribuirProximoNumero($alunoId, $turmaId, $anoLetivoId, $dataEntrada);
-
+            $this->garantirFichaVidaEscolar($alunoId, $turmaId, (int) $anoLetivoAno);
             return;
         }
 
@@ -259,6 +259,17 @@ class AlunoMovimentacaoService
             $this->sincronizarListaChamadaRemanejamento($alunoId, $turmaAntigaId, $turmaId);
         } else {
             $this->listaChamada->atribuirProximoNumero($alunoId, $turmaId, $anoLetivoId, $dataEntrada);
+        }
+        $this->garantirFichaVidaEscolar($alunoId, $turmaId, (int) $anoLetivoAno);
+    }
+
+    private function garantirFichaVidaEscolar(int $alunoId, int $turmaId, int $anoLetivo): void
+    {
+        try {
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            \App\Modulos\VidaEscolar\Services\VidaEscolarService::aoVincularTurma($alunoId, $turmaId, $anoLetivo);
+        } catch (\Throwable $e) {
+            error_log('VidaEscolar vincular turma: ' . $e->getMessage());
         }
     }
 

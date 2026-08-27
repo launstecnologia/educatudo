@@ -882,7 +882,9 @@ class StudentAdminController extends AdminBaseController
         $service = new \App\Services\AdminStudentProfileService($this->db, $this);
 
         try {
-            $data = $service->getStudentProfile((int) $id, $user ?? []);
+            $data = $service->getStudentProfile((int) $id, $user ?? [], [
+                'ficha_id' => (int) ($_GET['ficha_id'] ?? 0),
+            ]);
         } catch (\RuntimeException $e) {
             if ($e->getCode() === 404) {
                 $this->redirect('/admin/students');

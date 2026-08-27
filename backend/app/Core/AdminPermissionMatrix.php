@@ -70,6 +70,10 @@ class AdminPermissionMatrix
             'notificacoes_push' => ['label' => 'Notificações Push', 'prefixes' => ['/admin/push-notifications']],
 
             'configuracao_boletim' => ['label' => 'Configuração Boletim', 'prefixes' => ['/admin/boletim', '/admin/boletim-configuracao']],
+            'vida_escolar' => ['label' => 'Vida Escolar (prontuário do aluno)', 'prefixes' => [
+                '/admin/vida-escolar',
+                '/admin/students/%id%/vida-escolar',
+            ]],
             'notas_semanais' => ['label' => 'Quadro de Notas Semanais', 'prefixes' => ['/admin/notas-semanais']],
             'guia_boletim' => ['label' => 'Guia do Boletim', 'prefixes' => ['/admin/boletim-guia', '/admin/boletim_guia']],
             'modo_manutencao' => ['label' => 'Modo Manutenção', 'prefixes' => ['/admin/maintenance']],
@@ -192,7 +196,7 @@ class AdminPermissionMatrix
                 'censo_escolar', 'conformidade', 'conselho_classe', 'diario_classe', 'faltas', 'presenca',
                 'documentos_institucionais', 'modelos_documentos', 'documentos_professor',
                 'processos_matricula', 'transferencia', 'ocorrencias', 'almoxarifado', 'patrimonio',
-                'resultados_finais', 'saude_academica', 'pacotes_creditos',
+                'resultados_finais', 'vida_escolar', 'saude_academica', 'pacotes_creditos',
             ]],
             'monitoramento' => ['label' => 'Monitoramento', 'items' => ['alertas_sensiveis', 'alunos_online', 'tentativas_login', 'reconhecimento_facial']],
             'pedagogico' => ['label' => 'Pedagógico', 'items' => ['planos_aula', 'ava', 'bncc', 'minicursos']],
@@ -234,7 +238,7 @@ class AdminPermissionMatrix
                 return self::denyModules($all, ['dev_settings', 'tickets_dev', 'configuracao_prompt']);
             case 'coordenador':
                 return self::onlyModules($all, [
-                    'dashboard', 'alunos', 'assistente', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'salas', 'turmas',
+                    'dashboard', 'alunos', 'assistente', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor', 'inclusao', 'listagem_avaliacoes', 'relatorio_avaliacoes',
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
                     'configuracao_boletim', 'notas_semanais', 'guia_boletim', 'modo_manutencao', 'slider_dashboard',
@@ -259,7 +263,7 @@ class AdminPermissionMatrix
                 return self::onlyModules($all, ['dashboard', 'financeiro_dashboard', 'financeiro_relatorio_pagantes', 'pacotes_creditos', 'tab_relatorio']);
             case 'secretaria':
                 return self::onlyModules($all, [
-                    'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'salas', 'turmas',
+                    'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor',
                     'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'unidades', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
                     'professores', 'transferencia', 'lista_chamada', 'reconhecimento_facial',

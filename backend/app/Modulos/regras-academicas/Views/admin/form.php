@@ -140,7 +140,7 @@ $val = static function (?array $item, string $key, $default = '') {
                 <input type="text" name="formula_media" value="<?= htmlspecialchars((string) $val($item, 'formula_media')) ?>"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                        placeholder="Ex.: (B1 + B2 + B3 + B4) / 4">
-                <p class="text-xs text-gray-500 mt-1">Ilustrativa / documentação. A composição das notas do evento continua no boletim.</p>
+                <p class="text-xs text-gray-500 mt-1">Usada no boletim da Vida Escolar para calcular a coluna FINAL a partir dos bimestres (B1–B4).</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Fórmula final (com recuperação)</label>

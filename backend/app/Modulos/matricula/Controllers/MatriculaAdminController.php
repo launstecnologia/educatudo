@@ -942,6 +942,12 @@ class MatriculaAdminController extends BaseController
             'criado_por' => $user['id'] ?? null,
         ]);
 
+        $alunoIdProc = (int) ($this->model->findById($id)['aluno_id'] ?? 0);
+        if ($alunoIdProc > 0) {
+            require_once dirname(__DIR__, 2) . '/vida-escolar/Services/ProntuarioVidaEscolarService.php';
+            (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())->reconhecerEntregasExternas($alunoIdProc);
+        }
+
         $this->redirectWithMsg('/admin/enrollment/' . $id, 'Documento anexado.', 'success');
     }
 

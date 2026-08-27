@@ -617,15 +617,35 @@ class HistoricoEscolarService
     private function reconsolidarInternos(int $historicoId, int $alunoId): void
     {
         $this->model->limparItensInternos($historicoId);
-        // Resultadoes anuais derivados de itens internos são recriados; externos preservados via upsert
+        $existentesExternos = [];
+        foreach ($this->model->listarItens($historicoId) as $ex) {
+            if (($ex['origem'] ?? '') !== 'Externo') {
+                continue;
+            }
+            $mk = function_exists('mb_strtolower')
+                ? mb_strtolower(trim((string) ($ex['componente'] ?? '')), 'UTF-8')
+                : strtolower(trim((string) ($ex['componente'] ?? '')));
+            $existentesExternos[(string) ($ex['ano_letivo'] ?? '') . '|' . $mk] = true;
+        }
         $consolidados = $this->consolidarDoBoletim($alunoId);
         $ordem = 0;
         $anosSerie = [];
         foreach ($consolidados['itens'] as $item) {
+            $origem = (($item['origem'] ?? 'Interno') === 'Externo') ? 'Externo' : 'Interno';
+            if ($origem === 'Externo') {
+                $mk = function_exists('mb_strtolower')
+                    ? mb_strtolower(trim((string) ($item['componente'] ?? '')), 'UTF-8')
+                    : strtolower(trim((string) ($item['componente'] ?? '')));
+                $ek = (string) ($item['ano_letivo'] ?? '') . '|' . $mk;
+                if (isset($existentesExternos[$ek])) {
+                    continue;
+                }
+                $existentesExternos[$ek] = true;
+            }
             $ordem++;
             $item['historico_id'] = $historicoId;
-            $item['origem'] = 'Interno';
-            $item['ordem'] = $ordem;
+            $item['origem'] = $origem;
+            $item['ordem'] = $origem === 'Externo' ? 1000 + $ordem : $ordem;
             $this->model->inserirItem($item);
             $key = $item['ano_letivo'] . '|' . $item['serie_ano'];
             $anosSerie[$key] = [
@@ -656,6 +676,7 @@ class HistoricoEscolarService
         $itens = [];
         $seen = [];
         $this->anexarItensHomologados($alunoId, $itens, $seen);
+        $this->anexarItensEscolarizacao($alunoId, $itens, $seen);
         $motor = new \ResultadoAcademicoService();
         $ctxAluno = $this->contextoAcademicoDoAluno($alunoId);
 
@@ -734,6 +755,41 @@ class HistoricoEscolarService
         }
 
         return ['itens' => $itens];
+    }
+
+    /**
+     * Anos da ficha viva / importação (escolarizacao_*), inclusive outra escola.
+     *
+     * @param list<array<string, mixed>> $itens
+     * @param array<string, true> $seen
+     */
+    private function anexarItensEscolarizacao(int $alunoId, array &$itens, array &$seen): void
+    {
+        try {
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            if (!$svc->model()->schemaPronto()) {
+                return;
+            }
+            foreach ($svc->itensParaHistoricoOficial($alunoId) as $item) {
+                $materia = trim((string) ($item['componente'] ?? ''));
+                $ano = (string) ($item['ano_letivo'] ?? '');
+                if ($materia === '' || $ano === '') {
+                    continue;
+                }
+                $materiaKey = function_exists('mb_strtolower')
+                    ? mb_strtolower($materia, 'UTF-8')
+                    : strtolower($materia);
+                $key = $ano . '|' . $materiaKey;
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $itens[] = $item;
+            }
+        } catch (\Throwable $e) {
+            // módulo/migration ainda não aplicados
+        }
     }
 
     /**

@@ -203,6 +203,13 @@ class CreditosModuleRegistry
             'feature_modules' => ['inclusao'],
             'pagador' => 'escola',
         ],
+        'vida_escolar_ler_historico' => [
+            'label' => 'Vida Escolar — ler histórico (OCR + IA)',
+            'grupo' => 'Secretaria',
+            'escopo_ui' => 'acao',
+            'feature_modules' => ['vida_escolar'],
+            'pagador' => 'escola',
+        ],
         'educainclui_gerar_prova' => [
             'label' => 'EducaInclui — gerar prova adaptada',
             'grupo' => 'EducaInclui',

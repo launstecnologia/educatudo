@@ -145,6 +145,10 @@ class ModeloDocumentoService
         'assinante_nome' => 'Nome de quem assina (layout padrão)',
         'assinante_cargo' => 'Cargo de quem assina (Direção, Coordenação…)',
         'quadro_notas_html' => 'Quadro de notas/componentes (HTML)',
+        'identidade_html' => 'Tabela de identidade do aluno (HTML)',
+        'trajetoria_html' => 'Trajetória escolar por ano (HTML)',
+        'documentos_html' => 'Checklist de documentos (HTML)',
+        'sed_html' => 'Conferência SED / Educacenso (HTML)',
         'situacao_final' => 'Situação acadêmica final',
         'frequencia_percentual' => 'Frequência (%)',
         'tabela_html' => 'Tabela coletiva (ata/relatório)',
@@ -267,6 +271,11 @@ class ModeloDocumentoService
         'resultado_boletim_padrao',
         'resultado_relatorio_padrao',
         'resultado_historico',
+        'vida_escolar_boletim',
+        'vida_escolar_dossie',
+        'vida_escolar_pacote',
+        'vida_escolar_sed',
+        'vida_escolar_historico',
     ];
 
     private $db;
@@ -397,6 +406,22 @@ class ModeloDocumentoService
                 'alvo' => 'corpo_html',
                 'ajuda' => 'Componentes e notas (ficha/boletim).',
                 'html' => '{{quadro_notas_html}}',
+            ],
+            [
+                'id' => 'identidade',
+                'label' => 'Identidade do aluno',
+                'icone' => 'fa-id-card',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Tabela civil/matrícula da Vida Escolar.',
+                'html' => '{{identidade_html}}',
+            ],
+            [
+                'id' => 'trajetoria',
+                'label' => 'Trajetória',
+                'icone' => 'fa-timeline',
+                'alvo' => 'corpo_html',
+                'ajuda' => 'Anos de escolarização (esta escola e origem).',
+                'html' => '{{trajetoria_html}}',
             ],
             [
                 'id' => 'tabela_coletiva',
@@ -740,7 +765,7 @@ class ModeloDocumentoService
         if (str_starts_with($codigo, 'contrato_')) {
             return 'contrato';
         }
-        if (str_starts_with($codigo, 'resultado_')) {
+        if (str_starts_with($codigo, 'resultado_') || str_starts_with($codigo, 'vida_escolar_')) {
             return 'oficial';
         }
         return 'outro';
@@ -2553,6 +2578,10 @@ HTML;
             'assinante_cargo' => 'Direção',
             'logo_html' => '',
             'quadro_notas_html' => '<table class="dados"><tr><td class="label">Língua Portuguesa</td><td>8,5</td></tr><tr><td class="label">Matemática</td><td>7,0</td></tr></table>',
+            'identidade_html' => '<table class="dados"><tr><td class="label">Nome</td><td>Maria Eduarda Silva</td></tr><tr><td class="label">CPF</td><td>123.456.789-00</td></tr></table>',
+            'trajetoria_html' => '<table class="dados"><tr><td>2024</td><td>8º Ano</td><td>EMEF Exemplo</td><td>externo</td><td>Aprovado</td></tr></table>',
+            'documentos_html' => '<table class="dados"><tr><td>Certidão de nascimento</td><td>entregue</td></tr></table>',
+            'sed_html' => '<table class="dados"><tr><td>CPF ou RG</td><td>Ok</td></tr></table>',
             'situacao_final' => 'Aprovado',
             'frequencia_percentual' => '95,0%',
             'tabela_html' => '<table class="dados"><tr><td class="label">Aluno</td><td class="label">Situação</td></tr><tr><td>Maria Eduarda Silva</td><td>Aprovado</td></tr></table>',
@@ -2569,6 +2598,7 @@ HTML;
             $htmlKeys = [
                 'logo_html', 'frequencia_html', 'info_pertinente_html', 'responsaveis_html',
                 'historico_html', 'quadro_notas_html', 'tabela_html',
+                'identidade_html', 'trajetoria_html', 'documentos_html', 'sed_html',
             ];
             $out[$k] = in_array($k, $htmlKeys, true) ? $v : $esc($v);
         }

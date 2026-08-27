@@ -466,6 +466,9 @@ class AIJobService
             case 'grade_horaria_importar_imagem':
                 return self::dispatchGradeHorariaImportarImagem($payload);
 
+            case 'vida_escolar_ler_historico':
+                return self::dispatchVidaEscolarLerHistorico($payload);
+
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");
         }
@@ -473,6 +476,29 @@ class AIJobService
 
     // -------------------------------------------------------------------------
     // Handlers específicos que fazem AI + persistência no banco
+
+    private static function dispatchVidaEscolarLerHistorico(array $payload): array
+    {
+        $alunoId = (int) ($payload['aluno_id'] ?? 0);
+        $documentoId = (int) ($payload['documento_id'] ?? 0);
+        if ($alunoId <= 0 || $documentoId <= 0) {
+            throw new \RuntimeException('Aluno ou documento ausente para leitura do histórico.');
+        }
+        require_once __DIR__ . '/../Modulos/vida-escolar/Services/HistoricoOcrService.php';
+        $ocr = new \App\Modulos\VidaEscolar\Services\HistoricoOcrService();
+        $res = $ocr->processarDocumento($alunoId, $documentoId, [
+            'id' => (int) ($payload['user_id'] ?? 0),
+            'nome' => (string) ($payload['user_nome'] ?? 'IA'),
+            'tipo' => (string) ($payload['user_tipo'] ?? 'admin'),
+        ]);
+        if (empty($res['success'])) {
+            throw new \RuntimeException((string) ($res['error'] ?? 'Falha ao ler o histórico.'));
+        }
+        return [
+            'importacao_id' => (int) ($res['importacao_id'] ?? 0),
+            'aluno_id' => $alunoId,
+        ];
+    }
 
     private static function dispatchGradeHorariaImportarImagem(array $payload): array
     {

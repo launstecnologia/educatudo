@@ -507,8 +507,8 @@ class ModuloCatalogo
             ],
             [
                 'chave' => 'geral_boletim',
-                'nome' => 'Notas e Boletim',
-                'aliases' => ['Boletim', 'Guia do Boletim'],
+                'nome' => 'Eventos de Notas',
+                'aliases' => ['Boletim', 'Notas e Boletim', 'Guia do Boletim'],
                 'feature_keys' => ['boletim'],
                 'rotas' => [
                     '/admin/boletim' => 'boletim',

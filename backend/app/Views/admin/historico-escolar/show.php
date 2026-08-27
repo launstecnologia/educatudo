@@ -31,9 +31,9 @@ $cargosAssinados = array_column($assinaturas, 'cargo');
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="<?= $base ?>/pdf" target="_blank" rel="noopener"
+            <a href="<?= $base ?>/pdf" download
                class="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50">
-                <i class="fa-solid fa-file-pdf text-rose-500 mr-2"></i> Ver PDF
+                <i class="fa-solid fa-file-pdf text-rose-500 mr-2"></i> Baixar PDF
             </a>
             <?php if (!empty($detalhe['validation_url'])): ?>
                 <a href="<?= htmlspecialchars((string) $detalhe['validation_url'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener"

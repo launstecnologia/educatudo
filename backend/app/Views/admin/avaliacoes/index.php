@@ -46,8 +46,8 @@ if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('jornadas')) {
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('boletim')) {
     $hub_cards[] = [
         'href' => URL . '/admin/boletim',
-        'title' => 'Notas e Boletim',
-        'description' => 'Modelo de boletim, pesos e exibição de notas.',
+        'title' => 'Eventos de Notas',
+        'description' => 'Eventos do bimestre. A média gerada alimenta o boletim da Vida Escolar.',
         'icon' => 'fa-regular fa-file-lines',
     ];
     $hub_cards[] = [

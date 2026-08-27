@@ -7,9 +7,11 @@
 require_once __DIR__ . '/../Admin/AdminBaseController.php';
 require_once __DIR__ . '/../../Services/HistoricoEscolarService.php';
 require_once __DIR__ . '/../../Services/DeclarationService.php';
+require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarPdfService.php';
 
 use App\Services\HistoricoEscolarService;
 use App\Services\DeclarationService;
+use App\Modulos\VidaEscolar\Services\VidaEscolarPdfService;
 
 if (!class_exists('AdminHistoricoEscolarController')) {
 class AdminHistoricoEscolarController extends AdminBaseController
@@ -216,22 +218,16 @@ class AdminHistoricoEscolarController extends AdminBaseController
         }
 
         $doc = $dados['documento'];
-        $viewData = [
-            'titulo' => 'Histórico Escolar',
-            'dados' => $dados,
-            'documento' => $doc,
-            'assinaturas' => $dados['assinaturas'] ?? [],
-            'validation_url' => $dados['validation_url'] ?? '',
-            'resultado_labels' => HistoricoEscolarService::RESULTADO_LABELS,
-            'logo_data' => $this->resolveLogo($dados['unidade'] ?? null),
-            'cidade_data' => $this->cidadeData($dados['unidade'] ?? null),
-            'gerado_em' => date('d/m/Y H:i'),
-        ];
-
-        $html = $this->renderTemplate($viewData);
+        $dados['resultado_labels'] = HistoricoEscolarService::RESULTADO_LABELS;
         $nome = preg_replace('/[^a-z0-9]+/i', '_', (string) (($dados['aluno']['nome'] ?? 'aluno'))) ?: 'aluno';
         $filename = 'historico_escolar_v' . (int) ($doc['versao'] ?? 1) . '_' . $nome . '.pdf';
-        $this->outputPdf($html, $filename);
+        try {
+            (new VidaEscolarPdfService($this->db))->emitirHistorico($dados, $this->config ?? null, $filename);
+        } catch (\Throwable $e) {
+            error_log('AdminHistoricoEscolarController pdf: ' . $e->getMessage());
+            $_SESSION['error_message'] = 'Não foi possível gerar o PDF. Confira o modelo “Histórico escolar oficial” em Layout de documentos.';
+            $this->redirect('/admin/students/' . $alunoId . '/historico-escolar/' . $historicoId);
+        }
     }
 
     /**
@@ -266,140 +262,6 @@ class AdminHistoricoEscolarController extends AdminBaseController
         $_SESSION['success_message'] = $okMsg;
         $destId = $redirectToNew && !empty($res['id']) ? (int) $res['id'] : $historicoId;
         $this->redirect('/admin/students/' . $alunoId . '/historico-escolar/' . $destId);
-    }
-
-    /**
-     * @param array<string, mixed> $viewData
-     */
-    private function renderTemplate(array $viewData): string
-    {
-        $templateFile = __DIR__ . '/../../Views/admin/historico-escolar/pdf.php';
-        ob_start();
-        extract($viewData, EXTR_SKIP);
-        require $templateFile;
-        return (string) ob_get_clean();
-    }
-
-    private function outputPdf(string $html, string $filename): void
-    {
-        $oldDisplayErrors = ini_get('display_errors');
-        ini_set('display_errors', '0');
-        try {
-            while (ob_get_level() > 0) {
-                ob_end_clean();
-            }
-            $options = new \Dompdf\Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-            $options->set('defaultFont', 'DejaVu Sans');
-
-            $dompdf = new \Dompdf\Dompdf($options);
-            $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4', 'landscape');
-            $dompdf->render();
-
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: inline; filename="' . $filename . '"');
-            header('Cache-Control: private, max-age=0, must-revalidate');
-            echo $dompdf->output();
-            exit;
-        } finally {
-            ini_set('display_errors', (string) $oldDisplayErrors);
-        }
-    }
-
-    /**
-     * @param array<string, mixed>|null $unidade
-     */
-    private function resolveLogo(?array $unidade): string
-    {
-        $candidates = [];
-        if ($unidade && !empty($unidade['logo_url'])) {
-            $candidates[] = (string) $unidade['logo_url'];
-        }
-        try {
-            $layoutLogo = (string) \LayoutHelper::get('logo_url', '');
-            if ($layoutLogo !== '') {
-                $candidates[] = $layoutLogo;
-            }
-        } catch (\Throwable $e) {
-            // ignore
-        }
-
-        foreach ($candidates as $url) {
-            $data = $this->logoToDataUri($url);
-            if ($data !== '') {
-                return $data;
-            }
-        }
-        return '';
-    }
-
-    private function logoToDataUri(string $url): string
-    {
-        $url = trim($url);
-        if ($url === '') {
-            return '';
-        }
-        if (strpos($url, 'data:') === 0) {
-            return $url;
-        }
-        $path = $url;
-        if (preg_match('#^https?://#i', $url)) {
-            $base = defined('URL') ? rtrim((string) URL, '/') : '';
-            if ($base !== '' && strpos($url, $base) === 0) {
-                $path = substr($url, strlen($base));
-            } else {
-                return '';
-            }
-        }
-        $path = '/' . ltrim(str_replace('\\', '/', $path), '/');
-        $root = dirname(__DIR__, 3);
-        $full = $root . '/public' . $path;
-        if (!is_file($full)) {
-            $full = $root . $path;
-        }
-        if (!is_file($full)) {
-            return '';
-        }
-        $mime = 'image/png';
-        $ext = strtolower(pathinfo($full, PATHINFO_EXTENSION));
-        if ($ext === 'jpg' || $ext === 'jpeg') {
-            $mime = 'image/jpeg';
-        } elseif ($ext === 'gif') {
-            $mime = 'image/gif';
-        } elseif ($ext === 'webp') {
-            $mime = 'image/webp';
-        } elseif ($ext === 'svg') {
-            $mime = 'image/svg+xml';
-        }
-        $bin = @file_get_contents($full);
-        if ($bin === false) {
-            return '';
-        }
-        return 'data:' . $mime . ';base64,' . base64_encode($bin);
-    }
-
-    /**
-     * @param array<string, mixed>|null $unidade
-     */
-    private function cidadeData(?array $unidade): string
-    {
-        $cidade = trim((string) ($unidade['cidade'] ?? ''));
-        $uf = trim((string) ($unidade['uf'] ?? ''));
-        $meses = [
-            1 => 'janeiro', 2 => 'fevereiro', 3 => 'março', 4 => 'abril',
-            5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
-            9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro',
-        ];
-        $dia = (int) date('j');
-        $mes = $meses[(int) date('n')] ?? date('m');
-        $ano = date('Y');
-        $local = $cidade !== '' ? $cidade : 'Local';
-        if ($uf !== '') {
-            $local .= '/' . $uf;
-        }
-        return $local . ', ' . $dia . ' de ' . $mes . ' de ' . $ano;
     }
 }
 }

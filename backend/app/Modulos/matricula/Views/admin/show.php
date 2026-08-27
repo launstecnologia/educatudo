@@ -86,7 +86,19 @@ if (!empty($faltando_enturmar)) {
     $editUrl .= '?passo=' . (int) $passoFaltando;
 }
 $podeEditarProcesso = !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'], true);
+$alunoIdFicha = (int) ($enrollment['aluno_id'] ?? 0);
+$mostrarVidaEscolar = $alunoIdFicha > 0 && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'));
 ob_start(); ?>
+<?php if ($alunoIdFicha > 0): ?>
+<a href="<?= URL ?>/admin/students/<?= $alunoIdFicha ?>" class="btn-secondary text-sm">
+    <i class="fa-solid fa-id-card mr-1.5"></i> Ficha da aluna
+</a>
+<?php if ($mostrarVidaEscolar): ?>
+<a href="<?= URL ?>/admin/students/<?= $alunoIdFicha ?>/vida-escolar" class="btn-primary text-sm">
+    <i class="fa-solid fa-scroll mr-1.5"></i> Vida escolar
+</a>
+<?php endif; ?>
+<?php endif; ?>
 <?php if ($podeEditarProcesso): ?>
 <a href="<?= $esc($editUrl) ?>" class="btn-secondary text-sm">
     <i class="fa-solid fa-pen mr-1.5"></i> Editar
@@ -358,7 +370,16 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
             <h3 class="font-semibold text-gray-800 mb-4">Dados do Aluno</h3>
             <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div class="col-span-2"><dt class="text-gray-400 text-xs">Nome</dt><dd class="font-medium text-gray-800"><?= $esc($enrollment['aluno_nome']) ?></dd></div>
+                <div class="col-span-2">
+                    <dt class="text-gray-400 text-xs">Nome</dt>
+                    <dd class="font-medium text-gray-800">
+                        <?php if ($alunoIdFicha > 0): ?>
+                        <a href="<?= URL ?>/admin/students/<?= $alunoIdFicha ?>" class="hover:underline"><?= $esc($enrollment['aluno_nome']) ?></a>
+                        <?php else: ?>
+                        <?= $esc($enrollment['aluno_nome']) ?>
+                        <?php endif; ?>
+                    </dd>
+                </div>
                 <div>
                     <dt class="text-gray-400 text-xs">CPF</dt>
                     <?php

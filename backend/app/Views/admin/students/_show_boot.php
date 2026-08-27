@@ -28,6 +28,10 @@ $admin_permissions = is_array($admin_permissions ?? null) ? $admin_permissions :
 $ficha_complementar = is_array($ficha_complementar ?? null) ? $ficha_complementar : [];
 $documentos_aluno = is_array($documentos_aluno ?? null) ? $documentos_aluno : [];
 $audit_logs = is_array($audit_logs ?? null) ? $audit_logs : [];
+$vida_escolar_prontuario = is_array($vida_escolar_prontuario ?? null) ? $vida_escolar_prontuario : [];
+$vida_escolar_kpis = is_array($vida_escolar_kpis ?? null) ? $vida_escolar_kpis : ['media' => null, 'frequencia' => null];
+$vida_escolar_schema = (bool) ($vida_escolar_schema ?? false);
+$vida_escolar_pode_ler_ia = (bool) ($vida_escolar_pode_ler_ia ?? false);
 $csrf_token = $csrf_token ?? '';
 $flash_message = (string)($flash_message ?? '');
 $flash_type = (string)($flash_type ?? '');

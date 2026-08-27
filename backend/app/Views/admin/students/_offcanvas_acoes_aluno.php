@@ -114,6 +114,15 @@ $gruposAcoesAluno = [
                 'perm_action' => 'visualizar',
                 'onclick' => "abrirModalDoc('Documentacao')",
             ],
+            (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar')) ? [
+                'id' => 'vida-escolar',
+                'label' => 'Vida escolar',
+                'descricao' => 'Prontuário: boletim, histórico, documentos, SED e INEP',
+                'icon' => 'fa-scroll',
+                'perm_key' => 'vida_escolar',
+                'perm_action' => 'visualizar',
+                'href' => URL . '/admin/students/' . $alunoIdAcoes . '?tab=vida-escolar',
+            ] : null,
             $inclusaoVisivel ? [
                 'id' => 'educainclui',
                 'label' => 'EducaInclui / Laudo',
