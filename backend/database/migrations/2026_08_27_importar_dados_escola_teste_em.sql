@@ -9,6 +9,10 @@
 -- Volume alto (diário B1+B2). Se o Master estourar 180s, rode este arquivo
 -- com mysql no banco do tenant.
 --
+-- Já inclui: diário B1+B2, frequência (falta/atraso/justificada/saída),
+-- entrada/saída (facial + secretaria), faltas agregadas, planos de aula
+-- vinculados, eventos de prova/trabalho/participação no diário do dia.
+--
 -- Aborta se já existir aluno que não seja deste seed (nickname et.*).
 -- Idempotente na reexecução do próprio seed.
 -- Rollback: 2026_08_27_importar_dados_escola_teste_em_rollback.sql
@@ -521,12 +525,34 @@ BEGIN
   -- ── Diário B1+B2 (todos os dias letivos) ──────────────────
   INSERT INTO diario_aulas (
     grade_horaria_id, professor_id, turma_id, materia_id, data_aula, horario_de, horario_ate,
-    execucao, conteudo_realizado, tipo_aula, status, finalizada_at
+    execucao, conteudo_realizado, observacoes, tipo_aula, status, finalizada_at
   )
   SELECT gh.id, gh.professor_id, gh.turma_id, gh.materia_id, d.data_aula, gh.horario_de, gh.horario_ate,
-         'conforme_planejado', CONCAT('ET ', t.nome, ' — ', d.data_aula), 'regular', 'finalizada', NOW()
+         CASE
+           WHEN (CRC32(CONCAT(gh.id, '|', d.data_aula, '|ex')) % 100) < 10 THEN 'parcial'
+           WHEN (CRC32(CONCAT(gh.id, '|', d.data_aula, '|ex')) % 100) < 15 THEN 'alterado'
+           ELSE 'conforme_planejado'
+         END,
+         CONCAT('ET ', mat.nome, ' — ',
+           CASE
+             WHEN (CRC32(CONCAT(gh.id, '|', d.data_aula, '|ex')) % 100) < 10
+               THEN 'conteúdo iniciado; restante na próxima aula.'
+             WHEN (CRC32(CONCAT(gh.id, '|', d.data_aula, '|ex')) % 100) < 15
+               THEN 'sequência ajustada em sala (atividade extra).'
+             ELSE CONCAT('aula ministrada conforme o plano (', t.nome, ').')
+           END
+         ),
+         CONCAT('ET-SEED|',
+           CASE
+             WHEN (CRC32(CONCAT(gh.id, '|', d.data_aula, '|ex')) % 100) < 10 THEN 'parcial'
+             WHEN (CRC32(CONCAT(gh.id, '|', d.data_aula, '|ex')) % 100) < 15 THEN 'alterado'
+             ELSE 'ok'
+           END
+         ),
+         'regular', 'finalizada', NOW()
   FROM grade_horaria gh
   INNER JOIN turmas t ON t.id = gh.turma_id AND t.ano_letivo = 2026
+  INNER JOIN materias mat ON mat.id = gh.materia_id
   INNER JOIN (
     SELECT DATE('2026-02-02') + INTERVAL seq DAY AS data_aula
     FROM (
@@ -555,12 +581,20 @@ BEGIN
       WHEN (CRC32(CONCAT(m.aluno_id, '|', da.data_aula)) % 100) < 7 THEN 'falta'
       WHEN (CRC32(CONCAT(m.aluno_id, '|', da.data_aula)) % 100) < 10 THEN 'atraso'
       WHEN (CRC32(CONCAT(m.aluno_id, '|', da.data_aula)) % 100) < 12 THEN 'falta_justificada'
+      WHEN (CRC32(CONCAT(m.aluno_id, '|', da.data_aula)) % 100) < 14 THEN 'saida_antecipada'
       ELSE 'presente'
     END,
-    'importacao'
+    CASE
+      WHEN (m.aluno_id % 17 = 0 AND WEEKDAY(da.data_aula) >= 3)
+        OR (CRC32(CONCAT(m.aluno_id, '|', da.data_aula)) % 100) < 7
+        THEN IF(m.aluno_id % 5 = 0, 'ajuste_gestao', 'manual_diario')
+      WHEN (CRC32(CONCAT(m.aluno_id, '|', da.data_aula)) % 100) < 12 THEN 'ajuste_gestao'
+      WHEN m.aluno_id % 5 = 0 THEN 'ajuste_gestao'
+      ELSE 'entrada_saida'
+    END
   FROM diario_aulas da
   INNER JOIN matricula m ON m.turma_id = da.turma_id AND m.status = 'ativa' AND m.ano_letivo_id = v_ano_id
-  WHERE da.conteudo_realizado LIKE 'ET %'
+  WHERE (da.conteudo_realizado LIKE 'ET %' OR da.observacoes LIKE 'ET-SEED%')
     AND da.data_aula BETWEEN '2026-02-02' AND '2026-06-30';
 
   -- ── Faltas agregadas ──────────────────────────────────────
@@ -582,7 +616,8 @@ BEGIN
            CASE WHEN da.data_aula <= '2026-03-31' THEN 1 ELSE 2 END bim
     FROM diario_frequencias df
     INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
-    WHERE da.conteudo_realizado LIKE 'ET %' AND da.data_aula BETWEEN '2026-02-02' AND '2026-06-30'
+    WHERE (da.conteudo_realizado LIKE 'ET %' OR da.observacoes LIKE 'ET-SEED%')
+      AND da.data_aula BETWEEN '2026-02-02' AND '2026-06-30'
     GROUP BY df.aluno_id, da.materia_id, CASE WHEN da.data_aula <= '2026-03-31' THEN 1 ELSE 2 END
     HAVING faltas > 0
   ) x ON e.bimestre = CAST(x.bim AS CHAR) AND e.ano_letivo = 2026 AND e.ativo = 1 AND e.origem = 'diario'
@@ -602,7 +637,8 @@ BEGIN
   FROM alunos a
   INNER JOIN turmas t ON t.id = a.turma_id
   INNER JOIN (
-    SELECT DISTINCT turma_id, data_aula FROM diario_aulas WHERE conteudo_realizado LIKE 'ET %'
+    SELECT DISTINCT turma_id, data_aula FROM diario_aulas
+    WHERE conteudo_realizado LIKE 'ET %' OR observacoes LIKE 'ET-SEED%'
   ) d ON d.turma_id = a.turma_id
   WHERE a.nickname LIKE 'et.%'
     AND NOT (a.id % 17 = 0 AND WEEKDAY(d.data_aula) >= 3)
@@ -617,7 +653,8 @@ BEGIN
   FROM alunos a
   INNER JOIN turmas t ON t.id = a.turma_id
   INNER JOIN (
-    SELECT DISTINCT turma_id, data_aula FROM diario_aulas WHERE conteudo_realizado LIKE 'ET %'
+    SELECT DISTINCT turma_id, data_aula FROM diario_aulas
+    WHERE conteudo_realizado LIKE 'ET %' OR observacoes LIKE 'ET-SEED%'
   ) d ON d.turma_id = a.turma_id
   WHERE a.nickname LIKE 'et.%'
     AND EXISTS (
@@ -713,6 +750,103 @@ BEGIN
   INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
   INNER JOIN alunos a ON a.turma_id = pbt.turma_id AND a.nickname LIKE 'et.%'
   WHERE pb.titulo LIKE 'ET %' AND pb.deleted_at IS NULL;
+
+  -- ── Planos de aula (1 por turma × matéria × bimestre) ─────
+  INSERT INTO planos_aula (
+    professor_id, materia_id, turma_id, data_aula, titulo, ano_disciplina,
+    objetivos, conteudo, metodologia, avaliacao, status
+  )
+  SELECT g.professor_id, g.materia_id, g.turma_id,
+         IF(b.bim = 1, '2026-02-02', '2026-04-01'),
+         CONCAT('ET ', t.nome, ' ', m.nome, ' B', b.bim),
+         CONCAT(t.serie, ' / ', m.nome),
+         CONCAT('Desenvolver as habilidades de ', m.nome, ' no ', b.bim, 'º bimestre, com acompanhamento contínuo em sala.'),
+         CONCAT('Sequência de aulas de ', m.nome, ' alinhada à matriz curricular (', t.nome, ', ', b.bim, 'º bimestre).'),
+         'Exposição dialogada, exercícios em dupla, correção coletiva e registro no diário.',
+         'Participação, trabalho e prova bimestral do evento de notas.',
+         'aprovado'
+  FROM (
+    SELECT DISTINCT professor_id, materia_id, turma_id FROM grade_horaria
+  ) g
+  INNER JOIN turmas t ON t.id = g.turma_id AND t.ano_letivo = 2026 AND t.observacoes LIKE 'ET %'
+  INNER JOIN materias m ON m.id = g.materia_id
+  CROSS JOIN (SELECT 1 bim UNION ALL SELECT 2) b
+  WHERE NOT EXISTS (
+    SELECT 1 FROM planos_aula p
+    WHERE p.titulo = CONCAT('ET ', t.nome, ' ', m.nome, ' B', b.bim) AND p.deleted_at IS NULL
+  );
+
+  UPDATE diario_aulas da
+  INNER JOIN planos_aula pa
+    ON pa.professor_id = da.professor_id AND pa.turma_id = da.turma_id AND pa.materia_id = da.materia_id
+   AND pa.deleted_at IS NULL AND pa.titulo LIKE 'ET %'
+   AND ((da.data_aula <= '2026-03-31' AND pa.titulo LIKE '% B1')
+     OR (da.data_aula > '2026-03-31' AND pa.titulo LIKE '% B2'))
+  SET da.plano_aula_id = pa.id
+  WHERE (da.conteudo_realizado LIKE 'ET %' OR da.observacoes LIKE 'ET-SEED%')
+    AND da.data_aula BETWEEN '2026-02-02' AND '2026-06-30';
+
+  -- Evento de prova/trabalho/participação no diário do dia
+  UPDATE diario_aulas da
+  INNER JOIN provas_blocos pb
+    ON pb.turma_id = da.turma_id AND pb.data_prova = da.data_aula
+   AND pb.titulo LIKE 'ET %' AND pb.deleted_at IS NULL
+  INNER JOIN provas_blocos_professores bp
+    ON bp.bloco_id = pb.id AND bp.materia_id = da.materia_id AND bp.professor_id = da.professor_id
+  SET da.evento_bloco_id = pb.id,
+      da.tipo_aula = IF(pb.titulo LIKE 'ET Prova%', 'avaliacao', 'atividade'),
+      da.execucao = 'conforme_planejado',
+      da.conteudo_realizado = CONCAT('ET Aplicação em sala — ', pb.titulo),
+      da.observacoes = CONCAT('ET-SEED|evento|', pb.id)
+  WHERE da.data_aula BETWEEN '2026-02-02' AND '2026-06-30';
+
+  -- Reexecução: enriquece aulas já inseridas sem ET-SEED
+  UPDATE diario_aulas da
+  INNER JOIN materias mat ON mat.id = da.materia_id
+  INNER JOIN turmas t ON t.id = da.turma_id
+  SET da.execucao = CASE
+        WHEN (CRC32(CONCAT(da.grade_horaria_id, '|', da.data_aula, '|ex')) % 100) < 10 THEN 'parcial'
+        WHEN (CRC32(CONCAT(da.grade_horaria_id, '|', da.data_aula, '|ex')) % 100) < 15 THEN 'alterado'
+        ELSE 'conforme_planejado'
+      END,
+      da.conteudo_realizado = CONCAT('ET ', mat.nome, ' — ',
+        CASE
+          WHEN (CRC32(CONCAT(da.grade_horaria_id, '|', da.data_aula, '|ex')) % 100) < 10
+            THEN 'conteúdo iniciado; restante na próxima aula.'
+          WHEN (CRC32(CONCAT(da.grade_horaria_id, '|', da.data_aula, '|ex')) % 100) < 15
+            THEN 'sequência ajustada em sala (atividade extra).'
+          ELSE CONCAT('aula ministrada conforme o plano (', t.nome, ').')
+        END
+      ),
+      da.observacoes = CONCAT('ET-SEED|',
+        CASE
+          WHEN (CRC32(CONCAT(da.grade_horaria_id, '|', da.data_aula, '|ex')) % 100) < 10 THEN 'parcial'
+          WHEN (CRC32(CONCAT(da.grade_horaria_id, '|', da.data_aula, '|ex')) % 100) < 15 THEN 'alterado'
+          ELSE 'ok'
+        END
+      )
+  WHERE t.observacoes LIKE 'ET %'
+    AND da.evento_bloco_id IS NULL
+    AND (da.observacoes IS NULL OR da.observacoes NOT LIKE 'ET-SEED|evento%');
+
+  UPDATE diario_frequencias df
+  INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
+  SET df.situacao = CASE
+        WHEN df.aluno_id % 17 = 0 AND WEEKDAY(da.data_aula) >= 3 THEN 'falta'
+        WHEN (CRC32(CONCAT(df.aluno_id, '|', da.data_aula)) % 100) < 7 THEN 'falta'
+        WHEN (CRC32(CONCAT(df.aluno_id, '|', da.data_aula)) % 100) < 10 THEN 'atraso'
+        WHEN (CRC32(CONCAT(df.aluno_id, '|', da.data_aula)) % 100) < 12 THEN 'falta_justificada'
+        WHEN (CRC32(CONCAT(df.aluno_id, '|', da.data_aula)) % 100) < 14 THEN 'saida_antecipada'
+        ELSE 'presente'
+      END,
+      df.origem = CASE
+        WHEN df.aluno_id % 17 = 0 AND WEEKDAY(da.data_aula) >= 3 THEN IF(df.aluno_id % 5 = 0, 'ajuste_gestao', 'manual_diario')
+        WHEN (CRC32(CONCAT(df.aluno_id, '|', da.data_aula)) % 100) < 7 THEN IF(df.aluno_id % 5 = 0, 'ajuste_gestao', 'manual_diario')
+        WHEN (CRC32(CONCAT(df.aluno_id, '|', da.data_aula)) % 100) < 12 THEN 'ajuste_gestao'
+        WHEN df.aluno_id % 5 = 0 THEN 'ajuste_gestao'
+        ELSE 'entrada_saida'
+      END
+  WHERE da.conteudo_realizado LIKE 'ET %' OR da.observacoes LIKE 'ET-SEED%';
 END$$
 
 DELIMITER ;

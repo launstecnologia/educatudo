@@ -18,7 +18,7 @@ DELETE FROM boletim_regras WHERE codigo LIKE 'et-2026-%';
 
 DELETE FROM provas_blocos WHERE titulo LIKE 'ET %';
 
--- ── Presença / faltas / diário ───────────────────────────────
+-- ── Presença / faltas / diário / planos ──────────────────────
 DELETE FROM presenca_eventos WHERE id_externo LIKE 'et-%';
 
 DELETE FROM faltas_eventos
@@ -27,9 +27,16 @@ WHERE origem = 'diario'
 
 DELETE df FROM diario_frequencias df
 INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
-WHERE da.conteudo_realizado LIKE 'ET %';
+WHERE da.conteudo_realizado LIKE 'ET %' OR da.observacoes LIKE 'ET-SEED%';
 
-DELETE FROM diario_aulas WHERE conteudo_realizado LIKE 'ET %';
+UPDATE diario_aulas
+SET plano_aula_id = NULL, evento_bloco_id = NULL
+WHERE conteudo_realizado LIKE 'ET %' OR observacoes LIKE 'ET-SEED%';
+
+DELETE FROM diario_aulas
+WHERE conteudo_realizado LIKE 'ET %' OR observacoes LIKE 'ET-SEED%';
+
+DELETE FROM planos_aula WHERE titulo LIKE 'ET %';
 
 -- ── Matrícula, ficha, documentos, vínculos ───────────────────
 DELETE d FROM alunos_documentos d
