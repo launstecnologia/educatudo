@@ -22,6 +22,8 @@ class VidaEscolarService
     private ?ResultadoAcademicoService $motor = null;
     /** @var array<string, ?array<string,mixed>> */
     private array $regraAcadCache = [];
+    /** @var array<string, array<string, int>> alunoId_materiaId => faltas, chave ano:bimestre */
+    private array $faltasLancadasCache = [];
 
     public function __construct(?VidaEscolar $model = null)
     {
@@ -475,15 +477,27 @@ class VidaEscolarService
                 continue;
             }
             $linhaId = (int) $linha['id'];
-            foreach ($this->periodosDaLinhaGerada($row) as $periodo => $vals) {
+            $periodosGerados = $this->periodosDaLinhaGerada($row);
+            $bimRow = (int) ($row['bimestre'] ?? 0);
+            if ($bimRow < 1 || $bimRow > 4) {
+                $bimRow = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
+            }
+            if ($bimRow >= 1 && $bimRow <= 4 && !isset($periodosGerados[$bimRow])) {
+                $periodosGerados[$bimRow] = ['nota' => null, 'faltas' => null];
+            }
+            foreach ($periodosGerados as $periodo => $vals) {
                 if ($periodo < 1 || $periodo > 4) {
                     continue;
+                }
+                $faltas = $vals['faltas'] ?? null;
+                if ($faltas === null) {
+                    $faltas = $this->faltasLancadasAlunoMateria($alunoId, $mid, $periodo, $ano);
                 }
                 if ($this->aplicarCelulaCalculada(
                     $linhaId,
                     $periodo,
                     $vals['nota'] ?? null,
-                    $vals['faltas'] ?? null,
+                    $faltas,
                     $incluirReabertas
                 )) {
                     $n++;
@@ -1014,6 +1028,10 @@ class VidaEscolarService
         $colunas = json_decode((string) ($row['colunas_json'] ?? ''), true);
         $colunas = is_array($colunas) ? $colunas : [];
         $out = [];
+        $bimEvento = (int) ($row['bimestre'] ?? 0);
+        if ($bimEvento < 1 || $bimEvento > 4) {
+            $bimEvento = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
+        }
         $aplicar = static function (int $periodo, ?float $nota, ?int $faltas) use (&$out): void {
             if ($periodo < 1 || $periodo > 4) {
                 return;
@@ -1057,7 +1075,11 @@ class VidaEscolarService
             if (in_array($tipo, ['rec', 'resultado', 'semana_nq', 'media_sem', 'n', 'q'], true)) {
                 continue;
             }
+            $ehFalta = $tipo === 'faltas' || str_contains($cod, 'falt');
             $periodo = $periodoDe($grupo, $cod);
+            if ($periodo === null && $ehFalta && $bimEvento >= 1 && $bimEvento <= 4) {
+                $periodo = $bimEvento;
+            }
             if ($periodo === null) {
                 continue;
             }
@@ -1065,7 +1087,6 @@ class VidaEscolarService
             if (!is_numeric($val)) {
                 continue;
             }
-            $ehFalta = $tipo === 'faltas' || str_contains($cod, 'falt');
             $ehMedia = $tipo === 'media' || str_contains($cod, 'media');
             if ($ehFalta) {
                 $aplicar($periodo, null, (int) round((float) $val));
@@ -1087,6 +1108,15 @@ class VidaEscolarService
             }
         }
 
+        if ($bimEvento >= 1 && $bimEvento <= 4 && ($out[$bimEvento]['faltas'] ?? null) === null) {
+            foreach (['faltas', 'faltas_bim'] as $k) {
+                if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
+                    $aplicar($bimEvento, null, (int) round((float) $notasLower[$k]));
+                    break;
+                }
+            }
+        }
+
         $temNotaBim = false;
         foreach ($out as $vals) {
             if (($vals['nota'] ?? null) !== null) {
@@ -1095,10 +1125,6 @@ class VidaEscolarService
             }
         }
         if (!$temNotaBim) {
-            $bim = (int) ($row['bimestre'] ?? 0);
-            if ($bim < 1 || $bim > 4) {
-                $bim = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
-            }
             $media = null;
             if (is_numeric($row['media_final'] ?? null)) {
                 $media = (float) $row['media_final'];
@@ -1110,16 +1136,59 @@ class VidaEscolarService
                     }
                 }
             }
-            $faltas = null;
-            foreach (['faltas', 'faltas_bim', 'faltas_final'] as $k) {
-                if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $faltas = (int) round((float) $notasLower[$k]);
-                    break;
-                }
+            if ($bimEvento >= 1 && $bimEvento <= 4 && $media !== null) {
+                $aplicar($bimEvento, $media, null);
             }
-            if (($bim >= 1 && $bim <= 4) && ($media !== null || $faltas !== null)) {
-                $aplicar($bim, $media, $faltas);
+        }
+
+        return $out;
+    }
+
+    private function faltasLancadasAlunoMateria(int $alunoId, int $materiaId, int $bimestre, int $anoLetivo): ?int
+    {
+        if ($alunoId <= 0 || $bimestre < 1 || $bimestre > 4 || $anoLetivo < 2000) {
+            return null;
+        }
+        $cacheKey = $anoLetivo . ':' . $bimestre;
+        if (!isset($this->faltasLancadasCache[$cacheKey])) {
+            $this->faltasLancadasCache[$cacheKey] = $this->carregarFaltasLancadas($anoLetivo, $bimestre);
+        }
+        $map = $this->faltasLancadasCache[$cacheKey];
+        $porMateria = $alunoId . '_' . $materiaId;
+        if ($materiaId > 0 && array_key_exists($porMateria, $map)) {
+            return $map[$porMateria];
+        }
+        $legado = $alunoId . '_0';
+        if (array_key_exists($legado, $map)) {
+            return $map[$legado];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function carregarFaltasLancadas(int $anoLetivo, int $bimestre): array
+    {
+        $path = dirname(__DIR__, 3) . '/Models/Education/SchoolAbsence.php';
+        if (!class_exists('SchoolAbsence', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('SchoolAbsence', false)) {
+            return [];
+        }
+        $absence = new \SchoolAbsence();
+        $eventoId = $absence->idEventoPorAnoBimestre($anoLetivo, $bimestre);
+        if ($eventoId <= 0) {
+            return [];
+        }
+        $out = [];
+        foreach ($absence->getLancamentosMapByEvento($eventoId) as $chave => $item) {
+            if (!is_array($item) || !is_numeric($item['faltas'] ?? null)) {
+                continue;
             }
+            $out[(string) $chave] = (int) round((float) $item['faltas']);
         }
 
         return $out;

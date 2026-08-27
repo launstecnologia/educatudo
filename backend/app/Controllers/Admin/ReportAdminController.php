@@ -362,7 +362,7 @@ class ReportAdminController extends AdminBaseController
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              INNER JOIN alunos a ON a.id = g.aluno_id
              LEFT JOIN turmas t ON t.id = a.turma_id
-             WHERE g.preview = 0 AND r.ativo = 1 AND r.exibir_em = 'boletim' AND a.ativo = 1
+             WHERE g.preview = 0 AND g.vigente = 1 AND r.ativo = 1 AND r.exibir_em = 'boletim' AND a.ativo = 1
              GROUP BY g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.series_ids
              ORDER BY COALESCE(r.ano_letivo, 0) DESC, updated_at DESC, r.nome ASC"
         ) ?: [];
@@ -441,7 +441,7 @@ class ReportAdminController extends AdminBaseController
              INNER JOIN alunos a ON a.id = g.aluno_id
              LEFT JOIN turmas t ON t.id = a.turma_id
              LEFT JOIN boletim_observacoes o ON o.aluno_id = a.id
-             WHERE g.preview = 0 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
+             WHERE g.preview = 0 AND g.vigente = 1 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
                AND a.ativo = 1{$whereTurma}
              ORDER BY t.nome ASC, a.nome ASC, g.ordem_linha ASC, g.id ASC",
             $params

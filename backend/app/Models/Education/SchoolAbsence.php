@@ -430,6 +430,27 @@ class SchoolAbsence
         return $out;
     }
 
+    /**
+     * Evento de faltas mais recente do ano/bimestre (1–4). 0 se não houver.
+     */
+    public function idEventoPorAnoBimestre(int $anoLetivo, int $bimestre): int
+    {
+        if ($anoLetivo < 2000 || $bimestre < 1 || $bimestre > 4) {
+            return 0;
+        }
+        foreach ($this->listEventos(300) as $ev) {
+            if ((int) ($ev['ano_letivo'] ?? 0) !== $anoLetivo) {
+                continue;
+            }
+            $rotulo = (string) ($ev['bimestre'] ?? '');
+            if (preg_match('/([1-4])/', $rotulo, $m) && (int) $m[1] === $bimestre) {
+                return (int) ($ev['id'] ?? 0);
+            }
+        }
+
+        return 0;
+    }
+
     public function deleteEvento(int $eventoId): void
     {
         if ($eventoId <= 0) {

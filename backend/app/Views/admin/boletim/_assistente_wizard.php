@@ -1768,8 +1768,16 @@ $boletimWizardSteps = [
             if (id > 0) selecionadas[id] = true;
         });
         var filtrar = Object.keys(selecionadas).length > 0;
+        var lista = ((catalogo && catalogo.materias) || []).slice().sort(function (a, b) {
+            var ia = Number((a && a.id) || 0);
+            var ib = Number((b && b.id) || 0);
+            var oa = (a && a.ordem != null && a.ordem !== '') ? Number(a.ordem) : (100000 + ia);
+            var ob = (b && b.ordem != null && b.ordem !== '') ? Number(b.ordem) : (100000 + ib);
+            if (oa !== ob) return oa - ob;
+            return ia - ib;
+        });
         var nomes = [];
-        (catalogo.materias || []).forEach(function (m) {
+        lista.forEach(function (m) {
             var id = Number(m && m.id || 0);
             if (id <= 0) return;
             if (filtrar && !selecionadas[id]) return;

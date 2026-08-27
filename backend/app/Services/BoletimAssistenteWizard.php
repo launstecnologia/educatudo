@@ -86,6 +86,7 @@ class BoletimAssistenteWizard
                 $materias[] = [
                     'id' => (int) ($m['id'] ?? 0),
                     'nome' => (string) ($m['nome'] ?? ''),
+                    'ordem' => (int) ($m['ordem'] ?? 0),
                 ];
             }
         } catch (Throwable $e) {
@@ -570,8 +571,59 @@ class BoletimAssistenteWizard
             $comps[$i] = $c;
         }
         $rascunho['componentes'] = $comps;
+        $this->anexarFaltasEventoNotasSeFaltar($rascunho, $estado);
 
         return $rascunho;
+    }
+
+    /**
+     * Evento de Notas: inclui o lançamento de faltas do mesmo bimestre, se ainda não houver bloco.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     */
+    private function anexarFaltasEventoNotasSeFaltar(array &$rascunho, array $estado): void
+    {
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            $src = (string) ($c['source_type'] ?? '');
+            $lt = strtolower(trim((string) (($c['config']['layout_type'] ?? '') ?: ($c['layout_type'] ?? ''))));
+            if ($src === 'faltas_evento' || $lt === 'faltas' || str_contains($cod, 'falt')) {
+                return;
+            }
+        }
+        $bim = (int) ($rascunho['bimestre'] ?? $estado['bimestre'] ?? 0);
+        $ano = (int) ($rascunho['ano_letivo'] ?? $estado['ano_letivo'] ?? 0);
+        if ($bim < 1 || $bim > 4) {
+            return;
+        }
+        $idFaltas = 0;
+        foreach ($this->ferramentas->listarFaltasEventos(300) as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            if ($ano > 0 && (int) ($ev['ano_letivo'] ?? 0) !== $ano) {
+                continue;
+            }
+            if ((int) ($ev['bimestre'] ?? 0) === $bim) {
+                $idFaltas = (int) ($ev['id'] ?? 0);
+                break;
+            }
+        }
+        if ($idFaltas <= 0) {
+            return;
+        }
+        $grupo = 'b' . $bim;
+        $comps[] = $this->componenteBoletim('faltas', 'Faltas', 'faltas_evento', [
+            'faltas_evento_id' => $idFaltas,
+            'layout_group' => $grupo,
+            'layout_type' => 'faltas',
+        ]);
+        $rascunho['componentes'] = $comps;
     }
 
     /**
@@ -4083,7 +4135,7 @@ class BoletimAssistenteWizard
             static fn ($id) => $id > 0
         )));
         $selecionadasSet = array_fill_keys($selecionadas, true);
-        $nomes = [];
+        $itens = [];
 
         try {
             foreach ($this->ferramentas->listarMaterias(500) as $m) {
@@ -4095,14 +4147,30 @@ class BoletimAssistenteWizard
                     continue;
                 }
                 $nome = trim((string) ($m['nome'] ?? ''));
-                if ($nome !== '') {
-                    $nomes[] = $nome;
+                if ($nome === '') {
+                    continue;
                 }
+                $itens[] = [
+                    'nome' => $nome,
+                    'ordem' => (int) ($m['ordem'] ?? (100000 + $id)),
+                    'id' => $id,
+                ];
             }
         } catch (Throwable $e) {
             error_log('BoletimAssistenteWizard materias preview: ' . $e->getMessage());
         }
 
+        usort($itens, static function (array $a, array $b): int {
+            if ((int) $a['ordem'] !== (int) $b['ordem']) {
+                return (int) $a['ordem'] <=> (int) $b['ordem'];
+            }
+
+            return ((int) $a['id']) <=> ((int) $b['id']);
+        });
+        $nomes = [];
+        foreach ($itens as $it) {
+            $nomes[] = $it['nome'];
+        }
         $nomes = array_values(array_unique($nomes));
         return $nomes !== [] ? $nomes : $fallback;
     }

@@ -616,7 +616,7 @@ class ResultadoHomologacaoService
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              INNER JOIN alunos a ON a.id = g.aluno_id
-             WHERE g.preview = 0 AND r.ano_letivo = :ano_regra {$whereBim}
+             WHERE g.preview = 0 AND g.vigente = 1 AND r.ano_letivo = :ano_regra {$whereBim}
                AND g.aluno_id IN (
                     SELECT m.aluno_id
                     FROM matricula m

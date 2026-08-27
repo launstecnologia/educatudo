@@ -24,6 +24,9 @@ $csrfToken = (string) ($csrf_token ?? '');
 $somenteTabela = !empty($somente_tabela);
 $boletimAssistenteDisponivel = !empty($boletim_assistente_disponivel);
 $geracaoEmAndamento = !empty($geracao_em_andamento);
+$alunosTravados = is_array($alunos_travados ?? null) ? $alunos_travados : [];
+$alunoTravado = !empty($aluno_travado);
+$versoesAluno = is_array($versoes_aluno ?? null) ? $versoes_aluno : [];
 $roundModeSelected = strtolower(trim((string) ($regra['round_mode'] ?? 'none')));
 if (!in_array($roundModeSelected, ['none', 'half'], true)) {
     $roundModeSelected = 'none';
@@ -851,7 +854,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
                     <p class="text-sm font-semibold text-emerald-950">Gerar boletins</p>
                     <p class="text-sm text-emerald-900">
-                        Recalcula e grava a tabela de notas por matéria para <strong>todos os alunos vinculados</strong> a este evento (séries / escopo). Roda em segundo plano: você volta para a listagem e acompanha o status “Gerando…”.
+                        Recalcula e grava uma <strong>nova versão vigente</strong> da tabela de notas por matéria para os alunos vinculados. As versões anteriores ficam guardadas para auditoria. Alunos travados não entram no lote. Roda em segundo plano.
                     </p>
                     <?php if ($geracaoEmAndamento): ?>
                     <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
@@ -873,7 +876,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
                     <p class="text-sm font-semibold text-amber-950">Atualizar boletins existentes</p>
                     <p class="text-sm text-amber-950">
-                        Recalcula os boletins oficiais deste período. Se ainda existir apenas prévia, publica oficialmente para todos os alunos vinculados.
+                        Cria uma <strong>nova versão vigente</strong> dos boletins oficiais deste período. Alunos travados permanecem na versão em que foram ajustados. Se ainda existir apenas prévia, publica oficialmente para os vinculados (exceto travados).
                     </p>
                     <?php if ($geracaoEmAndamento): ?>
                     <button type="button" disabled class="w-full px-4 py-2 bg-amber-300 text-white rounded-lg font-medium cursor-not-allowed">
@@ -887,12 +890,41 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 </form>
 
                 <?php if (!empty($regra['id'])): ?>
+                <?php if ($alunosTravados !== []): ?>
+                <div class="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-2">
+                    <p class="text-sm font-semibold text-amber-950">Alunos travados neste período</p>
+                    <p class="text-xs text-amber-900">Não entram no recálculo em lote. Dá para destravar se precisar ajustar todo mundo de novo.</p>
+                    <ul class="text-sm space-y-2">
+                        <?php foreach ($alunosTravados as $tr): ?>
+                            <li class="flex items-start justify-between gap-2">
+                                <span class="text-amber-950">
+                                    <?= htmlspecialchars((string) ($tr['aluno_nome'] ?? ('#' . (int) ($tr['aluno_id'] ?? 0)))) ?>
+                                    <?php if (!empty($tr['motivo'])): ?>
+                                        <span class="block text-xs text-amber-800"><?= htmlspecialchars((string) $tr['motivo']) ?></span>
+                                    <?php endif; ?>
+                                </span>
+                                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/destravar-aluno" class="shrink-0">
+                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                                    <input type="hidden" name="aluno_id" value="<?= (int) ($tr['aluno_id'] ?? 0) ?>">
+                                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                                    <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                                    <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                                    <button type="submit" class="text-xs text-amber-800 hover:underline">Destravar</button>
+                                </form>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
                 <div class="border border-gray-200 rounded-lg p-4">
                     <div class="flex items-center justify-between">
-                        <p class="text-sm font-semibold text-gray-900">Histórico de gerações</p>
-                        <button type="button" id="btn-ver-logs-geracao" class="text-xs text-indigo-600 hover:underline">Ver últimas 10</button>
+                        <p class="text-sm font-semibold text-gray-900">Histórico de versões</p>
+                        <button type="button" id="btn-ver-logs-geracao" class="text-xs text-indigo-600 hover:underline">Ver gerações</button>
                     </div>
+                    <p class="text-xs text-gray-500 mt-1">Cada geração vira uma versão. A vigente é a que vale para aluno, pais e ficha. As anteriores ficam para auditoria.</p>
                     <div id="logs-geracao-resultado" class="hidden mt-2 text-sm space-y-1.5"></div>
+                    <div id="geracao-detalhe-resultado" class="hidden mt-3 text-sm border-t border-gray-100 pt-2"></div>
                 </div>
                 <?php endif; ?>
             </div>
@@ -1036,19 +1068,75 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 <?php endif; ?>
 
                 <?php if ($podeGravarBoletimOficialAluno): ?>
-                    <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/publicar-boletim-aluno" class="mt-6 pt-5 border-t border-gray-200 space-y-2">
+                    <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/publicar-boletim-aluno" class="mt-6 pt-5 border-t border-gray-200 space-y-3">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                         <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
                         <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
                         <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
                         <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
                         <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
-                        <p class="text-sm text-gray-600">Grava no sistema o boletim <strong>oficial</strong> só deste aluno e período (substitui o boletim anterior dele, se existir). Os demais alunos do evento não são alterados — use o botão verde abaixo para gerar em lote.</p>
+                        <p class="text-sm text-gray-600">Grava uma <strong>nova versão vigente</strong> só deste aluno e período. Os demais não mudam. Use para aluno novo (vem zerado) ou ajuste pontual.</p>
+                        <label class="flex items-start gap-2 text-sm text-gray-800">
+                            <input type="checkbox" name="travar_aluno" value="1" class="mt-1 rounded border-gray-300" <?= $alunoTravado ? 'checked' : '' ?>>
+                            <span>Não recalcular este aluno nas próximas gerações em lote (trava). Desmarque se depois quiser incluir ele no “ajustar todos”.</span>
+                        </label>
                         <button type="submit" class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg hover:opacity-90 shadow-sm">
                             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                             Gravar boletim oficial (só este aluno)
                         </button>
                     </form>
+                    <?php if ($alunoTravado): ?>
+                        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/destravar-aluno" class="mt-2">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
+                            <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                            <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                            <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                            <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                            <button type="submit" class="text-sm text-amber-800 hover:underline">Este aluno está travado — clicar para destravar</button>
+                        </form>
+                    <?php else: ?>
+                        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/travar-aluno" class="mt-2">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
+                            <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                            <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                            <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                            <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                            <input type="hidden" name="motivo" value="Ajuste manual — não recalcular em lote">
+                            <button type="submit" class="text-sm text-gray-600 hover:underline">Travar este aluno sem gravar de novo</button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if ($versoesAluno !== []): ?>
+                        <div class="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                            <p class="text-sm font-semibold text-slate-900 mb-2">Versões deste aluno</p>
+                            <ul class="text-sm space-y-1.5">
+                                <?php foreach ($versoesAluno as $vAl): ?>
+                                    <?php
+                                    $vNum = (int) ($vAl['versao'] ?? 0);
+                                    $vVig = (int) ($vAl['vigente'] ?? 0) === 1;
+                                    $vQuando = !empty($vAl['created_at']) ? date('d/m/Y H:i', strtotime((string) $vAl['created_at'])) : '';
+                                    $previewUrl = URL . '/admin/boletim-configuracao/gerados/preview?' . http_build_query([
+                                        'aluno_id' => $selectedAlunoId,
+                                        'regra_id' => $regraIdBoletim,
+                                        'periodo_ref' => $periodoRef,
+                                        'versao' => $vNum,
+                                    ]);
+                                    ?>
+                                    <li class="flex items-center justify-between gap-2">
+                                        <span>
+                                            Versão <?= $vNum ?>
+                                            <?php if ($vVig): ?>
+                                                <span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>
+                                            <?php endif; ?>
+                                            <span class="text-xs text-slate-500"><?= htmlspecialchars($vQuando) ?><?= !empty($vAl['usuario_nome']) ? ' · ' . htmlspecialchars((string) $vAl['usuario_nome']) : '' ?></span>
+                                        </span>
+                                        <a href="<?= htmlspecialchars($previewUrl) ?>" target="_blank" rel="noopener" class="text-xs text-indigo-600 hover:underline">Ver tabela</a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
                 <?php endif; ?>
 
 
@@ -1697,6 +1785,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     const EVENTO_COMPONENTES_JSON_URL = <?= json_encode(URL . '/admin/boletim-configuracao/evento-componentes', JSON_UNESCAPED_SLASHES) ?>;
     const CHECKLIST_PRE_GERACAO_URL = <?= json_encode(URL . '/admin/boletim-configuracao/checklist-pre-geracao', JSON_UNESCAPED_SLASHES) ?>;
     const LOGS_GERACAO_URL = <?= json_encode(URL . '/admin/boletim-configuracao/logs-geracao', JSON_UNESCAPED_SLASHES) ?>;
+    const GERACAO_DETALHE_URL = <?= json_encode(URL . '/admin/boletim-configuracao/geracao-detalhe', JSON_UNESCAPED_SLASHES) ?>;
+    const GERADOS_PREVIEW_URL = <?= json_encode(URL . '/admin/boletim-configuracao/gerados/preview', JSON_UNESCAPED_SLASHES) ?>;
+    const PERIODO_REF_ATUAL = <?= json_encode($periodoRef, JSON_UNESCAPED_UNICODE) ?>;
     const SIMULAR_LOTE_URL = <?= json_encode(URL . '/admin/boletim-configuracao/simular-lote', JSON_UNESCAPED_SLASHES) ?>;
     const REGRA_ATUAL_ID = <?= (int) ($regra['id'] ?? 0) ?>;
     const REGRA_ATUAL_BIMESTRE = <?= (int) ($regra['bimestre'] ?? 0) ?>;
@@ -4379,26 +4470,84 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     if (btnVerLogs) {
         btnVerLogs.addEventListener('click', function () {
             var logsBox = document.getElementById('logs-geracao-resultado');
-            fetch(LOGS_GERACAO_URL + '?regra_id=' + encodeURIComponent(REGRA_ATUAL_ID), { credentials: 'same-origin' })
+            var detalheBox = document.getElementById('geracao-detalhe-resultado');
+            var url = LOGS_GERACAO_URL + '?regra_id=' + encodeURIComponent(REGRA_ATUAL_ID)
+                + '&periodo_ref=' + encodeURIComponent(PERIODO_REF_ATUAL);
+            fetch(url, { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     logsBox.classList.remove('hidden');
+                    var geracoes = data.geracoes || [];
                     var logs = data.logs || [];
-                    if (logs.length === 0) {
+                    if (geracoes.length === 0 && logs.length === 0) {
                         logsBox.innerHTML = '<p class="text-gray-500">Nenhuma geração registrada ainda.</p>';
                         return;
                     }
                     var html = '';
-                    logs.forEach(function (l) {
-                        html += '<div class="border-b border-gray-100 pb-1.5">'
-                            + '<span class="text-gray-900 font-medium">' + (l.created_at_fmt || '') + '</span>'
-                            + ' — ' + (l.usuario_nome || 'usuário desconhecido')
-                            + ' · ' + l.alunos_processados + ' aluno(s), ' + l.linhas_geradas + ' linha(s)'
-                            + (parseInt(l.erros, 10) > 0 ? ', <span class="text-red-700">' + l.erros + ' erro(s)</span>' : '')
-                            + (parseInt(l.alunos_mudanca_significativa, 10) > 0 ? ', <span class="text-amber-700">' + l.alunos_mudanca_significativa + ' aluno(s) com mudança grande</span>' : '')
-                            + '</div>';
-                    });
+                    if (geracoes.length > 0) {
+                        geracoes.forEach(function (g) {
+                            var vigente = parseInt(g.vigente, 10) === 1
+                                ? ' <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>'
+                                : '';
+                            var preservados = parseInt(g.alunos_preservados, 10) || 0;
+                            html += '<div class="border-b border-gray-100 pb-1.5">'
+                                + '<button type="button" class="btn-geracao-detalhe text-left w-full" data-geracao-id="' + g.id + '">'
+                                + '<span class="text-gray-900 font-medium">Versão ' + g.versao + vigente + '</span>'
+                                + ' — ' + (g.created_at_fmt || '')
+                                + ' · ' + (g.usuario_nome || 'usuário desconhecido')
+                                + ' · ' + g.alunos_processados + ' aluno(s)'
+                                + (preservados > 0 ? ', ' + preservados + ' travado(s)' : '')
+                                + (parseInt(g.erros, 10) > 0 ? ', <span class="text-red-700">' + g.erros + ' erro(s)</span>' : '')
+                                + '</button></div>';
+                        });
+                    } else {
+                        logs.forEach(function (l) {
+                            html += '<div class="border-b border-gray-100 pb-1.5">'
+                                + '<span class="text-gray-900 font-medium">' + (l.created_at_fmt || '') + '</span>'
+                                + ' — ' + (l.usuario_nome || 'usuário desconhecido')
+                                + ' · ' + l.alunos_processados + ' aluno(s), ' + l.linhas_geradas + ' linha(s)'
+                                + (parseInt(l.erros, 10) > 0 ? ', <span class="text-red-700">' + l.erros + ' erro(s)</span>' : '')
+                                + '</div>';
+                        });
+                    }
                     logsBox.innerHTML = html;
+                    logsBox.querySelectorAll('.btn-geracao-detalhe').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            var gid = btn.getAttribute('data-geracao-id');
+                            if (!detalheBox || !gid) return;
+                            fetch(GERACAO_DETALHE_URL + '?id=' + encodeURIComponent(gid), { credentials: 'same-origin' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (det) {
+                                    detalheBox.classList.remove('hidden');
+                                    if (det.erro) {
+                                        detalheBox.innerHTML = '<p class="text-red-700">' + det.erro + '</p>';
+                                        return;
+                                    }
+                                    var alunos = det.alunos || [];
+                                    var ge = det.geracao || {};
+                                    var h = '<p class="font-medium text-gray-900 mb-1">Alunos da versão ' + (ge.versao || '') + '</p>';
+                                    if (alunos.length === 0) {
+                                        h += '<p class="text-gray-500">Nenhum aluno gravado nesta geração (todos travados ou só metadado).</p>';
+                                    } else {
+                                        h += '<ul class="space-y-1">';
+                                        alunos.forEach(function (a) {
+                                            var href = GERADOS_PREVIEW_URL + '?aluno_id=' + encodeURIComponent(a.aluno_id)
+                                                + '&regra_id=' + encodeURIComponent(REGRA_ATUAL_ID)
+                                                + '&periodo_ref=' + encodeURIComponent(ge.periodo_ref || PERIODO_REF_ATUAL)
+                                                + '&versao=' + encodeURIComponent(a.versao);
+                                            h += '<li><a class="text-indigo-600 hover:underline" href="' + href + '" target="_blank" rel="noopener">'
+                                                + (a.nome || ('#' + a.aluno_id)) + '</a> · v' + a.versao + '</li>';
+                                        });
+                                        h += '</ul>';
+                                    }
+                                    detalheBox.innerHTML = h;
+                                })
+                                .catch(function () {
+                                    detalheBox.classList.remove('hidden');
+                                    detalheBox.innerHTML = '<p class="text-red-700">Erro ao carregar o detalhe.</p>';
+                                });
+                        });
+                    });
                 })
                 .catch(function () {
                     logsBox.classList.remove('hidden');

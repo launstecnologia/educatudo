@@ -572,7 +572,7 @@ class ConselhoService
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              INNER JOIN alunos a ON a.id = g.aluno_id
-             WHERE g.preview = 0 AND a.turma_id = :turma_id
+             WHERE g.preview = 0 AND g.vigente = 1 AND a.turma_id = :turma_id
                AND r.ano_letivo = :ano_letivo AND r.bimestre = :bimestre
              ORDER BY g.ordem_linha ASC, g.id ASC",
             $params

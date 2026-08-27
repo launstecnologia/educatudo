@@ -69,10 +69,11 @@ class BoletimAssistenteFerramentas
     }
 
     /**
-     * @return list<array{id:int,nome:string}>
+     * @return list<array{id:int,nome:string,ordem:int}>
      */
     public function listarMaterias(int $limit = 300): array
     {
+        $ordem = $this->boletimConfig->mapaOrdemBoletimMaterias();
         $out = [];
         foreach ($this->boletimConfig->getAvailableSubjects($limit) as $materia) {
             $id = (int) ($materia['id'] ?? 0);
@@ -82,8 +83,17 @@ class BoletimAssistenteFerramentas
             $out[] = [
                 'id' => $id,
                 'nome' => trim((string) ($materia['nome'] ?? '')),
+                'ordem' => (int) ($ordem[$id] ?? (100000 + $id)),
             ];
         }
+        usort($out, static function (array $a, array $b): int {
+            if ((int) $a['ordem'] !== (int) $b['ordem']) {
+                return (int) $a['ordem'] <=> (int) $b['ordem'];
+            }
+
+            return ((int) $a['id']) <=> ((int) $b['id']);
+        });
+
         return $out;
     }
 

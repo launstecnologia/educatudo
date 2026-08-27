@@ -194,12 +194,21 @@ class VidaEscolar
         } catch (\Throwable $e) {
             return [];
         }
+        $vigenteSql = '';
+        try {
+            $colVigente = $this->db->fetch("SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'vigente'");
+            if ($colVigente) {
+                $vigenteSql = ' AND g.vigente = 1';
+            }
+        } catch (\Throwable $e) {
+            $vigenteSql = '';
+        }
         $rows = $this->db->fetchAll(
             "SELECT g.id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
                     g.periodo_ref, r.exibir_em, r.bimestre, r.ano_letivo
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id = :aid AND g.preview = 0
+             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}
              ORDER BY g.id ASC",
             ['aid' => $alunoId]
         );

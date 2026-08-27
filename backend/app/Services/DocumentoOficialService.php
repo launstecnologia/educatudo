@@ -512,7 +512,7 @@ class DocumentoOficialService
                 "SELECT g.materia_id, g.materia_nome, g.media_final, g.notas_json, r.bimestre
                  FROM boletim_resultados_gerados g
                  INNER JOIN boletim_regras r ON r.id = g.regra_id
-                 WHERE g.preview = 0 AND g.aluno_id = :aluno AND r.ano_letivo = :ano_regra
+                 WHERE g.preview = 0 AND g.vigente = 1 AND g.aluno_id = :aluno AND r.ano_letivo = :ano_regra
                    AND r.bimestre BETWEEN 1 AND 4
                    AND EXISTS (
                         SELECT 1

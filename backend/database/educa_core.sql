@@ -1325,6 +1325,51 @@ CREATE TABLE IF NOT EXISTS `boletim_log_geracoes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- boletim_geracoes
+--
+CREATE TABLE IF NOT EXISTS `boletim_geracoes` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `regra_id` int NOT NULL,
+  `periodo_ref` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `versao` int NOT NULL DEFAULT '1',
+  `vigente` tinyint(1) NOT NULL DEFAULT '1',
+  `modo` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'gerar',
+  `usuario_id` int DEFAULT NULL,
+  `usuario_nome` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `alunos_processados` int NOT NULL DEFAULT '0',
+  `alunos_preservados` int NOT NULL DEFAULT '0',
+  `linhas_geradas` int NOT NULL DEFAULT '0',
+  `erros` int NOT NULL DEFAULT '0',
+  `alunos_mudanca_significativa` int NOT NULL DEFAULT '0',
+  `detalhes_json` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_boletim_geracoes_regra_periodo_versao` (`regra_id`,`periodo_ref`,`versao`),
+  KEY `idx_boletim_geracoes_regra_vigente` (`regra_id`,`periodo_ref`,`vigente`),
+  CONSTRAINT `fk_boletim_geracoes_regra` FOREIGN KEY (`regra_id`) REFERENCES `boletim_regras` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- boletim_alunos_travados
+--
+CREATE TABLE IF NOT EXISTS `boletim_alunos_travados` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `regra_id` int NOT NULL,
+  `aluno_id` int NOT NULL,
+  `periodo_ref` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `motivo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `usuario_id` int DEFAULT NULL,
+  `usuario_nome` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_boletim_alunos_travados` (`regra_id`,`aluno_id`,`periodo_ref`),
+  KEY `idx_boletim_alunos_travados_regra` (`regra_id`,`periodo_ref`),
+  CONSTRAINT `fk_boletim_alunos_travados_regra` FOREIGN KEY (`regra_id`) REFERENCES `boletim_regras` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_boletim_alunos_travados_aluno` FOREIGN KEY (`aluno_id`) REFERENCES `alunos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- boletim_notas_manuais
 --
 CREATE TABLE IF NOT EXISTS `boletim_notas_manuais` (
@@ -1415,6 +1460,9 @@ CREATE TABLE IF NOT EXISTS `boletim_resultados_gerados` (
   `notas_json` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `media_final` decimal(8,2) DEFAULT NULL,
   `preview` tinyint(1) NOT NULL DEFAULT '0',
+  `geracao_id` int DEFAULT NULL,
+  `versao` int NOT NULL DEFAULT '1',
+  `vigente` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -1422,8 +1470,11 @@ CREATE TABLE IF NOT EXISTS `boletim_resultados_gerados` (
   KEY `idx_boletim_resultados_regra` (`regra_id`),
   KEY `idx_boletim_resultados_lookup` (`regra_id`,`aluno_id`,`periodo_ref`),
   KEY `idx_boletim_resultados_preview` (`regra_id`,`aluno_id`,`periodo_ref`,`preview`),
+  KEY `idx_boletim_resultados_vigente` (`regra_id`,`aluno_id`,`periodo_ref`,`vigente`,`preview`),
+  KEY `idx_boletim_resultados_geracao` (`geracao_id`),
   CONSTRAINT `fk_boletim_resultados_aluno` FOREIGN KEY (`aluno_id`) REFERENCES `alunos` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_boletim_resultados_regra` FOREIGN KEY (`regra_id`) REFERENCES `boletim_regras` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_boletim_resultados_regra` FOREIGN KEY (`regra_id`) REFERENCES `boletim_regras` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_boletim_resultados_geracao` FOREIGN KEY (`geracao_id`) REFERENCES `boletim_geracoes` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --

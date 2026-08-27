@@ -20,6 +20,14 @@ $bimestreLabel = static function ($bimestre) {
     $bimestre = (int) $bimestre;
     return $bimestre > 0 ? $bimestre . 'º Bimestre' : 'N/A';
 };
+$dataHoraGeracao = static function (?string $valor): ?string {
+    $valor = trim((string) $valor);
+    if ($valor === '') {
+        return null;
+    }
+    $ts = strtotime($valor);
+    return $ts !== false ? date('d/m/Y H:i', $ts) : null;
+};
 ?>
 
 <!-- Header Section -->
@@ -158,10 +166,10 @@ $bimestreLabel = static function ($bimestre) {
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exibir em</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Séries / Turmas</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Séries</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano Letivo</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Atualizado em</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Geração</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
             </thead>
@@ -215,16 +223,12 @@ $bimestreLabel = static function ($bimestre) {
                     </td>
                     <td class="px-6 py-4">
                         <?php $seriesNomes = $evento['series_nomes'] ?? []; ?>
-                        <?php $turmasNomes = $evento['turmas_nomes'] ?? []; ?>
-                        <?php if (empty($seriesNomes) && empty($turmasNomes)): ?>
-                            <span class="text-sm text-gray-500">Todas as séries e turmas</span>
+                        <?php if (empty($seriesNomes)): ?>
+                            <span class="text-sm text-gray-500">Todas as séries</span>
                         <?php else: ?>
                             <div class="flex flex-wrap gap-1 max-w-xs">
                                 <?php foreach ($seriesNomes as $serieNome): ?>
-                                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700"><?= htmlspecialchars($serieNome) ?></span>
-                                <?php endforeach; ?>
-                                <?php foreach ($turmasNomes as $turmaNome): ?>
-                                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700"><?= htmlspecialchars($turmaNome) ?></span>
+                                    <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700"><?= htmlspecialchars((string) $serieNome) ?></span>
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
@@ -236,7 +240,16 @@ $bimestreLabel = static function ($bimestre) {
                         <?= $bimestreLabel($evento['bimestre'] ?? null) ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?= !empty($evento['updated_at']) ? date('d/m/Y H:i', strtotime((string) $evento['updated_at'])) : 'N/A' ?>
+                        <?php
+                        $geracaoEmAndamento = in_array($stGeracao, ['pending', 'processing'], true);
+                        $inicioGeracao = $dataHoraGeracao($evento['geracao_iniciada_em'] ?? null);
+                        $fimGeracao = $dataHoraGeracao($evento['geracao_completed_at'] ?? null);
+                        if ($fimGeracao === null && !$geracaoEmAndamento) {
+                            $fimGeracao = $dataHoraGeracao($evento['ultima_geracao'] ?? null);
+                        }
+                        ?>
+                        <div>Início <?= $inicioGeracao ?? '—' ?></div>
+                        <div class="mt-0.5">Término <?= $geracaoEmAndamento ? 'em andamento' : ($fimGeracao ?? '—') ?></div>
                         <?php if (!empty($evento['boletim_desatualizado'])): ?>
                             <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300"
                                   title="A configuração foi alterada depois da última geração em massa. Os boletins já visíveis para alunos/pais podem estar com a regra antiga.">

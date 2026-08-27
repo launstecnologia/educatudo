@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../Core/Database.php';
 class BoletimConfig
 {
     private $db;
+    /** @var array<string, array<int,int>> */
+    private array $mapaOrdemBoletimCache = [];
 
     public function __construct()
     {
@@ -164,6 +166,7 @@ class BoletimConfig
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
         $this->ensurePeriodoRefWidth();
+        $this->ensureSchemaVersionamento();
 
         // Observação do boletim por aluno (escrita pela coordenação, exibida no PDF).
         $this->db->query(
@@ -277,6 +280,15 @@ class BoletimConfig
             $where[] = 'g.preview = :preview_flag';
             $params['preview_flag'] = (int) $previewFilter;
         }
+        $vigenteFilter = strtolower(trim((string) ($filters['vigente'] ?? '1')));
+        if (
+            $previewFilter !== '1'
+            && ($vigenteFilter === '0' || $vigenteFilter === '1')
+            && $this->hasColumn('boletim_resultados_gerados', 'vigente')
+        ) {
+            $where[] = 'g.vigente = :vigente_flag';
+            $params['vigente_flag'] = (int) $vigenteFilter;
+        }
         $alunoQ = trim((string) ($filters['aluno_q'] ?? ''));
         if ($alunoQ !== '') {
             // O wrapper de Database desta aplicação exige nomes únicos por ocorrência
@@ -306,6 +318,9 @@ class BoletimConfig
         }
         $whereSql = implode(' AND ', $where);
 
+        $versaoSelect = $this->hasColumn('boletim_resultados_gerados', 'versao')
+            ? 'MAX(g.versao) AS versao,'
+            : '1 AS versao,';
         $rows = $this->db->fetchAll(
             "SELECT
                 g.regra_id,
@@ -315,6 +330,7 @@ class BoletimConfig
                 MIN(g.data_inicio) AS data_inicio,
                 MAX(g.data_fim) AS data_fim,
                 COUNT(*) AS linhas_qtd,
+                {$versaoSelect}
                 MAX(g.updated_at) AS updated_at,
                 r.nome AS regra_nome,
                 r.codigo AS regra_codigo,
@@ -354,8 +370,10 @@ class BoletimConfig
      * específico, com a mesma forma esperada pelo partial `partials/boletins_gerados.php`.
      * Diferente de getGeneratedBoletimByAlunoAndRegra, NÃO filtra por preview nem
      * vis_aluno/vis_pais/vis_coordenacao — é uma visão administrativa pura.
+     *
+     * Sem $versao: mostra a vigente (oficial). Com $versao: snapshot histórico daquela versão.
      */
-    public function getGeneratedBoletimAdmin(int $alunoId, int $regraId, string $periodoRef): ?array
+    public function getGeneratedBoletimAdmin(int $alunoId, int $regraId, string $periodoRef, ?int $versao = null): ?array
     {
         if ($alunoId <= 0 || $regraId <= 0) {
             return null;
@@ -364,6 +382,25 @@ class BoletimConfig
         if ($periodoRef === '') {
             return null;
         }
+
+        $params = [
+            'aluno_id' => $alunoId,
+            'regra_id' => $regraId,
+            'periodo_ref' => $periodoRef,
+        ];
+        $extra = '';
+        if ($versao !== null && $versao > 0 && $this->hasColumn('boletim_resultados_gerados', 'versao')) {
+            $extra = ' AND g.preview = 0 AND g.versao = :versao';
+            $params['versao'] = $versao;
+        } elseif ($this->hasColumn('boletim_resultados_gerados', 'vigente')) {
+            $extra = ' AND ((g.preview = 0 AND g.vigente = 1) OR (g.preview = 1 AND NOT EXISTS (
+                SELECT 1 FROM boletim_resultados_gerados g2
+                WHERE g2.aluno_id = g.aluno_id AND g2.regra_id = g.regra_id
+                  AND g2.periodo_ref = g.periodo_ref AND g2.preview = 0 AND g2.vigente = 1
+                LIMIT 1
+            )))';
+        }
+
         $rows = $this->db->fetchAll(
             "SELECT g.*, r.nome AS regra_nome, r.codigo AS regra_codigo, r.exibir_em, r.decimal_places,
                     a.nome AS aluno_nome, a.ra AS aluno_ra, t.nome AS turma_nome
@@ -374,12 +411,9 @@ class BoletimConfig
              WHERE g.aluno_id = :aluno_id
                AND g.regra_id = :regra_id
                AND g.periodo_ref = :periodo_ref
+               {$extra}
              ORDER BY g.ordem_linha ASC, g.id ASC",
-            [
-                'aluno_id' => $alunoId,
-                'regra_id' => $regraId,
-                'periodo_ref' => $periodoRef,
-            ]
+            $params
         ) ?: [];
 
         if (!$rows) {
@@ -398,6 +432,8 @@ class BoletimConfig
             'data_fim' => (string) ($first['data_fim'] ?? ''),
             'updated_at' => (string) ($first['updated_at'] ?? ''),
             'preview' => (int) ($first['preview'] ?? 0),
+            'versao' => (int) ($first['versao'] ?? 1),
+            'vigente' => (int) ($first['vigente'] ?? 1),
             'aluno_id' => (int) ($first['aluno_id'] ?? 0),
             'aluno_nome' => (string) ($first['aluno_nome'] ?? ''),
             'aluno_ra' => (string) ($first['aluno_ra'] ?? ''),
@@ -518,6 +554,111 @@ class BoletimConfig
         } catch (Throwable $e) {
             error_log('BoletimConfig deleteGeneratedResultsForAluno aluno=' . $alunoId . ' regra=' . $regraId . ': ' . $e->getMessage());
             return 0;
+        }
+    }
+
+    private function ensureSchemaVersionamento(): void
+    {
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS boletim_geracoes (
+                id INT NOT NULL AUTO_INCREMENT,
+                regra_id INT NOT NULL,
+                periodo_ref VARCHAR(60) NOT NULL,
+                versao INT NOT NULL DEFAULT 1,
+                vigente TINYINT(1) NOT NULL DEFAULT 1,
+                modo VARCHAR(40) NOT NULL DEFAULT 'gerar',
+                usuario_id INT NULL,
+                usuario_nome VARCHAR(150) NULL,
+                alunos_processados INT NOT NULL DEFAULT 0,
+                alunos_preservados INT NOT NULL DEFAULT 0,
+                linhas_geradas INT NOT NULL DEFAULT 0,
+                erros INT NOT NULL DEFAULT 0,
+                alunos_mudanca_significativa INT NOT NULL DEFAULT 0,
+                detalhes_json TEXT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uk_boletim_geracoes_regra_periodo_versao (regra_id, periodo_ref, versao),
+                KEY idx_boletim_geracoes_regra_vigente (regra_id, periodo_ref, vigente),
+                CONSTRAINT fk_boletim_geracoes_regra FOREIGN KEY (regra_id) REFERENCES boletim_regras(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS boletim_alunos_travados (
+                id INT NOT NULL AUTO_INCREMENT,
+                regra_id INT NOT NULL,
+                aluno_id INT NOT NULL,
+                periodo_ref VARCHAR(60) NOT NULL,
+                motivo VARCHAR(255) NULL,
+                usuario_id INT NULL,
+                usuario_nome VARCHAR(150) NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uk_boletim_alunos_travados (regra_id, aluno_id, periodo_ref),
+                KEY idx_boletim_alunos_travados_regra (regra_id, periodo_ref),
+                CONSTRAINT fk_boletim_alunos_travados_regra FOREIGN KEY (regra_id) REFERENCES boletim_regras(id) ON DELETE CASCADE,
+                CONSTRAINT fk_boletim_alunos_travados_aluno FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $this->ensureBoletimResultadoColumn('geracao_id', "ALTER TABLE boletim_resultados_gerados ADD COLUMN geracao_id INT NULL DEFAULT NULL AFTER preview");
+        $this->ensureBoletimResultadoColumn('versao', "ALTER TABLE boletim_resultados_gerados ADD COLUMN versao INT NOT NULL DEFAULT 1 AFTER geracao_id");
+        $this->ensureBoletimResultadoColumn('vigente', "ALTER TABLE boletim_resultados_gerados ADD COLUMN vigente TINYINT(1) NOT NULL DEFAULT 1 AFTER versao");
+
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'boletim_resultados_gerados'
+                   AND INDEX_NAME = 'idx_boletim_resultados_vigente'
+                 LIMIT 1"
+            );
+            if (!$row) {
+                $this->db->query(
+                    "ALTER TABLE boletim_resultados_gerados
+                     ADD INDEX idx_boletim_resultados_vigente (regra_id, aluno_id, periodo_ref, vigente, preview)"
+                );
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimConfig idx vigente: ' . $e->getMessage());
+        }
+
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'boletim_resultados_gerados'
+                   AND INDEX_NAME = 'idx_boletim_resultados_geracao'
+                 LIMIT 1"
+            );
+            if (!$row) {
+                $this->db->query(
+                    "ALTER TABLE boletim_resultados_gerados
+                     ADD INDEX idx_boletim_resultados_geracao (geracao_id)"
+                );
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimConfig idx geracao: ' . $e->getMessage());
+        }
+
+        try {
+            $fk = $this->db->fetch(
+                "SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'boletim_resultados_gerados'
+                   AND CONSTRAINT_NAME = 'fk_boletim_resultados_geracao'
+                   AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+                 LIMIT 1"
+            );
+            if (!$fk) {
+                $this->db->query(
+                    "ALTER TABLE boletim_resultados_gerados
+                     ADD CONSTRAINT fk_boletim_resultados_geracao
+                     FOREIGN KEY (geracao_id) REFERENCES boletim_geracoes(id) ON DELETE SET NULL"
+                );
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimConfig fk geracao: ' . $e->getMessage());
         }
     }
 
@@ -794,7 +935,7 @@ class BoletimConfig
     /**
      * Último job de geração em massa por regra (fila ai_jobs, tipo boletim_gerar).
      *
-     * @return array<int, array{job_id:int,status:string,error:string,created_at:string}>
+     * @return array<int, array{job_id:int,status:string,error:string,created_at:string,completed_at:string,mensagem:string}>
      */
     public function mapearStatusGeracaoAssincrona(): array
     {
@@ -942,6 +1083,319 @@ class BoletimConfig
     }
 
     /**
+     * Fragmento SQL para ler só a versão vigente. Vazio se a coluna ainda não existir.
+     */
+    public function sqlFiltroVigente(string $alias = 'g'): string
+    {
+        if (!$this->hasColumn('boletim_resultados_gerados', 'vigente')) {
+            return '';
+        }
+        $prefixo = $alias === '' ? '' : ($alias . '.');
+        return " AND {$prefixo}vigente = 1";
+    }
+
+    public function criarGeracao(
+        int $regraId,
+        string $periodoRef,
+        string $modo,
+        ?int $usuarioId,
+        ?string $usuarioNome
+    ): ?int {
+        if ($regraId <= 0 || !$this->hasTable('boletim_geracoes')) {
+            return null;
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        $modos = ['gerar', 'atualizar', 'atualizar_previa', 'aluno', 'edicao'];
+        if (!in_array($modo, $modos, true)) {
+            $modo = 'gerar';
+        }
+
+        $max = $this->db->fetch(
+            "SELECT MAX(versao) AS max_versao
+             FROM boletim_geracoes
+             WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref",
+            ['regra_id' => $regraId, 'periodo_ref' => $periodoRef]
+        );
+        $versao = (int) ($max['max_versao'] ?? 0) + 1;
+
+        $lote = in_array($modo, ['gerar', 'atualizar', 'atualizar_previa'], true);
+        if ($lote) {
+            $this->db->update(
+                "UPDATE boletim_geracoes
+                 SET vigente = 0
+                 WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref AND vigente = 1",
+                ['regra_id' => $regraId, 'periodo_ref' => $periodoRef]
+            );
+        }
+
+        $id = (int) $this->db->insert(
+            "INSERT INTO boletim_geracoes
+            (regra_id, periodo_ref, versao, vigente, modo, usuario_id, usuario_nome)
+            VALUES (:regra_id, :periodo_ref, :versao, :vigente, :modo, :usuario_id, :usuario_nome)",
+            [
+                'regra_id' => $regraId,
+                'periodo_ref' => $periodoRef,
+                'versao' => $versao,
+                'vigente' => $lote ? 1 : 0,
+                'modo' => $modo,
+                'usuario_id' => $usuarioId,
+                'usuario_nome' => $usuarioNome !== null ? mb_substr($usuarioNome, 0, 150, 'UTF-8') : null,
+            ]
+        );
+
+        return $id > 0 ? $id : null;
+    }
+
+    public function atualizarGeracaoTotais(
+        int $geracaoId,
+        int $processados,
+        int $preservados,
+        int $linhas,
+        int $erros,
+        int $mudanca,
+        array $detalhes = []
+    ): void {
+        if ($geracaoId <= 0 || !$this->hasTable('boletim_geracoes')) {
+            return;
+        }
+        $this->db->update(
+            "UPDATE boletim_geracoes
+             SET alunos_processados = :processados,
+                 alunos_preservados = :preservados,
+                 linhas_geradas = :linhas,
+                 erros = :erros,
+                 alunos_mudanca_significativa = :mudanca,
+                 detalhes_json = :detalhes_json
+             WHERE id = :id",
+            [
+                'id' => $geracaoId,
+                'processados' => $processados,
+                'preservados' => $preservados,
+                'linhas' => $linhas,
+                'erros' => $erros,
+                'mudanca' => $mudanca,
+                'detalhes_json' => $detalhes !== [] ? json_encode($detalhes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            ]
+        );
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarGeracoesPorRegra(int $regraId, string $periodoRef = '', int $limit = 20): array
+    {
+        if ($regraId <= 0 || !$this->hasTable('boletim_geracoes')) {
+            return [];
+        }
+        $limit = max(1, min($limit, 50));
+        $sql = "SELECT * FROM boletim_geracoes WHERE regra_id = :regra_id";
+        $params = ['regra_id' => $regraId];
+        if ($periodoRef !== '') {
+            $sql .= " AND periodo_ref = :periodo_ref";
+            $params['periodo_ref'] = substr(trim($periodoRef), 0, 60);
+        }
+        $sql .= " ORDER BY versao DESC, id DESC LIMIT {$limit}";
+
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    public function findGeracao(int $geracaoId): ?array
+    {
+        if ($geracaoId <= 0 || !$this->hasTable('boletim_geracoes')) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            "SELECT * FROM boletim_geracoes WHERE id = :id LIMIT 1",
+            ['id' => $geracaoId]
+        );
+        return $row ?: null;
+    }
+
+    /**
+     * Alunos que participaram de uma geração (linhas gravadas naquele geracao_id).
+     *
+     * @return list<array{aluno_id:int,nome:string,versao:int,preservado:int}>
+     */
+    public function listarAlunosDaGeracao(int $geracaoId): array
+    {
+        if ($geracaoId <= 0 || !$this->hasColumn('boletim_resultados_gerados', 'geracao_id')) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT g.aluno_id, a.nome, MAX(g.versao) AS versao
+             FROM boletim_resultados_gerados g
+             INNER JOIN alunos a ON a.id = g.aluno_id
+             WHERE g.geracao_id = :geracao_id AND g.preview = 0
+             GROUP BY g.aluno_id, a.nome
+             ORDER BY a.nome ASC",
+            ['geracao_id' => $geracaoId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'aluno_id' => (int) ($r['aluno_id'] ?? 0),
+                'nome' => (string) ($r['nome'] ?? ''),
+                'versao' => (int) ($r['versao'] ?? 0),
+                'preservado' => 0,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{versao:int,vigente:int,geracao_id:?int,created_at:string,usuario_nome:?string,modo:?string}>
+     */
+    public function listarVersoesAluno(int $regraId, int $alunoId, string $periodoRef): array
+    {
+        if ($regraId <= 0 || $alunoId <= 0 || !$this->hasColumn('boletim_resultados_gerados', 'versao')) {
+            return [];
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        if ($periodoRef === '') {
+            return [];
+        }
+        $joinGeracao = $this->hasTable('boletim_geracoes')
+            ? 'LEFT JOIN boletim_geracoes ge ON ge.id = g.geracao_id'
+            : '';
+        $selectExtra = $this->hasTable('boletim_geracoes')
+            ? ', MAX(ge.usuario_nome) AS usuario_nome, MAX(ge.modo) AS modo'
+            : ', NULL AS usuario_nome, NULL AS modo';
+
+        return $this->db->fetchAll(
+            "SELECT g.versao, MAX(g.vigente) AS vigente, MAX(g.geracao_id) AS geracao_id,
+                    MAX(g.created_at) AS created_at {$selectExtra}
+             FROM boletim_resultados_gerados g
+             {$joinGeracao}
+             WHERE g.regra_id = :regra_id AND g.aluno_id = :aluno_id
+               AND g.periodo_ref = :periodo_ref AND g.preview = 0
+             GROUP BY g.versao
+             ORDER BY g.versao DESC",
+            [
+                'regra_id' => $regraId,
+                'aluno_id' => $alunoId,
+                'periodo_ref' => $periodoRef,
+            ]
+        ) ?: [];
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function idsAlunosTravados(int $regraId, string $periodoRef): array
+    {
+        if ($regraId <= 0 || !$this->hasTable('boletim_alunos_travados')) {
+            return [];
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        if ($periodoRef === '') {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT aluno_id FROM boletim_alunos_travados
+             WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref",
+            ['regra_id' => $regraId, 'periodo_ref' => $periodoRef]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['aluno_id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    public function alunoEstaTravado(int $regraId, int $alunoId, string $periodoRef): bool
+    {
+        if ($regraId <= 0 || $alunoId <= 0 || !$this->hasTable('boletim_alunos_travados')) {
+            return false;
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        $row = $this->db->fetch(
+            "SELECT 1 FROM boletim_alunos_travados
+             WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
+             LIMIT 1",
+            ['regra_id' => $regraId, 'aluno_id' => $alunoId, 'periodo_ref' => $periodoRef]
+        );
+
+        return $row !== false && !empty($row);
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarAlunosTravados(int $regraId, string $periodoRef): array
+    {
+        if ($regraId <= 0 || !$this->hasTable('boletim_alunos_travados')) {
+            return [];
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+
+        return $this->db->fetchAll(
+            "SELECT t.aluno_id, t.motivo, t.usuario_nome, t.created_at, a.nome AS aluno_nome
+             FROM boletim_alunos_travados t
+             INNER JOIN alunos a ON a.id = t.aluno_id
+             WHERE t.regra_id = :regra_id AND t.periodo_ref = :periodo_ref
+             ORDER BY a.nome ASC",
+            ['regra_id' => $regraId, 'periodo_ref' => $periodoRef]
+        ) ?: [];
+    }
+
+    public function travarAluno(
+        int $regraId,
+        int $alunoId,
+        string $periodoRef,
+        ?string $motivo,
+        ?int $usuarioId,
+        ?string $usuarioNome
+    ): bool {
+        if ($regraId <= 0 || $alunoId <= 0 || !$this->hasTable('boletim_alunos_travados')) {
+            return false;
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        if ($periodoRef === '') {
+            return false;
+        }
+        $motivo = $motivo !== null ? mb_substr(trim($motivo), 0, 255, 'UTF-8') : null;
+        $this->db->query(
+            "INSERT INTO boletim_alunos_travados
+            (regra_id, aluno_id, periodo_ref, motivo, usuario_id, usuario_nome)
+            VALUES (:regra_id, :aluno_id, :periodo_ref, :motivo, :usuario_id, :usuario_nome)
+            ON DUPLICATE KEY UPDATE
+                motivo = VALUES(motivo),
+                usuario_id = VALUES(usuario_id),
+                usuario_nome = VALUES(usuario_nome)",
+            [
+                'regra_id' => $regraId,
+                'aluno_id' => $alunoId,
+                'periodo_ref' => $periodoRef,
+                'motivo' => $motivo !== '' ? $motivo : null,
+                'usuario_id' => $usuarioId,
+                'usuario_nome' => $usuarioNome !== null ? mb_substr($usuarioNome, 0, 150, 'UTF-8') : null,
+            ]
+        );
+
+        return true;
+    }
+
+    public function destravarAluno(int $regraId, int $alunoId, string $periodoRef): bool
+    {
+        if ($regraId <= 0 || $alunoId <= 0 || !$this->hasTable('boletim_alunos_travados')) {
+            return false;
+        }
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        $n = $this->db->delete(
+            "DELETE FROM boletim_alunos_travados
+             WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref",
+            ['regra_id' => $regraId, 'aluno_id' => $alunoId, 'periodo_ref' => $periodoRef]
+        );
+
+        return (int) $n > 0;
+    }
+
+    /**
      * Código do componente marcado como "final" (layout.group = final) de uma regra,
      * usado para comparar a nota final antes/depois de uma geração em massa.
      */
@@ -971,7 +1425,8 @@ class BoletimConfig
         $rows = $this->db->fetchAll(
             "SELECT aluno_id, JSON_UNQUOTE(JSON_EXTRACT(notas_json, :path)) AS valor
              FROM boletim_resultados_gerados
-             WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref AND preview = 0",
+             WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref AND preview = 0"
+            . $this->sqlFiltroVigente(''),
             [
                 'regra_id' => $regraId,
                 'periodo_ref' => $periodoRef,
@@ -1248,7 +1703,9 @@ class BoletimConfig
     }
 
     /**
-     * Substitui as linhas geradas da matriz por matéria para aluno/regra/período.
+     * Grava as linhas da matriz por matéria para aluno/regra/período.
+     * Preview: substitui só as linhas de prévia.
+     * Oficial: cria uma nova versão vigente e mantém as anteriores para auditoria.
      *
      * @param list<array<string,mixed>> $colunas
      * @param list<array<string,mixed>> $linhas
@@ -1261,7 +1718,8 @@ class BoletimConfig
         ?string $dataFim,
         array $colunas,
         array $linhas,
-        bool $preview = false
+        bool $preview = false,
+        ?int $geracaoId = null
     ): void {
         $periodoRef = trim($periodoRef);
         if (strlen($periodoRef) > 60) {
@@ -1271,10 +1729,10 @@ class BoletimConfig
             return;
         }
 
+        $versionar = !$preview && $this->hasColumn('boletim_resultados_gerados', 'versao');
+
         $this->db->beginTransaction();
         try {
-            // Preview limpa só preview; gravação oficial limpa tudo (preview + oficial)
-            // para o mesmo (regra, aluno, periodo).
             if ($preview) {
                 $this->db->delete(
                     "DELETE FROM boletim_resultados_gerados
@@ -1286,7 +1744,7 @@ class BoletimConfig
                         'periodo_ref' => $periodoRef,
                     ]
                 );
-            } else {
+            } elseif (!$versionar) {
                 $this->db->delete(
                     "DELETE FROM boletim_resultados_gerados
                      WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref",
@@ -1298,9 +1756,47 @@ class BoletimConfig
                 );
             }
 
+            $versao = 1;
+            if ($versionar) {
+                $this->db->delete(
+                    "DELETE FROM boletim_resultados_gerados
+                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
+                       AND preview = 1",
+                    [
+                        'regra_id' => $regraId,
+                        'aluno_id' => $alunoId,
+                        'periodo_ref' => $periodoRef,
+                    ]
+                );
+                $rowMax = $this->db->fetch(
+                    "SELECT MAX(versao) AS max_versao
+                     FROM boletim_resultados_gerados
+                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
+                       AND preview = 0",
+                    [
+                        'regra_id' => $regraId,
+                        'aluno_id' => $alunoId,
+                        'periodo_ref' => $periodoRef,
+                    ]
+                );
+                $versao = (int) ($rowMax['max_versao'] ?? 0) + 1;
+                $this->db->update(
+                    "UPDATE boletim_resultados_gerados
+                     SET vigente = 0
+                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
+                       AND preview = 0 AND vigente = 1",
+                    [
+                        'regra_id' => $regraId,
+                        'aluno_id' => $alunoId,
+                        'periodo_ref' => $periodoRef,
+                    ]
+                );
+            }
+
             if (!empty($linhas)) {
                 $colunasJson = json_encode($colunas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 $ordem = 0;
+                $temGeracaoCol = $this->hasColumn('boletim_resultados_gerados', 'geracao_id');
                 foreach ($linhas as $lin) {
                     if (!is_array($lin)) {
                         continue;
@@ -1318,26 +1814,36 @@ class BoletimConfig
                         $notas['media_final'] = $mediaFinal;
                     }
                     $materiaRef = (string) $alunoId;
+                    $params = [
+                        'regra_id' => $regraId,
+                        'aluno_id' => $alunoId,
+                        'periodo_ref' => $periodoRef,
+                        'data_inicio' => $dataInicio,
+                        'data_fim' => $dataFim,
+                        'materia_id' => $materiaId > 0 ? $materiaId : null,
+                        'materia_nome' => $materiaNome !== '' ? $materiaNome : 'Sem matéria',
+                        'materia_ref' => $materiaRef,
+                        'ordem_linha' => $ordem++,
+                        'colunas_json' => $this->trimConfigJson($colunasJson),
+                        'notas_json' => $this->trimConfigJson(json_encode($notas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
+                        'media_final' => $mediaFinal,
+                        'preview' => $preview ? 1 : 0,
+                    ];
+                    $colsExtra = '';
+                    $valsExtra = '';
+                    if ($this->hasColumn('boletim_resultados_gerados', 'versao')) {
+                        $colsExtra .= ', geracao_id, versao, vigente';
+                        $valsExtra .= ', :geracao_id, :versao, :vigente';
+                        $params['geracao_id'] = ($temGeracaoCol && $geracaoId !== null && $geracaoId > 0) ? $geracaoId : null;
+                        $params['versao'] = $preview ? 0 : $versao;
+                        $params['vigente'] = $preview ? 0 : 1;
+                    }
                     $this->db->insert(
                         "INSERT INTO boletim_resultados_gerados
-                        (regra_id, aluno_id, periodo_ref, data_inicio, data_fim, materia_id, materia_nome, materia_ref, ordem_linha, colunas_json, notas_json, media_final, preview)
+                        (regra_id, aluno_id, periodo_ref, data_inicio, data_fim, materia_id, materia_nome, materia_ref, ordem_linha, colunas_json, notas_json, media_final, preview{$colsExtra})
                         VALUES
-                        (:regra_id, :aluno_id, :periodo_ref, :data_inicio, :data_fim, :materia_id, :materia_nome, :materia_ref, :ordem_linha, :colunas_json, :notas_json, :media_final, :preview)",
-                        [
-                            'regra_id' => $regraId,
-                            'aluno_id' => $alunoId,
-                            'periodo_ref' => $periodoRef,
-                            'data_inicio' => $dataInicio,
-                            'data_fim' => $dataFim,
-                            'materia_id' => $materiaId > 0 ? $materiaId : null,
-                            'materia_nome' => $materiaNome !== '' ? $materiaNome : 'Sem matéria',
-                            'materia_ref' => $materiaRef,
-                            'ordem_linha' => $ordem++,
-                            'colunas_json' => $this->trimConfigJson($colunasJson),
-                            'notas_json' => $this->trimConfigJson(json_encode($notas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
-                            'media_final' => $mediaFinal,
-                            'preview' => $preview ? 1 : 0,
-                        ]
+                        (:regra_id, :aluno_id, :periodo_ref, :data_inicio, :data_fim, :materia_id, :materia_nome, :materia_ref, :ordem_linha, :colunas_json, :notas_json, :media_final, :preview{$valsExtra})",
+                        $params
                     );
                 }
             }
@@ -1368,7 +1874,8 @@ class BoletimConfig
         }
         $row = $this->db->fetch(
             "SELECT 1 FROM boletim_resultados_gerados
-             WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref AND preview = 0
+             WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref AND preview = 0"
+            . $this->sqlFiltroVigente('') . "
              LIMIT 1",
             ['regra_id' => $regraId, 'aluno_id' => $alunoId, 'periodo_ref' => $periodoRef]
         );
@@ -1410,6 +1917,9 @@ class BoletimConfig
         if ($preview !== null) {
             $previewSql = ' AND preview = :preview_flag';
             $params['preview_flag'] = $preview ? 1 : 0;
+        }
+        if ($preview === false && $this->hasColumn('boletim_resultados_gerados', 'vigente')) {
+            $previewSql .= ' AND vigente = 1';
         }
         $rows = $this->db->fetchAll(
             "SELECT DISTINCT aluno_id
@@ -1498,7 +2008,8 @@ class BoletimConfig
              WHERE g.aluno_id = :aluno_id
                AND g.preview = 0
                AND r.ativo = 1
-               AND {$visCol} = 1";
+               AND {$visCol} = 1"
+            . $this->sqlFiltroVigente('g');
         $params = ['aluno_id' => $alunoId];
         if ($exibirFilter !== null) {
             $sql .= " AND r.exibir_em = :exibir_em";
@@ -1587,7 +2098,8 @@ class BoletimConfig
         $rowRef = $this->db->fetch(
             "SELECT periodo_ref, MAX(updated_at) AS updated_at
              FROM boletim_resultados_gerados
-             WHERE aluno_id = :aluno_id AND regra_id = :regra_id AND preview = 0
+             WHERE aluno_id = :aluno_id AND regra_id = :regra_id AND preview = 0"
+            . $this->sqlFiltroVigente('') . "
              GROUP BY periodo_ref
              ORDER BY updated_at DESC
              LIMIT 1",
@@ -1612,7 +2124,8 @@ class BoletimConfig
              WHERE g.aluno_id = :aluno_id
                AND g.regra_id = :regra_id
                AND g.periodo_ref = :periodo_ref
-               AND g.preview = 0
+               AND g.preview = 0"
+            . $this->sqlFiltroVigente('g') . "
              ORDER BY g.ordem_linha ASC",
             [
                 'aluno_id' => $alunoId,
@@ -2214,6 +2727,14 @@ class BoletimConfig
                  LIMIT 1",
                 ['table' => $table, 'col' => $column]
             );
+            if (!empty($row)) {
+                return true;
+            }
+        } catch (Throwable $e) {
+            // Tenant sem information_schema: cai no SHOW COLUMNS.
+        }
+        try {
+            $row = $this->db->fetch("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
             return !empty($row);
         } catch (Throwable $e) {
             return false;
@@ -2247,6 +2768,92 @@ class BoletimConfig
              ORDER BY m.nome ASC
              LIMIT {$limit}"
         );
+    }
+
+    /**
+     * Ordem das matérias no boletim (matriz curricular). Sem matriz, usa o id de cadastro.
+     *
+     * @param list<int> $seriesIds
+     * @param list<int> $turmasIds
+     * @return array<int, int> materia_id => ordem
+     */
+    public function mapaOrdemBoletimMaterias(array $seriesIds = [], array $turmasIds = []): array
+    {
+        $seriesIds = array_values(array_unique(array_filter(array_map('intval', $seriesIds), static fn ($id) => $id > 0)));
+        $turmasIds = array_values(array_unique(array_filter(array_map('intval', $turmasIds), static fn ($id) => $id > 0)));
+        $cacheKey = implode(',', $seriesIds) . '|' . implode(',', $turmasIds);
+        if (isset($this->mapaOrdemBoletimCache[$cacheKey])) {
+            return $this->mapaOrdemBoletimCache[$cacheKey];
+        }
+
+        $out = [];
+        foreach ($this->getAvailableSubjects(2000) as $m) {
+            $id = (int) ($m['id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = 100000 + $id;
+            }
+        }
+        if (!$this->hasTable('matrizes_curriculares_componentes')) {
+            $this->mapaOrdemBoletimCache[$cacheKey] = $out;
+            return $out;
+        }
+
+        $rows = [];
+
+        if ($turmasIds !== [] && $this->hasColumn('turmas', 'matriz_curricular_id')) {
+            $params = [];
+            $ph = [];
+            foreach ($turmasIds as $i => $tid) {
+                $key = 't' . $i;
+                $ph[] = ':' . $key;
+                $params[$key] = $tid;
+            }
+            $rows = $this->db->fetchAll(
+                'SELECT mcc.materia_id, MIN(mcc.ordem_boletim) AS ordem
+                 FROM turmas t
+                 INNER JOIN matrizes_curriculares_componentes mcc ON mcc.matriz_id = t.matriz_curricular_id
+                 WHERE t.id IN (' . implode(',', $ph) . ')
+                 GROUP BY mcc.materia_id',
+                $params
+            ) ?: [];
+        }
+
+        if ($rows === [] && $seriesIds !== [] && $this->hasTable('matrizes_curriculares')) {
+            $params = [];
+            $ph = [];
+            foreach ($seriesIds as $i => $sid) {
+                $key = 's' . $i;
+                $ph[] = ':' . $key;
+                $params[$key] = $sid;
+            }
+            $rows = $this->db->fetchAll(
+                'SELECT mcc.materia_id, MIN(mcc.ordem_boletim) AS ordem
+                 FROM matrizes_curriculares mx
+                 INNER JOIN matrizes_curriculares_componentes mcc ON mcc.matriz_id = mx.id
+                 WHERE mx.serie_id IN (' . implode(',', $ph) . ')
+                 GROUP BY mcc.materia_id',
+                $params
+            ) ?: [];
+        }
+
+        if ($rows === []) {
+            $rows = $this->db->fetchAll(
+                'SELECT materia_id, MIN(ordem_boletim) AS ordem
+                 FROM matrizes_curriculares_componentes
+                 GROUP BY materia_id'
+            ) ?: [];
+        }
+
+        foreach ($rows as $r) {
+            $mid = (int) ($r['materia_id'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
+            $out[$mid] = (int) ($r['ordem'] ?? 0);
+        }
+
+        $this->mapaOrdemBoletimCache[$cacheKey] = $out;
+        return $out;
     }
 
     /**

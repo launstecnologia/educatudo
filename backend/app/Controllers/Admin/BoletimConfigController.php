@@ -95,31 +95,6 @@ class BoletimConfigController extends BaseController
         foreach ($this->boletimConfig->getAvailableSeries(300) as $serie) {
             $seriesNomesPorId[(int) ($serie['id'] ?? 0)] = trim((string) ($serie['nome'] ?? ''));
         }
-        $turmasNomesPorId = [];
-        foreach ($this->boletimConfig->getAvailableClasses(1000) as $turma) {
-            $tid = (int) ($turma['id'] ?? 0);
-            if ($tid <= 0) {
-                continue;
-            }
-            $turmaNome = trim((string) ($turma['nome'] ?? ('Turma #' . $tid)));
-            $serieNome = trim((string) ($turma['serie_nome'] ?? ''));
-            $cursoNome = trim((string) ($turma['curso_nome'] ?? ''));
-            $anoTurma = (int) ($turma['ano_letivo'] ?? 0);
-            $rotuloTurma = $turmaNome;
-            if ($serieNome !== '' && stripos($turmaNome, $serieNome) === false) {
-                $rotuloTurma .= ' · ' . $serieNome;
-            }
-            if ($cursoNome !== '' && stripos($rotuloTurma, $cursoNome) === false) {
-                $rotuloTurma .= ' · ' . $cursoNome;
-            }
-            if ($serieNome === '') {
-                $rotuloTurma .= ' · Sem série';
-            }
-            if ($anoTurma > 0) {
-                $rotuloTurma .= ' · ' . $anoTurma;
-            }
-            $turmasNomesPorId[$tid] = $rotuloTurma;
-        }
         $ultimaGeracaoPorRegra = $this->boletimConfig->getUltimaGeracaoPorRegra();
         $statusGeracaoPorRegra = $this->boletimConfig->mapearStatusGeracaoAssincrona();
         $geracaoJobIds = [];
@@ -132,11 +107,6 @@ class BoletimConfigController extends BaseController
                 return $seriesNomesPorId[(int) $sid] ?? null;
             }, $seriesIds));
             $ev['series_nomes'] = $nomes;
-            $turmasIds = $this->parseTurmasIdsFromRegra($ev);
-            $turmasNomes = array_filter(array_map(static function ($tid) use ($turmasNomesPorId) {
-                return $turmasNomesPorId[(int) $tid] ?? null;
-            }, $turmasIds));
-            $ev['turmas_nomes'] = $turmasNomes;
 
             $regraIdEv = (int) ($ev['id'] ?? 0);
             $ultimaGeracao = $ultimaGeracaoPorRegra[$regraIdEv] ?? null;
@@ -149,6 +119,7 @@ class BoletimConfigController extends BaseController
             $ev['geracao_job_id'] = is_array($stGeracao) ? (int) ($stGeracao['job_id'] ?? 0) : 0;
             $ev['geracao_erro'] = is_array($stGeracao) ? (string) ($stGeracao['error'] ?? '') : '';
             $ev['geracao_mensagem'] = is_array($stGeracao) ? (string) ($stGeracao['mensagem'] ?? '') : '';
+            $ev['geracao_iniciada_em'] = is_array($stGeracao) ? (string) ($stGeracao['created_at'] ?? '') : '';
             $ev['geracao_completed_at'] = is_array($stGeracao) ? (string) ($stGeracao['completed_at'] ?? '') : '';
             if (in_array($ev['geracao_status'], ['pending', 'processing'], true) && $ev['geracao_job_id'] > 0) {
                 $geracaoJobIds[] = $ev['geracao_job_id'];
@@ -400,6 +371,15 @@ class BoletimConfigController extends BaseController
             'somente_tabela' => $somenteTabela,
             'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
             'geracao_em_andamento' => $this->boletimConfig->temGeracaoEmAndamento((int) ($regra['id'] ?? 0)),
+            'alunos_travados' => ((int) ($regra['id'] ?? 0) > 0)
+                ? $this->boletimConfig->listarAlunosTravados((int) $regra['id'], $periodoRef)
+                : [],
+            'aluno_travado' => ($selectedAlunoId > 0 && (int) ($regra['id'] ?? 0) > 0)
+                ? $this->boletimConfig->alunoEstaTravado((int) $regra['id'], $selectedAlunoId, $periodoRef)
+                : false,
+            'versoes_aluno' => ($selectedAlunoId > 0 && (int) ($regra['id'] ?? 0) > 0)
+                ? $this->boletimConfig->listarVersoesAluno((int) $regra['id'], $selectedAlunoId, $periodoRef)
+                : [],
         ];
 
         if ($somenteTabela) {
@@ -553,6 +533,7 @@ class BoletimConfigController extends BaseController
         $alunoId = (int) ($_GET['aluno_id'] ?? 0);
         $regraId = (int) ($_GET['regra_id'] ?? 0);
         $periodoRef = trim((string) ($_GET['periodo_ref'] ?? ''));
+        $versao = isset($_GET['versao']) ? (int) $_GET['versao'] : 0;
 
         header('Content-Type: text/html; charset=utf-8');
 
@@ -562,20 +543,28 @@ class BoletimConfigController extends BaseController
             return;
         }
 
-        $evento = $this->boletimConfig->getGeneratedBoletimAdmin($alunoId, $regraId, $periodoRef);
+        $evento = $this->boletimConfig->getGeneratedBoletimAdmin(
+            $alunoId,
+            $regraId,
+            $periodoRef,
+            $versao > 0 ? $versao : null
+        );
         if (!$evento) {
             echo '<div class="p-4 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg">Nenhum dado encontrado para esse boletim.</div>';
             return;
         }
 
         $cabecalho = sprintf(
-            '<div class="mb-3 text-sm text-gray-700"><strong>Aluno:</strong> %s%s &middot; <strong>Regra:</strong> %s &middot; <strong>Período:</strong> %s%s</div>',
+            '<div class="mb-3 text-sm text-gray-700"><strong>Aluno:</strong> %s%s &middot; <strong>Regra:</strong> %s &middot; <strong>Período:</strong> %s%s%s</div>',
             htmlspecialchars((string) ($evento['aluno_nome'] ?? ''), ENT_QUOTES, 'UTF-8'),
             $evento['aluno_ra'] ? ' (RA ' . htmlspecialchars((string) $evento['aluno_ra'], ENT_QUOTES, 'UTF-8') . ')' : '',
             htmlspecialchars((string) ($evento['regra_nome'] ?? ''), ENT_QUOTES, 'UTF-8'),
             htmlspecialchars((string) ($evento['periodo_ref'] ?? ''), ENT_QUOTES, 'UTF-8'),
             ((int) ($evento['preview'] ?? 0) === 1)
                 ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800">preview</span>'
+                : '',
+            ((int) ($evento['versao'] ?? 0) > 0)
+                ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700">versão ' . (int) $evento['versao'] . (((int) ($evento['vigente'] ?? 0) === 1) ? ' vigente' : '') . '</span>'
                 : ''
         );
 
@@ -951,8 +940,102 @@ class BoletimConfigController extends BaseController
         }
         unset($log);
 
-        echo json_encode(['logs' => $logs], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $periodoRef = trim((string) ($_GET['periodo_ref'] ?? ''));
+        $geracoes = $this->boletimConfig->listarGeracoesPorRegra($regraId, $periodoRef, 20);
+        foreach ($geracoes as &$g) {
+            $g['created_at_fmt'] = !empty($g['created_at']) ? date('d/m/Y H:i', strtotime((string) $g['created_at'])) : '';
+        }
+        unset($g);
+
+        echo json_encode(['logs' => $logs, 'geracoes' => $geracoes], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
+    }
+
+    public function geracaoDetalheJson(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $geracaoId = (int) ($_GET['id'] ?? 0);
+        if ($geracaoId <= 0) {
+            echo json_encode(['erro' => 'Geração inválida.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        $geracao = $this->boletimConfig->findGeracao($geracaoId);
+        if (!$geracao) {
+            echo json_encode(['erro' => 'Geração não encontrada.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+        $geracao['created_at_fmt'] = !empty($geracao['created_at']) ? date('d/m/Y H:i', strtotime((string) $geracao['created_at'])) : '';
+        $alunos = $this->boletimConfig->listarAlunosDaGeracao($geracaoId);
+        $travados = $this->boletimConfig->listarAlunosTravados((int) $geracao['regra_id'], (string) $geracao['periodo_ref']);
+        echo json_encode([
+            'geracao' => $geracao,
+            'alunos' => $alunos,
+            'travados' => $travados,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    public function travarAluno(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        $alunoId = (int) ($_POST['aluno_id'] ?? 0);
+        $periodoRef = trim((string) ($_POST['periodo_ref'] ?? ''));
+        $motivo = trim((string) ($_POST['motivo'] ?? ''));
+        $dataInicio = $this->normalizarDataYmdOpcional((string) ($_POST['data_inicio'] ?? ''));
+        $dataFim = $this->normalizarDataYmdOpcional((string) ($_POST['data_fim'] ?? ''));
+        $qs = ['regra_id' => $regraId, 'aluno_id' => $alunoId, 'periodo_ref' => $periodoRef];
+        if ($dataInicio !== null && $dataFim !== null) {
+            $qs['data_inicio'] = $dataInicio;
+            $qs['data_fim'] = $dataFim;
+        }
+
+        if ($regraId <= 0 || $alunoId <= 0 || $periodoRef === '') {
+            $_SESSION['boletim_flash'] = 'Informe evento, aluno e período para travar.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+            return;
+        }
+
+        $user = $this->auth->getUser();
+        $ok = $this->boletimConfig->travarAluno(
+            $regraId,
+            $alunoId,
+            $periodoRef,
+            $motivo !== '' ? $motivo : 'Ajuste manual — não recalcular em lote',
+            (int) ($user['id'] ?? 0) ?: null,
+            (string) ($user['nome'] ?? '') ?: null
+        );
+        $_SESSION['boletim_flash'] = $ok
+            ? 'Aluno travado neste período. As próximas gerações em lote não vão recalcular as notas dele.'
+            : 'Não foi possível travar este aluno.';
+        $_SESSION['boletim_flash_type'] = $ok ? 'success' : 'error';
+        $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+    }
+
+    public function destravarAluno(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        $alunoId = (int) ($_POST['aluno_id'] ?? 0);
+        $periodoRef = trim((string) ($_POST['periodo_ref'] ?? ''));
+        $dataInicio = $this->normalizarDataYmdOpcional((string) ($_POST['data_inicio'] ?? ''));
+        $dataFim = $this->normalizarDataYmdOpcional((string) ($_POST['data_fim'] ?? ''));
+        $qs = ['regra_id' => $regraId, 'periodo_ref' => $periodoRef];
+        if ($alunoId > 0) {
+            $qs['aluno_id'] = $alunoId;
+        }
+        if ($dataInicio !== null && $dataFim !== null) {
+            $qs['data_inicio'] = $dataInicio;
+            $qs['data_fim'] = $dataFim;
+        }
+
+        $ok = $this->boletimConfig->destravarAluno($regraId, $alunoId, $periodoRef);
+        $_SESSION['boletim_flash'] = $ok
+            ? 'Aluno destravado. A próxima geração em lote vai recalcular as notas dele.'
+            : 'Este aluno não estava travado.';
+        $_SESSION['boletim_flash_type'] = $ok ? 'success' : 'error';
+        $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
     }
 
     /**
@@ -1389,6 +1472,14 @@ class BoletimConfigController extends BaseController
                     $colunas = is_array($matriz) && is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
                     $linhas = is_array($matriz) && is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
                     if ($colunas !== [] && $linhas !== []) {
+                        $userEdit = $this->auth->getUser();
+                        $geracaoId = $this->boletimConfig->criarGeracao(
+                            $regraId,
+                            $periodoRef,
+                            'edicao',
+                            (int) ($userEdit['id'] ?? 0) ?: null,
+                            (string) ($userEdit['nome'] ?? '') ?: null
+                        );
                         $this->boletimConfig->replaceGeneratedResultsForAluno(
                             $regraId,
                             $alunoId,
@@ -1397,8 +1488,12 @@ class BoletimConfigController extends BaseController
                             $dataFim,
                             $colunas,
                             $linhas,
-                            false
+                            false,
+                            $geracaoId
                         );
+                        if ($geracaoId !== null) {
+                            $this->boletimConfig->atualizarGeracaoTotais($geracaoId, 1, 0, count($linhas), 0, 0, ['modo' => 'edicao']);
+                        }
                         $resultado['boletim_oficial_atualizado'] = true;
                     }
                 }
@@ -1662,6 +1757,14 @@ class BoletimConfigController extends BaseController
                 $this->redirect('/admin/boletim-configuracao?' . http_build_query($qsOk));
                 return;
             }
+            $userPub = $this->auth->getUser();
+            $geracaoId = $this->boletimConfig->criarGeracao(
+                $regraId,
+                $periodoRef,
+                'aluno',
+                (int) ($userPub['id'] ?? 0) ?: null,
+                (string) ($userPub['nome'] ?? '') ?: null
+            );
             $this->boletimConfig->replaceGeneratedResultsForAluno(
                 $regraId,
                 $alunoId,
@@ -1670,11 +1773,28 @@ class BoletimConfigController extends BaseController
                 $dataFim,
                 $colunas,
                 $linhas,
-                false
+                false,
+                $geracaoId
             );
-            $_SESSION['boletim_flash'] = 'Boletim oficial gravado para este aluno neste período (visível no app como os demais gerados em lote).';
+            if ($geracaoId !== null) {
+                $this->boletimConfig->atualizarGeracaoTotais($geracaoId, 1, 0, count($linhas), 0, 0, ['modo' => 'aluno']);
+            }
+            $travar = !empty($_POST['travar_aluno']);
+            if ($travar) {
+                $this->boletimConfig->travarAluno(
+                    $regraId,
+                    $alunoId,
+                    $periodoRef,
+                    'Ajuste manual — não recalcular em lote',
+                    (int) ($userPub['id'] ?? 0) ?: null,
+                    (string) ($userPub['nome'] ?? '') ?: null
+                );
+            }
+            $msgTravado = $travar
+                ? ' Este aluno ficou travado: as próximas gerações em lote não vão recalcular as notas dele.'
+                : '';
+            $_SESSION['boletim_flash'] = 'Boletim oficial gravado como nova versão vigente para este aluno neste período.' . $msgTravado;
             $_SESSION['boletim_flash_type'] = 'success';
-            $userPub = $this->auth->getUser();
             $this->sincronizarFichaVidaEscolar(
                 $alunoId,
                 is_array($userPub) ? $userPub : [],
@@ -1941,6 +2061,17 @@ class BoletimConfigController extends BaseController
             ? $this->boletimConfig->getMediaFinalPorAluno($regraId, $periodoRef, $codigoFinal)
             : [];
 
+        $usuarioLog = $this->usuarioGeracaoJob ?? $this->auth->getUser();
+        $usuarioIdLog = (int) ($usuarioLog['id'] ?? 0) ?: null;
+        $usuarioNomeLog = (string) ($usuarioLog['nome'] ?? '') ?: null;
+        $geracaoId = $this->boletimConfig->criarGeracao(
+            $regraId,
+            $periodoRef,
+            $modo,
+            $usuarioIdLog,
+            $usuarioNomeLog
+        );
+
         $stats = $this->gravarBoletinsSimulacaoParaAlunos(
             $regra,
             $regraId,
@@ -1949,12 +2080,14 @@ class BoletimConfigController extends BaseController
             $dataFim,
             $alunos,
             $logContexto,
-            false
+            false,
+            $geracaoId
         );
         $gerados = $stats['gerados'];
         $linhas = $stats['linhas'];
         $erros = $stats['erros'];
         $errosAmostra = $stats['errosAmostra'];
+        $preservados = (int) ($stats['preservados'] ?? 0);
 
         $alunosComMudancaSignificativa = [];
         if ($codigoFinal !== '') {
@@ -1990,14 +2123,36 @@ class BoletimConfigController extends BaseController
             $linhas,
             $erros,
             count($alunosComMudancaSignificativa),
-            ['alunos_mudanca_significativa' => array_slice($alunosComMudancaSignificativa, 0, 20), 'modo' => $modo]
+            [
+                'alunos_mudanca_significativa' => array_slice($alunosComMudancaSignificativa, 0, 20),
+                'modo' => $modo,
+                'alunos_preservados' => $preservados,
+                'geracao_id' => $geracaoId,
+            ]
         );
+        if ($geracaoId !== null) {
+            $this->boletimConfig->atualizarGeracaoTotais(
+                $geracaoId,
+                $gerados,
+                $preservados,
+                $linhas,
+                $erros,
+                count($alunosComMudancaSignificativa),
+                [
+                    'alunos_mudanca_significativa' => array_slice($alunosComMudancaSignificativa, 0, 20),
+                    'modo' => $modo,
+                ]
+            );
+        }
 
         if ($modo === 'gerar') {
-            $msg = 'Geração concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+            $msg = 'Geração concluída: versão nova vigente com ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
         } else {
             $tipoAtualizado = $modo === 'atualizar_previa' ? 'boletins oficiais dos alunos vinculados' : 'boletins oficiais';
-            $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+            $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: versão nova vigente com ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+        }
+        if ($preservados > 0) {
+            $msg .= ' ' . $preservados . ' aluno(s) travado(s) não foram recalculados.';
         }
         if (!empty($errosAmostra)) {
             $msg .= ' Exemplo(s): ' . implode(' | ', $errosAmostra);
@@ -2013,15 +2168,17 @@ class BoletimConfigController extends BaseController
             'gerados' => $gerados,
             'linhas' => $linhas,
             'erros' => $erros,
+            'preservados' => $preservados,
             'mensagem' => $msg,
         ];
     }
 
     /**
-     * Recalcula a matriz e substitui linhas em boletim_resultados_gerados por aluno.
+     * Recalcula a matriz e grava uma nova versão vigente em boletim_resultados_gerados por aluno.
+     * Alunos travados são pulados (a versão vigente deles permanece).
      *
      * @param list<array{id:int,nome?:string}> $alunos
-     * @return array{gerados:int,linhas:int,erros:int,errosAmostra:list<string>}
+     * @return array{gerados:int,linhas:int,erros:int,errosAmostra:list<string>,preservados:int}
      */
     private function gravarBoletinsSimulacaoParaAlunos(
         array $regra,
@@ -2031,17 +2188,27 @@ class BoletimConfigController extends BaseController
         ?string $dataFim,
         array $alunos,
         string $logContexto,
-        bool $preview = false
+        bool $preview = false,
+        ?int $geracaoId = null
     ): array {
         $gerados = 0;
         $linhas = 0;
         $erros = 0;
         $errosAmostra = [];
+        $preservados = 0;
+        $idsTravados = [];
+        if (!$preview) {
+            $idsTravados = array_fill_keys($this->boletimConfig->idsAlunosTravados($regraId, $periodoRef), true);
+        }
         $usuarioVidaRaw = $this->usuarioGeracaoJob ?? $this->auth->getUser();
         $usuarioVida = is_array($usuarioVidaRaw) ? $usuarioVidaRaw : [];
         foreach ($alunos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
             if ($alunoId <= 0) {
+                continue;
+            }
+            if (isset($idsTravados[$alunoId])) {
+                $preservados++;
                 continue;
             }
             $this->renovarHeartbeatGeracao();
@@ -2058,7 +2225,8 @@ class BoletimConfigController extends BaseController
                     $dataFim,
                     $colunas,
                     $rows,
-                    $preview
+                    $preview,
+                    $geracaoId
                 );
                 $gerados++;
                 $linhas += count($rows);
@@ -2080,6 +2248,7 @@ class BoletimConfigController extends BaseController
             'linhas' => $linhas,
             'erros' => $erros,
             'errosAmostra' => $errosAmostra,
+            'preservados' => $preservados,
         ];
     }
 
@@ -2123,7 +2292,8 @@ class BoletimConfigController extends BaseController
         $componentes = $regra['componentes'] ?? [];
         $expansaoQuadro = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
         $regra = $expansaoQuadro['regra'];
-        $componentes = $expansaoQuadro['componentes'];
+        $componentes = $this->anexarFaltasEventoNotasSeFaltar($expansaoQuadro['regra'], $expansaoQuadro['componentes']);
+        $regra['componentes'] = $componentes;
 
         $componentesResultado = [];
         $valoresPorCodigo = [];
@@ -3622,13 +3792,15 @@ class BoletimConfigController extends BaseController
             }));
         }
 
-        usort($midsOrdenados, static function (int $a, int $b) use ($materiaNomesPorId) {
-            $na = $materiaNomesPorId[$a] ?? ('#' . $a);
-            $nb = $materiaNomesPorId[$b] ?? ('#' . $b);
-            $la = function_exists('mb_strtolower') ? mb_strtolower($na, 'UTF-8') : strtolower($na);
-            $lb = function_exists('mb_strtolower') ? mb_strtolower($nb, 'UTF-8') : strtolower($nb);
+        $mapaOrdemMaterias = $this->mapaOrdemMateriasDaRegra($regra);
+        usort($midsOrdenados, static function (int $a, int $b) use ($materiaNomesPorId, $mapaOrdemMaterias): int {
+            $oa = $mapaOrdemMaterias[$a] ?? ($a < 0 ? 50000 + abs($a) : 100000 + $a);
+            $ob = $mapaOrdemMaterias[$b] ?? ($b < 0 ? 50000 + abs($b) : 100000 + $b);
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
 
-            return strcasecmp($la, $lb);
+            return $a <=> $b;
         });
 
         $formula = trim((string) ($regra['formula_final'] ?? ''));
@@ -4103,6 +4275,9 @@ class BoletimConfigController extends BaseController
         $somaPesos = 0.0;
         $somaPonderada = 0.0;
         foreach ($componentesResultado as $comp) {
+            if ($this->componenteContaComoFalta($comp)) {
+                continue;
+            }
             $cod = (string) ($comp['codigo'] ?? '');
             if ($cod === '' || !array_key_exists($cod, $notasLinha) || !is_numeric($notasLinha[$cod])) {
                 continue;
@@ -4158,7 +4333,10 @@ class BoletimConfigController extends BaseController
         $somaPesos = 0.0;
         $somaPonderada = 0.0;
         foreach ($componentes as $comp) {
-            if (!is_numeric($comp['valor'])) {
+            if ($this->componenteContaComoFalta($comp)) {
+                continue;
+            }
+            if (!is_numeric($comp['valor'] ?? null)) {
                 continue;
             }
             $peso = (float) ($comp['peso'] ?? 1);
@@ -5999,6 +6177,92 @@ class BoletimConfigController extends BaseController
         }
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param array<string,mixed> $comp
+     */
+    private function componenteContaComoFalta(array $comp): bool
+    {
+        if ((string) ($comp['source_type'] ?? '') === 'faltas_evento') {
+            return true;
+        }
+        $cfg = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+        $lt = strtolower(trim((string) ($cfg['layout_type'] ?? ($comp['layout_type'] ?? ''))));
+
+        return $lt === 'faltas';
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @return array<int,int>
+     */
+    private function mapaOrdemMateriasDaRegra(array $regra): array
+    {
+        return $this->boletimConfig->mapaOrdemBoletimMaterias(
+            $this->parseSeriesIdsFromRegra($regra),
+            $this->parseTurmasIdsFromRegra($regra)
+        );
+    }
+
+    /**
+     * Evento de Notas sem bloco de faltas: puxa o lançamento do mesmo ano/bimestre.
+     *
+     * @param list<array<string,mixed>> $componentes
+     * @return list<array<string,mixed>>
+     */
+    private function anexarFaltasEventoNotasSeFaltar(array $regra, array $componentes): array
+    {
+        if (strtolower(trim((string) ($regra['exibir_em'] ?? ''))) !== 'notas') {
+            return $componentes;
+        }
+        $bim = (int) ($regra['bimestre'] ?? 0);
+        $ano = (int) ($regra['ano_letivo'] ?? 0);
+        if ($bim < 1 || $bim > 4) {
+            return $componentes;
+        }
+        foreach ($componentes as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $src = (string) ($c['source_type'] ?? '');
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            $lt = strtolower(trim((string) ($cfg['layout_type'] ?? ($c['layout_type'] ?? ''))));
+            if ($src === 'faltas_evento' || $lt === 'faltas' || str_contains($cod, 'falt')) {
+                return $componentes;
+            }
+        }
+        $eventoId = (new SchoolAbsence())->idEventoPorAnoBimestre($ano, $bim);
+        if ($eventoId <= 0) {
+            return $componentes;
+        }
+        $grupo = 'b' . $bim;
+        $componentes[] = [
+            'codigo' => 'faltas',
+            'nome' => 'Faltas',
+            'source_type' => 'faltas_evento',
+            'calc_type' => 'media',
+            'peso' => 1,
+            'filtro_titulo' => '',
+            'blocos_ids' => [],
+            'materias_ids' => [],
+            'usar_percentual' => 0,
+            'escala_max' => 999,
+            'obrigatorio' => 0,
+            'config' => [
+                'faltas_evento_id' => $eventoId,
+                'layout_group' => $grupo,
+                'layout_type' => 'faltas',
+            ],
+            'config_json' => json_encode([
+                'faltas_evento_id' => $eventoId,
+                'layout_group' => $grupo,
+                'layout_type' => 'faltas',
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ];
+
+        return $componentes;
     }
 
     /**

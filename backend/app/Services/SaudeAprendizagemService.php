@@ -306,6 +306,7 @@ class SaudeAprendizagemService
         if ($this->tableExists('boletim_resultados_gerados') && $this->tableExists('boletim_regras')) {
             $ph = implode(',', array_fill(0, count($ids), '?'));
             $previewFilter = $this->columnExists('boletim_resultados_gerados', 'preview') ? ' AND g.preview = 0' : '';
+            $vigenteFilter = $this->columnExists('boletim_resultados_gerados', 'vigente') ? ' AND g.vigente = 1' : '';
             $notaMinExpr = $this->columnExists('boletim_regras', 'nota_minima_aprovacao')
                 ? 'COALESCE(r.nota_minima_aprovacao, 6)'
                 : '6';
@@ -330,10 +331,10 @@ class SaudeAprendizagemService
                  INNER JOIN (
                     SELECT MAX(g2.id) AS id
                     FROM boletim_resultados_gerados g2
-                    WHERE g2.aluno_id IN ($ph)" . ($this->columnExists('boletim_resultados_gerados', 'preview') ? ' AND g2.preview = 0' : '') . "
+                    WHERE g2.aluno_id IN ($ph)" . ($this->columnExists('boletim_resultados_gerados', 'preview') ? ' AND g2.preview = 0' : '') . ($this->columnExists('boletim_resultados_gerados', 'vigente') ? ' AND g2.vigente = 1' : '') . "
                     GROUP BY g2.regra_id, g2.aluno_id, g2.periodo_ref, $materiaGroup
                  ) atual ON atual.id = g.id
-                 WHERE g.media_final IS NOT NULL $previewFilter $anoFilter
+                 WHERE g.media_final IS NOT NULL $previewFilter $vigenteFilter $anoFilter
                  GROUP BY g.aluno_id",
                 $params
             ) ?: [];
