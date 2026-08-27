@@ -99,7 +99,6 @@ $linhas[] = '-- Usado ao criar escola no Master (MysqlProvisioningService::aplic
 $linhas[] = '';
 $linhas[] = 'SET NAMES utf8mb4;';
 $linhas[] = "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';";
-$linhas[] = 'SET SESSION sql_require_primary_key = 0;';
 $linhas[] = 'SET FOREIGN_KEY_CHECKS = 0;';
 $linhas[] = 'SET UNIQUE_CHECKS = 0;';
 $linhas[] = '';

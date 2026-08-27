@@ -49,7 +49,17 @@ $ehFragmento = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fragment');
             <p class="text-sm text-slate-500 mt-1">Somente leitura. Atualiza sozinho a cada 20 segundos, sem recarregar a página.</p>
             <a href="<?= URL ?>/master/escolas/<?= $escolaId ?>/detalhes" class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mt-2">Voltar à ficha da escola</a>
         </div>
-        <p class="text-sm text-slate-500 shrink-0">Atualizado às <?= htmlspecialchars($atualizado_em) ?></p>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
+            <?php if ($tenant_ok && $blocoIdAtual > 0): ?>
+            <a href="<?= URL ?>/master/escolas/<?= $escolaId ?>/provas-ao-vivo/pdf?bloco_id=<?= $blocoIdAtual ?>"
+               target="_blank"
+               class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Relatório PDF
+            </a>
+            <?php endif; ?>
+            <p class="text-sm text-slate-500">Atualizado às <?= htmlspecialchars($atualizado_em) ?></p>
+        </div>
     </div>
 
     <?php if (!$tenant_ok): ?>

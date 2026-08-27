@@ -234,7 +234,7 @@ class MasterProvasAoVivoService
 
         try {
             $stmt = $pdo->prepare(
-                "SELECT pr.aluno_id, pr.prova_id, pr.status, pr.iniciado_em, pr.finalizado_em,
+                "SELECT pr.aluno_id, pr.prova_id, pr.status, pr.iniciado_em, pr.finalizado_em, pr.tempo_gasto,
                         a.nome AS aluno_nome, a.ra AS aluno_ra, t.nome AS turma_nome
                  FROM provas_realizacoes pr
                  INNER JOIN provas_blocos_vinculo pbp ON pbp.prova_id = pr.prova_id AND pbp.bloco_id = :bloco_id
@@ -259,6 +259,9 @@ class MasterProvasAoVivoService
                     'status' => $status,
                     'iniciado_em' => $row['iniciado_em'] ?? null,
                     'finalizado_em' => $row['finalizado_em'] ?? null,
+                    'tempo_gasto' => isset($row['tempo_gasto']) && $row['tempo_gasto'] !== null
+                        ? (int) $row['tempo_gasto']
+                        : null,
                 ];
                 if ($status === 'iniciado') {
                     $porAluno[$alunoId]['em_prova'] = true;
@@ -339,5 +342,232 @@ class MasterProvasAoVivoService
             }
         }
         return $resumo;
+    }
+
+    public const TIPOS_SAIDA_PROVA = [
+        'saida_modo_seguro',
+        'tentativa_sair_tela_cheia',
+        'tentativa_atualizar_pagina',
+        'tentativa_voltar_navegador',
+    ];
+
+    /**
+     * Relatório de efetividade: participação, horários por matéria e tentativas de sair da prova.
+     *
+     * @return array{
+     *   blocos: array,
+     *   bloco: ?array,
+     *   materias: array,
+     *   resumo: array,
+     *   efetividade: array,
+     *   alunos: array,
+     *   eventos: array,
+     *   erro: ?string
+     * }
+     */
+    public function montarRelatorioEfetividade(PDO $pdo, int $blocoIdSelecionado = 0): array
+    {
+        $painel = $this->montarPainel($pdo, $blocoIdSelecionado);
+        $blocoId = (int) ($painel['bloco']['id'] ?? 0);
+        $materias = $painel['materias'] ?? [];
+        $alunos = $painel['alunos'] ?? [];
+        $resumo = $painel['resumo'] ?? [];
+
+        $eventos = [];
+        if ($blocoId > 0) {
+            $provaIds = [];
+            foreach ($materias as $mat) {
+                $pid = (int) ($mat['id'] ?? 0);
+                if ($pid > 0) {
+                    $provaIds[] = $pid;
+                }
+            }
+            $eventos = $this->listarEventosSeguranca($pdo, $blocoId, $provaIds);
+        }
+
+        $alunos = $this->enriquecerAlunosRelatorio($alunos, $eventos);
+        $efetividade = $this->montarEfetividade($alunos, $resumo, count($materias), $eventos);
+
+        $painel['alunos'] = $alunos;
+        $painel['eventos'] = $eventos;
+        $painel['efetividade'] = $efetividade;
+        return $painel;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function rotulosTipoEvento(): array
+    {
+        return [
+            'erro_sessao' => 'Erro de sessão',
+            'erro_salvar_resposta' => 'Erro ao salvar resposta',
+            'erro_finalizar' => 'Erro ao finalizar',
+            'saida_modo_seguro' => 'Saiu do modo seguro (trocou ou fechou a aba)',
+            'tentativa_sair_tela_cheia' => 'Tentou sair da tela cheia',
+            'tentativa_atualizar_pagina' => 'Tentou atualizar a página',
+            'tentativa_voltar_navegador' => 'Tentou voltar no navegador',
+            'outro' => 'Outro incidente',
+        ];
+    }
+
+    /**
+     * @param list<int> $provaIds
+     * @return list<array<string, mixed>>
+     */
+    private function listarEventosSeguranca(PDO $pdo, int $blocoId, array $provaIds): array
+    {
+        try {
+            $sql = "SELECT ev.aluno_id, ev.tipo_evento, ev.prova_id, ev.bloco_id, ev.detalhe, ev.created_at,
+                           a.nome AS aluno_nome, a.ra AS aluno_ra
+                    FROM provas_log_eventos ev
+                    LEFT JOIN alunos a ON a.id = ev.aluno_id
+                    WHERE (ev.bloco_id = :bloco_id";
+            $params = ['bloco_id' => $blocoId];
+
+            $provaIds = array_values(array_unique(array_filter(array_map('intval', $provaIds))));
+            if ($provaIds !== []) {
+                $placeholders = [];
+                foreach ($provaIds as $i => $pid) {
+                    $key = 'prova_' . $i;
+                    $placeholders[] = ':' . $key;
+                    $params[$key] = $pid;
+                }
+                $sql .= ' OR (ev.bloco_id IS NULL AND ev.prova_id IN (' . implode(',', $placeholders) . '))';
+            }
+            $sql .= ') ORDER BY ev.created_at ASC';
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            error_log('MasterProvasAoVivoService::listarEventosSeguranca: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $alunos
+     * @param list<array<string, mixed>> $eventos
+     * @return list<array<string, mixed>>
+     */
+    private function enriquecerAlunosRelatorio(array $alunos, array $eventos): array
+    {
+        $eventosPorAluno = [];
+        foreach ($eventos as $ev) {
+            $alunoId = (int) ($ev['aluno_id'] ?? 0);
+            if ($alunoId <= 0) {
+                continue;
+            }
+            $eventosPorAluno[$alunoId][] = $ev;
+        }
+
+        foreach ($alunos as &$aluno) {
+            $alunoId = (int) ($aluno['aluno_id'] ?? 0);
+            $evs = $eventosPorAluno[$alunoId] ?? [];
+            $aluno['eventos'] = $evs;
+            $aluno['tentou_sair'] = false;
+            $aluno['total_saidas'] = 0;
+            foreach ($evs as $ev) {
+                if (in_array((string) ($ev['tipo_evento'] ?? ''), self::TIPOS_SAIDA_PROVA, true)) {
+                    $aluno['tentou_sair'] = true;
+                    $aluno['total_saidas']++;
+                }
+            }
+
+            $primeiroInicio = null;
+            $ultimoFim = null;
+            $tempoTotal = 0;
+            $temTempo = false;
+            foreach (($aluno['por_materia'] ?? []) as $cel) {
+                $ini = $this->timestampValido($cel['iniciado_em'] ?? null);
+                $fim = $this->timestampValido($cel['finalizado_em'] ?? null);
+                if ($ini !== null && ($primeiroInicio === null || $ini < $primeiroInicio)) {
+                    $primeiroInicio = $ini;
+                }
+                if ($fim !== null && ($ultimoFim === null || $fim > $ultimoFim)) {
+                    $ultimoFim = $fim;
+                }
+                $gasto = $cel['tempo_gasto'] ?? null;
+                if ($gasto !== null && (int) $gasto > 0) {
+                    $tempoTotal += (int) $gasto;
+                    $temTempo = true;
+                } elseif ($ini !== null && $fim !== null && $fim >= $ini) {
+                    $tempoTotal += (int) round(($fim - $ini) / 60);
+                    $temTempo = true;
+                }
+            }
+            $aluno['iniciado_em_primeiro'] = $primeiroInicio !== null ? date('Y-m-d H:i:s', $primeiroInicio) : null;
+            $aluno['finalizado_em_ultimo'] = $ultimoFim !== null ? date('Y-m-d H:i:s', $ultimoFim) : null;
+            $aluno['tempo_total_min'] = $temTempo ? $tempoTotal : null;
+        }
+        unset($aluno);
+
+        return $alunos;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $alunos
+     * @param array<string, int> $resumo
+     * @param list<array<string, mixed>> $eventos
+     * @return array<string, mixed>
+     */
+    private function montarEfetividade(array $alunos, array $resumo, int $totalMaterias, array $eventos): array
+    {
+        $total = count($alunos);
+        $participaram = (int) ($resumo['com_atividade'] ?? 0);
+        $concluiuTodas = (int) ($resumo['concluiu_todas'] ?? 0);
+        $naoComecou = (int) ($resumo['nao_comecou'] ?? 0);
+        $canceladas = (int) ($resumo['canceladas'] ?? 0);
+        $emProva = (int) ($resumo['em_prova'] ?? 0);
+
+        $tentaramSair = 0;
+        $alunosSairam = [];
+        foreach ($alunos as $aluno) {
+            if (!empty($aluno['tentou_sair'])) {
+                $tentaramSair++;
+                $alunosSairam[] = $aluno;
+            }
+        }
+
+        $eventosSaida = 0;
+        foreach ($eventos as $ev) {
+            if (in_array((string) ($ev['tipo_evento'] ?? ''), self::TIPOS_SAIDA_PROVA, true)) {
+                $eventosSaida++;
+            }
+        }
+
+        $pct = static function (int $parte, int $base): ?float {
+            if ($base <= 0) {
+                return null;
+            }
+            return round(($parte / $base) * 100, 1);
+        };
+
+        return [
+            'total_alunos' => $total,
+            'total_materias' => $totalMaterias,
+            'participaram' => $participaram,
+            'nao_comecou' => $naoComecou,
+            'concluiu_todas' => $concluiuTodas,
+            'canceladas' => $canceladas,
+            'em_prova' => $emProva,
+            'pct_participacao' => $pct($participaram, $total),
+            'pct_conclusao' => $pct($concluiuTodas, $total),
+            'pct_conclusao_participantes' => $pct($concluiuTodas, $participaram),
+            'tentaram_sair' => $tentaramSair,
+            'eventos_saida' => $eventosSaida,
+            'alunos_sairam' => $alunosSairam,
+        ];
+    }
+
+    private function timestampValido($valor): ?int
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '' || $valor === '0000-00-00 00:00:00') {
+            return null;
+        }
+        $ts = strtotime($valor);
+        return $ts ?: null;
     }
 }

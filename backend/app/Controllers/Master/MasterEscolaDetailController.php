@@ -2105,6 +2105,98 @@ class MasterEscolaDetailController extends BaseController
             'atualizado_em' => date('H:i:s'),
         ]));
     }
+
+    /**
+     * PDF de efetividade da prova na plataforma (participação, horários e saídas).
+     */
+    public function provasAoVivoPdf($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $escola = $this->getEscolaOrFail($id);
+
+        require_once __DIR__ . '/../../Services/MasterProvasAoVivoService.php';
+
+        $pdo = $this->connectTenant($escola);
+        if (!$pdo) {
+            $this->setFlashMessage('Não foi possível conectar ao banco da escola.', 'error');
+            $this->redirect('/master/escolas/' . $id . '/provas-ao-vivo');
+            return;
+        }
+
+        $servico = new MasterProvasAoVivoService();
+        $relatorio = $servico->montarRelatorioEfetividade($pdo, (int) ($_GET['bloco_id'] ?? 0));
+        if (empty($relatorio['bloco'])) {
+            $this->setFlashMessage('Nenhum bloco de prova encontrado para gerar o relatório.', 'error');
+            $this->redirect('/master/escolas/' . $id . '/provas-ao-vivo');
+            return;
+        }
+
+        $viewFile = $this->resolveViewPath('master/escolas/detail/provas-ao-vivo-pdf');
+        if ($viewFile === null) {
+            $this->setFlashMessage('Modelo do relatório PDF não encontrado.', 'error');
+            $this->redirect('/master/escolas/' . $id . '/provas-ao-vivo');
+            return;
+        }
+
+        ob_start();
+        extract([
+            'escola' => $escola,
+            'bloco' => $relatorio['bloco'],
+            'materias' => $relatorio['materias'] ?? [],
+            'alunos' => $relatorio['alunos'] ?? [],
+            'efetividade' => $relatorio['efetividade'] ?? [],
+            'eventos' => $relatorio['eventos'] ?? [],
+            'rotulos_evento' => MasterProvasAoVivoService::rotulosTipoEvento(),
+            'logo_data' => $this->logoEducatudoDataUri(),
+            'gerado_em' => date('d/m/Y H:i'),
+        ], EXTR_SKIP);
+        require $viewFile;
+        $html = (string) ob_get_clean();
+
+        $slug = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($relatorio['bloco']['titulo'] ?? 'prova'));
+        $slug = trim((string) $slug, '_-') ?: 'prova';
+        $filename = 'efetividade_prova_' . $slug . '_' . date('Ymd_His') . '.pdf';
+        $this->outputPdfPaisagem($html, $filename);
+    }
+
+    private function logoEducatudoDataUri(): string
+    {
+        $path = dirname(__DIR__, 3) . '/public/assets/logos/logo-educatudo-black.png';
+        if (!is_file($path) || !is_readable($path)) {
+            return '';
+        }
+        $bin = @file_get_contents($path);
+        if (!is_string($bin) || $bin === '') {
+            return '';
+        }
+        return 'data:image/png;base64,' . base64_encode($bin);
+    }
+
+    private function outputPdfPaisagem(string $html, string $filename): void
+    {
+        $oldDisplayErrors = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        try {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'landscape');
+            $dompdf->render();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            echo $dompdf->output();
+            exit;
+        } finally {
+            ini_set('display_errors', (string) $oldDisplayErrors);
+        }
+    }
 }
 
 }
