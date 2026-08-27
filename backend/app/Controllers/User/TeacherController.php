@@ -1558,14 +1558,15 @@ if (!class_exists('TeacherController')) {
                     j.titulo as jornada_titulo,
                     jme.titulo as exercicio_titulo,
                     jme.enunciado as exercicio_enunciado,
-                    jme.resposta_correta
+                    jme.resposta_correta,
+                    jme.tipo as exercicio_tipo
              FROM jornadas_progresso_alunos jpa
              LEFT JOIN jornadas_modulos jm ON jpa.modulo_id = jm.id
              LEFT JOIN jornadas j ON jm.jornada_id = j.id
              LEFT JOIN jornadas_modulos_exercicios jme ON jpa.exercicio_modulo_id = jme.id
              WHERE jpa.aluno_id = :aluno_id
              AND jpa.status = 'concluido'
-             AND jpa.pontuacao IS NOT NULL
+             AND jpa.resposta IS NOT NULL
              ORDER BY jpa.data_conclusao DESC
              LIMIT 50",
             ['aluno_id' => $aluno['id']]
@@ -1616,7 +1617,13 @@ if (!class_exists('TeacherController')) {
         if (!empty($exercicios)) {
             $acertos = 0;
             foreach ($exercicios as $exercicio) {
-                if ($exercicio['pontuacao'] > 0) {
+                $statusEx = JornadaExercicioAvaliacao::classificar(
+                    $exercicio['exercicio_tipo'] ?? '',
+                    $exercicio['pontuacao'] ?? null,
+                    $exercicio['resposta'] ?? '',
+                    true
+                );
+                if ($statusEx === JornadaExercicioAvaliacao::STATUS_ACERTO) {
                     $acertos++;
                 }
             }

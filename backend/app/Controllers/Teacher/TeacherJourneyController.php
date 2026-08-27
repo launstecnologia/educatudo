@@ -949,6 +949,15 @@ class TeacherJourneyController extends BaseController
             // Professor pode sempre acessar o gerenciador de blocos (aguardando, em andamento ou concluído)
             $mostrarGerenciarBlocos = true;
             
+            $sqlAcertoJme = JornadaExercicioAvaliacao::sqlCaseAcerto('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroJme = JornadaExercicioAvaliacao::sqlCaseErro('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlAcertoJmeG = JornadaExercicioAvaliacao::sqlCaseAcertoCorrigido('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroJmeG = JornadaExercicioAvaliacao::sqlCaseErroCorrigido('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlAcertoJe = JornadaExercicioAvaliacao::sqlCaseAcerto('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroJe = JornadaExercicioAvaliacao::sqlCaseErro('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlAcertoJeG = JornadaExercicioAvaliacao::sqlCaseAcertoCorrigido('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroJeG = JornadaExercicioAvaliacao::sqlCaseErroCorrigido('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+
             // Busca estatísticas dos exercícios (dashboard)
             $dashboard_exercicios = [];
             $tem_exercicios = false;
@@ -961,10 +970,10 @@ class TeacherJourneyController extends BaseController
                     jme.enunciado,
                     jm.titulo as modulo_nome,
                     COUNT(DISTINCT jpa.id) as total_respostas,
-                    SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as total_acertos,
-                    SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as total_erros,
-                    COALESCE(AVG(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) * 100, 0) as taxa_acerto,
-                    COALESCE(AVG(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) * 100, 0) as taxa_erro
+                    SUM({$sqlAcertoJme}) as total_acertos,
+                    SUM({$sqlErroJme}) as total_erros,
+                    COALESCE(AVG({$sqlAcertoJmeG}) * 100, 0) as taxa_acerto,
+                    COALESCE(AVG({$sqlErroJmeG}) * 100, 0) as taxa_erro
                  FROM jornadas_modulos jm
                  LEFT JOIN jornadas_modulos_exercicios jme ON jme.modulo_id = jm.id
                  LEFT JOIN jornadas_progresso_alunos jpa ON jpa.exercicio_modulo_id = jme.id 
@@ -987,10 +996,10 @@ class TeacherJourneyController extends BaseController
                     je.descricao as enunciado,
                     'Exercício' as modulo_nome,
                     COUNT(DISTINCT jpa.id) as total_respostas,
-                    SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as total_acertos,
-                    SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as total_erros,
-                    COALESCE(AVG(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) * 100, 0) as taxa_acerto,
-                    COALESCE(AVG(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) * 100, 0) as taxa_erro
+                    SUM({$sqlAcertoJe}) as total_acertos,
+                    SUM({$sqlErroJe}) as total_erros,
+                    COALESCE(AVG({$sqlAcertoJeG}) * 100, 0) as taxa_acerto,
+                    COALESCE(AVG({$sqlErroJeG}) * 100, 0) as taxa_erro
                  FROM jornadas_exercicios je
                  LEFT JOIN jornadas_progresso_alunos jpa ON jpa.exercicio_id = je.id 
                      AND jpa.jornada_id = je.jornada_id
@@ -1061,21 +1070,27 @@ class TeacherJourneyController extends BaseController
                 }
                 $placeholders = implode(',', array_fill(0, count($turmasIds), '?'));
                 $params = array_merge([$id], $turmasIds);
+                $sqlAcertoAluno = JornadaExercicioAvaliacao::sqlCaseAcerto('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+                $sqlErroAluno = JornadaExercicioAvaliacao::sqlCaseErro('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+                $sqlAcertoAlunoG = JornadaExercicioAvaliacao::sqlCaseAcertoCorrigido('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+                $sqlErroAlunoG = JornadaExercicioAvaliacao::sqlCaseErroCorrigido('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
                 $alunosComBaixoDesempenho = $this->db->fetchAll(
                     "SELECT 
                         a.id as aluno_id,
                         a.nome as aluno_nome,
                         a.ra as aluno_ra,
                         COUNT(jpa.id) as total_respostas,
-                        SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as total_acertos,
-                        SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as total_erros,
-                        CASE WHEN COUNT(jpa.id) > 0 THEN ROUND((SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(jpa.id)), 1) ELSE 0 END as taxa_erro,
-                        CASE WHEN COUNT(jpa.id) > 0 THEN ROUND((SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(jpa.id)), 1) ELSE 0 END as taxa_acerto
+                        SUM({$sqlAcertoAluno}) as total_acertos,
+                        SUM({$sqlErroAluno}) as total_erros,
+                        COALESCE(ROUND(AVG({$sqlErroAlunoG}) * 100, 1), 0) as taxa_erro,
+                        COALESCE(ROUND(AVG({$sqlAcertoAlunoG}) * 100, 1), 0) as taxa_acerto
                      FROM alunos a
                      LEFT JOIN jornadas_progresso_alunos jpa ON jpa.aluno_id = a.id 
                          AND jpa.jornada_id = ?
                          AND jpa.resposta IS NOT NULL
                          AND (jpa.atividade_tipo = 'exercicio_modulo' OR jpa.atividade_tipo = 'exercicio')
+                     LEFT JOIN jornadas_modulos_exercicios jme ON jme.id = jpa.exercicio_modulo_id
+                     LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
                      WHERE a.turma_id IN ($placeholders) AND a.ativo = 1
                      GROUP BY a.id, a.nome, a.ra
                      HAVING total_erros > 0 AND taxa_erro > 40
@@ -1955,31 +1970,16 @@ class TeacherJourneyController extends BaseController
             if (!$jornada) {
                 throw new Exception('Você não tem permissão para avaliar esta jornada');
             }
-            $pontuacao_val = $pontuacao === null ? 0 : (float) $pontuacao;
-            $stmt = $this->db->query(
-                "UPDATE jornadas_progresso_alunos 
-                 SET pontuacao = :pontuacao, updated_at = NOW() 
-                 WHERE exercicio_modulo_id = :exercicio_id AND aluno_id = :aluno_id AND jornada_id = :jornada_id AND atividade_tipo = 'exercicio_modulo'",
-                [
-                    'pontuacao' => $pontuacao_val,
-                    'exercicio_id' => $exercicio_id,
-                    'aluno_id' => $aluno_id,
-                    'jornada_id' => $jornada_id
-                ]
+            $pontuacao_val = $pontuacao === null ? 0.0 : (float) $pontuacao;
+            $affected = JornadaExercicioAvaliacao::aplicarNotaProfessor(
+                $this->db,
+                (int) $exercicio_id,
+                (int) $aluno_id,
+                (int) $jornada_id,
+                $pontuacao_val
             );
-            $affected = $stmt ? $stmt->rowCount() : 0;
             if ($affected === 0) {
-                $this->db->query(
-                    "UPDATE jornadas_progresso_alunos 
-                     SET pontuacao = :pontuacao, updated_at = NOW() 
-                     WHERE exercicio_id = :exercicio_id AND aluno_id = :aluno_id AND jornada_id = :jornada_id AND atividade_tipo = 'exercicio'",
-                    [
-                        'pontuacao' => $pontuacao_val,
-                        'exercicio_id' => $exercicio_id,
-                        'aluno_id' => $aluno_id,
-                        'jornada_id' => $jornada_id
-                    ]
-                );
+                throw new Exception('Resposta do aluno não encontrada para atribuir nota');
             }
             $this->json([
                 'success' => true,
@@ -5747,14 +5747,30 @@ Retorne APENAS um JSON válido no seguinte formato:
                     $stats = $this->db->fetch(
                         "SELECT
                             COUNT(*) as total_exercicios,
-                            SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) as acertos,
-                            SUM(CASE WHEN base.pontuacao <= 0 THEN 1 ELSE 0 END) as erros,
+                            SUM(CASE
+                                  WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0
+                                  WHEN base.pontuacao > 0 THEN 1
+                                  ELSE 0
+                                END) as acertos,
+                            SUM(CASE
+                                  WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0
+                                  WHEN base.pontuacao > 0 THEN 0
+                                  ELSE 1
+                                END) as erros,
                             COALESCE(SUM(base.pontuacao), 0) as nota_total,
                             COALESCE(AVG(base.pontuacao), 0) as nota_media,
                             COUNT(*) as total_respostas
                          FROM (
-                            SELECT jpa.exercicio_modulo_id, MAX(COALESCE(jpa.pontuacao, 0)) as pontuacao
+                            SELECT jpa.exercicio_modulo_id,
+                                   MAX(jpa.pontuacao) as pontuacao,
+                                   MAX(me.tipo) as tipo,
+                                   MAX(CASE
+                                         WHEN JSON_VALID(jpa.resposta)
+                                          AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(jpa.resposta, '$.correcao_status')), '') = 'corrigida'
+                                         THEN 1 ELSE 0
+                                       END) as corrigida
                             FROM jornadas_progresso_alunos jpa
+                            LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
                             WHERE jpa.aluno_id = :aluno_id
                               AND jpa.jornada_id = :jornada_id
                               AND jpa.atividade_tipo = 'exercicio_modulo'
@@ -6288,39 +6304,13 @@ Retorne APENAS um JSON válido no seguinte formato:
                 error_log("Exercícios antigos encontrados: " . count($exerciciosAntigosCheck));
             }
             
-            // Calcula estatísticas
-            $total = count($exercicios);
-            $respondidos = 0;
-            $acertos = 0;
-            $erros = 0;
-            $notaTotal = 0;
-            
-            foreach ($exercicios as $ex) {
-                if (!empty($ex['resposta_aluno'])) {
-                    $respondidos++;
-                    if (($ex['pontuacao_aluno'] ?? 0) > 0) {
-                        $acertos++;
-                        $notaTotal += $ex['pontuacao_aluno'];
-                    } else {
-                        $erros++;
-                    }
-                }
-            }
-            
             $data = [
                 'title' => 'Prova Detalhada - ' . $aluno['nome'] . ' - EducaTudo',
                 'user' => $user,
                 'jornada' => $jornada,
                 'aluno' => $aluno,
                 'exercicios' => $exercicios,
-                'estatisticas' => [
-                    'total' => $total,
-                    'respondidos' => $respondidos,
-                    'acertos' => $acertos,
-                    'erros' => $erros,
-                    'nota_total' => $notaTotal,
-                    'percentual' => $total > 0 ? round(($acertos / $total) * 100, 1) : 0
-                ],
+                'estatisticas' => JornadaExercicioAvaliacao::agregarEstatisticas($exercicios),
                 'current_page' => 'journeys',
                 'csrf_token' => $this->generateCsrfToken()
             ];

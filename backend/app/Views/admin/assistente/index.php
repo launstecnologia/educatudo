@@ -621,8 +621,8 @@ $urlBase = URL . '/admin/assistente';
                 he += '<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Sem exercícios neste detalhe.</td></tr>';
             }
             exs.forEach(function (e) {
-                var res = !e.respondeu ? 'Não respondeu' : (e.acertou ? 'Acerto' : 'Erro');
-                var resClass = !e.respondeu ? 'text-gray-500' : (e.acertou ? 'text-emerald-700 font-semibold' : 'text-rose-700 font-semibold');
+                var res = !e.respondeu ? 'Não respondeu' : (e.aguardando_correcao ? 'Aguardando correção' : (e.acertou ? 'Acerto' : 'Erro'));
+                var resClass = !e.respondeu ? 'text-gray-500' : (e.aguardando_correcao ? 'text-amber-700 font-semibold' : (e.acertou ? 'text-emerald-700 font-semibold' : 'text-rose-700 font-semibold'));
                 var marcou = '—';
                 if (e.alternativa_marcada) {
                     marcou = esc((e.alternativa_marcada.letra || '') + ') ' + (e.alternativa_marcada.texto || ''));

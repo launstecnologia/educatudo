@@ -214,6 +214,7 @@ $router->post('/admin/jornadas/excluir', 'Education/AdminJourneyController@exclu
 $router->post('/admin/jornadas/inativar', 'Education/AdminJourneyController@inativar');
 $router->post('/admin/jornadas/inativar-lote', 'Education/AdminJourneyController@inativarLote');
 $router->post('/admin/jornadas/resumos/atribuir-nota', 'Education/AdminJourneyController@atribuirNotaResumo');
+$router->post('/admin/jornadas/exercicios/atribuir-nota-dissertativa', 'Education/AdminJourneyController@atribuirNotaDissertativa');
 $router->delete('/admin/jornadas/{id}', 'Education/AdminJourneyController@delete');
 $router->get('/admin/jornadas/professor/{professor_id}', 'Education/AdminJourneyController@porProfessor');
 $router->get('/admin/jornadas/turma/{turma_id}', 'Education/AdminJourneyController@porTurma');

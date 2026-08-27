@@ -224,7 +224,21 @@
                             </p>
                         </div>
                         <div class="ml-4 text-right">
-                            <?php if ($exercicio['pontuacao'] > 0): ?>
+                            <?php
+                            $statusEx = JornadaExercicioAvaliacao::classificar(
+                                $exercicio['exercicio_tipo'] ?? '',
+                                $exercicio['pontuacao'] ?? null,
+                                $exercicio['resposta'] ?? '',
+                                true
+                            );
+                            $pendenteEx = $statusEx === JornadaExercicioAvaliacao::STATUS_PENDENTE;
+                            $corretoEx = $statusEx === JornadaExercicioAvaliacao::STATUS_ACERTO;
+                            ?>
+                            <?php if ($pendenteEx): ?>
+                                <span class="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-sm font-semibold rounded-full">
+                                    Aguardando correção
+                                </span>
+                            <?php elseif ($corretoEx): ?>
                                 <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-sm font-semibold rounded-full">
                                     ✓ Correto
                                 </span>
@@ -233,7 +247,9 @@
                                     ✗ Errado
                                 </span>
                             <?php endif; ?>
-                            <p class="text-xs text-gray-500 mt-1">Pontuação: <?= number_format($exercicio['pontuacao'] ?? 0, 1) ?></p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                <?= $pendenteEx ? 'Pontuação: —' : ('Pontuação: ' . number_format($exercicio['pontuacao'] ?? 0, 1)) ?>
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -59,9 +59,15 @@ $engClass = $coresEng[$eng['cor'] ?? 'gray'] ?? $coresEng['gray'];
             }
         }
         $respondido = trim((string) $respostaAluno) !== '';
-        $pontuacao = (float) ($ex['pontuacao_aluno'] ?? 0);
-        $correto = $respondido && $pontuacao > 0;
-        $border = $correto ? 'border-green-200' : ($respondido ? 'border-red-200' : 'border-gray-200');
+        $resultadoEx = JornadaExercicioAvaliacao::classificar(
+            $ex['tipo'] ?? '',
+            $ex['pontuacao_aluno'] ?? null,
+            $ex['resposta_aluno'] ?? '',
+            $respondido
+        );
+        $pendente = $resultadoEx === JornadaExercicioAvaliacao::STATUS_PENDENTE;
+        $correto = $resultadoEx === JornadaExercicioAvaliacao::STATUS_ACERTO;
+        $border = $correto ? 'border-green-200' : ($pendente ? 'border-amber-200' : ($respondido ? 'border-red-200' : 'border-gray-200'));
         ?>
         <div class="bg-white rounded-xl shadow p-5 border-2 <?= $border ?>">
             <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
@@ -72,8 +78,8 @@ $engClass = $coresEng[$eng['cor'] ?? 'gray'] ?? $coresEng['gray'];
                     <?php endif; ?>
                 </div>
                 <?php if ($respondido): ?>
-                    <span class="text-xs px-2 py-1 rounded-full <?= $correto ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
-                        <?= $correto ? 'Acertou' : 'Errou' ?>
+                    <span class="text-xs px-2 py-1 rounded-full <?= $pendente ? 'bg-amber-100 text-amber-800' : ($correto ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') ?>">
+                        <?= $pendente ? 'Aguardando correção' : ($correto ? 'Acertou' : 'Errou') ?>
                     </span>
                 <?php else: ?>
                     <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">Sem resposta</span>

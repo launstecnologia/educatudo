@@ -248,7 +248,7 @@ class JourneyController extends BaseController
             "SELECT jpa.id, jpa.jornada_id, jpa.atividade_tipo, jpa.exercicio_modulo_id, jpa.exercicio_id,
                     jpa.pontuacao, jpa.resposta,
                     me.tipo AS tipo_me, me.questoes_json AS qjson_me,
-                    NULL AS qjson_legacy
+                    NULL AS tipo_leg, NULL AS qjson_legacy
              FROM jornadas_progresso_alunos jpa
              LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
              WHERE jpa.aluno_id = ?
@@ -265,7 +265,7 @@ class JourneyController extends BaseController
             "SELECT jpa.id, jpa.jornada_id, jpa.atividade_tipo, jpa.exercicio_modulo_id, jpa.exercicio_id,
                     jpa.pontuacao, jpa.resposta,
                     NULL AS tipo_me, NULL AS qjson_me,
-                    je.questoes_json AS qjson_legacy
+                    je.tipo AS tipo_leg, je.questoes_json AS qjson_legacy
              FROM jornadas_progresso_alunos jpa
              LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
              WHERE jpa.aluno_id = ?
@@ -301,6 +301,8 @@ class JourneyController extends BaseController
             $p = (float) ($row['pontuacao'] ?? 0);
             $respostaEnc = (string) ($row['resposta'] ?? '');
             $tipoMe = (string) ($row['tipo_me'] ?? '');
+            $tipoLeg = (string) ($row['tipo_leg'] ?? '');
+            $tipoEx = $tipoAt === 'exercicio_modulo' ? $tipoMe : $tipoLeg;
             $qjson = $row['qjson_me'] ?? null;
             if ($tipoAt === 'exercicio') {
                 $qjson = $row['qjson_legacy'] ?? null;
@@ -313,16 +315,27 @@ class JourneyController extends BaseController
                 $gabarito = $this->avaliarAlternativasCorretoPorQuestoesJson($qjson, $respostaEnc);
             }
 
+            $pendente = JornadaExercicioAvaliacao::pendenteCorrecao(
+                $tipoEx,
+                $row['pontuacao'] ?? null,
+                $respostaEnc,
+                true
+            );
             $acerto = $p > 0;
             if ($gabarito !== null) {
                 $acerto = ($gabarito === true);
             }
+            if ($pendente) {
+                $acerto = false;
+            }
 
             if (!isset($stats[$jid])) {
-                $stats[$jid] = ['resp' => 0, 'acertos' => 0];
+                $stats[$jid] = ['resp' => 0, 'acertos' => 0, 'pendentes' => 0];
             }
             $stats[$jid]['resp']++;
-            if ($acerto) {
+            if ($pendente) {
+                $stats[$jid]['pendentes']++;
+            } elseif ($acerto) {
                 $stats[$jid]['acertos']++;
             }
         }
@@ -332,6 +345,7 @@ class JourneyController extends BaseController
             if ($jid > 0 && isset($stats[$jid])) {
                 $j['questoes_respondidas'] = $stats[$jid]['resp'];
                 $j['questoes_acertos'] = $stats[$jid]['acertos'];
+                $j['questoes_pendentes'] = $stats[$jid]['pendentes'];
             }
         }
         unset($j);
@@ -428,13 +442,16 @@ class JourneyController extends BaseController
             $qt = (int) ($jornada['questoes_total'] ?? 0);
             $resp = (int) ($jornada['questoes_respondidas'] ?? 0);
             $ac = (int) ($jornada['questoes_acertos'] ?? 0);
-            $er = max(0, $resp - $ac);
+            $pend = (int) ($jornada['questoes_pendentes'] ?? 0);
+            $er = max(0, $resp - $ac - $pend);
+            $jornada['questoes_pendentes'] = $pend;
             $jornada['questoes_erros'] = $er;
             $jornada['questoes_nao_respondidas'] = max(0, $qt - $resp);
             $jornada['questoes_pct_acertos_total'] = $qt > 0 ? round(($ac / $qt) * 100, 1) : null;
             $jornada['questoes_pct_erros_total'] = $qt > 0 ? round(($er / $qt) * 100, 1) : null;
-            $jornada['questoes_pct_acertos_respondidas'] = $resp > 0 ? round(($ac / $resp) * 100, 1) : null;
-            $jornada['questoes_pct_erros_respondidas'] = $resp > 0 ? round(($er / $resp) * 100, 1) : null;
+            $corrigidas = max(0, $resp - $pend);
+            $jornada['questoes_pct_acertos_respondidas'] = $corrigidas > 0 ? round(($ac / $corrigidas) * 100, 1) : null;
+            $jornada['questoes_pct_erros_respondidas'] = $corrigidas > 0 ? round(($er / $corrigidas) * 100, 1) : null;
         }
         unset($jornada);
 
@@ -474,6 +491,7 @@ class JourneyController extends BaseController
         $questoesTotal = 0;
         $questoesRespondidas = 0;
         $questoesAcertos = 0;
+        $questoesPendentes = 0;
         foreach ($jornadas as $j) {
             $st = (string) ($j['status_exibicao'] ?? '');
             if (!empty($j['jornada_concluida']) || $st === 'concluido') {
@@ -488,8 +506,9 @@ class JourneyController extends BaseController
             $questoesTotal += (int) ($j['questoes_total'] ?? 0);
             $questoesRespondidas += (int) ($j['questoes_respondidas'] ?? 0);
             $questoesAcertos += (int) ($j['questoes_acertos'] ?? 0);
+            $questoesPendentes += (int) ($j['questoes_pendentes'] ?? 0);
         }
-        $questoesErros = max(0, $questoesRespondidas - $questoesAcertos);
+        $questoesErros = max(0, $questoesRespondidas - $questoesAcertos - $questoesPendentes);
         $questoesNaoRespondidas = max(0, $questoesTotal - $questoesRespondidas);
         $pctJornConcl = $total > 0 ? round(($concluidas / $total) * 100, 1) : null;
         $pctJornEm = $total > 0 ? round(($jornadasEmAndamento / $total) * 100, 1) : null;
@@ -517,6 +536,7 @@ class JourneyController extends BaseController
             'questoes_respondidas' => $questoesRespondidas,
             'questoes_acertos' => $questoesAcertos,
             'questoes_erros' => $questoesErros,
+            'questoes_pendentes' => $questoesPendentes,
             'questoes_nao_respondidas' => $questoesNaoRespondidas,
             'questoes_pct_respondidas' => $pctQuestResp,
             'questoes_pct_acertos_respondidas' => $pctAcertosResp,
@@ -1307,6 +1327,7 @@ class JourneyController extends BaseController
                 COALESCE(jme.total_modulo_exercicios, 0) + COALESCE(je.total_exercicios, 0) AS questoes_total,
                 COALESCE(jqst_mod.questoes_respondidas, 0) + COALESCE(jqst_leg.questoes_respondidas, 0) AS questoes_respondidas,
                 COALESCE(jqst_mod.questoes_acertos, 0) + COALESCE(jqst_leg.questoes_acertos, 0) AS questoes_acertos,
+                COALESCE(jqst_mod.questoes_pendentes, 0) + COALESCE(jqst_leg.questoes_pendentes, 0) AS questoes_pendentes,
                 COALESCE(jpa_aulas.aulas_concluidas, 0) AS aulas_concluidas,
                 COALESCE(jm.total_modulos, 0) AS total_modulos,
                 COALESCE(jpa_mod.modulos_concluidos, 0) AS modulos_concluidos
@@ -1334,10 +1355,26 @@ class JourneyController extends BaseController
             LEFT JOIN (
                 SELECT base.jornada_id,
                        COUNT(*) AS questoes_respondidas,
-                       SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) AS questoes_acertos
+                       SUM(CASE
+                             WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0
+                             WHEN base.pontuacao > 0 THEN 1
+                             ELSE 0
+                           END) AS questoes_acertos,
+                       SUM(CASE
+                             WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 1
+                             ELSE 0
+                           END) AS questoes_pendentes
                 FROM (
-                    SELECT jpa.jornada_id, MAX(COALESCE(jpa.pontuacao, 0)) AS pontuacao
+                    SELECT jpa.jornada_id,
+                           MAX(jpa.pontuacao) AS pontuacao,
+                           MAX(me.tipo) AS tipo,
+                           MAX(CASE
+                                 WHEN JSON_VALID(jpa.resposta)
+                                  AND JSON_UNQUOTE(JSON_EXTRACT(jpa.resposta, '$.correcao_status')) = 'corrigida'
+                                 THEN 1 ELSE 0
+                               END) AS corrigida
                     FROM jornadas_progresso_alunos jpa
+                    LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
                     WHERE jpa.aluno_id = :aluno_id_quest_mod
                       AND jpa.atividade_tipo = 'exercicio_modulo'
                       AND jpa.resposta IS NOT NULL
@@ -1349,10 +1386,26 @@ class JourneyController extends BaseController
             LEFT JOIN (
                 SELECT base.jornada_id,
                        COUNT(*) AS questoes_respondidas,
-                       SUM(CASE WHEN base.pontuacao > 0 THEN 1 ELSE 0 END) AS questoes_acertos
+                       SUM(CASE
+                             WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 0
+                             WHEN base.pontuacao > 0 THEN 1
+                             ELSE 0
+                           END) AS questoes_acertos,
+                       SUM(CASE
+                             WHEN base.tipo = 'dissertativa' AND base.corrigida = 0 AND (base.pontuacao IS NULL OR base.pontuacao <= 0) THEN 1
+                             ELSE 0
+                           END) AS questoes_pendentes
                 FROM (
-                    SELECT jpa.jornada_id, MAX(COALESCE(jpa.pontuacao, 0)) AS pontuacao
+                    SELECT jpa.jornada_id,
+                           MAX(jpa.pontuacao) AS pontuacao,
+                           MAX(je.tipo) AS tipo,
+                           MAX(CASE
+                                 WHEN JSON_VALID(jpa.resposta)
+                                  AND JSON_UNQUOTE(JSON_EXTRACT(jpa.resposta, '$.correcao_status')) = 'corrigida'
+                                 THEN 1 ELSE 0
+                               END) AS corrigida
                     FROM jornadas_progresso_alunos jpa
+                    LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
                     WHERE jpa.aluno_id = :aluno_id_quest_leg
                       AND jpa.atividade_tipo = 'exercicio'
                       AND jpa.resposta IS NOT NULL
@@ -4192,6 +4245,32 @@ class JourneyController extends BaseController
                 }
             }
 
+            $aguardandoCorrecao = false;
+            if (($exercicio['tipo'] ?? '') === 'dissertativa') {
+                $jaCorrigida = $progresso && JornadaExercicioAvaliacao::corrigidaPeloProfessor($progresso['resposta'] ?? null);
+                $textoIgual = $respostaAnterior !== null && trim((string) $resposta) === trim((string) $respostaAnterior);
+                if ($jaCorrigida && $textoIgual) {
+                    $pontuacao = isset($progresso['pontuacao']) && $progresso['pontuacao'] !== null && $progresso['pontuacao'] !== ''
+                        ? (float) $progresso['pontuacao']
+                        : 0.0;
+                    $correto = $pontuacao > 0;
+                    $respostaJson = JornadaExercicioAvaliacao::montarRespostaJson(
+                        (string) $resposta,
+                        JornadaExercicioAvaliacao::CORRECAO_CORRIGIDA,
+                        $progresso['resposta'] ?? null
+                    );
+                } else {
+                    $correto = false;
+                    $aguardandoCorrecao = true;
+                    $pontuacao = null;
+                    $respostaJson = JornadaExercicioAvaliacao::montarRespostaJson(
+                        (string) $resposta,
+                        JornadaExercicioAvaliacao::CORRECAO_PENDENTE,
+                        $progresso['resposta'] ?? null
+                    );
+                }
+            }
+
             if ($progresso) {
                 $this->db->update(
                     "UPDATE jornadas_progresso_alunos 
@@ -4271,11 +4350,12 @@ class JourneyController extends BaseController
                 'de_valor' => $respostaAnterior,
                 'para_valor' => $resposta,
                 'resposta_final' => $resposta,
-                'correto' => $correto ? 1 : 0,
+                'correto' => $aguardandoCorrecao ? null : ($correto ? 1 : 0),
                 'pontuacao' => $pontuacao,
                 'detalhes_json' => [
                     'tipo_exercicio' => $exercicio['tipo'] ?? null,
                     'modulo_auto_concluido' => $moduloAutoConcluido ? 1 : 0,
+                    'aguardando_correcao' => $aguardandoCorrecao ? 1 : 0,
                 ],
             ]);
 
@@ -4283,10 +4363,18 @@ class JourneyController extends BaseController
                 $this->invalidateJourneyListCacheForAluno($alunoId);
             }
 
+            $mensagem = 'Resposta incorreta. Tente novamente.';
+            if ($aguardandoCorrecao) {
+                $mensagem = 'Resposta salva. Aguardando correção do professor.';
+            } elseif ($correto) {
+                $mensagem = 'Resposta correta! Parabéns!';
+            }
+
             $this->json([
                 'success' => true, 
-                'message' => $correto ? 'Resposta correta! Parabéns!' : 'Resposta incorreta. Tente novamente.',
-                'correto' => $correto,
+                'message' => $mensagem,
+                'correto' => $aguardandoCorrecao ? null : $correto,
+                'aguardando_correcao' => $aguardandoCorrecao,
                 'modulo_concluido' => $moduloAutoConcluido
             ]);
             

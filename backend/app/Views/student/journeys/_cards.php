@@ -18,8 +18,9 @@ if (empty($jornadas)): ?>
         $dataFimAttr = !empty($jornada['data_fim']) ? date('Y-m-d', strtotime($jornada['data_fim'])) : '';
         $cardResp = (int) ($jornada['questoes_respondidas'] ?? 0);
         $cardAc = (int) ($jornada['questoes_acertos'] ?? 0);
+        $cardPend = (int) ($jornada['questoes_pendentes'] ?? 0);
         $cardQt = (int) ($jornada['questoes_total'] ?? 0);
-        $cardEr = (int) ($jornada['questoes_erros'] ?? max(0, $cardResp - $cardAc));
+        $cardEr = (int) ($jornada['questoes_erros'] ?? max(0, $cardResp - $cardAc - $cardPend));
         ?>
         <div class="jornada-card flex h-full min-h-0 flex-col rounded-xl bg-white p-6 shadow-lg transition-shadow hover:shadow-xl"
              data-titulo="<?= strtolower(htmlspecialchars($jornada['titulo'])) ?>"
@@ -133,7 +134,8 @@ if (empty($jornadas)): ?>
             $qt = (int) ($jornada['questoes_total'] ?? 0);
             $resp = (int) ($jornada['questoes_respondidas'] ?? 0);
             $ac = (int) ($jornada['questoes_acertos'] ?? 0);
-            $er = (int) ($jornada['questoes_erros'] ?? max(0, $resp - $ac));
+            $pend = (int) ($jornada['questoes_pendentes'] ?? 0);
+            $er = (int) ($jornada['questoes_erros'] ?? max(0, $resp - $ac - $pend));
             $nr = (int) ($jornada['questoes_nao_respondidas'] ?? max(0, $qt - $resp));
             $pctAcTot = $jornada['questoes_pct_acertos_total'] ?? null;
             $pctErTot = $jornada['questoes_pct_erros_total'] ?? null;
@@ -168,6 +170,9 @@ if (empty($jornadas)): ?>
                 </div>
                 <?php if ($nr > 0): ?>
                 <div class="text-gray-500 text-xs mt-2">Ainda não respondidas: <strong><?= $nr ?></strong></div>
+                <?php endif; ?>
+                <?php if ($pend > 0): ?>
+                <div class="text-amber-700 text-xs mt-2">Aguardando correção do professor: <strong><?= $pend ?></strong></div>
                 <?php endif; ?>
             </div>
             <?php endif; ?>

@@ -175,6 +175,7 @@ class JornadasAlunoConsultaService
                     'ultima_atividade' => $ultimaAtiv[$jid] ?? null,
                     'acertos' => (int) ($ex['acertos'] ?? 0),
                     'erros' => (int) ($ex['erros'] ?? 0),
+                    'pendentes' => (int) ($ex['pendentes'] ?? 0),
                     'total_respostas' => (int) ($ex['total_respostas'] ?? 0),
                 ],
             ];
@@ -306,17 +307,27 @@ class JornadasAlunoConsultaService
                 $pont = $r['pontuacao_aluno'];
                 $rawResp = $r['resposta_aluno'] ?? null;
                 $respondeu = isset($rawResp) && $rawResp !== null && $rawResp !== '';
-                $acertou = $respondeu && (float) ($pont ?? 0) > 0;
+                $resultado = JornadaExercicioAvaliacao::classificar(
+                    $r['tipo'] ?? '',
+                    $pont,
+                    is_string($rawResp) ? $rawResp : (string) ($rawResp ?? ''),
+                    $respondeu
+                );
+                $acertou = $resultado === JornadaExercicioAvaliacao::STATUS_ACERTO;
+                $aguardandoCorrecao = $resultado === JornadaExercicioAvaliacao::STATUS_PENDENTE;
 
                 $gabaritoAlt = $this->extrairAlternativasJornada(
                     $r['questoes_json'] ?? null,
                     is_string($rawResp) ? $rawResp : (string) ($rawResp ?? '')
                 );
-                if ($gabaritoAlt['acertou_gabarito'] !== null) {
+                if (!$aguardandoCorrecao && $gabaritoAlt['acertou_gabarito'] !== null) {
                     $acertou = $respondeu && $gabaritoAlt['acertou_gabarito'];
                 }
 
-                if ($somenteErros && (!$respondeu || $acertou)) {
+                $resultadoFinal = $aguardandoCorrecao
+                    ? JornadaExercicioAvaliacao::STATUS_PENDENTE
+                    : ($acertou ? JornadaExercicioAvaliacao::STATUS_ACERTO : JornadaExercicioAvaliacao::STATUS_ERRO);
+                if ($somenteErros && $resultadoFinal !== JornadaExercicioAvaliacao::STATUS_ERRO) {
                     continue;
                 }
 
@@ -328,7 +339,8 @@ class JornadasAlunoConsultaService
                     'modulo' => trim((string) ($r['modulo_titulo'] ?? '')),
                     'enunciado' => $this->textoCurto((string) ($r['enunciado'] ?? ''), 500),
                     'respondeu' => $respondeu,
-                    'acertou' => $acertou,
+                    'acertou' => $aguardandoCorrecao ? null : $acertou,
+                    'aguardando_correcao' => $aguardandoCorrecao,
                     'pontuacao' => $pont !== null && $pont !== '' ? (float) $pont : null,
                     'status' => isset($r['status_aluno']) ? (string) $r['status_aluno'] : null,
                     'data_conclusao' => isset($r['data_conclusao']) ? (string) $r['data_conclusao'] : null,
@@ -731,7 +743,7 @@ class JornadasAlunoConsultaService
 
     /**
      * @param list<int> $jornadaIds
-     * @return array<int,array{acertos:int,erros:int,total_respostas:int}>
+     * @return array<int,array{acertos:int,erros:int,pendentes:int,total_respostas:int}>
      */
     private function statsExercicios(int $alunoId, array $jornadaIds): array
     {
@@ -740,17 +752,23 @@ class JornadasAlunoConsultaService
         }
         $ph = implode(',', array_fill(0, count($jornadaIds), '?'));
         $params = array_merge([$alunoId], $jornadaIds);
+        $sqlPendente = JornadaExercicioAvaliacao::sqlPendente('COALESCE(me.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlAcerto = JornadaExercicioAvaliacao::sqlCaseAcerto('COALESCE(me.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlErro = JornadaExercicioAvaliacao::sqlCaseErro('COALESCE(me.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
         $rows = $this->db->fetchAll(
-            "SELECT jornada_id,
-                    SUM(CASE WHEN pontuacao > 0 THEN 1 ELSE 0 END) AS acertos,
-                    SUM(CASE WHEN pontuacao = 0 OR pontuacao IS NULL THEN 1 ELSE 0 END) AS erros,
+            "SELECT jpa.jornada_id,
+                    SUM({$sqlAcerto}) AS acertos,
+                    SUM({$sqlErro}) AS erros,
+                    SUM(CASE WHEN {$sqlPendente} THEN 1 ELSE 0 END) AS pendentes,
                     COUNT(*) AS total_respostas
-             FROM jornadas_progresso_alunos
-             WHERE aluno_id = ?
-               AND jornada_id IN ($ph)
-               AND atividade_tipo IN ('exercicio_modulo', 'exercicio')
-               AND resposta IS NOT NULL
-             GROUP BY jornada_id",
+             FROM jornadas_progresso_alunos jpa
+             LEFT JOIN jornadas_modulos_exercicios me ON me.id = jpa.exercicio_modulo_id
+             LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
+             WHERE jpa.aluno_id = ?
+               AND jpa.jornada_id IN ($ph)
+               AND jpa.atividade_tipo IN ('exercicio_modulo', 'exercicio')
+               AND jpa.resposta IS NOT NULL
+             GROUP BY jpa.jornada_id",
             $params
         ) ?: [];
         $out = [];
@@ -758,6 +776,7 @@ class JornadasAlunoConsultaService
             $out[(int) $r['jornada_id']] = [
                 'acertos' => (int) ($r['acertos'] ?? 0),
                 'erros' => (int) ($r['erros'] ?? 0),
+                'pendentes' => (int) ($r['pendentes'] ?? 0),
                 'total_respostas' => (int) ($r['total_respostas'] ?? 0),
             ];
         }

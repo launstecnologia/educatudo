@@ -481,6 +481,15 @@ class AdminJourneyController extends BaseController
             $jornada['total_alunos_jornada'] = (int)($jornada['realizou_count'] ?? 0) + (int)($jornada['nao_realizou_count'] ?? 0);
         }
         
+        $sqlAcertoJme = JornadaExercicioAvaliacao::sqlCaseAcerto('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlErroJme = JornadaExercicioAvaliacao::sqlCaseErro('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlAcertoJmeG = JornadaExercicioAvaliacao::sqlCaseAcertoCorrigido('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlErroJmeG = JornadaExercicioAvaliacao::sqlCaseErroCorrigido('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlAcertoJe = JornadaExercicioAvaliacao::sqlCaseAcerto('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlErroJe = JornadaExercicioAvaliacao::sqlCaseErro('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlAcertoJeG = JornadaExercicioAvaliacao::sqlCaseAcertoCorrigido('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+        $sqlErroJeG = JornadaExercicioAvaliacao::sqlCaseErroCorrigido('je.tipo', 'jpa.pontuacao', 'jpa.resposta');
+
         // Dashboard de Exercícios (mesma lógica do professor)
         $dashboard_exercicios = [];
         $exerciciosModulos = $this->db->fetchAll(
@@ -490,10 +499,10 @@ class AdminJourneyController extends BaseController
                 jme.enunciado,
                 jm.titulo as modulo_nome,
                 COUNT(DISTINCT jpa.id) as total_respostas,
-                SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as total_acertos,
-                SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as total_erros,
-                COALESCE(AVG(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) * 100, 0) as taxa_acerto,
-                COALESCE(AVG(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) * 100, 0) as taxa_erro
+                SUM({$sqlAcertoJme}) as total_acertos,
+                SUM({$sqlErroJme}) as total_erros,
+                COALESCE(AVG({$sqlAcertoJmeG}) * 100, 0) as taxa_acerto,
+                COALESCE(AVG({$sqlErroJmeG}) * 100, 0) as taxa_erro
              FROM jornadas_modulos jm
              LEFT JOIN jornadas_modulos_exercicios jme ON jme.modulo_id = jm.id
              LEFT JOIN jornadas_progresso_alunos jpa ON jpa.exercicio_modulo_id = jme.id 
@@ -514,10 +523,10 @@ class AdminJourneyController extends BaseController
                 je.descricao as enunciado,
                 'Exercício' as modulo_nome,
                 COUNT(DISTINCT jpa.id) as total_respostas,
-                SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as total_acertos,
-                SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as total_erros,
-                COALESCE(AVG(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) * 100, 0) as taxa_acerto,
-                COALESCE(AVG(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) * 100, 0) as taxa_erro
+                SUM({$sqlAcertoJe}) as total_acertos,
+                SUM({$sqlErroJe}) as total_erros,
+                COALESCE(AVG({$sqlAcertoJeG}) * 100, 0) as taxa_acerto,
+                COALESCE(AVG({$sqlErroJeG}) * 100, 0) as taxa_erro
              FROM jornadas_exercicios je
              LEFT JOIN jornadas_progresso_alunos jpa ON jpa.exercicio_id = je.id 
                  AND jpa.jornada_id = je.jornada_id
@@ -573,21 +582,27 @@ class AdminJourneyController extends BaseController
             }
             $placeholdersAtencao = implode(',', array_fill(0, count($turmasIdsAtencao), '?'));
             $paramsAtencao = array_merge([$id], $turmasIdsAtencao);
+            $sqlAcertoAluno = JornadaExercicioAvaliacao::sqlCaseAcerto('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroAluno = JornadaExercicioAvaliacao::sqlCaseErro('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlAcertoAlunoG = JornadaExercicioAvaliacao::sqlCaseAcertoCorrigido('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroAlunoG = JornadaExercicioAvaliacao::sqlCaseErroCorrigido('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
             $alunosComBaixoDesempenho = $this->db->fetchAll(
                 "SELECT 
                     a.id as aluno_id,
                     a.nome as aluno_nome,
                     a.ra as aluno_ra,
                     COUNT(jpa.id) as total_respostas,
-                    SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as total_acertos,
-                    SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as total_erros,
-                    CASE WHEN COUNT(jpa.id) > 0 THEN ROUND((SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(jpa.id)), 1) ELSE 0 END as taxa_erro,
-                    CASE WHEN COUNT(jpa.id) > 0 THEN ROUND((SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(jpa.id)), 1) ELSE 0 END as taxa_acerto
+                    SUM({$sqlAcertoAluno}) as total_acertos,
+                    SUM({$sqlErroAluno}) as total_erros,
+                    COALESCE(ROUND(AVG({$sqlErroAlunoG}) * 100, 1), 0) as taxa_erro,
+                    COALESCE(ROUND(AVG({$sqlAcertoAlunoG}) * 100, 1), 0) as taxa_acerto
                  FROM alunos a
                  LEFT JOIN jornadas_progresso_alunos jpa ON jpa.aluno_id = a.id 
                      AND jpa.jornada_id = ?
                      AND jpa.resposta IS NOT NULL
                      AND (jpa.atividade_tipo = 'exercicio_modulo' OR jpa.atividade_tipo = 'exercicio')
+                 LEFT JOIN jornadas_modulos_exercicios jme ON jme.id = jpa.exercicio_modulo_id
+                 LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
                  WHERE a.turma_id IN ($placeholdersAtencao) AND a.ativo = 1
                  GROUP BY a.id, a.nome, a.ra
                  HAVING total_erros > 0 AND taxa_erro > 40
@@ -700,11 +715,13 @@ class AdminJourneyController extends BaseController
         // Pré-busca stats de exercícios e status de visualização em 2 queries para todos os alunos (evita N+1)
         $statsExPorAluno = [];
         if ($temExercicios) {
+            $sqlAcertoStats = JornadaExercicioAvaliacao::sqlCaseAcerto('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
+            $sqlErroStats = JornadaExercicioAvaliacao::sqlCaseErro('jme.tipo', 'jpa.pontuacao', 'jpa.resposta');
             $statsExRows = $this->db->fetchAll(
                 "SELECT jpa.aluno_id,
                     COUNT(DISTINCT jpa.exercicio_modulo_id) as total_exercicios,
-                    SUM(CASE WHEN jpa.pontuacao > 0 THEN 1 ELSE 0 END) as acertos,
-                    SUM(CASE WHEN jpa.pontuacao = 0 OR jpa.pontuacao IS NULL THEN 1 ELSE 0 END) as erros,
+                    SUM({$sqlAcertoStats}) as acertos,
+                    SUM({$sqlErroStats}) as erros,
                     COALESCE(SUM(jpa.pontuacao), 0) as nota_total,
                     COALESCE(AVG(jpa.pontuacao), 0) as nota_media,
                     COUNT(jpa.id) as total_respostas
@@ -1050,40 +1067,17 @@ class AdminJourneyController extends BaseController
                 );
             }
             
-            $total = count($exercicios);
-            $respondidos = 0;
-            $acertos = 0;
-            $erros = 0;
-            $notaTotal = 0;
-            foreach ($exercicios as $ex) {
-                if (!empty($ex['resposta_aluno'])) {
-                    $respondidos++;
-                    if (($ex['pontuacao_aluno'] ?? 0) > 0) {
-                        $acertos++;
-                        $notaTotal += $ex['pontuacao_aluno'];
-                    } else {
-                        $erros++;
-                    }
-                }
-            }
-            
             $data = [
                 'title' => 'Prova Detalhada - ' . $aluno['nome'] . ' - Admin - EducaTudo',
                 'user' => $user,
                 'jornada' => $jornada,
                 'aluno' => $aluno,
                 'exercicios' => $exercicios,
-                'estatisticas' => [
-                    'total' => $total,
-                    'respondidos' => $respondidos,
-                    'acertos' => $acertos,
-                    'erros' => $erros,
-                    'nota_total' => $notaTotal,
-                    'percentual' => $total > 0 ? round(($acertos / $total) * 100, 1) : 0
-                ],
+                'estatisticas' => JornadaExercicioAvaliacao::agregarEstatisticas($exercicios),
                 'current_page' => 'journeys',
                 'csrf_token' => $this->generateCsrfToken(),
-                'base_url_jornadas' => URL . '/admin/jornadas'
+                'base_url_jornadas' => URL . '/admin/jornadas',
+                'url_atribuir_nota' => URL . '/admin/jornadas/exercicios/atribuir-nota-dissertativa'
             ];
             
             $this->viewWithLayout('admin', 'admin/journeys/exercicios-aluno-detalhado', $data);
@@ -1155,6 +1149,61 @@ class AdminJourneyController extends BaseController
             'url_atribuir_nota' => $urlAtribuirNota
         ];
         $this->viewWithLayout('admin', 'teacher/journeys/ver-resumo', $data);
+    }
+
+    /**
+     * Atribui nota à resposta dissertativa de um exercício (admin).
+     */
+    public function atribuirNotaDissertativa()
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido'], 400);
+            return;
+        }
+        try {
+            $user = $this->authManager->getUser();
+            if (!$user || ($user['tipo'] !== 'admin' && $user['tipo'] !== 'admin_escola')) {
+                $this->json(['error' => 'Acesso negado'], 403);
+                return;
+            }
+            $exercicio_id = $_POST['exercicio_id'] ?? null;
+            $aluno_id = $_POST['aluno_id'] ?? null;
+            $jornada_id = $_POST['jornada_id'] ?? null;
+            $pontuacao = $_POST['pontuacao'] ?? null;
+            if (empty($exercicio_id) || empty($aluno_id) || empty($jornada_id)) {
+                throw new Exception('Dados obrigatórios: exercício, aluno e jornada');
+            }
+            $pontuacao = $pontuacao !== null && $pontuacao !== '' ? filter_var($pontuacao, FILTER_VALIDATE_FLOAT) : null;
+            if ($pontuacao !== null && ($pontuacao < 0 || $pontuacao === false)) {
+                throw new Exception('Pontuação deve ser um número não negativo');
+            }
+            $jornada = $this->db->fetch(
+                "SELECT j.id FROM jornadas j WHERE j.id = :jornada_id",
+                ['jornada_id' => $jornada_id]
+            );
+            if (!$jornada) {
+                throw new Exception('Jornada não encontrada');
+            }
+            $pontuacao_val = $pontuacao === null ? 0.0 : (float) $pontuacao;
+            $affected = JornadaExercicioAvaliacao::aplicarNotaProfessor(
+                $this->db,
+                (int) $exercicio_id,
+                (int) $aluno_id,
+                (int) $jornada_id,
+                $pontuacao_val
+            );
+            if ($affected === 0) {
+                throw new Exception('Resposta do aluno não encontrada para atribuir nota');
+            }
+            $this->json([
+                'success' => true,
+                'message' => 'Nota atribuída com sucesso',
+                'pontuacao' => $pontuacao_val
+            ]);
+        } catch (Exception $e) {
+            error_log("Erro ao atribuir nota dissertativa (admin): " . $e->getMessage());
+            $this->json(['error' => $e->getMessage()], 400);
+        }
     }
     
     /**
