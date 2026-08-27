@@ -358,7 +358,7 @@ class BoletimAssistenteWizard
                 $resumo = $this->montarResumoHumano($rascunhoOk);
                 $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
                 return [
-                    'ok' => $rascunhoOk['componentes'] !== [] && $errosOut === [],
+                    'ok' => $rascunhoOk['componentes'] !== [],
                     'estado' => $estado,
                     'rascunho' => $rascunhoOk,
                     'resumo' => $resumo,
@@ -425,7 +425,7 @@ class BoletimAssistenteWizard
             $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
             $rascunhoOk = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
             return [
-                'ok' => $rascunhoOk['componentes'] !== [] && $errosOut === [],
+                'ok' => $rascunhoOk['componentes'] !== [],
                 'estado' => $estado,
                 'rascunho' => $rascunhoOk,
                 'resumo' => $this->montarResumoHumano($rascunhoOk),
@@ -443,7 +443,7 @@ class BoletimAssistenteWizard
             $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
             $errosOut = array_values(array_unique(array_merge($erros, $errosFontes, $validado['erros'])));
             return [
-                'ok' => $validado['rascunho']['componentes'] !== [] && $errosOut === [],
+                'ok' => $validado['rascunho']['componentes'] !== [],
                 'estado' => $estado,
                 'rascunho' => $validado['rascunho'],
                 'resumo' => $this->montarResumoHumano($validado['rascunho']),
@@ -497,7 +497,7 @@ class BoletimAssistenteWizard
             $validadoQuadro = $this->ferramentas->validarEEnriquecerRascunho($rascunhoQuadro);
             $errosQuadro = array_values(array_unique(array_merge($erros, $validadoQuadro['erros'])));
             return [
-                'ok' => $validadoQuadro['rascunho']['componentes'] !== [] && $errosQuadro === [],
+                'ok' => $validadoQuadro['rascunho']['componentes'] !== [],
                 'estado' => $estado,
                 'rascunho' => $validadoQuadro['rascunho'],
                 'resumo' => $this->montarResumoHumano($validadoQuadro['rascunho']),
@@ -515,7 +515,7 @@ class BoletimAssistenteWizard
         $rascunhoOut = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
 
         return [
-            'ok' => $rascunhoOut['componentes'] !== [] && $erros === [],
+            'ok' => $rascunhoOut['componentes'] !== [],
             'estado' => $estado,
             'rascunho' => $rascunhoOut,
             'resumo' => $this->montarResumoHumano($rascunhoOut),
@@ -2131,10 +2131,16 @@ class BoletimAssistenteWizard
         }
         $ultimo = $tokens[$n - 1];
         $div = $tokens[$n - 2];
-        if (($ultimo['type'] ?? '') !== 'num'
-            || ($div['type'] ?? '') !== 'op'
-            || (string) ($div['value'] ?? '') !== '/'
-        ) {
+        if (($ultimo['type'] ?? '') !== 'num' || ($div['type'] ?? '') !== 'op') {
+            return $tokens;
+        }
+        $op = (string) ($div['value'] ?? '');
+        if ($op === '+') {
+            $tokens[$n - 2] = ['type' => 'op', 'value' => '/', 'label' => '÷'];
+            $div = $tokens[$n - 2];
+            $op = '/';
+        }
+        if ($op !== '/') {
             return $tokens;
         }
         $left = array_slice($tokens, 0, $n - 2);
@@ -2251,6 +2257,9 @@ class BoletimAssistenteWizard
     private function envolverSomaAntesDeDivisaoNaExpressao(string $exp): string
     {
         $exp = trim($exp);
+        if ($exp !== '' && preg_match('/^([a-z][a-z0-9_]*(?:\s*\+\s*[a-z][a-z0-9_]*)+)\s*\+\s*(\d+(?:\.\d+)?)$/i', $exp, $maisN)) {
+            $exp = trim((string) $maisN[1]) . ' / ' . $maisN[2];
+        }
         if ($exp === '' || !preg_match('/^(.*)\/\s*(\d+(?:\.\d+)?)$/', $exp, $m)) {
             return $exp;
         }

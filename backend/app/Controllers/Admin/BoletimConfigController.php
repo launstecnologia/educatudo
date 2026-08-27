@@ -266,6 +266,7 @@ class BoletimConfigController extends BaseController
         } elseif ($selectedRegraId <= 0) {
             $selectedRegraId = (int) ($regra['id'] ?? 0);
         }
+        $regra = $this->aplicarRascunhoAssistenteSessao($regra, $isNewMode, $selectedRegraId);
         $regra['materias_ids_array'] = $this->parseMateriasIdsFromRegra($regra);
         $regra['formula_materias_map'] = $this->parseFormulaMateriasMapFromRegra($regra);
         $regra['series_ids_array'] = $this->parseSeriesIdsFromRegra($regra);
@@ -1038,6 +1039,7 @@ class BoletimConfigController extends BaseController
     public function salvarRegra()
     {
         $this->assertCsrfOrRedirect();
+        $this->guardarRascunhoAssistenteDaSessao($_POST);
 
         $regraId = isset($_POST['regra_id']) && $_POST['regra_id'] !== '' ? (int) $_POST['regra_id'] : null;
         $nome = trim((string) ($_POST['regra_nome'] ?? ''));
@@ -1069,29 +1071,29 @@ class BoletimConfigController extends BaseController
         if ($nome === '') {
             $_SESSION['boletim_flash'] = 'Informe o nome do evento.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirectFalhaConfiguracao($regraId);
         }
         if ($codigoRegra !== '' && $this->boletimConfig->existsRuleCode($codigoRegra, $regraId)) {
             $_SESSION['boletim_flash'] = 'Já existe outro evento com esse código.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirectFalhaConfiguracao($regraId);
         }
         if ($anoLetivo < 2000 || $anoLetivo > 2100) {
             $_SESSION['boletim_flash'] = 'Selecione um ano letivo válido.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirectFalhaConfiguracao($regraId);
         }
         if ($exibirEm === 'notas' && !in_array($bimestre, [1, 2, 3, 4], true)) {
             $_SESSION['boletim_flash'] = 'Selecione um bimestre válido para exibição em Notas.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirectFalhaConfiguracao($regraId);
         }
 
         $componentes = json_decode($componentesJson, true);
         if (!is_array($componentes) || empty($componentes)) {
             $_SESSION['boletim_flash'] = 'Adicione pelo menos um componente no fluxo do boletim.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirectFalhaConfiguracao($regraId);
         }
 
         $componentesNormalizados = [];
@@ -1139,7 +1141,7 @@ class BoletimConfigController extends BaseController
         if (empty($componentesNormalizados)) {
             $_SESSION['boletim_flash'] = 'Nenhum componente válido foi informado.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirectFalhaConfiguracao($regraId);
         }
 
         $extrasJsonNormalized = null;
@@ -1150,12 +1152,12 @@ class BoletimConfigController extends BaseController
             if (json_last_error() !== JSON_ERROR_NONE) {
                 $_SESSION['boletim_flash'] = 'O campo Extras (JSON) não contém um JSON válido: ' . json_last_error_msg();
                 $_SESSION['boletim_flash_type'] = 'error';
-                $this->redirect('/admin/boletim-configuracao');
+                $this->redirectFalhaConfiguracao($regraId);
             }
             if (!is_array($decodedExtras)) {
                 $_SESSION['boletim_flash'] = 'O campo Extras (JSON) deve ser um objeto JSON (ex.: {}).';
                 $_SESSION['boletim_flash_type'] = 'error';
-                $this->redirect('/admin/boletim-configuracao');
+                $this->redirectFalhaConfiguracao($regraId);
             }
         } elseif ($regraId !== null && $regraId > 0) {
             $regraExistente = $this->boletimConfig->getRuleById($regraId);
@@ -1208,6 +1210,7 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash_type'] = 'success';
             if ($savedId > 0) {
                 $regraId = $savedId;
+                unset($_SESSION['boletim_assistente_rascunho']);
             }
         } catch (Throwable $e) {
             error_log('Erro ao salvar regra de boletim: ' . $e->getMessage());
@@ -6323,6 +6326,104 @@ class BoletimConfigController extends BaseController
         $bid = (int) ($componente['bloco_id'] ?? 0);
 
         return $bid > 0 ? [$bid] : [];
+    }
+
+    /**
+     * @param array<string,mixed> $post
+     */
+    private function guardarRascunhoAssistenteDaSessao(array $post): void
+    {
+        if (empty($post['origem_assistente']) && empty($post['assistente_rascunho'])) {
+            return;
+        }
+        $rascunho = null;
+        $raw = $post['assistente_rascunho'] ?? '';
+        if (is_string($raw) && $raw !== '') {
+            $dec = json_decode($raw, true);
+            if (is_array($dec)) {
+                $rascunho = $dec;
+            }
+        }
+        if ($rascunho === null) {
+            $comps = json_decode((string) ($post['componentes_json'] ?? '[]'), true);
+            if (!is_array($comps) || $comps === []) {
+                return;
+            }
+            $rascunho = [
+                'nome' => (string) ($post['regra_nome'] ?? ''),
+                'codigo' => (string) ($post['regra_codigo'] ?? ''),
+                'formula_final' => (string) ($post['formula_final'] ?? ''),
+                'exibir_em' => (string) ($post['exibir_em'] ?? 'notas'),
+                'ano_letivo' => (int) ($post['ano_letivo'] ?? 0),
+                'bimestre' => (int) ($post['bimestre'] ?? 0),
+                'round_mode' => (string) ($post['round_mode'] ?? 'half'),
+                'nota_minima_aprovacao' => $post['nota_minima_aprovacao'] ?? 7,
+                'componentes' => $comps,
+            ];
+        }
+        $rascunho['regra_id'] = (int) ($post['regra_id'] ?? $rascunho['regra_id'] ?? 0);
+        if (empty($rascunho['componentes']) || !is_array($rascunho['componentes'])) {
+            return;
+        }
+        $_SESSION['boletim_assistente_rascunho'] = $rascunho;
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function aplicarRascunhoAssistenteSessao(array $regra, bool $isNewMode, int $selectedRegraId): array
+    {
+        $raw = $_SESSION['boletim_assistente_rascunho'] ?? null;
+        if (!is_array($raw) || empty($raw['componentes']) || !is_array($raw['componentes'])) {
+            return $regra;
+        }
+        $rascunhoId = (int) ($raw['regra_id'] ?? 0);
+        $regraId = (int) ($regra['id'] ?? $selectedRegraId);
+        $bateNovo = $isNewMode && $rascunhoId <= 0;
+        $bateEdicao = !$isNewMode && $rascunhoId > 0 && $rascunhoId === $regraId;
+        if (!$bateNovo && !$bateEdicao) {
+            return $regra;
+        }
+        unset($_SESSION['boletim_assistente_rascunho']);
+        foreach (['nome', 'codigo', 'formula_final', 'exibir_em', 'ano_letivo', 'bimestre', 'round_mode', 'nota_minima_aprovacao'] as $k) {
+            if (isset($raw[$k]) && $raw[$k] !== '' && $raw[$k] !== null) {
+                $regra[$k] = $raw[$k];
+            }
+        }
+        $comps = [];
+        foreach ($raw['componentes'] as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if (empty($c['config_json']) && isset($c['config']) && is_array($c['config'])) {
+                $c['config_json'] = json_encode($c['config'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            if (isset($c['blocos_ids']) && is_array($c['blocos_ids'])) {
+                $ids = [];
+                foreach ($c['blocos_ids'] as $bid) {
+                    $bid = (int) $bid;
+                    if ($bid > 0) {
+                        $ids[] = $bid;
+                    }
+                }
+                $c['blocos_ids'] = implode(',', $ids);
+            }
+            $comps[] = $c;
+        }
+        if ($comps !== []) {
+            $regra['componentes'] = $comps;
+        }
+        return $regra;
+    }
+
+    private function redirectFalhaConfiguracao(?int $regraId): void
+    {
+        $id = (int) ($regraId ?? 0);
+        if ($id <= 0 && !empty($_POST['origem_assistente'])) {
+            $this->redirect('/admin/boletim-configuracao?novo=1');
+        }
+        $this->redirect('/admin/boletim-configuracao' . ($id > 0 ? ('?regra_id=' . $id) : ''));
     }
 
     private function assertCsrfOrRedirect(): void

@@ -986,7 +986,12 @@ $boletimWizardSteps = [
         if (n < 5) return tokens;
         var ultimo = tokens[n - 1];
         var div = tokens[n - 2];
-        if (!ultimo || ultimo.type !== 'num' || !div || div.type !== 'op' || div.value !== '/') return tokens;
+        if (!ultimo || ultimo.type !== 'num' || !div || div.type !== 'op') return tokens;
+        if (div.value === '+') {
+            div = { type: 'op', value: '/', label: '÷' };
+            tokens[n - 2] = div;
+        }
+        if (div.value !== '/') return tokens;
         var left = tokens.slice(0, n - 2);
         if (tokensJaEnvolvidosPorParenteses(left) || !tokensSaoSomaSimples(left)) return tokens;
         return [{ type: 'op', value: '(', label: '(' }].concat(left, [{ type: 'op', value: ')', label: ')' }, div, ultimo]);
@@ -1456,7 +1461,9 @@ $boletimWizardSteps = [
         if (estado.blocos_calc.indexOf(codigo) < 0) estado.blocos_calc.push(codigo);
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         if (estado.colunas_ordem.indexOf(codigo) < 0) estado.colunas_ordem.push(codigo);
-        if (!estado.formulas_blocos[codigo]) estado.formulas_blocos[codigo] = [];
+        if (!estado.formulas_blocos[codigo] || !estado.formulas_blocos[codigo].length) {
+            estado.formulas_blocos[codigo] = tokensMediaDasPecas();
+        }
         if (!estado.nomes_blocos[codigo]) {
             estado.nomes_blocos[codigo] = codigo === 'media_bim' ? 'Média Bim'
                 : (codigo === 'media_final' ? 'Média Bim Final' : 'Nova média');
@@ -1572,6 +1579,11 @@ $boletimWizardSteps = [
                 var inp = document.getElementById('bw-formula-num');
                 var v = String((inp && inp.value) || '').trim().replace(',', '.');
                 if (!/^\d+(\.\d+)?$/.test(v)) return;
+                var toksNum = (estado.formula_tokens || []);
+                var lastTok = toksNum[toksNum.length - 1];
+                if (lastTok && (lastTok.type === 'peca' || lastTok.type === 'num' || (lastTok.type === 'op' && lastTok.value === ')'))) {
+                    pushToken({ type: 'op', value: '/', label: '÷' });
+                }
                 pushToken({ type: 'num', value: v, label: v });
                 if (inp) inp.value = '';
                 return;
@@ -3486,6 +3498,7 @@ $boletimWizardSteps = [
             addArray('series_ids[]', r.series_ids);
             addArray('turmas_ids[]', r.turmas_ids);
             add('componentes_json', JSON.stringify(comps));
+            add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
             document.body.appendChild(form);
             form.submit();
@@ -3505,7 +3518,8 @@ $boletimWizardSteps = [
             renderResumo((j && (j.error || (j.erros && j.erros[0]))) || 'Não consegui montar o evento.', ['Volte nas etapas anteriores, confira as peças/fontes e tente de novo.']);
             return false;
         }
-        if (j.ok !== true) {
+        var compsRasc = (j.rascunho && Array.isArray(j.rascunho.componentes)) ? j.rascunho.componentes : [];
+        if (j.ok !== true && !compsRasc.length) {
             renderResumo(j.resumo || 'Ainda falta ajustar o evento.', j.erros && j.erros.length ? j.erros : ['O assistente ainda não conseguiu montar um evento válido.']);
             return false;
         }
