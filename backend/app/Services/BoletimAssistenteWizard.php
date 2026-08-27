@@ -354,12 +354,13 @@ class BoletimAssistenteWizard
             );
             if (!$this->deveRemontarComoQuadro($estado, $rascunho)) {
                 $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
-                $resumo = $this->montarResumoHumano($validado['rascunho']);
+                $rascunhoOk = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
+                $resumo = $this->montarResumoHumano($rascunhoOk);
                 $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
                 return [
-                    'ok' => $validado['rascunho']['componentes'] !== [] && $errosOut === [],
+                    'ok' => $rascunhoOk['componentes'] !== [] && $errosOut === [],
                     'estado' => $estado,
-                    'rascunho' => $validado['rascunho'],
+                    'rascunho' => $rascunhoOk,
                     'resumo' => $resumo,
                     'erros' => $errosOut,
                     'formulas_disponiveis' => $this->formulasParaPecas($estado['pecas']),
@@ -422,11 +423,12 @@ class BoletimAssistenteWizard
             $rascunho = $this->aplicarFormulasBlocos($rascunho, $estado, []);
             $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
             $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
+            $rascunhoOk = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
             return [
-                'ok' => $validado['rascunho']['componentes'] !== [] && $errosOut === [],
+                'ok' => $rascunhoOk['componentes'] !== [] && $errosOut === [],
                 'estado' => $estado,
-                'rascunho' => $validado['rascunho'],
-                'resumo' => $this->montarResumoHumano($validado['rascunho']),
+                'rascunho' => $rascunhoOk,
+                'resumo' => $this->montarResumoHumano($rascunhoOk),
                 'erros' => $errosOut,
                 'formulas_disponiveis' => $this->formulasParaPecas($estado['pecas']),
             ];
@@ -510,15 +512,66 @@ class BoletimAssistenteWizard
         );
         $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
         $erros = array_merge($erros, $validado['erros']);
+        $rascunhoOut = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
 
         return [
-            'ok' => $validado['rascunho']['componentes'] !== [] && $erros === [],
+            'ok' => $rascunhoOut['componentes'] !== [] && $erros === [],
             'estado' => $estado,
-            'rascunho' => $validado['rascunho'],
-            'resumo' => $this->montarResumoHumano($validado['rascunho']),
+            'rascunho' => $rascunhoOut,
+            'resumo' => $this->montarResumoHumano($rascunhoOut),
             'erros' => array_values(array_unique($erros)),
             'formulas_disponiveis' => $this->formulasParaPecas($estado['pecas']),
         ];
+    }
+
+    /**
+     * Evento de Notas: a média calculada e as faltas entram no bimestre da Vida Escolar (B1–B4).
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function aplicarLayoutBimestreNoRascunhoNotas(array $rascunho, array $estado): array
+    {
+        if ($this->ehBoletimComposto($estado)) {
+            return $rascunho;
+        }
+        $exibir = strtolower(trim((string) ($rascunho['exibir_em'] ?? $estado['exibir_em'] ?? '')));
+        if ($exibir !== 'notas') {
+            return $rascunho;
+        }
+        $bim = (int) ($rascunho['bimestre'] ?? $estado['bimestre'] ?? 0);
+        if ($bim < 1 || $bim > 4) {
+            return $rascunho;
+        }
+        $grupo = 'b' . $bim;
+        $formulaFinal = strtolower(trim((string) ($rascunho['formula_final'] ?? '')));
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        foreach ($comps as $i => $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            $src = (string) ($c['source_type'] ?? '');
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            $ehMediaFinal = ($src === 'calculado' && in_array($cod, ['media_bim', 'media_final', 'media', $grupo . '_media'], true))
+                || ($formulaFinal !== '' && $cod === $formulaFinal);
+            $ehFaltas = $src === 'faltas_evento' || str_contains($cod, 'falt');
+            if (!$ehMediaFinal && !$ehFaltas) {
+                continue;
+            }
+            if (trim((string) ($cfg['layout_group'] ?? '')) === '') {
+                $cfg['layout_group'] = $grupo;
+            }
+            if (trim((string) ($cfg['layout_type'] ?? '')) === '') {
+                $cfg['layout_type'] = $ehFaltas ? 'faltas' : 'media';
+            }
+            $c['config'] = $cfg;
+            $comps[$i] = $c;
+        }
+        $rascunho['componentes'] = $comps;
+
+        return $rascunho;
     }
 
     /**
@@ -3773,21 +3826,7 @@ class BoletimAssistenteWizard
      */
     private function rascunhoEhLayoutBoletim(?array $rascunho, array $estado): bool
     {
-        if ($this->ehBoletimComposto($estado)) {
-            return true;
-        }
-        foreach ((array) ($rascunho['componentes'] ?? []) as $c) {
-            if (!is_array($c)) {
-                continue;
-            }
-            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
-            $g = strtolower(trim((string) ($cfg['layout_group'] ?? $c['layout_group'] ?? '')));
-            if (in_array($g, ['b1', 'b2', 'b3', 'b4', 'final'], true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->ehBoletimComposto($estado);
     }
 
     /**

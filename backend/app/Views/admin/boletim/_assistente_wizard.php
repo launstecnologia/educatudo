@@ -61,7 +61,7 @@ $boletimWizardSteps = [
             ?>
             <div class="bg-white rounded-xl shadow-lg p-6 w-full min-h-[calc(100vh-20rem)] flex flex-col">
                 <pre id="boletim-wizard-resumo" class="hidden"></pre>
-                <div id="boletim-wizard-erros" class="hidden"></div>
+                <div id="boletim-wizard-erros" class="hidden mb-4 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm"></div>
                 <div id="boletim-wizard-body" class="flex-1 min-h-[24rem] space-y-4"></div>
                 <div class="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
                     <button type="button" id="boletim-wizard-voltar" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed">
@@ -93,7 +93,7 @@ $boletimWizardSteps = [
                 <div class="flex flex-col min-h-0 flex-1">
                     <nav id="boletim-wizard-steps" class="px-4 pt-3 pb-2 flex flex-wrap gap-1.5 border-b border-gray-50 bg-white"></nav>
                     <pre id="boletim-wizard-resumo" class="hidden"></pre>
-                    <div id="boletim-wizard-erros" class="hidden"></div>
+                    <div id="boletim-wizard-erros" class="hidden mx-4 mt-2 p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm"></div>
                     <div id="boletim-wizard-body" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"></div>
                     <div class="px-4 py-3 border-t border-gray-100 bg-white flex flex-wrap items-center justify-between gap-2">
                         <button type="button" id="boletim-wizard-voltar" class="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40">Voltar</button>
@@ -149,6 +149,7 @@ $boletimWizardSteps = [
 .bw-chip-x:hover { color: #b91c1c; }
 .bw-canvas-ph { width: 100%; font-size: 12px; color: #94a3b8; padding: 18px 8px; text-align: center; }
 .bw-preview-table { border-collapse: collapse; width: 100%; font-size: 11px; text-align: center; }
+.bw-preview-table thead th { position: sticky; top: 0; z-index: 1; }
 .bw-preview-table th { background: #1f2937; color: #fff; border: 1px solid #111827; padding: 4px 6px; font-weight: 600; }
 .bw-preview-table th.sub { background: #374151; }
 .bw-preview-table td { border: 1px solid #d1d5db; padding: 3px 5px; }
@@ -1588,6 +1589,21 @@ $boletimWizardSteps = [
         return String(Math.round(n * 100) / 100).replace('.', ',');
     }
 
+    function notaDaLinhaPreview(notas, codigo) {
+        if (!notas || typeof notas !== 'object') return null;
+        if (Object.prototype.hasOwnProperty.call(notas, codigo) && notas[codigo] != null && notas[codigo] !== '') {
+            return notas[codigo];
+        }
+        var alvo = String(codigo || '').toLowerCase();
+        var keys = Object.keys(notas);
+        for (var i = 0; i < keys.length; i++) {
+            if (String(keys[i]).toLowerCase() === alvo) {
+                return notas[keys[i]];
+            }
+        }
+        return null;
+    }
+
     function roundPreviewValor(v) {
         var n = Number(v);
         if (!isFinite(n)) return v;
@@ -1952,7 +1968,7 @@ $boletimWizardSteps = [
 
     function htmlTabelaPreviewBoletim(tab) {
         var grupos = tab.grupos || [];
-        var html = '<div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">';
+        var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
         html += '<table class="bw-preview-table boletim"><thead><tr>';
         html += '<th rowspan="2" class="mat text-left">' + esc(tab.titulo || 'Matéria') + '</th>';
         grupos.forEach(function (g) {
@@ -1970,7 +1986,7 @@ $boletimWizardSteps = [
             html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
             grupos.forEach(function (g) {
                 (g.cols || []).forEach(function (c) {
-                    var v = notas[c.codigo];
+                    var v = notaDaLinhaPreview(notas, c.codigo);
                     html += '<td class="' + classePreviewCelula(v, c) + '">' + fmtPreviewCelula(v, c) + '</td>';
                 });
             });
@@ -1984,7 +2000,7 @@ $boletimWizardSteps = [
         if (tab && (tab.grupos || []).length) return htmlTabelaPreviewBoletim(tab);
         var semanas = tab.semanas || [];
         var outras = tab.outras || [];
-        var html = '<div class="overflow-x-auto border border-gray-300 rounded-lg bg-white mb-4">';
+        var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
         if (tab.subtitulo) {
             html += '<div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">' + esc(tab.subtitulo) + '</div>';
         }
@@ -2016,7 +2032,7 @@ $boletimWizardSteps = [
             });
             if (semanas.length) html += '<td><strong>' + totN + '</strong></td><td><strong>' + totQ + '</strong></td>';
             outras.forEach(function (o) {
-                html += '<td>' + fmtPreviewNota(notas[o.codigo]) + '</td>';
+                html += '<td>' + fmtPreviewNota(notaDaLinhaPreview(notas, o.codigo)) + '</td>';
             });
             html += '</tr>';
         });
@@ -3182,10 +3198,16 @@ $boletimWizardSteps = [
     }
 
     function renderResumo(resumo, erros) {
-        resumoEl.textContent = resumo || 'Monte as escolhas à esquerda para ver o resumo.';
+        if (resumoEl) {
+            resumoEl.textContent = resumo || '';
+        }
+        if (!errosEl) return;
         if (erros && erros.length) {
             errosEl.classList.remove('hidden');
-            errosEl.textContent = erros.join(' ');
+            errosEl.textContent = (resumo ? (resumo + ' ') : '') + erros.join(' ');
+            if (typeof errosEl.scrollIntoView === 'function') {
+                errosEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         } else {
             errosEl.classList.add('hidden');
             errosEl.textContent = '';
@@ -3327,7 +3349,7 @@ $boletimWizardSteps = [
         if (!r || typeof r !== 'object') return false;
         if (document.getElementById('form-regra-boletim')) {
             aplicarRascunho(r);
-            return true;
+            return 'form';
         }
         if (pageMode && urlSalvar) {
             var form = document.createElement('form');
@@ -3371,14 +3393,15 @@ $boletimWizardSteps = [
             addArray('series_ids[]', r.series_ids);
             addArray('turmas_ids[]', r.turmas_ids);
             add('componentes_json', JSON.stringify(normalizarComponentesRascunho(r.componentes)));
+            add('origem_assistente', '1');
             document.body.appendChild(form);
             form.submit();
-            return true;
+            return 'submit';
         }
         try {
             sessionStorage.setItem('boletim_assistente_rascunho', JSON.stringify(r));
             window.location.href = returnUrl;
-            return true;
+            return 'redirect';
         } catch (e) {
             renderResumo('Não consegui levar o rascunho para a configuração.', ['Copie a receita e tente de novo.']);
             return false;
@@ -3387,17 +3410,21 @@ $boletimWizardSteps = [
 
     function aplicarRascunhoSeOk(j, msgOk) {
         if (!j || !j.rascunho) {
-            renderResumo((j && (j.error || (j.erros && j.erros[0]))) || 'Não consegui montar o evento.', ['Volte em Peças, marque bimestral/semanal e tente de novo.']);
+            renderResumo((j && (j.error || (j.erros && j.erros[0]))) || 'Não consegui montar o evento.', ['Volte nas etapas anteriores, confira as peças/fontes e tente de novo.']);
             return false;
         }
         if (j.ok !== true) {
-            var errs = (j.erros || []).join(' ');
-            renderResumo(j.resumo, j.erros || []);
+            renderResumo(j.resumo || 'Ainda falta ajustar o evento.', j.erros && j.erros.length ? j.erros : ['O assistente ainda não conseguiu montar um evento válido.']);
             return false;
         }
-        aplicarRascunhoNaConfiguracao(j.rascunho);
-        renderResumo(msgOk, []);
-        return true;
+        var aplicado = aplicarRascunhoNaConfiguracao(j.rascunho);
+        if (!aplicado) {
+            return false;
+        }
+        if (aplicado !== 'submit') {
+            renderResumo(msgOk, []);
+        }
+        return aplicado;
     }
 
     function avancar() {
@@ -3407,9 +3434,21 @@ $boletimWizardSteps = [
         var i = 0;
         vis.forEach(function (p, idx) { if (p.id === estado.passo) i = idx; });
         if (estado.passo === 'revisar') {
+            if (btnAvancar) btnAvancar.disabled = true;
             montarAgora().then(function (j) {
-                if (!aplicarRascunhoSeOk(j, pageMode ? 'Aplicado. Abrindo a configuração para salvar o evento.' : 'Aplicado no formulário. Revise os blocos e clique em Salvar evento.')) return;
-                fecharWizard();
+                var aplicado = aplicarRascunhoSeOk(j, pageMode ? 'Aplicado. Salvando o evento…' : 'Aplicado no formulário. Revise os blocos e clique em Salvar evento.');
+                if (!aplicado) {
+                    if (btnAvancar) btnAvancar.disabled = false;
+                    return;
+                }
+                // Em página própria o POST de salvar já navega. Não chamar fecharWizard(),
+                // senão window.location cancela o submit e o evento não grava.
+                if (aplicado !== 'submit') {
+                    fecharWizard();
+                }
+            }).catch(function () {
+                if (btnAvancar) btnAvancar.disabled = false;
+                renderResumo('Não deu para concluir agora.', ['Recarregue a página e tente de novo.']);
             });
             return;
         }

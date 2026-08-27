@@ -792,6 +792,109 @@ class BoletimConfig
     }
 
     /**
+     * Último job de geração em massa por regra (fila ai_jobs, tipo boletim_gerar).
+     *
+     * @return array<int, array{job_id:int,status:string,error:string,created_at:string}>
+     */
+    public function mapearStatusGeracaoAssincrona(): array
+    {
+        if (!$this->db->tableExists('ai_jobs')) {
+            return [];
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT id, status, payload, error_message, created_at, completed_at, result
+             FROM ai_jobs
+             WHERE job_type = :tipo
+             ORDER BY id DESC
+             LIMIT 80",
+            ['tipo' => 'boletim_gerar']
+        ) ?: [];
+
+        $out = [];
+        foreach ($rows as $row) {
+            $payload = json_decode((string) ($row['payload'] ?? ''), true);
+            $regraId = (int) ($payload['regra_id'] ?? 0);
+            if ($regraId <= 0 || isset($out[$regraId])) {
+                continue;
+            }
+            $result = json_decode((string) ($row['result'] ?? ''), true);
+            $out[$regraId] = [
+                'job_id' => (int) ($row['id'] ?? 0),
+                'status' => (string) ($row['status'] ?? ''),
+                'error' => (string) ($row['error_message'] ?? ''),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+                'completed_at' => (string) ($row['completed_at'] ?? ''),
+                'mensagem' => is_array($result) ? (string) ($result['mensagem'] ?? '') : '',
+            ];
+        }
+
+        return $out;
+    }
+
+    public function temGeracaoEmAndamento(int $regraId): bool
+    {
+        if ($regraId <= 0 || !$this->db->tableExists('ai_jobs')) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            "SELECT id
+             FROM ai_jobs
+             WHERE job_type = :tipo
+               AND status IN ('pending', 'processing')
+               AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.regra_id')) AS UNSIGNED) = :regra
+             LIMIT 1",
+            ['tipo' => 'boletim_gerar', 'regra' => $regraId]
+        );
+
+        return is_array($row) && (int) ($row['id'] ?? 0) > 0;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array<int, array{job_id:int,status:string,error:string,mensagem:string}>
+     */
+    public function statusJobsGeracaoPorIds(array $ids): array
+    {
+        if (!$this->db->tableExists('ai_jobs')) {
+            return [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === []) {
+            return [];
+        }
+
+        $params = ['tipo' => 'boletim_gerar'];
+        $placeholders = [];
+        foreach ($ids as $i => $id) {
+            $key = 'id' . $i;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $id;
+        }
+
+        $rows = $this->db->fetchAll(
+            'SELECT id, status, error_message, result
+             FROM ai_jobs
+             WHERE job_type = :tipo AND id IN (' . implode(',', $placeholders) . ')',
+            $params
+        ) ?: [];
+
+        $out = [];
+        foreach ($rows as $row) {
+            $result = json_decode((string) ($row['result'] ?? ''), true);
+            $jobId = (int) ($row['id'] ?? 0);
+            $out[$jobId] = [
+                'job_id' => $jobId,
+                'status' => (string) ($row['status'] ?? ''),
+                'error' => (string) ($row['error_message'] ?? ''),
+                'mensagem' => is_array($result) ? (string) ($result['mensagem'] ?? '') : '',
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Grava uma linha de auditoria de execução de "Gerar boletins".
      */
     public function registrarLogGeracao(

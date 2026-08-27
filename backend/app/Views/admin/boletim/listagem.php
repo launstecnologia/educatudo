@@ -6,6 +6,9 @@ $filtroAno = (string) ($filtro_ano ?? '');
 $filtroBimestre = (string) ($filtro_bimestre ?? '');
 $flashMessage = (string) ($flash_message ?? '');
 $flashType = (string) ($flash_type ?? 'success');
+$temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
+$geracaoJobIds = array_values(array_filter(array_map('intval', $geracao_job_ids ?? [])));
+$geracaoConcluidaMsg = trim((string) ($geracao_concluida_msg ?? ''));
 $filtrosAtivosCount = 0;
 foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     if ($fv !== '') {
@@ -55,8 +58,29 @@ $bimestreLabel = static function ($bimestre) {
 </div>
 
 <?php if ($flashMessage !== ''): ?>
-    <?php $flashClasses = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
+    <?php
+    $flashClasses = 'bg-green-50 border-green-200 text-green-800';
+    if ($flashType === 'error') {
+        $flashClasses = 'bg-red-50 border-red-200 text-red-800';
+    } elseif ($flashType === 'info') {
+        $flashClasses = 'bg-amber-50 border-amber-200 text-amber-900';
+    }
+    ?>
     <div class="mb-6 p-4 rounded-lg border <?= $flashClasses ?>"><?= htmlspecialchars($flashMessage) ?></div>
+<?php endif; ?>
+
+<?php if ($flashMessage === '' && $geracaoConcluidaMsg !== ''): ?>
+    <div class="mb-6 p-4 rounded-lg border bg-green-50 border-green-200 text-green-800"><?= htmlspecialchars($geracaoConcluidaMsg) ?></div>
+<?php endif; ?>
+
+<?php if ($temGeracaoEmAndamento): ?>
+    <div class="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 flex items-start gap-3">
+        <i class="fa-solid fa-spinner fa-spin mt-0.5"></i>
+        <div>
+            <p class="font-semibold">Gerando boletins em segundo plano</p>
+            <p class="text-sm mt-0.5">Você pode continuar na listagem. Esta página atualiza sozinha quando a geração terminar.</p>
+        </div>
+    </div>
 <?php endif; ?>
 
 <!-- Filtro em drawer lateral -->
@@ -162,6 +186,20 @@ $bimestreLabel = static function ($bimestre) {
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($evento['nome'] ?? '')) ?></div>
                         <?php if (!empty($evento['codigo'])): ?>
                         <div class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars((string) $evento['codigo']) ?></div>
+                        <?php endif; ?>
+                        <?php
+                        $stGeracao = (string) ($evento['geracao_status'] ?? '');
+                        $erroGeracao = trim((string) ($evento['geracao_erro'] ?? ''));
+                        ?>
+                        <?php if (in_array($stGeracao, ['pending', 'processing'], true)): ?>
+                        <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                            <i class="fa-solid fa-spinner fa-spin"></i> Gerando…
+                        </span>
+                        <?php elseif ($stGeracao === 'failed'): ?>
+                        <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800"
+                              title="<?= htmlspecialchars($erroGeracao !== '' ? $erroGeracao : 'A geração em segundo plano falhou.') ?>">
+                            <i class="fa-solid fa-circle-exclamation"></i> Falhou
+                        </span>
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -325,4 +363,47 @@ document.addEventListener('keydown', function (e) {
         closeFilterDrawer();
     }
 });
+
+(function pollGeracaoBoletim() {
+    const jobIds = <?= json_encode($geracaoJobIds, JSON_UNESCAPED_UNICODE) ?>;
+    if (!Array.isArray(jobIds) || jobIds.length === 0) {
+        return;
+    }
+    const ids = jobIds.map(function (id) { return Number(id); }).filter(function (id) { return id > 0; });
+    const url = <?= json_encode(URL . '/admin/boletim/geracao-status', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+        + '?ids=' + encodeURIComponent(ids.join(','));
+
+    function aindaRodando(jobs) {
+        if (!jobs || typeof jobs !== 'object') {
+            return true;
+        }
+        return ids.some(function (id) {
+            const st = jobs[String(id)] || jobs[id];
+            if (!st) {
+                return true;
+            }
+            return st.status === 'pending' || st.status === 'processing';
+        });
+    }
+
+    function tick() {
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || !data.ok) {
+                    setTimeout(tick, 5000);
+                    return;
+                }
+                if (!aindaRodando(data.jobs)) {
+                    window.location.reload();
+                    return;
+                }
+                setTimeout(tick, 3000);
+            })
+            .catch(function () {
+                setTimeout(tick, 5000);
+            });
+    }
+    setTimeout(tick, 2500);
+})();
 </script>

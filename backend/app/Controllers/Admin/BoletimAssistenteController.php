@@ -300,13 +300,14 @@ class BoletimAssistenteController extends BaseController
             if (!is_array($colRaw)) {
                 continue;
             }
-            $codigo = strtolower(trim((string) ($colRaw['codigo'] ?? '')));
+            $codigoOrig = trim((string) ($colRaw['codigo'] ?? ''));
+            $codigo = strtolower($codigoOrig);
             if ($codigo === '') {
                 continue;
             }
             $col = [
-                'codigo' => $codigo,
-                'nome' => (string) ($colRaw['nome'] ?? $codigo),
+                'codigo' => $codigoOrig,
+                'nome' => (string) ($colRaw['nome'] ?? $codigoOrig),
                 'layout_group' => strtolower(trim((string) ($colRaw['layout_group'] ?? ''))),
                 'layout_type' => strtolower(trim((string) ($colRaw['layout_type'] ?? ''))),
                 'source_type' => (string) ($colRaw['source_type'] ?? ''),

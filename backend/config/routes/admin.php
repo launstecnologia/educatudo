@@ -342,6 +342,7 @@ $router->get('/admin/settings', 'Admin/SchoolSettingsAdminController@configuraco
 $router->put('/admin/settings', 'User/AdminController@salvarConfiguracoes');
 $router->post('/admin/settings/sliders-dashboard', 'Admin/SchoolSettingsAdminController@salvarSlidersDashboard');
 $router->get('/admin/boletim', 'Admin/BoletimConfigController@listagem');
+$router->get('/admin/boletim/geracao-status', 'Admin/BoletimConfigController@geracaoStatusJson');
 $router->get('/admin/boletim-guia', 'Admin/BoletimGuiaController@index');
 $router->get('/admin/boletim-configuracao', 'Admin/BoletimConfigController@index');
 $router->get('/admin/boletim-configuracao/assistente', 'Admin/BoletimConfigController@assistente');

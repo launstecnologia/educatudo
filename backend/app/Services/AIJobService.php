@@ -16,6 +16,7 @@ class AIJobService
 {
     private const MAX_ATTEMPTS = 3;
     private const STALE_MINUTES = 10;
+    private const STALE_MINUTES_BOLETIM = 45;
 
     /**
      * Enfileira um novo job de IA e retorna o id gerado em ai_jobs.
@@ -52,6 +53,37 @@ class AIJobService
         }
 
         return $jobId;
+    }
+
+    /**
+     * Tenta disparar o worker CLI sem processar inline nesta request.
+     * Usar em jobs longos (ex.: geração de boletim) para não estourar o timeout do PHP-FPM.
+     */
+    public static function tentarDispararWorker(): bool
+    {
+        if (PHP_SAPI === 'cli') {
+            return false;
+        }
+
+        return self::spawnBackgroundWorker();
+    }
+
+    /**
+     * Renova started_at para jobs longos não serem marcados como stale (10 min).
+     */
+    public static function renovarHeartbeat(int $jobId): void
+    {
+        if ($jobId <= 0) {
+            return;
+        }
+        $db = \Database::getInstance();
+        if (!$db->tableExists('ai_jobs')) {
+            return;
+        }
+        $db->query(
+            "UPDATE ai_jobs SET started_at = NOW() WHERE id = ? AND status = 'processing'",
+            [$jobId]
+        );
     }
 
     /**
@@ -228,6 +260,10 @@ class AIJobService
 
         try {
             $payload = json_decode($job['payload'], true);
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+            $payload['_job_id'] = (int) $job['id'];
             $result  = self::dispatch($job['job_type'], $payload);
 
             $db->query(
@@ -351,12 +387,14 @@ class AIJobService
                  error_message = COALESCE(error_message, 'Worker interrompido; reenfileirado automaticamente.')
              WHERE status = 'processing'
                AND started_at IS NOT NULL
-               AND started_at < NOW() - INTERVAL ? MINUTE
-               AND attempts < ?",
-            [self::STALE_MINUTES, self::MAX_ATTEMPTS]
+               AND attempts < ?
+               AND (
+                    (job_type = 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') <> 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
+               )",
+            [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
         );
 
-        // Sem tentativas restantes: marca failed (antes ficava processing para sempre).
         $db->query(
             "UPDATE ai_jobs
              SET status = 'failed',
@@ -364,9 +402,12 @@ class AIJobService
                  error_message = COALESCE(error_message, 'Worker interrompido após esgotar tentativas.')
              WHERE status = 'processing'
                AND started_at IS NOT NULL
-               AND started_at < NOW() - INTERVAL ? MINUTE
-               AND attempts >= ?",
-            [self::STALE_MINUTES, self::MAX_ATTEMPTS]
+               AND attempts >= ?
+               AND (
+                    (job_type = 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') <> 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
+               )",
+            [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
         );
     }
 
@@ -469,6 +510,9 @@ class AIJobService
             case 'vida_escolar_ler_historico':
                 return self::dispatchVidaEscolarLerHistorico($payload);
 
+            case 'boletim_gerar':
+                return self::dispatchBoletimGerar($payload);
+
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");
         }
@@ -476,6 +520,30 @@ class AIJobService
 
     // -------------------------------------------------------------------------
     // Handlers específicos que fazem AI + persistência no banco
+
+    private static function dispatchBoletimGerar(array $payload): array
+    {
+        $regraId = (int) ($payload['regra_id'] ?? 0);
+        if ($regraId <= 0) {
+            throw new \RuntimeException('Evento ausente para gerar boletim em segundo plano.');
+        }
+
+        $db = \Database::getInstance();
+        $lockNome = 'boletim_gerar_' . $regraId;
+        $got = $db->fetch('SELECT GET_LOCK(:nome, 0) AS got', ['nome' => $lockNome]);
+        if ((int) ($got['got'] ?? 0) !== 1) {
+            throw new \RuntimeException('Já existe uma geração em andamento para este evento.');
+        }
+
+        try {
+            require_once __DIR__ . '/../Controllers/Admin/BoletimConfigController.php';
+            $ctrl = new \BoletimConfigController(true);
+
+            return $ctrl->executarGeracaoJob($payload);
+        } finally {
+            $db->fetch('SELECT RELEASE_LOCK(:nome) AS ok', ['nome' => $lockNome]);
+        }
+    }
 
     private static function dispatchVidaEscolarLerHistorico(array $payload): array
     {

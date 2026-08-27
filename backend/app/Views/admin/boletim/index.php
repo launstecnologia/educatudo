@@ -23,6 +23,7 @@ $flashType = (string) ($flash_type ?? 'success');
 $csrfToken = (string) ($csrf_token ?? '');
 $somenteTabela = !empty($somente_tabela);
 $boletimAssistenteDisponivel = !empty($boletim_assistente_disponivel);
+$geracaoEmAndamento = !empty($geracao_em_andamento);
 $roundModeSelected = strtolower(trim((string) ($regra['round_mode'] ?? 'none')));
 if (!in_array($roundModeSelected, ['none', 'half'], true)) {
     $roundModeSelected = 'none';
@@ -850,11 +851,18 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
                     <p class="text-sm font-semibold text-emerald-950">Gerar boletins</p>
                     <p class="text-sm text-emerald-900">
-                        Recalcula e grava a tabela de notas por matéria para <strong>todos os alunos vinculados</strong> a este evento (séries / escopo). Quem ainda não tinha boletim neste período passa a ter; quem já tinha tem as linhas substituídas pela regra atual.
+                        Recalcula e grava a tabela de notas por matéria para <strong>todos os alunos vinculados</strong> a este evento (séries / escopo). Roda em segundo plano: você volta para a listagem e acompanha o status “Gerando…”.
                     </p>
+                    <?php if ($geracaoEmAndamento): ?>
+                    <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
+                    <a href="<?= URL ?>/admin/boletim" class="btn-primary-custom w-full px-4 py-2 rounded-lg hover:opacity-90 font-medium text-center inline-block">
+                        Ver status na listagem
+                    </a>
+                    <?php else: ?>
                     <button type="submit" class="btn-primary-custom w-full px-4 py-2 rounded-lg hover:opacity-90 font-medium">
                         Gerar boletins de todos os alunos vinculados
                     </button>
+                    <?php endif; ?>
                 </form>
 
                 <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/atualizar-boletins-gravados" class="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
@@ -867,9 +875,15 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <p class="text-sm text-amber-950">
                         Recalcula os boletins oficiais deste período. Se ainda existir apenas prévia, publica oficialmente para todos os alunos vinculados.
                     </p>
+                    <?php if ($geracaoEmAndamento): ?>
+                    <button type="button" disabled class="w-full px-4 py-2 bg-amber-300 text-white rounded-lg font-medium cursor-not-allowed">
+                        Geração em andamento…
+                    </button>
+                    <?php else: ?>
                     <button type="submit" class="w-full px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium">
                         Atualizar/publicar boletins deste período
                     </button>
+                    <?php endif; ?>
                 </form>
 
                 <?php if (!empty($regra['id'])): ?>

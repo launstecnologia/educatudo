@@ -17,14 +17,21 @@ class BoletimConfigController extends BaseController
     private ?ResultadoAcademicoService $resultadoAcademicoSvc = null;
     /** @var array<int, ?int> */
     private array $cursoPorTurmaCache = [];
+    /** @var array<string, mixed>|null Usuário do job CLI (sem sessão). */
+    private ?array $usuarioGeracaoJob = null;
+    private int $jobIdHeartbeat = 0;
 
-    public function __construct()
+    public function __construct(bool $somenteGeracao = false)
     {
         parent::__construct();
 
         $this->auth = new AuthManager();
         $this->boletimConfig = new BoletimConfig();
         $this->boletimConfig->ensureSchema();
+
+        if ($somenteGeracao) {
+            return;
+        }
 
         $user = $this->auth->getUser();
         if (!$this->usuarioPodeConfigurarBoletim($user)) {
@@ -114,6 +121,10 @@ class BoletimConfigController extends BaseController
             $turmasNomesPorId[$tid] = $rotuloTurma;
         }
         $ultimaGeracaoPorRegra = $this->boletimConfig->getUltimaGeracaoPorRegra();
+        $statusGeracaoPorRegra = $this->boletimConfig->mapearStatusGeracaoAssincrona();
+        $geracaoJobIds = [];
+        $temGeracaoEmAndamento = false;
+        $geracaoConcluidaMsg = '';
 
         foreach ($eventos as &$ev) {
             $seriesIds = $this->parseSeriesIdsFromRegra($ev);
@@ -133,6 +144,27 @@ class BoletimConfigController extends BaseController
             $regraAtualizadaEm = strtotime((string) ($ev['updated_at'] ?? ''));
             $geracaoEm = $ultimaGeracao !== null ? strtotime((string) $ultimaGeracao) : false;
             $ev['boletim_desatualizado'] = $geracaoEm !== false && $regraAtualizadaEm !== false && $regraAtualizadaEm > $geracaoEm;
+            $stGeracao = $statusGeracaoPorRegra[$regraIdEv] ?? null;
+            $ev['geracao_status'] = is_array($stGeracao) ? (string) ($stGeracao['status'] ?? '') : '';
+            $ev['geracao_job_id'] = is_array($stGeracao) ? (int) ($stGeracao['job_id'] ?? 0) : 0;
+            $ev['geracao_erro'] = is_array($stGeracao) ? (string) ($stGeracao['error'] ?? '') : '';
+            $ev['geracao_mensagem'] = is_array($stGeracao) ? (string) ($stGeracao['mensagem'] ?? '') : '';
+            $ev['geracao_completed_at'] = is_array($stGeracao) ? (string) ($stGeracao['completed_at'] ?? '') : '';
+            if (in_array($ev['geracao_status'], ['pending', 'processing'], true) && $ev['geracao_job_id'] > 0) {
+                $geracaoJobIds[] = $ev['geracao_job_id'];
+                $temGeracaoEmAndamento = true;
+            }
+            if (
+                $geracaoConcluidaMsg === ''
+                && $ev['geracao_status'] === 'done'
+                && $ev['geracao_mensagem'] !== ''
+                && $ev['geracao_completed_at'] !== ''
+            ) {
+                $concluidaEm = strtotime($ev['geracao_completed_at']);
+                if ($concluidaEm !== false && (time() - $concluidaEm) <= 180) {
+                    $geracaoConcluidaMsg = $ev['geracao_mensagem'];
+                }
+            }
         }
         unset($ev);
 
@@ -161,10 +193,38 @@ class BoletimConfigController extends BaseController
             ],
             'flash_message' => $_SESSION['boletim_flash'] ?? '',
             'flash_type' => $_SESSION['boletim_flash_type'] ?? 'success',
+            'tem_geracao_em_andamento' => $temGeracaoEmAndamento,
+            'geracao_job_ids' => $geracaoJobIds,
+            'geracao_concluida_msg' => $geracaoConcluidaMsg,
         ];
 
         $this->viewWithLayout('admin', 'admin/boletim/listagem', $data);
         unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
+    }
+
+    public function geracaoStatusJson(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+
+        $idsRaw = trim((string) ($_GET['ids'] ?? ''));
+        $ids = $idsRaw === '' ? [] : array_map('intval', explode(',', $idsRaw));
+        $jobs = [];
+        if ($ids !== []) {
+            foreach ($this->boletimConfig->statusJobsGeracaoPorIds($ids) as $jobId => $st) {
+                $jobs[(string) (int) $jobId] = [
+                    'job_id' => (int) ($st['job_id'] ?? $jobId),
+                    'status' => (string) ($st['status'] ?? ''),
+                    'error' => (string) ($st['error'] ?? ''),
+                    'mensagem' => (string) ($st['mensagem'] ?? ''),
+                ];
+            }
+        }
+
+        echo json_encode(['ok' => true, 'jobs' => $jobs], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     public function index()
@@ -338,6 +398,7 @@ class BoletimConfigController extends BaseController
             'flash_type' => $_SESSION['boletim_flash_type'] ?? 'success',
             'somente_tabela' => $somenteTabela,
             'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
+            'geracao_em_andamento' => $this->boletimConfig->temGeracaoEmAndamento((int) ($regra['id'] ?? 0)),
         ];
 
         if ($somenteTabela) {
@@ -1141,7 +1202,9 @@ class BoletimConfigController extends BaseController
                 $usarResultadoAprovacao,
                 $extrasJsonNormalized
             );
-            $_SESSION['boletim_flash'] = 'Evento de boletim salvo com sucesso.';
+            $_SESSION['boletim_flash'] = !empty($_POST['origem_assistente'])
+                ? 'Evento salvo pelo assistente. Revise os blocos e clique em Gerar boletins para gravar as notas.'
+                : 'Evento de boletim salvo com sucesso.';
             $_SESSION['boletim_flash_type'] = 'success';
         } catch (Throwable $e) {
             error_log('Erro ao salvar regra de boletim: ' . $e->getMessage());
@@ -1499,83 +1562,22 @@ class BoletimConfigController extends BaseController
             $this->redirect('/admin/boletim-configuracao?regra_id=' . $regraId);
         }
 
-        $codigoFinal = $this->boletimConfig->getComponenteFinalCodigo($regraId) ?? '';
-        $mediasAntes = $codigoFinal !== ''
-            ? $this->boletimConfig->getMediaFinalPorAluno($regraId, $periodoRef, $codigoFinal)
-            : [];
+        if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar')) {
+            return;
+        }
 
-        $stats = $this->gravarBoletinsSimulacaoParaAlunos(
+        $resultado = $this->executarGeracaoMassaInterna(
             $regra,
             $regraId,
             $periodoRef,
             $dataInicio,
             $dataFim,
             $alunos,
-            'gerarBoletins'
+            'gerar'
         );
-        $gerados = $stats['gerados'];
-        $linhas = $stats['linhas'];
-        $erros = $stats['erros'];
-        $errosAmostra = $stats['errosAmostra'];
-
-        $alunosComMudancaSignificativa = [];
-        if ($codigoFinal !== '') {
-            $mediasDepois = $this->boletimConfig->getMediaFinalPorAluno($regraId, $periodoRef, $codigoFinal);
-            $nomesPorAlunoId = [];
-            foreach ($alunos as $al) {
-                $nomesPorAlunoId[(int) ($al['id'] ?? 0)] = (string) ($al['nome'] ?? '');
-            }
-            foreach ($mediasDepois as $alunoIdDiff => $valorDepois) {
-                $valorAntes = $mediasAntes[$alunoIdDiff] ?? null;
-                if ($valorAntes === null) {
-                    continue;
-                }
-                $diferenca = abs($valorDepois - $valorAntes);
-                if ($diferenca >= 2.0) {
-                    $alunosComMudancaSignificativa[] = [
-                        'aluno_id' => $alunoIdDiff,
-                        'nome' => $nomesPorAlunoId[$alunoIdDiff] ?? ('#' . $alunoIdDiff),
-                        'antes' => round($valorAntes, 2),
-                        'depois' => round($valorDepois, 2),
-                    ];
-                }
-            }
-        }
-
-        $usuarioLog = $this->auth->getUser();
-        $this->boletimConfig->registrarLogGeracao(
-            $regraId,
-            $periodoRef,
-            (int) ($usuarioLog['id'] ?? 0) ?: null,
-            (string) ($usuarioLog['nome'] ?? '') ?: null,
-            $gerados,
-            $linhas,
-            $erros,
-            count($alunosComMudancaSignificativa),
-            ['alunos_mudanca_significativa' => array_slice($alunosComMudancaSignificativa, 0, 20)]
-        );
-
-        $msg = 'Geração concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
-        if (!empty($errosAmostra)) {
-            $msg .= ' Exemplo(s): ' . implode(' | ', $errosAmostra);
-        }
-        if (!empty($alunosComMudancaSignificativa)) {
-            $exemplosMudanca = array_slice(array_map(static function ($a) {
-                return $a['nome'] . ' (' . $a['antes'] . '→' . $a['depois'] . ')';
-            }, $alunosComMudancaSignificativa), 0, 5);
-            $msg .= ' ⚠️ ' . count($alunosComMudancaSignificativa) . ' aluno(s) com nota final mudando 2+ pontos: ' . implode(', ', $exemplosMudanca) . '.';
-        }
-        $_SESSION['boletim_flash'] = $msg;
-        $_SESSION['boletim_flash_type'] = $erros > 0 ? 'error' : 'success';
-        $qs = [
-            'regra_id' => $regraId,
-            'periodo_ref' => $periodoRef,
-        ];
-        if ($dataInicio !== null && $dataFim !== null) {
-            $qs['data_inicio'] = $dataInicio;
-            $qs['data_fim'] = $dataFim;
-        }
-        $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+        $_SESSION['boletim_flash'] = $resultado['mensagem'];
+        $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
+        $this->redirect('/admin/boletim');
     }
 
     /**
@@ -1754,6 +1756,185 @@ class BoletimConfigController extends BaseController
             }
             $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
         }
+
+        if ($this->enfileirarGeracaoBoletim(
+            $regraId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            $publicarAPartirDePrevia ? 'atualizar_previa' : 'atualizar'
+        )) {
+            return;
+        }
+
+        $resultado = $this->executarGeracaoMassaInterna(
+            $regra,
+            $regraId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            $alunos,
+            $publicarAPartirDePrevia ? 'atualizar_previa' : 'atualizar'
+        );
+        $_SESSION['boletim_flash'] = $resultado['mensagem'];
+        $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
+        $this->redirect('/admin/boletim');
+    }
+
+    /**
+     * Worker CLI da fila ai_jobs (tipo boletim_gerar). Sem sessão admin.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function executarGeracaoJob(array $payload): array
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+        $this->jobIdHeartbeat = (int) ($payload['_job_id'] ?? 0);
+        $this->renovarHeartbeatGeracao();
+        $this->usuarioGeracaoJob = [
+            'id' => (int) ($payload['user_id'] ?? 0),
+            'nome' => (string) ($payload['user_nome'] ?? ''),
+            'tipo' => (string) ($payload['user_tipo'] ?? 'admin'),
+        ];
+
+        $regraId = (int) ($payload['regra_id'] ?? 0);
+        $periodoRef = trim((string) ($payload['periodo_ref'] ?? ''));
+        $dataInicio = $this->normalizarDataYmdOpcional((string) ($payload['data_inicio'] ?? ''));
+        $dataFim = $this->normalizarDataYmdOpcional((string) ($payload['data_fim'] ?? ''));
+        $modo = (string) ($payload['modo'] ?? 'gerar');
+        if (!in_array($modo, ['gerar', 'atualizar', 'atualizar_previa'], true)) {
+            throw new RuntimeException('Modo de geração inválido.');
+        }
+        if ($periodoRef === '') {
+            $periodoRef = $this->periodoDefault();
+        }
+        if (strlen($periodoRef) > 60) {
+            $periodoRef = substr($periodoRef, 0, 60);
+        }
+
+        $regra = $regraId > 0 ? $this->boletimConfig->getRuleById($regraId) : null;
+        if (!$regra) {
+            throw new RuntimeException('Evento de boletim não encontrado para gerar em segundo plano.');
+        }
+        $regraId = (int) ($regra['id'] ?? 0);
+
+        $alunos = $this->resolverAlunosGeracaoPorModo($regra, $regraId, $periodoRef, $modo);
+        if ($alunos === []) {
+            throw new RuntimeException('Nenhum aluno ativo encontrado para gerar o boletim.');
+        }
+
+        return $this->executarGeracaoMassaInterna(
+            $regra,
+            $regraId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            $alunos,
+            $modo
+        );
+    }
+
+    /**
+     * Enfileira e redireciona para a listagem. Retorna false se a fila não existir (caller roda síncrono).
+     */
+    private function enfileirarGeracaoBoletim(
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        string $modo
+    ): bool {
+        if ($this->boletimConfig->temGeracaoEmAndamento($regraId)) {
+            $_SESSION['boletim_flash'] = 'Já existe uma geração em andamento para este evento. Aguarde terminar para gerar de novo.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim');
+        }
+
+        $db = Database::getInstance();
+        if (!$db->tableExists('ai_jobs')) {
+            return false;
+        }
+
+        $user = $this->auth->getUser();
+        require_once __DIR__ . '/../../Services/AIJobService.php';
+        try {
+            \App\Services\AIJobService::enqueue('boletim_gerar', [
+                'regra_id' => $regraId,
+                'periodo_ref' => $periodoRef,
+                'data_inicio' => $dataInicio,
+                'data_fim' => $dataFim,
+                'modo' => $modo,
+                'user_id' => (int) ($user['id'] ?? 0),
+                'user_nome' => (string) ($user['nome'] ?? ''),
+                'user_tipo' => (string) ($user['tipo'] ?? 'admin'),
+            ], (int) ($user['id'] ?? 0), 'admin', false);
+            \App\Services\AIJobService::tentarDispararWorker();
+        } catch (Throwable $e) {
+            error_log('enfileirarGeracaoBoletim: ' . $e->getMessage());
+            return false;
+        }
+
+        $_SESSION['boletim_flash'] = 'Geração iniciada em segundo plano. Acompanhe o status na listagem — a página atualiza sozinha quando terminar.';
+        $_SESSION['boletim_flash_type'] = 'info';
+        $this->redirect('/admin/boletim');
+        return true;
+    }
+
+    private function renovarHeartbeatGeracao(): void
+    {
+        if ($this->jobIdHeartbeat <= 0) {
+            return;
+        }
+        if (!class_exists(\App\Services\AIJobService::class, false)) {
+            require_once __DIR__ . '/../../Services/AIJobService.php';
+        }
+        \App\Services\AIJobService::renovarHeartbeat($this->jobIdHeartbeat);
+    }
+
+    /**
+     * @return list<array{id:int,nome?:string}>
+     */
+    private function resolverAlunosGeracaoPorModo(array $regra, int $regraId, string $periodoRef, string $modo): array
+    {
+        if ($modo === 'gerar' || $modo === 'atualizar_previa') {
+            return $this->resolveAlunosVinculadosRegra($regra);
+        }
+
+        $idsComGravacao = $this->boletimConfig->listAlunoIdsWithOfficialBoletim($regraId, $periodoRef);
+        if ($idsComGravacao === []) {
+            $idsComGravacao = $this->boletimConfig->listAlunoIdsWithGeneratedBoletim($regraId, $periodoRef, true);
+        }
+        if ($idsComGravacao === []) {
+            return [];
+        }
+
+        return $this->boletimConfig->getStudentsByIds($idsComGravacao);
+    }
+
+    /**
+     * @param list<array{id:int,nome?:string}> $alunos
+     * @return array{gerados:int,linhas:int,erros:int,mensagem:string}
+     */
+    private function executarGeracaoMassaInterna(
+        array $regra,
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $alunos,
+        string $modo
+    ): array {
+        $logContexto = $modo === 'gerar' ? 'gerarBoletins' : 'atualizarBoletinsGravados';
+        $codigoFinal = $modo === 'gerar'
+            ? ($this->boletimConfig->getComponenteFinalCodigo($regraId) ?? '')
+            : '';
+        $mediasAntes = $codigoFinal !== ''
+            ? $this->boletimConfig->getMediaFinalPorAluno($regraId, $periodoRef, $codigoFinal)
+            : [];
+
         $stats = $this->gravarBoletinsSimulacaoParaAlunos(
             $regra,
             $regraId,
@@ -1761,7 +1942,7 @@ class BoletimConfigController extends BaseController
             $dataInicio,
             $dataFim,
             $alunos,
-            'atualizarBoletinsGravados',
+            $logContexto,
             false
         );
         $gerados = $stats['gerados'];
@@ -1769,22 +1950,65 @@ class BoletimConfigController extends BaseController
         $erros = $stats['erros'];
         $errosAmostra = $stats['errosAmostra'];
 
-        $tipoAtualizado = $publicarAPartirDePrevia ? 'boletins oficiais dos alunos vinculados' : 'boletins oficiais';
-        $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+        $alunosComMudancaSignificativa = [];
+        if ($codigoFinal !== '') {
+            $mediasDepois = $this->boletimConfig->getMediaFinalPorAluno($regraId, $periodoRef, $codigoFinal);
+            $nomesPorAlunoId = [];
+            foreach ($alunos as $al) {
+                $nomesPorAlunoId[(int) ($al['id'] ?? 0)] = (string) ($al['nome'] ?? '');
+            }
+            foreach ($mediasDepois as $alunoIdDiff => $valorDepois) {
+                $valorAntes = $mediasAntes[$alunoIdDiff] ?? null;
+                if ($valorAntes === null) {
+                    continue;
+                }
+                $diferenca = abs($valorDepois - $valorAntes);
+                if ($diferenca >= 2.0) {
+                    $alunosComMudancaSignificativa[] = [
+                        'aluno_id' => $alunoIdDiff,
+                        'nome' => $nomesPorAlunoId[$alunoIdDiff] ?? ('#' . $alunoIdDiff),
+                        'antes' => round($valorAntes, 2),
+                        'depois' => round($valorDepois, 2),
+                    ];
+                }
+            }
+        }
+
+        $usuarioLog = $this->usuarioGeracaoJob ?? $this->auth->getUser();
+        $this->boletimConfig->registrarLogGeracao(
+            $regraId,
+            $periodoRef,
+            (int) ($usuarioLog['id'] ?? 0) ?: null,
+            (string) ($usuarioLog['nome'] ?? '') ?: null,
+            $gerados,
+            $linhas,
+            $erros,
+            count($alunosComMudancaSignificativa),
+            ['alunos_mudanca_significativa' => array_slice($alunosComMudancaSignificativa, 0, 20), 'modo' => $modo]
+        );
+
+        if ($modo === 'gerar') {
+            $msg = 'Geração concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+        } else {
+            $tipoAtualizado = $modo === 'atualizar_previa' ? 'boletins oficiais dos alunos vinculados' : 'boletins oficiais';
+            $msg = 'Atualização dos ' . $tipoAtualizado . ' já gravados concluída: ' . $gerados . ' aluno(s), ' . $linhas . ' linha(s) de matéria.' . ($erros > 0 ? (' Falhas: ' . $erros . '.') : '');
+        }
         if (!empty($errosAmostra)) {
             $msg .= ' Exemplo(s): ' . implode(' | ', $errosAmostra);
         }
-        $_SESSION['boletim_flash'] = $msg;
-        $_SESSION['boletim_flash_type'] = $erros > 0 ? 'error' : 'success';
-        $qs = [
-            'regra_id' => $regraId,
-            'periodo_ref' => $periodoRef,
-        ];
-        if ($dataInicio !== null && $dataFim !== null) {
-            $qs['data_inicio'] = $dataInicio;
-            $qs['data_fim'] = $dataFim;
+        if (!empty($alunosComMudancaSignificativa)) {
+            $exemplosMudanca = array_slice(array_map(static function ($a) {
+                return $a['nome'] . ' (' . $a['antes'] . '→' . $a['depois'] . ')';
+            }, $alunosComMudancaSignificativa), 0, 5);
+            $msg .= ' ⚠️ ' . count($alunosComMudancaSignificativa) . ' aluno(s) com nota final mudando 2+ pontos: ' . implode(', ', $exemplosMudanca) . '.';
         }
-        $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+
+        return [
+            'gerados' => $gerados,
+            'linhas' => $linhas,
+            'erros' => $erros,
+            'mensagem' => $msg,
+        ];
     }
 
     /**
@@ -1807,13 +2031,14 @@ class BoletimConfigController extends BaseController
         $linhas = 0;
         $erros = 0;
         $errosAmostra = [];
-        $usuarioVidaRaw = $this->auth->getUser();
+        $usuarioVidaRaw = $this->usuarioGeracaoJob ?? $this->auth->getUser();
         $usuarioVida = is_array($usuarioVidaRaw) ? $usuarioVidaRaw : [];
         foreach ($alunos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
             if ($alunoId <= 0) {
                 continue;
             }
+            $this->renovarHeartbeatGeracao();
             try {
                 $sim = $this->simularRegraAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
                 $matriz = $sim['matriz_materias'] ?? null;
