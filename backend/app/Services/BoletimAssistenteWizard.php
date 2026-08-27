@@ -1094,7 +1094,9 @@ class BoletimAssistenteWizard
         };
         $merged['formula_tokens'] = array_values(array_filter($merged['formula_tokens'], $filtrarTok));
         foreach ($merged['formulas_blocos'] as $codFb => $toksFb) {
-            $merged['formulas_blocos'][$codFb] = array_values(array_filter($toksFb, $filtrarTok));
+            $merged['formulas_blocos'][$codFb] = $this->envolverSomaAntesDeDivisao(
+                array_values(array_filter($toksFb, $filtrarTok))
+            );
         }
         foreach ($merged['formulas_materias_blocos'] as $codFb => $porMat) {
             if ($porMat instanceof \stdClass) {
@@ -1105,10 +1107,12 @@ class BoletimAssistenteWizard
                 continue;
             }
             foreach ($porMat as $midFb => $toksFb) {
-                $merged['formulas_materias_blocos'][$codFb][$midFb] = array_values(array_filter(
-                    is_array($toksFb) ? $toksFb : [],
-                    $filtrarTok
-                ));
+                $merged['formulas_materias_blocos'][$codFb][$midFb] = $this->envolverSomaAntesDeDivisao(
+                    array_values(array_filter(
+                        is_array($toksFb) ? $toksFb : [],
+                        $filtrarTok
+                    ))
+                );
             }
             if ($merged['formulas_materias_blocos'][$codFb] === []) {
                 $merged['formulas_materias_blocos'][$codFb] = new \stdClass();
@@ -1123,6 +1127,8 @@ class BoletimAssistenteWizard
         }
         if (!$temPecaTok) {
             $merged['formula_tokens'] = [];
+        } else {
+            $merged['formula_tokens'] = $this->envolverSomaAntesDeDivisao($merged['formula_tokens']);
         }
         $merged['formula_custom'] = trim((string) ($merged['formula_custom'] ?? ''));
         if ($merged['formula_tokens'] === []) {
@@ -2107,7 +2113,183 @@ class BoletimAssistenteWizard
         if ((str_contains($exp, 'max(') || str_contains($exp, 'min(')) && !str_contains($exp, ',')) {
             return '';
         }
-        return $exp;
+        return $this->envolverSomaAntesDeDivisaoNaExpressao($exp);
+    }
+
+    /**
+     * a + b + c / 3 vira (a + b + c) / 3 — senão a divisão pega só o último termo.
+     *
+     * @param list<array{type:string,value:string,label?:string}> $tokens
+     * @return list<array{type:string,value:string,label?:string}>
+     */
+    private function envolverSomaAntesDeDivisao(array $tokens): array
+    {
+        $tokens = array_values($tokens);
+        $n = count($tokens);
+        if ($n < 5) {
+            return $tokens;
+        }
+        $ultimo = $tokens[$n - 1];
+        $div = $tokens[$n - 2];
+        if (($ultimo['type'] ?? '') !== 'num'
+            || ($div['type'] ?? '') !== 'op'
+            || (string) ($div['value'] ?? '') !== '/'
+        ) {
+            return $tokens;
+        }
+        $left = array_slice($tokens, 0, $n - 2);
+        if ($this->tokensJaEnvolvidosPorParenteses($left) || !$this->tokensSaoSomaSimples($left)) {
+            return $tokens;
+        }
+
+        return array_merge(
+            [['type' => 'op', 'value' => '(', 'label' => '(']],
+            $left,
+            [['type' => 'op', 'value' => ')', 'label' => ')']],
+            [$div, $ultimo]
+        );
+    }
+
+    /**
+     * @param list<array{type:string,value:string,label?:string}> $left
+     */
+    private function tokensJaEnvolvidosPorParenteses(array $left): bool
+    {
+        $len = count($left);
+        if ($len < 3) {
+            return false;
+        }
+        if (($left[0]['type'] ?? '') !== 'op' || (string) ($left[0]['value'] ?? '') !== '(') {
+            return false;
+        }
+        if (($left[$len - 1]['type'] ?? '') !== 'op' || (string) ($left[$len - 1]['value'] ?? '') !== ')') {
+            return false;
+        }
+        $depth = 0;
+        foreach ($left as $i => $t) {
+            if (($t['type'] ?? '') !== 'op') {
+                continue;
+            }
+            $v = (string) ($t['value'] ?? '');
+            if ($v === '(') {
+                $depth++;
+            } elseif ($v === ')') {
+                $depth--;
+                if ($depth < 0) {
+                    return false;
+                }
+                if ($depth === 0 && $i < $len - 1) {
+                    return false;
+                }
+            }
+        }
+        return $depth === 0;
+    }
+
+    /**
+     * @param list<array{type:string,value:string,label?:string}> $left
+     */
+    private function tokensSaoSomaSimples(array $left): bool
+    {
+        $depth = 0;
+        $somas = 0;
+        $esperandoTermo = true;
+        foreach ($left as $t) {
+            $type = (string) ($t['type'] ?? '');
+            $v = (string) ($t['value'] ?? '');
+            if ($type === 'fn') {
+                if ($depth === 0 && !$esperandoTermo) {
+                    return false;
+                }
+                $depth++;
+                $esperandoTermo = false;
+                continue;
+            }
+            if ($type === 'op' && $v === '(') {
+                if ($depth === 0 && !$esperandoTermo) {
+                    return false;
+                }
+                $depth++;
+                $esperandoTermo = true;
+                continue;
+            }
+            if ($type === 'op' && $v === ')') {
+                $depth--;
+                if ($depth < 0) {
+                    return false;
+                }
+                $esperandoTermo = false;
+                continue;
+            }
+            if ($depth > 0) {
+                continue;
+            }
+            if ($type === 'op' && $v === '+') {
+                if ($esperandoTermo) {
+                    return false;
+                }
+                $somas++;
+                $esperandoTermo = true;
+                continue;
+            }
+            if ($type === 'op') {
+                return false;
+            }
+            if ($type === 'peca' || $type === 'num') {
+                if (!$esperandoTermo) {
+                    return false;
+                }
+                $esperandoTermo = false;
+                continue;
+            }
+            return false;
+        }
+
+        return !$esperandoTermo && $somas >= 1 && $depth === 0;
+    }
+
+    private function envolverSomaAntesDeDivisaoNaExpressao(string $exp): string
+    {
+        $exp = trim($exp);
+        if ($exp === '' || !preg_match('/^(.*)\/\s*(\d+(?:\.\d+)?)$/', $exp, $m)) {
+            return $exp;
+        }
+        $left = trim((string) $m[1]);
+        $div = (string) $m[2];
+        if ($left === '' || $this->expressaoJaEnvolvidaPorParenteses($left)) {
+            return $exp;
+        }
+        if (!(bool) preg_match('/^[a-z][a-z0-9_]*(?:\s*\+\s*[a-z][a-z0-9_]*)+$/i', $left)) {
+            return $exp;
+        }
+
+        return '(' . $left . ') / ' . $div;
+    }
+
+    private function expressaoJaEnvolvidaPorParenteses(string $left): bool
+    {
+        $left = trim($left);
+        $len = strlen($left);
+        if ($len < 3 || $left[0] !== '(' || $left[$len - 1] !== ')') {
+            return false;
+        }
+        $depth = 0;
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $left[$i];
+            if ($ch === '(') {
+                $depth++;
+            } elseif ($ch === ')') {
+                $depth--;
+                if ($depth < 0) {
+                    return false;
+                }
+                if ($depth === 0 && $i < $len - 1) {
+                    return false;
+                }
+            }
+        }
+
+        return $depth === 0;
     }
 
     /**
@@ -4299,6 +4481,7 @@ class BoletimAssistenteWizard
         if ($expr === '') {
             return null;
         }
+        $expr = $this->envolverSomaAntesDeDivisaoNaExpressao($expr);
         $nums = [];
         foreach ($vals as $cod => $n) {
             if (!is_numeric($n) || str_contains((string) $cod, '__')) {

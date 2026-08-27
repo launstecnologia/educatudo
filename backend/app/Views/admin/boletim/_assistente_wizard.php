@@ -946,7 +946,7 @@ $boletimWizardSteps = [
                 return pecaTokenOk(t.value);
             });
             var temPeca = out.some(function (t) { return t && t.type === 'peca'; });
-            return temPeca ? out : [];
+            return temPeca ? envolverSomaAntesDeDivisao(out) : [];
         }
         if (Array.isArray(estado.formula_tokens)) {
             estado.formula_tokens = filtrarLista(estado.formula_tokens);
@@ -978,6 +978,82 @@ $boletimWizardSteps = [
         });
         var exp = parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')').replace(/ ,/g, ',');
         return exp.replace(/\b(max|min)\(\s+/g, '$1(').trim();
+    }
+
+    function envolverSomaAntesDeDivisao(tokens) {
+        tokens = (tokens || []).slice();
+        var n = tokens.length;
+        if (n < 5) return tokens;
+        var ultimo = tokens[n - 1];
+        var div = tokens[n - 2];
+        if (!ultimo || ultimo.type !== 'num' || !div || div.type !== 'op' || div.value !== '/') return tokens;
+        var left = tokens.slice(0, n - 2);
+        if (tokensJaEnvolvidosPorParenteses(left) || !tokensSaoSomaSimples(left)) return tokens;
+        return [{ type: 'op', value: '(', label: '(' }].concat(left, [{ type: 'op', value: ')', label: ')' }, div, ultimo]);
+    }
+
+    function tokensJaEnvolvidosPorParenteses(left) {
+        var len = (left || []).length;
+        if (len < 3) return false;
+        if (!left[0] || left[0].type !== 'op' || left[0].value !== '(') return false;
+        if (!left[len - 1] || left[len - 1].type !== 'op' || left[len - 1].value !== ')') return false;
+        var depth = 0;
+        for (var i = 0; i < len; i++) {
+            var t = left[i];
+            if (!t || t.type !== 'op') continue;
+            if (t.value === '(') depth++;
+            else if (t.value === ')') {
+                depth--;
+                if (depth < 0) return false;
+                if (depth === 0 && i < len - 1) return false;
+            }
+        }
+        return depth === 0;
+    }
+
+    function tokensSaoSomaSimples(left) {
+        var depth = 0;
+        var somas = 0;
+        var esperandoTermo = true;
+        for (var i = 0; i < (left || []).length; i++) {
+            var t = left[i];
+            if (!t) return false;
+            var type = t.type;
+            var v = String(t.value || '');
+            if (type === 'fn') {
+                if (depth === 0 && !esperandoTermo) return false;
+                depth++;
+                esperandoTermo = false;
+                continue;
+            }
+            if (type === 'op' && v === '(') {
+                if (depth === 0 && !esperandoTermo) return false;
+                depth++;
+                esperandoTermo = true;
+                continue;
+            }
+            if (type === 'op' && v === ')') {
+                depth--;
+                if (depth < 0) return false;
+                esperandoTermo = false;
+                continue;
+            }
+            if (depth > 0) continue;
+            if (type === 'op' && v === '+') {
+                if (esperandoTermo) return false;
+                somas++;
+                esperandoTermo = true;
+                continue;
+            }
+            if (type === 'op') return false;
+            if (type === 'peca' || type === 'num') {
+                if (!esperandoTermo) return false;
+                esperandoTermo = false;
+                continue;
+            }
+            return false;
+        }
+        return !esperandoTermo && somas >= 1 && depth === 0;
     }
 
     function tokensMediaDasPecas() {
@@ -1098,6 +1174,7 @@ $boletimWizardSteps = [
 
     function afterFormulaChange() {
         marcarEdicaoManual();
+        estado.formula_tokens = envolverSomaAntesDeDivisao(estado.formula_tokens || []);
         if (estado.bloco_calc) {
             gravarTokensBlocoAberto();
         }
@@ -1244,7 +1321,7 @@ $boletimWizardSteps = [
         if (ajuda) {
             ajuda.textContent = mid > 0
                 ? 'Esta fórmula vale somente para ' + nomeMat + '. As outras matérias seguem a fórmula geral da coluna.'
-                : 'Peças e sinais viram a fórmula desta coluna. Ex.: maior ( Média Bim , ENAC ).';
+                : 'A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.';
         }
         if (label) {
             label.textContent = mid > 0 ? 'Fórmula só de ' + nomeMat : 'Fórmula desta coluna';
@@ -2763,7 +2840,7 @@ $boletimWizardSteps = [
                 html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
                 html += '</div>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
-                html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">Peças e sinais viram a fórmula desta coluna. Ex.: maior ( Média Bim , ENAC ).</p>';
+                html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Usar no cálculo</p>';
                 html += '<div id="bw-formula-pecas-pal" class="bw-palette flex flex-wrap gap-2"></div>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
@@ -3345,8 +3422,24 @@ $boletimWizardSteps = [
         document.body.style.overflow = '';
     }
 
+    function guardarRascunhoAssistente(r) {
+        try {
+            sessionStorage.setItem('boletim_assistente_rascunho', JSON.stringify(r));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     function aplicarRascunhoNaConfiguracao(r) {
         if (!r || typeof r !== 'object') return false;
+        var comps = normalizarComponentesRascunho(r.componentes);
+        if (!comps.length) {
+            renderResumo('O assistente montou o evento, mas sem blocos.', ['Volte em Peças, marque as colunas e monte a média. Depois clique de novo em Concluir e aplicar.']);
+            return false;
+        }
+        r.componentes = comps;
+        guardarRascunhoAssistente(r);
         if (document.getElementById('form-regra-boletim')) {
             aplicarRascunho(r);
             return 'form';
@@ -3392,14 +3485,13 @@ $boletimWizardSteps = [
             addArray('materias_ids[]', r.materias_ids);
             addArray('series_ids[]', r.series_ids);
             addArray('turmas_ids[]', r.turmas_ids);
-            add('componentes_json', JSON.stringify(normalizarComponentesRascunho(r.componentes)));
+            add('componentes_json', JSON.stringify(comps));
             add('origem_assistente', '1');
             document.body.appendChild(form);
             form.submit();
             return 'submit';
         }
         try {
-            sessionStorage.setItem('boletim_assistente_rascunho', JSON.stringify(r));
             window.location.href = returnUrl;
             return 'redirect';
         } catch (e) {

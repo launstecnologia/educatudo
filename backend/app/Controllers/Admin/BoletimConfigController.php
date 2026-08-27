@@ -1177,11 +1177,11 @@ class BoletimConfigController extends BaseController
         }
 
         try {
-            $this->boletimConfig->saveRule(
+            $savedId = $this->boletimConfig->saveRule(
                 $nome,
                 $formulaFinal,
                 $componentesNormalizados,
-                $regraId,
+                ($regraId !== null && $regraId > 0) ? $regraId : null,
                 $descricaoCurta,
                 json_encode($materiasIds, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 $this->normalizeFormulaMateriasJsonForSave($formulaMateriasJson),
@@ -1206,13 +1206,16 @@ class BoletimConfigController extends BaseController
                 ? 'Evento salvo pelo assistente. Revise os blocos e clique em Gerar boletins para gravar as notas.'
                 : 'Evento de boletim salvo com sucesso.';
             $_SESSION['boletim_flash_type'] = 'success';
+            if ($savedId > 0) {
+                $regraId = $savedId;
+            }
         } catch (Throwable $e) {
             error_log('Erro ao salvar regra de boletim: ' . $e->getMessage());
             $_SESSION['boletim_flash'] = 'Erro ao salvar regra: ' . $e->getMessage();
             $_SESSION['boletim_flash_type'] = 'error';
         }
 
-        $redirId = $regraId ?? 0;
+        $redirId = (int) ($regraId ?? 0);
         if ($redirId <= 0 && $codigoRegra !== '') {
             $saved = $this->boletimConfig->getRuleByCode($codigoRegra);
             $redirId = (int) ($saved['id'] ?? 0);
