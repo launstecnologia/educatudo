@@ -274,6 +274,7 @@ class ReportAdminController extends AdminBaseController
         }
 
         $flash = $this->getFlashMessage();
+        $zipJob = $this->resolverZipJobBoletinsVidaEscolar();
         $this->viewWithLayout('admin', 'admin/reports/boletim_coordenacao', [
             'title' => 'Notas da Coordenação - EducaTudo',
             'user' => $user,
@@ -292,8 +293,11 @@ class ReportAdminController extends AdminBaseController
             'relatorio' => $relatorio,
             'pode_editar_observacao' => $this->podeEditarObservacaoBoletimCoordenacao($user),
             'csrf_token' => $this->generateCsrfToken(),
-            'flash_status' => ($flash['type'] ?? '') === 'success' ? 'success' : (($flash['message'] ?? '') ? 'error' : ''),
+            'flash_status' => in_array((string) ($flash['type'] ?? ''), ['success', 'info'], true)
+                ? (($flash['message'] ?? '') !== '' ? 'success' : '')
+                : (($flash['message'] ?? '') !== '' ? 'error' : ''),
             'flash_message' => (string) ($flash['message'] ?? ''),
+            'zip_job' => $zipJob,
         ]);
     }
 
@@ -354,7 +358,7 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
-     * PDF em lote: um boletim oficial da Vida Escolar por aluno (papel timbrado).
+     * Enfileira ZIP em segundo plano: um PDF por aluno.
      *
      * @param array<string,mixed> $relatorio
      */
@@ -371,8 +375,8 @@ class ReportAdminController extends AdminBaseController
         }
 
         require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
-        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/ProntuarioVidaEscolarService.php';
-        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarPdfService.php';
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarBoletinsLoteService.php';
+        require_once __DIR__ . '/../../Services/AIJobService.php';
 
         $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
         if (!$vida->model()->schemaPronto()) {
@@ -397,17 +401,20 @@ class ReportAdminController extends AdminBaseController
         }
 
         $fichas = $vida->model()->listarFichasAlunosAno($alunoIds, $anoLetivo);
-        $porAluno = [];
+        $idsComFicha = [];
         foreach ($fichas as $ficha) {
-            $porAluno[(int) ($ficha['aluno_id'] ?? 0)] = (int) ($ficha['id'] ?? 0);
-        }
-        $comFicha = 0;
-        foreach ($alunos as $aluno) {
-            if ((int) ($porAluno[(int) ($aluno['id'] ?? 0)] ?? 0) > 0) {
-                $comFicha++;
+            $id = (int) ($ficha['aluno_id'] ?? 0);
+            if ($id > 0) {
+                $idsComFicha[$id] = $id;
             }
         }
-        if ($comFicha === 0) {
+        $alunoIdsFiltrados = [];
+        foreach ($alunoIds as $id) {
+            if (isset($idsComFicha[$id])) {
+                $alunoIdsFiltrados[] = $id;
+            }
+        }
+        if ($alunoIdsFiltrados === []) {
             $this->setFlashMessage(
                 'Nenhum aluno deste filtro tem ficha na Vida Escolar para o ano ' . $anoLetivo . '.',
                 'error'
@@ -415,34 +422,54 @@ class ReportAdminController extends AdminBaseController
             $this->redirect($voltar);
             return;
         }
-        if ($comFicha > 80) {
+        if (count($alunoIdsFiltrados) > \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::MAX_ALUNOS) {
             $this->setFlashMessage(
-                'O lote tem ' . $comFicha . ' ficha(s) na Vida Escolar. Filtre por turma para baixar no máximo 80 boletins por vez.',
+                'O lote tem ' . count($alunoIdsFiltrados) . ' fichas. Filtre por turma (máximo '
+                . \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::MAX_ALUNOS . ' boletins por vez).',
                 'error'
             );
             $this->redirect($voltar);
             return;
         }
 
-        $prontuarioSvc = new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService();
-        $prontuarios = [];
-        foreach ($alunos as $aluno) {
-            $alunoId = (int) ($aluno['id'] ?? 0);
-            $fichaId = (int) ($porAluno[$alunoId] ?? 0);
-            if ($alunoId <= 0 || $fichaId <= 0) {
-                continue;
-            }
-            $dados = $prontuarioSvc->montar($alunoId, $vida, $fichaId);
-            if ($dados === []) {
-                continue;
-            }
-            $dados['planilha_sed'] = $prontuarioSvc->planilhaSed($dados);
-            $prontuarios[] = $dados;
+        if (!$this->db->tableExists('ai_jobs')) {
+            $this->setFlashMessage(
+                'A fila de segundo plano (ai_jobs) não está configurada nesta escola. Execute a migration no painel Master.',
+                'error'
+            );
+            $this->redirect($voltar);
+            return;
         }
 
-        if ($prontuarios === []) {
+        $user = $this->auth->getUser();
+        $userId = (int) ($user['id'] ?? 0);
+        $tenantSlug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        if (!is_string($tenantSlug) || $tenantSlug === '') {
+            $this->setFlashMessage('Não foi possível identificar a escola para gravar o ZIP. Recarregue a página e tente de novo.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $pendente = $this->db->fetch(
+            "SELECT id, status, user_id
+             FROM ai_jobs
+             WHERE job_type = :tipo AND status IN ('pending', 'processing')
+             ORDER BY id DESC
+             LIMIT 1",
+            ['tipo' => \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::TIPO_JOB]
+        );
+        if (is_array($pendente) && (int) ($pendente['id'] ?? 0) > 0) {
+            $jobIdPendente = (int) $pendente['id'];
+            if ($userId > 0 && (int) ($pendente['user_id'] ?? 0) === $userId) {
+                $_SESSION['vida_escolar_boletins_zip_job'] = $jobIdPendente;
+                $this->setFlashMessage(
+                    'Os boletins ainda estão sendo gerados em segundo plano. O download começa quando o ZIP ficar pronto.',
+                    'info'
+                );
+                $this->redirect($this->urlVoltarBoletimCoordenacao(['zip_job' => $jobIdPendente]));
+                return;
+            }
             $this->setFlashMessage(
-                'Nenhum aluno deste filtro tem ficha na Vida Escolar para o ano ' . $anoLetivo . '.',
+                'Já existe um ZIP de boletins em geração nesta escola. Aguarde terminar para pedir outro.',
                 'error'
             );
             $this->redirect($voltar);
@@ -450,26 +477,133 @@ class ReportAdminController extends AdminBaseController
         }
 
         try {
-            $pdf = new \App\Modulos\VidaEscolar\Services\VidaEscolarPdfService();
-            $pdf->emitirBoletinsLote(
-                $prontuarios,
-                \App\Modulos\VidaEscolar\Services\VidaEscolarService::PERIODOS,
-                $this->config ?? null,
-                'boletins_vida_escolar_' . $filenameBase . '.pdf'
+            $jobId = \App\Services\AIJobService::enqueue(
+                \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::TIPO_JOB,
+                [
+                    'aluno_ids' => $alunoIdsFiltrados,
+                    'ano_letivo' => $anoLetivo,
+                    'user_id' => $userId,
+                    'tenant_slug' => $tenantSlug,
+                    'nome_download' => 'boletins_vida_escolar_' . $filenameBase . '.zip',
+                ],
+                $userId,
+                'admin',
+                false
             );
+            \App\Services\AIJobService::tentarDispararWorker();
         } catch (\Throwable $e) {
-            error_log('ReportAdminController boletim Vida Escolar lote: ' . $e->getMessage());
+            error_log('ReportAdminController ZIP Vida Escolar: ' . $e->getMessage());
             $this->setFlashMessage(
-                'Não foi possível gerar o PDF. Confira o Layout de documentos (papel timbrado e modelo do boletim da Vida Escolar).',
+                'Não foi possível enfileirar o ZIP dos boletins. Tente de novo em instantes.',
                 'error'
             );
             $this->redirect($voltar);
+            return;
         }
+
+        $_SESSION['vida_escolar_boletins_zip_job'] = $jobId;
+        $this->setFlashMessage(
+            'Geração iniciada em segundo plano: um PDF por aluno, entregues num ZIP. Com '
+            . count($alunoIdsFiltrados)
+            . ' boletim(ns) pode levar vários minutos — deixe esta página aberta.',
+            'info'
+        );
+        $this->redirect($this->urlVoltarBoletimCoordenacao(['zip_job' => $jobId]));
     }
 
-    private function urlVoltarBoletimCoordenacao(): string
+    public function baixarZipBoletinsVidaEscolar($id): void
     {
-        $qs = http_build_query([
+        if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', false)) {
+            return;
+        }
+
+        $jobId = (int) $id;
+        $voltar = $this->urlVoltarBoletimCoordenacao($jobId > 0 ? ['zip_job' => $jobId] : []);
+        require_once __DIR__ . '/../../Services/AIJobService.php';
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarBoletinsLoteService.php';
+
+        $job = \App\Services\AIJobService::getJob($jobId);
+        if (!$job || (string) ($job['job_type'] ?? '') !== \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::TIPO_JOB) {
+            $this->setFlashMessage('ZIP de boletins não encontrado.', 'error');
+            $this->redirect($this->urlVoltarBoletimCoordenacao());
+            return;
+        }
+        if ((string) ($job['status'] ?? '') !== 'done') {
+            $this->setFlashMessage('O ZIP ainda não está pronto. Aguarde a geração em segundo plano.', 'info');
+            $this->redirect($voltar);
+            return;
+        }
+
+        $resultado = json_decode((string) ($job['result'] ?? ''), true);
+        $nomeDownload = is_array($resultado) ? (string) ($resultado['nome_download'] ?? '') : '';
+        $nomeDownload = basename(preg_replace('/[\r\n\t"\\\\]/', '', $nomeDownload) ?: '');
+        if ($nomeDownload === '' || !str_ends_with(strtolower($nomeDownload), '.zip')) {
+            $nomeDownload = 'boletins_vida_escolar_' . $jobId . '.zip';
+        }
+        $path = \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::caminhoZip($jobId);
+        if ($path === null || !is_file($path)) {
+            $this->setFlashMessage('O arquivo ZIP não está mais no disco. Gere os boletins de novo.', 'error');
+            $this->redirect($this->urlVoltarBoletimCoordenacao());
+            return;
+        }
+
+        $tamanho = filesize($path);
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $nomeDownload . '"');
+        header('X-Content-Type-Options: nosniff');
+        if (is_int($tamanho) && $tamanho > 0) {
+            header('Content-Length: ' . $tamanho);
+        }
+        readfile($path);
+        exit;
+    }
+
+    /**
+     * @return array{id:int,status:string,erro:string,emitidos:int,falhas:int,total:int}|null
+     */
+    private function resolverZipJobBoletinsVidaEscolar(): ?array
+    {
+        $jobId = max(0, (int) ($_GET['zip_job'] ?? $_SESSION['vida_escolar_boletins_zip_job'] ?? 0));
+        if ($jobId <= 0) {
+            return null;
+        }
+        if (!$this->db->tableExists('ai_jobs')) {
+            return null;
+        }
+        require_once __DIR__ . '/../../Services/AIJobService.php';
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarBoletinsLoteService.php';
+        $job = \App\Services\AIJobService::getJob($jobId);
+        if (!$job || (string) ($job['job_type'] ?? '') !== \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::TIPO_JOB) {
+            return null;
+        }
+        $status = (string) ($job['status'] ?? '');
+        $resultado = json_decode((string) ($job['result'] ?? ''), true);
+        $resultado = is_array($resultado) ? $resultado : [];
+        if ($status === 'done') {
+            $path = \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService::caminhoZip($jobId);
+            if ($path === null) {
+                $status = 'failed';
+            }
+        }
+        return [
+            'id' => $jobId,
+            'status' => $status,
+            'erro' => (string) ($job['error_message'] ?? ''),
+            'emitidos' => (int) ($resultado['emitidos'] ?? 0),
+            'falhas' => (int) ($resultado['falhas'] ?? 0),
+            'total' => (int) ($resultado['total'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $extra
+     */
+    private function urlVoltarBoletimCoordenacao(array $extra = []): string
+    {
+        $params = [
             'fonte' => $this->parseFonteBoletimCoordenacao(),
             'evento' => (string) ($_GET['evento'] ?? ''),
             'ano_letivo' => max(0, (int) ($_GET['ano_letivo'] ?? 0)),
@@ -478,8 +612,14 @@ class ReportAdminController extends AdminBaseController
             'materias_exibicao' => $this->parseMateriasExibicaoBoletim($_GET['materias_exibicao'] ?? 'todas'),
             'assinatura' => !empty($_GET['assinatura']) ? 1 : 0,
             'executar' => 1,
-        ]);
-        return '/admin/reports/boletim-coordenacao?' . $qs;
+        ];
+        foreach ($extra as $chave => $valor) {
+            if ($valor === null || $valor === '') {
+                continue;
+            }
+            $params[$chave] = $valor;
+        }
+        return '/admin/reports/boletim-coordenacao?' . http_build_query($params);
     }
 
     private function parseFonteBoletimCoordenacao(): string

@@ -745,6 +745,7 @@ $router->get('/admin/reports', 'Admin/ReportAdminController@relatorios');
 $router->get('/admin/reports/censo', 'Admin/ReportAdminController@censo');
 $router->get('/admin/reports/boletim-coordenacao', 'Admin/ReportAdminController@boletimCoordenacao');
 $router->get('/admin/reports/boletim-coordenacao/exportar', 'Admin/ReportAdminController@exportarBoletimCoordenacao');
+$router->get('/admin/reports/boletim-coordenacao/zip/{id}', 'Admin/ReportAdminController@baixarZipBoletinsVidaEscolar');
 
 // Financeiro
 // Legado: redireciona /admin/financeiro (SaaS billing) → novo módulo escolar

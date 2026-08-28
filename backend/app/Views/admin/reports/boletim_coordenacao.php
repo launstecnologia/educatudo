@@ -22,6 +22,12 @@ $formatNota = static function ($value, int $places): string {
     return is_numeric($value) ? number_format((float) $value, $places, ',', '.') : ((string) $value !== '' ? (string) $value : '—');
 };
 $fonteRelatorio = (string) ($relatorio['fonte'] ?? $fonte);
+$zipJob = is_array($zip_job ?? null) ? $zip_job : null;
+$zipJobId = (int) ($zipJob['id'] ?? 0);
+$zipJobStatus = (string) ($zipJob['status'] ?? '');
+$zipGerando = $zipJobId > 0 && in_array($zipJobStatus, ['pending', 'processing'], true);
+$zipPronto = $zipJobId > 0 && $zipJobStatus === 'done';
+$zipFalhou = $zipJobId > 0 && in_array($zipJobStatus, ['failed', 'error'], true);
 include __DIR__ . '/../_partials/flash_message.php';
 ?>
 <div class="mb-6">
@@ -103,15 +109,30 @@ include __DIR__ . '/../_partials/flash_message.php';
     </div>
 </form>
 
+<?php if ($zipGerando || $zipPronto || $zipFalhou): ?>
+    <div id="zip-boletins-banner" class="rounded-lg p-4 mb-6 <?= $zipFalhou ? 'bg-red-50 border border-red-200 text-red-800' : ($zipPronto ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-indigo-50 border border-indigo-200 text-indigo-900') ?>">
+        <?php if ($zipGerando): ?>
+            <p class="font-semibold"><i class="fa-solid fa-spinner fa-spin mr-2"></i><span id="zip-boletins-texto">Gerando os boletins em segundo plano. Um PDF por aluno, depois o ZIP. Com a escola inteira pode levar vários minutos — deixe esta página aberta.</span></p>
+        <?php elseif ($zipPronto): ?>
+            <p class="font-semibold"><i class="fa-solid fa-circle-check mr-2"></i>ZIP pronto<?= (int) ($zipJob['emitidos'] ?? 0) > 0 ? ': ' . (int) $zipJob['emitidos'] . ' boletim(ns)' : '' ?><?= (int) ($zipJob['falhas'] ?? 0) > 0 ? ' · ' . (int) $zipJob['falhas'] . ' falha(s)' : '' ?>.</p>
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/zip/<?= $zipJobId ?>" class="inline-flex items-center mt-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"><i class="fa-solid fa-download mr-2"></i>Baixar ZIP</a>
+        <?php else: ?>
+            <p class="font-semibold"><i class="fa-solid fa-circle-exclamation mr-2"></i>Não foi possível gerar o ZIP<?= ($zipJob['erro'] ?? '') !== '' ? ': ' . htmlspecialchars((string) $zipJob['erro']) : '.' ?></p>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+
 <?php if (!empty($executar) && $relatorio): ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?><?php if ($fonteRelatorio === 'vida_escolar' && !empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?></span></div>
         <div class="flex gap-2">
             <?php if ($fonteRelatorio === 'vida_escolar'): ?>
-                <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && (int) ($relatorio['alunos_com_ficha'] ?? 0) <= 80): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</a>
+                <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && !$zipGerando): ?>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</a>
+                <?php elseif ($zipGerando): ?>
+                <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Aguarde o ZIP atual terminar"><i class="fa-solid fa-file-zipper mr-2"></i>Gerando ZIP...</span>
                 <?php else: ?>
-                <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="<?= (int) ($relatorio['alunos_com_ficha'] ?? 0) > 80 ? 'Filtre por turma (máximo 80 boletins)' : 'Nenhum aluno com ficha na Vida Escolar' ?>"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</span>
+                <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Nenhum aluno com ficha na Vida Escolar"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</span>
                 <?php endif; ?>
             <?php elseif (!empty($relatorio['alunos'])): ?>
                 <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
@@ -119,11 +140,11 @@ include __DIR__ . '/../_partials/flash_message.php';
             <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
         </div>
     </div>
-    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && !empty($relatorio['alunos'])): ?>
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4"><?= (int) $relatorio['alunos_sem_ficha'] ?> aluno(s) desta lista ainda não têm ficha na Vida Escolar no ano <?= (int) ($relatorio['ano_letivo'] ?? 0) ?> e ficam de fora do PDF.</div>
+    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_com_ficha'] ?? 0) > 0): ?>
+        <p class="text-sm text-gray-500 mb-4">Um PDF por aluno, gerado em segundo plano e empacotado em ZIP. Com a escola inteira pode levar vários minutos.</p>
     <?php endif; ?>
-    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_com_ficha'] ?? 0) > 80): ?>
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4">Há <?= (int) $relatorio['alunos_com_ficha'] ?> fichas neste filtro. Filtre por turma para baixar no máximo 80 boletins por vez.</div>
+    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && !empty($relatorio['alunos'])): ?>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4"><?= (int) $relatorio['alunos_sem_ficha'] ?> aluno(s) desta lista ainda não têm ficha na Vida Escolar no ano <?= (int) ($relatorio['ano_letivo'] ?? 0) ?> e ficam de fora do ZIP.</div>
     <?php endif; ?>
     <?php if (empty($relatorio['alunos'])): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?= $fonteRelatorio === 'vida_escolar' ? 'Nenhuma ficha da Vida Escolar encontrada para os filtros selecionados.' : 'Nenhum evento gerado encontrado para os filtros selecionados.' ?></div>
@@ -263,5 +284,52 @@ include __DIR__ . '/../_partials/flash_message.php';
         });
     });
 })();
+</script>
+<?php endif; ?>
+<?php if ($zipGerando): ?>
+<?php include dirname(__DIR__, 2) . '/components/ai-job-poller.php'; ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var jobId = <?= (int) $zipJobId ?>;
+    var downloadUrl = <?= json_encode(rtrim((string) URL, '/') . '/admin/reports/boletim-coordenacao/zip/' . (int) $zipJobId) ?>;
+    var texto = document.getElementById('zip-boletins-texto');
+    var banner = document.getElementById('zip-boletins-banner');
+    new AIJobPoller(jobId, {
+        interval: 4000,
+        statusUrl: <?= json_encode(rtrim((string) URL, '/') . '/admin/ai-job/{id}/status') ?>,
+        onDone: function (result) {
+            var emitidos = result && result.emitidos ? result.emitidos : 0;
+            var falhas = result && result.falhas ? result.falhas : 0;
+            if (banner) {
+                banner.className = 'rounded-lg p-4 mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800';
+                banner.innerHTML = '<p class="font-semibold"><i class="fa-solid fa-circle-check mr-2"></i>ZIP pronto'
+                    + (emitidos ? ': ' + emitidos + ' boletim(ns)' : '')
+                    + (falhas ? ' · ' + falhas + ' falha(s)' : '')
+                    + '.</p>'
+                    + '<a href="' + downloadUrl + '" class="inline-flex items-center mt-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"><i class="fa-solid fa-download mr-2"></i>Baixar ZIP</a>';
+            }
+            var iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = downloadUrl;
+            document.body.appendChild(iframe);
+        },
+        onFailed: function (msg) {
+            if (banner) {
+                banner.className = 'rounded-lg p-4 mb-6 bg-red-50 border border-red-200 text-red-800';
+            }
+            if (texto) {
+                texto.textContent = 'Não foi possível gerar o ZIP: ' + (msg || 'erro desconhecido');
+            }
+        },
+        onProgress: function (status) {
+            if (!texto) return;
+            if (status === 'pending') {
+                texto.textContent = 'Na fila: a geração começa em instantes.';
+            } else if (status === 'processing') {
+                texto.textContent = 'Gerando os boletins em segundo plano. Um PDF por aluno, depois o ZIP. Com a escola inteira pode levar vários minutos — deixe esta página aberta.';
+            }
+        }
+    });
+});
 </script>
 <?php endif; ?>

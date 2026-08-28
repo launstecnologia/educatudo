@@ -69,7 +69,7 @@ class AIJobService
     }
 
     /**
-     * Renova started_at para jobs longos não serem marcados como stale (10 min).
+     * Renova started_at para jobs longos não serem marcados como stale.
      */
     public static function renovarHeartbeat(int $jobId): void
     {
@@ -275,6 +275,16 @@ class AIJobService
                  WHERE id = ?",
                 [json_encode($result, JSON_UNESCAPED_UNICODE), $job['id']]
             );
+        } catch (FilaJobAdiarException $e) {
+            $db->query(
+                "UPDATE ai_jobs
+                 SET status = 'pending',
+                     attempts = GREATEST(attempts - 1, 0),
+                     started_at = NULL,
+                     error_message = ?
+                 WHERE id = ?",
+                [$e->getMessage(), $job['id']]
+            );
         } catch (\Throwable $e) {
             // attempts já foi incrementado pelo UPDATE acima; usa +1 para refletir a tentativa atual
             $isFinal = (int) $job['attempts'] + 1 >= self::MAX_ATTEMPTS;
@@ -389,8 +399,8 @@ class AIJobService
                AND started_at IS NOT NULL
                AND attempts < ?
                AND (
-                    (job_type = 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
-                    OR (IFNULL(job_type, '') <> 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
+                    (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
                )",
             [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
         );
@@ -404,8 +414,8 @@ class AIJobService
                AND started_at IS NOT NULL
                AND attempts >= ?
                AND (
-                    (job_type = 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
-                    OR (IFNULL(job_type, '') <> 'boletim_gerar' AND started_at < NOW() - INTERVAL ? MINUTE)
+                    (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
                )",
             [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
         );
@@ -513,6 +523,9 @@ class AIJobService
             case 'boletim_gerar':
                 return self::dispatchBoletimGerar($payload);
 
+            case 'vida_escolar_boletins_zip':
+                return self::dispatchVidaEscolarBoletinsZip($payload);
+
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");
         }
@@ -520,6 +533,29 @@ class AIJobService
 
     // -------------------------------------------------------------------------
     // Handlers específicos que fazem AI + persistência no banco
+
+    private static function dispatchVidaEscolarBoletinsZip(array $payload): array
+    {
+        $db = \Database::getInstance();
+        $banco = $db->fetch('SELECT DATABASE() AS n');
+        $sufixo = preg_replace('/[^a-z0-9_]/i', '', (string) ($banco['n'] ?? ''));
+        if (!is_string($sufixo) || $sufixo === '') {
+            throw new \RuntimeException('Banco da escola ausente para gerar o ZIP dos boletins.');
+        }
+        $lockNome = substr('vida_escolar_boletins_zip_' . $sufixo, 0, 64);
+        $got = $db->fetch('SELECT GET_LOCK(:nome, 0) AS got', ['nome' => $lockNome]);
+        if ((int) ($got['got'] ?? 0) !== 1) {
+            throw new FilaJobAdiarException('Já existe um ZIP de boletins em geração nesta escola. O job volta para a fila.');
+        }
+
+        try {
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarBoletinsLoteService.php';
+            $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarBoletinsLoteService();
+            return $svc->executarJob($payload);
+        } finally {
+            $db->fetch('SELECT RELEASE_LOCK(:nome) AS ok', ['nome' => $lockNome]);
+        }
+    }
 
     private static function dispatchBoletimGerar(array $payload): array
     {
@@ -2397,4 +2433,11 @@ PROMPT;
             'exercicios'   => $lista,
         ];
     }
+}
+
+/**
+ * Job não pode rodar agora (lock ocupado). Volta para pending sem gastar tentativa.
+ */
+class FilaJobAdiarException extends \RuntimeException
+{
 }
