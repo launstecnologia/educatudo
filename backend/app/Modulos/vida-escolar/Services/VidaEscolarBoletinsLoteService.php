@@ -19,7 +19,7 @@ class VidaEscolarBoletinsLoteService
 
     /**
      * @param array<string,mixed> $payload
-     * @return array{arquivo:string,nome_download:string,total:int,emitidos:int,falhas:int}
+     * @return array{arquivo:string,nome_download:string,total:int,emitidos:int,falhas:int,iniciado_em:string,finalizado_em:string}
      */
     public function executarJob(array $payload): array
     {
@@ -35,6 +35,13 @@ class VidaEscolarBoletinsLoteService
         $anoLetivo = (int) ($payload['ano_letivo'] ?? 0);
         $slugTenant = $this->slugDePayload($payload);
         $alunoIds = $this->normalizarIds($payload['aluno_ids'] ?? []);
+        $iniciadoEm = date('Y-m-d H:i:s');
+        if ($jobId > 0) {
+            $this->gravarProgresso($jobId, [
+                'iniciado_em' => $iniciadoEm,
+                'finalizado_em' => null,
+            ]);
+        }
         if ($jobId <= 0 || $anoLetivo <= 0 || $alunoIds === []) {
             throw new \RuntimeException('Lote de boletins incompleto (ano ou alunos ausentes).');
         }
@@ -151,7 +158,15 @@ class VidaEscolarBoletinsLoteService
             $emitidos = count($arquivos);
             $arquivos[] = [
                 'nome' => 'LEIA-ME.txt',
-                'path' => $this->gravarManifesto($dirTmp, $anoLetivo, count($ordem), $emitidos, $falhas),
+                'path' => $this->gravarManifesto(
+                    $dirTmp,
+                    $anoLetivo,
+                    count($ordem),
+                    $emitidos,
+                    $falhas,
+                    $iniciadoEm,
+                    date('Y-m-d H:i:s')
+                ),
             ];
 
             $nomeZip = 'boletins_' . $jobId . '.zip';
@@ -160,6 +175,7 @@ class VidaEscolarBoletinsLoteService
                 @unlink($pathZip);
             }
             $this->empacotarZip($pathZip, $arquivos);
+            $finalizadoEm = date('Y-m-d H:i:s');
 
             $nomeDownload = trim((string) ($payload['nome_download'] ?? ''));
             $nomeDownload = preg_replace('/[\r\n\t"\\\\]/', '', $nomeDownload) ?: '';
@@ -173,6 +189,8 @@ class VidaEscolarBoletinsLoteService
                 'total' => count($ordem),
                 'emitidos' => $emitidos,
                 'falhas' => count($falhas),
+                'iniciado_em' => $iniciadoEm,
+                'finalizado_em' => $finalizadoEm,
             ];
         } finally {
             $this->limparDiretorio($dirTmp);
@@ -308,13 +326,48 @@ class VidaEscolarBoletinsLoteService
     }
 
     /**
+     * @param array<string,mixed> $parcial
+     */
+    private function gravarProgresso(int $jobId, array $parcial): void
+    {
+        if ($jobId <= 0) {
+            return;
+        }
+        $db = \Database::getInstance();
+        if (!$db->tableExists('ai_jobs')) {
+            return;
+        }
+        try {
+            $db->query(
+                'UPDATE ai_jobs SET result = :result WHERE id = :id AND status = :status',
+                [
+                    'result' => json_encode($parcial, JSON_UNESCAPED_UNICODE),
+                    'id' => $jobId,
+                    'status' => 'processing',
+                ]
+            );
+        } catch (\Throwable $e) {
+            error_log('VidaEscolarBoletinsLoteService progresso job=' . $jobId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
      * @param list<string> $falhas
      */
-    private function gravarManifesto(string $dirTmp, int $anoLetivo, int $total, int $emitidos, array $falhas): string
-    {
+    private function gravarManifesto(
+        string $dirTmp,
+        int $anoLetivo,
+        int $total,
+        int $emitidos,
+        array $falhas,
+        string $iniciadoEm,
+        string $finalizadoEm
+    ): string {
         $linhas = [
             'Boletins da Vida Escolar',
             'Ano letivo: ' . $anoLetivo,
+            'Início da geração: ' . $this->formatarHorario($iniciadoEm),
+            'Término da geração: ' . $this->formatarHorario($finalizadoEm),
             'Alunos no lote: ' . $total,
             'PDFs gerados: ' . $emitidos,
             'Falhas: ' . count($falhas),
@@ -329,6 +382,12 @@ class VidaEscolarBoletinsLoteService
         $path = $dirTmp . DIRECTORY_SEPARATOR . 'LEIA-ME.txt';
         file_put_contents($path, implode("\n", $linhas) . "\n");
         return $path;
+    }
+
+    private function formatarHorario(string $dt): string
+    {
+        $ts = strtotime($dt);
+        return $ts === false ? $dt : date('d/m/Y H:i:s', $ts);
     }
 
     private function nomeEntradaZip(string $nome): string

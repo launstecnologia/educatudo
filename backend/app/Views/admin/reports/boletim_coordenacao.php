@@ -28,6 +28,10 @@ $zipJobStatus = (string) ($zipJob['status'] ?? '');
 $zipGerando = $zipJobId > 0 && in_array($zipJobStatus, ['pending', 'processing'], true);
 $zipPronto = $zipJobId > 0 && $zipJobStatus === 'done';
 $zipFalhou = $zipJobId > 0 && in_array($zipJobStatus, ['failed', 'error'], true);
+$zipInicio = (string) ($zipJob['iniciado_em'] ?? '');
+$zipTermino = (string) ($zipJob['finalizado_em'] ?? '');
+$zipPedido = (string) ($zipJob['pedido_em'] ?? '');
+$zipDuracao = (string) ($zipJob['duracao'] ?? '');
 include __DIR__ . '/../_partials/flash_message.php';
 ?>
 <div class="mb-6">
@@ -119,6 +123,17 @@ include __DIR__ . '/../_partials/flash_message.php';
         <?php else: ?>
             <p class="font-semibold"><i class="fa-solid fa-circle-exclamation mr-2"></i>Não foi possível gerar o ZIP<?= ($zipJob['erro'] ?? '') !== '' ? ': ' . htmlspecialchars((string) $zipJob['erro']) : '.' ?></p>
         <?php endif; ?>
+        <p id="zip-boletins-horarios" class="text-sm mt-2 <?= $zipFalhou ? 'text-red-700' : ($zipPronto ? 'text-emerald-800' : 'text-indigo-800') ?>">
+            <?php if ($zipInicio !== ''): ?>
+                Início: <?= htmlspecialchars($zipInicio) ?>
+                <?php if ($zipTermino !== ''): ?> · Término: <?= htmlspecialchars($zipTermino) ?><?php else: ?> · Término: em andamento<?php endif; ?>
+                <?php if ($zipDuracao !== ''): ?> · Duração: <?= htmlspecialchars($zipDuracao) ?><?php endif; ?>
+            <?php elseif ($zipPedido !== ''): ?>
+                Pedido às <?= htmlspecialchars($zipPedido) ?> · Aguardando início da geração
+            <?php else: ?>
+                Horários da geração aparecem assim que o processamento começar.
+            <?php endif; ?>
+        </p>
     </div>
 <?php endif; ?>
 
@@ -294,18 +309,75 @@ document.addEventListener('DOMContentLoaded', function () {
     var downloadUrl = <?= json_encode(rtrim((string) URL, '/') . '/admin/reports/boletim-coordenacao/zip/' . (int) $zipJobId) ?>;
     var texto = document.getElementById('zip-boletins-texto');
     var banner = document.getElementById('zip-boletins-banner');
+    var horariosEl = document.getElementById('zip-boletins-horarios');
+
+    function formatarHorarioZip(valor) {
+        if (!valor) return '';
+        var s = String(valor).replace('T', ' ').replace(/\.\d+.*/, '');
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+        if (!m) return s;
+        return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + ':' + m[5] + ':' + m[6];
+    }
+
+    function formatarDuracaoZip(inicio, fim) {
+        var a = Date.parse(String(inicio || '').replace(' ', 'T'));
+        var b = Date.parse(String(fim || '').replace(' ', 'T'));
+        if (!a || !b || b < a) return '';
+        var seg = Math.round((b - a) / 1000);
+        if (seg < 60) return seg + 's';
+        var min = Math.floor(seg / 60);
+        var resto = seg % 60;
+        if (min < 60) return resto ? (min + ' min ' + resto + 's') : (min + ' min');
+        var h = Math.floor(min / 60);
+        min = min % 60;
+        return min ? (h + 'h ' + min + ' min') : (h + 'h');
+    }
+
+    function textoHorarios(inicio, termino, pedido, emAndamento) {
+        var ini = formatarHorarioZip(inicio);
+        var fim = formatarHorarioZip(termino);
+        var ped = formatarHorarioZip(pedido);
+        if (ini) {
+            var t = 'Início: ' + ini + (fim ? ' · Término: ' + fim : (emAndamento ? ' · Término: em andamento' : ''));
+            var dur = formatarDuracaoZip(inicio, termino);
+            if (dur) t += ' · Duração: ' + dur;
+            return t;
+        }
+        if (ped) return 'Pedido às ' + ped + ' · Aguardando início da geração';
+        return 'Horários da geração aparecem assim que o processamento começar.';
+    }
+
+    function atualizarHorarios(data, emAndamento) {
+        if (!horariosEl) return;
+        data = data || {};
+        var result = data.result || {};
+        horariosEl.textContent = textoHorarios(
+            data.iniciado_em || result.iniciado_em || '',
+            data.finalizado_em || result.finalizado_em || data.completed_at || '',
+            data.created_at || '',
+            emAndamento
+        );
+    }
+
     new AIJobPoller(jobId, {
         interval: 4000,
         statusUrl: <?= json_encode(rtrim((string) URL, '/') . '/admin/ai-job/{id}/status') ?>,
         onDone: function (result) {
             var emitidos = result && result.emitidos ? result.emitidos : 0;
             var falhas = result && result.falhas ? result.falhas : 0;
+            var linhaHorarios = textoHorarios(
+                result && result.iniciado_em,
+                result && result.finalizado_em,
+                '',
+                false
+            );
             if (banner) {
                 banner.className = 'rounded-lg p-4 mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800';
                 banner.innerHTML = '<p class="font-semibold"><i class="fa-solid fa-circle-check mr-2"></i>ZIP pronto'
                     + (emitidos ? ': ' + emitidos + ' boletim(ns)' : '')
                     + (falhas ? ' · ' + falhas + ' falha(s)' : '')
                     + '.</p>'
+                    + '<p class="text-sm mt-2 text-emerald-800">' + linhaHorarios + '</p>'
                     + '<a href="' + downloadUrl + '" class="inline-flex items-center mt-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"><i class="fa-solid fa-download mr-2"></i>Baixar ZIP</a>';
             }
             var iframe = document.createElement('iframe');
@@ -320,8 +392,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (texto) {
                 texto.textContent = 'Não foi possível gerar o ZIP: ' + (msg || 'erro desconhecido');
             }
+            if (horariosEl) {
+                horariosEl.className = 'text-sm mt-2 text-red-700';
+            }
         },
-        onProgress: function (status) {
+        onProgress: function (status, data) {
+            atualizarHorarios(data, true);
             if (!texto) return;
             if (status === 'pending') {
                 texto.textContent = 'Na fila: a geração começa em instantes.';

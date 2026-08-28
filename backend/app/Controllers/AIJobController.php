@@ -59,7 +59,19 @@ class AIJobController
             $response = [
                 'id'     => (int) $job['id'],
                 'status' => (string) ($job['status'] ?? 'pending'),
+                'created_at' => (string) ($job['created_at'] ?? ''),
+                'completed_at' => (string) ($job['completed_at'] ?? ''),
             ];
+
+            $decoded = json_decode((string) ($job['result'] ?? ''), true);
+            if (is_array($decoded)) {
+                if (!empty($decoded['iniciado_em'])) {
+                    $response['iniciado_em'] = (string) $decoded['iniciado_em'];
+                }
+                if (!empty($decoded['finalizado_em'])) {
+                    $response['finalizado_em'] = (string) $decoded['finalizado_em'];
+                }
+            }
 
             if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
                 $response['debug'] = [
@@ -73,7 +85,6 @@ class AIJobController
             }
 
             if ($job['status'] === 'done') {
-                $decoded = json_decode((string) ($job['result'] ?? ''), true);
                 $response['result'] = is_array($decoded) ? $decoded : ['raw' => $job['result']];
             }
 

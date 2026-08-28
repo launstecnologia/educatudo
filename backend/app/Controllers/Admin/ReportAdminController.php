@@ -562,7 +562,7 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
-     * @return array{id:int,status:string,erro:string,emitidos:int,falhas:int,total:int}|null
+     * @return array{id:int,status:string,erro:string,emitidos:int,falhas:int,total:int,iniciado_em:string,finalizado_em:string,pedido_em:string,duracao:string}|null
      */
     private function resolverZipJobBoletinsVidaEscolar(): ?array
     {
@@ -595,7 +595,49 @@ class ReportAdminController extends AdminBaseController
             'emitidos' => (int) ($resultado['emitidos'] ?? 0),
             'falhas' => (int) ($resultado['falhas'] ?? 0),
             'total' => (int) ($resultado['total'] ?? 0),
+            'iniciado_em' => $this->formatarHorarioBoletimZip(
+                (string) ($resultado['iniciado_em'] ?? '')
+            ),
+            'finalizado_em' => $this->formatarHorarioBoletimZip(
+                (string) ($resultado['finalizado_em'] ?? ($status === 'done' || $status === 'failed' ? ($job['completed_at'] ?? '') : ''))
+            ),
+            'pedido_em' => $this->formatarHorarioBoletimZip((string) ($job['created_at'] ?? '')),
+            'duracao' => $this->formatarDuracaoBoletimZip(
+                (string) ($resultado['iniciado_em'] ?? ''),
+                (string) ($resultado['finalizado_em'] ?? ($job['completed_at'] ?? ''))
+            ),
         ];
+    }
+
+    private function formatarHorarioBoletimZip(string $dt): string
+    {
+        $dt = trim($dt);
+        if ($dt === '') {
+            return '';
+        }
+        $ts = strtotime($dt);
+        return $ts === false ? '' : date('d/m/Y H:i:s', $ts);
+    }
+
+    private function formatarDuracaoBoletimZip(string $inicio, string $fim): string
+    {
+        $a = strtotime(trim($inicio));
+        $b = strtotime(trim($fim));
+        if ($a === false || $b === false || $b < $a) {
+            return '';
+        }
+        $seg = $b - $a;
+        if ($seg < 60) {
+            return $seg . 's';
+        }
+        $min = intdiv($seg, 60);
+        $resto = $seg % 60;
+        if ($min < 60) {
+            return $resto > 0 ? $min . ' min ' . $resto . 's' : $min . ' min';
+        }
+        $horas = intdiv($min, 60);
+        $min = $min % 60;
+        return $min > 0 ? $horas . 'h ' . $min . ' min' : $horas . 'h';
     }
 
     /**
