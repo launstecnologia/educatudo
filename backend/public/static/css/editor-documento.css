@@ -230,16 +230,21 @@ body.edoc-body {
   width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit;
 }
 .edoc-quadro-notas th, .edoc-quadro-notas td {
-  border: 1px solid #d1d5db; padding: 3px 4px; font-size: inherit;
+  border: 1px solid #d1d5db; padding: 4px 5px; font-size: inherit;
 }
 .edoc-quadro-notas th {
-  background: #f3f4f6; font-weight: 700; text-align: center;
-  text-transform: uppercase; letter-spacing: .02em; color: #6b7280;
+  background: #e5e7eb; font-weight: 700; text-align: center;
+  text-transform: uppercase; letter-spacing: .02em; color: #374151;
 }
 .edoc-quadro-notas td.comp, .edoc-quadro-notas th.comp {
   text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600;
 }
 .edoc-quadro-notas td.num { text-align: center; }
+.edoc-quadro-notas th.final, .edoc-quadro-notas td.final { background: #e8eef6; font-weight: 600; }
+.edoc-quadro-notas tr.zebra td { background: #f8fafc; }
+.edoc-html-raw table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
+.edoc-html-raw table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
+.edoc-html-raw table.ident-boletim td.label { background: #f3f4f6; font-weight: 700; width: 12%; }
 .edoc-logo-slot {
   min-height: 48px; display: flex; align-items: center; justify-content: center;
   border: 1px dashed #d1d5db; border-radius: 6px; color: #6b7280; font-size: 11px; background: #fafafa;

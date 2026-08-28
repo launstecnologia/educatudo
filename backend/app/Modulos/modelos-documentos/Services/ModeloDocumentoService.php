@@ -662,32 +662,37 @@ class ModeloDocumentoService
     {
         $est = self::estruturaVazia('a4', 'paisagem', 12);
 
-        $cab = self::secaoPadrao([100], 'header');
+        $cab = self::secaoPadrao([28, 72], 'header');
         $cab['columns'][0]['vAlign'] = 'middle';
+        $cab['columns'][1]['vAlign'] = 'middle';
         $cab['columns'][0]['elements'][] = self::elementoEstrutura(
             'logo',
-            ['width' => 200, 'align' => 'center', 'vAlign' => 'middle']
+            ['width' => 180, 'align' => 'left', 'vAlign' => 'middle']
         );
-        $est['header']['sections'] = [$cab];
-
-        $titulo = self::secaoPadrao([100], 'body');
-        $titulo['columns'][0]['elements'] = [
+        $cab['columns'][1]['elements'] = [
             self::elementoEstrutura(
                 'titulo',
                 ['text' => 'BOLETIM ESCOLAR', 'tag' => 'h1'],
-                ['textAlign' => 'center', 'fontWeight' => 'bold']
+                ['textAlign' => 'right', 'fontWeight' => 'bold']
             ),
             self::elementoEstrutura(
                 'texto',
-                ['text' => '{{aluno_nome}} · {{turma_nome}} · {{serie}} · {{ano_letivo}} · RA {{aluno_codigo}}'],
-                ['textAlign' => 'center', 'fontSize' => 9, 'color' => '#374151']
+                ['text' => '{{aluno_nome}}'],
+                ['textAlign' => 'right', 'fontSize' => 11]
             ),
             self::elementoEstrutura(
                 'texto',
-                ['text' => 'Situação: {{situacao_final}}  |  Frequência: {{frequencia_percentual}}'],
-                ['textAlign' => 'center', 'fontSize' => 9]
+                ['text' => '{{turma_nome}} · {{serie}} · {{ano_letivo}}'],
+                ['textAlign' => 'right', 'fontSize' => 9, 'color' => '#4b5563']
             ),
         ];
+        $est['header']['sections'] = [$cab];
+
+        $ident = self::secaoPadrao([100], 'body');
+        $ident['columns'][0]['elements'][] = self::elementoEstrutura(
+            'html',
+            ['html' => self::htmlIdentificacaoBoletim()]
+        );
 
         $notas = self::secaoPadrao([100], 'body');
         $notas['columns'][0]['elements'][] = self::elementoEstrutura(
@@ -699,7 +704,7 @@ class ModeloDocumentoService
         $obs = self::secaoPadrao([100], 'body');
         $obs['columns'][0]['elements'][] = self::elementoEstrutura('observacoes', [], [], true);
 
-        $est['body']['sections'] = [$titulo, $notas, $obs];
+        $est['body']['sections'] = [$ident, $notas, $obs];
 
         $data = self::secaoPadrao([100], 'footer');
         $data['columns'][0]['elements'][] = self::elementoEstrutura(
@@ -761,37 +766,77 @@ class ModeloDocumentoService
         $colspan = 1 + ($nPer * 2);
 
         $html = '<table class="quadro-notas dados"><thead><tr>'
-            . '<th class="comp" rowspan="2">Componente</th>';
-        foreach ($periodos as $rotulo) {
-            $html .= '<th colspan="2">' . htmlspecialchars((string) $rotulo, ENT_QUOTES, 'UTF-8') . '</th>';
+            . self::thQuadro('Componente', ' class="comp" rowspan="2"', '#e5e7eb');
+        foreach ($periodos as $i => $rotulo) {
+            $final = ($i === $nPer - 1);
+            $html .= self::thQuadro(
+                htmlspecialchars((string) $rotulo, ENT_QUOTES, 'UTF-8'),
+                ' colspan="2"' . ($final ? ' class="final"' : ''),
+                $final ? '#dbe3ee' : '#e5e7eb'
+            );
         }
         $html .= '</tr><tr>';
         for ($i = 0; $i < $nPer; $i++) {
-            $html .= '<th>Nota</th><th>Falta</th>';
+            $final = ($i === $nPer - 1);
+            $cls = $final ? ' class="final"' : '';
+            $bg = $final ? '#dbe3ee' : '#eef0f3';
+            $html .= self::thQuadro('Nota', $cls, $bg) . self::thQuadro('Falta', $cls, $bg);
         }
         $html .= '</tr></thead><tbody>';
 
         if ($linhas === []) {
             $html .= '<tr><td colspan="' . $colspan . '">Sem notas lançadas neste boletim.</td></tr>';
         } else {
+            $linhaIdx = 0;
             foreach ($linhas as $row) {
                 if (!is_array($row)) {
                     continue;
                 }
-                $html .= '<tr><td class="comp">' . htmlspecialchars((string) ($row['componente'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
+                $zebra = ($linhaIdx % 2 === 1);
+                $html .= '<tr' . ($zebra ? ' class="zebra"' : '') . '>'
+                    . '<td class="comp"' . ($zebra ? ' bgcolor="#f8fafc" style="background-color:#f8fafc;"' : '') . '>'
+                    . htmlspecialchars((string) ($row['componente'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
                 $celulas = is_array($row['celulas'] ?? null) ? $row['celulas'] : [];
                 for ($i = 0; $i < $nPer; $i++) {
                     $c = is_array($celulas[$i] ?? null) ? $celulas[$i] : [];
                     $nota = trim((string) ($c['nota'] ?? '')) !== '' ? (string) $c['nota'] : '—';
                     $falta = trim((string) ($c['falta'] ?? '')) !== '' ? (string) $c['falta'] : '—';
-                    $html .= '<td class="num">' . htmlspecialchars($nota, ENT_QUOTES, 'UTF-8') . '</td>'
-                        . '<td class="num">' . htmlspecialchars($falta, ENT_QUOTES, 'UTF-8') . '</td>';
+                    $final = ($i === $nPer - 1);
+                    $tdBg = $final ? '#eef2f7' : ($zebra ? '#f8fafc' : '#ffffff');
+                    $cls = 'num' . ($final ? ' final' : '');
+                    $tdAttr = ' class="' . $cls . '" bgcolor="' . $tdBg . '" style="background-color:' . $tdBg . ';"';
+                    $html .= '<td' . $tdAttr . '>' . htmlspecialchars($nota, ENT_QUOTES, 'UTF-8') . '</td>'
+                        . '<td' . $tdAttr . '>' . htmlspecialchars($falta, ENT_QUOTES, 'UTF-8') . '</td>';
                 }
                 $html .= '</tr>';
+                $linhaIdx++;
             }
         }
 
         return $html . '</tbody></table>';
+    }
+
+    private static function thQuadro(string $html, string $attrs = '', string $bg = '#eef0f3'): string
+    {
+        return '<th' . $attrs . ' bgcolor="' . $bg . '" style="background-color:' . $bg . ';">' . $html . '</th>';
+    }
+
+    public static function htmlIdentificacaoBoletim(): string
+    {
+        $lab = static fn (string $r): string => '<td class="label" bgcolor="#f3f4f6" style="background-color:#f3f4f6;font-weight:bold;">' . $r . '</td>';
+
+        return '<table class="ident-boletim dados">'
+            . '<tr>'
+            . $lab('Aluno(a)') . '<td>{{aluno_nome}}</td>'
+            . $lab('Turma') . '<td>{{turma_nome}}</td>'
+            . $lab('Série') . '<td>{{serie}}</td>'
+            . $lab('Ano') . '<td>{{ano_letivo}}</td>'
+            . '</tr><tr>'
+            . $lab('RA') . '<td>{{aluno_codigo}}</td>'
+            . $lab('Situação') . '<td>{{situacao_final}}</td>'
+            . $lab('Frequência') . '<td>{{frequencia_percentual}}</td>'
+            . $lab('Período') . '<td>{{periodo_label}}</td>'
+            . '</tr></table>';
     }
 
     public static function htmlQuadroNotasAmostra(): string
@@ -2920,18 +2965,21 @@ CSS;
     {
         return <<<CSS
   table.doc-linha { width: 100% !important; border-collapse: collapse; table-layout: fixed; margin: 0 0 8px 0; border: none !important; page-break-inside: auto; }
-  table.doc-linha table { width: 100%; margin: 0 !important; border: none !important; border-collapse: collapse; height: auto !important; }
+  table.doc-linha > tbody > tr > td { border: none !important; background: transparent !important; padding: 4px 8px; vertical-align: middle; }
+  table.doc-linha table { width: 100%; margin: 0 !important; border-collapse: collapse; height: auto !important; }
   figure.table { width: 100%; margin: 0 0 10px 0; }
-  figure.table table { width: 100%; border: none !important; }
-  table.doc-linha td, table.doc-linha th,
-  figure.table td, figure.table th { border: none !important; background: transparent !important; padding: 4px 8px; vertical-align: middle; }
+  figure.table table { width: 100%; }
   table.dados { margin: 8px 0; }
-  table.dados td, table.dados th { border: 1px solid #ccc !important; background: transparent; }
-  table.quadro-notas { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit; }
-  table.quadro-notas th, table.quadro-notas td { border: 1px solid #d1d5db !important; padding: 3px 4px; font-size: inherit !important; }
-  table.quadro-notas th { background: #f3f4f6 !important; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #6b7280; }
+  table.dados td, table.dados th { border: 1px solid #ccc; }
+  table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
+  table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
+  table.ident-boletim td.label { background-color: #f3f4f6; font-weight: bold; width: 12%; }
+  table.quadro-notas { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit; border: 1px solid #9ca3af; }
+  table.quadro-notas th, table.quadro-notas td { border: 1px solid #d1d5db; padding: 4px 5px; font-size: inherit !important; }
+  table.quadro-notas th { font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #374151; }
   table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
   table.quadro-notas td.num { text-align: center; }
+  table.quadro-notas td.final, table.quadro-notas th.final { font-weight: 600; }
   .quadro-notas-wrap { font-size: inherit; }
   .doc-logo-el { max-width: 100%; }
   .doc-logo-el img, .doc-logo img {
@@ -2945,6 +2993,7 @@ CSS;
   .image-style-align-right { float: right; margin: 0 0 8px 10px; }
   .image-style-align-center, .image-style-block-align-center { display: table; margin: 0 auto; }
   .doc-secao { page-break-inside: auto; }
+  h1 { margin: 0 0 4px; font-size: 16pt; }
 CSS;
     }
     private function cssBanners(array $modelo): string
@@ -2985,18 +3034,23 @@ CSS;
   .header .escola { font-size: 13pt; font-weight: bold; color: #064e3b; margin: 0 0 2px 0; }
   .header .meta { font-size: 8.5pt; color: #4b5563; margin: 1px 0; }
   .doc-num { text-align: right; font-size: 8.5pt; color: #6b7280; margin: 6px 0 18px 0; }
-  h1.doc-title { text-align: center; font-size: 15pt; color: #111827; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 26px 0; }
+  h1.doc-title { text-align: center; font-size: 15pt; color: #111827; letter-spacing: 1px; text-transform: uppercase; margin: 4px 0 8px 0; }
+  table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
+  table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
+  table.ident-boletim td.label { background-color: #f3f4f6; font-weight: bold; }
+  table.quadro-notas { margin: 4px 0 8px; font-size: inherit; border: 1px solid #9ca3af; }
+  table.quadro-notas th, table.quadro-notas td { font-size: inherit !important; padding: 4px 5px; }
+  table.quadro-notas th { font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #374151; }
+  table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
+  table.quadro-notas td.num { text-align: center; }
+  table.quadro-notas td.final, table.quadro-notas th.final { font-weight: 600; }
   .corpo { margin: 0 4px; }
   .corpo p { margin: 0 0 0.6em 0; }
   .destaque { font-weight: bold; color: #111827; }
   table.dados { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: inherit; }
   table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; font-size: inherit; }
   table.dados td.label { background: #f3f4f6; font-weight: bold; width: 38%; }
-  table.quadro-notas { margin: 4px 0 8px; font-size: inherit; }
-  table.quadro-notas th, table.quadro-notas td { font-size: inherit !important; padding: 3px 4px; }
-  table.quadro-notas th { background: #f3f4f6; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #6b7280; font-size: inherit !important; }
-  table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
-  table.quadro-notas td.num { text-align: center; }
+  table.ident-boletim td.label { width: 12%; }
   .fecho { margin-top: 36px; text-align: right; font-size: 11pt; }
   .assinaturas { margin-top: 60px; width: 100%; display: table; }
   .assinaturas .sig { display: table-cell; width: 50%; text-align: center; vertical-align: bottom; padding: 0 16px; }
