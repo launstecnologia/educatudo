@@ -82,6 +82,48 @@ class VidaEscolar
         return is_array($rows) ? $rows : [];
     }
 
+    /**
+     * Última ficha do ano letivo para cada aluno informado.
+     *
+     * @param list<int> $alunoIds
+     * @return list<array<string,mixed>>
+     */
+    public function listarFichasAlunosAno(array $alunoIds, int $anoLetivo): array
+    {
+        $ids = [];
+        foreach ($alunoIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        $ids = array_values($ids);
+        if ($ids === [] || $anoLetivo <= 0) {
+            return [];
+        }
+        $params = ['ano' => $anoLetivo];
+        $placeholders = [];
+        foreach ($ids as $i => $id) {
+            $chave = 'a' . $i;
+            $placeholders[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT f.*, a.nome AS aluno_nome
+             FROM boletim_fichas f
+             INNER JOIN (
+                SELECT aluno_id, MAX(id) AS id
+                FROM boletim_fichas
+                WHERE ano_letivo = :ano AND aluno_id IN (' . implode(',', $placeholders) . ')
+                GROUP BY aluno_id
+             ) ult ON ult.id = f.id
+             INNER JOIN alunos a ON a.id = f.aluno_id
+             ORDER BY a.nome ASC',
+            $params
+        );
+        return is_array($rows) ? $rows : [];
+    }
+
     public function criarFicha(array $data): int
     {
         return (int) $this->db->insert(

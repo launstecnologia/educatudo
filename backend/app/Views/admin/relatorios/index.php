@@ -7,7 +7,7 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('boletim')) {
     $hub_cards[] = [
         'href' => URL . '/admin/reports/boletim-coordenacao',
         'title' => 'Notas da Coordenação',
-        'description' => 'Acompanhe notas e boletins consolidados por turma.',
+        'description' => 'Conferência por turma e PDF em lote do boletim oficial da Vida Escolar.',
         'icon' => 'fa-solid fa-file-signature',
     ];
 }

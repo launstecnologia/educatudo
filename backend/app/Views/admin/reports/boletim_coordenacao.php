@@ -10,10 +10,11 @@ $queryExport = [
 $formatNota = static function ($value, int $places): string {
     return is_numeric($value) ? number_format((float) $value, $places, ',', '.') : ((string) $value !== '' ? (string) $value : '—');
 };
+include __DIR__ . '/../_partials/flash_message.php';
 ?>
 <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Notas da Coordenação</h1>
-    <p class="text-gray-600 mt-1">Relatório consolidado dos boletins oficiais, pronto para conferência e assinatura.</p>
+    <p class="text-gray-600 mt-1">Conferência consolidada por turma. O PDF em lote emite o boletim oficial da Vida Escolar (papel timbrado), um aluno por página.</p>
 </div>
 
 <form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
@@ -63,7 +64,7 @@ $formatNota = static function ($value, int $places): string {
     </div>
     <label class="inline-flex items-center gap-2.5 mt-5 text-sm text-gray-700 cursor-pointer">
         <input type="checkbox" name="assinatura" value="1" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= !empty($incluir_assinatura) ? 'checked' : '' ?>>
-        Incluir campo de assinatura ao lado do nome do aluno
+        Incluir campo de assinatura ao lado do nome do aluno (vale na conferência e no Excel)
     </label>
     <div class="mt-5 flex flex-wrap gap-3">
         <button type="submit" name="executar" value="1" class="btn-primary-custom px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:opacity-90 transition-opacity"><i class="fa-solid fa-chart-column mr-2"></i>Gerar relatório</button>
@@ -73,12 +74,22 @@ $formatNota = static function ($value, int $places): string {
 
 <?php if (!empty($executar) && $relatorio): ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?></span></div>
+        <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?><?php if (!empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?></span></div>
         <div class="flex gap-2">
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
+            <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && (int) ($relatorio['alunos_com_ficha'] ?? 0) <= 80): ?>
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</a>
+            <?php else: ?>
+            <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="<?= (int) ($relatorio['alunos_com_ficha'] ?? 0) > 80 ? 'Filtre por turma (máximo 80 boletins)' : 'Nenhum aluno com ficha na Vida Escolar' ?>"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</span>
+            <?php endif; ?>
             <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
         </div>
     </div>
+    <?php if ((int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && !empty($relatorio['alunos'])): ?>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4"><?= (int) $relatorio['alunos_sem_ficha'] ?> aluno(s) desta lista ainda não têm ficha na Vida Escolar no ano <?= (int) ($relatorio['ano_letivo'] ?? 0) ?> e ficam de fora do PDF.</div>
+    <?php endif; ?>
+    <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 80): ?>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4">Há <?= (int) $relatorio['alunos_com_ficha'] ?> fichas neste filtro. Filtre por turma para baixar no máximo 80 boletins por vez.</div>
+    <?php endif; ?>
     <?php if (empty($relatorio['alunos'])): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4">Nenhum boletim oficial encontrado para os filtros selecionados.</div>
     <?php endif; ?>

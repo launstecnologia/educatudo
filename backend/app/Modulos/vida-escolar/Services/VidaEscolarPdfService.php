@@ -37,6 +37,67 @@ class VidaEscolarPdfService
     }
 
     /**
+     * Um PDF com um boletim da Vida Escolar por aluno (quebra de página).
+     *
+     * @param list<array<string,mixed>> $prontuarios
+     * @param array<int,string> $periodos
+     * @param array<string,mixed>|null $config
+     */
+    public function emitirBoletinsLote(array $prontuarios, array $periodos, ?array $config, string $filename): void
+    {
+        if ($prontuarios === []) {
+            throw new \RuntimeException('Nenhum boletim da Vida Escolar para emitir.');
+        }
+        if (count($prontuarios) > 80) {
+            throw new \RuntimeException('O lote tem mais de 80 boletins. Filtre por turma e tente de novo.');
+        }
+        @set_time_limit(180);
+        $this->garantirModelos();
+        $modelo = $this->modelos->findByCodigo(self::CODIGO_BOLETIM);
+        if (!$modelo) {
+            throw new \RuntimeException('Modelo vida_escolar_boletim indisponível. Cadastre-o em Layout de documentos.');
+        }
+        $css = '';
+        $corpos = [];
+        foreach ($prontuarios as $prontuario) {
+            $out = $this->htmlProntuario(self::CODIGO_BOLETIM, 'Boletim Escolar', $prontuario, $periodos, $config);
+            if ($css === '') {
+                $css = $this->extrairCssHtml($out['html']);
+            }
+            $corpos[] = $this->extrairCorpoHtml($out['html']);
+        }
+        $ultimo = count($corpos) - 1;
+        $partes = [];
+        foreach ($corpos as $i => $corpo) {
+            $quebra = $i < $ultimo ? 'page-break-after:always;break-after:page;' : '';
+            $partes[] = '<div class="boletim-lote" style="' . $quebra . '">' . $corpo . '</div>';
+        }
+        $html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>'
+            . $css
+            . "\n.page-break{page-break-after:always;break-after:page;}"
+            . '</style></head><body>'
+            . implode('', $partes)
+            . '</body></html>';
+        $this->enviarPdf($html, $filename, $modelo);
+    }
+
+    private function extrairCssHtml(string $html): string
+    {
+        if (preg_match('/<style[^>]*>(.*?)<\/style>/is', $html, $m)) {
+            return (string) $m[1];
+        }
+        return '';
+    }
+
+    private function extrairCorpoHtml(string $html): string
+    {
+        if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $m)) {
+            return (string) $m[1];
+        }
+        return $html;
+    }
+
+    /**
      * @param array<string,mixed> $prontuario
      * @param array<string,mixed>|null $config
      */
@@ -207,6 +268,16 @@ class VidaEscolarPdfService
         $vars['doc_rotulo'] = htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8');
         $vars['situacao_matricula'] = htmlspecialchars((string) ($capa['situacao'] ?? $vars['situacao_matricula'] ?? ''), ENT_QUOTES, 'UTF-8');
         $vars['situacao_final'] = $vars['situacao_matricula'];
+        $freqRaw = $ficha['frequencia_percentual'] ?? $capa['frequencia_percentual'] ?? '';
+        if ($freqRaw !== '' && $freqRaw !== null && is_numeric($freqRaw)) {
+            $vars['frequencia_percentual'] = htmlspecialchars(
+                number_format((float) $freqRaw, 1, ',', '.') . '%',
+                ENT_QUOTES,
+                'UTF-8'
+            );
+        } elseif (trim((string) ($vars['frequencia_percentual'] ?? '')) === '') {
+            $vars['frequencia_percentual'] = '—';
+        }
         $vars['identidade_html'] = $this->tabelaChaveValor($planilha);
         $vars['trajetoria_html'] = $this->trajetoriaHtml(is_array($prontuario['trajetoria']['anos'] ?? null) ? $prontuario['trajetoria']['anos'] : []);
         $vars['quadro_notas_html'] = $this->quadroHtml($quadro, $periodos);
@@ -518,10 +589,12 @@ class VidaEscolarPdfService
                 'corpo_html' => '<div class="doc-num">{{doc_rotulo}}</div><h1 class="doc-title">{{titulo}}</h1>'
                     . '<p style="text-align:center;font-size:10pt;color:#4b5563;">{{turma_nome}} · {{serie}} · {{ano_letivo}}</p>'
                     . '<table class="dados"><tr><td class="label">Aluno(a)</td><td>{{aluno_nome}}</td></tr>'
+                    . '<tr><td class="label">Matrícula / RA</td><td>{{aluno_codigo}}</td></tr>'
                     . '<tr><td class="label">CPF</td><td>{{aluno_cpf}}</td></tr>'
                     . '<tr><td class="label">Nascimento</td><td>{{aluno_data_nasc}}</td></tr>'
                     . '<tr><td class="label">Turma / série</td><td>{{turma_nome}} · {{serie}}</td></tr>'
-                    . '<tr><td class="label">Situação</td><td>{{situacao_matricula}}</td></tr></table>'
+                    . '<tr><td class="label">Situação</td><td>{{situacao_final}}</td></tr>'
+                    . '<tr><td class="label">Frequência</td><td>{{frequencia_percentual}}</td></tr></table>'
                     . '{{quadro_notas_html}}<p>{{observacoes}}</p>',
                 'rodape_html' => $rodape,
                 'orientacao' => 'paisagem',

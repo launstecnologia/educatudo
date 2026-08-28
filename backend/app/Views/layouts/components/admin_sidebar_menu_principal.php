@@ -12,7 +12,8 @@ $showAvaliacoesGroup = ($canViewSidebar(['inclusao']) && $modOn('inclusao'))
     || $modOn('aluno_provas') || $modOn('professor_provas')
     || $modOn('redacao_configuravel')
     || FeatureGate::isModuleEnabled('jornadas')
-    || $modOn('boletim');
+    || $modOn('boletim')
+    || $canViewSidebar(['relatorios_gerais']);
 $showPedagogicoGroup = $modOn('aulas_online')
     || FeatureGate::isModuleEnabled('ead')
     || $modOn('bncc')
@@ -187,6 +188,12 @@ $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ??
                 <span class="sidebar-text text-sm">Guia do Boletim</span>
             </a>
         </div>
+        <?php endif; ?>
+        <?php if ($canViewSidebar(['relatorios_gerais'])): ?>
+        <a href="<?= URL ?>/admin/relatorios" class="<?= $linkCls(in_array($cp, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
+            <i class="fa-solid fa-chart-pie w-4 h-4 mr-3"></i>
+            <span class="sidebar-text text-sm">Relatórios</span>
+        </a>
         <?php endif; ?>
     </div>
 </div>

@@ -113,7 +113,7 @@
         $avaliacoesOpen = in_array($cp, [
             'avaliacoes', 'inclusao', 'provas', 'provas_blocos', 'exercises',
             'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
-            'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao',
+            'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao', 'relatorios',
         ], true);
         $comunicacaoOpen = in_array($cp, [
             'comunicacao', 'school-communication', 'mural-recados', 'notifications',
@@ -662,6 +662,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'boletim_config': 'avaliacoes',
         'boletim_guia': 'avaliacoes',
         'reports_boletim_coordenacao': 'avaliacoes',
+        'relatorios': 'avaliacoes',
         'comunicacao': 'comunicacao',
         'school-communication': 'comunicacao',
         'mural-recados': 'comunicacao',

@@ -116,7 +116,7 @@ class AdminPermissionMatrix
             'alunos_online' => ['label' => 'Alunos Online', 'prefixes' => ['/admin/alunos-online', '/admin/api/alunos-online']],
             'reconhecimento_facial' => ['label' => 'Reconhecimento Facial', 'prefixes' => ['/admin/reconhecimento-facial']],
 
-            'relatorios_gerais' => ['label' => 'Gerais', 'prefixes' => ['/admin/reports']],
+            'relatorios_gerais' => ['label' => 'Gerais', 'prefixes' => ['/admin/reports', '/admin/relatorios']],
             'censo_escolar' => ['label' => 'Censo Escolar', 'prefixes' => ['/admin/censo']],
 
             'configuracao_prompt' => ['label' => 'Configuração de Prompt', 'prefixes' => ['/admin/dev/prompts-redacao']],

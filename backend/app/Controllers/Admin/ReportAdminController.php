@@ -263,6 +263,7 @@ class ReportAdminController extends AdminBaseController
             ? $this->montarRelatorioBoletimCoordenacao($regraId, $periodoRef, $turmaId, $notaAbaixoDe, $materiasExibicao)
             : null;
 
+        $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/reports/boletim_coordenacao', [
             'title' => 'Notas da Coordenação - EducaTudo',
             'user' => $user,
@@ -278,6 +279,8 @@ class ReportAdminController extends AdminBaseController
             'relatorio' => $relatorio,
             'pode_editar_observacao' => $this->podeEditarObservacaoBoletimCoordenacao($user),
             'csrf_token' => $this->generateCsrfToken(),
+            'flash_status' => ($flash['type'] ?? '') === 'success' ? 'success' : (($flash['message'] ?? '') ? 'error' : ''),
+            'flash_message' => (string) ($flash['message'] ?? ''),
         ]);
     }
 
@@ -307,48 +310,135 @@ class ReportAdminController extends AdminBaseController
             return;
         }
 
-        $logoData = $this->resolveSchoolLogoForCoordinationReportPdf();
-        if ($logoData === '') {
-            $logoPath = __DIR__ . '/../../../logo-educatudo.png';
-            if (is_file($logoPath) && is_readable($logoPath)) {
-                $logoBin = @file_get_contents($logoPath);
-                if (is_string($logoBin) && $logoBin !== '') {
-                    $logoData = 'data:image/png;base64,' . base64_encode($logoBin);
-                }
-            }
+        $this->exportarBoletinsVidaEscolarLote($relatorio, $filenameBase);
+        return;
+    }
+
+    /**
+     * PDF em lote: um boletim oficial da Vida Escolar por aluno (papel timbrado).
+     *
+     * @param array<string,mixed> $relatorio
+     */
+    private function exportarBoletinsVidaEscolarLote(array $relatorio, string $filenameBase): void
+    {
+        $voltar = $this->urlVoltarBoletimCoordenacao();
+        if (!class_exists('LayoutHelper', false)) {
+            require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        }
+        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+            $this->setFlashMessage('O módulo Vida Escolar está desativado nesta escola.', 'error');
+            $this->redirect($voltar);
+            return;
         }
 
-        ob_start();
-        extract([
-            'relatorio' => $relatorio,
-            'incluir_assinatura' => $incluirAssinatura,
-            'logo_data' => $logoData,
-            'gerado_em' => date('d/m/Y H:i'),
-        ], EXTR_SKIP);
-        require __DIR__ . '/../../Views/admin/reports/boletim_coordenacao_pdf.php';
-        $html = (string) ob_get_clean();
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/ProntuarioVidaEscolarService.php';
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarPdfService.php';
 
-        $oldDisplayErrors = ini_get('display_errors');
-        ini_set('display_errors', '0');
+        $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+        if (!$vida->model()->schemaPronto()) {
+            $this->setFlashMessage('Execute a migration da Vida Escolar (painel Master) antes de emitir os boletins.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+
+        $anoLetivo = (int) ($relatorio['ano_letivo'] ?? 0);
+        $alunos = is_array($relatorio['alunos'] ?? null) ? $relatorio['alunos'] : [];
+        $alunoIds = [];
+        foreach ($alunos as $aluno) {
+            $id = (int) ($aluno['id'] ?? 0);
+            if ($id > 0) {
+                $alunoIds[] = $id;
+            }
+        }
+        if ($anoLetivo <= 0 || $alunoIds === []) {
+            $this->setFlashMessage('Não há alunos neste filtro para emitir o boletim da Vida Escolar.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+
+        $fichas = $vida->model()->listarFichasAlunosAno($alunoIds, $anoLetivo);
+        $porAluno = [];
+        foreach ($fichas as $ficha) {
+            $porAluno[(int) ($ficha['aluno_id'] ?? 0)] = (int) ($ficha['id'] ?? 0);
+        }
+        $comFicha = 0;
+        foreach ($alunos as $aluno) {
+            if ((int) ($porAluno[(int) ($aluno['id'] ?? 0)] ?? 0) > 0) {
+                $comFicha++;
+            }
+        }
+        if ($comFicha === 0) {
+            $this->setFlashMessage(
+                'Nenhum aluno deste filtro tem ficha na Vida Escolar para o ano ' . $anoLetivo . '.',
+                'error'
+            );
+            $this->redirect($voltar);
+            return;
+        }
+        if ($comFicha > 80) {
+            $this->setFlashMessage(
+                'O lote tem ' . $comFicha . ' ficha(s) na Vida Escolar. Filtre por turma para baixar no máximo 80 boletins por vez.',
+                'error'
+            );
+            $this->redirect($voltar);
+            return;
+        }
+
+        $prontuarioSvc = new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService();
+        $prontuarios = [];
+        foreach ($alunos as $aluno) {
+            $alunoId = (int) ($aluno['id'] ?? 0);
+            $fichaId = (int) ($porAluno[$alunoId] ?? 0);
+            if ($alunoId <= 0 || $fichaId <= 0) {
+                continue;
+            }
+            $dados = $prontuarioSvc->montar($alunoId, $vida, $fichaId);
+            if ($dados === []) {
+                continue;
+            }
+            $dados['planilha_sed'] = $prontuarioSvc->planilhaSed($dados);
+            $prontuarios[] = $dados;
+        }
+
+        if ($prontuarios === []) {
+            $this->setFlashMessage(
+                'Nenhum aluno deste filtro tem ficha na Vida Escolar para o ano ' . $anoLetivo . '.',
+                'error'
+            );
+            $this->redirect($voltar);
+            return;
+        }
+
         try {
-            while (ob_get_level() > 0) {
-                ob_end_clean();
-            }
-            $options = new \Dompdf\Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('defaultFont', 'DejaVu Sans');
-            $dompdf = new \Dompdf\Dompdf($options);
-            $dompdf->loadHtml($html, 'UTF-8');
-            $dompdf->setPaper('A4', 'landscape');
-            $dompdf->render();
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: attachment; filename="' . $filenameBase . '.pdf"');
-            header('Cache-Control: private, max-age=0, must-revalidate');
-            echo $dompdf->output();
-            exit;
-        } finally {
-            ini_set('display_errors', (string) $oldDisplayErrors);
+            $pdf = new \App\Modulos\VidaEscolar\Services\VidaEscolarPdfService();
+            $pdf->emitirBoletinsLote(
+                $prontuarios,
+                \App\Modulos\VidaEscolar\Services\VidaEscolarService::PERIODOS,
+                $this->config ?? null,
+                'boletins_vida_escolar_' . $filenameBase . '.pdf'
+            );
+        } catch (\Throwable $e) {
+            error_log('ReportAdminController boletim Vida Escolar lote: ' . $e->getMessage());
+            $this->setFlashMessage(
+                'Não foi possível gerar o PDF. Confira o Layout de documentos (papel timbrado e modelo do boletim da Vida Escolar).',
+                'error'
+            );
+            $this->redirect($voltar);
         }
+    }
+
+    private function urlVoltarBoletimCoordenacao(): string
+    {
+        $qs = http_build_query([
+            'evento' => (string) ($_GET['evento'] ?? ''),
+            'turma_id' => max(0, (int) ($_GET['turma_id'] ?? 0)),
+            'nota_abaixo_de' => (string) ($_GET['nota_abaixo_de'] ?? ''),
+            'materias_exibicao' => $this->parseMateriasExibicaoBoletim($_GET['materias_exibicao'] ?? 'todas'),
+            'assinatura' => !empty($_GET['assinatura']) ? 1 : 0,
+            'executar' => 1,
+        ]);
+        return '/admin/reports/boletim-coordenacao?' . $qs;
     }
 
     private function listarEventosBoletimCoordenacao(): array
@@ -434,7 +524,7 @@ class ReportAdminController extends AdminBaseController
         $rows = $this->db->fetchAll(
             "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
                     a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
-                    r.nome AS evento_nome, r.series_ids, r.decimal_places,
+                    r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo,
                     o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
@@ -526,12 +616,15 @@ class ReportAdminController extends AdminBaseController
         foreach ($alunos as $aluno) {
             $totalLinhasFiltradas += count((array) ($aluno['materias'] ?? []));
         }
+        $anoLetivo = (int) ($rows[0]['ano_letivo'] ?? 0);
+        $fichasInfo = $this->contarFichasVidaEscolarBoletimCoordenacao($alunos, $anoLetivo);
         return [
             'evento_nome' => $this->nomeEventoBoletimCoordenacao(
                 (string) ($rows[0]['evento_nome'] ?? 'Boletim'),
                 $rows[0]['series_ids'] ?? null
             ),
             'periodo_ref' => $periodoRef,
+            'ano_letivo' => $anoLetivo,
             'decimal_places' => $decimalPlaces,
             'columns' => $columns,
             'alunos' => $alunos,
@@ -540,7 +633,41 @@ class ReportAdminController extends AdminBaseController
             'nota_abaixo_de' => $notaAbaixoDe,
             'materias_exibicao' => $materiasExibicao,
             'codigo_media_final' => $codigoMediaFinal,
+            'alunos_com_ficha' => $fichasInfo['com'],
+            'alunos_sem_ficha' => $fichasInfo['sem'],
         ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $alunos
+     * @return array{com:int,sem:int}
+     */
+    private function contarFichasVidaEscolarBoletimCoordenacao(array $alunos, int $anoLetivo): array
+    {
+        $total = count($alunos);
+        if ($total === 0 || $anoLetivo <= 0) {
+            return ['com' => 0, 'sem' => $total];
+        }
+        if (!class_exists('LayoutHelper', false)) {
+            require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        }
+        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+            return ['com' => 0, 'sem' => $total];
+        }
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+        $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+        if (!$vida->model()->schemaPronto()) {
+            return ['com' => 0, 'sem' => $total];
+        }
+        $ids = [];
+        foreach ($alunos as $aluno) {
+            $id = (int) ($aluno['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        $com = count($vida->model()->listarFichasAlunosAno($ids, $anoLetivo));
+        return ['com' => $com, 'sem' => max(0, $total - $com)];
     }
 
     private function selecionarColunasNotasBoletim(array $columnsRaw): array
@@ -649,57 +776,6 @@ class ReportAdminController extends AdminBaseController
         }, $rows);
         $seriesLabel = $this->joinLabelsBoletimCoordenacao($labels);
         return trim($nome . ($seriesLabel !== '' ? ' ' . $seriesLabel : ''));
-    }
-
-    private function resolveSchoolLogoForCoordinationReportPdf(): string
-    {
-        try {
-            $url = (string) LayoutHelper::getDocumentLogoUrl();
-            if ($url === '') {
-                return '';
-            }
-            $parts = parse_url($url) ?: [];
-            $query = [];
-            if (!empty($parts['query'])) {
-                parse_str((string) $parts['query'], $query);
-            }
-            $filePath = '';
-            $key = isset($query['key']) ? (string) $query['key'] : '';
-            $type = isset($query['type']) ? (string) $query['type'] : 'layout';
-            if ($key !== '') {
-                require_once __DIR__ . '/../../Services/MediaStorageService.php';
-                $media = new MediaStorageService($this->config);
-                $localPath = $media->getLocalPath($type, $key);
-                if ($localPath !== null && is_file($localPath) && is_readable($localPath)) {
-                    $filePath = $localPath;
-                }
-            }
-            if ($filePath === '' && !empty($parts['path'])) {
-                $relative = ltrim((string) $parts['path'], '/');
-                foreach ([__DIR__ . '/../../../public/' . $relative, __DIR__ . '/../../../' . $relative] as $candidate) {
-                    if (is_file($candidate) && is_readable($candidate)) {
-                        $filePath = $candidate;
-                        break;
-                    }
-                }
-            }
-            if ($filePath === '') {
-                return '';
-            }
-            $bin = @file_get_contents($filePath);
-            if (!is_string($bin) || $bin === '') {
-                return '';
-            }
-            $mimeMap = [
-                'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg',
-                'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml',
-            ];
-            $ext = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
-            return 'data:' . ($mimeMap[$ext] ?? 'image/png') . ';base64,' . base64_encode($bin);
-        } catch (Throwable $e) {
-            error_log('ReportAdminController resolveSchoolLogoForCoordinationReportPdf: ' . $e->getMessage());
-            return '';
-        }
     }
 
     private function exportarBoletimCoordenacaoExcel(array $relatorio, bool $incluirAssinatura, string $filenameBase): void

@@ -30,6 +30,7 @@ $academicoOpen = in_array($cur, [
 $avaliacoesOpen = in_array($cur, [
     'avaliacoes', 'provas', 'provas_blocos', 'exercises',
     'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
+    'relatorios', 'reports_boletim_coordenacao',
 ], true);
 $gestaoOpen = in_array($cur, [
     'gestao_escolar', 'censo_escolar', 'conselho_classe', 'diario_classe',
@@ -130,7 +131,7 @@ $gestaoOpen = in_array($cur, [
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['exercicios', 'provas_online', 'jornadas_aluno', 'redacao_professor'])): ?>
+<?php if ($secCan(['exercicios', 'provas_online', 'jornadas_aluno', 'redacao_professor', 'relatorios_gerais'])): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cur === 'avaliacoes' ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/avaliacoes" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -161,6 +162,12 @@ $gestaoOpen = in_array($cur, [
         <a href="<?= $urlBase ?>/admin/jornadas" class="<?= $linkCls(in_array($cur, ['journeys', 'journeys_relatorio'], true)) ?>">
             <i class="fa-solid fa-route w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['relatorios_gerais'])): ?>
+        <a href="<?= $urlBase ?>/admin/relatorios" class="<?= $linkCls(in_array($cur, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
+            <i class="fa-solid fa-chart-pie w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatórios</span>
         </a>
         <?php endif; ?>
     </div>
