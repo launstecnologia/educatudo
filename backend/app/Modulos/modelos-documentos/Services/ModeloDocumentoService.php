@@ -666,7 +666,7 @@ class ModeloDocumentoService
         $cab['columns'][0]['vAlign'] = 'middle';
         $cab['columns'][0]['elements'][] = self::elementoEstrutura(
             'logo',
-            ['width' => 96, 'align' => 'left', 'vAlign' => 'middle']
+            ['width' => 200, 'align' => 'center', 'vAlign' => 'middle']
         );
         $est['header']['sections'] = [$cab];
 
@@ -2213,7 +2213,7 @@ HTML;
     private function htmlImgLogo(string $src): string
     {
         return '<img src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
-            . '" alt="Logo" width="180" height="70" style="height:70px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;">';
+            . '" alt="Logo" style="max-height:56px;max-width:220px;width:auto;height:auto;object-fit:contain;display:inline-block;vertical-align:middle;">';
     }
 
     private function ehDataUriImagem(string $src): bool
@@ -2933,7 +2933,11 @@ CSS;
   table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
   table.quadro-notas td.num { text-align: center; }
   .quadro-notas-wrap { font-size: inherit; }
-  .doc-logo-el img, .doc-logo img { height: 70px; width: auto; max-width: 220px; display: inline-block; vertical-align: middle; }
+  .doc-logo-el { max-width: 100%; }
+  .doc-logo-el img, .doc-logo img {
+    max-height: 56px; max-width: 100%; width: auto !important; height: auto !important;
+    display: inline-block; vertical-align: middle; object-fit: contain;
+  }
   table.doc-linha img { max-width: 100%; }
   figure.image, .image { margin: 4px 0; }
   .image img { max-width: 100%; height: auto; }

@@ -151,11 +151,17 @@ body.edoc-body {
 .edoc-el-handles i.se { bottom: -4px; right: -4px; }
 .edoc-el-stretch { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 56px; }
 .edoc-media {
-  flex: 1;
-  min-height: 56px;
+  min-height: 0;
   box-sizing: border-box;
 }
-.edoc-media img { display: block; max-width: 100%; height: auto; }
+.edoc-media img {
+  display: inline-block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  vertical-align: middle;
+}
 .edoc-el-toolbar {
   display: none; position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
   background: #1f2937; border-radius: 6px; z-index: 6; white-space: nowrap;
@@ -238,7 +244,7 @@ body.edoc-body {
   min-height: 48px; display: flex; align-items: center; justify-content: center;
   border: 1px dashed #d1d5db; border-radius: 6px; color: #6b7280; font-size: 11px; background: #fafafa;
 }
-.edoc-logo-slot img { max-height: 70px; max-width: 100%; }
+.edoc-logo-slot img { max-height: 64px; max-width: 100%; width: auto; height: auto; object-fit: contain; }
 .edoc-chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 10px; }
 @media (max-width: 1024px) {
   .edoc-left, .edoc-right { width: 220px; flex-basis: 220px; }

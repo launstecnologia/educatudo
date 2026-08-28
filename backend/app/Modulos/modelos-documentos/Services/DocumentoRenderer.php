@@ -319,9 +319,9 @@ class DocumentoRenderer
     {
         $w = (int) ($props['width'] ?? 120);
         $w = max(24, min(400, $w));
-        $inner = '<span class="doc-logo-el">{{logo_html}}</span>';
+        $inner = '<span class="doc-logo-el" style="display:inline-block;max-width:' . $w . 'px;">{{logo_html}}</span>';
 
-        return $this->blocoPosicionado($inner, $props, $css . 'max-width:' . $w . 'px;');
+        return $this->blocoPosicionado($inner, $props, $css);
     }
 
     /**

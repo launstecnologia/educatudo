@@ -237,7 +237,7 @@
       var w = p.width || 120;
       var img = (C.logoPreview || '');
       var inner = img
-        ? '<img src="' + img.replace(/"/g, '') + '" alt="Logo" style="max-width:' + w + 'px;max-height:70px;height:auto;">'
+        ? '<img src="' + img.replace(/"/g, '') + '" alt="Logo" style="max-width:' + w + 'px;max-height:64px;width:auto;height:auto;object-fit:contain;">'
         : '<div class="edoc-logo-slot" style="max-width:' + w + 'px">LOGO</div>';
       return '<div class="edoc-media" style="' + st + posicaoCss(el) + '">' + inner + '</div>';
     }
@@ -304,7 +304,7 @@
       (col.elements || []).forEach(function (el) {
         var sel = state.selected && state.selected.id === el.id;
         html += '<div class="edoc-el' + (sel ? ' is-selected' : '')
-          + ((el.type === 'logo' || el.type === 'imagem') ? ' edoc-el-stretch' : '')
+          + ((el.type === 'imagem') ? ' edoc-el-stretch' : '')
           + '" data-id="' + el.id + '" data-kind="element" data-type="' + el.type + '">';
         html += '<div class="edoc-el-toolbar">'
           + '<button type="button" data-act="move" title="Mover"><i class="fa-solid fa-up-down-left-right"></i></button>'
@@ -509,7 +509,7 @@
     var el = { id: uid('e'), type: tipo, props: {}, style: {} };
     if (tipo === 'titulo') el.props = { text: 'Título do documento', tag: 'h1' };
     if (tipo === 'texto' || tipo === 'texto_rico') el.props = { text: 'Clique duas vezes para editar.' };
-    if (tipo === 'logo') el.props = { width: 120, align: 'center', vAlign: 'middle' };
+    if (tipo === 'logo') el.props = { width: 200, align: 'center', vAlign: 'middle' };
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
