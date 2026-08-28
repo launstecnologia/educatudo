@@ -342,28 +342,33 @@ class VidaEscolarPdfService
     {
         $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
         $cols = [1, 2, 3, 4, 0];
-        $html = '<table class="dados"><tr><td class="label" rowspan="2">Componente</td>';
+        $rotulos = [];
         foreach ($cols as $p) {
-            $html .= '<td class="label" colspan="2" style="text-align:center">' . $this->esc($periodos[$p] ?? (string) $p) . '</td>';
+            $rotulos[] = (string) ($periodos[$p] ?? (string) $p);
         }
-        $html .= '</tr><tr>';
-        foreach ($cols as $_p) {
-            $html .= '<td class="label" style="text-align:center">Nota</td><td class="label" style="text-align:center">Falta</td>';
-        }
-        $html .= '</tr>';
-        if ($grid === []) {
-            return $html . '<tr><td colspan="11">Sem ficha de boletim para este ano.</td></tr></table>';
-        }
+        $linhas = [];
         foreach ($grid as $row) {
-            $html .= '<tr><td>' . $this->esc($row['linha']['componente_nome'] ?? '') . '</td>';
+            if (!is_array($row)) {
+                continue;
+            }
+            $celulas = [];
             foreach ($cols as $p) {
                 $c = is_array($row['celulas'][$p] ?? null) ? $row['celulas'][$p] : null;
-                $html .= '<td style="text-align:center">' . $this->esc($this->fmtCelula($c)) . '</td>'
-                    . '<td style="text-align:center">' . $this->esc($this->fmtFalta($c)) . '</td>';
+                $celulas[] = [
+                    'nota' => $this->fmtCelula($c),
+                    'falta' => $this->fmtFalta($c),
+                ];
             }
-            $html .= '</tr>';
+            $linhas[] = [
+                'componente' => (string) ($row['linha']['componente_nome'] ?? ''),
+                'celulas' => $celulas,
+            ];
         }
-        return $html . '</table><p style="font-size:9pt;color:#4b5563;">¹ Resultado recebido da escola de origem.</p>';
+        $html = ModeloDocumentoService::htmlQuadroNotas($rotulos, $linhas);
+        if ($grid === []) {
+            return $html;
+        }
+        return $html . '<p style="font-size:8pt;color:#4b5563;margin:4px 0 0;">¹ Resultado recebido da escola de origem.</p>';
     }
 
     /**

@@ -660,13 +660,13 @@ class ModeloDocumentoService
      */
     public static function estruturaSugeridaBoletim(): array
     {
-        $est = self::estruturaVazia('a4', 'retrato', 15);
+        $est = self::estruturaVazia('a4', 'paisagem', 12);
 
         $cab = self::secaoPadrao([100], 'header');
         $cab['columns'][0]['vAlign'] = 'middle';
         $cab['columns'][0]['elements'][] = self::elementoEstrutura(
             'logo',
-            ['width' => 140, 'align' => 'center', 'vAlign' => 'middle']
+            ['width' => 96, 'align' => 'left', 'vAlign' => 'middle']
         );
         $est['header']['sections'] = [$cab];
 
@@ -679,24 +679,27 @@ class ModeloDocumentoService
             ),
             self::elementoEstrutura(
                 'texto',
-                ['text' => '{{periodo_label}} · {{turma_nome}} · {{ano_letivo}}'],
-                ['textAlign' => 'center', 'fontSize' => 10, 'color' => '#4b5563']
+                ['text' => '{{aluno_nome}} · {{turma_nome}} · {{serie}} · {{ano_letivo}} · RA {{aluno_codigo}}'],
+                ['textAlign' => 'center', 'fontSize' => 9, 'color' => '#374151']
+            ),
+            self::elementoEstrutura(
+                'texto',
+                ['text' => 'Situação: {{situacao_final}}  |  Frequência: {{frequencia_percentual}}'],
+                ['textAlign' => 'center', 'fontSize' => 9]
             ),
         ];
 
-        $ident = self::secaoPadrao([100], 'body');
-        $ident['columns'][0]['elements'][] = self::elementoEstrutura('dados_aluno');
-
-        $resumo = self::secaoPadrao([100], 'body');
-        $resumo['columns'][0]['elements'][] = self::elementoEstrutura('resultado_final');
-
         $notas = self::secaoPadrao([100], 'body');
-        $notas['columns'][0]['elements'][] = self::elementoEstrutura('tabela_notas');
+        $notas['columns'][0]['elements'][] = self::elementoEstrutura(
+            'tabela_notas',
+            [],
+            ['fontSize' => 8]
+        );
 
         $obs = self::secaoPadrao([100], 'body');
         $obs['columns'][0]['elements'][] = self::elementoEstrutura('observacoes', [], [], true);
 
-        $est['body']['sections'] = [$titulo, $ident, $resumo, $notas, $obs];
+        $est['body']['sections'] = [$titulo, $notas, $obs];
 
         $data = self::secaoPadrao([100], 'footer');
         $data['columns'][0]['elements'][] = self::elementoEstrutura(
@@ -705,10 +708,10 @@ class ModeloDocumentoService
             ['textAlign' => 'right', 'fontSize' => 10]
         );
 
-        $htmlSec = '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+        $htmlSec = '<p style="text-align:center;margin:16px 0 0;">________________________</p>'
             . '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">{{secretario_nome}}</p>'
             . '<p style="text-align:center;margin:0;font-size:9pt;color:#4b5563;">Secretaria</p>';
-        $htmlDir = '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+        $htmlDir = '<p style="text-align:center;margin:16px 0 0;">________________________</p>'
             . '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">{{diretor_nome}}</p>'
             . '<p style="text-align:center;margin:0;font-size:9pt;color:#4b5563;">Direção</p>';
 
@@ -739,6 +742,82 @@ class ModeloDocumentoService
             $el['hideIfEmpty'] = true;
         }
         return $el;
+    }
+
+    /**
+     * Quadro de notas no formato da ficha (bimestres + final, nota e falta).
+     * O tamanho do texto herda do bloco no editor (Propriedades → Tamanho).
+     *
+     * @param list<string> $periodos
+     * @param list<array{componente?:string,celulas?:list<array{nota?:string,falta?:string}>}> $linhas
+     */
+    public static function htmlQuadroNotas(array $periodos, array $linhas): string
+    {
+        $periodos = array_values($periodos);
+        if ($periodos === []) {
+            $periodos = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre', 'FINAL'];
+        }
+        $nPer = count($periodos);
+        $colspan = 1 + ($nPer * 2);
+
+        $html = '<table class="quadro-notas dados"><thead><tr>'
+            . '<th class="comp" rowspan="2">Componente</th>';
+        foreach ($periodos as $rotulo) {
+            $html .= '<th colspan="2">' . htmlspecialchars((string) $rotulo, ENT_QUOTES, 'UTF-8') . '</th>';
+        }
+        $html .= '</tr><tr>';
+        for ($i = 0; $i < $nPer; $i++) {
+            $html .= '<th>Nota</th><th>Falta</th>';
+        }
+        $html .= '</tr></thead><tbody>';
+
+        if ($linhas === []) {
+            $html .= '<tr><td colspan="' . $colspan . '">Sem notas lançadas neste boletim.</td></tr>';
+        } else {
+            foreach ($linhas as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $html .= '<tr><td class="comp">' . htmlspecialchars((string) ($row['componente'] ?? ''), ENT_QUOTES, 'UTF-8') . '</td>';
+                $celulas = is_array($row['celulas'] ?? null) ? $row['celulas'] : [];
+                for ($i = 0; $i < $nPer; $i++) {
+                    $c = is_array($celulas[$i] ?? null) ? $celulas[$i] : [];
+                    $nota = trim((string) ($c['nota'] ?? '')) !== '' ? (string) $c['nota'] : '—';
+                    $falta = trim((string) ($c['falta'] ?? '')) !== '' ? (string) $c['falta'] : '—';
+                    $html .= '<td class="num">' . htmlspecialchars($nota, ENT_QUOTES, 'UTF-8') . '</td>'
+                        . '<td class="num">' . htmlspecialchars($falta, ENT_QUOTES, 'UTF-8') . '</td>';
+                }
+                $html .= '</tr>';
+            }
+        }
+
+        return $html . '</tbody></table>';
+    }
+
+    public static function htmlQuadroNotasAmostra(): string
+    {
+        $nf = static fn (string $n, string $f): array => ['nota' => $n, 'falta' => $f];
+        $vazio = [$nf('—', '—'), $nf('—', '—'), $nf('—', '—')];
+        $linhas = [
+            ['componente' => 'Língua Portuguesa', 'celulas' => array_merge([$nf('7,0', '8')], $vazio, [$nf('7,0', '8')])],
+            ['componente' => 'Matemática', 'celulas' => array_merge([$nf('7,0', '2')], $vazio, [$nf('7,0', '2')])],
+            ['componente' => 'Língua Inglesa', 'celulas' => array_merge([$nf('7,0', '8')], $vazio, [$nf('7,0', '8')])],
+            ['componente' => 'História', 'celulas' => array_merge([$nf('7,5', '—')], $vazio, [$nf('7,5', '—')])],
+            ['componente' => 'Geografia', 'celulas' => array_merge([$nf('8,0', '2')], $vazio, [$nf('8,0', '2')])],
+            ['componente' => 'Física', 'celulas' => array_merge([$nf('5,5', '8')], $vazio, [$nf('5,5', '8')])],
+            ['componente' => 'Química', 'celulas' => array_merge([$nf('6,0', '2')], $vazio, [$nf('6,0', '2')])],
+            ['componente' => 'Biologia', 'celulas' => array_merge([$nf('9,0', '8')], $vazio, [$nf('9,0', '8')])],
+            ['componente' => 'Redação', 'celulas' => array_merge([$nf('8,5', '—')], $vazio, [$nf('8,5', '—')])],
+            ['componente' => 'Educação Física', 'celulas' => array_merge([$nf('10,0', '2')], $vazio, [$nf('10,0', '2')])],
+            ['componente' => 'Sociologia', 'celulas' => array_merge([$nf('9,5', '8')], $vazio, [$nf('9,5', '8')])],
+            ['componente' => 'Filosofia', 'celulas' => array_merge([$nf('8,0', '2')], $vazio, [$nf('8,0', '2')])],
+            ['componente' => 'Arte', 'celulas' => array_merge([$nf('9,5', '8')], $vazio, [$nf('9,5', '8')])],
+        ];
+
+        return self::htmlQuadroNotas(
+            ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre', 'FINAL'],
+            $linhas
+        );
     }
 
     public static function idEstrutura(string $prefixo = 'n'): string
@@ -2685,7 +2764,7 @@ HTML;
             'assinante_nome' => 'Diretor(a) Exemplo',
             'assinante_cargo' => 'Direção',
             'logo_html' => '',
-            'quadro_notas_html' => '<table class="dados"><tr><td class="label">Língua Portuguesa</td><td>8,5</td></tr><tr><td class="label">Matemática</td><td>7,0</td></tr></table>',
+            'quadro_notas_html' => self::htmlQuadroNotasAmostra(),
             'identidade_html' => '<table class="dados"><tr><td class="label">Nome</td><td>Maria Eduarda Silva</td></tr><tr><td class="label">CPF</td><td>123.456.789-00</td></tr></table>',
             'trajetoria_html' => '<table class="dados"><tr><td>2024</td><td>8º Ano</td><td>EMEF Exemplo</td><td>externo</td><td>Aprovado</td></tr></table>',
             'documentos_html' => '<table class="dados"><tr><td>Certidão de nascimento</td><td>entregue</td></tr></table>',
@@ -2826,8 +2905,10 @@ HTML;
   h1,h2,h3 { color: #111; }
   p { margin: 0 0 8px; }
   table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-  th, td { border: 1px solid #ccc; padding: 4px 6px; font-size: 9pt; }
+  th, td { border: 1px solid #ccc; padding: 4px 6px; }
   th { background: #f3f4f6; }
+  table.quadro-notas { font-size: inherit; }
+  table.quadro-notas th, table.quadro-notas td { font-size: inherit !important; padding: 3px 4px; }
   .page-break { page-break-after: always; break-after: page; }
 CSS;
     }
@@ -2846,6 +2927,12 @@ CSS;
   figure.table td, figure.table th { border: none !important; background: transparent !important; padding: 4px 8px; vertical-align: middle; }
   table.dados { margin: 8px 0; }
   table.dados td, table.dados th { border: 1px solid #ccc !important; background: transparent; }
+  table.quadro-notas { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit; }
+  table.quadro-notas th, table.quadro-notas td { border: 1px solid #d1d5db !important; padding: 3px 4px; font-size: inherit !important; }
+  table.quadro-notas th { background: #f3f4f6 !important; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #6b7280; }
+  table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
+  table.quadro-notas td.num { text-align: center; }
+  .quadro-notas-wrap { font-size: inherit; }
   .doc-logo-el img, .doc-logo img { height: 70px; width: auto; max-width: 220px; display: inline-block; vertical-align: middle; }
   table.doc-linha img { max-width: 100%; }
   figure.image, .image { margin: 4px 0; }
@@ -2898,9 +2985,14 @@ CSS;
   .corpo { margin: 0 4px; }
   .corpo p { margin: 0 0 0.6em 0; }
   .destaque { font-weight: bold; color: #111827; }
-  table.dados { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 10.5pt; }
-  table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; }
+  table.dados { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: inherit; }
+  table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; font-size: inherit; }
   table.dados td.label { background: #f3f4f6; font-weight: bold; width: 38%; }
+  table.quadro-notas { margin: 4px 0 8px; font-size: inherit; }
+  table.quadro-notas th, table.quadro-notas td { font-size: inherit !important; padding: 3px 4px; }
+  table.quadro-notas th { background: #f3f4f6; font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #6b7280; font-size: inherit !important; }
+  table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
+  table.quadro-notas td.num { text-align: center; }
   .fecho { margin-top: 36px; text-align: right; font-size: 11pt; }
   .assinaturas { margin-top: 60px; width: 100%; display: table; }
   .assinaturas .sig { display: table-cell; width: 50%; text-align: center; vertical-align: bottom; padding: 0 16px; }

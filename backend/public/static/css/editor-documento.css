@@ -218,6 +218,22 @@ body.edoc-body {
 .edoc-preview .edoc-section-bar, .edoc-preview .edoc-gutter { display: none !important; }
 .edoc-preview .edoc-el, .edoc-preview .edoc-col, .edoc-preview .edoc-section { outline: none !important; }
 .edoc-html-raw { font-size: 10pt; line-height: 1.4; }
+.edoc-quadro-notas { font-size: inherit; width: 100%; }
+.edoc-quadro-notas table.quadro-notas,
+.edoc-quadro-notas table.dados {
+  width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit;
+}
+.edoc-quadro-notas th, .edoc-quadro-notas td {
+  border: 1px solid #d1d5db; padding: 3px 4px; font-size: inherit;
+}
+.edoc-quadro-notas th {
+  background: #f3f4f6; font-weight: 700; text-align: center;
+  text-transform: uppercase; letter-spacing: .02em; color: #6b7280;
+}
+.edoc-quadro-notas td.comp, .edoc-quadro-notas th.comp {
+  text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600;
+}
+.edoc-quadro-notas td.num { text-align: center; }
 .edoc-logo-slot {
   min-height: 48px; display: flex; align-items: center; justify-content: center;
   border: 1px dashed #d1d5db; border-radius: 6px; color: #6b7280; font-size: 11px; background: #fafafa;

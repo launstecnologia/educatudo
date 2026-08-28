@@ -139,7 +139,7 @@ class DocumentoRenderer
         $html = match ($tipo) {
             'titulo' => $this->blocoTitulo($props, $css),
             'texto', 'texto_rico' => $this->blocoTexto($props, $css),
-            'html' => $this->blocoHtml($props),
+            'html' => $this->blocoHtmlLivre($this->blocoHtml($props), $css),
             'logo' => $this->blocoLogo($props, $css),
             'imagem' => $this->blocoImagem($props, $css),
             'linha' => '<hr style="border:none;border-top:1px solid #d1d5db;margin:8px 0;">',
@@ -181,7 +181,10 @@ class DocumentoRenderer
                 'Série' => '{{serie}}',
                 'Ano' => '{{ano_letivo}}',
             ], $css),
-            'tabela_notas' => $this->blocoHtmlLivre('{{quadro_notas_html}}', $css),
+            'tabela_notas' => $this->blocoHtmlLivre(
+                '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>',
+                $css
+            ),
             'tabela_frequencia' => $this->blocoHtmlLivre('{{frequencia_html}}', $css),
             'historico' => $this->blocoHtmlLivre('{{historico_html}}', $css),
             'resultado_final' => $this->tabelaChaveValor([

@@ -255,6 +255,12 @@
     if (t === 'pagina') return '<p style="' + st + 'text-align:center">Página ' + ph('{{pagina}}') + ' de ' + ph('{{total_paginas}}') + '</p>';
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
+    if (t === 'tabela_notas') {
+      var quadro = (C.varsPreview && C.varsPreview.quadro_notas_html)
+        ? C.varsPreview.quadro_notas_html
+        : '{{quadro_notas_html}}';
+      return '<div class="edoc-quadro-notas" style="' + st + '">' + sanitizeHtml(quadro) + '</div>';
+    }
     if (t === 'assinaturas') {
       return '<div style="' + st + ';display:flex;gap:16px;margin-top:28px">'
         + '<div style="flex:1;text-align:center">____________<br><small>Responsável</small></div>'
@@ -507,6 +513,7 @@
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
+    if (tipo === 'tabela_notas') el.style = { fontSize: 8 };
     if (tipo === 'html') el.props = { html: '<p></p>' };
     return el;
   }
@@ -687,6 +694,9 @@
     if (el.type === 'titulo' || el.type === 'texto' || el.type === 'texto_rico' || el.type === 'html') {
       html += '<label>Conteúdo</label><textarea data-f="text" rows="5">' + String(p.text || p.html || '').replace(/</g, '&lt;') + '</textarea>';
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
+    }
+    if (el.type === 'tabela_notas') {
+      html += '<p class="edoc-hint">Quadro com 1º ao 4º bimestre e final (nota e falta). O tamanho do texto abaixo vale para a tabela inteira — diminua para caber em uma folha.</p>';
     }
     if (el.type === 'titulo') {
       html += '<label>Nível</label><select data-f="tag"><option value="h1">Título</option><option value="h2">Subtítulo</option><option value="h3">Seção</option></select>';
