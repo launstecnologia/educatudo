@@ -796,111 +796,50 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 
         <div class="xl:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200">
             <div class="px-5 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Testes e geração em lote</h2>
-                <p class="text-sm text-gray-500 mt-1">Simule antes de gravar e depois gere os boletins do escopo.</p>
+                <h2 class="text-lg font-semibold text-gray-900">Geração em lote</h2>
+                <p class="text-sm text-gray-500 mt-1">Simule um aluno e depois gere o período. Alunos travados não entram.</p>
             </div>
 
-            <form method="GET" action="<?= URL ?>/admin/boletim-configuracao" class="p-5 space-y-4">
-                <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-900 mb-1">Simular um aluno</label>
-                    <select name="aluno_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
-                        <option value="">Selecione</option>
-                        <?php foreach ($alunos as $aluno): ?>
-                            <?php $label = trim((string) ($aluno['nome'] ?? '')) . ' (' . ((string) ($aluno['turma_nome'] ?? 'Sem turma')) . ')'; ?>
-                            <option value="<?= (int) ($aluno['id'] ?? 0) ?>" <?= ((int) ($aluno['id'] ?? 0) === $selectedAlunoId) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
-                <button type="submit" class="btn-primary-custom w-full px-4 py-2 rounded-lg hover:opacity-90 font-medium">Simular aluno</button>
-            </form>
+            <div class="p-5 space-y-4">
+                <button type="button" id="btn-abrir-conferir-boletim" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <i class="fa-solid fa-magnifying-glass mr-2"></i>Conferir
+                </button>
 
-            <div class="px-5 pb-5">
-                <div class="border border-slate-200 bg-slate-50 rounded-lg p-4">
-                    <p class="text-sm font-semibold text-slate-900 mb-1">Simular lote</p>
-                    <p class="text-xs text-slate-500 mb-3">Valida até 60 alunos sem gravar nada.</p>
-                    <div class="flex flex-wrap items-end gap-2">
-                        <div class="flex-1 min-w-[10rem]">
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Turma (opcional)</label>
-                            <select id="lote-turma-id" class="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm">
-                                <option value="">Todo o escopo do evento</option>
-                                <?php foreach ($turmas as $turmaOpt): ?>
-                                    <option value="<?= (int) ($turmaOpt['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($turmaOpt['nome'] ?? '')) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <button type="button" id="btn-simular-lote" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 text-sm font-medium">Simular lote</button>
-                    </div>
-                    <div id="lote-resultado" class="hidden mt-3 max-h-72 overflow-y-auto border border-slate-200 rounded-lg bg-white"></div>
-                </div>
-            </div>
-
-            <div class="px-5 pb-5 space-y-3">
-                <div class="border border-indigo-200 bg-indigo-50 rounded-lg p-4">
-                    <div class="flex items-center justify-between gap-2">
-                        <p class="text-sm font-semibold text-indigo-900">Checklist antes de gerar em massa</p>
-                        <button type="button" id="btn-checklist-pre-geracao" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-xs font-medium shrink-0">Verificar agora</button>
-                    </div>
-                    <p class="text-xs text-indigo-700 mt-1">Confere matéria que está no evento mas falta em algum bloco, blocos com evento de origem de bimestre/série diferente, e quantos alunos têm nota faltando.</p>
-                    <div id="checklist-resultado" class="hidden mt-3 space-y-2 text-sm"></div>
-                </div>
-
-                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" class="border border-emerald-200 bg-emerald-50 rounded-lg p-4 space-y-3">
+                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" id="form-gerar-lote-boletim" class="space-y-4">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                     <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
                     <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
                     <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
-                    <p class="text-sm font-semibold text-emerald-950">Gerar boletins</p>
-                    <p class="text-sm text-emerald-900">
-                        Recalcula e grava uma <strong>nova versão vigente</strong> da tabela de notas por matéria para os alunos vinculados. As versões anteriores ficam guardadas para auditoria. Alunos travados não entram no lote. Roda em segundo plano.
-                    </p>
+                    <label class="flex items-start gap-2.5 text-sm text-gray-800 cursor-pointer">
+                        <input type="checkbox" id="incluir-novos-boletim" name="incluir_novos" value="1" class="mt-1 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" checked>
+                        <span>Incluir alunos que ainda não têm boletim neste período</span>
+                    </label>
+                    <p class="text-xs text-gray-500">Nova versão vigente; o histórico fica guardado. Roda em segundo plano.</p>
                     <?php if ($geracaoEmAndamento): ?>
                     <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
-                    <a href="<?= URL ?>/admin/boletim" class="btn-primary-custom w-full px-4 py-2 rounded-lg hover:opacity-90 font-medium text-center inline-block">
+                    <a href="<?= URL ?>/admin/boletim" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg hover:opacity-90 font-semibold text-center inline-block">
                         Ver status na listagem
                     </a>
                     <?php else: ?>
-                    <button type="submit" class="btn-primary-custom w-full px-4 py-2 rounded-lg hover:opacity-90 font-medium">
-                        Gerar boletins de todos os alunos vinculados
-                    </button>
-                    <?php endif; ?>
-                </form>
-
-                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/atualizar-boletins-gravados" class="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
-                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
-                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
-                    <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
-                    <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
-                    <p class="text-sm font-semibold text-amber-950">Atualizar boletins existentes</p>
-                    <p class="text-sm text-amber-950">
-                        Cria uma <strong>nova versão vigente</strong> dos boletins oficiais deste período. Alunos travados permanecem na versão em que foram ajustados. Se ainda existir apenas prévia, publica oficialmente para os vinculados (exceto travados).
-                    </p>
-                    <?php if ($geracaoEmAndamento): ?>
-                    <button type="button" disabled class="w-full px-4 py-2 bg-amber-300 text-white rounded-lg font-medium cursor-not-allowed">
-                        Geração em andamento…
-                    </button>
-                    <?php else: ?>
-                    <button type="submit" class="w-full px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium">
-                        Atualizar/publicar boletins deste período
+                    <button type="submit" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg hover:opacity-90 font-semibold">
+                        Gerar boletins
                     </button>
                     <?php endif; ?>
                 </form>
 
                 <?php if (!empty($regra['id'])): ?>
                 <?php if ($alunosTravados !== []): ?>
-                <div class="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-2">
-                    <p class="text-sm font-semibold text-amber-950">Alunos travados neste período</p>
-                    <p class="text-xs text-amber-900">Não entram no recálculo em lote. Dá para destravar se precisar ajustar todo mundo de novo.</p>
+                <div class="border-t border-gray-200 pt-4 space-y-2">
+                    <p class="text-sm font-semibold text-gray-900">Alunos travados neste período</p>
+                    <p class="text-xs text-gray-500">Não entram no recálculo em lote.</p>
                     <ul class="text-sm space-y-2">
                         <?php foreach ($alunosTravados as $tr): ?>
                             <li class="flex items-start justify-between gap-2">
-                                <span class="text-amber-950">
+                                <span class="text-gray-800">
                                     <?= htmlspecialchars((string) ($tr['aluno_nome'] ?? ('#' . (int) ($tr['aluno_id'] ?? 0)))) ?>
                                     <?php if (!empty($tr['motivo'])): ?>
-                                        <span class="block text-xs text-amber-800"><?= htmlspecialchars((string) $tr['motivo']) ?></span>
+                                        <span class="block text-xs text-gray-500"><?= htmlspecialchars((string) $tr['motivo']) ?></span>
                                     <?php endif; ?>
                                 </span>
                                 <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/destravar-aluno" class="shrink-0">
@@ -910,19 +849,19 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                                     <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
                                     <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
                                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
-                                    <button type="submit" class="text-xs text-amber-800 hover:underline">Destravar</button>
+                                    <button type="submit" class="text-xs text-gray-600 hover:underline">Destravar</button>
                                 </form>
                             </li>
                         <?php endforeach; ?>
                     </ul>
                 </div>
                 <?php endif; ?>
-                <div class="border border-gray-200 rounded-lg p-4">
+                <div class="border-t border-gray-200 pt-4">
                     <div class="flex items-center justify-between">
                         <p class="text-sm font-semibold text-gray-900">Histórico de versões</p>
-                        <button type="button" id="btn-ver-logs-geracao" class="text-xs text-indigo-600 hover:underline">Ver gerações</button>
+                        <button type="button" id="btn-ver-logs-geracao" class="text-xs text-gray-600 hover:underline">Ver gerações</button>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Cada geração vira uma versão. A vigente é a que vale para aluno, pais e ficha. As anteriores ficam para auditoria.</p>
+                    <p class="text-xs text-gray-500 mt-1">A vigente é a que vale para aluno, pais e ficha.</p>
                     <div id="logs-geracao-resultado" class="hidden mt-2 text-sm space-y-1.5"></div>
                     <div id="geracao-detalhe-resultado" class="hidden mt-3 text-sm border-t border-gray-100 pt-2"></div>
                 </div>
@@ -930,6 +869,62 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             </div>
         </div>
     </div>
+
+    <div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharConferirBoletim()"></div>
+    <aside id="boletimConferirDrawer"
+           class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+           aria-hidden="true">
+        <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-900">Conferir boletim</h2>
+            <button type="button" onclick="fecharConferirBoletim()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Ver um aluno</h3>
+                <form method="GET" action="<?= URL ?>/admin/boletim-configuracao" class="space-y-4">
+                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                    <div>
+                        <label for="conferir-aluno-id" class="block text-sm font-medium text-gray-700 mb-1">Aluno <span class="text-red-500">*</span></label>
+                        <select name="aluno_id" id="conferir-aluno-id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Selecione</option>
+                            <?php foreach ($alunos as $aluno): ?>
+                                <?php $label = trim((string) ($aluno['nome'] ?? '')) . ' (' . ((string) ($aluno['turma_nome'] ?? 'Sem turma')) . ')'; ?>
+                                <option value="<?= (int) ($aluno['id'] ?? 0) ?>" <?= ((int) ($aluno['id'] ?? 0) === $selectedAlunoId) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm">Ver simulação</button>
+                </form>
+            </section>
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Conferir lote</h3>
+                <p class="text-sm text-gray-500 mb-4">Valida até 60 alunos sem gravar. A turma é opcional.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label for="lote-turma-id" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                        <select id="lote-turma-id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Todo o escopo do evento</option>
+                            <?php foreach ($turmas as $turmaOpt): ?>
+                                <option value="<?= (int) ($turmaOpt['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($turmaOpt['nome'] ?? '')) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="flex flex-col-reverse sm:flex-row gap-3">
+                        <button type="button" id="btn-checklist-pre-geracao" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Verificar problemas</button>
+                        <button type="button" id="btn-simular-lote" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm text-sm">Simular lote</button>
+                    </div>
+                    <div id="lote-resultado" class="hidden max-h-72 overflow-y-auto border border-gray-200 rounded-lg bg-white"></div>
+                    <div id="checklist-resultado" class="hidden space-y-2 text-sm"></div>
+                </div>
+            </section>
+        </div>
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex justify-end">
+            <button type="button" onclick="fecharConferirBoletim()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Fechar</button>
+        </div>
+    </aside>
 
     <?php if (is_array($simulacao)): ?>
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -4345,6 +4340,57 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     }
     setInterval(boletimKeepalive, 2 * 60 * 1000);
 
+    var URL_GERAR_LOTE = <?= json_encode(URL . '/admin/boletim-configuracao/gerar-boletins', JSON_UNESCAPED_SLASHES) ?>;
+    var URL_ATUALIZAR_LOTE = <?= json_encode(URL . '/admin/boletim-configuracao/atualizar-boletins-gravados', JSON_UNESCAPED_SLASHES) ?>;
+    var formGerarLote = document.getElementById('form-gerar-lote-boletim');
+    var chkIncluirNovos = document.getElementById('incluir-novos-boletim');
+    function aplicarAcaoGerarLote() {
+        if (!formGerarLote) return;
+        formGerarLote.action = (chkIncluirNovos && chkIncluirNovos.checked) ? URL_GERAR_LOTE : URL_ATUALIZAR_LOTE;
+    }
+    if (formGerarLote) {
+        aplicarAcaoGerarLote();
+        if (chkIncluirNovos) {
+            chkIncluirNovos.addEventListener('change', aplicarAcaoGerarLote);
+        }
+        formGerarLote.addEventListener('submit', aplicarAcaoGerarLote);
+    }
+
+    window.abrirConferirBoletim = function () {
+        var backdrop = document.getElementById('boletimConferirBackdrop');
+        var drawer = document.getElementById('boletimConferirDrawer');
+        if (!backdrop || !drawer) return;
+        backdrop.classList.remove('hidden');
+        drawer.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+        requestAnimationFrame(function () {
+            drawer.classList.remove('translate-x-full');
+        });
+    };
+    window.fecharConferirBoletim = function () {
+        var backdrop = document.getElementById('boletimConferirBackdrop');
+        var drawer = document.getElementById('boletimConferirDrawer');
+        if (!backdrop || !drawer) return;
+        drawer.classList.add('translate-x-full');
+        drawer.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('overflow-hidden');
+        setTimeout(function () {
+            backdrop.classList.add('hidden');
+        }, 300);
+    };
+    var btnAbrirConferir = document.getElementById('btn-abrir-conferir-boletim');
+    if (btnAbrirConferir) {
+        btnAbrirConferir.addEventListener('click', function () {
+            window.abrirConferirBoletim();
+        });
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        var drawer = document.getElementById('boletimConferirDrawer');
+        if (!drawer || drawer.getAttribute('aria-hidden') === 'true') return;
+        window.fecharConferirBoletim();
+    });
+
     var btnChecklist = document.getElementById('btn-checklist-pre-geracao');
     if (btnChecklist) {
         btnChecklist.addEventListener('click', function () {
@@ -4366,7 +4412,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 })
                 .finally(function () {
                     btnChecklist.disabled = false;
-                    btnChecklist.textContent = 'Verificar agora';
+                    btnChecklist.textContent = 'Verificar problemas';
                 });
         });
     }
