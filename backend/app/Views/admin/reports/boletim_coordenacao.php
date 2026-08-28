@@ -1,7 +1,18 @@
 <?php
+$fonte = (($fonte ?? 'vida_escolar') === 'evento') ? 'evento' : 'vida_escolar';
 $relatorio = is_array($relatorio ?? null) ? $relatorio : null;
+$anosLetivos = (array) ($anos_letivos ?? []);
+if ($anosLetivos === []) {
+    $anosLetivos[] = (int) date('Y');
+}
+$anoSelecionado = (int) ($ano_letivo ?? 0);
+if ($anoSelecionado <= 0) {
+    $anoSelecionado = (int) $anosLetivos[0];
+}
 $queryExport = [
+    'fonte' => $fonte,
     'evento' => $evento_selecionado ?? '',
+    'ano_letivo' => $anoSelecionado,
     'turma_id' => (int) ($turma_id ?? 0),
     'nota_abaixo_de' => $nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '',
     'materias_exibicao' => $materias_exibicao ?? 'todas',
@@ -10,19 +21,39 @@ $queryExport = [
 $formatNota = static function ($value, int $places): string {
     return is_numeric($value) ? number_format((float) $value, $places, ',', '.') : ((string) $value !== '' ? (string) $value : '—');
 };
+$fonteRelatorio = (string) ($relatorio['fonte'] ?? $fonte);
 include __DIR__ . '/../_partials/flash_message.php';
 ?>
 <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Notas da Coordenação</h1>
-    <p class="text-gray-600 mt-1">Conferência consolidada por turma. O PDF em lote emite o boletim oficial da Vida Escolar (papel timbrado), um aluno por página.</p>
+    <p class="text-gray-600 mt-1">Escolha o boletim da Vida Escolar ou as notas do evento (provas, trabalhos e médias).</p>
 </div>
 
-<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
+<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-start">
         <label class="block xl:col-span-4">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Boletim oficial</span>
+            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir</span>
             <span class="relative block">
-            <select name="evento" required class="appearance-none w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <select name="fonte" id="fonte-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+                <option value="vida_escolar" <?= $fonte === 'vida_escolar' ? 'selected' : '' ?>>Boletim da Vida Escolar</option>
+                <option value="evento" <?= $fonte === 'evento' ? 'selected' : '' ?>>Notas do evento (provas, trabalhos, médias)</option>
+            </select>
+            </span>
+        </label>
+        <label class="block xl:col-span-4 campo-fonte campo-fonte-vida_escolar <?= $fonte === 'vida_escolar' ? '' : 'hidden' ?>">
+            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Ano letivo</span>
+            <span class="relative block">
+            <select name="ano_letivo" id="ano-letivo-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'vida_escolar' ? 'required' : '' ?>>
+                <?php foreach ($anosLetivos as $ano): ?>
+                    <option value="<?= (int) $ano ?>" <?= $anoSelecionado === (int) $ano ? 'selected' : '' ?>><?= (int) $ano ?></option>
+                <?php endforeach; ?>
+            </select>
+            </span>
+        </label>
+        <label class="block xl:col-span-4 campo-fonte campo-fonte-evento <?= $fonte === 'evento' ? '' : 'hidden' ?>">
+            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Evento de notas</span>
+            <span class="relative block">
+            <select name="evento" id="evento-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'evento' ? 'required' : '' ?>>
                 <option value="">Selecione...</option>
                 <?php foreach ((array) ($eventos ?? []) as $evento):
                     $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']); ?>
@@ -31,19 +62,20 @@ include __DIR__ . '/../_partials/flash_message.php';
                     </option>
                 <?php endforeach; ?>
             </select>
-            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
             </span>
+            <?php if (empty($eventos)): ?>
+                <span class="block text-xs text-gray-500 mt-1">Nenhum evento gerado. Em Eventos de Notas, gere o lote para ver provas, trabalhos e médias.</span>
+            <?php endif; ?>
         </label>
         <label class="block xl:col-span-2">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Turma</span>
             <span class="relative block">
-            <select name="turma_id" class="appearance-none w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <select name="turma_id" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
                 <option value="0">Todas as turmas</option>
                 <?php foreach ((array) ($turmas ?? []) as $turma): ?>
                     <option value="<?= (int) $turma['id'] ?>" <?= (int) ($turma_id ?? 0) === (int) $turma['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $turma['nome']) ?></option>
                 <?php endforeach; ?>
             </select>
-            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
             </span>
         </label>
         <label class="block xl:col-span-2">
@@ -54,11 +86,10 @@ include __DIR__ . '/../_partials/flash_message.php';
         <label class="block xl:col-span-4">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir matérias</span>
             <span class="relative block">
-            <select name="materias_exibicao" class="appearance-none w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <select name="materias_exibicao" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
                 <option value="todas" <?= ($materias_exibicao ?? 'todas') === 'todas' ? 'selected' : '' ?>>Todas as matérias do aluno</option>
                 <option value="abaixo" <?= ($materias_exibicao ?? 'todas') === 'abaixo' ? 'selected' : '' ?>>Somente matérias abaixo do corte</option>
             </select>
-            <i class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400"></i>
             </span>
         </label>
     </div>
@@ -74,24 +105,28 @@ include __DIR__ . '/../_partials/flash_message.php';
 
 <?php if (!empty($executar) && $relatorio): ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?><?php if (!empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?></span></div>
+        <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?><?php if ($fonteRelatorio === 'vida_escolar' && !empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?></span></div>
         <div class="flex gap-2">
-            <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && (int) ($relatorio['alunos_com_ficha'] ?? 0) <= 80): ?>
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</a>
-            <?php else: ?>
-            <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="<?= (int) ($relatorio['alunos_com_ficha'] ?? 0) > 80 ? 'Filtre por turma (máximo 80 boletins)' : 'Nenhum aluno com ficha na Vida Escolar' ?>"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</span>
+            <?php if ($fonteRelatorio === 'vida_escolar'): ?>
+                <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && (int) ($relatorio['alunos_com_ficha'] ?? 0) <= 80): ?>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</a>
+                <?php else: ?>
+                <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="<?= (int) ($relatorio['alunos_com_ficha'] ?? 0) > 80 ? 'Filtre por turma (máximo 80 boletins)' : 'Nenhum aluno com ficha na Vida Escolar' ?>"><i class="fa-solid fa-file-pdf mr-2"></i>Baixar boletins (PDF)</span>
+                <?php endif; ?>
+            <?php elseif (!empty($relatorio['alunos'])): ?>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
             <?php endif; ?>
             <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
         </div>
     </div>
-    <?php if ((int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && !empty($relatorio['alunos'])): ?>
+    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && !empty($relatorio['alunos'])): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4"><?= (int) $relatorio['alunos_sem_ficha'] ?> aluno(s) desta lista ainda não têm ficha na Vida Escolar no ano <?= (int) ($relatorio['ano_letivo'] ?? 0) ?> e ficam de fora do PDF.</div>
     <?php endif; ?>
-    <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 80): ?>
+    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_com_ficha'] ?? 0) > 80): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4">Há <?= (int) $relatorio['alunos_com_ficha'] ?> fichas neste filtro. Filtre por turma para baixar no máximo 80 boletins por vez.</div>
     <?php endif; ?>
     <?php if (empty($relatorio['alunos'])): ?>
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4">Nenhum boletim oficial encontrado para os filtros selecionados.</div>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?= $fonteRelatorio === 'vida_escolar' ? 'Nenhuma ficha da Vida Escolar encontrada para os filtros selecionados.' : 'Nenhum evento gerado encontrado para os filtros selecionados.' ?></div>
     <?php endif; ?>
     <?php foreach ((array) $relatorio['alunos'] as $aluno): ?>
         <?php $observacaoAluno = trim((string) ($aluno['observacao'] ?? '')); ?>
@@ -142,6 +177,29 @@ include __DIR__ . '/../_partials/flash_message.php';
     <?php endforeach; ?>
 <?php endif; ?>
 
+<script>
+(function () {
+    var fonteSelect = document.getElementById('fonte-boletim-coord');
+    var eventoSelect = document.getElementById('evento-boletim-coord');
+    var anoSelect = document.getElementById('ano-letivo-boletim-coord');
+    function aplicarFonte() {
+        var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
+        document.querySelectorAll('.campo-fonte').forEach(function (el) {
+            el.classList.toggle('hidden', !el.classList.contains('campo-fonte-' + fonte));
+        });
+        if (eventoSelect) {
+            eventoSelect.required = fonte === 'evento';
+        }
+        if (anoSelect) {
+            anoSelect.required = fonte === 'vida_escolar';
+        }
+    }
+    if (fonteSelect) {
+        fonteSelect.addEventListener('change', aplicarFonte);
+        aplicarFonte();
+    }
+})();
+</script>
 <?php if (!empty($pode_editar_observacao)): ?>
 <script>
 (function () {
