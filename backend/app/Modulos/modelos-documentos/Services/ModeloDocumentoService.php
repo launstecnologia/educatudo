@@ -633,6 +633,114 @@ class ModeloDocumentoService
         ];
     }
 
+    /**
+     * Layout visual pronto para o editor (boletim e modelos com “boletim” no código).
+     *
+     * @return array<string,mixed>|null
+     */
+    public static function estruturaSugeridaParaCodigo(string $codigo): ?array
+    {
+        $codigo = strtolower(trim($codigo));
+        if ($codigo === '') {
+            return null;
+        }
+        if ($codigo === 'resultado_boletim_padrao'
+            || $codigo === 'vida_escolar_boletim'
+            || str_contains($codigo, 'boletim')
+        ) {
+            return self::estruturaSugeridaBoletim();
+        }
+        return null;
+    }
+
+    /**
+     * Boletim oficial: identificação, resultado, quadro de notas e duas assinaturas.
+     *
+     * @return array<string,mixed>
+     */
+    public static function estruturaSugeridaBoletim(): array
+    {
+        $est = self::estruturaVazia('a4', 'retrato', 15);
+
+        $cab = self::secaoPadrao([100], 'header');
+        $cab['columns'][0]['vAlign'] = 'middle';
+        $cab['columns'][0]['elements'][] = self::elementoEstrutura(
+            'logo',
+            ['width' => 140, 'align' => 'center', 'vAlign' => 'middle']
+        );
+        $est['header']['sections'] = [$cab];
+
+        $titulo = self::secaoPadrao([100], 'body');
+        $titulo['columns'][0]['elements'] = [
+            self::elementoEstrutura(
+                'titulo',
+                ['text' => 'BOLETIM ESCOLAR', 'tag' => 'h1'],
+                ['textAlign' => 'center', 'fontWeight' => 'bold']
+            ),
+            self::elementoEstrutura(
+                'texto',
+                ['text' => '{{periodo_label}} · {{turma_nome}} · {{ano_letivo}}'],
+                ['textAlign' => 'center', 'fontSize' => 10, 'color' => '#4b5563']
+            ),
+        ];
+
+        $ident = self::secaoPadrao([100], 'body');
+        $ident['columns'][0]['elements'][] = self::elementoEstrutura('dados_aluno');
+
+        $resumo = self::secaoPadrao([100], 'body');
+        $resumo['columns'][0]['elements'][] = self::elementoEstrutura('resultado_final');
+
+        $notas = self::secaoPadrao([100], 'body');
+        $notas['columns'][0]['elements'][] = self::elementoEstrutura('tabela_notas');
+
+        $obs = self::secaoPadrao([100], 'body');
+        $obs['columns'][0]['elements'][] = self::elementoEstrutura('observacoes', [], [], true);
+
+        $est['body']['sections'] = [$titulo, $ident, $resumo, $notas, $obs];
+
+        $data = self::secaoPadrao([100], 'footer');
+        $data['columns'][0]['elements'][] = self::elementoEstrutura(
+            'texto',
+            ['text' => '{{cidade_data}}.'],
+            ['textAlign' => 'right', 'fontSize' => 10]
+        );
+
+        $htmlSec = '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+            . '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">{{secretario_nome}}</p>'
+            . '<p style="text-align:center;margin:0;font-size:9pt;color:#4b5563;">Secretaria</p>';
+        $htmlDir = '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+            . '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">{{diretor_nome}}</p>'
+            . '<p style="text-align:center;margin:0;font-size:9pt;color:#4b5563;">Direção</p>';
+
+        $ass = self::secaoPadrao([50, 50], 'footer');
+        $ass['columns'][0]['vAlign'] = 'bottom';
+        $ass['columns'][1]['vAlign'] = 'bottom';
+        $ass['columns'][0]['elements'][] = self::elementoEstrutura('texto_rico', ['html' => $htmlSec], ['textAlign' => 'center']);
+        $ass['columns'][1]['elements'][] = self::elementoEstrutura('texto_rico', ['html' => $htmlDir], ['textAlign' => 'center']);
+        $est['footer']['sections'] = [$data, $ass];
+
+        return $est;
+    }
+
+    /**
+     * @param array<string,mixed> $props
+     * @param array<string,mixed> $style
+     * @return array<string,mixed>
+     */
+    private static function elementoEstrutura(string $tipo, array $props = [], array $style = [], bool $ocultarVazio = false): array
+    {
+        $el = [
+            'id' => self::idEstrutura('e'),
+            'type' => $tipo,
+            'props' => $props,
+            'style' => $style,
+        ];
+        if ($ocultarVazio) {
+            $el['hideIfEmpty'] = true;
+        }
+        return $el;
+    }
+
     public static function idEstrutura(string $prefixo = 'n'): string
     {
         try {

@@ -854,6 +854,21 @@
     });
   }
 
+  function aplicarLayoutSugerido() {
+    if (!C.layoutSugerido) return;
+    if (!window.confirm('Montar o layout organizado do boletim? O conteúdo atual do cabeçalho, do corpo e do rodapé será substituído. O tamanho da folha permanece o mesmo.')) {
+      return;
+    }
+    var page = clone(state.estrutura.page || {});
+    state.estrutura = normalizarEstrutura(clone(C.layoutSugerido));
+    state.estrutura.page = page;
+    state.selected = null;
+    pushHist();
+    render();
+    scheduleSave();
+    setStatus('Layout do boletim aplicado — confira e salve');
+  }
+
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(save, 1600);
@@ -982,6 +997,7 @@
     onClick('#edoc-zoom-out', function () { state.zoom = Math.max(50, state.zoom - 10); render(); });
     onClick('#edoc-zoom-in', function () { state.zoom = Math.min(150, state.zoom + 10); render(); });
     onClick('#edoc-zoom-fit', function () { state.zoom = 90; render(); });
+    onClick('#edoc-layout-sugerido', aplicarLayoutSugerido);
     onClick('#edoc-preview-mode', function () {
       state.preview = !state.preview;
       this.classList.toggle('active', state.preview);

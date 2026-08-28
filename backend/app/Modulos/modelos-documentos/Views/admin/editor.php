@@ -138,6 +138,11 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <span id="edoc-zoom-label" style="font-size:12px;min-width:48px;text-align:center">90%</span>
                 <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-zoom-in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="edoc-btn" id="edoc-zoom-fit">Ajustar à tela</button>
+                <?php if (!empty($layout_sugerido)): ?>
+                <button type="button" class="edoc-btn" id="edoc-layout-sugerido" title="Monta cabeçalho, identificação, notas e assinaturas lado a lado">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Montar boletim
+                </button>
+                <?php endif; ?>
             </div>
             <div class="edoc-stage">
                 <div id="edoc-paper-wrap" class="edoc-paper-wrap">
@@ -201,7 +206,8 @@ window.EDOC = {
   modelo: <?= json_encode(['id' => $id, 'nome' => $nome, 'codigo' => $codigo, 'descricao' => (string) ($modelo['descricao'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   estrutura: <?= json_encode($estrutura, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   varsPreview: <?= json_encode($vars_preview ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
-  catalogo: <?= json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>
+  catalogo: <?= json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
+  layoutSugerido: <?= json_encode($layout_sugerido ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>
 };
 </script>
 <script src="<?= URL ?>/static/js/editor-documento.js?v=<?= $esc($vJs) ?>"></script>

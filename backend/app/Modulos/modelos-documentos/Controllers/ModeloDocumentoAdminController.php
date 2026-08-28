@@ -429,6 +429,9 @@ class ModeloDocumentoAdminController extends AdminBaseController
         $estrutura = $modelo
             ? $this->service->estruturaDoModelo($modelo)
             : ModeloDocumentoService::estruturaVazia();
+        $layoutSugerido = ModeloDocumentoService::estruturaSugeridaParaCodigo(
+            (string) ($modelo['codigo'] ?? '')
+        );
         $logoPreview = '';
         try {
             $logoPreview = $this->service->logoHtmlInstitucional(null, $this->config);
@@ -452,6 +455,7 @@ class ModeloDocumentoAdminController extends AdminBaseController
             'codigo_sistema' => $modelo ? ModeloDocumentoService::isCodigoSistema((string) ($modelo['codigo'] ?? '')) : false,
             'vars_preview' => ModeloDocumentoService::varsExemplo(),
             'logo_preview' => $logoPreview,
+            'layout_sugerido' => $layoutSugerido,
         ]);
     }
 
