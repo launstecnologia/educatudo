@@ -34,6 +34,15 @@ class MasterMigrationsController extends BaseController
         $db = Database::getInstance();
 
         $migrationFiles = $this->getMigrationFiles();
+        $cargasFiles = [];
+        $schemaFiles = [];
+        foreach ($migrationFiles as $f) {
+            if (stripos($f, 'importar_dados_') !== false) {
+                $cargasFiles[] = $f;
+            } else {
+                $schemaFiles[] = $f;
+            }
+        }
         $masterMigrationFiles = $this->getMasterMigrationFiles();
 
         $masterExecutadas = [];
@@ -70,17 +79,21 @@ class MasterMigrationsController extends BaseController
         $totalPendentes = 0;
         foreach ($escolas as $e) {
             $exec = $executadasMap[$e['id']] ?? [];
-            $pendentes = array_diff($migrationFiles, $exec);
-            $totalPendentes += count($pendentes);
+            $pendentesSchema = array_values(array_diff($schemaFiles, $exec));
+            $cargasPendentes = array_values(array_diff($cargasFiles, $exec));
+            $escolherLista = array_values(array_merge($pendentesSchema, $cargasPendentes));
+            $totalPendentes += count($pendentesSchema);
             $escolasData[] = [
                 'id' => $e['id'],
                 'nome' => $e['nome'],
                 'slug' => $e['slug'],
                 'ativo' => $e['ativo'],
                 'nome_banco' => $e['nome_banco'],
-                'executadas' => count($exec),
-                'pendentes' => count($pendentes),
-                'pendentes_lista' => array_values($pendentes),
+                'executadas' => count(array_intersect($exec, $schemaFiles)),
+                'pendentes' => count($pendentesSchema),
+                'pendentes_lista' => $pendentesSchema,
+                'cargas_pendentes' => count($cargasPendentes),
+                'escolher_lista' => $escolherLista,
             ];
         }
 
@@ -90,7 +103,8 @@ class MasterMigrationsController extends BaseController
             'current_page' => 'migrations',
             'master_nome' => $_SESSION['master_user_nome'] ?? 'Admin',
             'migration_files' => $migrationFiles,
-            'total_migrations' => count($migrationFiles),
+            'cargas_files' => $cargasFiles,
+            'total_migrations' => count($schemaFiles),
             'escolas' => $escolasData,
             'total_escolas' => count($escolasData),
             'total_pendentes' => $totalPendentes,

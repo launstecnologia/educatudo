@@ -1,5 +1,6 @@
 <?php
 $migrationFiles = $migration_files ?? [];
+$cargasFiles = $cargas_files ?? [];
 $totalMigrations = $total_migrations ?? 0;
 $escolasData = $escolas ?? [];
 $totalEscolas = $total_escolas ?? 0;
@@ -145,9 +146,9 @@ $masterPendentes = $master_pendentes ?? [];
     <div class="px-6 py-4 border-b border-slate-200">
         <h3 class="text-lg font-semibold text-slate-900">Migrations das escolas</h3>
         <p class="text-sm text-slate-600 mt-0.5">
-            <?= (int) $totalMigrations ?> arquivo(s) em <code class="bg-slate-100 px-1 rounded text-xs">database/migrations</code>
-            (sem <code class="bg-slate-100 px-1 rounded text-xs">_master</code> e sem rollback).
-            Para rodar, use <strong>Escolher</strong> ou <strong>Executar todas</strong> na tabela de escolas abaixo.
+            <?= (int) $totalMigrations ?> arquivo(s) de schema em <code class="bg-slate-100 px-1 rounded text-xs">database/migrations</code>
+            (sem <code class="bg-slate-100 px-1 rounded text-xs">_master</code>, sem rollback e sem <code class="bg-slate-100 px-1 rounded text-xs">importar_dados_*</code>).
+            Seeds de população não entram em <strong>Executar todas</strong> — use <strong>Escolher</strong>.
         </p>
     </div>
     <div class="px-6 py-4">
@@ -156,6 +157,28 @@ $masterPendentes = $master_pendentes ?? [];
         <?php else: ?>
         <ul class="max-h-56 overflow-y-auto space-y-1 font-mono text-xs text-slate-700">
             <?php foreach (array_reverse($migrationFiles) as $f): ?>
+            <li><?= htmlspecialchars($f) ?></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Cargas pontuais (importar_dados_*) -->
+<div class="mb-8 bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+    <div class="px-6 py-4 border-b border-amber-200 bg-amber-50">
+        <h3 class="text-lg font-semibold text-slate-900">Cargas pontuais (seeds)</h3>
+        <p class="text-sm text-slate-600 mt-0.5">
+            Arquivos <code class="bg-white px-1 rounded text-xs">importar_dados_*</code>. Não rodam no bootstrap nem em “Executar todas”.
+            Na escola, clique em <strong>Escolher</strong> e marque só o arquivo desejado.
+        </p>
+    </div>
+    <div class="px-6 py-4">
+        <?php if (empty($cargasFiles)): ?>
+        <p class="text-sm text-slate-500">Nenhum <code class="bg-slate-100 px-1 rounded text-xs">importar_dados_*.sql</code> nesta pasta. Se o seed foi criado só na sua máquina, copie o arquivo para o servidor e recarregue esta página.</p>
+        <?php else: ?>
+        <ul class="space-y-1.5 font-mono text-xs text-slate-700">
+            <?php foreach ($cargasFiles as $f): ?>
             <li><?= htmlspecialchars($f) ?></li>
             <?php endforeach; ?>
         </ul>
@@ -196,6 +219,9 @@ $masterPendentes = $master_pendentes ?? [];
                             <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold">Inativa</span>
                         <?php elseif ($e['pendentes'] === 0): ?>
                             <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">Em dia</span>
+                            <?php if (($e['cargas_pendentes'] ?? 0) > 0): ?>
+                            <span class="ml-1 px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold"><?= (int) $e['cargas_pendentes'] ?> carga(s)</span>
+                            <?php endif; ?>
                         <?php else: ?>
                             <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold"><?= $e['pendentes'] ?> pendente(s)</span>
                         <?php endif; ?>
@@ -203,21 +229,21 @@ $masterPendentes = $master_pendentes ?? [];
                     <td class="px-4 py-3 text-center text-sm font-medium text-slate-700"><?= $e['executadas'] ?>/<?= $totalMigrations ?></td>
                     <td class="px-4 py-3 text-center text-sm font-bold <?= $e['pendentes'] > 0 ? 'text-red-600' : 'text-green-600' ?>"><?= $e['pendentes'] ?></td>
                     <td class="px-4 py-3 text-center">
-                        <?php if ($e['pendentes'] > 0): ?>
                             <div class="flex items-center justify-center gap-2 flex-wrap">
+                                <?php if ($e['pendentes'] > 0): ?>
                                 <button type="button" class="btn-executar-escola bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>">
                                     Executar todas
                                 </button>
-                                <button type="button" class="btn-escolher-migrations bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>" data-escola-nome="<?= htmlspecialchars($e['nome']) ?>" data-pendentes="<?= htmlspecialchars(json_encode($e['pendentes_lista'] ?? [])) ?>">
+                                <?php endif; ?>
+                                <button type="button" class="btn-escolher-migrations bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>" data-escola-nome="<?= htmlspecialchars($e['nome']) ?>" data-pendentes="<?= htmlspecialchars(json_encode($e['escolher_lista'] ?? $e['pendentes_lista'] ?? [])) ?>">
                                     Escolher
                                 </button>
+                                <?php if ($e['pendentes'] > 0): ?>
                                 <button type="button" class="btn-marcar-executada bg-gray-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-gray-300 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>" title="Marca como executada sem rodar SQL (para escolas que já tinham banco)">
                                     Ignorar
                                 </button>
+                                <?php endif; ?>
                             </div>
-                        <?php else: ?>
-                            <span class="text-xs text-gray-400">--</span>
-                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -239,7 +265,7 @@ $masterPendentes = $master_pendentes ?? [];
             <form id="form-escolher-migrations" class="flex flex-col flex-1 min-h-0">
                 <input type="hidden" name="escola_id" id="modal-escolher-escola-id" value="">
                 <div class="px-6 py-3 overflow-y-auto flex-1">
-                    <p class="text-xs text-slate-500 mb-3">Marque apenas as migrations que deseja executar nesta escola. As já executadas não aparecem aqui.</p>
+                    <p class="text-xs text-slate-500 mb-3">Marque só o que deseja executar. Seeds <code class="bg-slate-100 px-1 rounded">importar_dados_*</code> não entram em “Executar todas”. Arquivos já executados nesta escola não aparecem.</p>
                     <ul id="modal-escolher-lista" class="space-y-2">
                         <!-- preenchido via JS -->
                     </ul>
@@ -553,7 +579,9 @@ $masterPendentes = $master_pendentes ?? [];
         modalNome.textContent = escolaNome;
         modalLista.innerHTML = '';
         var list = Array.isArray(pendentes) ? pendentes : [];
+        var soCargas = list.length > 0 && list.every(function(f) { return String(f).indexOf('importar_dados_') !== -1; });
         list.forEach(function(file) {
+            var isCarga = String(file).indexOf('importar_dados_') !== -1;
             var li = document.createElement('li');
             li.className = 'flex items-center gap-2';
             var cb = document.createElement('input');
@@ -561,18 +589,18 @@ $masterPendentes = $master_pendentes ?? [];
             cb.name = 'migrations[]';
             cb.value = file;
             cb.id = 'mig-' + file.replace(/[^a-z0-9_]/gi, '-');
-            cb.checked = true;
+            cb.checked = soCargas || !isCarga;
             cb.className = 'rounded border-slate-300 text-blue-600 focus:ring-blue-500';
             var label = document.createElement('label');
             label.htmlFor = cb.id;
             label.className = 'text-sm text-slate-700 font-mono cursor-pointer';
-            label.textContent = file;
+            label.textContent = file + (isCarga ? '  (carga)' : '');
             li.appendChild(cb);
             li.appendChild(label);
             modalLista.appendChild(li);
         });
         if (list.length === 0) {
-            modalLista.innerHTML = '<li class="text-sm text-slate-500">Nenhuma migration pendente.</li>';
+            modalLista.innerHTML = '<li class="text-sm text-slate-500">Nada pendente nesta escola. Se o seed não aparece, o arquivo ainda não está na pasta de migrations deste servidor.</li>';
         }
         modalEscolher.classList.remove('hidden');
     }

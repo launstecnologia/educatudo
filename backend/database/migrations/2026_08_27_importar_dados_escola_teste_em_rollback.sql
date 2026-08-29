@@ -23,7 +23,12 @@ DELETE FROM presenca_eventos WHERE id_externo LIKE 'et-%';
 
 DELETE FROM faltas_eventos
 WHERE origem = 'diario'
-  AND nome IN ('ET Faltas 1º bimestre 2026', 'ET Faltas 2º bimestre 2026');
+  AND nome IN (
+    'ET Faltas 1º bimestre 2026',
+    'ET Faltas 2º bimestre 2026',
+    'ET Faltas 3º bimestre 2026',
+    'ET Faltas 4º bimestre 2026'
+  );
 
 DELETE df FROM diario_frequencias df
 INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
@@ -92,21 +97,38 @@ WHERE c.nome = 'Ensino Médio'
 
 DELETE FROM curso WHERE nome = 'Ensino Médio' AND descricao LIKE '%Educa Teste%';
 
+-- Infra compartilhada com o seed FII: só remove se não houver turmas ETF.
 DELETE e FROM calendario_letivo_eventos e
 INNER JOIN calendario_letivo c ON c.id = e.calendario_id
-WHERE c.observacao = 'Calendário Escola Educa Teste';
+WHERE c.observacao = 'Calendário Escola Educa Teste'
+  AND NOT EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
 
-DELETE FROM calendario_letivo WHERE observacao = 'Calendário Escola Educa Teste';
+DELETE FROM calendario_letivo
+WHERE observacao = 'Calendário Escola Educa Teste'
+  AND NOT EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
 
-DELETE FROM ano_letivo WHERE ano = 2026;
+DELETE FROM ano_letivo
+WHERE ano = 2026
+  AND NOT EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
 
 -- ── Unidade / equipe / layout ────────────────────────────────
 DELETE FROM unidades
-WHERE nome = 'Escola Educa Teste'
-   OR cnpj = '11.222.333/0001-81';
+WHERE (nome = 'Escola Educa Teste' OR cnpj = '11.222.333/0001-81')
+  AND NOT EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
 
-DELETE FROM usuarios WHERE email LIKE '%@educateste.local';
+DELETE FROM usuarios
+WHERE email LIKE '%@educateste.local'
+  AND NOT EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
 
 DELETE FROM config_layout
-WHERE (config_key = 'system_title' AND config_value = 'Escola Educa Teste')
-   OR (config_key = 'system_subtitle' AND config_value = 'Ensino Médio · 2026');
+WHERE (
+    (config_key = 'system_title' AND config_value = 'Escola Educa Teste')
+    OR (config_key = 'system_subtitle' AND config_value LIKE '%2026%')
+  )
+  AND NOT EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
+
+UPDATE config_layout
+SET config_value = 'Fundamental II · 2026'
+WHERE config_key = 'system_subtitle'
+  AND config_value LIKE '%Ensino Médio%'
+  AND EXISTS (SELECT 1 FROM turmas WHERE observacoes LIKE 'ETF %');
