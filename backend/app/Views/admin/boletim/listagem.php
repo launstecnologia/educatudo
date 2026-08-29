@@ -28,6 +28,26 @@ $dataHoraGeracao = static function (?string $valor): ?string {
     $ts = strtotime($valor);
     return $ts !== false ? date('d/m/Y H:i', $ts) : null;
 };
+$duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
+    $a = strtotime(trim((string) $inicio));
+    $b = strtotime(trim((string) $fim));
+    if ($a === false || $b === false || $b < $a) {
+        return null;
+    }
+    $seg = $b - $a;
+    if ($seg < 60) {
+        return $seg . 's';
+    }
+    $min = intdiv($seg, 60);
+    $resto = $seg % 60;
+    if ($min < 60) {
+        return $resto > 0 ? $min . ' min ' . $resto . 's' : $min . ' min';
+    }
+    $horas = intdiv($min, 60);
+    $min = $min % 60;
+
+    return $min > 0 ? $horas . 'h ' . $min . ' min' : $horas . 'h';
+};
 ?>
 
 <!-- Header Section -->
@@ -253,14 +273,22 @@ $dataHoraGeracao = static function (?string $valor): ?string {
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <?php
                         $geracaoEmAndamento = in_array($stGeracao, ['pending', 'processing'], true);
-                        $inicioGeracao = $dataHoraGeracao($evento['geracao_iniciada_em'] ?? null);
-                        $fimGeracao = $dataHoraGeracao($evento['geracao_completed_at'] ?? null);
-                        if ($fimGeracao === null && !$geracaoEmAndamento) {
-                            $fimGeracao = $dataHoraGeracao($evento['ultima_geracao'] ?? null);
+                        $inicioBruto = trim((string) ($evento['geracao_iniciada_em'] ?? ''));
+                        $fimBruto = trim((string) ($evento['geracao_completed_at'] ?? ''));
+                        if ($fimBruto === '' && !$geracaoEmAndamento) {
+                            $fimBruto = trim((string) ($evento['ultima_geracao'] ?? ''));
                         }
+                        $inicioGeracao = $dataHoraGeracao($inicioBruto !== '' ? $inicioBruto : null);
+                        $fimGeracao = $dataHoraGeracao($fimBruto !== '' ? $fimBruto : null);
+                        $duracaoTxt = $geracaoEmAndamento
+                            ? $duracaoGeracao($inicioBruto !== '' ? $inicioBruto : null, date('Y-m-d H:i:s'))
+                            : $duracaoGeracao($inicioBruto !== '' ? $inicioBruto : null, $fimBruto !== '' ? $fimBruto : null);
                         ?>
                         <div>Início <?= $inicioGeracao ?? '—' ?></div>
                         <div class="mt-0.5">Término <?= $geracaoEmAndamento ? 'em andamento' : ($fimGeracao ?? '—') ?></div>
+                        <?php if ($duracaoTxt !== null): ?>
+                        <div class="mt-0.5 text-xs text-gray-400">Duração <?= htmlspecialchars($duracaoTxt) ?><?= $geracaoEmAndamento ? ' até agora' : '' ?></div>
+                        <?php endif; ?>
                         <?php if (!empty($evento['boletim_desatualizado'])): ?>
                             <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300"
                                   title="A configuração foi alterada depois da última geração em massa. Os boletins já visíveis para alunos/pais podem estar com a regra antiga.">
