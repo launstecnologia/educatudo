@@ -3127,7 +3127,9 @@ class BoletimConfig
                 INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
                 LEFT JOIN materias m ON m.id = n.materia_id
                 LEFT JOIN provas_blocos_professores pbp
-                  ON pbp.bloco_id = n.bloco_id AND pbp.professor_id = n.professor_id
+                  ON pbp.bloco_id = n.bloco_id
+                 AND pbp.professor_id = n.professor_id
+                 AND (n.materia_id = 0 OR pbp.materia_id = n.materia_id)
                 LEFT JOIN materias m2 ON m2.id = pbp.materia_id
                 WHERE n.aluno_id IN ($phAlunos)
                   AND n.bloco_id IN ($phBlocos)
@@ -3789,6 +3791,96 @@ class BoletimConfig
     }
 
     /**
+     * Mantém só blocos das turmas geradas (ou blocos sem turma, de escopo escola).
+     *
+     * @param list<int> $blocoIds
+     * @param list<int> $turmaIds
+     * @return list<int>
+     */
+    public function filtrarBlocoIdsPorTurmas(array $blocoIds, array $turmaIds): array
+    {
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $turmaIds = array_values(array_unique(array_filter(array_map('intval', $turmaIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($blocoIds === [] || $turmaIds === []) {
+            return $blocoIds;
+        }
+        $temPbt = $this->hasTable('provas_blocos_turmas');
+        $temTurmaCol = $this->hasColumn('provas_blocos', 'turma_id');
+        $temPbpt = $this->hasTable('provas_blocos_professores_turmas') && $this->hasTable('provas_blocos_professores');
+        if (!$temPbt && !$temTurmaCol && !$temPbpt) {
+            return $blocoIds;
+        }
+
+        $phB = implode(',', array_fill(0, count($blocoIds), '?'));
+        $phT = implode(',', array_fill(0, count($turmaIds), '?'));
+        $params = $blocoIds;
+        $or = [];
+        if ($temPbt) {
+            $or[] = "EXISTS (
+                SELECT 1 FROM provas_blocos_turmas pbt
+                WHERE pbt.bloco_id = pb.id AND pbt.turma_id IN ($phT)
+            )";
+            $params = array_merge($params, $turmaIds);
+        }
+        if ($temTurmaCol) {
+            $or[] = "pb.turma_id IN ($phT)";
+            $params = array_merge($params, $turmaIds);
+        }
+        if ($temPbpt) {
+            $or[] = "EXISTS (
+                SELECT 1 FROM provas_blocos_professores pbp
+                INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp.id
+                WHERE pbp.bloco_id = pb.id AND pbpt.turma_id IN ($phT)
+            )";
+            $params = array_merge($params, $turmaIds);
+        }
+        $semEscopo = [];
+        if ($temPbt) {
+            $semEscopo[] = 'NOT EXISTS (SELECT 1 FROM provas_blocos_turmas pbt0 WHERE pbt0.bloco_id = pb.id)';
+        }
+        if ($temTurmaCol) {
+            $semEscopo[] = '(pb.turma_id IS NULL OR pb.turma_id = 0)';
+        }
+        if ($semEscopo !== []) {
+            $or[] = '(' . implode(' AND ', $semEscopo) . ')';
+        }
+        if ($or === []) {
+            return $blocoIds;
+        }
+
+        $sql = "SELECT pb.id FROM provas_blocos pb
+                WHERE pb.id IN ($phB)
+                  AND pb.deleted_at IS NULL
+                  AND (" . implode(' OR ', $or) . ')';
+        try {
+            $rows = $this->db->fetchAll($sql, $params) ?: [];
+        } catch (Throwable $e) {
+            error_log('BoletimConfig filtrarBlocoIdsPorTurmas: ' . $e->getMessage());
+
+            return $blocoIds;
+        }
+        $keep = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $keep[$id] = true;
+            }
+        }
+        $out = [];
+        foreach ($blocoIds as $id) {
+            if (isset($keep[$id])) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param list<int> $blocoIds
      * @param list<int> $bimestres
      * @return list<int>
@@ -3894,7 +3986,7 @@ class BoletimConfig
             }
             $sql .= ' AND (bimestre IS NULL OR bimestre = 0 OR bimestre IN (' . implode(',', $ph) . '))';
         }
-        $sql .= ' ORDER BY data_prova DESC, id DESC LIMIT 40';
+        $sql .= ' ORDER BY data_prova DESC, id DESC LIMIT 400';
         $rows = $this->db->fetchAll($sql, $params) ?: [];
         $out = [];
         foreach ($rows as $row) {

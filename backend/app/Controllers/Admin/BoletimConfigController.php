@@ -36,6 +36,12 @@ class BoletimConfigController extends BaseController
     private array $expansaoRegraCache = [];
     /** @var array<string, array<string, mixed>> */
     private array $simulacaoAlunoCache = [];
+    /** @var list<int> */
+    private array $turmasEscopoGeracao = [];
+    /** @var list<int> */
+    private array $seriesEscopoGeracao = [];
+    /** @var array<string, list<int>> */
+    private array $blocosFiltradosPorTurmaCache = [];
     /** @var array{a: list<int>, b: list<int>}|null */
     private ?array $semanasQuadroCache = null;
     private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 200;
@@ -2431,6 +2437,9 @@ class BoletimConfigController extends BaseController
         $this->notasManuaisGeracaoCache = [];
         $this->notasManuaisGeracaoAtivo = false;
         $this->simulacaoAlunoCache = [];
+        $this->turmasEscopoGeracao = [];
+        $this->seriesEscopoGeracao = [];
+        $this->blocosFiltradosPorTurmaCache = [];
 
         foreach ($alunos as $aluno) {
             $id = (int) ($aluno['id'] ?? 0);
@@ -2442,6 +2451,7 @@ class BoletimConfigController extends BaseController
         if ($alunoIds === []) {
             return;
         }
+        $this->definirEscopoGeracaoFromAlunos($this->alunosPorIdCache);
 
         $this->renovarHeartbeatGeracao();
 
@@ -2544,7 +2554,7 @@ class BoletimConfigController extends BaseController
             if ($src === 'evento_boletim') {
                 $cfgEvento = $this->parseEventoConfigFromComponente($componente);
                 $ref = $this->boletimConfig->getRuleByCode((string) ($cfgEvento['regra_codigo'] ?? ''));
-                if (is_array($ref)) {
+                if (is_array($ref) && $this->regraNoEscopoGeracao($ref)) {
                     $this->acumularPrefetchDaRegra(
                         $ref,
                         $range,
@@ -2615,6 +2625,11 @@ class BoletimConfigController extends BaseController
             if ($blocoIds === [] && $semanaForcada) {
                 continue;
             }
+            $tinhaBlocos = $blocoIds !== [];
+            $blocoIds = $this->aplicarFiltroTurmasNosBlocos($blocoIds);
+            if ($tinhaBlocos && $blocoIds === []) {
+                continue;
+            }
             $inicioChave = $blocoIds !== [] ? null : ($range['inicio'] ?? null);
             $fimChave = $blocoIds !== [] ? null : ($range['fim'] ?? null);
             $chave = $this->chaveCacheProvasGeracao($blocoIds, $filtroTitulo, $materiaFiltroConsulta, $inicioChave, $fimChave);
@@ -2644,6 +2659,75 @@ class BoletimConfigController extends BaseController
         sort($blocoIds);
 
         return implode(',', $blocoIds) . '|' . (string) $filtroTitulo . '|' . (int) $materiaId . '|' . (string) $inicio . '|' . (string) $fim;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $alunos
+     */
+    private function definirEscopoGeracaoFromAlunos(array $alunos): void
+    {
+        $turmas = [];
+        $series = [];
+        foreach ($alunos as $aluno) {
+            if (!is_array($aluno)) {
+                continue;
+            }
+            $tid = (int) ($aluno['turma_id'] ?? 0);
+            if ($tid > 0) {
+                $turmas[$tid] = true;
+            }
+            $sid = (int) ($aluno['serie_id'] ?? 0);
+            if ($sid > 0) {
+                $series[$sid] = true;
+            }
+        }
+        $this->turmasEscopoGeracao = array_map('intval', array_keys($turmas));
+        $this->seriesEscopoGeracao = array_map('intval', array_keys($series));
+    }
+
+    /**
+     * Desmarcar série/turma no evento só reduz alunos; os blocos de prova gravados
+     * no componente continuam os da escola inteira. Filtra pela turma dos alunos
+     * desta geração para não varrer pauta do Fundamental II ao gerar só o EM.
+     *
+     * @param list<int> $blocoIds
+     * @return list<int>
+     */
+    private function aplicarFiltroTurmasNosBlocos(array $blocoIds): array
+    {
+        if ($this->turmasEscopoGeracao === [] || $blocoIds === []) {
+            return $blocoIds;
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        sort($ids);
+        $chave = implode(',', $ids);
+        if (isset($this->blocosFiltradosPorTurmaCache[$chave])) {
+            return $this->blocosFiltradosPorTurmaCache[$chave];
+        }
+
+        return $this->blocosFiltradosPorTurmaCache[$chave] = $this->boletimConfig->filtrarBlocoIdsPorTurmas(
+            $ids,
+            $this->turmasEscopoGeracao
+        );
+    }
+
+    private function regraNoEscopoGeracao(array $regra): bool
+    {
+        if ($this->turmasEscopoGeracao === [] && $this->seriesEscopoGeracao === []) {
+            return true;
+        }
+        $turmasRef = $this->parseTurmasIdsFromRegra($regra);
+        if ($turmasRef !== [] && $this->turmasEscopoGeracao !== []) {
+            return array_intersect($turmasRef, $this->turmasEscopoGeracao) !== [];
+        }
+        $seriesRef = $this->parseSeriesIdsFromRegra($regra);
+        if ($seriesRef !== [] && $this->seriesEscopoGeracao !== []) {
+            return array_intersect($seriesRef, $this->seriesEscopoGeracao) !== [];
+        }
+
+        return true;
     }
 
     /**
@@ -2900,6 +2984,8 @@ class BoletimConfigController extends BaseController
                         $refRegra = $this->boletimConfig->getRuleByCode($codEvento);
                         if (!$refRegra) {
                             $detalhes['erro'] = 'Evento não encontrado pelo código: ' . $codEvento;
+                        } elseif (!$this->regraNoEscopoGeracao($refRegra)) {
+                            $detalhes['aviso_escopo'] = 'Evento de origem fora das turmas/séries desta geração.';
                         } else {
                             $codColunaResolvido = $this->resolveEventoComponenteCodigo($refRegra, $codColuna);
                             $detalhes['componente_codigo_resolvido'] = $codColunaResolvido;
@@ -3232,6 +3318,8 @@ class BoletimConfigController extends BaseController
                 }
                 $filtroTitulo = trim((string) ($componente['filtro_titulo'] ?? ''));
                 $filtroTitulo = $filtroTitulo !== '' ? $filtroTitulo : null;
+                $tinhaBlocos = $blocoIds !== [];
+                $blocoIds = $this->aplicarFiltroTurmasNosBlocos($blocoIds);
 
                 if (!empty($blocoIds)) {
                     $rows = $this->obterProvasAlunoBlocosCached(
@@ -3246,6 +3334,8 @@ class BoletimConfigController extends BaseController
                 } elseif ($semanaForcada) {
                     $rows = [];
                     $detalhes['aviso_semana'] = 'Nenhum evento de prova com a semana S' . $semanaComp . '.';
+                } elseif ($tinhaBlocos) {
+                    $rows = [];
                 } else {
                     $rows = $this->boletimConfig->getProvasFinalizadasByAluno(
                         $alunoId,
