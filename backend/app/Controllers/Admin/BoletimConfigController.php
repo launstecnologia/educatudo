@@ -20,6 +20,17 @@ class BoletimConfigController extends BaseController
     /** @var array<string, mixed>|null Usuário do job CLI (sem sessão). */
     private ?array $usuarioGeracaoJob = null;
     private int $jobIdHeartbeat = 0;
+    /** @var array<int, array<string, mixed>> */
+    private array $alunosPorIdCache = [];
+    /** @var array<string, array<int, list<array<string, mixed>>>> chave prefetch => aluno_id => provas */
+    private array $provasGeracaoCache = [];
+    /** @var array<int, array<string, mixed>> */
+    private array $faltasEventoCache = [];
+    /** @var array<int, array<int, array<int, array<string, mixed>>>> */
+    private array $notasManuaisGeracaoCache = [];
+    private bool $notasManuaisGeracaoAtivo = false;
+    /** @var array<int, array<string, mixed>> */
+    private array $eventosFaltasCache = [];
 
     public function __construct(bool $somenteGeracao = false)
     {
@@ -2202,6 +2213,9 @@ class BoletimConfigController extends BaseController
         }
         $usuarioVidaRaw = $this->usuarioGeracaoJob ?? $this->auth->getUser();
         $usuarioVida = is_array($usuarioVidaRaw) ? $usuarioVidaRaw : [];
+        $this->prepararCacheGeracaoBoletim($regra, $alunos, $periodoRef, $dataInicio, $dataFim);
+        $itensPersistir = [];
+        $alunoIdsOk = [];
         foreach ($alunos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
             if ($alunoId <= 0) {
@@ -2217,22 +2231,14 @@ class BoletimConfigController extends BaseController
                 $matriz = $sim['matriz_materias'] ?? null;
                 $colunas = is_array($matriz) && is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
                 $rows = is_array($matriz) && is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
-                $this->boletimConfig->replaceGeneratedResultsForAluno(
-                    $regraId,
-                    $alunoId,
-                    $periodoRef,
-                    $dataInicio,
-                    $dataFim,
-                    $colunas,
-                    $rows,
-                    $preview,
-                    $geracaoId
-                );
+                $itensPersistir[] = [
+                    'aluno_id' => $alunoId,
+                    'colunas' => $colunas,
+                    'linhas' => $rows,
+                ];
+                $alunoIdsOk[] = $alunoId;
                 $gerados++;
                 $linhas += count($rows);
-                if (!$preview) {
-                    $this->sincronizarFichaVidaEscolar($alunoId, $usuarioVida, $periodoRef, $regraId);
-                }
             } catch (Throwable $e) {
                 $erros++;
                 if (count($errosAmostra) < 3) {
@@ -2240,6 +2246,31 @@ class BoletimConfigController extends BaseController
                     $errosAmostra[] = $nomeAluno . ': ' . $e->getMessage();
                 }
                 error_log('Boletim ' . $logContexto . ' aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+        }
+
+        if ($itensPersistir !== []) {
+            try {
+                $this->boletimConfig->replaceGeneratedResultsEmLote(
+                    $regraId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    $itensPersistir,
+                    $preview,
+                    $geracaoId
+                );
+                if (!$preview) {
+                    $this->sincronizarFichasVidaEscolarLote($alunoIdsOk, $usuarioVida, $periodoRef, $regraId);
+                }
+            } catch (Throwable $e) {
+                $erros += $gerados;
+                $gerados = 0;
+                $linhas = 0;
+                if (count($errosAmostra) < 3) {
+                    $errosAmostra[] = 'Gravação em lote: ' . $e->getMessage();
+                }
+                error_log('Boletim ' . $logContexto . ' lote: ' . $e->getMessage());
             }
         }
 
@@ -2269,6 +2300,204 @@ class BoletimConfigController extends BaseController
             $vida->sincronizarDeEventosGerados($alunoId, $usuario, $regraId, $periodoRef, null, true, false);
         } catch (Throwable $e) {
             error_log('Vida escolar sync aluno #' . $alunoId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Prefetch de provas, faltas e notas manuais pra geração em massa.
+     *
+     * @param list<array<string,mixed>> $alunos
+     */
+    private function prepararCacheGeracaoBoletim(
+        array $regra,
+        array $alunos,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim
+    ): void {
+        $this->alunosPorIdCache = [];
+        $this->provasGeracaoCache = [];
+        $this->faltasEventoCache = [];
+        $this->eventosFaltasCache = [];
+        $this->notasManuaisGeracaoCache = [];
+        $this->notasManuaisGeracaoAtivo = false;
+
+        foreach ($alunos as $aluno) {
+            $id = (int) ($aluno['id'] ?? 0);
+            if ($id > 0) {
+                $this->alunosPorIdCache[$id] = $aluno;
+            }
+        }
+        $alunoIds = array_keys($this->alunosPorIdCache);
+        if ($alunoIds === []) {
+            return;
+        }
+
+        $componentes = $regra['componentes'] ?? [];
+        $expansao = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
+        $componentes = $this->anexarFaltasEventoNotasSeFaltar($expansao['regra'], $expansao['componentes']);
+
+        $range = [
+            'inicio' => $dataInicio ? ($dataInicio . ' 00:00:00') : null,
+            'fim' => $dataFim ? ($dataFim . ' 23:59:59') : null,
+        ];
+        if ($range['inicio'] === null || $range['fim'] === null) {
+            $range = $this->periodoToRange($periodoRef);
+        }
+
+        $compIdsManual = [];
+        $incluirPct = false;
+        $chavesProvas = [];
+        $absence = null;
+        foreach ($componentes as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $src = (string) ($componente['source_type'] ?? 'provas_sistema');
+            $cid = (int) ($componente['id'] ?? 0);
+            if ($cid > 0 && in_array($src, ['provas_sistema', 'jornadas', 'manual'], true)) {
+                $compIdsManual[] = $cid;
+            }
+            if (!empty($componente['usar_percentual'])) {
+                $incluirPct = true;
+            }
+            if ($src === 'faltas_evento') {
+                $cfgF = $this->parseFaltasConfigFromComponente($componente);
+                $eventoIdF = (int) ($cfgF['evento_id'] ?? 0);
+                if ($eventoIdF > 0 && !isset($this->faltasEventoCache[$eventoIdF])) {
+                    if ($absence === null) {
+                        $absence = new SchoolAbsence();
+                    }
+                    $this->faltasEventoCache[$eventoIdF] = $absence->getLancamentosMapByEvento($eventoIdF);
+                    $ev = $absence->getEventoById($eventoIdF);
+                    $this->eventosFaltasCache[$eventoIdF] = is_array($ev) ? $ev : [];
+                }
+            }
+            if ($src !== 'provas_sistema' && $src !== '') {
+                continue;
+            }
+            $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
+            $semanaComp = $this->parseSemanaFromComponente($componente);
+            $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
+            $bimestresComp = $this->parseProvaBimestresFromComponente($componente);
+            if ($blocoIds !== [] && $bimestresComp !== []) {
+                $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
+            }
+            $semanaForcada = $semanaComp >= 1 && $semanaComp <= 8;
+            if ($semanaForcada) {
+                if ($blocoIds !== []) {
+                    $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
+                    if ($filtradosSemana !== []) {
+                        $blocoIds = $filtradosSemana;
+                    } elseif ($tipoAvaliacaoComp > 0) {
+                        $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                            $tipoAvaliacaoComp,
+                            $semanaComp,
+                            $range['inicio'] ?? null,
+                            $range['fim'] ?? null,
+                            $bimestresComp
+                        );
+                    } else {
+                        $blocoIds = [];
+                    }
+                } elseif ($tipoAvaliacaoComp > 0) {
+                    $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                        $tipoAvaliacaoComp,
+                        $semanaComp,
+                        $range['inicio'] ?? null,
+                        $range['fim'] ?? null,
+                        $bimestresComp
+                    );
+                }
+            }
+            $filtroTitulo = trim((string) ($componente['filtro_titulo'] ?? ''));
+            $filtroTitulo = $filtroTitulo !== '' ? $filtroTitulo : null;
+            $materiasFiltro = $this->parseMateriasIdsFromComponente($componente);
+            $materiaFiltroConsulta = $materiasFiltro !== []
+                ? null
+                : ((int) ($componente['materia_id'] ?? 0) > 0 ? (int) $componente['materia_id'] : null);
+            if ($blocoIds === [] && $semanaForcada) {
+                continue;
+            }
+            $inicioChave = $blocoIds !== [] ? null : ($range['inicio'] ?? null);
+            $fimChave = $blocoIds !== [] ? null : ($range['fim'] ?? null);
+            $chave = $this->chaveCacheProvasGeracao($blocoIds, $filtroTitulo, $materiaFiltroConsulta, $inicioChave, $fimChave);
+            $chavesProvas[$chave] = [
+                'bloco_ids' => $blocoIds,
+                'filtro_titulo' => $filtroTitulo,
+                'materia_id' => $materiaFiltroConsulta,
+                'data_inicio' => $inicioChave,
+                'data_fim' => $fimChave,
+            ];
+        }
+
+        foreach ($chavesProvas as $chave => $cfgP) {
+            $blocoIdsP = $cfgP['bloco_ids'];
+            if ($blocoIdsP !== []) {
+                $porAluno = $this->boletimConfig->getProvasFinalizadasPorAlunosAndBlocos(
+                    $alunoIds,
+                    $blocoIdsP,
+                    $cfgP['data_inicio'],
+                    $cfgP['data_fim'],
+                    $cfgP['filtro_titulo'],
+                    $cfgP['materia_id'],
+                    $incluirPct
+                );
+                $this->provasGeracaoCache[$chave] = $porAluno;
+            }
+        }
+
+        if ($compIdsManual !== []) {
+            $this->notasManuaisGeracaoCache = $this->boletimConfig->getManualNotesPorAlunos($compIdsManual, $alunoIds, $periodoRef);
+            $this->notasManuaisGeracaoAtivo = true;
+        }
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     */
+    private function chaveCacheProvasGeracao(
+        array $blocoIds,
+        ?string $filtroTitulo,
+        ?int $materiaId,
+        ?string $inicio,
+        ?string $fim
+    ): string {
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        sort($blocoIds);
+
+        return implode(',', $blocoIds) . '|' . (string) $filtroTitulo . '|' . (int) $materiaId . '|' . (string) $inicio . '|' . (string) $fim;
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     */
+    private function sincronizarFichasVidaEscolarLote(
+        array $alunoIds,
+        array $usuario,
+        ?string $periodoRef,
+        ?int $regraId
+    ): void {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === []) {
+            return;
+        }
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once dirname(__DIR__, 2) . '/Core/LayoutHelper.php';
+            }
+            if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return;
+            }
+            require_once dirname(__DIR__, 2) . '/Modulos/vida-escolar/Services/VidaEscolarService.php';
+            $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $vida->sincronizarDeEventosGeradosEmLote($alunoIds, $usuario, $regraId, $periodoRef);
+        } catch (Throwable $e) {
+            error_log('Vida escolar sync lote: ' . $e->getMessage());
         }
     }
 
@@ -2341,7 +2570,7 @@ class BoletimConfigController extends BaseController
             // por componente e continua tratado pelo ramo 'manual' abaixo.
             $compIdOverride = (int) ($componente['id'] ?? 0);
             $overridesPorMateria = ($compIdOverride > 0 && in_array(($componente['source_type'] ?? ''), ['provas_sistema', 'jornadas'], true))
-                ? $this->boletimConfig->getManualNotesByComponente($compIdOverride, $alunoId, $periodoRef)
+                ? $this->obterNotasManuaisComponenteCached($compIdOverride, $alunoId, $periodoRef)
                 : [];
 
             if (($componente['source_type'] ?? 'provas_sistema') === 'nenhuma') {
@@ -2349,7 +2578,7 @@ class BoletimConfigController extends BaseController
             } elseif (($componente['source_type'] ?? 'provas_sistema') === 'manual') {
                 $compIdManual = (int) ($componente['id'] ?? 0);
                 $manual = $compIdManual > 0
-                    ? $this->boletimConfig->getManualNote($compIdManual, $alunoId, $periodoRef)
+                    ? $this->obterNotaManualCached($compIdManual, $alunoId, $periodoRef, 0)
                     : null;
                 if ($manual) {
                     $bloqueado = (int) ($manual['bloqueado'] ?? 0) === 1;
@@ -2715,7 +2944,11 @@ class BoletimConfigController extends BaseController
                     $detalhes['erro'] = 'Selecione um evento de faltas.';
                 } else {
                     $absence = new SchoolAbsence();
-                    $lancamentosFaltas = $absence->getLancamentosMapByEvento($eventoIdFaltas);
+                    $lancamentosFaltas = $this->faltasEventoCache[$eventoIdFaltas]
+                        ?? $absence->getLancamentosMapByEvento($eventoIdFaltas);
+                    if (!isset($this->faltasEventoCache[$eventoIdFaltas])) {
+                        $this->faltasEventoCache[$eventoIdFaltas] = $lancamentosFaltas;
+                    }
                     $faltasPorMateria = [];
                     $faltasLegado = null;
                     $materiasFiltroFaltas = $this->parseMateriasIdsFromComponente($componente);
@@ -2747,7 +2980,11 @@ class BoletimConfigController extends BaseController
                         $valor = array_sum($faltasPorMateria);
 
                         $nomesFaltasPorMateria = [];
-                        $eventoFaltas = $absence->getEventoById($eventoIdFaltas);
+                        $eventoFaltas = $this->eventosFaltasCache[$eventoIdFaltas]
+                            ?? $absence->getEventoById($eventoIdFaltas);
+                        if (is_array($eventoFaltas) && !isset($this->eventosFaltasCache[$eventoIdFaltas])) {
+                            $this->eventosFaltasCache[$eventoIdFaltas] = $eventoFaltas;
+                        }
                         $materiasEventoIds = array_map('intval', (array) ($eventoFaltas['materias_ids'] ?? []));
                         if ($materiasEventoIds !== []) {
                             foreach ($absence->listMateriasByIds($materiasEventoIds) as $matF) {
@@ -2830,9 +3067,7 @@ class BoletimConfigController extends BaseController
                 $filtroTitulo = $filtroTitulo !== '' ? $filtroTitulo : null;
 
                 if (!empty($blocoIds)) {
-                    // Regra de negócio: bloco(s) de prova selecionado(s) devem
-                    // contabilizar independente do intervalo de data global.
-                    $rows = $this->boletimConfig->getProvasFinalizadasByAlunoAndBlocos(
+                    $rows = $this->obterProvasAlunoBlocosCached(
                         $alunoId,
                         $blocoIds,
                         null,
@@ -4729,14 +4964,69 @@ class BoletimConfigController extends BaseController
 
     private function buscarAluno(int $alunoId): ?array
     {
-        $rows = $this->boletimConfig->getStudentsList(1000);
-        foreach ($rows as $aluno) {
-            if ((int) ($aluno['id'] ?? 0) === $alunoId) {
-                return $aluno;
-            }
+        if (isset($this->alunosPorIdCache[$alunoId])) {
+            return $this->alunosPorIdCache[$alunoId];
+        }
+        $rows = $this->boletimConfig->getStudentsByIds([$alunoId]);
+        $aluno = is_array($rows[0] ?? null) ? $rows[0] : null;
+        if ($aluno !== null) {
+            $this->alunosPorIdCache[$alunoId] = $aluno;
         }
 
-        return null;
+        return $aluno;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function obterNotasManuaisComponenteCached(int $componenteId, int $alunoId, string $periodoRef): array
+    {
+        if ($this->notasManuaisGeracaoAtivo) {
+            $porMateria = $this->notasManuaisGeracaoCache[$componenteId][$alunoId] ?? [];
+            unset($porMateria[0]);
+
+            return $porMateria;
+        }
+
+        return $this->boletimConfig->getManualNotesByComponente($componenteId, $alunoId, $periodoRef);
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     * @return list<array<string, mixed>>
+     */
+    private function obterProvasAlunoBlocosCached(
+        int $alunoId,
+        array $blocoIds,
+        ?string $inicio,
+        ?string $fim,
+        ?string $filtroTitulo,
+        ?int $materiaId
+    ): array {
+        $chave = $this->chaveCacheProvasGeracao($blocoIds, $filtroTitulo, $materiaId, $inicio, $fim);
+        if (isset($this->provasGeracaoCache[$chave])) {
+            return $this->provasGeracaoCache[$chave][$alunoId] ?? [];
+        }
+
+        return $this->boletimConfig->getProvasFinalizadasByAlunoAndBlocos(
+            $alunoId,
+            $blocoIds,
+            $inicio,
+            $fim,
+            $filtroTitulo,
+            $materiaId
+        );
+    }
+
+    private function obterNotaManualCached(int $componenteId, int $alunoId, string $periodoRef, int $materiaId = 0): ?array
+    {
+        if ($this->notasManuaisGeracaoAtivo) {
+            $row = $this->notasManuaisGeracaoCache[$componenteId][$alunoId][$materiaId] ?? null;
+
+            return is_array($row) ? $row : null;
+        }
+
+        return $this->boletimConfig->getManualNote($componenteId, $alunoId, $periodoRef, $materiaId);
     }
 
     private function slug(string $text): string

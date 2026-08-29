@@ -528,6 +528,213 @@ class VidaEscolarService
     }
 
     /**
+     * Sincroniza fichas de vários alunos após gerar boletim em lote.
+     *
+     * @param list<int> $alunoIds
+     * @return array{success: bool, atualizadas?: int, error?: string}
+     */
+    public function sincronizarDeEventosGeradosEmLote(
+        array $alunoIds,
+        array $usuario = [],
+        ?int $regraId = null,
+        ?string $periodoRef = null
+    ): array {
+        if (!$this->model->schemaPronto()) {
+            return ['success' => false, 'error' => 'Migration da vida escolar ainda não foi aplicada.'];
+        }
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === []) {
+            return ['success' => true, 'atualizadas' => 0];
+        }
+
+        $alunos = $this->model->alunosPorIds($alunoIds);
+        $porAno = [];
+        foreach ($alunos as $aid => $aluno) {
+            $ano = (int) ($aluno['turma_ano_letivo'] ?? date('Y'));
+            $turmaId = (int) ($aluno['turma_id'] ?? 0);
+            if ($ano <= 0 || $turmaId <= 0) {
+                continue;
+            }
+            $porAno[$ano][$aid] = $aluno;
+        }
+
+        $n = 0;
+        foreach ($porAno as $ano => $alunosAno) {
+            $idsAno = array_map('intval', array_keys($alunosAno));
+            $fichas = $this->model->listarFichasPorAlunosAno($idsAno, (int) $ano);
+            foreach ($alunosAno as $aid => $aluno) {
+                $turmaId = (int) ($aluno['turma_id'] ?? 0);
+                $chaveFicha = $aid . ':' . $turmaId;
+                if (isset($fichas[$chaveFicha])) {
+                    continue;
+                }
+                $ok = $this->garantirFicha($aid, $turmaId, (int) $ano, $usuario['id'] ?? null);
+                if (!empty($ok['success']) && (int) ($ok['id'] ?? 0) > 0) {
+                    $fichaNova = $this->model->findFicha((int) $ok['id']);
+                    if (is_array($fichaNova)) {
+                        $fichas[$chaveFicha] = $fichaNova;
+                    }
+                }
+            }
+
+            $fichaIds = [];
+            $fichaPorAluno = [];
+            foreach ($alunosAno as $aid => $aluno) {
+                $turmaId = (int) ($aluno['turma_id'] ?? 0);
+                $ficha = $fichas[$aid . ':' . $turmaId] ?? null;
+                if (!is_array($ficha) || ($ficha['status'] ?? '') === 'homologada') {
+                    continue;
+                }
+                $fid = (int) ($ficha['id'] ?? 0);
+                if ($fid <= 0) {
+                    continue;
+                }
+                $fichaIds[] = $fid;
+                $fichaPorAluno[$aid] = $ficha;
+            }
+            if ($fichaIds === []) {
+                continue;
+            }
+
+            $linhasPorFicha = $this->model->listarLinhasPorFichas($fichaIds);
+            $linhaIds = [];
+            foreach ($linhasPorFicha as $linhasF) {
+                foreach ($linhasF as $linha) {
+                    $linhaIds[] = (int) ($linha['id'] ?? 0);
+                }
+            }
+            $celulas = $this->model->listarCelulasPorLinhas($linhaIds);
+            $resultadosPorAluno = $this->model->listarResultadosGeradosOficiaisPorAlunos(array_keys($fichaPorAluno));
+            $updates = [];
+            $linhasTocadas = [];
+
+            foreach ($fichaPorAluno as $aid => $ficha) {
+                $fid = (int) ($ficha['id'] ?? 0);
+                $linhas = $linhasPorFicha[$fid] ?? [];
+                $porId = [];
+                $porNome = [];
+                foreach ($linhas as $linha) {
+                    $mid = (int) ($linha['materia_id'] ?? 0);
+                    if ($mid > 0) {
+                        $porId[$mid] = $linha;
+                    }
+                    $nome = mb_strtolower(trim((string) ($linha['componente_nome'] ?? '')));
+                    if ($nome !== '') {
+                        $porNome[$nome] = $linha;
+                    }
+                }
+                foreach ($resultadosPorAluno[$aid] ?? [] as $row) {
+                    if (!$this->eventoPertenceAoAno($row, (int) $ano)) {
+                        continue;
+                    }
+                    $mid = (int) ($row['materia_id'] ?? 0);
+                    $nome = mb_strtolower(trim((string) ($row['materia_nome'] ?? '')));
+                    $linha = ($mid > 0 ? ($porId[$mid] ?? null) : null) ?? ($porNome[$nome] ?? null);
+                    if (!$linha) {
+                        continue;
+                    }
+                    $linhaId = (int) $linha['id'];
+                    $periodosGerados = $this->periodosDaLinhaGerada($row);
+                    $bimRow = (int) ($row['bimestre'] ?? 0);
+                    if ($bimRow < 1 || $bimRow > 4) {
+                        $bimRow = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
+                    }
+                    if ($bimRow >= 1 && $bimRow <= 4 && !isset($periodosGerados[$bimRow])) {
+                        $periodosGerados[$bimRow] = ['nota' => null, 'faltas' => null];
+                    }
+                    foreach ($periodosGerados as $periodo => $vals) {
+                        $periodo = (int) $periodo;
+                        if ($periodo < 1 || $periodo > 4) {
+                            continue;
+                        }
+                        $faltas = $vals['faltas'] ?? null;
+                        if ($faltas === null) {
+                            $faltas = $this->faltasLancadasAlunoMateria($aid, $mid, $periodo, (int) $ano);
+                        }
+                        $chaveCel = $linhaId . ':' . $periodo;
+                        $cel = $celulas[$chaveCel] ?? null;
+                        if (!$cel) {
+                            continue;
+                        }
+                        $status = (string) ($cel['status'] ?? '');
+                        if ($status !== 'aberta' || ($cel['origem'] ?? '') === 'externa') {
+                            continue;
+                        }
+                        $nota = $vals['nota'] ?? null;
+                        if ($nota === null && $faltas === null) {
+                            continue;
+                        }
+                        $campos = ['id' => (int) $cel['id'], 'origem' => 'calculada'];
+                        if ($nota !== null) {
+                            $campos['nota'] = round((float) $nota, 2);
+                            $celulas[$chaveCel]['nota'] = $campos['nota'];
+                        } else {
+                            $campos['nota'] = $cel['nota'] ?? null;
+                        }
+                        if ($faltas !== null) {
+                            $campos['faltas'] = (int) $faltas;
+                            $celulas[$chaveCel]['faltas'] = $campos['faltas'];
+                        } else {
+                            $campos['faltas'] = $cel['faltas'] ?? null;
+                        }
+                        $celulas[$chaveCel]['origem'] = 'calculada';
+                        $updates[] = $campos;
+                        $n++;
+                        $linhasTocadas[$linhaId] = $ficha;
+                    }
+                }
+            }
+
+            foreach ($linhasTocadas as $linhaId => $ficha) {
+                $porBim = [];
+                $faltasTotal = 0;
+                $temFaltas = false;
+                foreach ([1, 2, 3, 4] as $p) {
+                    $c = $celulas[$linhaId . ':' . $p] ?? null;
+                    if ($c && is_numeric($c['nota'] ?? null)) {
+                        $porBim[$p] = (float) $c['nota'];
+                    }
+                    if ($c && $c['faltas'] !== null && $c['faltas'] !== '') {
+                        $faltasTotal += (int) $c['faltas'];
+                        $temFaltas = true;
+                    }
+                }
+                $final = $celulas[$linhaId . ':0'] ?? null;
+                if (!$final) {
+                    continue;
+                }
+                $stFinal = (string) ($final['status'] ?? '');
+                if ($stFinal === 'homologada') {
+                    continue;
+                }
+                if ($stFinal === 'fechada' && ($final['origem'] ?? '') === 'externa') {
+                    continue;
+                }
+                $materiaId = 0;
+                foreach ($linhasPorFicha[(int) ($ficha['id'] ?? 0)] ?? [] as $ln) {
+                    if ((int) ($ln['id'] ?? 0) === (int) $linhaId) {
+                        $materiaId = (int) ($ln['materia_id'] ?? 0);
+                        break;
+                    }
+                }
+                $media = $this->mediaFinalDaLinha($porBim, is_array($ficha) ? $ficha : [], $materiaId);
+                $updates[] = [
+                    'id' => (int) $final['id'],
+                    'nota' => $media,
+                    'faltas' => $temFaltas ? $faltasTotal : null,
+                    'origem' => $media === null ? 'vazia' : 'calculada',
+                ];
+            }
+
+            $this->model->atualizarCelulasEmLote($updates);
+        }
+
+        return ['success' => true, 'atualizadas' => $n];
+    }
+
+    /**
      * Trajetória para a tela de histórico vivo.
      *
      * @return array{anos: list<array<string,mixed>>}

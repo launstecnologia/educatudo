@@ -15,6 +15,8 @@ class BoletimConfig
     private array $mapaOrdemBoletimCache = [];
     /** @var array<string, bool> */
     private array $colunaExisteCache = [];
+    /** @var array<string, list<array<string,mixed>>> */
+    private array $materiasDisponiveisCache = [];
 
     public function __construct()
     {
@@ -1729,131 +1731,230 @@ class BoletimConfig
         bool $preview = false,
         ?int $geracaoId = null
     ): void {
+        $this->replaceGeneratedResultsEmLote(
+            $regraId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            [[
+                'aluno_id' => $alunoId,
+                'colunas' => $colunas,
+                'linhas' => $linhas,
+            ]],
+            $preview,
+            $geracaoId
+        );
+    }
+
+    /**
+     * Grava resultados de vários alunos numa transação: versiona em lote e
+     * INSERT de {@see TAMANHO_LOTE_INSERT_RESULTADOS} linhas por vez.
+     *
+     * @param list<array{aluno_id:int, colunas?:list<array<string,mixed>>, linhas?:list<array<string,mixed>>}> $itens
+     */
+    public function replaceGeneratedResultsEmLote(
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $itens,
+        bool $preview = false,
+        ?int $geracaoId = null
+    ): void {
         $periodoRef = trim($periodoRef);
         if (strlen($periodoRef) > 60) {
             $periodoRef = substr($periodoRef, 0, 60);
         }
-        if ($regraId <= 0 || $alunoId <= 0 || $periodoRef === '') {
+        if ($regraId <= 0 || $periodoRef === '' || $itens === []) {
+            return;
+        }
+
+        $porAluno = [];
+        foreach ($itens as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $alunoId = (int) ($item['aluno_id'] ?? 0);
+            if ($alunoId <= 0) {
+                continue;
+            }
+            $porAluno[$alunoId] = $item;
+        }
+        $alunoIds = array_keys($porAluno);
+        if ($alunoIds === []) {
             return;
         }
 
         $versionar = !$preview && $this->hasColumn('boletim_resultados_gerados', 'versao');
+        $temVersao = $this->hasColumn('boletim_resultados_gerados', 'versao');
+        $temGeracaoCol = $temVersao && $this->hasColumn('boletim_resultados_gerados', 'geracao_id');
+        $in = $this->sqlInIds($alunoIds, 'aid_');
 
         $this->db->beginTransaction();
         try {
+            $baseParams = [
+                'regra_id' => $regraId,
+                'periodo_ref' => $periodoRef,
+            ] + $in['params'];
+
             if ($preview) {
                 $this->db->delete(
                     "DELETE FROM boletim_resultados_gerados
-                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
-                       AND preview = 1",
-                    [
-                        'regra_id' => $regraId,
-                        'aluno_id' => $alunoId,
-                        'periodo_ref' => $periodoRef,
-                    ]
+                     WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref
+                       AND preview = 1 AND aluno_id IN ({$in['sql']})",
+                    $baseParams
                 );
             } elseif (!$versionar) {
                 $this->db->delete(
                     "DELETE FROM boletim_resultados_gerados
-                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref",
-                    [
-                        'regra_id' => $regraId,
-                        'aluno_id' => $alunoId,
-                        'periodo_ref' => $periodoRef,
-                    ]
+                     WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref
+                       AND aluno_id IN ({$in['sql']})",
+                    $baseParams
                 );
             }
 
-            $versao = 1;
+            $versaoPorAluno = [];
             if ($versionar) {
                 $this->db->delete(
                     "DELETE FROM boletim_resultados_gerados
-                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
-                       AND preview = 1",
-                    [
-                        'regra_id' => $regraId,
-                        'aluno_id' => $alunoId,
-                        'periodo_ref' => $periodoRef,
-                    ]
+                     WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref
+                       AND preview = 1 AND aluno_id IN ({$in['sql']})",
+                    $baseParams
                 );
-                $rowMax = $this->db->fetch(
-                    "SELECT MAX(versao) AS max_versao
+                $maxRows = $this->db->fetchAll(
+                    "SELECT aluno_id, MAX(versao) AS max_versao
                      FROM boletim_resultados_gerados
-                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
-                       AND preview = 0",
-                    [
-                        'regra_id' => $regraId,
-                        'aluno_id' => $alunoId,
-                        'periodo_ref' => $periodoRef,
-                    ]
-                );
-                $versao = (int) ($rowMax['max_versao'] ?? 0) + 1;
+                     WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref
+                       AND preview = 0 AND aluno_id IN ({$in['sql']})
+                     GROUP BY aluno_id",
+                    $baseParams
+                ) ?: [];
+                foreach ($maxRows as $rowMax) {
+                    $versaoPorAluno[(int) ($rowMax['aluno_id'] ?? 0)] = (int) ($rowMax['max_versao'] ?? 0) + 1;
+                }
                 $this->db->update(
                     "UPDATE boletim_resultados_gerados
                      SET vigente = 0
-                     WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND periodo_ref = :periodo_ref
-                       AND preview = 0 AND vigente = 1",
-                    [
-                        'regra_id' => $regraId,
-                        'aluno_id' => $alunoId,
-                        'periodo_ref' => $periodoRef,
-                    ]
+                     WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref
+                       AND preview = 0 AND vigente = 1 AND aluno_id IN ({$in['sql']})",
+                    $baseParams
                 );
             }
 
-            if (!empty($linhas)) {
-                $colunasJson = json_encode($colunas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                $colunasJsonTrim = $this->trimConfigJson($colunasJson);
-                $ordem = 0;
-                $temVersao = $this->hasColumn('boletim_resultados_gerados', 'versao');
-                $temGeracaoCol = $temVersao && $this->hasColumn('boletim_resultados_gerados', 'geracao_id');
-                $registros = [];
-                foreach ($linhas as $lin) {
-                    if (!is_array($lin)) {
-                        continue;
-                    }
-                    $materiaId = (int) ($lin['materia_id'] ?? 0);
-                    $materiaNome = trim((string) ($lin['materia_nome'] ?? 'Sem matéria'));
-                    $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
-                    $mediaFinal = null;
-                    if (isset($notas['media_final']) && is_numeric($notas['media_final'])) {
-                        $mediaFinal = (float) $notas['media_final'];
-                    } elseif (isset($lin['nota_resumo']) && is_numeric($lin['nota_resumo'])) {
-                        $mediaFinal = (float) $lin['nota_resumo'];
-                    }
-                    if ($mediaFinal !== null && !isset($notas['media_final'])) {
-                        $notas['media_final'] = $mediaFinal;
-                    }
-                    $registro = [
-                        'regra_id' => $regraId,
-                        'aluno_id' => $alunoId,
-                        'periodo_ref' => $periodoRef,
-                        'data_inicio' => $dataInicio,
-                        'data_fim' => $dataFim,
-                        'materia_id' => $materiaId > 0 ? $materiaId : null,
-                        'materia_nome' => $materiaNome !== '' ? $materiaNome : 'Sem matéria',
-                        'materia_ref' => (string) $alunoId,
-                        'ordem_linha' => $ordem++,
-                        'colunas_json' => $colunasJsonTrim,
-                        'notas_json' => $this->trimConfigJson(json_encode($notas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
-                        'media_final' => $mediaFinal,
-                        'preview' => $preview ? 1 : 0,
-                    ];
-                    if ($temVersao) {
-                        $registro['geracao_id'] = ($temGeracaoCol && $geracaoId !== null && $geracaoId > 0) ? $geracaoId : null;
-                        $registro['versao'] = $preview ? 0 : $versao;
-                        $registro['vigente'] = $preview ? 0 : 1;
-                    }
+            $registros = [];
+            foreach ($porAluno as $alunoId => $item) {
+                $versao = $versaoPorAluno[$alunoId] ?? 1;
+                foreach ($this->montarRegistrosResultadoAluno(
+                    $regraId,
+                    (int) $alunoId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    is_array($item['colunas'] ?? null) ? $item['colunas'] : [],
+                    is_array($item['linhas'] ?? null) ? $item['linhas'] : [],
+                    $preview,
+                    $geracaoId,
+                    $versao,
+                    $temVersao,
+                    $temGeracaoCol
+                ) as $registro) {
                     $registros[] = $registro;
                 }
-                $this->inserirResultadosGeradosEmLote($registros, $temVersao);
             }
+            $this->inserirResultadosGeradosEmLote($registros, $temVersao);
 
             $this->db->commit();
         } catch (Throwable $e) {
             $this->db->rollback();
             throw $e;
         }
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array{sql: string, params: array<string, int>}
+     */
+    private function sqlInIds(array $ids, string $prefix): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($id) {
+            return $id > 0;
+        })));
+        $sql = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $key = $prefix . $i;
+            $sql[] = ':' . $key;
+            $params[$key] = $id;
+        }
+
+        return ['sql' => implode(',', $sql), 'params' => $params];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $colunas
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string, mixed>>
+     */
+    private function montarRegistrosResultadoAluno(
+        int $regraId,
+        int $alunoId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $colunas,
+        array $linhas,
+        bool $preview,
+        ?int $geracaoId,
+        int $versao,
+        bool $temVersao,
+        bool $temGeracaoCol
+    ): array {
+        if ($linhas === []) {
+            return [];
+        }
+        $colunasJsonTrim = $this->trimConfigJson(json_encode($colunas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $ordem = 0;
+        $registros = [];
+        foreach ($linhas as $lin) {
+            if (!is_array($lin)) {
+                continue;
+            }
+            $materiaId = (int) ($lin['materia_id'] ?? 0);
+            $materiaNome = trim((string) ($lin['materia_nome'] ?? 'Sem matéria'));
+            $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
+            $mediaFinal = null;
+            if (isset($notas['media_final']) && is_numeric($notas['media_final'])) {
+                $mediaFinal = (float) $notas['media_final'];
+            } elseif (isset($lin['nota_resumo']) && is_numeric($lin['nota_resumo'])) {
+                $mediaFinal = (float) $lin['nota_resumo'];
+            }
+            if ($mediaFinal !== null && !isset($notas['media_final'])) {
+                $notas['media_final'] = $mediaFinal;
+            }
+            $registro = [
+                'regra_id' => $regraId,
+                'aluno_id' => $alunoId,
+                'periodo_ref' => $periodoRef,
+                'data_inicio' => $dataInicio,
+                'data_fim' => $dataFim,
+                'materia_id' => $materiaId > 0 ? $materiaId : null,
+                'materia_nome' => $materiaNome !== '' ? $materiaNome : 'Sem matéria',
+                'materia_ref' => (string) $alunoId,
+                'ordem_linha' => $ordem++,
+                'colunas_json' => $colunasJsonTrim,
+                'notas_json' => $this->trimConfigJson(json_encode($notas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
+                'media_final' => $mediaFinal,
+                'preview' => $preview ? 1 : 0,
+            ];
+            if ($temVersao) {
+                $registro['geracao_id'] = ($temGeracaoCol && $geracaoId !== null && $geracaoId > 0) ? $geracaoId : null;
+                $registro['versao'] = $preview ? 0 : $versao;
+                $registro['vigente'] = $preview ? 0 : 1;
+            }
+            $registros[] = $registro;
+        }
+
+        return $registros;
     }
 
     /**
@@ -2263,6 +2364,43 @@ class BoletimConfig
     }
 
     /**
+     * @param list<int> $componenteIds
+     * @param list<int> $alunoIds
+     * @return array<int, array<int, array<int, array<string, mixed>>>> [componente_id][aluno_id][materia_id]
+     */
+    public function getManualNotesPorAlunos(array $componenteIds, array $alunoIds, string $periodoRef): array
+    {
+        $componenteIds = array_values(array_unique(array_filter(array_map('intval', $componenteIds), static function ($id) {
+            return $id > 0;
+        })));
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $periodoRef = substr(trim($periodoRef), 0, 60);
+        if ($componenteIds === [] || $alunoIds === [] || $periodoRef === '') {
+            return [];
+        }
+        $inComp = $this->sqlInIds($componenteIds, 'c_');
+        $inAluno = $this->sqlInIds($alunoIds, 'a_');
+        $rows = $this->db->fetchAll(
+            "SELECT * FROM boletim_notas_manuais
+             WHERE periodo_ref = :periodo_ref
+               AND componente_id IN ({$inComp['sql']})
+               AND aluno_id IN ({$inAluno['sql']})",
+            ['periodo_ref' => $periodoRef] + $inComp['params'] + $inAluno['params']
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $cid = (int) ($r['componente_id'] ?? 0);
+            $aid = (int) ($r['aluno_id'] ?? 0);
+            $mid = (int) ($r['materia_id'] ?? 0);
+            $out[$cid][$aid][$mid] = $r;
+        }
+
+        return $out;
+    }
+
+    /**
      * Lista lançamentos manuais do mesmo componente/aluno em outros períodos (útil quando a simulação usa periodo_ref diferente do lançamento).
      *
      * @return list<array{periodo_ref: string, nota: float, updated_at: ?string}>
@@ -2589,6 +2727,121 @@ class BoletimConfig
     }
 
     /**
+     * Provas finalizadas de vários alunos nos mesmos blocos, agrupadas por aluno_id.
+     *
+     * @param list<int> $alunoIds
+     * @param list<int> $blocoIds
+     * @return array<int, list<array<string,mixed>>>
+     */
+    public function getProvasFinalizadasPorAlunosAndBlocos(
+        array $alunoIds,
+        array $blocoIds,
+        ?string $inicio,
+        ?string $fim,
+        ?string $filtroTitulo = null,
+        ?int $materiaId = null,
+        bool $incluirEstatisticasQuestoes = false
+    ): array {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === [] || $blocoIds === []) {
+            return [];
+        }
+        if (count($blocoIds) > 40) {
+            $blocoIds = array_slice($blocoIds, 0, 40);
+        }
+
+        $phAlunos = implode(',', array_fill(0, count($alunoIds), '?'));
+        $phBlocos = implode(',', array_fill(0, count($blocoIds), '?'));
+        $selectNotaUnica = $this->hasColumn('provas_blocos', 'nota_unica_todas_materias')
+            ? 'pb.nota_unica_todas_materias'
+            : '0 AS nota_unica_todas_materias';
+        $statsSelect = '0 AS total_questoes, 0 AS acertos';
+        $statsJoin = '';
+        if ($incluirEstatisticasQuestoes) {
+            $statsSelect = 'COALESCE(st.total_questoes, 0) AS total_questoes, COALESCE(st.acertos, 0) AS acertos';
+            $statsJoin = "LEFT JOIN (
+                    SELECT prova_id, aluno_id,
+                           COUNT(*) AS total_questoes,
+                           SUM(CASE WHEN correta = 1 THEN 1 ELSE 0 END) AS acertos
+                    FROM provas_respostas
+                    WHERE aluno_id IN ($phAlunos)
+                    GROUP BY prova_id, aluno_id
+                 ) st ON st.prova_id = pr.prova_id AND st.aluno_id = pr.aluno_id";
+        }
+
+        $sql = "SELECT DISTINCT
+                    pr.id,
+                    pr.prova_id,
+                    pr.aluno_id,
+                    pr.nota,
+                    pr.finalizado_em,
+                    pb.id AS bloco_id,
+                    {$selectNotaUnica},
+                    p.materia_id,
+                    m.nome AS materia_nome,
+                    p.titulo,
+                    p.valor_total,
+                    {$statsSelect}
+                FROM provas_realizacoes pr
+                INNER JOIN provas p ON p.id = pr.prova_id
+                LEFT JOIN materias m ON m.id = p.materia_id
+                INNER JOIN provas_blocos_vinculo pbv ON pbv.prova_id = pr.prova_id
+                INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
+                {$statsJoin}
+                WHERE pr.aluno_id IN ($phAlunos)
+                  AND pbv.bloco_id IN ($phBlocos)
+                  AND pr.status = 'finalizado'";
+
+        if ($inicio !== null && $fim !== null) {
+            $sql .= ' AND (
+                    (pr.finalizado_em IS NOT NULL AND pr.finalizado_em BETWEEN ? AND ?)
+                    OR (
+                        pb.data_prova IS NOT NULL
+                        AND CAST(pb.data_prova AS CHAR) <> \'0000-00-00\'
+                        AND pb.data_prova BETWEEN DATE(?) AND DATE(?)
+                    )
+                )';
+        }
+        if ($materiaId !== null && $materiaId > 0) {
+            $sql .= ' AND p.materia_id = ?';
+        }
+        $sql .= ' ORDER BY pr.aluno_id ASC, pr.finalizado_em DESC, pr.id DESC';
+
+        $execParams = $incluirEstatisticasQuestoes
+            ? array_merge($alunoIds, $alunoIds, $blocoIds)
+            : array_merge($alunoIds, $blocoIds);
+        if ($inicio !== null && $fim !== null) {
+            $execParams[] = $inicio;
+            $execParams[] = $fim;
+            $execParams[] = $inicio;
+            $execParams[] = $fim;
+        }
+        if ($materiaId !== null && $materiaId > 0) {
+            $execParams[] = $materiaId;
+        }
+
+        $online = $this->db->fetchAll($sql, $execParams) ?: [];
+        $manual = $this->hasNotasLancadasBlocosTable()
+            ? $this->fetchNotasLancadasPorBlocosAlunos($alunoIds, $blocoIds, $inicio, $fim, $materiaId)
+            : [];
+        $merged = $this->mergeProvasOnlineENotasLancadas($online, $manual);
+        $porAluno = [];
+        foreach ($merged as $row) {
+            $aid = (int) ($row['aluno_id'] ?? 0);
+            if ($aid > 0) {
+                $porAluno[$aid][] = $row;
+            }
+        }
+
+        return $porAluno;
+    }
+
+    /**
      * Blocos em formato "lançamento de nota" usam {@see provas_blocos_notas_lancadas}, não provas_realizacoes.
      */
     private function hasNotasLancadasBlocosTable(): bool
@@ -2722,6 +2975,105 @@ class BoletimConfig
     }
 
     /**
+     * @param list<int> $alunoIds
+     * @param list<int> $blocoIds
+     * @return list<array<string,mixed>>
+     */
+    private function fetchNotasLancadasPorBlocosAlunos(
+        array $alunoIds,
+        array $blocoIds,
+        ?string $inicio,
+        ?string $fim,
+        ?int $materiaId
+    ): array {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === [] || $blocoIds === []) {
+            return [];
+        }
+        $phAlunos = implode(',', array_fill(0, count($alunoIds), '?'));
+        $phBlocos = implode(',', array_fill(0, count($blocoIds), '?'));
+        $selectNotaUnica = $this->hasColumn('provas_blocos', 'nota_unica_todas_materias')
+            ? 'pb.nota_unica_todas_materias'
+            : '0 AS nota_unica_todas_materias';
+
+        $sql = "SELECT
+                    n.id,
+                    n.bloco_id,
+                    n.professor_id,
+                    (2000000000 + n.id) AS prova_id,
+                    n.aluno_id,
+                    n.nota,
+                    COALESCE(n.updated_at, CONCAT(pb.data_prova, ' 12:00:00')) AS finalizado_em,
+                    {$selectNotaUnica},
+                    pb.data_prova,
+                    NULLIF(n.materia_id, 0) AS nota_materia_id,
+                    m.nome AS nota_materia_nome,
+                    COALESCE(NULLIF(n.materia_id, 0), pbp.materia_id) AS materia_id,
+                    COALESCE(m.nome, m2.nome) AS materia_nome,
+                    CONCAT(COALESCE(pb.titulo, 'Bloco'), ' (pauta)') AS titulo,
+                    10 AS valor_total,
+                    0 AS total_questoes,
+                    0 AS acertos
+                FROM provas_blocos_notas_lancadas n
+                INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                LEFT JOIN materias m ON m.id = n.materia_id
+                LEFT JOIN provas_blocos_professores pbp
+                  ON pbp.bloco_id = n.bloco_id AND pbp.professor_id = n.professor_id
+                LEFT JOIN materias m2 ON m2.id = pbp.materia_id
+                WHERE n.aluno_id IN ($phAlunos)
+                  AND n.bloco_id IN ($phBlocos)
+                  AND n.nota IS NOT NULL";
+
+        $params = array_merge($alunoIds, $blocoIds);
+        if ($inicio !== null && $fim !== null) {
+            $sql .= ' AND (
+                    (n.updated_at IS NOT NULL AND n.updated_at BETWEEN ? AND ?)
+                    OR (
+                        pb.data_prova IS NOT NULL
+                        AND CAST(pb.data_prova AS CHAR) <> \'0000-00-00\'
+                        AND pb.data_prova BETWEEN DATE(?) AND DATE(?)
+                    )
+                )';
+            $params[] = $inicio;
+            $params[] = $fim;
+            $params[] = $inicio;
+            $params[] = $fim;
+        }
+        if ($materiaId !== null && $materiaId > 0) {
+            $sql .= ' AND (n.materia_id = ? OR pbp.materia_id = ?)';
+            $params[] = $materiaId;
+            $params[] = $materiaId;
+        }
+        $sql .= ' ORDER BY n.aluno_id ASC, finalizado_em DESC, n.id DESC';
+
+        try {
+            $rows = $this->db->fetchAll($sql, $params) ?: [];
+        } catch (Throwable $e) {
+            error_log('BoletimConfig fetchNotasLancadasPorBlocosAlunos: ' . $e->getMessage());
+
+            return [];
+        }
+
+        $seen = [];
+        $out = [];
+        foreach ($rows as $row) {
+            $key = (int) ($row['id'] ?? 0);
+            if ($key > 0 && isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
      * @param list<array<string,mixed>> $online
      * @param list<array<string,mixed>> $manual
      * @return list<array<string,mixed>>
@@ -2813,13 +3165,20 @@ class BoletimConfig
 
     public function getAvailableSubjects(int $limit = 300): array
     {
-        $limit = max(1, min($limit, 1000));
-        return $this->db->fetchAll(
+        $limit = max(1, min($limit, 2000));
+        $cacheKey = 'lim' . $limit;
+        if (isset($this->materiasDisponiveisCache[$cacheKey])) {
+            return $this->materiasDisponiveisCache[$cacheKey];
+        }
+        $rows = $this->db->fetchAll(
             "SELECT m.id, m.nome
              FROM materias m
              ORDER BY m.nome ASC
              LIMIT {$limit}"
-        );
+        ) ?: [];
+        $this->materiasDisponiveisCache[$cacheKey] = $rows;
+
+        return $rows;
     }
 
     /**

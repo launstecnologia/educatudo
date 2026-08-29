@@ -11,6 +11,8 @@ class VidaEscolar
 {
     private $db;
 
+    private ?bool $schemaProntoCache = null;
+
     public function __construct(?Database $db = null)
     {
         $this->db = $db ?? Database::getInstance();
@@ -18,12 +20,16 @@ class VidaEscolar
 
     public function schemaPronto(): bool
     {
+        if ($this->schemaProntoCache !== null) {
+            return $this->schemaProntoCache;
+        }
         try {
             $row = $this->db->fetch("SHOW TABLES LIKE 'boletim_fichas'");
-            return $row !== false && !empty($row);
+            $this->schemaProntoCache = $row !== false && !empty($row);
         } catch (\Throwable $e) {
-            return false;
+            $this->schemaProntoCache = false;
         }
+        return $this->schemaProntoCache;
     }
 
     public function findFicha(int $id): ?array
@@ -289,6 +295,242 @@ class VidaEscolar
             ['aid' => $alunoId]
         );
         return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, list<array<string,mixed>>>
+     */
+    public function listarResultadosGeradosOficiaisPorAlunos(array $alunoIds): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === []) {
+            return [];
+        }
+        if (!$this->temTabelaResultadosGerados()) {
+            return [];
+        }
+        $vigenteSql = $this->sqlFiltroVigenteResultados();
+        $ph = [];
+        $params = [];
+        foreach ($alunoIds as $i => $id) {
+            $k = 'a' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT g.id, g.aluno_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
+                    g.periodo_ref, r.exibir_em, r.bimestre, r.ano_letivo
+             FROM boletim_resultados_gerados g
+             INNER JOIN boletim_regras r ON r.id = g.regra_id
+             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}
+             ORDER BY g.aluno_id ASC, g.id ASC",
+            $params
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $aid = (int) ($row['aluno_id'] ?? 0);
+            if ($aid > 0) {
+                $out[$aid][] = $row;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, array<string,mixed>>
+     */
+    public function listarFichasPorAlunosAno(array $alunoIds, int $anoLetivo): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === [] || $anoLetivo <= 0) {
+            return [];
+        }
+        $ph = [];
+        $params = ['ano' => $anoLetivo];
+        foreach ($alunoIds as $i => $id) {
+            $k = 'a' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT f.* FROM boletim_fichas f
+             WHERE f.ano_letivo = :ano AND f.aluno_id IN (' . implode(',', $ph) . ')
+             ORDER BY f.id DESC',
+            $params
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $aid = (int) ($row['aluno_id'] ?? 0);
+            $tid = (int) ($row['turma_id'] ?? 0);
+            if ($aid <= 0) {
+                continue;
+            }
+            $chave = $aid . ':' . $tid;
+            if (!isset($out[$chave])) {
+                $out[$chave] = $row;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $fichaIds
+     * @return array<int, list<array<string,mixed>>>
+     */
+    public function listarLinhasPorFichas(array $fichaIds): array
+    {
+        $fichaIds = array_values(array_unique(array_filter(array_map('intval', $fichaIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($fichaIds === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($fichaIds as $i => $id) {
+            $k = 'f' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT * FROM boletim_ficha_linhas
+             WHERE ficha_id IN (' . implode(',', $ph) . ')
+             ORDER BY ficha_id ASC, ordem ASC, id ASC',
+            $params
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $fid = (int) ($row['ficha_id'] ?? 0);
+            $out[$fid][] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $linhaIds
+     * @return array<string, array<string,mixed>>
+     */
+    public function listarCelulasPorLinhas(array $linhaIds): array
+    {
+        $linhaIds = array_values(array_unique(array_filter(array_map('intval', $linhaIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($linhaIds === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($linhaIds as $i => $id) {
+            $k = 'l' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT * FROM boletim_ficha_celulas
+             WHERE linha_id IN (' . implode(',', $ph) . ')',
+            $params
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $lid = (int) ($row['linha_id'] ?? 0);
+            $p = (int) ($row['periodo_numero'] ?? 0);
+            $out[$lid . ':' . $p] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array{id:int, nota?:mixed, faltas?:mixed, origem?:string}> $updates
+     */
+    public function atualizarCelulasEmLote(array $updates): void
+    {
+        foreach (array_chunk($updates, 500) as $lote) {
+            $ids = [];
+            $notaSql = [];
+            $faltasSql = [];
+            $origemSql = [];
+            $params = [];
+            foreach ($lote as $i => $u) {
+                $id = (int) ($u['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $ikN = 'cidn' . $i;
+                $ikF = 'cidf' . $i;
+                $ikO = 'cido' . $i;
+                $nk = 'n' . $i;
+                $fk = 'f' . $i;
+                $ok = 'o' . $i;
+                $wk = 'wid' . $i;
+                $ids[] = ':' . $wk;
+                $params[$wk] = $id;
+                $params[$ikN] = $id;
+                $params[$ikF] = $id;
+                $params[$ikO] = $id;
+                $params[$nk] = $u['nota'] ?? null;
+                $params[$fk] = $u['faltas'] ?? null;
+                $params[$ok] = $u['origem'] ?? 'calculada';
+                $notaSql[] = 'WHEN :' . $ikN . ' THEN :' . $nk;
+                $faltasSql[] = 'WHEN :' . $ikF . ' THEN :' . $fk;
+                $origemSql[] = 'WHEN :' . $ikO . ' THEN :' . $ok;
+            }
+            if ($ids === []) {
+                continue;
+            }
+            $this->db->update(
+                'UPDATE boletim_ficha_celulas SET
+                    nota = CASE id ' . implode(' ', $notaSql) . ' END,
+                    faltas = CASE id ' . implode(' ', $faltasSql) . ' END,
+                    origem = CASE id ' . implode(' ', $origemSql) . ' END
+                 WHERE id IN (' . implode(',', $ids) . ')',
+                $params
+            );
+        }
+    }
+
+    private function temTabelaResultadosGerados(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'boletim_resultados_gerados'");
+            $cache = $tem !== false && !empty($tem);
+        } catch (\Throwable $e) {
+            $cache = false;
+        }
+
+        return $cache;
+    }
+
+    private function sqlFiltroVigenteResultados(): string
+    {
+        static $sql = null;
+        if ($sql !== null) {
+            return $sql;
+        }
+        $sql = '';
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'vigente'");
+            if ($col) {
+                $sql = ' AND g.vigente = 1';
+            }
+        } catch (\Throwable $e) {
+            $sql = '';
+        }
+
+        return $sql;
     }
 
     /** @return list<array<string,mixed>> */
@@ -616,6 +858,44 @@ class VidaEscolar
             ['id' => $id]
         );
         return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array<int, array<string,mixed>>
+     */
+    public function alunosPorIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($id) {
+            return $id > 0;
+        })));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $k = 'a' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT a.*, t.nome AS turma_nome, t.serie AS turma_serie, t.matriz_curricular_id,
+                    t.ano_letivo AS turma_ano_letivo
+             FROM alunos a
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE a.id IN (" . implode(',', $ph) . ')',
+            $params
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = $row;
+            }
+        }
+
+        return $out;
     }
 
     public function turmaPorId(int $id): ?array
