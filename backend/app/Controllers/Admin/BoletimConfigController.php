@@ -25,6 +25,8 @@ class BoletimConfigController extends BaseController
     private array $alunosPorIdCache = [];
     /** @var array<string, array<int, list<array<string, mixed>>>> chave prefetch => aluno_id => provas */
     private array $provasGeracaoCache = [];
+    private bool $prefetchGeracaoPronto = false;
+    private bool $prefetchIncluirPct = false;
     /** @var array<int, array<string, mixed>> */
     private array $faltasEventoCache = [];
     /** @var array<int, array<int, array<int, array<string, mixed>>>> */
@@ -2432,6 +2434,8 @@ class BoletimConfigController extends BaseController
     ): void {
         $this->alunosPorIdCache = [];
         $this->provasGeracaoCache = [];
+        $this->prefetchGeracaoPronto = false;
+        $this->prefetchIncluirPct = false;
         $this->faltasEventoCache = [];
         $this->eventosFaltasCache = [];
         $this->notasManuaisGeracaoCache = [];
@@ -2491,6 +2495,8 @@ class BoletimConfigController extends BaseController
             $this->notasManuaisGeracaoCache = $this->boletimConfig->getManualNotesPorAlunos($compIdsManual, $alunoIds, $periodoRef);
             $this->notasManuaisGeracaoAtivo = true;
         }
+        $this->prefetchIncluirPct = $incluirPct;
+        $this->prefetchGeracaoPronto = true;
     }
 
     /**
@@ -5233,6 +5239,23 @@ class BoletimConfigController extends BaseController
         ?int $materiaId
     ): array {
         $chave = $this->chaveCacheProvasGeracao($blocoIds, $filtroTitulo, $materiaId, $inicio, $fim);
+        if (!isset($this->provasGeracaoCache[$chave]) && $this->prefetchGeracaoPronto) {
+            $alunoIds = array_keys($this->alunosPorIdCache);
+            if ($alunoId > 0 && !isset($this->alunosPorIdCache[$alunoId])) {
+                $alunoIds[] = $alunoId;
+            }
+            if ($blocoIds !== [] && $alunoIds !== []) {
+                $this->provasGeracaoCache[$chave] = $this->boletimConfig->getProvasFinalizadasPorAlunosAndBlocos(
+                    $alunoIds,
+                    $blocoIds,
+                    $inicio,
+                    $fim,
+                    $filtroTitulo,
+                    $materiaId,
+                    $this->prefetchIncluirPct
+                );
+            }
+        }
         if (isset($this->provasGeracaoCache[$chave])) {
             return $this->provasGeracaoCache[$chave][$alunoId] ?? [];
         }

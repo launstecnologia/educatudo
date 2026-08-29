@@ -21,6 +21,8 @@ class BoletimConfig
     private array $filtroBlocosCache = [];
     /** @var array<string, array<string, mixed>|null> */
     private array $regraPorCodigoCache = [];
+    /** @var array<string, bool> */
+    private array $tabelaExisteCache = [];
 
     public function __construct()
     {
@@ -2529,10 +2531,8 @@ class BoletimConfig
                     m.nome AS materia_nome,
                     p.titulo,
                     p.valor_total,
-                    (SELECT COUNT(*) FROM provas_respostas rr
-                      WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id) AS total_questoes,
-                    (SELECT COUNT(*) FROM provas_respostas rr
-                      WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id AND rr.correta = 1) AS acertos
+                    0 AS total_questoes,
+                    0 AS acertos
                 FROM provas_realizacoes pr
                 INNER JOIN provas p ON p.id = pr.prova_id
                 LEFT JOIN materias m ON m.id = p.materia_id
@@ -2708,10 +2708,8 @@ class BoletimConfig
                     m.nome AS materia_nome,
                     p.titulo,
                     p.valor_total,
-                    (SELECT COUNT(*) FROM provas_respostas rr
-                      WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id) AS total_questoes,
-                    (SELECT COUNT(*) FROM provas_respostas rr
-                      WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id AND rr.correta = 1) AS acertos
+                    0 AS total_questoes,
+                    0 AS acertos
                 FROM provas_realizacoes pr
                 INNER JOIN provas p ON p.id = pr.prova_id
                 LEFT JOIN materias m ON m.id = p.materia_id
@@ -3256,6 +3254,9 @@ class BoletimConfig
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
             return false;
         }
+        if (array_key_exists($table, $this->tabelaExisteCache)) {
+            return $this->tabelaExisteCache[$table];
+        }
         try {
             $row = $this->db->fetch(
                 "SELECT 1 AS ok FROM information_schema.TABLES
@@ -3263,9 +3264,9 @@ class BoletimConfig
                  LIMIT 1",
                 ['table' => $table]
             );
-            return !empty($row);
+            return $this->tabelaExisteCache[$table] = !empty($row);
         } catch (Throwable $e) {
-            return false;
+            return $this->tabelaExisteCache[$table] = false;
         }
     }
 

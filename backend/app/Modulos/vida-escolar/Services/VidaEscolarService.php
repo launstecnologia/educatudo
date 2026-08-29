@@ -606,7 +606,10 @@ class VidaEscolarService
                 }
             }
             $celulas = $this->model->listarCelulasPorLinhas($linhaIds);
-            $resultadosPorAluno = $this->model->listarResultadosGeradosOficiaisPorAlunos(array_keys($fichaPorAluno));
+            $resultadosPorAluno = $this->model->listarResultadosGeradosOficiaisPorAlunos(
+                array_keys($fichaPorAluno),
+                $regraId
+            );
             $updates = [];
             $linhasTocadas = [];
 

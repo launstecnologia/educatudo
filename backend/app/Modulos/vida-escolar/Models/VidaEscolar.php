@@ -301,7 +301,7 @@ class VidaEscolar
      * @param list<int> $alunoIds
      * @return array<int, list<array<string,mixed>>>
      */
-    public function listarResultadosGeradosOficiaisPorAlunos(array $alunoIds): array
+    public function listarResultadosGeradosOficiaisPorAlunos(array $alunoIds, ?int $regraId = null): array
     {
         $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
             return $id > 0;
@@ -320,15 +320,18 @@ class VidaEscolar
             $ph[] = ':' . $k;
             $params[$k] = $id;
         }
-        $rows = $this->db->fetchAll(
-            "SELECT g.id, g.aluno_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
+        $sql = "SELECT g.id, g.aluno_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
                     g.periodo_ref, r.exibir_em, r.bimestre, r.ano_letivo
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}
-             ORDER BY g.aluno_id ASC, g.id ASC",
-            $params
-        ) ?: [];
+             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}";
+        $regraId = (int) $regraId;
+        if ($regraId > 0) {
+            $sql .= ' AND g.regra_id = :regra_id';
+            $params['regra_id'] = $regraId;
+        }
+        $sql .= ' ORDER BY g.aluno_id ASC, g.id ASC';
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
         $out = [];
         foreach ($rows as $row) {
             $aid = (int) ($row['aluno_id'] ?? 0);
