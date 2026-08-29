@@ -31,6 +31,11 @@ class BoletimConfigController extends BaseController
     private bool $notasManuaisGeracaoAtivo = false;
     /** @var array<int, array<string, mixed>> */
     private array $eventosFaltasCache = [];
+    /** @var array<int, array{regra: array<string, mixed>, componentes: list<array<string, mixed>>}> */
+    private array $expansaoRegraCache = [];
+    /** @var array{a: list<int>, b: list<int>}|null */
+    private ?array $semanasQuadroCache = null;
+    private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 50;
 
     public function __construct(bool $somenteGeracao = false)
     {
@@ -207,6 +212,24 @@ class BoletimConfigController extends BaseController
 
         echo json_encode(['ok' => true, 'jobs' => $jobs], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    public function cancelarGeracaoBoletim(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        require_once __DIR__ . '/../../Services/AIJobService.php';
+        $n = \App\Services\AIJobService::cancelarBoletimGerar($regraId > 0 ? $regraId : null);
+        if ($n > 0) {
+            $_SESSION['boletim_flash'] = $n === 1
+                ? 'Geração interrompida. Você já pode gerar de novo.'
+                : ('Interrompidas ' . $n . ' gerações em andamento.');
+            $_SESSION['boletim_flash_type'] = 'info';
+        } else {
+            $_SESSION['boletim_flash'] = 'Não havia geração na fila; o processo no banco foi encerrado se ainda estivesse preso.';
+            $_SESSION['boletim_flash_type'] = 'info';
+        }
+        $this->redirect('/admin/boletim');
     }
 
     public function index()
@@ -2216,6 +2239,7 @@ class BoletimConfigController extends BaseController
         $this->prepararCacheGeracaoBoletim($regra, $alunos, $periodoRef, $dataInicio, $dataFim);
         $itensPersistir = [];
         $alunoIdsOk = [];
+        $alunoIdsSync = [];
         foreach ($alunos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
             if ($alunoId <= 0) {
@@ -2239,6 +2263,8 @@ class BoletimConfigController extends BaseController
                 $alunoIdsOk[] = $alunoId;
                 $gerados++;
                 $linhas += count($rows);
+            } catch (\App\Services\FilaJobCanceladaException $e) {
+                throw $e;
             } catch (Throwable $e) {
                 $erros++;
                 if (count($errosAmostra) < 3) {
@@ -2247,31 +2273,49 @@ class BoletimConfigController extends BaseController
                 }
                 error_log('Boletim ' . $logContexto . ' aluno #' . $alunoId . ': ' . $e->getMessage());
             }
-        }
-
-        if ($itensPersistir !== []) {
-            try {
-                $this->boletimConfig->replaceGeneratedResultsEmLote(
+            if (count($itensPersistir) >= self::TAMANHO_LOTE_ALUNOS_PERSISTIR) {
+                $this->persistirLoteSimulacao(
                     $regraId,
                     $periodoRef,
                     $dataInicio,
                     $dataFim,
                     $itensPersistir,
+                    $alunoIdsOk,
                     $preview,
-                    $geracaoId
+                    $geracaoId,
+                    $logContexto,
+                    $gerados,
+                    $linhas,
+                    $erros,
+                    $errosAmostra,
+                    $alunoIdsSync
                 );
-                if (!$preview) {
-                    $this->sincronizarFichasVidaEscolarLote($alunoIdsOk, $usuarioVida, $periodoRef, $regraId);
-                }
-            } catch (Throwable $e) {
-                $erros += $gerados;
-                $gerados = 0;
-                $linhas = 0;
-                if (count($errosAmostra) < 3) {
-                    $errosAmostra[] = 'Gravação em lote: ' . $e->getMessage();
-                }
-                error_log('Boletim ' . $logContexto . ' lote: ' . $e->getMessage());
+                $itensPersistir = [];
+                $alunoIdsOk = [];
             }
+        }
+
+        if ($itensPersistir !== []) {
+            $this->persistirLoteSimulacao(
+                $regraId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                $itensPersistir,
+                $alunoIdsOk,
+                $preview,
+                $geracaoId,
+                $logContexto,
+                $gerados,
+                $linhas,
+                $erros,
+                $errosAmostra,
+                $alunoIdsSync
+            );
+        }
+
+        if (!$preview && $alunoIdsSync !== []) {
+            $this->sincronizarFichasVidaEscolarLote($alunoIdsSync, $usuarioVida, $periodoRef, $regraId);
         }
 
         return [
@@ -2281,6 +2325,61 @@ class BoletimConfigController extends BaseController
             'errosAmostra' => $errosAmostra,
             'preservados' => $preservados,
         ];
+    }
+
+    /**
+     * @param list<array{aluno_id:int, colunas:list<array<string,mixed>>, linhas:list<array<string,mixed>>}> $itensPersistir
+     * @param list<int> $alunoIdsOk
+     * @param list<string> $errosAmostra
+     * @param list<int> $alunoIdsSync
+     */
+    private function persistirLoteSimulacao(
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $itensPersistir,
+        array $alunoIdsOk,
+        bool $preview,
+        ?int $geracaoId,
+        string $logContexto,
+        int &$gerados,
+        int &$linhas,
+        int &$erros,
+        array &$errosAmostra,
+        array &$alunoIdsSync
+    ): void {
+        if ($itensPersistir === []) {
+            return;
+        }
+        $this->renovarHeartbeatGeracao();
+        try {
+            $this->boletimConfig->replaceGeneratedResultsEmLote(
+                $regraId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                $itensPersistir,
+                $preview,
+                $geracaoId
+            );
+            $alunoIdsSync = array_merge($alunoIdsSync, $alunoIdsOk);
+        } catch (\App\Services\FilaJobCanceladaException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            $n = count($alunoIdsOk);
+            $linhasLote = 0;
+            foreach ($itensPersistir as $item) {
+                $linhasLote += count($item['linhas'] ?? []);
+            }
+            $erros += $n;
+            $gerados = max(0, $gerados - $n);
+            $linhas = max(0, $linhas - $linhasLote);
+            if (count($errosAmostra) < 3) {
+                $errosAmostra[] = 'Gravação em lote: ' . $e->getMessage();
+            }
+            error_log('Boletim ' . $logContexto . ' lote: ' . $e->getMessage());
+        }
     }
 
     private function sincronizarFichaVidaEscolar(int $alunoId, array $usuario, ?string $periodoRef = null, ?int $regraId = null): void
@@ -2333,9 +2432,7 @@ class BoletimConfigController extends BaseController
             return;
         }
 
-        $componentes = $regra['componentes'] ?? [];
-        $expansao = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
-        $componentes = $this->anexarFaltasEventoNotasSeFaltar($expansao['regra'], $expansao['componentes']);
+        $this->renovarHeartbeatGeracao();
 
         $range = [
             'inicio' => $dataInicio ? ($dataInicio . ' 00:00:00') : null,
@@ -2349,7 +2446,79 @@ class BoletimConfigController extends BaseController
         $incluirPct = false;
         $chavesProvas = [];
         $absence = null;
-        foreach ($componentes as $componente) {
+        $visitados = [];
+        $this->acumularPrefetchDaRegra($regra, $range, $incluirPct, $chavesProvas, $compIdsManual, $absence, $visitados);
+
+        foreach ($chavesProvas as $chave => $cfgP) {
+            $this->renovarHeartbeatGeracao();
+            $blocoIdsP = $cfgP['bloco_ids'];
+            if ($blocoIdsP !== []) {
+                $porAluno = $this->boletimConfig->getProvasFinalizadasPorAlunosAndBlocos(
+                    $alunoIds,
+                    $blocoIdsP,
+                    $cfgP['data_inicio'],
+                    $cfgP['data_fim'],
+                    $cfgP['filtro_titulo'],
+                    $cfgP['materia_id'],
+                    $incluirPct
+                );
+                $this->provasGeracaoCache[$chave] = $porAluno;
+            }
+        }
+
+        if ($compIdsManual !== []) {
+            $this->notasManuaisGeracaoCache = $this->boletimConfig->getManualNotesPorAlunos($compIdsManual, $alunoIds, $periodoRef);
+            $this->notasManuaisGeracaoAtivo = true;
+        }
+    }
+
+    /**
+     * Expande quadro semanal e anexa faltas uma vez por evento (não a cada aluno).
+     *
+     * @return array{regra: array<string,mixed>, componentes: list<array<string,mixed>>}
+     */
+    private function componentesParaSimulacao(array $regra): array
+    {
+        $regraId = (int) ($regra['id'] ?? 0);
+        if ($regraId > 0 && isset($this->expansaoRegraCache[$regraId])) {
+            return $this->expansaoRegraCache[$regraId];
+        }
+        $componentes = $regra['componentes'] ?? [];
+        $expansao = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
+        $componentes = $this->anexarFaltasEventoNotasSeFaltar($expansao['regra'], $expansao['componentes']);
+        $expansao['regra']['componentes'] = $componentes;
+        $out = ['regra' => $expansao['regra'], 'componentes' => $componentes];
+        if ($regraId > 0) {
+            $this->expansaoRegraCache[$regraId] = $out;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array{inicio:?string,fim:?string} $range
+     * @param array<string, array<string, mixed>> $chavesProvas
+     * @param list<int> $compIdsManual
+     * @param array<string, bool> $visitados
+     */
+    private function acumularPrefetchDaRegra(
+        array $regra,
+        array $range,
+        bool &$incluirPct,
+        array &$chavesProvas,
+        array &$compIdsManual,
+        ?SchoolAbsence &$absence,
+        array &$visitados
+    ): void {
+        $codigo = trim((string) ($regra['codigo'] ?? ''));
+        $vid = $codigo !== '' ? $codigo : ('id:' . (int) ($regra['id'] ?? 0));
+        if ($vid === 'id:0' || isset($visitados[$vid])) {
+            return;
+        }
+        $visitados[$vid] = true;
+
+        $expansao = $this->componentesParaSimulacao($regra);
+        foreach ($expansao['componentes'] as $componente) {
             if (!is_array($componente)) {
                 continue;
             }
@@ -2360,6 +2529,22 @@ class BoletimConfigController extends BaseController
             }
             if (!empty($componente['usar_percentual'])) {
                 $incluirPct = true;
+            }
+            if ($src === 'evento_boletim') {
+                $cfgEvento = $this->parseEventoConfigFromComponente($componente);
+                $ref = $this->boletimConfig->getRuleByCode((string) ($cfgEvento['regra_codigo'] ?? ''));
+                if (is_array($ref)) {
+                    $this->acumularPrefetchDaRegra(
+                        $ref,
+                        $range,
+                        $incluirPct,
+                        $chavesProvas,
+                        $compIdsManual,
+                        $absence,
+                        $visitados
+                    );
+                }
+                continue;
             }
             if ($src === 'faltas_evento') {
                 $cfgF = $this->parseFaltasConfigFromComponente($componente);
@@ -2430,27 +2615,6 @@ class BoletimConfigController extends BaseController
                 'data_fim' => $fimChave,
             ];
         }
-
-        foreach ($chavesProvas as $chave => $cfgP) {
-            $blocoIdsP = $cfgP['bloco_ids'];
-            if ($blocoIdsP !== []) {
-                $porAluno = $this->boletimConfig->getProvasFinalizadasPorAlunosAndBlocos(
-                    $alunoIds,
-                    $blocoIdsP,
-                    $cfgP['data_inicio'],
-                    $cfgP['data_fim'],
-                    $cfgP['filtro_titulo'],
-                    $cfgP['materia_id'],
-                    $incluirPct
-                );
-                $this->provasGeracaoCache[$chave] = $porAluno;
-            }
-        }
-
-        if ($compIdsManual !== []) {
-            $this->notasManuaisGeracaoCache = $this->boletimConfig->getManualNotesPorAlunos($compIdsManual, $alunoIds, $periodoRef);
-            $this->notasManuaisGeracaoAtivo = true;
-        }
     }
 
     /**
@@ -2518,10 +2682,9 @@ class BoletimConfigController extends BaseController
         if ($range['inicio'] === null || $range['fim'] === null) {
             $range = $this->periodoToRange($periodoRef);
         }
-        $componentes = $regra['componentes'] ?? [];
-        $expansaoQuadro = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
+        $expansaoQuadro = $this->componentesParaSimulacao($regra);
         $regra = $expansaoQuadro['regra'];
-        $componentes = $this->anexarFaltasEventoNotasSeFaltar($expansaoQuadro['regra'], $expansaoQuadro['componentes']);
+        $componentes = $expansaoQuadro['componentes'];
         $regra['componentes'] = $componentes;
 
         $componentesResultado = [];
@@ -2590,7 +2753,7 @@ class BoletimConfigController extends BaseController
                         // vazio, força o traço mesmo que fosse obrigatório.
                         $detalhes['manual_vazio'] = true;
                     }
-                } elseif ($compIdManual > 0) {
+                } elseif ($compIdManual > 0 && !$this->notasManuaisGeracaoAtivo) {
                     $outros = $this->boletimConfig->listManualNotesOtherPeriods($compIdManual, $alunoId, $periodoRef, 8);
                     if (!empty($outros)) {
                         $detalhes['manual_outros_periodos'] = $outros;
@@ -6620,6 +6783,9 @@ class BoletimConfigController extends BaseController
      */
     private function semanasQuadroNaSimulacao(): array
     {
+        if ($this->semanasQuadroCache !== null) {
+            return $this->semanasQuadroCache;
+        }
         $a = [1, 3, 5, 7];
         $b = [2, 4, 6, 8];
         $path = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Models/NotasSemanaisConfig.php';
@@ -6627,7 +6793,7 @@ class BoletimConfigController extends BaseController
             require_once $path;
         }
         if (!class_exists('NotasSemanaisConfig', false)) {
-            return ['a' => $a, 'b' => $b];
+            return $this->semanasQuadroCache = ['a' => $a, 'b' => $b];
         }
         try {
             $cfg = (new NotasSemanaisConfig())->obter();
@@ -6643,7 +6809,7 @@ class BoletimConfigController extends BaseController
             error_log('BoletimConfig semanas quadro: ' . $e->getMessage());
         }
 
-        return ['a' => $a, 'b' => $b];
+        return $this->semanasQuadroCache = ['a' => $a, 'b' => $b];
     }
 
     private function parseSemanaFromComponente(array $componente): int

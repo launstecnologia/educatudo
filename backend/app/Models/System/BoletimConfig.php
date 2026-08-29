@@ -17,6 +17,10 @@ class BoletimConfig
     private array $colunaExisteCache = [];
     /** @var array<string, list<array<string,mixed>>> */
     private array $materiasDisponiveisCache = [];
+    /** @var array<string, list<int>> */
+    private array $filtroBlocosCache = [];
+    /** @var array<string, array<string, mixed>|null> */
+    private array $regraPorCodigoCache = [];
 
     public function __construct()
     {
@@ -878,17 +882,22 @@ class BoletimConfig
         if ($codigo === '') {
             return null;
         }
+        if (array_key_exists($codigo, $this->regraPorCodigoCache)) {
+            return $this->regraPorCodigoCache[$codigo];
+        }
         $regra = $this->db->fetch(
             "SELECT * FROM boletim_regras WHERE codigo = :codigo AND ativo = 1 ORDER BY updated_at DESC, id DESC LIMIT 1",
             ['codigo' => $codigo]
         );
         if (!$regra) {
+            $this->regraPorCodigoCache[$codigo] = null;
             return null;
         }
         $regra['componentes'] = $this->db->fetchAll(
             "SELECT * FROM boletim_componentes WHERE regra_id = :regra_id AND ativo = 1 ORDER BY ordem ASC, id ASC",
             ['regra_id' => (int) $regra['id']]
         );
+        $this->regraPorCodigoCache[$codigo] = $regra;
 
         return $regra;
     }
@@ -1859,9 +1868,15 @@ class BoletimConfig
                     $temGeracaoCol
                 ) as $registro) {
                     $registros[] = $registro;
+                    if (count($registros) >= self::TAMANHO_LOTE_INSERT_RESULTADOS) {
+                        $this->inserirResultadosGeradosEmLote($registros, $temVersao);
+                        $registros = [];
+                    }
                 }
             }
-            $this->inserirResultadosGeradosEmLote($registros, $temVersao);
+            if ($registros !== []) {
+                $this->inserirResultadosGeradosEmLote($registros, $temVersao);
+            }
 
             $this->db->commit();
         } catch (Throwable $e) {
@@ -2760,19 +2775,6 @@ class BoletimConfig
         $selectNotaUnica = $this->hasColumn('provas_blocos', 'nota_unica_todas_materias')
             ? 'pb.nota_unica_todas_materias'
             : '0 AS nota_unica_todas_materias';
-        $statsSelect = '0 AS total_questoes, 0 AS acertos';
-        $statsJoin = '';
-        if ($incluirEstatisticasQuestoes) {
-            $statsSelect = 'COALESCE(st.total_questoes, 0) AS total_questoes, COALESCE(st.acertos, 0) AS acertos';
-            $statsJoin = "LEFT JOIN (
-                    SELECT prova_id, aluno_id,
-                           COUNT(*) AS total_questoes,
-                           SUM(CASE WHEN correta = 1 THEN 1 ELSE 0 END) AS acertos
-                    FROM provas_respostas
-                    WHERE aluno_id IN ($phAlunos)
-                    GROUP BY prova_id, aluno_id
-                 ) st ON st.prova_id = pr.prova_id AND st.aluno_id = pr.aluno_id";
-        }
 
         $sql = "SELECT DISTINCT
                     pr.id,
@@ -2786,13 +2788,13 @@ class BoletimConfig
                     m.nome AS materia_nome,
                     p.titulo,
                     p.valor_total,
-                    {$statsSelect}
+                    0 AS total_questoes,
+                    0 AS acertos
                 FROM provas_realizacoes pr
                 INNER JOIN provas p ON p.id = pr.prova_id
                 LEFT JOIN materias m ON m.id = p.materia_id
                 INNER JOIN provas_blocos_vinculo pbv ON pbv.prova_id = pr.prova_id
                 INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
-                {$statsJoin}
                 WHERE pr.aluno_id IN ($phAlunos)
                   AND pbv.bloco_id IN ($phBlocos)
                   AND pr.status = 'finalizado'";
@@ -2812,9 +2814,7 @@ class BoletimConfig
         }
         $sql .= ' ORDER BY pr.aluno_id ASC, pr.finalizado_em DESC, pr.id DESC';
 
-        $execParams = $incluirEstatisticasQuestoes
-            ? array_merge($alunoIds, $alunoIds, $blocoIds)
-            : array_merge($alunoIds, $blocoIds);
+        $execParams = array_merge($alunoIds, $blocoIds);
         if ($inicio !== null && $fim !== null) {
             $execParams[] = $inicio;
             $execParams[] = $fim;
@@ -2826,6 +2826,9 @@ class BoletimConfig
         }
 
         $online = $this->db->fetchAll($sql, $execParams) ?: [];
+        if ($incluirEstatisticasQuestoes && $online !== []) {
+            $online = $this->anexarEstatisticasQuestoesNasProvas($online, $alunoIds);
+        }
         $manual = $this->hasNotasLancadasBlocosTable()
             ? $this->fetchNotasLancadasPorBlocosAlunos($alunoIds, $blocoIds, $inicio, $fim, $materiaId)
             : [];
@@ -2839,6 +2842,54 @@ class BoletimConfig
         }
 
         return $porAluno;
+    }
+
+    /**
+     * Conta acertos só nas provas que já vieram no lote (não varre provas_respostas inteira).
+     *
+     * @param list<array<string,mixed>> $rows
+     * @param list<int> $alunoIds
+     * @return list<array<string,mixed>>
+     */
+    private function anexarEstatisticasQuestoesNasProvas(array $rows, array $alunoIds): array
+    {
+        $provaIds = [];
+        foreach ($rows as $row) {
+            $pid = (int) ($row['prova_id'] ?? 0);
+            if ($pid > 0 && $pid < 2000000000) {
+                $provaIds[$pid] = true;
+            }
+        }
+        $provaIds = array_keys($provaIds);
+        if ($provaIds === [] || $alunoIds === []) {
+            return $rows;
+        }
+        $phAlunos = implode(',', array_fill(0, count($alunoIds), '?'));
+        $phProvas = implode(',', array_fill(0, count($provaIds), '?'));
+        $stats = $this->db->fetchAll(
+            "SELECT prova_id, aluno_id,
+                    COUNT(*) AS total_questoes,
+                    SUM(CASE WHEN correta = 1 THEN 1 ELSE 0 END) AS acertos
+             FROM provas_respostas
+             WHERE aluno_id IN ($phAlunos) AND prova_id IN ($phProvas)
+             GROUP BY prova_id, aluno_id",
+            array_merge($alunoIds, $provaIds)
+        ) ?: [];
+        $mapa = [];
+        foreach ($stats as $st) {
+            $chave = (int) ($st['aluno_id'] ?? 0) . ':' . (int) ($st['prova_id'] ?? 0);
+            $mapa[$chave] = $st;
+        }
+        foreach ($rows as $i => $row) {
+            $chave = (int) ($row['aluno_id'] ?? 0) . ':' . (int) ($row['prova_id'] ?? 0);
+            if (!isset($mapa[$chave])) {
+                continue;
+            }
+            $rows[$i]['total_questoes'] = (int) ($mapa[$chave]['total_questoes'] ?? 0);
+            $rows[$i]['acertos'] = (int) ($mapa[$chave]['acertos'] ?? 0);
+        }
+
+        return $rows;
     }
 
     /**
@@ -3661,8 +3712,12 @@ class BoletimConfig
         $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
             return $id > 0;
         })));
+        $cacheKey = 'sem:' . $semana . ':' . implode(',', $blocoIds);
+        if (isset($this->filtroBlocosCache[$cacheKey])) {
+            return $this->filtroBlocosCache[$cacheKey];
+        }
         if ($blocoIds === [] || $semana < 1 || $semana > 8 || !$this->hasColumn('provas_blocos', 'semana')) {
-            return $blocoIds;
+            return $this->filtroBlocosCache[$cacheKey] = $blocoIds;
         }
         $placeholders = implode(',', array_fill(0, count($blocoIds), '?'));
         $sql = "SELECT id FROM provas_blocos
@@ -3677,7 +3732,7 @@ class BoletimConfig
             }
         }
 
-        return array_values(array_unique($out));
+        return $this->filtroBlocosCache[$cacheKey] = array_values(array_unique($out));
     }
 
     /**
@@ -3700,6 +3755,10 @@ class BoletimConfig
         if ($blocoIds === [] || $bims === [] || !$this->hasColumn('provas_blocos', 'bimestre')) {
             return $blocoIds;
         }
+        $cacheKey = 'bim:' . implode(',', $bims) . ':' . implode(',', $blocoIds);
+        if (isset($this->filtroBlocosCache[$cacheKey])) {
+            return $this->filtroBlocosCache[$cacheKey];
+        }
         $placeholdersIds = implode(',', array_fill(0, count($blocoIds), '?'));
         $placeholdersBims = implode(',', array_fill(0, count($bims), '?'));
         $sql = "SELECT id FROM provas_blocos
@@ -3716,7 +3775,7 @@ class BoletimConfig
             }
         }
 
-        return array_values(array_unique($out));
+        return $this->filtroBlocosCache[$cacheKey] = array_values(array_unique($out));
     }
 
     /**
@@ -3737,6 +3796,17 @@ class BoletimConfig
             || !$this->hasColumn('provas_blocos', 'semana')
         ) {
             return [];
+        }
+        $bimsKey = [];
+        foreach ($bimestres as $b) {
+            $n = (int) $b;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $bimsKey, true)) {
+                $bimsKey[] = $n;
+            }
+        }
+        $cacheKey = 'tipo:' . $tipoAvaliacaoId . ':' . $semana . ':' . (string) $inicio . ':' . (string) $fim . ':' . implode(',', $bimsKey);
+        if (isset($this->filtroBlocosCache[$cacheKey])) {
+            return $this->filtroBlocosCache[$cacheKey];
         }
         $sql = 'SELECT id FROM provas_blocos
                 WHERE deleted_at IS NULL
@@ -3781,6 +3851,6 @@ class BoletimConfig
             }
         }
 
-        return array_values(array_unique($out));
+        return $this->filtroBlocosCache[$cacheKey] = array_values(array_unique($out));
     }
 }

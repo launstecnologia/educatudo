@@ -82,12 +82,23 @@ $dataHoraGeracao = static function (?string $valor): ?string {
 <?php endif; ?>
 
 <?php if ($temGeracaoEmAndamento): ?>
-    <div class="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 flex items-start gap-3">
-        <i class="fa-solid fa-spinner fa-spin mt-0.5"></i>
-        <div>
-            <p class="font-semibold">Gerando boletins em segundo plano</p>
-            <p class="text-sm mt-0.5">Você pode continuar na listagem. Esta página atualiza sozinha quando a geração terminar.</p>
+    <div class="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex items-start gap-3">
+            <i class="fa-solid fa-spinner fa-spin mt-0.5"></i>
+            <div>
+                <p class="font-semibold">Gerando boletins em segundo plano</p>
+                <p class="text-sm mt-0.5">Você pode continuar na listagem. Esta página atualiza sozinha quando a geração terminar.</p>
+            </div>
         </div>
+        <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="shrink-0"
+              onsubmit="return confirm('Parar a geração em andamento? Os boletins já gravados deste lote ficam como estão.');">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700">
+                <i class="fa-solid fa-stop mr-2"></i>
+                Parar geração
+            </button>
+        </form>
     </div>
 <?php endif; ?>
 
@@ -274,6 +285,17 @@ $dataHoraGeracao = static function (?string $valor): ?string {
                             <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Liberar para alunos/pais' ?>
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
+                        <?php if ($geracaoEmAndamento): ?>
+                        <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="block"
+                              onsubmit="return confirm('Parar a geração deste evento?');">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="regra_id" value="<?= $eventoId ?>">
+                            <button type="submit"
+                                    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                <i class="fa-solid fa-stop text-red-400 w-4 text-center"></i> Parar geração
+                            </button>
+                        </form>
+                        <?php endif; ?>
                         <button type="button" onclick="excluirEventoBoletim(<?= $eventoId ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir

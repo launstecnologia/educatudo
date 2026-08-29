@@ -84,6 +84,14 @@ class AIJobService
             "UPDATE ai_jobs SET started_at = NOW() WHERE id = ? AND status = 'processing'",
             [$jobId]
         );
+        $row = $db->fetch(
+            "SELECT status FROM ai_jobs WHERE id = ?",
+            [$jobId]
+        );
+        $status = is_array($row) ? (string) ($row['status'] ?? '') : '';
+        if ($status !== 'processing') {
+            throw new FilaJobCanceladaException('Geração de boletim cancelada.');
+        }
     }
 
     /**
@@ -272,7 +280,7 @@ class AIJobService
                      result = ?,
                      error_message = NULL,
                      completed_at = NOW()
-                 WHERE id = ?",
+                 WHERE id = ? AND status = 'processing'",
                 [json_encode($result, JSON_UNESCAPED_UNICODE), $job['id']]
             );
         } catch (FilaJobAdiarException $e) {
@@ -284,6 +292,16 @@ class AIJobService
                      error_message = ?
                  WHERE id = ?",
                 [$e->getMessage(), $job['id']]
+            );
+        } catch (FilaJobCanceladaException $e) {
+            $db->query(
+                "UPDATE ai_jobs
+                 SET status = 'failed',
+                     attempts = ?,
+                     error_message = ?,
+                     completed_at = NOW()
+                 WHERE id = ? AND status IN ('pending', 'processing')",
+                [self::MAX_ATTEMPTS, $e->getMessage(), $job['id']]
             );
         } catch (\Throwable $e) {
             // attempts já foi incrementado pelo UPDATE acima; usa +1 para refletir a tentativa atual
@@ -578,6 +596,88 @@ class AIJobService
             return $ctrl->executarGeracaoJob($payload);
         } finally {
             $db->fetch('SELECT RELEASE_LOCK(:nome) AS ok', ['nome' => $lockNome]);
+        }
+    }
+
+    /**
+     * Marca jobs boletim_gerar como falhos e derruba a conexão que segura o GET_LOCK.
+     *
+     * @return int Quantidade de jobs cancelados
+     */
+    public static function cancelarBoletimGerar(?int $regraId = null): int
+    {
+        $db = \Database::getInstance();
+        if (!$db->tableExists('ai_jobs')) {
+            return 0;
+        }
+
+        $sql = "SELECT id, payload
+                FROM ai_jobs
+                WHERE job_type = 'boletim_gerar'
+                  AND status IN ('pending', 'processing')";
+        $params = [];
+        if ($regraId !== null && $regraId > 0) {
+            $sql .= " AND CAST(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.regra_id')) AS UNSIGNED) = :regra";
+            $params['regra'] = $regraId;
+        }
+        $jobs = $db->fetchAll($sql, $params) ?: [];
+        $regras = [];
+        if ($regraId !== null && $regraId > 0) {
+            $regras[$regraId] = true;
+        }
+        $ids = [];
+        foreach ($jobs as $job) {
+            $id = (int) ($job['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+            $payload = json_decode((string) ($job['payload'] ?? ''), true);
+            $rid = (int) ($payload['regra_id'] ?? 0);
+            if ($rid > 0) {
+                $regras[$rid] = true;
+            }
+        }
+        if ($ids !== []) {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $db->query(
+                "UPDATE ai_jobs
+                 SET status = 'failed',
+                     attempts = ?,
+                     error_message = 'Cancelada pelo administrador.',
+                     completed_at = NOW()
+                 WHERE id IN ($ph)",
+                array_merge([self::MAX_ATTEMPTS], $ids)
+            );
+        }
+        foreach (array_keys($regras) as $rid) {
+            self::encerrarLockBoletimGerar((int) $rid);
+        }
+
+        return count($ids);
+    }
+
+    private static function encerrarLockBoletimGerar(int $regraId): void
+    {
+        if ($regraId <= 0) {
+            return;
+        }
+        $db = \Database::getInstance();
+        $lockNome = 'boletim_gerar_' . $regraId;
+        $got = $db->fetch('SELECT IS_USED_LOCK(:nome) AS conn_id', ['nome' => $lockNome]);
+        $connId = (int) ($got['conn_id'] ?? 0);
+        if ($connId <= 0) {
+            return;
+        }
+        $eu = $db->fetch('SELECT CONNECTION_ID() AS id');
+        $myId = (int) ($eu['id'] ?? 0);
+        if ($connId === $myId) {
+            $db->fetch('SELECT RELEASE_LOCK(:nome) AS ok', ['nome' => $lockNome]);
+            return;
+        }
+        try {
+            $db->query('KILL ' . $connId);
+        } catch (\Throwable $e) {
+            error_log('AIJobService encerrarLockBoletimGerar: ' . $e->getMessage());
         }
     }
 
@@ -2439,5 +2539,12 @@ PROMPT;
  * Job não pode rodar agora (lock ocupado). Volta para pending sem gastar tentativa.
  */
 class FilaJobAdiarException extends \RuntimeException
+{
+}
+
+/**
+ * Job interrompido pelo administrador. Não reenfileira.
+ */
+class FilaJobCanceladaException extends \RuntimeException
 {
 }
