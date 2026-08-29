@@ -4,9 +4,17 @@ require_once __DIR__ . '/../../Core/Database.php';
 
 class BoletimConfig
 {
+    /**
+     * Linhas por INSERT em lote. 500 (não 999): cada linha leva JSON de colunas/notas
+     * e o limite real no MySQL é max_allowed_packet, não o teto de 1000 do SQL Server.
+     */
+    private const TAMANHO_LOTE_INSERT_RESULTADOS = 500;
+
     private $db;
     /** @var array<string, array<int,int>> */
     private array $mapaOrdemBoletimCache = [];
+    /** @var array<string, bool> */
+    private array $colunaExisteCache = [];
 
     public function __construct()
     {
@@ -1795,8 +1803,11 @@ class BoletimConfig
 
             if (!empty($linhas)) {
                 $colunasJson = json_encode($colunas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $colunasJsonTrim = $this->trimConfigJson($colunasJson);
                 $ordem = 0;
-                $temGeracaoCol = $this->hasColumn('boletim_resultados_gerados', 'geracao_id');
+                $temVersao = $this->hasColumn('boletim_resultados_gerados', 'versao');
+                $temGeracaoCol = $temVersao && $this->hasColumn('boletim_resultados_gerados', 'geracao_id');
+                $registros = [];
                 foreach ($linhas as $lin) {
                     if (!is_array($lin)) {
                         continue;
@@ -1813,8 +1824,7 @@ class BoletimConfig
                     if ($mediaFinal !== null && !isset($notas['media_final'])) {
                         $notas['media_final'] = $mediaFinal;
                     }
-                    $materiaRef = (string) $alunoId;
-                    $params = [
+                    $registro = [
                         'regra_id' => $regraId,
                         'aluno_id' => $alunoId,
                         'periodo_ref' => $periodoRef,
@@ -1822,36 +1832,69 @@ class BoletimConfig
                         'data_fim' => $dataFim,
                         'materia_id' => $materiaId > 0 ? $materiaId : null,
                         'materia_nome' => $materiaNome !== '' ? $materiaNome : 'Sem matéria',
-                        'materia_ref' => $materiaRef,
+                        'materia_ref' => (string) $alunoId,
                         'ordem_linha' => $ordem++,
-                        'colunas_json' => $this->trimConfigJson($colunasJson),
+                        'colunas_json' => $colunasJsonTrim,
                         'notas_json' => $this->trimConfigJson(json_encode($notas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
                         'media_final' => $mediaFinal,
                         'preview' => $preview ? 1 : 0,
                     ];
-                    $colsExtra = '';
-                    $valsExtra = '';
-                    if ($this->hasColumn('boletim_resultados_gerados', 'versao')) {
-                        $colsExtra .= ', geracao_id, versao, vigente';
-                        $valsExtra .= ', :geracao_id, :versao, :vigente';
-                        $params['geracao_id'] = ($temGeracaoCol && $geracaoId !== null && $geracaoId > 0) ? $geracaoId : null;
-                        $params['versao'] = $preview ? 0 : $versao;
-                        $params['vigente'] = $preview ? 0 : 1;
+                    if ($temVersao) {
+                        $registro['geracao_id'] = ($temGeracaoCol && $geracaoId !== null && $geracaoId > 0) ? $geracaoId : null;
+                        $registro['versao'] = $preview ? 0 : $versao;
+                        $registro['vigente'] = $preview ? 0 : 1;
                     }
-                    $this->db->insert(
-                        "INSERT INTO boletim_resultados_gerados
-                        (regra_id, aluno_id, periodo_ref, data_inicio, data_fim, materia_id, materia_nome, materia_ref, ordem_linha, colunas_json, notas_json, media_final, preview{$colsExtra})
-                        VALUES
-                        (:regra_id, :aluno_id, :periodo_ref, :data_inicio, :data_fim, :materia_id, :materia_nome, :materia_ref, :ordem_linha, :colunas_json, :notas_json, :media_final, :preview{$valsExtra})",
-                        $params
-                    );
+                    $registros[] = $registro;
                 }
+                $this->inserirResultadosGeradosEmLote($registros, $temVersao);
             }
 
             $this->db->commit();
         } catch (Throwable $e) {
             $this->db->rollback();
             throw $e;
+        }
+    }
+
+    /**
+     * Insere linhas de boletim_resultados_gerados em lotes (prepared statement).
+     *
+     * @param list<array<string, mixed>> $registros
+     */
+    private function inserirResultadosGeradosEmLote(array $registros, bool $comVersao): void
+    {
+        if ($registros === []) {
+            return;
+        }
+
+        $chaves = [
+            'regra_id', 'aluno_id', 'periodo_ref', 'data_inicio', 'data_fim',
+            'materia_id', 'materia_nome', 'materia_ref', 'ordem_linha',
+            'colunas_json', 'notas_json', 'media_final', 'preview',
+        ];
+        if ($comVersao) {
+            $chaves[] = 'geracao_id';
+            $chaves[] = 'versao';
+            $chaves[] = 'vigente';
+        }
+        $colunasSql = implode(', ', $chaves);
+
+        foreach (array_chunk($registros, self::TAMANHO_LOTE_INSERT_RESULTADOS) as $lote) {
+            $valuesSql = [];
+            $params = [];
+            foreach ($lote as $i => $row) {
+                $placeholders = [];
+                foreach ($chaves as $chave) {
+                    $nome = $chave . '_' . $i;
+                    $placeholders[] = ':' . $nome;
+                    $params[$nome] = $row[$chave] ?? null;
+                }
+                $valuesSql[] = '(' . implode(', ', $placeholders) . ')';
+            }
+            $this->db->insert(
+                'INSERT INTO boletim_resultados_gerados (' . $colunasSql . ') VALUES ' . implode(', ', $valuesSql),
+                $params
+            );
         }
     }
 
@@ -2720,6 +2763,11 @@ class BoletimConfig
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
             return false;
         }
+        $cacheKey = $table . '.' . $column;
+        if (array_key_exists($cacheKey, $this->colunaExisteCache)) {
+            return $this->colunaExisteCache[$cacheKey];
+        }
+        $existe = false;
         try {
             $row = $this->db->fetch(
                 "SELECT 1 AS ok FROM information_schema.COLUMNS
@@ -2728,17 +2776,21 @@ class BoletimConfig
                 ['table' => $table, 'col' => $column]
             );
             if (!empty($row)) {
-                return true;
+                $existe = true;
             }
         } catch (Throwable $e) {
             // Tenant sem information_schema: cai no SHOW COLUMNS.
         }
-        try {
-            $row = $this->db->fetch("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
-            return !empty($row);
-        } catch (Throwable $e) {
-            return false;
+        if (!$existe) {
+            try {
+                $row = $this->db->fetch("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
+                $existe = !empty($row);
+            } catch (Throwable $e) {
+                $existe = false;
+            }
         }
+        $this->colunaExisteCache[$cacheKey] = $existe;
+        return $existe;
     }
 
     private function hasTable(string $table): bool
@@ -3006,9 +3058,11 @@ class BoletimConfig
         );
 
         if ($exists) {
+            $this->colunaExisteCache['boletim_resultados_gerados.' . $column] = true;
             return;
         }
         $this->db->query($sqlAlter);
+        $this->colunaExisteCache['boletim_resultados_gerados.' . $column] = true;
     }
 
     private function ensureBoletimResultadoNoUniqueByMateriaRef(): void
