@@ -5,7 +5,6 @@ $status = $status_inscricao ?? [];
 $csrf_token = $csrf_token ?? '';
 $objetivos = $relacoes['objetivos'] ?? [];
 $etapas = $relacoes['etapas'] ?? [];
-$rubrica = $relacoes['rubrica'] ?? [];
 $materiais = $relacoes['materiais'] ?? [];
 $papeis = $relacoes['papeis'] ?? [];
 $insc = $status['inscricao'] ?? null;
@@ -16,8 +15,10 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
     <a href="<?= URL ?>/expo-colag" class="text-sm text-primary hover:underline">← Voltar ao mural</a>
 
     <div class="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-        <?php if (!empty($projeto['capa_url'])): ?>
-            <img src="<?= htmlspecialchars($projeto['capa_url']) ?>" alt="" class="w-full max-h-56 object-cover rounded-lg">
+        <?php
+        $capaSrc = (string) ($projeto['capa_src'] ?? ExpoColagService::resolverUrlCapa((string) ($projeto['capa_url'] ?? ''), (int) ($projeto['id'] ?? 0)));
+        if ($capaSrc !== ''): ?>
+            <img src="<?= htmlspecialchars($capaSrc) ?>" alt="" class="w-full max-h-56 object-cover rounded-lg">
         <?php endif; ?>
         <div>
             <?php if (!empty($projeto['area'])): ?>
@@ -49,10 +50,21 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
             </div>
         <?php endif; ?>
 
-        <?php if (!empty($projeto['produto_esperado'])): ?>
+        <?php
+        $tiposAluno = array_column($relacoes['tipos_trabalho'] ?? [], 'tipo');
+        if ($tiposAluno || !empty($projeto['produto_esperado'])): ?>
             <div>
-                <h2 class="text-sm font-semibold text-gray-800 mb-1">Produto esperado</h2>
-                <p class="text-sm text-gray-700 whitespace-pre-wrap"><?= htmlspecialchars($projeto['produto_esperado']) ?></p>
+                <h2 class="text-sm font-semibold text-gray-800 mb-1">O que apresentaremos</h2>
+                <?php if ($tiposAluno): ?>
+                    <div class="flex flex-wrap gap-1.5 mb-2">
+                        <?php foreach ($tiposAluno as $tipo): ?>
+                            <span class="inline-flex px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 text-xs font-medium"><?= htmlspecialchars((string) $tipo) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <?php if (!empty($projeto['produto_esperado'])): ?>
+                    <p class="text-sm text-gray-700 whitespace-pre-wrap"><?= htmlspecialchars($projeto['produto_esperado']) ?></p>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -72,10 +84,18 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
                 <h2 class="text-sm font-semibold text-gray-800 mb-2">Cronograma</h2>
                 <ol class="space-y-2">
                     <?php foreach ($etapas as $et): ?>
-                        <li class="text-sm border border-gray-100 rounded-lg px-3 py-2">
-                            <span class="font-medium"><?= htmlspecialchars($et['titulo'] ?? '') ?></span>
-                            <?php if (!empty($et['data_limite'])): ?>
-                                <span class="text-gray-500"> · até <?= htmlspecialchars(date('d/m/Y', strtotime($et['data_limite']))) ?></span>
+                        <li class="text-sm border border-gray-100 rounded-lg px-3 py-2 space-y-1">
+                            <div>
+                                <span class="font-medium"><?= htmlspecialchars($et['titulo'] ?? '') ?></span>
+                                <?php if (!empty($et['data_limite'])): ?>
+                                    <span class="text-gray-500"> · até <?= htmlspecialchars(date('d/m/Y', strtotime($et['data_limite']))) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php if (!empty($et['descricao'])): ?>
+                                <p class="text-gray-600 whitespace-pre-wrap"><?= htmlspecialchars($et['descricao']) ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($et['entregavel_esperado'])): ?>
+                                <p class="text-gray-700"><span class="font-medium">Entregável:</span> <?= htmlspecialchars($et['entregavel_esperado']) ?></p>
                             <?php endif; ?>
                         </li>
                     <?php endforeach; ?>
@@ -83,17 +103,24 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
             </div>
         <?php endif; ?>
 
-        <?php if ($rubrica): ?>
+        <?php if (!empty($projeto['briefing_entrega'])): ?>
             <div>
-                <h2 class="text-sm font-semibold text-gray-800 mb-2">Rubrica</h2>
-                <ul class="text-sm space-y-1">
-                    <?php foreach ($rubrica as $r): ?>
-                        <li class="flex justify-between gap-2 border-b border-gray-50 py-1">
-                            <span><?= htmlspecialchars($r['criterio'] ?? '') ?></span>
-                            <span class="text-gray-500"><?= htmlspecialchars((string) ($r['peso'] ?? 0)) ?>%</span>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
+                <h2 class="text-sm font-semibold text-gray-800 mb-1">Anotações do grupo</h2>
+                <p class="text-sm text-gray-700 whitespace-pre-wrap"><?= htmlspecialchars($projeto['briefing_entrega']) ?></p>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($projeto['educalabs_ativa']) || !empty($projeto['tudinha_ativa'])): ?>
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-2">Pesquisa e ideias</h2>
+                <div class="flex flex-wrap gap-2">
+                    <?php if (!empty($projeto['educalabs_ativa'])): ?>
+                        <a href="<?= URL ?>/educalabs/access" class="inline-flex px-3 py-1.5 rounded-lg bg-indigo-800 text-white text-sm font-semibold hover:bg-indigo-900">EducaLabs</a>
+                    <?php endif; ?>
+                    <?php if (!empty($projeto['tudinha_ativa'])): ?>
+                        <a href="<?= URL ?>/chat" class="inline-flex px-3 py-1.5 rounded-lg border border-indigo-800 text-indigo-800 text-sm font-semibold hover:bg-indigo-50">Tudinha</a>
+                    <?php endif; ?>
+                </div>
             </div>
         <?php endif; ?>
 

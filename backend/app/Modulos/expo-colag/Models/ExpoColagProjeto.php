@@ -135,7 +135,8 @@ class ExpoColagProjeto
             'modo_ingresso', 'exige_justificativa', 'lista_espera_ativa', 'publicar_em',
             'inscricoes_inicio', 'inscricoes_fim', 'data_inicio', 'data_fim', 'data_apresentacao',
             'briefing_entrega', 'formatos_aceitos', 'vale_nota', 'evento_avaliativo_id',
-            'tudinha_ativa', 'tudinha_contexto', 'custo_tudicoins', 'permite_solicitacao_recursos',
+            'tudinha_ativa', 'educalabs_ativa', 'tudinha_contexto', 'custo_tudicoins',
+            'materiais_necessarios', 'permite_solicitacao_recursos',
             'destaque', 'ativo', 'status', 'motivo_cancelamento',
         ];
         foreach ($permitidos as $campo) {

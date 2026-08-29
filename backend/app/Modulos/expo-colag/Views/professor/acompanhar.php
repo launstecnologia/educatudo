@@ -90,6 +90,28 @@ foreach ($atribuicoes as $a) {
         <?php if (!empty($projeto['descricao'])): ?>
             <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-700 whitespace-pre-line"><?= htmlspecialchars($projeto['descricao']) ?></div>
         <?php endif; ?>
+        <?php
+        $listaAlmoxAcomp = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+        if ($listaAlmoxAcomp): ?>
+            <div class="rounded-xl border border-gray-200 bg-white p-5">
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <h2 class="font-semibold text-gray-900">Materiais do almoxarifado</h2>
+                    <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
+                       target="_blank" rel="noopener"
+                       class="text-sm font-semibold text-indigo-800 hover:underline">Exportar PDF</a>
+                </div>
+                <ul class="text-sm space-y-1">
+                    <?php foreach ($listaAlmoxAcomp as $item): ?>
+                        <li>
+                            <?= htmlspecialchars($item['nome']) ?>
+                            <?php if ($item['quantidade'] !== ''): ?>
+                                <span class="text-gray-500"> · <?= htmlspecialchars($item['quantidade']) ?></span>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
         <?php if ($etapas): ?>
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <h2 class="font-semibold text-gray-900 mb-3">Etapas</h2>

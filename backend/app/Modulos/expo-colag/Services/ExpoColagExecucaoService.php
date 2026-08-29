@@ -376,17 +376,10 @@ class ExpoColagExecucaoService
             return ['success' => false, 'error' => 'Este stand não está mais ativo.', 'cancelado' => true];
         }
         $nomes = $this->standModel->primeirosNomesAprovados((int) $stand['projeto_id']);
-        $capa = $this->urlHttpSegura(
-            (string) ($stand['capa_url'] ?: ($stand['projeto_capa_url'] ?? ''))
-        );
-        // Permite também path relativo da plataforma (/storage/...)
-        if ($capa === null) {
-            $capaRel = trim((string) ($stand['capa_url'] ?: ($stand['projeto_capa_url'] ?? '')));
-            if ($capaRel !== '' && str_starts_with($capaRel, '/storage/')) {
-                $capa = (defined('URL') ? rtrim((string) URL, '/') : '') . $capaRel;
-            } elseif ($capaRel !== '' && preg_match('#^https?://#i', $capaRel)) {
-                $capa = $this->urlHttpSegura($capaRel);
-            }
+        $capaRaw = trim((string) ($stand['capa_url'] ?: ($stand['projeto_capa_url'] ?? '')));
+        $capa = ExpoColagService::resolverUrlCapa($capaRaw, (int) ($stand['projeto_id'] ?? 0));
+        if ($capa === '') {
+            $capa = null;
         }
         $resumo = trim((string) ($stand['resumo_publico'] ?? ''));
         if ($resumo === '') {

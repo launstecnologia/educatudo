@@ -277,14 +277,21 @@ class ExpoColagProfessorController extends BaseController
     public function salvar(): void
     {
         $user = $this->requireProfessor();
+        $wantsJson = $this->wantsJson();
+
+        $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && $contentLength > 0 && empty($_POST) && empty($_FILES)) {
+            $this->responderSalvar(false, 'A capa é grande demais para o servidor. Use JPG/PNG até 10 MB.', null, $wantsJson);
+            return;
+        }
+
         if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
-            $this->responderSalvar(false, 'Token de segurança inválido.', null, true);
+            $this->responderSalvar(false, 'Token de segurança inválido.', null, $wantsJson);
             return;
         }
 
         $capa = $_FILES['capa'] ?? null;
         $result = $this->service->salvarProjetoCompleto((int) $user['id'], $_POST, is_array($capa) ? $capa : null);
-        $wantsJson = $this->wantsJson();
 
         if (!$result['success']) {
             $this->responderSalvar(false, $result['error'] ?? 'Erro ao salvar.', null, $wantsJson);
@@ -297,14 +304,21 @@ class ExpoColagProfessorController extends BaseController
         if ($acao === 'publicar') {
             $pub = $this->service->publicarProjeto($id, (int) $user['id']);
             if (!$pub['success']) {
-                $this->responderSalvar(false, $pub['error'] ?? 'Salvo, mas não publicado.', $id, $wantsJson);
+                $this->responderSalvar(false, $pub['error'] ?? 'Salvo, mas não publicado.', $id, $wantsJson, null, $result);
                 return;
             }
-            $this->responderSalvar(true, 'Projeto publicado.', $id, $wantsJson, '/professor/expo-colag');
+            $this->responderSalvar(true, 'Projeto publicado.', $id, $wantsJson, '/professor/expo-colag', $result);
             return;
         }
 
-        $this->responderSalvar(true, 'Rascunho salvo.', $id, $wantsJson, '/professor/expo-colag/projetos/' . $id . '/editar');
+        $this->responderSalvar(
+            true,
+            'Rascunho salvo.',
+            $id,
+            $wantsJson,
+            '/professor/expo-colag/projetos/' . $id . '/editar',
+            $result
+        );
     }
 
     public function publicar($id): void
@@ -358,6 +372,63 @@ class ExpoColagProfessorController extends BaseController
         ]);
     }
 
+    public function materiaisPdf($id): void
+    {
+        $user = $this->requireProfessor();
+        $completo = $this->service->carregarProjetoCompleto((int) $id, (int) $user['id']);
+        if (!$completo['success']) {
+            $this->setFlashMessage($completo['error'] ?? 'Projeto não encontrado.', 'error');
+            $this->redirect('/professor/expo-colag');
+            return;
+        }
+
+        $projeto = $completo['projeto'];
+        $itens = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+        $escola = class_exists('LayoutHelper')
+            ? (string) LayoutHelper::getSystemTitle()
+            : 'Escola';
+
+        $viewFile = $this->resolveViewPath('professor/expo-colag/materiais_pdf');
+        if ($viewFile === null) {
+            $this->setFlashMessage('Modelo do PDF não encontrado.', 'error');
+            $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/editar');
+            return;
+        }
+
+        ob_start();
+        $geradoEm = date('d/m/Y H:i');
+        include $viewFile;
+        $html = (string) ob_get_clean();
+        $slug = preg_replace('/[^a-z0-9]+/i', '-', (string) ($projeto['titulo'] ?? 'projeto')) ?: 'projeto';
+        $this->enviarPdf($html, 'materiais-' . $slug . '-' . (int) $id . '.pdf');
+    }
+
+    private function enviarPdf(string $html, string $filename): void
+    {
+        $old = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        try {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', false);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            echo $dompdf->output();
+            exit;
+        } finally {
+            ini_set('display_errors', (string) $old);
+        }
+    }
+
     public function alunosTurma(): void
     {
         $this->requireProfessor();
@@ -402,7 +473,10 @@ class ExpoColagProfessorController extends BaseController
             || !empty($_POST['ajax']);
     }
 
-    private function responderSalvar(bool $ok, string $msg, ?int $id, bool $json, ?string $redirect = null): void
+    /**
+     * @param array<string, mixed>|null $extra
+     */
+    private function responderSalvar(bool $ok, string $msg, ?int $id, bool $json, ?string $redirect = null, ?array $extra = null): void
     {
         if ($json) {
             $this->jsonResponse([
@@ -410,6 +484,8 @@ class ExpoColagProfessorController extends BaseController
                 'message' => $msg,
                 'id' => $id,
                 'redirect' => $redirect,
+                'capa_url' => $extra['capa_url'] ?? null,
+                'capa_src' => $extra['capa_src'] ?? null,
             ], $ok ? 200 : 422);
         }
         $this->setFlashMessage($msg, $ok ? 'success' : 'error');

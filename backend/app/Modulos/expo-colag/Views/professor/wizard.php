@@ -1,21 +1,36 @@
 <?php
-$projeto = $projeto ?? null;
+$projeto = is_array($projeto ?? null) ? $projeto : [];
 $relacoes = $relacoes ?? [];
 $catalogos = $catalogos ?? [];
 $csrf_token = $csrf_token ?? '';
+$user = $user ?? [];
 $config = $catalogos['config_edicao'] ?? [];
 $materias = $catalogos['materias'] ?? [];
 $professores = $catalogos['professores'] ?? [];
 $series = $catalogos['series'] ?? [];
-$criteriosPadrao = $catalogos['criterios_banca_padrao'] ?? [];
 
 $pid = (int) ($projeto['id'] ?? 0);
 $status = (string) ($projeto['status'] ?? 'Rascunho');
+$profAtualId = (int) ($user['id'] ?? 0);
+$capaUrl = (string) ($projeto['capa_url'] ?? '');
+$capaSrc = (string) ($projeto['capa_src'] ?? ExpoColagService::resolverUrlCapa($capaUrl, $pid));
 
 $matConectadas = array_map('intval', array_column($relacoes['materias'] ?? [], 'materia_id'));
 $profParceiros = array_map('intval', array_column($relacoes['professores'] ?? [], 'professor_id'));
-$objetivosTxt = implode("\n", array_column($relacoes['objetivos'] ?? [], 'texto'));
+$objetivosLista = [];
+foreach ($relacoes['objetivos'] ?? [] as $o) {
+    $t = trim((string) ($o['texto'] ?? ''));
+    if ($t !== '') {
+        $objetivosLista[] = $t;
+    }
+}
+if ($objetivosLista === []) {
+    $objetivosLista = [''];
+}
+$conexoesLista = preg_split('/\s*[;\n,•·]+\s*/u', (string) ($projeto['conexoes_interdisciplinares'] ?? '')) ?: [];
+$conexoesLista = array_values(array_filter(array_map('trim', $conexoesLista), static fn ($v) => $v !== ''));
 $tiposTrabalho = array_column($relacoes['tipos_trabalho'] ?? [], 'tipo');
+$tiposOpcoes = ['Pesquisa', 'Experimentação', 'Protótipo', 'Maquete', 'Campanha', 'Documentário', 'Outro'];
 $visib = $relacoes['visibilidade'] ?? [];
 $visSeries = [];
 $visTurmas = [];
@@ -31,14 +46,12 @@ foreach ($visib as $v) {
 }
 
 $etapas = $relacoes['etapas'] ?? [];
-$encontros = $relacoes['encontros'] ?? [];
-$rubrica = $relacoes['rubrica'] ?? [];
-if ($rubrica === [] && $criteriosPadrao) {
-    $rubrica = $criteriosPadrao;
-}
 $papeis = $relacoes['papeis'] ?? [];
-$habilidades = $relacoes['habilidades'] ?? [];
 $materiais = $relacoes['materiais'] ?? [];
+$listaAlmox = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+if ($listaAlmox === []) {
+    $listaAlmox = [['nome' => '', 'quantidade' => '', 'observacao' => '']];
+}
 
 $inscIni = !empty($projeto['inscricoes_inicio']) ? substr($projeto['inscricoes_inicio'], 0, 10) : ($config['inscricoes_inicio'] ?? '');
 $inscFim = !empty($projeto['inscricoes_fim']) ? substr($projeto['inscricoes_fim'], 0, 10) : ($config['inscricoes_fim'] ?? '');
@@ -49,16 +62,8 @@ $steps = [
     ['n' => 3, 'label' => 'Formato', 'sub' => 'Participação'],
     ['n' => 4, 'label' => 'Visibilidade', 'sub' => 'Quem vê'],
     ['n' => 5, 'label' => 'Cronograma', 'sub' => 'Etapas'],
-    ['n' => 6, 'label' => 'Recursos', 'sub' => 'Tudinha'],
+    ['n' => 6, 'label' => 'Recursos', 'sub' => 'Materiais'],
 ];
-
-$formatos = [];
-if (!empty($projeto['formatos_aceitos'])) {
-    $decoded = is_string($projeto['formatos_aceitos'])
-        ? json_decode($projeto['formatos_aceitos'], true)
-        : $projeto['formatos_aceitos'];
-    $formatos = is_array($decoded) ? $decoded : [];
-}
 ?>
 <style>
 #expoWizard .step-nav-btn {
@@ -116,14 +121,21 @@ if (!empty($projeto['formatos_aceitos'])) {
     inset: auto !important;
     z-index: auto !important;
     margin-top: 2rem;
-    padding: 1.5rem 0 6rem;
+    padding: 1.5rem 7.5rem 6rem 0;
     border-top: 1px solid #e2e8f0;
     background: transparent !important;
     backdrop-filter: none !important;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: .75rem;
+}
+#expoWizard .wizard-actions .autosave-status {
+    margin-right: auto;
+    font-size: .75rem;
+    color: #64748b;
+    min-height: 1.25rem;
 }
 #expoWizard .wizard-actions .btn-nav {
     display: inline-flex;
@@ -135,15 +147,139 @@ if (!empty($projeto['formatos_aceitos'])) {
     color: #0f172a !important;
     font-size: .875rem;
     font-weight: 600;
+    text-decoration: none;
 }
 #expoWizard .wizard-actions .btn-nav:hover:not(:disabled) { background: #f1f5f9 !important; }
 #expoWizard .wizard-actions .btn-nav:disabled { opacity: .4; cursor: not-allowed; }
+#expoWizard .expo-chip {
+    display: inline-flex;
+    cursor: pointer;
+    margin: 0;
+}
+#expoWizard .expo-chip span {
+    display: inline-block;
+    padding: .4rem .75rem;
+    border-radius: .5rem;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #334155;
+    font-size: .8125rem;
+    line-height: 1.25;
+    transition: background .15s, color .15s, border-color .15s;
+}
+#expoWizard .expo-chip input:checked + span {
+    background: #1e3a8a;
+    border-color: #1e3a8a;
+    color: #ffffff;
+}
+#expoWizard .expo-chip input:focus-visible + span {
+    outline: 2px solid #1e3a8a;
+    outline-offset: 2px;
+}
+#expoWizard .capa-box {
+    position: relative;
+    border: 2px dashed #cbd5e1;
+    border-radius: .75rem;
+    overflow: hidden;
+    background: #f8fafc;
+    min-height: 10rem;
+}
+#expoWizard .proposta-card {
+    border: 1px solid #e2e8f0;
+    border-radius: .9rem;
+    background: #f8fafc;
+    padding: 1rem 1.1rem 1.15rem;
+}
+#expoWizard .proposta-card h3 {
+    font-size: .95rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+#expoWizard .proposta-card .hint {
+    font-size: .75rem;
+    color: #64748b;
+    margin: .2rem 0 .75rem;
+}
+#expoWizard .proposta-area {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: .65rem;
+    background: #ffffff;
+    padding: .85rem 1rem;
+    font-size: 1rem;
+    line-height: 1.65;
+    color: #1e293b;
+}
+#expoWizard .proposta-area:focus {
+    outline: 2px solid #1e3a8a;
+    outline-offset: 1px;
+    border-color: #1e3a8a;
+}
+#expoWizard .objetivo-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+#expoWizard .objetivo-num {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    background: #1e3a8a;
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#expoWizard .conexao-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .35rem .7rem;
+    border-radius: 9999px;
+    background: #eef2ff;
+    color: #1e3a8a;
+    font-size: .8125rem;
+    font-weight: 600;
+}
+#expoWizard .btn-subir-capa {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .5rem .9rem;
+    border-radius: .5rem;
+    background: #1e3a8a;
+    color: #ffffff;
+    font-size: .8125rem;
+    font-weight: 600;
+    border: 0;
+    white-space: nowrap;
+}
+#expoWizard .btn-subir-capa:hover:not(:disabled) { background: #1e40af; }
+#expoWizard .btn-subir-capa:disabled { opacity: .45; cursor: not-allowed; }
+#expoWizard .etapa-row .etapa-cab {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+}
+#expoWizard .etapa-row .etapa-titulo { flex: 1; min-width: 0; }
+#expoWizard .etapa-row .etapa-data { width: 10.5rem; flex-shrink: 0; }
+#expoWizard .etapa-row label.mini {
+    display: block;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 .35rem;
+}
 </style>
 <div class="mb-6 space-y-6" id="expoWizard"
      data-projeto-id="<?= $pid ?>"
      data-url-base="<?= htmlspecialchars(URL) ?>"
-     data-alunos-url="<?= htmlspecialchars(URL . '/professor/expo-colag/alunos-turma') ?>"
-     data-bncc-url="<?= htmlspecialchars(URL . '/professor/expo-colag/bncc') ?>">
+     data-alunos-url="<?= htmlspecialchars(URL . '/professor/expo-colag/alunos-turma') ?>">
 
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-center gap-3">
@@ -152,7 +288,7 @@ if (!empty($projeto['formatos_aceitos'])) {
             </a>
             <div>
                 <h2 class="text-2xl font-bold text-gray-900"><?= $pid ? 'Editar projeto' : 'Criar projeto' ?></h2>
-                <p class="text-sm text-gray-600">Expo Colag · rascunho persistente em 6 blocos</p>
+                <p class="text-sm text-gray-600">Expo Colag · alterações salvas automaticamente</p>
             </div>
         </div>
         <span class="inline-flex px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-700">
@@ -186,10 +322,11 @@ if (!empty($projeto['formatos_aceitos'])) {
         <input type="hidden" name="visibilidade" id="campoVisibilidade" value="">
         <input type="hidden" name="papeis" id="campoPapeis" value="">
         <input type="hidden" name="etapas" id="campoEtapas" value="">
-        <input type="hidden" name="encontros" id="campoEncontros" value="">
-        <input type="hidden" name="rubrica" id="campoRubrica" value="">
         <input type="hidden" name="materiais" id="campoMateriais" value="">
-        <input type="hidden" name="habilidades" id="campoHabilidades" value="">
+        <input type="hidden" name="materiais_necessarios" id="campoMateriaisNecessarios" value="">
+        <input type="hidden" name="objetivos" id="campoObjetivos" value="">
+        <input type="hidden" name="conexoes_interdisciplinares" id="campoConexoes" value="">
+        <input type="hidden" name="habilidades" id="campoHabilidades" value="[]">
 
         <!-- Bloco 1 -->
         <section data-step="1" class="wizard-step rounded-xl border border-gray-200 bg-white p-6 space-y-4">
@@ -223,80 +360,119 @@ if (!empty($projeto['formatos_aceitos'])) {
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Capa (JPG/PNG/WebP)</label>
-                    <input type="file" name="capa" accept="image/jpeg,image/png,image/webp"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">
-                    <?php if (!empty($projeto['capa_url'])): ?>
-                        <p class="text-xs text-gray-500 mt-1">Atual: <a href="<?= htmlspecialchars($projeto['capa_url']) ?>" target="_blank" class="text-primary">ver capa</a></p>
-                        <input type="hidden" name="capa_url" value="<?= htmlspecialchars($projeto['capa_url']) ?>">
-                    <?php endif; ?>
+                    <div class="capa-box mb-2">
+                        <img id="capaPreview" src="<?= $capaSrc !== '' ? htmlspecialchars($capaSrc) : '' ?>" alt="Prévia da capa"
+                             class="w-full h-40 object-cover <?= $capaSrc !== '' ? '' : 'hidden' ?>">
+                        <div id="capaPlaceholder" class="<?= $capaSrc !== '' ? 'hidden' : '' ?> flex flex-col items-center justify-center h-40 px-4 text-center text-sm text-gray-500">
+                            <span>Nenhuma capa ainda</span>
+                            <span class="text-xs mt-1">Escolha o arquivo e clique em Subir capa</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="file" name="capa" id="campoCapa" accept="image/jpeg,image/png,image/webp,image/jpg"
+                               class="min-w-0 flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                        <button type="button" id="btnSubirCapa" class="btn-subir-capa" disabled>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/>
+                            </svg>
+                            <span class="btn-subir-label">Subir capa</span>
+                        </button>
+                    </div>
+                    <p id="capaStatus" class="hidden text-sm mt-2 rounded-lg px-3 py-2" role="status"></p>
+                    <p class="text-xs text-gray-500 mt-1">Até 10 MB. JPG, PNG ou WebP. Fotos grandes são compactadas automaticamente.</p>
+                    <input type="hidden" name="capa_url" id="campoCapaUrl" value="<?= htmlspecialchars($capaUrl) ?>">
                 </div>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Matérias conectadas</label>
-                <select name="materias_conectadas[]" multiple size="5" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                <input type="search" id="filtroMaterias" placeholder="Buscar matéria…" autocomplete="off"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm mb-2">
+                <div id="listaMateriasChips" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-0.5">
                     <?php foreach ($materias as $m): ?>
-                        <option value="<?= (int) $m['id'] ?>" <?= in_array((int) $m['id'], $matConectadas, true) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($m['nome']) ?>
-                        </option>
+                        <label class="expo-chip" data-nome="<?= htmlspecialchars(mb_strtolower((string) $m['nome'])) ?>">
+                            <input type="checkbox" name="materias_conectadas[]" value="<?= (int) $m['id'] ?>" class="sr-only"
+                                   <?= in_array((int) $m['id'], $matConectadas, true) ? 'checked' : '' ?>>
+                            <span><?= htmlspecialchars($m['nome']) ?></span>
+                        </label>
                     <?php endforeach; ?>
-                </select>
-                <p class="text-xs text-gray-500 mt-1">Segure Ctrl/Cmd para selecionar várias.</p>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Toque nas caixinhas para selecionar várias.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Professores parceiros</label>
-                <select name="professores_parceiros[]" multiple size="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                <input type="search" id="filtroProfessores" placeholder="Buscar professor…" autocomplete="off"
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm mb-2">
+                <div id="listaProfsChips" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-0.5">
                     <?php foreach ($professores as $p): ?>
-                        <option value="<?= (int) $p['id'] ?>" <?= in_array((int) $p['id'], $profParceiros, true) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($p['nome']) ?>
-                        </option>
+                        <?php if ((int) $p['id'] === $profAtualId) continue; ?>
+                        <label class="expo-chip" data-nome="<?= htmlspecialchars(mb_strtolower((string) $p['nome'])) ?>">
+                            <input type="checkbox" name="professores_parceiros[]" value="<?= (int) $p['id'] ?>" class="sr-only"
+                                   <?= in_array((int) $p['id'], $profParceiros, true) ? 'checked' : '' ?>>
+                            <span><?= htmlspecialchars($p['nome']) ?></span>
+                        </label>
                     <?php endforeach; ?>
-                </select>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Toque nas caixinhas para selecionar os parceiros.</p>
             </div>
         </section>
 
         <!-- Bloco 2 -->
         <section data-step="2" class="wizard-step hidden rounded-xl border border-gray-200 bg-white p-6 space-y-4">
-            <h2 class="text-lg font-semibold text-gray-900">2. Proposta pedagógica</h2>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
-                <textarea name="descricao" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['descricao'] ?? '') ?></textarea>
+                <h2 class="text-lg font-semibold text-gray-900">2. Proposta pedagógica</h2>
+                <p class="text-sm text-gray-500 mt-0.5">O que é o projeto, o que vai para a Expo e os objetivos.</p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Contexto prático</label>
-                    <textarea name="contexto_pratico" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['contexto_pratico'] ?? '') ?></textarea>
+
+            <div class="proposta-card">
+                <h3>Sobre o projeto *</h3>
+                <p class="hint">Conte a ideia em linguagem simples. Evite jargão — o aluno lê isso no mural.</p>
+                <textarea name="descricao" rows="5" class="proposta-area" placeholder="Ex.: Vamos investigar a qualidade da água do córrego e mostrar o que isso revela sobre o aquífero…"><?= htmlspecialchars($projeto['descricao'] ?? '') ?></textarea>
+            </div>
+
+            <div class="proposta-card">
+                <h3>O que apresentaremos</h3>
+                <p class="hint">Marque o tipo de trabalho e descreva os detalhes (stand, experimento, vídeo…).</p>
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <?php foreach ($tiposOpcoes as $tipo): ?>
+                        <label class="expo-chip">
+                            <input type="checkbox" name="tipos_trabalho[]" value="<?= htmlspecialchars($tipo) ?>" class="sr-only"
+                                   <?= in_array($tipo, $tiposTrabalho, true) ? 'checked' : '' ?>>
+                            <span><?= htmlspecialchars($tipo) ?></span>
+                        </label>
+                    <?php endforeach; ?>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Produto esperado</label>
-                    <textarea name="produto_esperado" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['produto_esperado'] ?? '') ?></textarea>
+                <textarea name="produto_esperado" rows="3" class="proposta-area" placeholder="Ex.: Stand com aquário de bioindicadores, mapa do aquífero e um infográfico com os resultados…"><?= htmlspecialchars($projeto['produto_esperado'] ?? '') ?></textarea>
+            </div>
+
+            <div class="proposta-card">
+                <div class="flex items-center justify-between gap-2 mb-1">
+                    <h3>Objetivos</h3>
+                    <button type="button" id="btnAddObjetivo" class="text-sm font-semibold text-indigo-800 hover:underline">+ Objetivo</button>
+                </div>
+                <p class="hint">Um objetivo por linha. Use frases curtas, no infinitivo (investigar, construir, comunicar…).</p>
+                <div id="listaObjetivos" class="space-y-2">
+                    <?php foreach ($objetivosLista as $i => $objTexto): ?>
+                        <div class="objetivo-row">
+                            <span class="objetivo-num"><?= (int) $i + 1 ?></span>
+                            <input type="text" class="objetivo-texto flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($objTexto) ?>" placeholder="Ex.: Identificar bioindicadores no córrego">
+                            <button type="button" class="objetivo-remove text-gray-400 hover:text-red-600 px-1" aria-label="Remover objetivo">&times;</button>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Objetivos (um por linha)</label>
-                <textarea name="objetivos" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($objetivosTxt) ?></textarea>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Conexões interdisciplinares</label>
-                    <textarea name="conexoes_interdisciplinares" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['conexoes_interdisciplinares'] ?? '') ?></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Pré-requisitos</label>
-                    <textarea name="pre_requisitos" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['pre_requisitos'] ?? '') ?></textarea>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Habilidades BNCC</label>
+
+            <div class="proposta-card">
+                <h3>Conexões interdisciplinares</h3>
+                <p class="hint">Digite e pressione Enter para adicionar (ex.: Química, Geografia, Matemática).</p>
                 <div class="flex gap-2 mb-2">
-                    <input type="text" id="bnccBusca" placeholder="Buscar código ou descrição…" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">
-                    <button type="button" id="btnBnccBusca" class="px-3 py-2 rounded-lg bg-gray-100 text-sm font-medium hover:bg-gray-200">Buscar</button>
+                    <input type="text" id="conexaoInput" maxlength="80" placeholder="Adicionar conexão…" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">
+                    <button type="button" id="btnAddConexao" class="px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm font-medium hover:bg-gray-50">Adicionar</button>
                 </div>
-                <div id="bnccResultados" class="text-sm space-y-1 mb-2 max-h-32 overflow-y-auto"></div>
-                <div id="bnccSelecionadas" class="flex flex-wrap gap-2">
-                    <?php foreach ($habilidades as $h): ?>
-                        <span class="bncc-chip inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-50 text-indigo-800 text-xs" data-codigo="<?= htmlspecialchars($h['codigo_habilidade']) ?>" data-hid="<?= (int) ($h['habilidade_id'] ?? 0) ?>">
-                            <?= htmlspecialchars($h['codigo_habilidade']) ?>
-                            <button type="button" class="bncc-remove font-bold">&times;</button>
+                <div id="listaConexoes" class="flex flex-wrap gap-2 min-h-[1.75rem]">
+                    <?php foreach ($conexoesLista as $cx): ?>
+                        <span class="conexao-chip">
+                            <?= htmlspecialchars($cx) ?>
+                            <button type="button" class="conexao-remove font-bold leading-none" aria-label="Remover">&times;</button>
                         </span>
                     <?php endforeach; ?>
                 </div>
@@ -326,11 +502,6 @@ if (!empty($projeto['formatos_aceitos'])) {
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tamanho do grupo</label>
-                    <input type="number" name="tamanho_grupo" min="1" value="<?= (int) ($projeto['tamanho_grupo'] ?? 0) ?: '' ?>"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
-                </div>
-                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Modo de ingresso</label>
                     <select name="modo_ingresso" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
                         <?php foreach (['Livre' => 'Livre', 'Com_aprovacao' => 'Com aprovação', 'Convite_direto' => 'Convite direto'] as $val => $lab): ?>
@@ -340,20 +511,7 @@ if (!empty($projeto['formatos_aceitos'])) {
                 </div>
             </div>
             <div class="flex flex-wrap gap-4 text-sm">
-                <label class="inline-flex items-center gap-2"><input type="checkbox" name="exige_justificativa" value="1" <?= !empty($projeto['exige_justificativa']) ? 'checked' : '' ?>> Exige justificativa</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" name="lista_espera_ativa" value="1" <?= ($projeto['lista_espera_ativa'] ?? 1) ? 'checked' : '' ?>> Lista de espera</label>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tipos de trabalho</label>
-                <?php
-                $tiposOpcoes = ['Pesquisa', 'Experimentação', 'Protótipo', 'Maquete', 'Campanha', 'Documentário', 'Outro'];
-                foreach ($tiposOpcoes as $tipo):
-                ?>
-                    <label class="inline-flex items-center gap-2 mr-4 mb-2 text-sm">
-                        <input type="checkbox" name="tipos_trabalho[]" value="<?= htmlspecialchars($tipo) ?>" <?= in_array($tipo, $tiposTrabalho, true) ? 'checked' : '' ?>>
-                        <?= htmlspecialchars($tipo) ?>
-                    </label>
-                <?php endforeach; ?>
             </div>
             <div id="blocoPapeis" class="<?= ($projeto['modalidade'] ?? '') === 'Grupo_com_papeis' ? '' : 'hidden' ?>">
                 <div class="flex items-center justify-between mb-2">
@@ -384,10 +542,23 @@ if (!empty($projeto['formatos_aceitos'])) {
             <p class="text-sm text-gray-600">Marque séries e/ou turmas. Opcionalmente refine por aluno.</p>
             <div id="arvoreVisibilidade" class="space-y-3 max-h-80 overflow-y-auto border border-gray-100 rounded-lg p-3">
                 <?php foreach ($series as $serie): ?>
-                    <?php $sid = (int) ($serie['referencia_id'] ?? $serie['id'] ?? 0); ?>
+                    <?php
+                    $sid = (int) ($serie['referencia_id'] ?? $serie['id'] ?? 0);
+                    $sids = array_map('intval', $serie['referencia_ids'] ?? ($sid > 0 ? [$sid] : []));
+                    $serieMarcada = $sid > 0 && in_array($sid, $visSeries, true);
+                    foreach ($sids as $one) {
+                        if ($one > 0 && in_array($one, $visSeries, true)) {
+                            $serieMarcada = true;
+                            break;
+                        }
+                    }
+                    ?>
                     <div class="serie-block">
                         <label class="inline-flex items-center gap-2 font-medium text-sm text-gray-800">
-                            <input type="checkbox" class="vis-serie" data-serie-id="<?= $sid ?>" <?= in_array($sid, $visSeries, true) ? 'checked' : '' ?>>
+                            <input type="checkbox" class="vis-serie"
+                                   data-serie-id="<?= $sid ?>"
+                                   data-serie-ids="<?= htmlspecialchars(implode(',', $sids)) ?>"
+                                   <?= $serieMarcada ? 'checked' : '' ?>>
                             <?= htmlspecialchars($serie['nome'] ?? 'Série') ?>
                         </label>
                         <div class="ml-6 mt-1 space-y-1">
@@ -441,64 +612,44 @@ if (!empty($projeto['formatos_aceitos'])) {
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
                 </div>
             </div>
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-gray-700">Etapas</label>
-                    <button type="button" id="btnAddEtapa" class="text-sm text-primary font-medium">+ Etapa</button>
+
+            <div class="proposta-card">
+                <div class="flex items-center justify-between gap-2 mb-1">
+                    <h3>Etapas</h3>
+                    <button type="button" id="btnAddEtapa" class="btn-subir-capa">+ Etapa</button>
                 </div>
+                <p class="hint">Uma etapa por bloco. Descreva o que o grupo faz e o que deve entregar até a data.</p>
                 <div id="listaEtapas" class="space-y-3">
                     <?php
                     $etapasRender = $etapas !== [] ? $etapas : [['titulo' => '', 'data_limite' => '', 'descricao' => '', 'entregavel_esperado' => '']];
-                    foreach ($etapasRender as $et):
+                    foreach ($etapasRender as $i => $et):
                     ?>
-                    <div class="etapa-row grid grid-cols-1 sm:grid-cols-2 gap-2 border border-gray-100 rounded-lg p-3">
-                        <input type="text" class="etapa-titulo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Título da etapa" value="<?= htmlspecialchars($et['titulo'] ?? '') ?>">
-                        <input type="date" class="etapa-data border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($et['data_limite'] ?? '') ?>">
-                        <input type="text" class="etapa-desc border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm sm:col-span-2" placeholder="Descrição" value="<?= htmlspecialchars($et['descricao'] ?? '') ?>">
-                        <input type="text" class="etapa-entregavel border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm sm:col-span-2" placeholder="Entregável esperado" value="<?= htmlspecialchars($et['entregavel_esperado'] ?? '') ?>">
+                    <div class="etapa-row rounded-xl border border-slate-200 bg-white p-3 space-y-3">
+                        <div class="etapa-cab">
+                            <span class="objetivo-num etapa-num"><?= (int) $i + 1 ?></span>
+                            <input type="text" class="etapa-titulo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Título da etapa" value="<?= htmlspecialchars($et['titulo'] ?? '') ?>">
+                            <input type="date" class="etapa-data border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($et['data_limite'] ?? '') ?>">
+                            <button type="button" class="etapa-remove text-gray-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Remover etapa">&times;</button>
+                        </div>
+                        <div>
+                            <label class="mini">Descrição</label>
+                            <textarea class="etapa-desc proposta-area" rows="3" placeholder="O que acontece nesta etapa? Quem faz o quê?"><?= htmlspecialchars($et['descricao'] ?? '') ?></textarea>
+                        </div>
+                        <div>
+                            <label class="mini">Entregável esperado</label>
+                            <textarea class="etapa-entregavel proposta-area" rows="2" placeholder="O que o grupo deve entregar ao final desta etapa?"><?= htmlspecialchars($et['entregavel_esperado'] ?? '') ?></textarea>
+                        </div>
                     </div>
                     <?php endforeach; ?>
                 </div>
             </div>
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-gray-700">Encontros</label>
-                    <button type="button" id="btnAddEncontro" class="text-sm text-primary font-medium">+ Encontro</button>
-                </div>
-                <div id="listaEncontros" class="space-y-2">
-                    <?php foreach ($encontros as $en): ?>
-                    <div class="encontro-row grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input type="text" class="encontro-rotulo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($en['rotulo'] ?? '') ?>" placeholder="Rótulo">
-                        <input type="datetime-local" class="encontro-data border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= !empty($en['data_hora']) ? htmlspecialchars(str_replace(' ', 'T', substr($en['data_hora'], 0, 16))) : '' ?>">
-                        <input type="url" class="encontro-link border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($en['link'] ?? '') ?>" placeholder="Link (opcional)">
-                    </div>
-                    <?php endforeach; ?>
-                </div>
+
+            <div class="proposta-card">
+                <h3>Anotações do grupo</h3>
+                <p class="hint">Cronograma de entrega das etapas e decisões tomadas nas reuniões.</p>
+                <textarea name="briefing_entrega" rows="5" class="proposta-area" placeholder="Ex.: 12/09 — definição do tema; 20/09 — rascunho do infográfico. Reunião 15/09: o stand terá aquário e mapa do aquífero."><?= htmlspecialchars($projeto['briefing_entrega'] ?? '') ?></textarea>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Briefing de entrega</label>
-                <textarea name="briefing_entrega" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['briefing_entrega'] ?? '') ?></textarea>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Formatos aceitos (separados por vírgula)</label>
-                <input type="text" name="formatos_aceitos" value="<?= htmlspecialchars(implode(', ', $formatos)) ?>"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white" placeholder="PDF, vídeo, link, maquete…">
-            </div>
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-gray-700">Rubrica</label>
-                    <button type="button" id="btnAddCriterio" class="text-sm text-primary font-medium">+ Critério</button>
-                </div>
-                <div id="listaRubrica" class="space-y-2">
-                    <?php foreach ($rubrica as $r): ?>
-                    <div class="rubrica-row grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input type="text" class="rubrica-criterio border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($r['criterio'] ?? '') ?>" placeholder="Critério">
-                        <input type="number" class="rubrica-peso border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" step="0.01" value="<?= htmlspecialchars((string) ($r['peso'] ?? 0)) ?>" placeholder="Peso %">
-                        <input type="text" class="rubrica-desc border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="<?= htmlspecialchars($r['descricao'] ?? '') ?>" placeholder="Descrição">
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
+
             <label class="inline-flex items-center gap-2 text-sm">
                 <input type="checkbox" name="vale_nota" value="1" <?= !empty($projeto['vale_nota']) ? 'checked' : '' ?>> Vale nota
             </label>
@@ -507,10 +658,57 @@ if (!empty($projeto['formatos_aceitos'])) {
         <!-- Bloco 6 -->
         <section data-step="6" class="wizard-step hidden rounded-xl border border-gray-200 bg-white p-6 space-y-4">
             <h2 class="text-lg font-semibold text-gray-900">6. Recursos</h2>
+
+            <div class="proposta-card">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                    <h3>Materiais do almoxarifado</h3>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="btnAddAlmox" class="text-sm font-semibold text-indigo-800 hover:underline">+ Item</button>
+                        <button type="button" id="btnPdfMateriais" class="btn-subir-capa">Exportar PDF</button>
+                    </div>
+                </div>
+                <p class="hint">Cola, cartolina, placa de isopor… A coordenação autoriza no PDF e o professor retira no almoxarifado.</p>
+                <div id="listaAlmox" class="space-y-2">
+                    <?php foreach ($listaAlmox as $item): ?>
+                    <div class="almox-row grid grid-cols-1 sm:grid-cols-12 gap-2">
+                        <input type="text" class="almox-nome sm:col-span-6 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Material (ex.: cola branca)" value="<?= htmlspecialchars($item['nome'] ?? '') ?>">
+                        <input type="text" class="almox-qtd sm:col-span-2 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Qtd." value="<?= htmlspecialchars($item['quantidade'] ?? '') ?>">
+                        <input type="text" class="almox-obs sm:col-span-3 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Observação" value="<?= htmlspecialchars($item['observacao'] ?? '') ?>">
+                        <button type="button" class="almox-remove sm:col-span-1 text-gray-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Remover item">&times;</button>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="proposta-card">
+                <h3>Pesquisa e ideias</h3>
+                <p class="hint">Libere as ferramentas para o grupo pesquisar e desenvolver ideias neste projeto.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 cursor-pointer">
+                        <input type="checkbox" name="educalabs_ativa" value="1" class="mt-1" <?= !empty($projeto['educalabs_ativa']) ? 'checked' : '' ?>>
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900">EducaLabs</span>
+                            <span class="block text-xs text-gray-500 mt-0.5">Pesquisa, experimentos e protótipos digitais.</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 cursor-pointer">
+                        <input type="checkbox" name="tudinha_ativa" value="1" class="mt-1" <?= !empty($projeto['tudinha_ativa']) ? 'checked' : '' ?>>
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900">Tudinha</span>
+                            <span class="block text-xs text-gray-500 mt-0.5">Chat para tirar dúvidas e gerar ideias.</span>
+                        </span>
+                    </label>
+                </div>
+                <p class="hint mt-3 mb-0">
+                    <a href="<?= htmlspecialchars(URL) ?>/professor/ai-agents" target="_blank" rel="noopener" class="font-semibold text-indigo-800 hover:underline">Abrir EducaProf</a>
+                    para idear o projeto enquanto você monta esta ficha.
+                </p>
+            </div>
+
             <div>
                 <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-gray-700">Materiais / links iniciais</label>
-                    <button type="button" id="btnAddMaterial" class="text-sm text-primary font-medium">+ Material</button>
+                    <label class="text-sm font-medium text-gray-700">Links e referências</label>
+                    <button type="button" id="btnAddMaterial" class="text-sm font-semibold text-indigo-800 hover:underline">+ Link</button>
                 </div>
                 <div id="listaMateriais" class="space-y-2">
                     <?php foreach ($materiais as $mat): ?>
@@ -526,19 +724,9 @@ if (!empty($projeto['formatos_aceitos'])) {
                 </div>
             </div>
             <div class="flex flex-wrap gap-4 text-sm">
-                <label class="inline-flex items-center gap-2"><input type="checkbox" name="tudinha_ativa" value="1" <?= !empty($projeto['tudinha_ativa']) ? 'checked' : '' ?>> Tudinha ativa neste projeto</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" name="permite_solicitacao_recursos" value="1" <?= ($projeto['permite_solicitacao_recursos'] ?? 1) ? 'checked' : '' ?>> Permitir solicitação de recursos</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" name="destaque" value="1" <?= !empty($projeto['destaque']) ? 'checked' : '' ?>> Destacar no mural</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" name="ativo" value="1" <?= ($projeto['ativo'] ?? 1) ? 'checked' : '' ?>> Ativo</label>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Contexto da Tudinha</label>
-                <textarea name="tudinha_contexto" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"><?= htmlspecialchars($projeto['tudinha_contexto'] ?? '') ?></textarea>
-            </div>
-            <div class="max-w-xs">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Custo TudiCoins</label>
-                <input type="number" name="custo_tudicoins" min="0" step="0.01" value="<?= htmlspecialchars((string) ($projeto['custo_tudicoins'] ?? '0')) ?>"
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
             </div>
         </section>
 
@@ -546,14 +734,13 @@ if (!empty($projeto['formatos_aceitos'])) {
     </form>
 
     <div class="wizard-actions" id="expoWizardActions">
+        <p id="autosaveStatus" class="autosave-status" aria-live="polite"></p>
         <button type="button" id="btnPrev" class="btn-nav" disabled>Anterior</button>
         <button type="button" id="btnNext" class="btn-nav">Próximo</button>
-        <div class="flex-1 min-w-[1rem]"></div>
-        <button type="submit" form="expoWizardForm" data-acao="rascunho" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm mr-28 sm:mr-32">Salvar rascunho</button>
-        <?php if ($pid > 0): ?>
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="btn-nav no-underline">Pré-visualizar</a>
-        <?php endif; ?>
-        <button type="submit" form="expoWizardForm" data-acao="publicar" class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Publicar</button>
+        <a id="btnPreview" href="<?= $pid > 0 ? htmlspecialchars(URL . '/professor/expo-colag/projetos/' . $pid . '/preview') : '#' ?>"
+           class="btn-nav hidden">Pré-visualizar</a>
+        <button type="submit" form="expoWizardForm" id="btnPublicar" data-acao="publicar"
+                class="hidden px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Publicar</button>
     </div>
 </div>
 
@@ -566,6 +753,10 @@ if (!empty($projeto['formatos_aceitos'])) {
     var form = document.getElementById('expoWizardForm');
     var alunosSeed = [];
     try { alunosSeed = JSON.parse(document.getElementById('visAlunosSeed').textContent || '[]'); } catch (e) {}
+    var capaPendente = null;
+    var autosaveTimer = null;
+    var salvando = false;
+    var savePendente = false;
 
     function showStep(n) {
         step = Math.max(1, Math.min(maxStep, n));
@@ -587,17 +778,182 @@ if (!empty($projeto['formatos_aceitos'])) {
                 btn.style.removeProperty('color');
             }
         });
+        var ultima = step === maxStep;
         document.getElementById('btnPrev').disabled = step === 1;
-        document.getElementById('btnNext').disabled = step === maxStep;
+        document.getElementById('btnNext').classList.toggle('hidden', ultima);
+        document.getElementById('btnPublicar').classList.toggle('hidden', !ultima);
+        var prev = document.getElementById('btnPreview');
+        var pidAtual = parseInt((form.querySelector('[name="projeto_id"]') || {}).value || '0', 10) || 0;
+        prev.classList.toggle('hidden', !ultima || pidAtual <= 0);
+    }
+
+    function irParaEtapa(n) {
+        flushAutosave();
+        showStep(n);
     }
 
     root.querySelectorAll('.step-nav-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            showStep(parseInt(btn.getAttribute('data-step-target'), 10));
+            irParaEtapa(parseInt(btn.getAttribute('data-step-target'), 10));
         });
     });
-    document.getElementById('btnPrev').addEventListener('click', function () { showStep(step - 1); });
-    document.getElementById('btnNext').addEventListener('click', function () { showStep(step + 1); });
+    document.getElementById('btnPrev').addEventListener('click', function () { irParaEtapa(step - 1); });
+    document.getElementById('btnNext').addEventListener('click', function () { irParaEtapa(step + 1); });
+
+    function filtrarChips(inputId, listId) {
+        var input = document.getElementById(inputId);
+        var list = document.getElementById(listId);
+        if (!input || !list) return;
+        input.addEventListener('input', function () {
+            var q = (input.value || '').toLowerCase().trim();
+            list.querySelectorAll('.expo-chip').forEach(function (lab) {
+                var nome = lab.getAttribute('data-nome') || '';
+                lab.classList.toggle('hidden', q !== '' && nome.indexOf(q) === -1);
+            });
+        });
+    }
+    filtrarChips('filtroMaterias', 'listaMateriasChips');
+    filtrarChips('filtroProfessores', 'listaProfsChips');
+
+    function mostrarCapaPreview(src) {
+        var img = document.getElementById('capaPreview');
+        var ph = document.getElementById('capaPlaceholder');
+        if (!img) return;
+        if (src) {
+            img.src = src;
+            img.classList.remove('hidden');
+            if (ph) ph.classList.add('hidden');
+        } else {
+            img.removeAttribute('src');
+            img.classList.add('hidden');
+            if (ph) ph.classList.remove('hidden');
+        }
+    }
+
+    function compactarCapa(file) {
+        var maxBytes = 10 * 1024 * 1024;
+        var okTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+        if (okTypes.indexOf(file.type) === -1) {
+            return Promise.reject(new Error('Use JPG, PNG ou WebP.'));
+        }
+        if (file.size <= 1.5 * 1024 * 1024) {
+            return Promise.resolve(file);
+        }
+        return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload = function () {
+                var w = img.naturalWidth || img.width;
+                var h = img.naturalHeight || img.height;
+                var maxDim = 1920;
+                var scale = Math.min(maxDim / w, maxDim / h, 1);
+                w = Math.max(1, Math.round(w * scale));
+                h = Math.max(1, Math.round(h * scale));
+                var canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                URL.revokeObjectURL(url);
+                var quality = 0.82;
+                function blobToFile(blob) {
+                    if (!blob) {
+                        reject(new Error('Não foi possível compactar a capa.'));
+                        return;
+                    }
+                    if (blob.size > maxBytes && quality > 0.55) {
+                        quality -= 0.12;
+                        canvas.toBlob(blobToFile, 'image/jpeg', quality);
+                        return;
+                    }
+                    if (blob.size > maxBytes) {
+                        reject(new Error('A capa ainda está acima de 10 MB após compactar.'));
+                        return;
+                    }
+                    resolve(new File([blob], (file.name || 'capa').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }));
+                }
+                canvas.toBlob(blobToFile, 'image/jpeg', quality);
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                reject(new Error('Não foi possível ler a imagem da capa.'));
+            };
+            img.src = url;
+        });
+    }
+
+    var campoCapa = document.getElementById('campoCapa');
+    var btnSubirCapa = document.getElementById('btnSubirCapa');
+    var capaObjectUrl = null;
+
+    function setBotaoCapa(habilitado, texto) {
+        if (!btnSubirCapa) return;
+        btnSubirCapa.disabled = !habilitado;
+        var label = btnSubirCapa.querySelector('span.btn-subir-label');
+        if (!label) {
+            var nodes = btnSubirCapa.childNodes;
+            for (var i = 0; i < nodes.length; i++) {
+                if (nodes[i].nodeType === 3 && nodes[i].textContent.trim()) {
+                    nodes[i].textContent = ' ' + (texto || 'Subir capa');
+                    return;
+                }
+            }
+            return;
+        }
+        label.textContent = texto || 'Subir capa';
+    }
+
+    function mostrarCapaStatus(tipo, texto) {
+        var el = document.getElementById('capaStatus');
+        if (!el) return;
+        el.classList.remove('hidden');
+        var cls = 'text-sm mt-2 rounded-lg px-3 py-2 border ';
+        if (tipo === 'ok') cls += 'bg-emerald-50 text-emerald-800 border-emerald-200';
+        else if (tipo === 'info') cls += 'bg-sky-50 text-sky-800 border-sky-200';
+        else cls += 'bg-red-50 text-red-800 border-red-200';
+        el.className = cls;
+        el.textContent = (tipo === 'ok' ? '✓ ' : '') + (texto || '');
+    }
+
+    if (campoCapa) {
+        campoCapa.addEventListener('change', function () {
+            var file = campoCapa.files && campoCapa.files[0];
+            if (!file) {
+                capaPendente = null;
+                setBotaoCapa(false, 'Subir capa');
+                return;
+            }
+            mostrarCapaStatus('info', 'Preparando imagem…');
+            compactarCapa(file).then(function (compactado) {
+                capaPendente = compactado;
+                if (capaObjectUrl) URL.revokeObjectURL(capaObjectUrl);
+                capaObjectUrl = URL.createObjectURL(compactado);
+                mostrarCapaPreview(capaObjectUrl);
+                setBotaoCapa(true, 'Subir capa');
+                mostrarCapaStatus('info', 'Arquivo pronto. Clique em Subir capa.');
+            }).catch(function (err) {
+                capaPendente = null;
+                campoCapa.value = '';
+                setBotaoCapa(false, 'Subir capa');
+                mostrarCapaStatus('erro', err.message || 'Falha ao processar a capa.');
+            });
+        });
+    }
+    if (btnSubirCapa) {
+        btnSubirCapa.addEventListener('click', function () {
+            if (!capaPendente) {
+                mostrarCapaStatus('erro', 'Escolha um arquivo primeiro.');
+                return;
+            }
+            if (!tituloPreenchido()) {
+                mostrarCapaStatus('erro', 'Preencha o título antes de enviar a capa.');
+                return;
+            }
+            setBotaoCapa(false, 'Enviando…');
+            mostrarCapaStatus('info', 'Enviando capa…');
+            salvar({ silencioso: true, capa: true });
+        });
+    }
 
     document.getElementById('campoModalidade').addEventListener('change', function () {
         document.getElementById('blocoPapeis').classList.toggle('hidden', this.value !== 'Grupo_com_papeis');
@@ -616,34 +972,60 @@ if (!empty($projeto['formatos_aceitos'])) {
     function addEtapa(data) {
         data = data || {};
         var wrap = document.getElementById('listaEtapas');
+        if (!wrap) return;
         var div = document.createElement('div');
-        div.className = 'etapa-row grid grid-cols-1 sm:grid-cols-2 gap-2 border border-gray-100 rounded-lg p-3';
-        div.innerHTML = '<input type="text" class="etapa-titulo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Título da etapa" value="' + (data.titulo || '') + '">' +
-            '<input type="date" class="etapa-data border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" value="' + (data.data_limite || '') + '">' +
-            '<input type="text" class="etapa-desc border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm sm:col-span-2" placeholder="Descrição" value="' + (data.descricao || '') + '">' +
-            '<input type="text" class="etapa-entregavel border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm sm:col-span-2" placeholder="Entregável" value="' + (data.entregavel_esperado || '') + '">';
+        div.className = 'etapa-row rounded-xl border border-slate-200 bg-white p-3 space-y-3';
+        div.innerHTML = '<div class="etapa-cab">' +
+            '<span class="objetivo-num etapa-num"></span>' +
+            '<input type="text" class="etapa-titulo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Título da etapa">' +
+            '<input type="date" class="etapa-data border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">' +
+            '<button type="button" class="etapa-remove text-gray-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Remover etapa">&times;</button>' +
+            '</div>' +
+            '<div><label class="mini">Descrição</label>' +
+            '<textarea class="etapa-desc proposta-area" rows="3" placeholder="O que acontece nesta etapa? Quem faz o quê?"></textarea></div>' +
+            '<div><label class="mini">Entregável esperado</label>' +
+            '<textarea class="etapa-entregavel proposta-area" rows="2" placeholder="O que o grupo deve entregar ao final desta etapa?"></textarea></div>';
+        var titulo = div.querySelector('.etapa-titulo');
+        var dataEl = div.querySelector('.etapa-data');
+        var desc = div.querySelector('.etapa-desc');
+        var ent = div.querySelector('.etapa-entregavel');
+        if (titulo) titulo.value = data.titulo || '';
+        if (dataEl) dataEl.value = data.data_limite || '';
+        if (desc) desc.value = data.descricao || '';
+        if (ent) ent.value = data.entregavel_esperado || '';
         wrap.appendChild(div);
+        renumerarEtapas();
+        if (titulo) titulo.focus();
+        agendarAutosave();
     }
-    document.getElementById('btnAddEtapa').addEventListener('click', function () { addEtapa(); });
 
-    document.getElementById('btnAddEncontro').addEventListener('click', function () {
-        var wrap = document.getElementById('listaEncontros');
-        var div = document.createElement('div');
-        div.className = 'encontro-row grid grid-cols-1 sm:grid-cols-3 gap-2';
-        div.innerHTML = '<input type="text" class="encontro-rotulo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Rótulo">' +
-            '<input type="datetime-local" class="encontro-data border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">' +
-            '<input type="url" class="encontro-link border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Link">';
-        wrap.appendChild(div);
-    });
+    function limparEtapa(row) {
+        row.querySelectorAll('input, textarea').forEach(function (el) { el.value = ''; });
+    }
 
-    document.getElementById('btnAddCriterio').addEventListener('click', function () {
-        var wrap = document.getElementById('listaRubrica');
-        var div = document.createElement('div');
-        div.className = 'rubrica-row grid grid-cols-1 sm:grid-cols-3 gap-2';
-        div.innerHTML = '<input type="text" class="rubrica-criterio border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Critério">' +
-            '<input type="number" class="rubrica-peso border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" step="0.01" placeholder="Peso %">' +
-            '<input type="text" class="rubrica-desc border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Descrição">';
-        wrap.appendChild(div);
+    function renumerarEtapas() {
+        root.querySelectorAll('#listaEtapas .etapa-row').forEach(function (row, idx) {
+            var num = row.querySelector('.etapa-num');
+            if (num) num.textContent = String(idx + 1);
+        });
+    }
+
+    var btnAddEtapa = document.getElementById('btnAddEtapa');
+    if (btnAddEtapa) {
+        btnAddEtapa.addEventListener('click', function () { addEtapa(); });
+    }
+    root.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.etapa-remove');
+        if (!btn || !root.contains(btn)) return;
+        var wrap = document.getElementById('listaEtapas');
+        var rows = wrap ? wrap.querySelectorAll('.etapa-row') : [];
+        if (rows.length <= 1) {
+            if (rows[0]) limparEtapa(rows[0]);
+        } else {
+            btn.closest('.etapa-row').remove();
+            renumerarEtapas();
+        }
+        agendarAutosave();
     });
 
     document.getElementById('btnAddMaterial').addEventListener('click', function () {
@@ -654,42 +1036,144 @@ if (!empty($projeto['formatos_aceitos'])) {
             '<input type="url" class="mat-link border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="URL">' +
             '<select class="mat-tipo border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm"><option value="link">Link</option><option value="arquivo">Arquivo</option></select>';
         wrap.appendChild(div);
+        agendarAutosave();
     });
 
-    // BNCC
-    document.getElementById('btnBnccBusca').addEventListener('click', function () {
-        var q = document.getElementById('bnccBusca').value.trim();
-        var box = document.getElementById('bnccResultados');
-        box.innerHTML = 'Buscando…';
-        fetch(root.getAttribute('data-bncc-url') + '?q=' + encodeURIComponent(q))
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                box.innerHTML = '';
-                (data.habilidades || []).forEach(function (h) {
-                    var btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'block w-full text-left px-2 py-1 rounded hover:bg-indigo-50 text-xs';
-                    btn.textContent = h.codigo + ' — ' + (h.descricao || '').slice(0, 80);
-                    btn.addEventListener('click', function () { addBnccChip(h.codigo, h.id); });
-                    box.appendChild(btn);
-                });
-                if (!(data.habilidades || []).length) box.textContent = 'Nenhuma habilidade encontrada.';
-            });
-    });
-
-    function addBnccChip(codigo, hid) {
-        var wrap = document.getElementById('bnccSelecionadas');
-        if (wrap.querySelector('[data-codigo="' + codigo + '"]')) return;
-        var span = document.createElement('span');
-        span.className = 'bncc-chip inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-50 text-indigo-800 text-xs';
-        span.setAttribute('data-codigo', codigo);
-        span.setAttribute('data-hid', hid || 0);
-        span.innerHTML = codigo + ' <button type="button" class="bncc-remove font-bold">&times;</button>';
-        span.querySelector('.bncc-remove').addEventListener('click', function () { span.remove(); });
-        wrap.appendChild(span);
+    function addAlmox() {
+        var wrap = document.getElementById('listaAlmox');
+        if (!wrap) return;
+        var div = document.createElement('div');
+        div.className = 'almox-row grid grid-cols-1 sm:grid-cols-12 gap-2';
+        div.innerHTML = '<input type="text" class="almox-nome sm:col-span-6 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Material (ex.: cola branca)">' +
+            '<input type="text" class="almox-qtd sm:col-span-2 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Qtd.">' +
+            '<input type="text" class="almox-obs sm:col-span-3 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Observação">' +
+            '<button type="button" class="almox-remove sm:col-span-1 text-gray-400 hover:text-red-600 px-1 text-lg leading-none" aria-label="Remover item">&times;</button>';
+        wrap.appendChild(div);
+        var nome = div.querySelector('.almox-nome');
+        if (nome) nome.focus();
+        agendarAutosave();
     }
-    document.querySelectorAll('.bncc-remove').forEach(function (btn) {
-        btn.addEventListener('click', function () { btn.closest('.bncc-chip').remove(); });
+    var btnAddAlmox = document.getElementById('btnAddAlmox');
+    if (btnAddAlmox) btnAddAlmox.addEventListener('click', addAlmox);
+    root.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.almox-remove');
+        if (!btn || !root.contains(btn)) return;
+        var wrap = document.getElementById('listaAlmox');
+        var rows = wrap ? wrap.querySelectorAll('.almox-row') : [];
+        if (rows.length <= 1) {
+            if (rows[0]) rows[0].querySelectorAll('input').forEach(function (el) { el.value = ''; });
+        } else {
+            btn.closest('.almox-row').remove();
+        }
+        agendarAutosave();
+    });
+
+    var btnPdfMateriais = document.getElementById('btnPdfMateriais');
+    if (btnPdfMateriais) {
+        btnPdfMateriais.addEventListener('click', function () {
+            salvar({
+                silencioso: true,
+                depois: function () {
+                    var pidNovo = parseInt((form.querySelector('[name="projeto_id"]') || {}).value || '0', 10) || 0;
+                    if (!pidNovo) {
+                        setAutosaveStatus('Não foi possível gerar o PDF. Confira se o título está preenchido.', true);
+                        return;
+                    }
+                    window.open(root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + pidNovo + '/materiais-pdf', '_blank');
+                }
+            });
+        });
+    }
+
+    function renumerarObjetivos() {
+        root.querySelectorAll('#listaObjetivos .objetivo-row').forEach(function (row, idx) {
+            var num = row.querySelector('.objetivo-num');
+            if (num) num.textContent = String(idx + 1);
+        });
+    }
+
+    function addObjetivo(texto) {
+        var wrap = document.getElementById('listaObjetivos');
+        if (!wrap) return;
+        var div = document.createElement('div');
+        div.className = 'objetivo-row';
+        div.innerHTML = '<span class="objetivo-num"></span>' +
+            '<input type="text" class="objetivo-texto flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm" placeholder="Ex.: Identificar bioindicadores no córrego">' +
+            '<button type="button" class="objetivo-remove text-gray-400 hover:text-red-600 px-1" aria-label="Remover objetivo">&times;</button>';
+        var input = div.querySelector('.objetivo-texto');
+        if (texto) input.value = texto;
+        wrap.appendChild(div);
+        renumerarObjetivos();
+        input.focus();
+        agendarAutosave();
+    }
+
+    var btnAddObjetivo = document.getElementById('btnAddObjetivo');
+    if (btnAddObjetivo) {
+        btnAddObjetivo.addEventListener('click', function () { addObjetivo(''); });
+    }
+    root.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.objetivo-remove');
+        if (!btn || !root.contains(btn)) return;
+        var wrap = document.getElementById('listaObjetivos');
+        var rows = wrap ? wrap.querySelectorAll('.objetivo-row') : [];
+        if (rows.length <= 1) {
+            var input = rows[0] && rows[0].querySelector('.objetivo-texto');
+            if (input) input.value = '';
+        } else {
+            btn.closest('.objetivo-row').remove();
+            renumerarObjetivos();
+        }
+        agendarAutosave();
+    });
+
+    function addConexao(texto) {
+        texto = (texto || '').trim();
+        if (!texto) return;
+        var wrap = document.getElementById('listaConexoes');
+        if (!wrap) return;
+        var existe = false;
+        wrap.querySelectorAll('.conexao-chip').forEach(function (chip) {
+            var atual = (chip.textContent || '').replace('×', '').replace('x', '').trim();
+            if (atual.toLowerCase() === texto.toLowerCase()) existe = true;
+        });
+        if (existe) return;
+        var span = document.createElement('span');
+        span.className = 'conexao-chip';
+        span.appendChild(document.createTextNode(texto + ' '));
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'conexao-remove font-bold leading-none';
+        rm.setAttribute('aria-label', 'Remover');
+        rm.textContent = '\u00d7';
+        span.appendChild(rm);
+        wrap.appendChild(span);
+        agendarAutosave();
+    }
+
+    var conexaoInput = document.getElementById('conexaoInput');
+    var btnAddConexao = document.getElementById('btnAddConexao');
+    if (btnAddConexao) {
+        btnAddConexao.addEventListener('click', function () {
+            addConexao(conexaoInput ? conexaoInput.value : '');
+            if (conexaoInput) conexaoInput.value = '';
+        });
+    }
+    if (conexaoInput) {
+        conexaoInput.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                addConexao(conexaoInput.value);
+                conexaoInput.value = '';
+            }
+        });
+    }
+    root.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.conexao-remove');
+        if (!btn || !root.contains(btn)) return;
+        var chip = btn.closest('.conexao-chip');
+        if (chip) chip.remove();
+        agendarAutosave();
     });
 
     // Alunos por turma
@@ -720,7 +1204,15 @@ if (!empty($projeto['formatos_aceitos'])) {
     function collectJsonFields() {
         var vis = [];
         root.querySelectorAll('.vis-serie:checked').forEach(function (el) {
-            vis.push({ escopo: 'Serie', referencia_id: parseInt(el.getAttribute('data-serie-id'), 10) });
+            var seen = {};
+            var raw = (el.getAttribute('data-serie-ids') || el.getAttribute('data-serie-id') || '').split(',');
+            raw.forEach(function (part) {
+                var id = parseInt(part, 10);
+                if (id && !seen[id]) {
+                    seen[id] = true;
+                    vis.push({ escopo: 'Serie', referencia_id: id });
+                }
+            });
         });
         root.querySelectorAll('.vis-turma:checked').forEach(function (el) {
             vis.push({ escopo: 'Turma', referencia_id: parseInt(el.getAttribute('data-turma-id'), 10) });
@@ -769,31 +1261,6 @@ if (!empty($projeto['formatos_aceitos'])) {
         });
         document.getElementById('campoEtapas').value = JSON.stringify(etapas);
 
-        var encontros = [];
-        root.querySelectorAll('.encontro-row').forEach(function (row) {
-            var rotulo = ((row.querySelector('.encontro-rotulo') || {}).value || '').trim();
-            var data = (row.querySelector('.encontro-data') || {}).value || '';
-            if (!rotulo || !data) return;
-            encontros.push({
-                rotulo: rotulo,
-                data_hora: data,
-                link: ((row.querySelector('.encontro-link') || {}).value || '').trim()
-            });
-        });
-        document.getElementById('campoEncontros').value = JSON.stringify(encontros);
-
-        var rubrica = [];
-        root.querySelectorAll('.rubrica-row').forEach(function (row) {
-            var criterio = ((row.querySelector('.rubrica-criterio') || {}).value || '').trim();
-            if (!criterio) return;
-            rubrica.push({
-                criterio: criterio,
-                peso: parseFloat((row.querySelector('.rubrica-peso') || {}).value || '0') || 0,
-                descricao: ((row.querySelector('.rubrica-desc') || {}).value || '').trim()
-            });
-        });
-        document.getElementById('campoRubrica').value = JSON.stringify(rubrica);
-
         var materiais = [];
         root.querySelectorAll('.material-row').forEach(function (row) {
             var titulo = ((row.querySelector('.mat-titulo') || {}).value || '').trim();
@@ -804,54 +1271,224 @@ if (!empty($projeto['formatos_aceitos'])) {
         });
         document.getElementById('campoMateriais').value = JSON.stringify(materiais);
 
-        var habs = [];
-        root.querySelectorAll('.bncc-chip').forEach(function (chip) {
-            habs.push({
-                codigo: chip.getAttribute('data-codigo'),
-                habilidade_id: parseInt(chip.getAttribute('data-hid') || '0', 10) || null
+        var almox = [];
+        root.querySelectorAll('.almox-row').forEach(function (row) {
+            var nome = ((row.querySelector('.almox-nome') || {}).value || '').trim();
+            if (!nome) return;
+            almox.push({
+                nome: nome,
+                quantidade: ((row.querySelector('.almox-qtd') || {}).value || '').trim(),
+                observacao: ((row.querySelector('.almox-obs') || {}).value || '').trim()
             });
         });
-        document.getElementById('campoHabilidades').value = JSON.stringify(habs);
+        var campoAlmox = document.getElementById('campoMateriaisNecessarios');
+        if (campoAlmox) campoAlmox.value = JSON.stringify(almox);
+
+        var objetivos = [];
+        root.querySelectorAll('.objetivo-texto').forEach(function (el) {
+            var t = (el.value || '').trim();
+            if (t) objetivos.push(t);
+        });
+        var campoObj = document.getElementById('campoObjetivos');
+        if (campoObj) campoObj.value = objetivos.join('\n');
+
+        var conexoes = [];
+        root.querySelectorAll('.conexao-chip').forEach(function (chip) {
+            var clone = chip.cloneNode(true);
+            var rm = clone.querySelector('.conexao-remove');
+            if (rm) rm.remove();
+            var t = (clone.textContent || '').trim();
+            if (t) conexoes.push(t);
+        });
+        var campoCx = document.getElementById('campoConexoes');
+        if (campoCx) campoCx.value = conexoes.join('\n');
+
+        var campoHab = document.getElementById('campoHabilidades');
+        if (campoHab) campoHab.value = '[]';
     }
 
-    root.querySelectorAll('#expoWizardActions button[type="submit"]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            document.getElementById('campoAcao').value = btn.getAttribute('data-acao') || 'rascunho';
-        });
-    });
+    function setAutosaveStatus(texto, erro) {
+        var el = document.getElementById('autosaveStatus');
+        if (!el) return;
+        el.textContent = texto || '';
+        el.style.color = erro ? '#b91c1c' : '#64748b';
+    }
 
-    form.addEventListener('submit', function (ev) {
-        ev.preventDefault();
+    function tituloPreenchido() {
+        var t = form.querySelector('[name="titulo"]');
+        return !!(t && (t.value || '').trim());
+    }
+
+    function montarFormData(acao) {
         collectJsonFields();
-        var msg = document.getElementById('wizardMsg');
-        msg.classList.add('hidden');
+        document.getElementById('campoAcao').value = acao || 'rascunho';
         var fd = new FormData(form);
-        fetch(form.action, {
+        fd.delete('capa');
+        if (capaPendente) {
+            fd.set('capa', capaPendente, capaPendente.name || 'capa.jpg');
+        }
+        return fd;
+    }
+
+    function aplicarIdSalvo(id) {
+        var pidInput = form.querySelector('[name="projeto_id"]');
+        var pidAtual = parseInt((pidInput && pidInput.value) || '0', 10) || 0;
+        if (id && pidInput && pidAtual <= 0) {
+            pidInput.value = String(id);
+            root.setAttribute('data-projeto-id', String(id));
+            history.replaceState(null, '', root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + id + '/editar');
+        }
+        var prev = document.getElementById('btnPreview');
+        if (prev && id) {
+            prev.href = root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + id + '/preview';
+            if (step === maxStep) prev.classList.remove('hidden');
+        }
+    }
+
+    function salvar(opts) {
+        opts = opts || {};
+        var silencioso = !!opts.silencioso;
+        var acao = opts.acao || 'rascunho';
+        var envioCapa = !!opts.capa;
+        if (salvando) {
+            savePendente = acao === 'rascunho' && !envioCapa;
+            return Promise.resolve();
+        }
+        if (acao === 'rascunho' && !tituloPreenchido()) {
+            setAutosaveStatus('Digite o título para salvar automaticamente.');
+            if (envioCapa) {
+                mostrarCapaStatus('erro', 'Preencha o título antes de enviar a capa.');
+                setBotaoCapa(!!capaPendente, 'Subir capa');
+            }
+            return Promise.resolve();
+        }
+        salvando = true;
+        if (silencioso) setAutosaveStatus('Salvando…');
+        var msg = document.getElementById('wizardMsg');
+        if (!silencioso) msg.classList.add('hidden');
+        var fd = montarFormData(acao);
+        return fetch(form.action, {
             method: 'POST',
             body: fd,
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
           .then(function (res) {
-              msg.classList.remove('hidden');
-              msg.className = 'rounded-lg px-4 py-3 text-sm ' + (res.j.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200');
-              msg.textContent = res.j.message || (res.j.success ? 'Salvo.' : 'Erro.');
-              var pidInput = form.querySelector('[name="projeto_id"]');
-              var pidAtual = parseInt((pidInput && pidInput.value) || '0', 10) || 0;
-              if (res.j.success && res.j.id && pidInput && pidAtual <= 0) {
-                  pidInput.value = String(res.j.id);
-                  root.setAttribute('data-projeto-id', String(res.j.id));
-                  history.replaceState(null, '', root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + res.j.id + '/editar');
+              salvando = false;
+              if (res.j.success) {
+                  aplicarIdSalvo(res.j.id);
+                  if (res.j.capa_url) {
+                      var hiddenCapa = document.getElementById('campoCapaUrl');
+                      if (hiddenCapa) hiddenCapa.value = res.j.capa_url;
+                  }
+                  if (res.j.capa_src) mostrarCapaPreview(res.j.capa_src);
+                  if (capaPendente && (res.j.capa_url || res.j.capa_src)) {
+                      capaPendente = null;
+                      if (campoCapa) campoCapa.value = '';
+                      setBotaoCapa(false, 'Subir capa');
+                      mostrarCapaStatus('ok', 'Capa enviada com sucesso.');
+                  } else if (envioCapa) {
+                      if (res.j.capa_src || res.j.capa_url) {
+                          capaPendente = null;
+                          if (campoCapa) campoCapa.value = '';
+                          setBotaoCapa(false, 'Subir capa');
+                          mostrarCapaStatus('ok', 'Capa enviada com sucesso.');
+                      } else {
+                          setBotaoCapa(true, 'Subir capa');
+                          mostrarCapaStatus('erro', 'O projeto foi salvo, mas a capa não chegou ao servidor. Tente de novo.');
+                      }
+                  }
+                  var agora = new Date();
+                  var hh = String(agora.getHours()).padStart(2, '0');
+                  var mm = String(agora.getMinutes()).padStart(2, '0');
+                  setAutosaveStatus('Salvo automaticamente às ' + hh + ':' + mm);
+                  if (!silencioso) {
+                      msg.classList.remove('hidden');
+                      msg.className = 'rounded-lg px-4 py-3 text-sm bg-green-50 text-green-800 border border-green-200';
+                      msg.textContent = res.j.message || 'Salvo.';
+                  }
+                  if (acao === 'publicar' && res.j.redirect) {
+                      window.location.href = res.j.redirect;
+                      return;
+                  }
+              } else {
+                  setAutosaveStatus(res.j.message || 'Não foi possível salvar.', true);
+                  if (envioCapa) {
+                      setBotaoCapa(!!capaPendente, 'Subir capa');
+                      mostrarCapaStatus('erro', res.j.message || 'Não foi possível enviar a capa.');
+                  }
+                  if (!silencioso) {
+                      msg.classList.remove('hidden');
+                      msg.className = 'rounded-lg px-4 py-3 text-sm bg-red-50 text-red-800 border border-red-200';
+                      msg.textContent = res.j.message || 'Erro.';
+                  }
               }
-              if (res.j.success && res.j.redirect && document.getElementById('campoAcao').value === 'publicar') {
-                  window.location.href = res.j.redirect;
+              if (savePendente && acao === 'rascunho') {
+                  savePendente = false;
+                  salvar({ silencioso: true });
               }
+              if (typeof opts.depois === 'function' && res.j.success) opts.depois();
           }).catch(function () {
-              msg.classList.remove('hidden');
-              msg.className = 'rounded-lg px-4 py-3 text-sm bg-red-50 text-red-800 border border-red-200';
-              msg.textContent = 'Falha de rede ao salvar.';
+              salvando = false;
+              setAutosaveStatus('Falha de rede ao salvar.', true);
+              if (envioCapa) {
+                  setBotaoCapa(!!capaPendente, 'Subir capa');
+                  mostrarCapaStatus('erro', 'Falha de rede ao enviar a capa. Tente de novo.');
+              }
+              if (!silencioso) {
+                  msg.classList.remove('hidden');
+                  msg.className = 'rounded-lg px-4 py-3 text-sm bg-red-50 text-red-800 border border-red-200';
+                  msg.textContent = 'Falha de rede ao salvar.';
+              }
           });
+    }
+
+    function agendarAutosave() {
+        if (autosaveTimer) clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(function () {
+            salvar({ silencioso: true });
+        }, 1200);
+    }
+
+    function flushAutosave() {
+        if (autosaveTimer) {
+            clearTimeout(autosaveTimer);
+            autosaveTimer = null;
+        }
+        salvar({ silencioso: true });
+    }
+
+    form.addEventListener('input', function (ev) {
+        var id = (ev.target && ev.target.id) || '';
+        if (id === 'campoCapa' || id === 'filtroMaterias' || id === 'filtroProfessores' || id === 'conexaoInput') return;
+        agendarAutosave();
+    });
+    form.addEventListener('change', function (ev) {
+        var id = (ev.target && ev.target.id) || '';
+        if (id === 'campoCapa' || id === 'filtroMaterias' || id === 'filtroProfessores') return;
+        agendarAutosave();
+    });
+
+    document.getElementById('btnPublicar').addEventListener('click', function () {
+        document.getElementById('campoAcao').value = 'publicar';
+    });
+
+    document.getElementById('btnPreview').addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var href = document.getElementById('btnPreview').getAttribute('href');
+        if (!href || href === '#') return;
+        salvar({
+            silencioso: true,
+            depois: function () { window.location.href = href; }
+        });
+    });
+
+    form.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var acao = document.getElementById('campoAcao').value || 'rascunho';
+        salvar({ silencioso: acao === 'rascunho', acao: acao });
     });
 
     showStep(1);
+    if (tituloPreenchido()) setAutosaveStatus('Alterações são salvas automaticamente.');
 })();
 </script>

@@ -20,7 +20,10 @@ $titulo = $stand['titulo'] ?? ($cancelado ? 'Stand indisponível' : 'Stand não 
 <?php if ($stand): ?>
     <?php
     $capaOk = !empty($stand['capa_url'])
-        && preg_match('#^https?://#i', (string) $stand['capa_url']);
+        && (
+            preg_match('#^https?://#i', (string) $stand['capa_url'])
+            || str_starts_with((string) $stand['capa_url'], '/')
+        );
     ?>
     <?php if ($capaOk): ?>
         <div class="w-full h-48 sm:h-64 bg-slate-800 overflow-hidden">

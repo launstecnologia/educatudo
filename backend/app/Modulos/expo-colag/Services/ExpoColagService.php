@@ -383,6 +383,7 @@ class ExpoColagService
                     continue;
                 }
             }
+            $p['capa_url'] = self::resolverUrlCapa((string) ($p['capa_url'] ?? ''), (int) $p['id']);
             $out[] = $p;
         }
         return $out;
@@ -1037,7 +1038,11 @@ class ExpoColagService
 
     public function obterProjeto(int $id): ?array
     {
-        return $this->projetoModel->findById($id);
+        $row = $this->projetoModel->findById($id);
+        if ($row) {
+            $row['capa_src'] = self::resolverUrlCapa((string) ($row['capa_url'] ?? ''), $id);
+        }
+        return $row;
     }
 
     /**
@@ -1054,6 +1059,7 @@ class ExpoColagService
         if ($professorId !== null && (int) $projeto['professor_id'] !== $professorId) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
+        $projeto['capa_src'] = self::resolverUrlCapa((string) ($projeto['capa_url'] ?? ''), $projetoId);
         return [
             'success' => true,
             'projeto' => $projeto,
@@ -1065,7 +1071,7 @@ class ExpoColagService
      * Salva o wizard completo (rascunho persistente). Cria se id=0.
      *
      * @param array<string, mixed> $input
-     * @return array{success:bool,id?:int,error?:string}
+     * @return array{success:bool,id?:int,capa_url?:string,capa_src?:string,error?:string}
      */
     public function salvarProjetoCompleto(int $professorId, array $input, ?array $capaFile = null): array
     {
@@ -1082,6 +1088,7 @@ class ExpoColagService
         $edicao = $edicaoResult['edicao'];
         $config = $edicao['config_decoded'] ?? self::configPadrao();
 
+        $existente = null;
         if ($projetoId > 0) {
             $existente = $this->projetoModel->findById($projetoId);
             if (!$existente || (int) $existente['professor_id'] !== $professorId) {
@@ -1099,20 +1106,21 @@ class ExpoColagService
         }
 
         $capaUrl = trim((string) ($input['capa_url'] ?? ''));
-        if ($capaFile && ($capaFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $erroUpload = (int) ($capaFile['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($capaFile && $erroUpload !== UPLOAD_ERR_NO_FILE && $erroUpload !== UPLOAD_ERR_OK) {
+            return ['success' => false, 'error' => self::mensagemErroUpload($erroUpload)];
+        }
+        if ($capaFile && $erroUpload === UPLOAD_ERR_OK) {
             $upload = $this->salvarCapa($capaFile, $projetoId);
             if (!$upload['success']) {
                 return $upload;
             }
             $capaUrl = $upload['url'];
-        }
-
-        $formatos = $input['formatos_aceitos'] ?? [];
-        if (is_string($formatos)) {
-            $formatos = array_filter(array_map('trim', explode(',', $formatos)));
-        }
-        if (!is_array($formatos)) {
-            $formatos = [];
+        } else {
+            $capaUrl = $this->sanitizarCapaUrl(
+                $capaUrl,
+                is_array($existente) ? (string) ($existente['capa_url'] ?? '') : ''
+            );
         }
 
         $dados = [
@@ -1138,11 +1146,10 @@ class ExpoColagService
             'data_fim' => $this->normalizarData($input['data_fim'] ?? null),
             'data_apresentacao' => $this->normalizarDateTime($input['data_apresentacao'] ?? null, false),
             'briefing_entrega' => trim((string) ($input['briefing_entrega'] ?? '')) ?: null,
-            'formatos_aceitos' => $formatos !== [] ? json_encode(array_values($formatos), JSON_UNESCAPED_UNICODE) : null,
             'vale_nota' => !empty($input['vale_nota']) ? 1 : 0,
             'tudinha_ativa' => !empty($input['tudinha_ativa']) ? 1 : 0,
-            'tudinha_contexto' => trim((string) ($input['tudinha_contexto'] ?? '')) ?: null,
-            'custo_tudicoins' => max(0, (float) ($input['custo_tudicoins'] ?? 0)),
+            'educalabs_ativa' => !empty($input['educalabs_ativa']) ? 1 : 0,
+            'materiais_necessarios' => $this->codificarMateriaisNecessarios($input['materiais_necessarios'] ?? []),
             'permite_solicitacao_recursos' => !empty($input['permite_solicitacao_recursos']) ? 1 : 0,
             'destaque' => !empty($input['destaque']) ? 1 : 0,
             'ativo' => !empty($input['ativo']) ? 1 : 0,
@@ -1180,8 +1187,6 @@ class ExpoColagService
         $habilidades = $this->parseHabilidades($input);
         $visibilidade = $this->parseVisibilidade($input);
         $etapas = $this->parseJsonOrArray($input['etapas'] ?? []);
-        $encontros = $this->parseJsonOrArray($input['encontros'] ?? []);
-        $rubrica = $this->parseJsonOrArray($input['rubrica'] ?? []);
         $materiais = $this->parseJsonOrArray($input['materiais'] ?? []);
 
         // Não apagar visibilidade de projeto já publicado se o form vier sem árvore.
@@ -1202,8 +1207,12 @@ class ExpoColagService
                 $this->relacoesModel->sincronizarVisibilidade($projetoId, $visibilidade);
             }
             $this->relacoesModel->sincronizarEtapas($projetoId, $etapas);
-            $this->relacoesModel->sincronizarEncontros($projetoId, $encontros);
-            $this->relacoesModel->sincronizarRubrica($projetoId, $rubrica);
+            if (array_key_exists('encontros', $input)) {
+                $this->relacoesModel->sincronizarEncontros($projetoId, $this->parseJsonOrArray($input['encontros']));
+            }
+            if (array_key_exists('rubrica', $input)) {
+                $this->relacoesModel->sincronizarRubrica($projetoId, $this->parseJsonOrArray($input['rubrica']));
+            }
             $this->relacoesModel->sincronizarMateriais($projetoId, $materiais, $professorId);
             $this->db->commit();
         } catch (Throwable $e) {
@@ -1213,7 +1222,12 @@ class ExpoColagService
             return ['success' => false, 'error' => 'Falha ao salvar relações do projeto. Tente novamente.'];
         }
 
-        return ['success' => true, 'id' => $projetoId];
+        return [
+            'success' => true,
+            'id' => $projetoId,
+            'capa_url' => $capaUrl,
+            'capa_src' => self::resolverUrlCapa($capaUrl, $projetoId),
+        ];
     }
 
     /**
@@ -1294,51 +1308,7 @@ class ExpoColagService
             unset($t);
         }
 
-        $seriesMap = [];
-        foreach ($turmas as $t) {
-            $serieId = (int) ($t['serie_id'] ?? 0);
-            $serieNome = trim((string) ($t['serie'] ?? ''));
-            $key = $serieId > 0 ? 'id:' . $serieId : 'nome:' . $serieNome;
-            if (!isset($seriesMap[$key])) {
-                $seriesMap[$key] = [
-                    'id' => $serieId > 0 ? $serieId : 0,
-                    'nome' => $serieNome !== '' ? $serieNome : ('Série #' . $serieId),
-                    'referencia_id' => $serieId > 0 ? $serieId : (int) $t['id'], // fallback: usa turma se sem serie_id
-                    'usa_serie_id' => $serieId > 0,
-                    'turmas' => [],
-                ];
-            }
-            $seriesMap[$key]['turmas'][] = [
-                'id' => (int) $t['id'],
-                'nome' => (string) $t['nome'],
-            ];
-        }
-
-        // Preferir tabela serie quando existir
-        try {
-            $serieRows = $this->db->fetchAll('SELECT id, nome FROM serie ORDER BY nome ASC') ?: [];
-            if ($serieRows !== []) {
-                $byId = [];
-                foreach ($serieRows as $s) {
-                    $byId[(int) $s['id']] = [
-                        'id' => (int) $s['id'],
-                        'nome' => (string) $s['nome'],
-                        'referencia_id' => (int) $s['id'],
-                        'usa_serie_id' => true,
-                        'turmas' => [],
-                    ];
-                }
-                foreach ($turmas as $t) {
-                    $sid = (int) ($t['serie_id'] ?? 0);
-                    if ($sid > 0 && isset($byId[$sid])) {
-                        $byId[$sid]['turmas'][] = ['id' => (int) $t['id'], 'nome' => (string) $t['nome']];
-                    }
-                }
-                $seriesMap = $byId;
-            }
-        } catch (Throwable $e) {
-            // tabela serie pode não existir em todos os tenants
-        }
+        $seriesMap = $this->montarArvoreVisibilidade($turmas);
 
         $habilidades = [];
         if (is_file(__DIR__ . '/../../../Models/Bncc/BnccSkill.php')) {
@@ -1353,11 +1323,111 @@ class ExpoColagService
         return [
             'materias' => $materias,
             'professores' => $professores,
-            'series' => array_values($seriesMap),
+            'series' => $seriesMap,
             'habilidades' => $habilidades,
             'config_edicao' => $config,
             'criterios_banca_padrao' => $config['criterios_banca'] ?? [],
         ];
+    }
+
+    /**
+     * Árvore série → turmas, sem séries vazias e sem “1ª Série” / “1º Ano” duplicados.
+     *
+     * @param list<array<string,mixed>> $turmas
+     * @return list<array<string,mixed>>
+     */
+    private function montarArvoreVisibilidade(array $turmas): array
+    {
+        $nomePorId = [];
+        try {
+            $serieRows = $this->db->fetchAll('SELECT id, nome FROM serie ORDER BY nome ASC') ?: [];
+            foreach ($serieRows as $s) {
+                $nomePorId[(int) $s['id']] = trim((string) $s['nome']);
+            }
+        } catch (Throwable $e) {
+            $nomePorId = [];
+        }
+
+        $grupos = [];
+        foreach ($turmas as $t) {
+            $sid = (int) ($t['serie_id'] ?? 0);
+            $nome = ($sid > 0 && isset($nomePorId[$sid]) && $nomePorId[$sid] !== '')
+                ? $nomePorId[$sid]
+                : trim((string) ($t['serie'] ?? ''));
+            if ($nome === '') {
+                $nome = 'Outras turmas';
+            }
+            $key = $this->chaveSerieNormalizada($nome);
+            if ($key === '') {
+                $key = $sid > 0 ? 'id:' . $sid : 'turma:' . (int) $t['id'];
+            }
+            if (!isset($grupos[$key])) {
+                $grupos[$key] = [
+                    'nome' => $nome,
+                    'referencia_ids' => [],
+                    'turmas' => [],
+                ];
+            }
+            if ($this->nomeSeriePreferido($nome, (string) $grupos[$key]['nome'])) {
+                $grupos[$key]['nome'] = $nome;
+            }
+            if ($sid > 0) {
+                $grupos[$key]['referencia_ids'][$sid] = $sid;
+            }
+            $tid = (int) ($t['id'] ?? 0);
+            if ($tid > 0) {
+                $grupos[$key]['turmas'][$tid] = [
+                    'id' => $tid,
+                    'nome' => (string) ($t['nome'] ?? ''),
+                ];
+            }
+        }
+
+        $out = [];
+        foreach ($grupos as $g) {
+            if ($g['turmas'] === []) {
+                continue;
+            }
+            $ids = array_values($g['referencia_ids']);
+            $turmasGrupo = array_values($g['turmas']);
+            usort($turmasGrupo, static function ($a, $b) {
+                return strnatcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+            });
+            $out[] = [
+                'id' => $ids[0] ?? 0,
+                'nome' => $g['nome'],
+                'referencia_id' => $ids[0] ?? 0,
+                'referencia_ids' => $ids,
+                'usa_serie_id' => $ids !== [],
+                'turmas' => $turmasGrupo,
+            ];
+        }
+
+        usort($out, static function ($a, $b) {
+            return strnatcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+        });
+
+        return $out;
+    }
+
+    /** “1ª Série” e “1º Ano” viram a mesma chave. */
+    private function chaveSerieNormalizada(string $nome): string
+    {
+        $n = mb_strtolower(trim($nome), 'UTF-8');
+        $n = strtr($n, ['ª' => '', 'º' => '', '°' => '']);
+        $n = preg_replace('/\b(s[eé]ries?|anos?)\b/u', '', $n) ?? $n;
+        $n = preg_replace('/[^a-z0-9]+/u', ' ', $n) ?? $n;
+        return trim(preg_replace('/\s+/', ' ', $n) ?? '');
+    }
+
+    /** Prefere o rótulo “Série” quando o outro for “Ano”. */
+    private function nomeSeriePreferido(string $candidato, string $atual): bool
+    {
+        $c = mb_strtolower($candidato, 'UTF-8');
+        $a = mb_strtolower($atual, 'UTF-8');
+        $cSerie = str_contains($c, 'série') || str_contains($c, 'serie');
+        $aSerie = str_contains($a, 'série') || str_contains($a, 'serie');
+        return $cSerie && !$aSerie;
     }
 
     public function listarAlunosPorTurma(int $turmaId): array
@@ -1412,6 +1482,101 @@ class ExpoColagService
         return $this->autorizacaoModel->registrar($alunoId, $status, $registradoPor, null, $observacao);
     }
 
+    public static function mensagemErroUpload(int $codigo): string
+    {
+        return match ($codigo) {
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'A capa excede o tamanho máximo permitido (10 MB). Compacte a imagem ou escolha outro arquivo.',
+            UPLOAD_ERR_PARTIAL => 'O envio da capa foi interrompido. Tente novamente.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Servidor sem pasta temporária para upload.',
+            UPLOAD_ERR_CANT_WRITE => 'Não foi possível gravar a capa no disco.',
+            default => 'Não foi possível enviar a capa. Tente um JPG ou PNG menor.',
+        };
+    }
+
+    private static function slugTenant(): string
+    {
+        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string) TENANT_SLUG) : 'tenant';
+        return $slug !== '' ? $slug : 'tenant';
+    }
+
+    /** Aceita só path gerado no upload ou a URL já gravada deste projeto. */
+    private function sanitizarCapaUrl(string $url, string $existente): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return $existente;
+        }
+        if ($existente !== '' && $url === $existente) {
+            return $existente;
+        }
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: $url);
+        if (preg_match('#^/uploads/expo-colag/[a-zA-Z0-9_-]+/expo_colag_\d+_\d+\.(jpe?g|png|webp)$#i', $path) === 1) {
+            return $path;
+        }
+        return $existente;
+    }
+
+    /**
+     * URL exibível da capa. Arquivos antigos em /storage/uploads não são servidos pelo Nginx.
+     */
+    public static function resolverUrlCapa(string $url, int $projetoId = 0): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: $url);
+        $base = defined('URL') ? rtrim((string) URL, '/') : '';
+        if (str_contains($path, '/storage/uploads/') && $projetoId > 0) {
+            return $base . '/expo-colag/midia/' . $projetoId . '/capa';
+        }
+        if (str_starts_with($path, '/uploads/') || str_starts_with($path, '/expo-colag/midia/')) {
+            return $base . $path;
+        }
+        return $url;
+    }
+
+    /**
+     * Caminho físico da capa (public/uploads novo ou storage/uploads legado).
+     */
+    public function caminhoArquivoCapa(int $projetoId): ?string
+    {
+        if ($projetoId <= 0) {
+            return null;
+        }
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto) {
+            return null;
+        }
+        $url = trim((string) ($projeto['capa_url'] ?? ''));
+        if ($url === '') {
+            return null;
+        }
+        $filename = basename((string) (parse_url($url, PHP_URL_PATH) ?: $url));
+        if ($filename === '' || !preg_match('/^expo_colag_\d+_\d+\.(jpe?g|png|webp)$/i', $filename)) {
+            return null;
+        }
+        $slug = self::slugTenant();
+        $backend = dirname(__DIR__, 4);
+        $candidatos = [
+            $backend . '/public/uploads/expo-colag/' . $slug . '/' . $filename,
+            $backend . '/storage/uploads/expo-colag/' . $slug . '/' . $filename,
+        ];
+        foreach ($candidatos as $caminho) {
+            $real = realpath($caminho);
+            if ($real !== false && is_file($real) && is_readable($real)) {
+                $basePublic = realpath($backend . '/public/uploads/expo-colag/' . $slug);
+                $baseStorage = realpath($backend . '/storage/uploads/expo-colag/' . $slug);
+                $ok = ($basePublic && str_starts_with($real, $basePublic . DIRECTORY_SEPARATOR))
+                    || ($baseStorage && str_starts_with($real, $baseStorage . DIRECTORY_SEPARATOR));
+                if ($ok) {
+                    return $real;
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * @param array<string,mixed> $file
      * @return array{success:bool,url?:string,error?:string}
@@ -1429,26 +1594,30 @@ class ExpoColagService
         if (!isset($allowed[$mime])) {
             return ['success' => false, 'error' => 'Capa deve ser JPG, PNG ou WebP.'];
         }
-        if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
-            return ['success' => false, 'error' => 'Capa deve ter no máximo 5 MB.'];
+        $maxBytes = 10 * 1024 * 1024;
+        $tamanho = @filesize($tmp);
+        if ($tamanho === false) {
+            $tamanho = (int) ($file['size'] ?? 0);
+        }
+        if ($tamanho > $maxBytes) {
+            return ['success' => false, 'error' => 'Capa deve ter no máximo 10 MB.'];
         }
 
-        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string) TENANT_SLUG) : 'tenant';
+        $slug = self::slugTenant();
         $ext = $allowed[$mime];
         $filename = 'expo_colag_' . $projetoId . '_' . time() . '.' . $ext;
         $relDir = 'expo-colag/' . $slug;
-        // Services/ → expo-colag/ → Modulos/ → app/ → backend/
-        $base = dirname(__DIR__, 4) . '/storage/uploads/' . $relDir;
-        if (!is_dir($base)) {
-            @mkdir($base, 0755, true);
+        // public/uploads é servido pelo Nginx em /uploads/ (storage/uploads é bloqueado)
+        $base = dirname(__DIR__, 4) . '/public/uploads/' . $relDir;
+        if (!is_dir($base) && !@mkdir($base, 0755, true) && !is_dir($base)) {
+            return ['success' => false, 'error' => 'Falha ao criar pasta da capa.'];
         }
         $dest = $base . '/' . $filename;
         if (!@move_uploaded_file($tmp, $dest)) {
             return ['success' => false, 'error' => 'Falha ao gravar a capa.'];
         }
 
-        $url = (defined('URL') ? URL : '') . '/storage/uploads/' . $relDir . '/' . $filename;
-        return ['success' => true, 'url' => $url];
+        return ['success' => true, 'url' => '/uploads/' . $relDir . '/' . $filename];
     }
 
     private function modoIngressoValido($value): string
@@ -1475,6 +1644,57 @@ class ExpoColagService
             return $v;
         }
         return null;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<array{nome:string,quantidade:string,observacao:string}>
+     */
+    public static function decodificarMateriaisNecessarios($raw): array
+    {
+        if (is_array($raw)) {
+            $decoded = $raw;
+        } elseif (is_string($raw) && $raw !== '') {
+            $decoded = json_decode($raw, true);
+        } else {
+            $decoded = [];
+        }
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $nome = trim((string) ($item['nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            $out[] = [
+                'nome' => $nome,
+                'quantidade' => trim((string) ($item['quantidade'] ?? '')),
+                'observacao' => trim((string) ($item['observacao'] ?? '')),
+            ];
+        }
+        return $out;
+    }
+
+    /** @param mixed $value */
+    private function codificarMateriaisNecessarios($value): ?string
+    {
+        $itens = [];
+        foreach (self::decodificarMateriaisNecessarios($this->parseJsonOrArray($value)) as $item) {
+            if (count($itens) >= 50) {
+                break;
+            }
+            $itens[] = [
+                'nome' => mb_substr($item['nome'], 0, 180),
+                'quantidade' => mb_substr($item['quantidade'], 0, 80),
+                'observacao' => mb_substr($item['observacao'], 0, 255),
+            ];
+        }
+        return $itens !== [] ? json_encode($itens, JSON_UNESCAPED_UNICODE) : null;
     }
 
     /** @return list<array<string,mixed>> */
