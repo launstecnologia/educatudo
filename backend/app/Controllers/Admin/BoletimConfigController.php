@@ -20,6 +20,7 @@ class BoletimConfigController extends BaseController
     /** @var array<string, mixed>|null Usuário do job CLI (sem sessão). */
     private ?array $usuarioGeracaoJob = null;
     private int $jobIdHeartbeat = 0;
+    private float $ultimoHeartbeatEm = 0.0;
     /** @var array<int, array<string, mixed>> */
     private array $alunosPorIdCache = [];
     /** @var array<string, array<int, list<array<string, mixed>>>> chave prefetch => aluno_id => provas */
@@ -33,9 +34,12 @@ class BoletimConfigController extends BaseController
     private array $eventosFaltasCache = [];
     /** @var array<int, array{regra: array<string, mixed>, componentes: list<array<string, mixed>>}> */
     private array $expansaoRegraCache = [];
+    /** @var array<string, array<string, mixed>> */
+    private array $simulacaoAlunoCache = [];
     /** @var array{a: list<int>, b: list<int>}|null */
     private ?array $semanasQuadroCache = null;
-    private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 50;
+    private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 200;
+    private const INTERVALO_HEARTBEAT_SEGUNDOS = 2.0;
 
     public function __construct(bool $somenteGeracao = false)
     {
@@ -2048,6 +2052,12 @@ class BoletimConfigController extends BaseController
         if ($this->jobIdHeartbeat <= 0) {
             return;
         }
+        $agora = microtime(true);
+        if ($this->ultimoHeartbeatEm > 0.0
+            && ($agora - $this->ultimoHeartbeatEm) < self::INTERVALO_HEARTBEAT_SEGUNDOS) {
+            return;
+        }
+        $this->ultimoHeartbeatEm = $agora;
         if (!class_exists(\App\Services\AIJobService::class, false)) {
             require_once __DIR__ . '/../../Services/AIJobService.php';
         }
@@ -2420,6 +2430,7 @@ class BoletimConfigController extends BaseController
         $this->eventosFaltasCache = [];
         $this->notasManuaisGeracaoCache = [];
         $this->notasManuaisGeracaoAtivo = false;
+        $this->simulacaoAlunoCache = [];
 
         foreach ($alunos as $aluno) {
             $id = (int) ($aluno['id'] ?? 0);
@@ -2674,6 +2685,13 @@ class BoletimConfigController extends BaseController
         array $visitedRuleCodes = []
     ): array
     {
+        $regraIdCache = (int) ($regra['id'] ?? 0);
+        $chaveSimulacao = $regraIdCache . ':' . $alunoId . ':' . $periodoRef . ':'
+            . (string) ($rangeInicioOverride ?? '') . ':' . (string) ($rangeFimOverride ?? '');
+        if ($regraIdCache > 0 && isset($this->simulacaoAlunoCache[$chaveSimulacao])) {
+            return $this->simulacaoAlunoCache[$chaveSimulacao];
+        }
+
         $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
         $range = [
             'inicio' => $rangeInicioOverride ? ($rangeInicioOverride . ' 00:00:00') : null,
@@ -2997,20 +3015,6 @@ class BoletimConfigController extends BaseController
                                     $valRef = $notasRef[$codColRes] ?? null;
                                     $nomeRef = trim((string) ($linRef['materia_nome'] ?? ''));
                                     $canonRef = $this->canonicalMateriaNomeKey($nomeRef);
-                                    // [DEBUG TEMPORARIO] Diagnostico da Redacao no boletim combinado.
-                                    // Remover apos validar o 2o bimestre da Redacao.
-                                    if ($canonRef === 'redacao' || stripos($nomeRef, 'reda') !== false) {
-                                        $this->debugBoletim(sprintf(
-                                            'BOLETIM_REDACAO_DEBUG col_resolvida=%s mid=%d nome="%s" canon=%s celula=%s nota_resumo=%s colunas_disponiveis=[%s]',
-                                            (string) $codColRes,
-                                            $midRef,
-                                            $nomeRef,
-                                            $canonRef,
-                                            var_export($notasRef[$codColRes] ?? null, true),
-                                            var_export($linRef['nota_resumo'] ?? null, true),
-                                            implode(',', array_keys($notasRef))
-                                        ));
-                                    }
                                     // A Redação costuma participar de colunas diferentes das demais
                                     // matérias no evento de origem (ex.: só tem "Média", sem "Prova
                                     // Semanal"). Quando a célula da coluna específica vem vazia, usamos
@@ -3647,7 +3651,7 @@ class BoletimConfigController extends BaseController
             ]
         );
 
-        return [
+        $resultado = [
             'aluno' => $aluno,
             'periodo_ref' => $periodoRef,
             'data_inicio' => substr((string) ($range['inicio'] ?? ''), 0, 10),
@@ -3660,6 +3664,11 @@ class BoletimConfigController extends BaseController
             'erro_formula' => $final['erro_formula'],
             'matriz_materias' => $matrizMaterias,
         ];
+        if ($regraIdCache > 0) {
+            $this->simulacaoAlunoCache[$chaveSimulacao] = $resultado;
+        }
+
+        return $resultado;
     }
 
     /**
@@ -3957,20 +3966,6 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * [DEBUG TEMPORARIO] Escreve diagnostico do boletim num arquivo fixo e conhecido
-     * (storage/logs/boletim_debug.log), alem do error_log padrao. Remover apos validar.
-     */
-    private function debugBoletim(string $msg): void
-    {
-        error_log($msg);
-        $dir = __DIR__ . '/../../../storage/logs';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0775, true);
-        }
-        @file_put_contents($dir . '/boletim_debug.log', date('c') . ' ' . $msg . "\n", FILE_APPEND);
-    }
-
-    /**
      * @param array<int, array<int, float>> $matrizPorCodigo
      * @param array<int, string> $materiaNomesPorId
      * @return array{colunas: list<array{codigo: string, nome: string, valor_global?: bool}>, linhas: list<array{materia_id: int, materia_nome: string, notas: array<string, float|null>, nota_resumo: ?float, metodo_resumo: string, erro_resumo: ?string}>}|null
@@ -3985,8 +3980,6 @@ class BoletimConfigController extends BaseController
         array $materiasAgrupadasHerdadas = [],
         array $contextoAluno = []
     ): ?array {
-        // [DEBUG TEMPORARIO] Carimbo para confirmar que o codigo novo esta no ar.
-        $this->debugBoletim('BOLETIM_DEBUG_V2 montarMatriz regra=' . (string) ($regra['codigo'] ?? '?') . ' exibir_em=' . (string) ($regra['exibir_em'] ?? '?'));
         $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
         $grp = $this->aplicarAgrupamentoLinhasPorComponente($componentesRegra, $matrizPorCodigo, $materiaNomesPorId, $matrizPercentStatsPorCodigo);
         $matrizPorCodigo = $grp['matriz_por_codigo'];
@@ -4303,23 +4296,6 @@ class BoletimConfigController extends BaseController
                 'metodo_resumo' => $resumo['metodo'],
                 'erro_resumo' => $resumo['erro'],
             ];
-        }
-
-        // [DEBUG TEMPORARIO] Loga as linhas de Redacao com as notas por coluna.
-        foreach ($linhas as $linhaDbg) {
-            $nomeDbg = (string) ($linhaDbg['materia_nome'] ?? '');
-            if (stripos($nomeDbg, 'reda') === false && $this->canonicalMateriaNomeKey($nomeDbg) !== 'redacao') {
-                continue;
-            }
-            $notasDbg = [];
-            foreach ((array) ($linhaDbg['notas'] ?? []) as $kDbg => $vDbg) {
-                $notasDbg[] = $kDbg . '=' . var_export($vDbg, true);
-            }
-            $this->debugBoletim('BOLETIM_DEBUG_V2 LINHA_REDACAO regra=' . (string) ($regra['codigo'] ?? '?')
-                . ' mid=' . (int) ($linhaDbg['materia_id'] ?? 0)
-                . ' nome="' . $nomeDbg . '"'
-                . ' resumo=' . var_export($linhaDbg['nota_resumo'] ?? null, true)
-                . ' notas=[' . implode(', ', $notasDbg) . ']');
         }
 
         return [

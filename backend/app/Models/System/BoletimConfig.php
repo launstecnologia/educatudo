@@ -2672,9 +2672,23 @@ class BoletimConfig
         if (empty($blocoIds)) {
             return [];
         }
-        $max = 40;
-        if (count($blocoIds) > $max) {
-            $blocoIds = array_slice($blocoIds, 0, $max);
+        if (count($blocoIds) > 80) {
+            $merged = [];
+            foreach (array_chunk($blocoIds, 80) as $chunkBlocos) {
+                $merged = array_merge(
+                    $merged,
+                    $this->getProvasFinalizadasByAlunoAndBlocos(
+                        $alunoId,
+                        $chunkBlocos,
+                        $inicio,
+                        $fim,
+                        $filtroTitulo,
+                        $materiaId
+                    )
+                );
+            }
+
+            return $this->mergeProvasOnlineENotasLancadas($merged, []);
         }
         $placeholders = implode(',', array_fill(0, count($blocoIds), '?'));
 
@@ -2766,8 +2780,47 @@ class BoletimConfig
         if ($alunoIds === [] || $blocoIds === []) {
             return [];
         }
-        if (count($blocoIds) > 40) {
-            $blocoIds = array_slice($blocoIds, 0, 40);
+        if (count($alunoIds) > 500) {
+            $porAluno = [];
+            foreach (array_chunk($alunoIds, 500) as $chunkAlunos) {
+                foreach ($this->getProvasFinalizadasPorAlunosAndBlocos(
+                    $chunkAlunos,
+                    $blocoIds,
+                    $inicio,
+                    $fim,
+                    $filtroTitulo,
+                    $materiaId,
+                    $incluirEstatisticasQuestoes
+                ) as $aid => $rows) {
+                    $porAluno[(int) $aid] = $rows;
+                }
+            }
+
+            return $porAluno;
+        }
+        if (count($blocoIds) > 80) {
+            $porAluno = [];
+            foreach (array_chunk($blocoIds, 80) as $chunkBlocos) {
+                foreach ($this->getProvasFinalizadasPorAlunosAndBlocos(
+                    $alunoIds,
+                    $chunkBlocos,
+                    $inicio,
+                    $fim,
+                    $filtroTitulo,
+                    $materiaId,
+                    $incluirEstatisticasQuestoes
+                ) as $aid => $rows) {
+                    $aid = (int) $aid;
+                    if (!isset($porAluno[$aid])) {
+                        $porAluno[$aid] = [];
+                    }
+                    foreach ($rows as $row) {
+                        $porAluno[$aid][] = $row;
+                    }
+                }
+            }
+
+            return $porAluno;
         }
 
         $phAlunos = implode(',', array_fill(0, count($alunoIds), '?'));
