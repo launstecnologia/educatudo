@@ -26,7 +26,7 @@ $renderCard = static function (array $p): void {
             <?php endif; ?>
         </div>
         <?php if (!empty($p['capa_url'])): ?>
-            <img src="<?= htmlspecialchars($p['capa_url']) ?>" alt="" class="w-full h-28 object-cover rounded-lg mb-3">
+            <img src="<?= htmlspecialchars($p['capa_url']) ?>" alt="" class="w-full aspect-[3/1] object-cover rounded-lg mb-3">
         <?php endif; ?>
         <h2 class="font-semibold text-gray-900 line-clamp-2"><?= htmlspecialchars($p['titulo'] ?? '') ?></h2>
         <?php if (!empty($p['area'])): ?>

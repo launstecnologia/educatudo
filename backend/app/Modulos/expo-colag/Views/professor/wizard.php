@@ -202,7 +202,13 @@ $steps = [
     border-radius: .75rem;
     overflow: hidden;
     background: #f8fafc;
-    min-height: 10rem;
+    aspect-ratio: 3 / 1;
+    width: 100%;
+}
+#expoWizard .capa-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 #expoWizard .proposta-card {
     border: 1px solid #e2e8f0;
@@ -382,10 +388,10 @@ $steps = [
                     <label class="block text-sm font-medium text-gray-700 mb-1">Capa (JPG/PNG/WebP)</label>
                     <div class="capa-box mb-2">
                         <img id="capaPreview" src="<?= $capaSrc !== '' ? htmlspecialchars($capaSrc) : '' ?>" alt="Prévia da capa"
-                             class="w-full h-40 object-cover <?= $capaSrc !== '' ? '' : 'hidden' ?>">
-                        <div id="capaPlaceholder" class="<?= $capaSrc !== '' ? 'hidden' : '' ?> flex flex-col items-center justify-center h-40 px-4 text-center text-sm text-gray-500">
+                             class="absolute inset-0 <?= $capaSrc !== '' ? '' : 'hidden' ?>">
+                        <div id="capaPlaceholder" class="<?= $capaSrc !== '' ? 'hidden' : '' ?> absolute inset-0 flex flex-col items-center justify-center px-4 text-center text-sm text-gray-500">
                             <span>Nenhuma capa ainda</span>
-                            <span class="text-xs mt-1">Escolha o arquivo e clique em Subir capa</span>
+                            <span class="text-xs mt-1">Ideal: 1200 × 400 px</span>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -399,7 +405,7 @@ $steps = [
                         </button>
                     </div>
                     <p id="capaStatus" class="hidden text-sm mt-2 rounded-lg px-3 py-2" role="status"></p>
-                    <p class="text-xs text-gray-500 mt-1">Até 10 MB. JPG, PNG ou WebP. Fotos grandes são compactadas automaticamente.</p>
+                    <p class="text-xs text-gray-500 mt-1">Tamanho ideal: <strong class="font-semibold text-gray-700">1200 × 400 pixels</strong> (paisagem 3:1). Assim a capa preenche a prévia e a tela do aluno sem cortes. Até 10 MB. JPG, PNG ou WebP.</p>
                     <input type="hidden" name="capa_url" id="campoCapaUrl" value="<?= htmlspecialchars($capaUrl) ?>">
                 </div>
             </div>

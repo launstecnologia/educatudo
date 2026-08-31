@@ -26,7 +26,7 @@ $titulo = $stand['titulo'] ?? ($cancelado ? 'Stand indisponível' : 'Stand não 
         );
     ?>
     <?php if ($capaOk): ?>
-        <div class="w-full h-48 sm:h-64 bg-slate-800 overflow-hidden">
+        <div class="w-full aspect-[3/1] bg-slate-800 overflow-hidden">
             <img src="<?= $e($stand['capa_url']) ?>" alt="" class="w-full h-full object-cover">
         </div>
     <?php else: ?>

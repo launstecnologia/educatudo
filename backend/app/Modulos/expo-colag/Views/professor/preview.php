@@ -14,7 +14,7 @@ $etapas = $relacoes['etapas'] ?? [];
         <?php
         $capaSrc = (string) ($projeto['capa_src'] ?? ExpoColagService::resolverUrlCapa((string) ($projeto['capa_url'] ?? ''), (int) ($projeto['id'] ?? 0)));
         if ($capaSrc !== ''): ?>
-            <img src="<?= htmlspecialchars($capaSrc) ?>" alt="" class="w-full max-h-56 object-cover rounded-lg">
+            <img src="<?= htmlspecialchars($capaSrc) ?>" alt="" class="w-full aspect-[3/1] object-cover rounded-lg">
         <?php endif; ?>
         <?php if (!empty($projeto['area'])): ?>
             <p class="text-xs font-medium uppercase tracking-wide text-gray-500"><?= htmlspecialchars($projeto['area']) ?></p>
