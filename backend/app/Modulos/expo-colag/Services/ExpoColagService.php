@@ -1290,10 +1290,15 @@ class ExpoColagService
     {
         $materias = $this->db->fetchAll('SELECT id, nome FROM materias ORDER BY nome ASC') ?: [];
         try {
-            $professores = $this->db->fetchAll('SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome ASC') ?: [];
+            $professores = $this->db->fetchAll('SELECT id, nome, materias FROM professores WHERE ativo = 1 ORDER BY nome ASC') ?: [];
         } catch (Throwable $e) {
-            $professores = $this->db->fetchAll('SELECT id, nome FROM professores ORDER BY nome ASC') ?: [];
+            try {
+                $professores = $this->db->fetchAll('SELECT id, nome, materias FROM professores ORDER BY nome ASC') ?: [];
+            } catch (Throwable $e2) {
+                $professores = $this->db->fetchAll('SELECT id, nome FROM professores ORDER BY nome ASC') ?: [];
+            }
         }
+        $materias = $this->anexarProfessoresNasMaterias($materias, $professores);
         try {
             $turmas = $this->db->fetchAll(
                 'SELECT id, nome, serie, serie_id FROM turmas WHERE ativo = 1 ORDER BY serie ASC, nome ASC'
@@ -1410,6 +1415,120 @@ class ExpoColagService
         return $out;
     }
 
+    /**
+     * Liga cada matéria aos professores que a lecionam (cadastro + grade horária).
+     *
+     * @param list<array<string,mixed>> $materias
+     * @param list<array<string,mixed>> $professores
+     * @return list<array<string,mixed>>
+     */
+    private function anexarProfessoresNasMaterias(array $materias, array $professores): array
+    {
+        $porId = [];
+        $porNome = [];
+        foreach ($materias as $m) {
+            $id = (int) ($m['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $porId[$id] = [];
+            $chave = $this->normalizarNomeMateria((string) ($m['nome'] ?? ''));
+            if ($chave !== '') {
+                $porNome[$chave] = $id;
+            }
+        }
+
+        foreach ($professores as $p) {
+            $pid = (int) ($p['id'] ?? 0);
+            if ($pid <= 0) {
+                continue;
+            }
+            $info = [
+                'id' => $pid,
+                'nome' => (string) ($p['nome'] ?? ''),
+            ];
+            $lista = $p['materias'] ?? [];
+            if (is_string($lista) && $lista !== '') {
+                $decoded = json_decode($lista, true);
+                $lista = is_array($decoded) ? $decoded : [];
+            }
+            if (!is_array($lista)) {
+                continue;
+            }
+            foreach ($lista as $item) {
+                $mid = 0;
+                if (is_array($item)) {
+                    if (isset($item['id']) && is_numeric($item['id'])) {
+                        $mid = (int) $item['id'];
+                    } elseif (isset($item['nome']) && is_string($item['nome'])) {
+                        $mid = $porNome[$this->normalizarNomeMateria($item['nome'])] ?? 0;
+                    }
+                } elseif (is_numeric($item)) {
+                    $mid = (int) $item;
+                } elseif (is_string($item)) {
+                    $mid = $porNome[$this->normalizarNomeMateria($item)] ?? 0;
+                }
+                if ($mid > 0 && isset($porId[$mid])) {
+                    $porId[$mid][$pid] = $info;
+                }
+            }
+        }
+
+        try {
+            $grade = $this->db->fetchAll(
+                'SELECT DISTINCT professor_id, materia_id
+                 FROM grade_horaria
+                 WHERE professor_id IS NOT NULL AND materia_id IS NOT NULL'
+            ) ?: [];
+            $profsPorId = [];
+            foreach ($professores as $p) {
+                $profsPorId[(int) ($p['id'] ?? 0)] = (string) ($p['nome'] ?? '');
+            }
+            foreach ($grade as $row) {
+                $pid = (int) ($row['professor_id'] ?? 0);
+                $mid = (int) ($row['materia_id'] ?? 0);
+                if ($pid <= 0 || $mid <= 0 || !isset($porId[$mid])) {
+                    continue;
+                }
+                if (!isset($profsPorId[$pid])) {
+                    continue;
+                }
+                $porId[$mid][$pid] = [
+                    'id' => $pid,
+                    'nome' => $profsPorId[$pid],
+                ];
+            }
+        } catch (Throwable $e) {
+            // grade_horaria pode não existir em tenants antigos
+        }
+
+        foreach ($materias as &$m) {
+            $id = (int) ($m['id'] ?? 0);
+            $lista = array_values($porId[$id] ?? []);
+            usort($lista, static function ($a, $b) {
+                return strcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+            });
+            $m['professores'] = $lista;
+        }
+        unset($m);
+
+        return $materias;
+    }
+
+    private function normalizarNomeMateria(string $nome): string
+    {
+        $n = mb_strtolower(trim($nome), 'UTF-8');
+        $n = strtr($n, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'ä' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ç' => 'c',
+        ]);
+        return trim($n);
+    }
+
     /** “1ª Série” e “1º Ano” viram a mesma chave. */
     private function chaveSerieNormalizada(string $nome): string
     {
@@ -1499,6 +1618,28 @@ class ExpoColagService
         return $slug !== '' ? $slug : 'tenant';
     }
 
+    private static function raizBackend(): string
+    {
+        if (defined('BASE_PATH') && (string) BASE_PATH !== '') {
+            return rtrim((string) BASE_PATH, '/');
+        }
+        return dirname(__DIR__, 4);
+    }
+
+    private static function garantirPasta(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            $old = umask(0002);
+            @mkdir($dir, 0775, true);
+            umask($old);
+            if (!is_dir($dir)) {
+                return false;
+            }
+            @chmod($dir, 0775);
+        }
+        return true;
+    }
+
     /** Aceita só path gerado no upload ou a URL já gravada deste projeto. */
     private function sanitizarCapaUrl(string $url, string $existente): string
     {
@@ -1527,8 +1668,12 @@ class ExpoColagService
         }
         $path = (string) (parse_url($url, PHP_URL_PATH) ?: $url);
         $base = defined('URL') ? rtrim((string) URL, '/') : '';
-        if (str_contains($path, '/storage/uploads/') && $projetoId > 0) {
-            return $base . '/expo-colag/midia/' . $projetoId . '/capa';
+        if ($projetoId > 0) {
+            $qs = '';
+            if (preg_match('/expo_colag_\d+_(\d+)\./i', $path, $m)) {
+                $qs = '?v=' . $m[1];
+            }
+            return $base . '/expo-colag/midia/' . $projetoId . '/capa' . $qs;
         }
         if (str_starts_with($path, '/uploads/') || str_starts_with($path, '/expo-colag/midia/')) {
             return $base . $path;
@@ -1557,7 +1702,7 @@ class ExpoColagService
             return null;
         }
         $slug = self::slugTenant();
-        $backend = dirname(__DIR__, 4);
+        $backend = self::raizBackend();
         $candidatos = [
             $backend . '/public/uploads/expo-colag/' . $slug . '/' . $filename,
             $backend . '/storage/uploads/expo-colag/' . $slug . '/' . $filename,
@@ -1607,17 +1752,49 @@ class ExpoColagService
         $ext = $allowed[$mime];
         $filename = 'expo_colag_' . $projetoId . '_' . time() . '.' . $ext;
         $relDir = 'expo-colag/' . $slug;
-        // public/uploads é servido pelo Nginx em /uploads/ (storage/uploads é bloqueado)
-        $base = dirname(__DIR__, 4) . '/public/uploads/' . $relDir;
-        if (!is_dir($base) && !@mkdir($base, 0755, true) && !is_dir($base)) {
-            return ['success' => false, 'error' => 'Falha ao criar pasta da capa.'];
-        }
-        $dest = $base . '/' . $filename;
-        if (!@move_uploaded_file($tmp, $dest)) {
-            return ['success' => false, 'error' => 'Falha ao gravar a capa.'];
+        $backend = self::raizBackend();
+        $urlCanonico = '/uploads/' . $relDir . '/' . $filename;
+        $destinos = [
+            $backend . '/public/uploads/' . $relDir,
+            $backend . '/storage/uploads/' . $relDir,
+        ];
+
+        $ultimoErro = 'Falha ao criar pasta da capa.';
+        $gravou = false;
+        foreach ($destinos as $dir) {
+            if (!self::garantirPasta($dir)) {
+                continue;
+            }
+            $dest = $dir . '/' . $filename;
+            $moveu = @move_uploaded_file($tmp, $dest);
+            if (!$moveu && is_uploaded_file($tmp)) {
+                $moveu = @copy($tmp, $dest);
+            }
+            if ($moveu) {
+                @chmod($dest, 0644);
+                if (is_file($dest) && filesize($dest) > 0) {
+                    $gravou = true;
+                    break;
+                }
+            }
+            $ultimoErro = 'Falha ao gravar a capa.';
         }
 
-        return ['success' => true, 'url' => '/uploads/' . $relDir . '/' . $filename];
+        if (!$gravou) {
+            if (class_exists('Logger')) {
+                Logger::error('Expo Colag: falha no upload da capa', [
+                    'projeto_id' => $projetoId,
+                    'slug' => $slug,
+                    'public_dir' => $destinos[0],
+                    'storage_dir' => $destinos[1],
+                    'public_existe' => is_dir(dirname($destinos[0])),
+                    'storage_existe' => is_dir(dirname($destinos[1])),
+                ], 'expo-colag');
+            }
+            return ['success' => false, 'error' => $ultimoErro];
+        }
+
+        return ['success' => true, 'url' => $urlCanonico];
     }
 
     private function modoIngressoValido($value): string

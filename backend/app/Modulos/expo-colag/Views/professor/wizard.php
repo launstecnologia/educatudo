@@ -156,6 +156,10 @@ $steps = [
     cursor: pointer;
     margin: 0;
 }
+#expoWizard .expo-chip.hidden,
+#expoWizard .expo-chip.is-oculto {
+    display: none !important;
+}
 #expoWizard .expo-chip span {
     display: inline-block;
     padding: .4rem .75rem;
@@ -166,6 +170,22 @@ $steps = [
     font-size: .8125rem;
     line-height: 1.25;
     transition: background .15s, color .15s, border-color .15s;
+}
+#expoWizard .expo-chip .chip-prof {
+    display: none;
+    font-size: .65rem;
+    font-weight: 500;
+    opacity: .9;
+    margin-top: .15rem;
+    line-height: 1.2;
+}
+#expoWizard .expo-chip input:checked + span .chip-prof {
+    display: block;
+}
+#expoWizard .expo-chip.is-sugerido span {
+    border-color: #1e3a8a;
+    background: #eef2ff;
+    color: #1e3a8a;
 }
 #expoWizard .expo-chip input:checked + span {
     background: #1e3a8a;
@@ -389,14 +409,45 @@ $steps = [
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm mb-2">
                 <div id="listaMateriasChips" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-0.5">
                     <?php foreach ($materias as $m): ?>
-                        <label class="expo-chip" data-nome="<?= htmlspecialchars(mb_strtolower((string) $m['nome'])) ?>">
+                        <?php
+                        $profsMat = is_array($m['professores'] ?? null) ? $m['professores'] : [];
+                        $profIdsMat = [];
+                        $profNomesMat = [];
+                        foreach ($profsMat as $pm) {
+                            $pidMat = (int) ($pm['id'] ?? 0);
+                            $nomeMat = trim((string) ($pm['nome'] ?? ''));
+                            if ($pidMat > 0) {
+                                $profIdsMat[] = $pidMat;
+                            }
+                            if ($nomeMat !== '') {
+                                $profNomesMat[] = $nomeMat;
+                            }
+                        }
+                        $profLabel = $profNomesMat !== [] ? implode(', ', $profNomesMat) : '';
+                        $nomeBusca = mb_strtolower((string) ($m['nome'] ?? ''), 'UTF-8');
+                        if ($profLabel !== '') {
+                            $nomeBusca .= ' ' . mb_strtolower($profLabel, 'UTF-8');
+                        }
+                        ?>
+                        <label class="expo-chip"
+                               data-nome="<?= htmlspecialchars($nomeBusca) ?>"
+                               data-materia-nome="<?= htmlspecialchars((string) ($m['nome'] ?? '')) ?>"
+                               data-professor-ids="<?= htmlspecialchars(implode(',', $profIdsMat)) ?>"
+                               data-professor-nomes="<?= htmlspecialchars($profLabel) ?>">
                             <input type="checkbox" name="materias_conectadas[]" value="<?= (int) $m['id'] ?>" class="sr-only"
                                    <?= in_array((int) $m['id'], $matConectadas, true) ? 'checked' : '' ?>>
-                            <span><?= htmlspecialchars($m['nome']) ?></span>
+                            <span>
+                                <?= htmlspecialchars($m['nome']) ?>
+                                <?php if ($profLabel !== ''): ?>
+                                    <small class="chip-prof"><?= htmlspecialchars($profLabel) ?></small>
+                                <?php endif; ?>
+                            </span>
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Toque nas caixinhas para selecionar várias.</p>
+                <p id="filtroMateriasVazio" class="hidden text-sm text-gray-500 mt-2">Nenhuma matéria encontrada com esse nome.</p>
+                <div id="resumoMaterias" class="hidden mt-3 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-sm text-slate-700 space-y-1"></div>
+                <p class="text-xs text-gray-500 mt-1">Digite para filtrar. Ao selecionar, o professor da matéria aparece abaixo e é marcado como parceiro (você pode desmarcar).</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Professores parceiros</label>
@@ -412,7 +463,8 @@ $steps = [
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Toque nas caixinhas para selecionar os parceiros.</p>
+                <p id="filtroProfsVazio" class="hidden text-sm text-gray-500 mt-2">Nenhum professor encontrado com esse nome.</p>
+                <p class="text-xs text-gray-500 mt-1">Os professores das matérias selecionadas são marcados automaticamente. Toque para desmarcar se não forem parceiros.</p>
             </div>
         </section>
 
@@ -800,20 +852,156 @@ $steps = [
     document.getElementById('btnPrev').addEventListener('click', function () { irParaEtapa(step - 1); });
     document.getElementById('btnNext').addEventListener('click', function () { irParaEtapa(step + 1); });
 
-    function filtrarChips(inputId, listId) {
+    function normalizarBusca(texto) {
+        return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    }
+
+    function filtrarChips(inputId, listId, vazioId) {
         var input = document.getElementById(inputId);
         var list = document.getElementById(listId);
+        var vazio = vazioId ? document.getElementById(vazioId) : null;
         if (!input || !list) return;
-        input.addEventListener('input', function () {
-            var q = (input.value || '').toLowerCase().trim();
+        function aplicar() {
+            var q = normalizarBusca(input.value);
+            var visiveis = 0;
             list.querySelectorAll('.expo-chip').forEach(function (lab) {
-                var nome = lab.getAttribute('data-nome') || '';
-                lab.classList.toggle('hidden', q !== '' && nome.indexOf(q) === -1);
+                var nome = normalizarBusca(lab.getAttribute('data-nome') || '');
+                var marcado = !!(lab.querySelector('input') && lab.querySelector('input').checked);
+                var some = q !== '' && nome.indexOf(q) === -1 && !marcado;
+                lab.classList.toggle('is-oculto', some);
+                lab.classList.toggle('hidden', some);
+                if (!some) visiveis++;
+            });
+            if (vazio) vazio.classList.toggle('hidden', visiveis > 0 || q === '');
+        }
+        input.addEventListener('input', aplicar);
+        input.addEventListener('keyup', aplicar);
+        input.addEventListener('search', aplicar);
+    }
+    filtrarChips('filtroMaterias', 'listaMateriasChips', 'filtroMateriasVazio');
+    filtrarChips('filtroProfessores', 'listaProfsChips', 'filtroProfsVazio');
+
+    function idsProfessoresDasMateriasSelecionadas() {
+        var ids = {};
+        document.querySelectorAll('#listaMateriasChips .expo-chip input:checked').forEach(function (cb) {
+            var lab = cb.closest('.expo-chip');
+            if (!lab) return;
+            (lab.getAttribute('data-professor-ids') || '').split(',').forEach(function (raw) {
+                var id = parseInt(raw, 10);
+                if (id) ids[id] = true;
             });
         });
+        return ids;
     }
-    filtrarChips('filtroMaterias', 'listaMateriasChips');
-    filtrarChips('filtroProfessores', 'listaProfsChips');
+
+    function aindaVinculadoPorMateria(professorId) {
+        var ids = idsProfessoresDasMateriasSelecionadas();
+        return !!ids[professorId];
+    }
+
+    function atualizarResumoMaterias() {
+        var box = document.getElementById('resumoMaterias');
+        if (!box) return;
+        var linhas = [];
+        document.querySelectorAll('#listaMateriasChips .expo-chip').forEach(function (lab) {
+            var cb = lab.querySelector('input');
+            if (!cb || !cb.checked) return;
+            var materia = lab.getAttribute('data-materia-nome') || (lab.querySelector('span') || {}).textContent || '';
+            var profs = (lab.getAttribute('data-professor-nomes') || '').trim();
+            linhas.push({ materia: materia.trim(), profs: profs });
+        });
+        if (linhas.length === 0) {
+            box.classList.add('hidden');
+            box.textContent = '';
+            return;
+        }
+        box.classList.remove('hidden');
+        box.textContent = '';
+        linhas.forEach(function (item) {
+            var div = document.createElement('div');
+            var strong = document.createElement('span');
+            strong.className = 'font-semibold text-slate-800';
+            strong.textContent = item.materia;
+            var rest = document.createElement('span');
+            rest.className = 'text-slate-600';
+            rest.textContent = item.profs ? ' — ' + item.profs : ' — professor não cadastrado nesta matéria';
+            div.appendChild(strong);
+            div.appendChild(rest);
+            box.appendChild(div);
+        });
+    }
+
+    function marcarProfessoresDoChip(chip, incluir) {
+        if (!chip) return;
+        (chip.getAttribute('data-professor-ids') || '').split(',').forEach(function (raw) {
+            var id = parseInt(raw, 10);
+            if (!id) return;
+            var profCb = document.querySelector('#listaProfsChips input[value="' + id + '"]');
+            if (!profCb) return;
+            if (incluir) {
+                if (!profCb.checked && profCb.getAttribute('data-auto-materia') !== '0') {
+                    profCb.checked = true;
+                    profCb.setAttribute('data-auto-materia', '1');
+                }
+            } else if (profCb.getAttribute('data-auto-materia') === '1' && !aindaVinculadoPorMateria(id)) {
+                profCb.checked = false;
+                profCb.removeAttribute('data-auto-materia');
+            }
+        });
+    }
+
+    function destacarProfessoresParceiros() {
+        var ids = idsProfessoresDasMateriasSelecionadas();
+        var list = document.getElementById('listaProfsChips');
+        if (!list) return;
+        var chips = Array.prototype.slice.call(list.querySelectorAll('.expo-chip'));
+        chips.forEach(function (lab) {
+            var cb = lab.querySelector('input');
+            var pid = cb ? parseInt(cb.value, 10) : 0;
+            lab.classList.toggle('is-sugerido', !!ids[pid] && !(cb && cb.checked));
+        });
+        chips.sort(function (a, b) {
+            var aSug = a.classList.contains('is-sugerido') || !!(a.querySelector('input') && a.querySelector('input').checked) ? 0 : 1;
+            var bSug = b.classList.contains('is-sugerido') || !!(b.querySelector('input') && b.querySelector('input').checked) ? 0 : 1;
+            return aSug - bSug;
+        });
+        chips.forEach(function (lab) { list.appendChild(lab); });
+    }
+
+    function aoMudarMateria(ev) {
+        var cb = ev && ev.target;
+        if (cb && cb.name === 'materias_conectadas[]') {
+            marcarProfessoresDoChip(cb.closest('.expo-chip'), !!cb.checked);
+        }
+        atualizarResumoMaterias();
+        destacarProfessoresParceiros();
+        agendarAutosave();
+    }
+
+    var listaMaterias = document.getElementById('listaMateriasChips');
+    if (listaMaterias) {
+        listaMaterias.addEventListener('change', function (ev) {
+            if (ev.target && ev.target.name === 'materias_conectadas[]') {
+                aoMudarMateria(ev);
+            }
+        });
+    }
+    var listaProfs = document.getElementById('listaProfsChips');
+    if (listaProfs) {
+        listaProfs.addEventListener('change', function (ev) {
+            var cb = ev.target;
+            if (!cb || cb.name !== 'professores_parceiros[]') return;
+            if (cb.getAttribute('data-auto-materia') === '1' && !cb.checked) {
+                cb.setAttribute('data-auto-materia', '0');
+            }
+            cb.closest('.expo-chip') && cb.closest('.expo-chip').classList.toggle(
+                'is-sugerido',
+                !cb.checked && aindaVinculadoPorMateria(parseInt(cb.value, 10))
+            );
+        });
+    }
+    atualizarResumoMaterias();
+    destacarProfessoresParceiros();
 
     function mostrarCapaPreview(src) {
         var img = document.getElementById('capaPreview');
