@@ -1290,15 +1290,10 @@ class ExpoColagService
     {
         $materias = $this->db->fetchAll('SELECT id, nome FROM materias ORDER BY nome ASC') ?: [];
         try {
-            $professores = $this->db->fetchAll('SELECT id, nome, materias FROM professores WHERE ativo = 1 ORDER BY nome ASC') ?: [];
+            $professores = $this->db->fetchAll('SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome ASC') ?: [];
         } catch (Throwable $e) {
-            try {
-                $professores = $this->db->fetchAll('SELECT id, nome, materias FROM professores ORDER BY nome ASC') ?: [];
-            } catch (Throwable $e2) {
-                $professores = $this->db->fetchAll('SELECT id, nome FROM professores ORDER BY nome ASC') ?: [];
-            }
+            $professores = $this->db->fetchAll('SELECT id, nome FROM professores ORDER BY nome ASC') ?: [];
         }
-        $materias = $this->anexarProfessoresNasMaterias($materias, $professores);
         try {
             $turmas = $this->db->fetchAll(
                 'SELECT id, nome, serie, serie_id FROM turmas WHERE ativo = 1 ORDER BY serie ASC, nome ASC'
@@ -1413,120 +1408,6 @@ class ExpoColagService
         });
 
         return $out;
-    }
-
-    /**
-     * Liga cada matéria aos professores que a lecionam (cadastro + grade horária).
-     *
-     * @param list<array<string,mixed>> $materias
-     * @param list<array<string,mixed>> $professores
-     * @return list<array<string,mixed>>
-     */
-    private function anexarProfessoresNasMaterias(array $materias, array $professores): array
-    {
-        $porId = [];
-        $porNome = [];
-        foreach ($materias as $m) {
-            $id = (int) ($m['id'] ?? 0);
-            if ($id <= 0) {
-                continue;
-            }
-            $porId[$id] = [];
-            $chave = $this->normalizarNomeMateria((string) ($m['nome'] ?? ''));
-            if ($chave !== '') {
-                $porNome[$chave] = $id;
-            }
-        }
-
-        foreach ($professores as $p) {
-            $pid = (int) ($p['id'] ?? 0);
-            if ($pid <= 0) {
-                continue;
-            }
-            $info = [
-                'id' => $pid,
-                'nome' => (string) ($p['nome'] ?? ''),
-            ];
-            $lista = $p['materias'] ?? [];
-            if (is_string($lista) && $lista !== '') {
-                $decoded = json_decode($lista, true);
-                $lista = is_array($decoded) ? $decoded : [];
-            }
-            if (!is_array($lista)) {
-                continue;
-            }
-            foreach ($lista as $item) {
-                $mid = 0;
-                if (is_array($item)) {
-                    if (isset($item['id']) && is_numeric($item['id'])) {
-                        $mid = (int) $item['id'];
-                    } elseif (isset($item['nome']) && is_string($item['nome'])) {
-                        $mid = $porNome[$this->normalizarNomeMateria($item['nome'])] ?? 0;
-                    }
-                } elseif (is_numeric($item)) {
-                    $mid = (int) $item;
-                } elseif (is_string($item)) {
-                    $mid = $porNome[$this->normalizarNomeMateria($item)] ?? 0;
-                }
-                if ($mid > 0 && isset($porId[$mid])) {
-                    $porId[$mid][$pid] = $info;
-                }
-            }
-        }
-
-        try {
-            $grade = $this->db->fetchAll(
-                'SELECT DISTINCT professor_id, materia_id
-                 FROM grade_horaria
-                 WHERE professor_id IS NOT NULL AND materia_id IS NOT NULL'
-            ) ?: [];
-            $profsPorId = [];
-            foreach ($professores as $p) {
-                $profsPorId[(int) ($p['id'] ?? 0)] = (string) ($p['nome'] ?? '');
-            }
-            foreach ($grade as $row) {
-                $pid = (int) ($row['professor_id'] ?? 0);
-                $mid = (int) ($row['materia_id'] ?? 0);
-                if ($pid <= 0 || $mid <= 0 || !isset($porId[$mid])) {
-                    continue;
-                }
-                if (!isset($profsPorId[$pid])) {
-                    continue;
-                }
-                $porId[$mid][$pid] = [
-                    'id' => $pid,
-                    'nome' => $profsPorId[$pid],
-                ];
-            }
-        } catch (Throwable $e) {
-            // grade_horaria pode não existir em tenants antigos
-        }
-
-        foreach ($materias as &$m) {
-            $id = (int) ($m['id'] ?? 0);
-            $lista = array_values($porId[$id] ?? []);
-            usort($lista, static function ($a, $b) {
-                return strcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
-            });
-            $m['professores'] = $lista;
-        }
-        unset($m);
-
-        return $materias;
-    }
-
-    private function normalizarNomeMateria(string $nome): string
-    {
-        $n = mb_strtolower(trim($nome), 'UTF-8');
-        $n = strtr($n, [
-            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'ä' => 'a',
-            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
-            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
-            'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
-            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
-            'ç' => 'c',
-        ]);
-        return trim($n);
     }
 
     /** “1ª Série” e “1º Ano” viram a mesma chave. */
