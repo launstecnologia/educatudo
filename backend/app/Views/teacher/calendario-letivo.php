@@ -2,39 +2,25 @@
 $eventos = $eventos ?? [];
 $ano     = (int) ($ano ?? date('Y'));
 
-$tipoLabels = [
-    'feriado'   => 'Feriado',
-    'recesso'   => 'Recesso',
-    'reposicao' => 'Reposição',
-    'evento'    => 'Evento',
-    'suspensao' => 'Suspensão',
-    'avaliacao' => 'Avaliação',
-];
-$tipoBg = [
-    'feriado'   => '#fee2e2',
-    'recesso'   => '#fef3c7',
-    'reposicao' => '#dcfce7',
-    'evento'    => '#dbeafe',
-    'suspensao' => '#f3f4f6',
-    'avaliacao' => '#ede9fe',
-];
-$tipoText = [
-    'feriado'   => '#991b1b',
-    'recesso'   => '#92400e',
-    'reposicao' => '#166534',
-    'evento'    => '#1e40af',
-    'suspensao' => '#374151',
-    'avaliacao' => '#5b21b6',
-];
-$tipoClasses = [
-    'feriado'   => 'bg-red-100 text-red-800',
-    'recesso'   => 'bg-amber-100 text-amber-800',
-    'reposicao' => 'bg-green-100 text-green-800',
-    'evento'    => 'bg-blue-100 text-blue-800',
-    'suspensao' => 'bg-gray-200 text-gray-700',
-    'avaliacao' => 'bg-violet-100 text-violet-800',
-];
+$tipoLabels = $tipoLabels ?? [];
+$tipoBg     = $tipoBg ?? [];
+$tipoText   = $tipoText ?? [];
+if ($tipoLabels === []) {
+    $tipoLabels = [
+        'feriado' => 'Feriado', 'recesso' => 'Recesso', 'reposicao' => 'Reposição',
+        'evento' => 'Evento', 'suspensao' => 'Suspensão', 'avaliacao' => 'Avaliação',
+    ];
+    $tipoBg = [
+        'feriado' => '#fee2e2', 'recesso' => '#fef3c7', 'reposicao' => '#dcfce7',
+        'evento' => '#dbeafe', 'suspensao' => '#f3f4f6', 'avaliacao' => '#ede9fe',
+    ];
+    $tipoText = [
+        'feriado' => '#991b1b', 'recesso' => '#92400e', 'reposicao' => '#166534',
+        'evento' => '#1e40af', 'suspensao' => '#374151', 'avaliacao' => '#5b21b6',
+    ];
+}
 
+$jsonJs = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 $eventMap = [];
 foreach ($eventos as $ev) {
     $start = strtotime((string) $ev['data_inicio']);
@@ -47,6 +33,14 @@ foreach ($eventos as $ev) {
 
 $mesesNomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 $mesAtual   = (int) date('m');
+$tiposUsados = [];
+foreach ($eventos as $ev) {
+    $t = (string) ($ev['tipo'] ?? '');
+    if ($t !== '') {
+        $tiposUsados[$t] = true;
+    }
+}
+$tipoLabelsLegenda = $tiposUsados === [] ? $tipoLabels : array_intersect_key($tipoLabels, $tiposUsados);
 ?>
 
 <div class="mb-6">
@@ -69,9 +63,9 @@ $mesAtual   = (int) date('m');
 
 <!-- Legenda -->
 <div class="flex flex-wrap gap-3 mb-5">
-    <?php foreach ($tipoLabels as $k => $v): ?>
-    <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full <?= $tipoClasses[$k] ?>">
-        <span class="w-2 h-2 rounded-full" style="background:<?= $tipoText[$k] ?>"></span><?= $v ?>
+    <?php foreach ($tipoLabelsLegenda as $k => $v): ?>
+    <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$k] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$k] ?? '#374151') ?>">
+        <span class="w-2 h-2 rounded-full" style="background:<?= htmlspecialchars($tipoText[$k] ?? '#6b7280') ?>"></span><?= htmlspecialchars((string) $v) ?>
     </span>
     <?php endforeach; ?>
     <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
@@ -155,7 +149,7 @@ $mesAtual   = (int) date('m');
                             'link_reuniao' => $e['link_reuniao'] ?? '',
                             'local_evento' => $e['local_evento'] ?? '',
                         ], array_values($evsDia)),
-                    ]), ENT_QUOTES);
+                    ], $jsonJs), ENT_QUOTES);
                 }
             ?>
             <div
@@ -189,7 +183,7 @@ $mesAtual   = (int) date('m');
                 <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) $ev['descricao']) ?></p>
                 <p class="text-xs text-gray-500"><?= $periodo ?><?= !empty($ev['local_evento']) ? ' · <i class="fa-solid fa-location-dot"></i> ' . htmlspecialchars($ev['local_evento']) : '' ?></p>
             </div>
-            <span class="text-xs font-semibold px-2 py-1 rounded-full <?= $tipoClasses[$t] ?? 'bg-gray-100 text-gray-600' ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$t] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$t] ?? '#374151') ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
             <?php if (!empty($ev['link_reuniao'])): ?>
             <a href="<?= htmlspecialchars($ev['link_reuniao']) ?>" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 text-xs"><i class="fa-solid fa-link"></i></a>
             <?php endif; ?>
@@ -219,12 +213,12 @@ $mesAtual   = (int) date('m');
 </div>
 
 <script>
-var MESES_NOMES = <?= json_encode($mesesNomes) ?>;
+var MESES_NOMES = <?= json_encode($mesesNomes, $jsonJs) ?>;
 var currentView = 'year';
 var currentMes  = <?= $mesAtual ?>;
 var anoAtual    = <?= $ano ?>;
-var tipoBg      = <?= json_encode($tipoBg) ?>;
-var tipoText    = <?= json_encode($tipoText) ?>;
+var tipoBg      = <?= json_encode($tipoBg, $jsonJs) ?>;
+var tipoText    = <?= json_encode($tipoText, $jsonJs) ?>;
 var eventData   = <?php
     $jsMap = [];
     foreach ($eventMap as $k => $evs) {
@@ -238,7 +232,7 @@ var eventData   = <?php
             'local_evento' => $e['local_evento'] ?? '',
         ], array_values($evs));
     }
-    echo json_encode($jsMap);
+    echo json_encode($jsMap, $jsonJs);
 ?>;
 
 function setView(v) {

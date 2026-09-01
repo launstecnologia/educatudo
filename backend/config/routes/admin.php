@@ -445,6 +445,8 @@ $router->get('/admin/calendario-letivo', 'Admin/SchoolCalendarController@index')
 $router->post('/admin/calendario-letivo/salvar-ano', 'Admin/SchoolCalendarController@salvarAno');
 $router->post('/admin/calendario-letivo/salvar-evento', 'Admin/SchoolCalendarController@salvarEvento');
 $router->post('/admin/calendario-letivo/excluir-evento', 'Admin/SchoolCalendarController@excluirEvento');
+$router->post('/admin/calendario-letivo/salvar-tipo', 'Admin/SchoolCalendarController@salvarTipo');
+$router->post('/admin/calendario-letivo/excluir-tipo', 'Admin/SchoolCalendarController@excluirTipo');
 
 // Documentos Institucionais (PPP, Regimento) + Documentos do Professor
 $router->get('/admin/documentos-institucionais', 'Admin/InstitutionalDocsController@index');

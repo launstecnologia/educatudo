@@ -25,6 +25,7 @@ class SchoolCalendarController extends AdminBaseController
             ? $service->status((int) $cfg['id'], $ano, (int) $cfg['dias_meta'], (int) $cfg['carga_horaria_meta'])
             : null;
         $flash = $this->getFlashMessage();
+        $visuais = $service->visuaisTipos();
         $this->viewWithLayout('admin', 'admin/calendario-letivo/index', [
             'title' => 'Calendário Letivo - EducaTudo',
             'user' => $this->auth->getUser(),
@@ -37,6 +38,12 @@ class SchoolCalendarController extends AdminBaseController
             'status' => $status,
             'schema_pronto' => $service->tableExists(),
             'pode_publicar_escolar' => $this->podePublicarCalendarioEscolar($service),
+            'pode_cadastrar_tipo' => $service->tabelaTiposExiste() && $this->podeAcaoCalendario('cadastrar'),
+            'pode_excluir_tipo' => $service->tabelaTiposExiste() && $this->podeAcaoCalendario('excluir'),
+            'tipos' => $visuais['tipos'],
+            'tipoLabels' => $visuais['labels'],
+            'tipoBg' => $visuais['bg'],
+            'tipoText' => $visuais['text'],
             'csrf_token' => $this->generateCsrfToken(),
         ]);
     }
@@ -89,8 +96,7 @@ class SchoolCalendarController extends AdminBaseController
         $fim = $this->sanitizeDate((string) ($_POST['data_fim'] ?? '')) ?: $inicio;
         $descricao = trim((string) ($_POST['descricao'] ?? ''));
         $tipo = (string) ($_POST['tipo'] ?? 'feriado');
-        $tiposValidos = ['feriado', 'recesso', 'reposicao', 'evento', 'suspensao', 'avaliacao'];
-        if (!in_array($tipo, $tiposValidos, true)) {
+        if (!$service->tipoValido($tipo)) {
             $tipo = 'feriado';
         }
         $local = trim((string) ($_POST['local_evento'] ?? ''));
@@ -149,6 +155,36 @@ class SchoolCalendarController extends AdminBaseController
         $this->redirect('/admin/calendario-letivo?ano=' . $ano);
     }
 
+    public function salvarTipo(): void
+    {
+        if (!$this->enforceAdminPermissionKey('calendario_letivo', 'cadastrar')) {
+            return;
+        }
+        if (!$this->validateCsrf((string) ($_POST['csrf_token'] ?? ''))) {
+            $this->json(['ok' => false, 'erro' => 'Sessão expirada. Recarregue a página.'], 403);
+            return;
+        }
+        $result = (new SchoolCalendarService($this->db))->salvarTipo(
+            (string) ($_POST['nome'] ?? ''),
+            (string) ($_POST['cor'] ?? ''),
+            !empty($_POST['nao_letivo'])
+        );
+        $this->json($result, !empty($result['ok']) ? 200 : 422);
+    }
+
+    public function excluirTipo(): void
+    {
+        if (!$this->enforceAdminPermissionKey('calendario_letivo', 'excluir')) {
+            return;
+        }
+        if (!$this->validateCsrf((string) ($_POST['csrf_token'] ?? ''))) {
+            $this->json(['ok' => false, 'erro' => 'Sessão expirada. Recarregue a página.'], 403);
+            return;
+        }
+        $result = (new SchoolCalendarService($this->db))->excluirTipo((string) ($_POST['slug'] ?? ''));
+        $this->json($result, !empty($result['ok']) ? 200 : 422);
+    }
+
     private function sanitizeDate(string $raw): string
     {
         $raw = trim($raw);
@@ -169,6 +205,15 @@ class SchoolCalendarController extends AdminBaseController
         }
         $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $this->auth->getUser() ?? []);
         return AdminPermissionMatrix::can($permissions, 'calendario_escolar', 'cadastrar');
+    }
+
+    private function podeAcaoCalendario(string $acao): bool
+    {
+        if (!class_exists('AdminPermissionMatrix')) {
+            require_once __DIR__ . '/../../Core/AdminPermissionMatrix.php';
+        }
+        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $this->auth->getUser() ?? []);
+        return AdminPermissionMatrix::can($permissions, 'calendario_letivo', $acao);
     }
 }
 }

@@ -4,38 +4,28 @@ $eventos = $eventos ?? [];
 $status  = $status  ?? null;
 $ano     = (int) ($ano ?? date('Y'));
 
-$tipoLabels = [
-    'feriado'   => 'Feriado',
-    'recesso'   => 'Recesso',
-    'reposicao' => 'Reposição',
-    'evento'    => 'Evento',
-    'suspensao' => 'Suspensão',
-    'avaliacao' => 'Avaliação',
-];
-$tipoBg = [
-    'feriado'   => '#fee2e2',
-    'recesso'   => '#fef3c7',
-    'reposicao' => '#dcfce7',
-    'evento'    => '#dbeafe',
-    'suspensao' => '#f3f4f6',
-    'avaliacao' => '#ede9fe',
-];
-$tipoText = [
-    'feriado'   => '#991b1b',
-    'recesso'   => '#92400e',
-    'reposicao' => '#166534',
-    'evento'    => '#1e40af',
-    'suspensao' => '#374151',
-    'avaliacao' => '#5b21b6',
-];
-$tipoClasses = [
-    'feriado'   => 'bg-red-100 text-red-800',
-    'recesso'   => 'bg-amber-100 text-amber-800',
-    'reposicao' => 'bg-green-100 text-green-800',
-    'evento'    => 'bg-blue-100 text-blue-800',
-    'suspensao' => 'bg-gray-200 text-gray-700',
-    'avaliacao' => 'bg-violet-100 text-violet-800',
-];
+$tipoLabels = $tipoLabels ?? [];
+$tipoBg     = $tipoBg ?? [];
+$tipoText   = $tipoText ?? [];
+$tipos      = $tipos ?? [];
+if ($tipoLabels === []) {
+    $tipoLabels = [
+        'feriado' => 'Feriado', 'recesso' => 'Recesso', 'reposicao' => 'Reposição',
+        'evento' => 'Evento', 'suspensao' => 'Suspensão', 'avaliacao' => 'Avaliação',
+    ];
+    $tipoBg = [
+        'feriado' => '#fee2e2', 'recesso' => '#fef3c7', 'reposicao' => '#dcfce7',
+        'evento' => '#dbeafe', 'suspensao' => '#f3f4f6', 'avaliacao' => '#ede9fe',
+    ];
+    $tipoText = [
+        'feriado' => '#991b1b', 'recesso' => '#92400e', 'reposicao' => '#166534',
+        'evento' => '#1e40af', 'suspensao' => '#374151', 'avaliacao' => '#5b21b6',
+    ];
+}
+$podeCadastrarTipo = !empty($pode_cadastrar_tipo);
+$podeExcluirTipo = !empty($pode_excluir_tipo);
+$coresTipoPreset = ['#0d9488', '#db2777', '#ea580c', '#0891b2', '#65a30d', '#e11d48', '#7c3aed', '#ca8a04'];
+$jsonJs = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
 $pct  = $status['percentual'] ?? null;
 $csrf = htmlspecialchars((string) ($csrf_token ?? ''));
@@ -132,9 +122,9 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 <!-- Legenda -->
 <div class="flex flex-wrap gap-3 mb-5">
     <?php foreach ($tipoLabels as $k => $v): ?>
-    <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full <?= $tipoClasses[$k] ?>">
-        <span class="w-2 h-2 rounded-full" style="background:<?= $tipoText[$k] ?>"></span>
-        <?= $v ?>
+    <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" data-tipo-slug="<?= htmlspecialchars($k) ?>" style="background:<?= htmlspecialchars($tipoBg[$k] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$k] ?? '#374151') ?>">
+        <span class="w-2 h-2 rounded-full" style="background:<?= htmlspecialchars($tipoText[$k] ?? '#6b7280') ?>"></span>
+        <?= htmlspecialchars((string) $v) ?>
     </span>
     <?php endforeach; ?>
     <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
@@ -229,7 +219,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                             'link_reuniao' => $e['link_reuniao'] ?? '',
                             'local_evento' => $e['local_evento'] ?? '',
                         ], array_values($evsDia)),
-                    ]), ENT_QUOTES);
+                    ], $jsonJs), ENT_QUOTES);
                 }
             ?>
             <div
@@ -263,7 +253,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                 <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) $ev['descricao']) ?></p>
                 <p class="text-xs text-gray-500"><?= $periodo ?></p>
             </div>
-            <span class="text-xs font-semibold px-2 py-1 rounded-full <?= $tipoClasses[$t] ?? 'bg-gray-100 text-gray-600' ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$t] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$t] ?? '#374151') ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
             <form method="post" action="<?= URL ?>/admin/calendario-letivo/excluir-evento" onsubmit="return confirm('Remover este evento?');" class="inline">
                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                 <input type="hidden" name="ano" value="<?= $ano ?>">
@@ -383,14 +373,53 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     </div>
                     <div class="sm:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            <?php foreach ($tipoLabels as $k => $v): ?>
-                            <label class="cursor-pointer">
-                                <input type="radio" name="tipo" value="<?= $k ?>" class="sr-only peer" <?= $k === 'feriado' ? 'checked' : '' ?>>
-                                <div class="text-center text-xs font-semibold px-2 py-2 rounded-lg border-2 border-transparent peer-checked:border-green-500 <?= $tipoClasses[$k] ?> hover:opacity-90 transition-all"><?= $v ?></div>
+                        <div id="tipoGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <?php foreach ($tipoLabels as $k => $v):
+                                $ehSistema = !isset($tipos[$k]) || (int) ($tipos[$k]['sistema'] ?? 1) === 1;
+                            ?>
+                            <label class="cursor-pointer relative group" data-tipo-slug="<?= htmlspecialchars($k) ?>">
+                                <input type="radio" name="tipo" value="<?= htmlspecialchars($k) ?>" class="sr-only peer" <?= $k === 'feriado' ? 'checked' : '' ?>>
+                                <div class="text-center text-xs font-semibold px-2 py-2 rounded-lg border-2 border-transparent peer-checked:border-green-500 hover:opacity-90 transition-all" style="background:<?= htmlspecialchars($tipoBg[$k] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$k] ?? '#374151') ?>"><?= htmlspecialchars((string) $v) ?></div>
+                                <?php if (!$ehSistema && $podeExcluirTipo): ?>
+                                <button type="button" class="tipo-excluir absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 items-center justify-center rounded-full bg-white border border-gray-300 text-gray-400 hover:text-red-600 hover:border-red-300 shadow-sm" title="Remover tipo" aria-label="Remover tipo <?= htmlspecialchars((string) $v) ?>">
+                                    <i class="fa-solid fa-xmark text-[9px]"></i>
+                                </button>
+                                <?php endif; ?>
                             </label>
                             <?php endforeach; ?>
                         </div>
+                        <?php if ($podeCadastrarTipo): ?>
+                        <button type="button" id="btnNovoTipo" onclick="toggleNovoTipo(true)" class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 px-2 py-1.5 rounded-lg border border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50">
+                            <i class="fa-solid fa-plus"></i> Novo tipo
+                        </button>
+                        <div id="novoTipoPanel" class="hidden mt-3 rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                            <p class="text-sm font-medium text-gray-800">Cadastrar tipo</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label for="novo_tipo_nome" class="block text-xs font-medium text-gray-600 mb-1">Nome</label>
+                                    <input type="text" id="novo_tipo_nome" maxlength="80" placeholder="Ex: Férias" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Cor</label>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <input type="color" id="novo_tipo_cor" value="#0d9488" class="h-9 w-12 p-0.5 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                                        <?php foreach ($coresTipoPreset as $hex): ?>
+                                        <button type="button" class="w-6 h-6 rounded-full border border-black/10 hover:scale-110 transition-transform" style="background:<?= $hex ?>" data-cor-preset="<?= $hex ?>" title="<?= $hex ?>"></button>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <label class="inline-flex items-start gap-2 cursor-pointer select-none">
+                                <input type="checkbox" id="novo_tipo_nao_letivo" class="mt-0.5 w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500" checked>
+                                <span class="text-xs text-gray-600">Descontar dos dias letivos <span class="text-gray-400">(como feriado ou recesso)</span></span>
+                            </label>
+                            <p id="novoTipoErro" class="hidden text-xs text-red-600"></p>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" onclick="toggleNovoTipo(false)" class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">Cancelar</button>
+                                <button type="button" id="btnSalvarTipo" onclick="salvarNovoTipo()" class="btn-primary-custom px-3 py-1.5 text-xs font-semibold rounded-lg">Salvar tipo</button>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <div class="sm:col-span-2">
                         <label for="evento_descricao" class="block text-sm font-medium text-gray-700 mb-1">Descrição <span class="text-red-500">*</span></label>
@@ -445,7 +474,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 
 <script>
 // ── View anual / mensal ───────────────────────────────────────────────────────
-var MESES_NOMES = <?= json_encode($mesesNomes) ?>;
+var MESES_NOMES = <?= json_encode($mesesNomes, $jsonJs) ?>;
 var currentView = 'year';
 var currentMes  = <?= $mesAtual ?>;  // 1-based
 
@@ -458,7 +487,7 @@ var countsAno = <?php
         'avaliacao' => $counts['avaliacao'] ?? 0,
         'diasLetivos' => (int)($status['dias_letivos'] ?? 0),
         'diasMeta'    => $diasLetivosMeta,
-    ]);
+    ], $jsonJs);
 ?>;
 
 function updateCards(mes) {
@@ -650,18 +679,19 @@ var eventData = <?php
             'local_evento' => $e['local_evento'] ?? '',
         ], array_values($evs));
     }
-    echo json_encode($jsMap);
+    echo json_encode($jsMap, $jsonJs);
 ?>;
 
 // Inicializa toggle
 setView('year');
 
-var tipoBg   = <?= json_encode($tipoBg) ?>;
-var tipoText = <?= json_encode($tipoText) ?>;
-var tipoClasses = <?= json_encode($tipoClasses) ?>;
-var csrfToken = <?= json_encode($csrf_token ?? '') ?>;
+var tipoBg   = <?= json_encode($tipoBg, $jsonJs) ?>;
+var tipoText = <?= json_encode($tipoText, $jsonJs) ?>;
+var tipoLabelsMap = <?= json_encode($tipoLabels, $jsonJs) ?>;
+var csrfToken = <?= json_encode($csrf_token ?? '', $jsonJs) ?>;
 var anoAtual  = <?= $ano ?>;
-var baseUrl   = <?= json_encode(defined('URL') ? URL : '') ?>;
+var baseUrl   = <?= json_encode(defined('URL') ? URL : '', $jsonJs) ?>;
+var podeExcluirTipo = <?= $podeExcluirTipo ? 'true' : 'false' ?>;
 
 function openDayModal(payloadStr) {
     var data = JSON.parse(payloadStr);
@@ -745,6 +775,7 @@ function openEventoDrawer(opts) {
     var savedInicio = opts.keepDates ? document.getElementById('evento_data_inicio').value : '';
     var savedFim = opts.keepDates ? document.getElementById('evento_data_fim').value : '';
     form.reset();
+    toggleNovoTipo(false);
     var feriado = form.querySelector('input[name="tipo"][value="feriado"]');
     if (feriado) feriado.checked = true;
     if (opts.keepDates) {
@@ -778,6 +809,168 @@ document.getElementById('evento_data_inicio').addEventListener('change', functio
     var fim = document.getElementById('evento_data_fim');
     if (!fim.value) fim.value = this.value;
 });
+
+function toggleNovoTipo(show) {
+    var panel = document.getElementById('novoTipoPanel');
+    var btn = document.getElementById('btnNovoTipo');
+    if (!panel) return;
+    panel.classList.toggle('hidden', !show);
+    if (btn) btn.classList.toggle('hidden', !!show);
+    if (show) {
+        var err = document.getElementById('novoTipoErro');
+        if (err) { err.classList.add('hidden'); err.textContent = ''; }
+        var nome = document.getElementById('novo_tipo_nome');
+        if (nome) { nome.value = ''; nome.focus(); }
+    }
+}
+
+function mostrarErroTipo(msg) {
+    var err = document.getElementById('novoTipoErro');
+    if (!err) return;
+    err.textContent = msg || 'Não foi possível salvar.';
+    err.classList.remove('hidden');
+}
+
+function montarBotaoTipo(tipo, checked) {
+    var label = document.createElement('label');
+    label.className = 'cursor-pointer relative group';
+    label.setAttribute('data-tipo-slug', tipo.slug);
+    var radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'tipo';
+    radio.value = tipo.slug;
+    radio.className = 'sr-only peer';
+    if (checked) radio.checked = true;
+    var chip = document.createElement('div');
+    chip.className = 'text-center text-xs font-semibold px-2 py-2 rounded-lg border-2 border-transparent peer-checked:border-green-500 hover:opacity-90 transition-all';
+    chip.style.background = tipo.cor_fundo;
+    chip.style.color = tipo.cor;
+    chip.textContent = tipo.nome;
+    label.appendChild(radio);
+    label.appendChild(chip);
+    if (!tipo.sistema && podeExcluirTipo) {
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'tipo-excluir absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 items-center justify-center rounded-full bg-white border border-gray-300 text-gray-400 hover:text-red-600 hover:border-red-300 shadow-sm';
+        del.title = 'Remover tipo';
+        del.setAttribute('aria-label', 'Remover tipo ' + tipo.nome);
+        del.innerHTML = '<i class="fa-solid fa-xmark text-[9px]"></i>';
+        del.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            excluirTipo(tipo.slug, label);
+        });
+        label.appendChild(del);
+    }
+    return label;
+}
+
+function adicionarTipoNaLegenda(tipo) {
+    var legendas = document.querySelectorAll('.flex.flex-wrap.gap-3.mb-5');
+    if (!legendas.length) return;
+    var span = document.createElement('span');
+    span.className = 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full';
+    span.style.background = tipo.cor_fundo;
+    span.style.color = tipo.cor;
+    span.setAttribute('data-tipo-slug', tipo.slug);
+    span.innerHTML = '<span class="w-2 h-2 rounded-full" style="background:' + escHtml(tipo.cor) + '"></span>' + escHtml(tipo.nome);
+    var weekend = legendas[0].querySelector('span:last-child');
+    if (weekend) legendas[0].insertBefore(span, weekend);
+    else legendas[0].appendChild(span);
+}
+
+function salvarNovoTipo() {
+    var nomeInp = document.getElementById('novo_tipo_nome');
+    var corInp = document.getElementById('novo_tipo_cor');
+    var naoLetivo = document.getElementById('novo_tipo_nao_letivo');
+    var btn = document.getElementById('btnSalvarTipo');
+    var nome = nomeInp ? nomeInp.value.trim() : '';
+    if (nome.length < 2) {
+        mostrarErroTipo('Informe o nome do tipo.');
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+    var body = new FormData();
+    body.append('csrf_token', csrfToken);
+    body.append('nome', nome);
+    body.append('cor', corInp ? corInp.value : '#0d9488');
+    if (naoLetivo && naoLetivo.checked) body.append('nao_letivo', '1');
+    fetch(baseUrl + '/admin/calendario-letivo/salvar-tipo', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: body
+    }).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+    .then(function (pack) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar tipo'; }
+        if (!pack.data || !pack.data.ok || !pack.data.tipo) {
+            mostrarErroTipo((pack.data && pack.data.erro) || 'Não foi possível salvar o tipo.');
+            return;
+        }
+        var tipo = pack.data.tipo;
+        tipoBg[tipo.slug] = tipo.cor_fundo;
+        tipoText[tipo.slug] = tipo.cor;
+        tipoLabelsMap[tipo.slug] = tipo.nome;
+        var grid = document.getElementById('tipoGrid');
+        if (grid) {
+            grid.appendChild(montarBotaoTipo(tipo, true));
+        }
+        adicionarTipoNaLegenda(tipo);
+        toggleNovoTipo(false);
+    }).catch(function () {
+        if (btn) { btn.disabled = false; btn.textContent = 'Salvar tipo'; }
+        mostrarErroTipo('Falha de rede. Tente de novo.');
+    });
+}
+
+function excluirTipo(slug, labelEl) {
+    if (!confirm('Remover este tipo?')) return;
+    var body = new FormData();
+    body.append('csrf_token', csrfToken);
+    body.append('slug', slug);
+    fetch(baseUrl + '/admin/calendario-letivo/excluir-tipo', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: body
+    }).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+    .then(function (pack) {
+        if (!pack.data || !pack.data.ok) {
+            alert((pack.data && pack.data.erro) || 'Não foi possível remover o tipo.');
+            return;
+        }
+        if (labelEl && labelEl.parentNode) labelEl.parentNode.removeChild(labelEl);
+        var leg = document.querySelector('.flex.flex-wrap.gap-3.mb-5 [data-tipo-slug="' + slug + '"]');
+        if (leg && leg.parentNode) leg.parentNode.removeChild(leg);
+        var feriado = document.querySelector('#tipoGrid input[name="tipo"][value="feriado"]');
+        if (feriado) feriado.checked = true;
+    }).catch(function () {
+        alert('Falha de rede. Tente de novo.');
+    });
+}
+
+document.querySelectorAll('.tipo-excluir').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var label = btn.closest('[data-tipo-slug]');
+        if (!label) return;
+        excluirTipo(label.getAttribute('data-tipo-slug'), label);
+    });
+});
+document.querySelectorAll('[data-cor-preset]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var corInp = document.getElementById('novo_tipo_cor');
+        if (corInp) corInp.value = btn.getAttribute('data-cor-preset');
+    });
+});
+var novoTipoPanel = document.getElementById('novoTipoPanel');
+if (novoTipoPanel) {
+    novoTipoPanel.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            salvarNovoTipo();
+        }
+    });
+}
 <?php if (!$config): ?>
 openConfigDrawer();
 <?php endif; ?>

@@ -1073,15 +1073,39 @@ class ClassDiary
      */
     private function datasNaoLetivas(string $inicio, string $fim): array
     {
+        $slugs = ['feriado', 'recesso', 'suspensao'];
+        try {
+            $rowsTipos = $this->db->fetchAll(
+                "SELECT slug FROM calendario_letivo_tipos WHERE efeito = 'nao_letivo'"
+            ) ?: [];
+            if ($rowsTipos !== []) {
+                $slugs = array_values(array_filter(array_map(
+                    static fn ($r) => (string) ($r['slug'] ?? ''),
+                    $rowsTipos
+                )));
+            }
+        } catch (Throwable $e) {
+            // tabela de tipos ainda não existe
+        }
+        if ($slugs === []) {
+            $slugs = ['feriado', 'recesso', 'suspensao'];
+        }
+        $placeholders = [];
+        $params = ['inicio' => $inicio, 'fim' => $fim];
+        foreach ($slugs as $i => $slug) {
+            $key = 'tipo_' . $i;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $slug;
+        }
         try {
             $rows = $this->db->fetchAll(
                 "SELECT e.data_inicio, e.data_fim
                  FROM calendario_letivo_eventos e
                  INNER JOIN calendario_letivo c ON c.id = e.calendario_id
-                 WHERE e.tipo IN ('feriado','recesso','suspensao')
+                 WHERE e.tipo IN (" . implode(',', $placeholders) . ")
                    AND e.data_inicio <= :fim
                    AND e.data_fim >= :inicio",
-                ['inicio' => $inicio, 'fim' => $fim]
+                $params
             ) ?: [];
         } catch (Throwable $e) {
             return [];

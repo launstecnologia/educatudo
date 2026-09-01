@@ -13,6 +13,47 @@ class SchoolCalendarService
     /** @var Database */
     private $db;
 
+    public const TIPOS_SISTEMA = [
+        'feriado' => [
+            'slug' => 'feriado', 'nome' => 'Feriado',
+            'cor' => '#991b1b', 'cor_fundo' => '#fee2e2',
+            'efeito' => 'nao_letivo', 'sistema' => 1, 'ordem' => 1,
+        ],
+        'recesso' => [
+            'slug' => 'recesso', 'nome' => 'Recesso',
+            'cor' => '#92400e', 'cor_fundo' => '#fef3c7',
+            'efeito' => 'nao_letivo', 'sistema' => 1, 'ordem' => 2,
+        ],
+        'reposicao' => [
+            'slug' => 'reposicao', 'nome' => 'Reposição',
+            'cor' => '#166534', 'cor_fundo' => '#dcfce7',
+            'efeito' => 'reposicao', 'sistema' => 1, 'ordem' => 3,
+        ],
+        'evento' => [
+            'slug' => 'evento', 'nome' => 'Evento',
+            'cor' => '#1e40af', 'cor_fundo' => '#dbeafe',
+            'efeito' => 'neutro', 'sistema' => 1, 'ordem' => 4,
+        ],
+        'suspensao' => [
+            'slug' => 'suspensao', 'nome' => 'Suspensão',
+            'cor' => '#374151', 'cor_fundo' => '#f3f4f6',
+            'efeito' => 'nao_letivo', 'sistema' => 1, 'ordem' => 5,
+        ],
+        'avaliacao' => [
+            'slug' => 'avaliacao', 'nome' => 'Avaliação',
+            'cor' => '#5b21b6', 'cor_fundo' => '#ede9fe',
+            'efeito' => 'neutro', 'sistema' => 1, 'ordem' => 6,
+        ],
+    ];
+
+    private const MAX_TIPOS_CUSTOM = 30;
+
+    /** @var array<string,array<string,mixed>>|null */
+    private $tiposCache = null;
+
+    /** @var bool|null */
+    private $tiposTabelaCache = null;
+
     public function __construct(?Database $db = null)
     {
         $this->db = $db ?? Database::getInstance();
@@ -31,6 +72,222 @@ class SchoolCalendarService
             $cache = false;
         }
         return $cache;
+    }
+
+    public function tabelaTiposExiste(): bool
+    {
+        if ($this->tiposTabelaCache !== null) {
+            return $this->tiposTabelaCache;
+        }
+        try {
+            $row = $this->db->fetch("SHOW TABLES LIKE 'calendario_letivo_tipos'");
+            $this->tiposTabelaCache = $row !== false && !empty($row);
+        } catch (Throwable $e) {
+            $this->tiposTabelaCache = false;
+        }
+        return $this->tiposTabelaCache;
+    }
+
+    /**
+     * Mapa slug => tipo (sistema + personalizados), na ordem de exibição.
+     *
+     * @return array<string,array{id?:int,slug:string,nome:string,cor:string,cor_fundo:string,efeito:string,sistema:int,ordem:int}>
+     */
+    public function tipos(): array
+    {
+        if ($this->tiposCache !== null) {
+            return $this->tiposCache;
+        }
+        if (!$this->tabelaTiposExiste()) {
+            $this->tiposCache = self::TIPOS_SISTEMA;
+            return $this->tiposCache;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, slug, nome, cor, cor_fundo, efeito, sistema, ordem
+                 FROM calendario_letivo_tipos
+                 ORDER BY ordem ASC, id ASC"
+            ) ?: [];
+        } catch (Throwable $e) {
+            $this->tiposCache = self::TIPOS_SISTEMA;
+            return $this->tiposCache;
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $slug = (string) ($row['slug'] ?? '');
+            if ($slug === '') {
+                continue;
+            }
+            $cor = $this->normalizarHex((string) ($row['cor'] ?? ''));
+            $fundo = $this->normalizarHex((string) ($row['cor_fundo'] ?? ''));
+            if ($cor === '') {
+                $cor = '#374151';
+            }
+            if ($fundo === '') {
+                $fundo = $this->clarearHex($cor);
+            }
+            $out[$slug] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'slug' => $slug,
+                'nome' => (string) ($row['nome'] ?? $slug),
+                'cor' => $cor,
+                'cor_fundo' => $fundo,
+                'efeito' => (string) ($row['efeito'] ?? 'neutro'),
+                'sistema' => (int) ($row['sistema'] ?? 0),
+                'ordem' => (int) ($row['ordem'] ?? 100),
+            ];
+        }
+        foreach (self::TIPOS_SISTEMA as $slug => $def) {
+            if (!isset($out[$slug])) {
+                $out[$slug] = $def;
+            }
+        }
+        $this->tiposCache = $out;
+        return $out;
+    }
+
+    /**
+     * @return array{labels:array<string,string>,bg:array<string,string>,text:array<string,string>,tipos:array<string,array<string,mixed>>}
+     */
+    public function visuaisTipos(): array
+    {
+        $tipos = $this->tipos();
+        $labels = [];
+        $bg = [];
+        $text = [];
+        foreach ($tipos as $slug => $t) {
+            $labels[$slug] = (string) $t['nome'];
+            $bg[$slug] = (string) $t['cor_fundo'];
+            $text[$slug] = (string) $t['cor'];
+        }
+        return ['labels' => $labels, 'bg' => $bg, 'text' => $text, 'tipos' => $tipos];
+    }
+
+    /** @return list<string> */
+    public function slugsComEfeito(string $efeito): array
+    {
+        $out = [];
+        foreach ($this->tipos() as $slug => $t) {
+            if (($t['efeito'] ?? '') === $efeito) {
+                $out[] = $slug;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @return array{ok:bool,erro?:string,tipo?:array<string,mixed>}
+     */
+    public function salvarTipo(string $nome, string $cor, bool $naoLetivo): array
+    {
+        if (!$this->tabelaTiposExiste()) {
+            return ['ok' => false, 'erro' => 'Rode a migration 2026_09_01_calendario_letivo_tipos.sql no painel Master.'];
+        }
+        $nome = trim($nome);
+        if (mb_strlen($nome) < 2 || mb_strlen($nome) > 80) {
+            return ['ok' => false, 'erro' => 'Informe um nome com 2 a 80 caracteres.'];
+        }
+        if (preg_match('/[<>]/u', $nome)) {
+            return ['ok' => false, 'erro' => 'O nome não pode conter os caracteres < ou >.'];
+        }
+        $cor = $this->normalizarHex($cor);
+        if ($cor === '') {
+            return ['ok' => false, 'erro' => 'Escolha uma cor válida.'];
+        }
+        $custom = 0;
+        foreach ($this->tipos() as $t) {
+            if ((int) ($t['sistema'] ?? 0) === 0) {
+                $custom++;
+            }
+        }
+        if ($custom >= self::MAX_TIPOS_CUSTOM) {
+            return ['ok' => false, 'erro' => 'Limite de tipos personalizados atingido.'];
+        }
+        $slug = $this->slugificar($nome);
+        $existentes = $this->tipos();
+        $base = $slug;
+        $n = 2;
+        while (isset($existentes[$slug])) {
+            $slug = $base . '_' . $n;
+            $n++;
+            if ($n > 50) {
+                return ['ok' => false, 'erro' => 'Já existe um tipo com esse nome.'];
+            }
+        }
+        $fundo = $this->clarearHex($cor);
+        $efeito = $naoLetivo ? 'nao_letivo' : 'neutro';
+        try {
+            $id = (int) $this->db->insert(
+                "INSERT INTO calendario_letivo_tipos (slug, nome, cor, cor_fundo, efeito, sistema, ordem)
+                 VALUES (:slug, :nome, :cor, :fundo, :efeito, 0, :ordem)",
+                [
+                    'slug' => $slug,
+                    'nome' => mb_substr($nome, 0, 80),
+                    'cor' => $cor,
+                    'fundo' => $fundo,
+                    'efeito' => $efeito,
+                    'ordem' => 100 + $custom,
+                ]
+            );
+        } catch (Throwable $e) {
+            error_log('Calendário letivo: falha ao salvar tipo: ' . $e->getMessage());
+            return ['ok' => false, 'erro' => 'Não foi possível salvar o tipo.'];
+        }
+        if ($id <= 0) {
+            return ['ok' => false, 'erro' => 'Não foi possível salvar o tipo.'];
+        }
+        $this->tiposCache = null;
+        return [
+            'ok' => true,
+            'tipo' => [
+                'id' => $id,
+                'slug' => $slug,
+                'nome' => mb_substr($nome, 0, 80),
+                'cor' => $cor,
+                'cor_fundo' => $fundo,
+                'efeito' => $efeito,
+                'sistema' => 0,
+                'ordem' => 100 + $custom,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{ok:bool,erro?:string}
+     */
+    public function excluirTipo(string $slug): array
+    {
+        if (!$this->tabelaTiposExiste()) {
+            return ['ok' => false, 'erro' => 'Cadastro de tipos ainda não está disponível.'];
+        }
+        $slug = trim($slug);
+        $tipos = $this->tipos();
+        if (!isset($tipos[$slug])) {
+            return ['ok' => false, 'erro' => 'Tipo não encontrado.'];
+        }
+        if ((int) ($tipos[$slug]['sistema'] ?? 0) === 1) {
+            return ['ok' => false, 'erro' => 'Tipos padrão não podem ser removidos.'];
+        }
+        $uso = $this->db->fetch(
+            "SELECT COUNT(*) AS n FROM calendario_letivo_eventos WHERE tipo = :slug",
+            ['slug' => $slug]
+        );
+        if ((int) ($uso['n'] ?? 0) > 0) {
+            return ['ok' => false, 'erro' => 'Há eventos usando este tipo. Remova-os antes.'];
+        }
+        try {
+            $this->db->query("DELETE FROM calendario_letivo_tipos WHERE slug = :slug AND sistema = 0", ['slug' => $slug]);
+        } catch (Throwable $e) {
+            error_log('Calendário letivo: falha ao excluir tipo: ' . $e->getMessage());
+            return ['ok' => false, 'erro' => 'Não foi possível remover o tipo.'];
+        }
+        $this->tiposCache = null;
+        return ['ok' => true];
+    }
+
+    public function tipoValido(string $tipo): bool
+    {
+        return isset($this->tipos()[$tipo]);
     }
 
     /** @return array<string,mixed>|null */
@@ -89,8 +346,7 @@ class SchoolCalendarService
         if ($calendarioId <= 0 || !$this->tableExists()) {
             return;
         }
-        $tipos = ['feriado', 'recesso', 'reposicao', 'evento', 'suspensao', 'avaliacao'];
-        if (!in_array($tipo, $tipos, true)) {
+        if (!$this->tipoValido($tipo)) {
             $tipo = 'feriado';
         }
         if ($fim < $inicio) {
@@ -269,10 +525,17 @@ class SchoolCalendarService
             }
         }
 
+        $mapa = $this->tipos();
         $naoLetivos = [];
         $reposicoes = [];
         foreach ($eventos as $ev) {
             $tipo = (string) ($ev['tipo'] ?? '');
+            $efeito = (string) ($mapa[$tipo]['efeito'] ?? '');
+            if ($efeito === '' && in_array($tipo, ['feriado', 'recesso', 'suspensao'], true)) {
+                $efeito = 'nao_letivo';
+            } elseif ($efeito === '' && $tipo === 'reposicao') {
+                $efeito = 'reposicao';
+            }
             try {
                 $ini = new DateTime((string) $ev['data_inicio']);
                 $f = new DateTime((string) $ev['data_fim']);
@@ -288,9 +551,9 @@ class SchoolCalendarService
                 }
                 $key = $d->format('Y-m-d');
                 $n = (int) $d->format('N');
-                if (in_array($tipo, ['feriado', 'recesso', 'suspensao'], true) && $n <= 5) {
+                if ($efeito === 'nao_letivo' && $n <= 5) {
                     $naoLetivos[$key] = true;
-                } elseif ($tipo === 'reposicao' && $n >= 6) {
+                } elseif ($efeito === 'reposicao' && $n >= 6) {
                     $reposicoes[$key] = true;
                 }
             }
@@ -298,5 +561,55 @@ class SchoolCalendarService
 
         $total = $uteis - count($naoLetivos) + count($reposicoes);
         return max(0, $total);
+    }
+
+    private function slugificar(string $nome): string
+    {
+        $s = mb_strtolower(trim($nome), 'UTF-8');
+        $s = strtr($s, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'ä' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ó' => 'o', 'ò' => 'o', 'õ' => 'o', 'ô' => 'o', 'ö' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ç' => 'c', 'ñ' => 'n',
+        ]);
+        $s = preg_replace('/[^a-z0-9]+/', '_', $s) ?? '';
+        $s = trim($s, '_');
+        if ($s === '') {
+            $s = 'tipo';
+        }
+        return mb_substr($s, 0, 50);
+    }
+
+    private function normalizarHex(string $hex): string
+    {
+        $hex = trim($hex);
+        if (preg_match('/^#([0-9A-Fa-f]{6})$/', $hex, $m)) {
+            return '#' . strtolower($m[1]);
+        }
+        if (preg_match('/^#([0-9A-Fa-f]{3})$/', $hex, $m)) {
+            $r = $m[1][0];
+            $g = $m[1][1];
+            $b = $m[1][2];
+            return '#' . strtolower($r . $r . $g . $g . $b . $b);
+        }
+        return '';
+    }
+
+    private function clarearHex(string $hex): string
+    {
+        $hex = $this->normalizarHex($hex);
+        if ($hex === '') {
+            return '#f3f4f6';
+        }
+        $r = hexdec(substr($hex, 1, 2));
+        $g = hexdec(substr($hex, 3, 2));
+        $b = hexdec(substr($hex, 5, 2));
+        $mix = 0.82;
+        $r = (int) round($r + (255 - $r) * $mix);
+        $g = (int) round($g + (255 - $g) * $mix);
+        $b = (int) round($b + (255 - $b) * $mix);
+        return sprintf('#%02x%02x%02x', $r, $g, $b);
     }
 }

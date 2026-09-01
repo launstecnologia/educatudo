@@ -2333,11 +2333,15 @@ if (!class_exists('TeacherController')) {
         $cfg     = $service->getAno($ano);
         $todos   = $cfg ? $service->eventos((int) $cfg['id']) : [];
         $eventos = array_values(array_filter($todos, fn($e) => (int) ($e['visivel_professor'] ?? 0) === 1));
+        $visuais = $service->visuaisTipos();
         $this->viewWithLayout('professor', 'teacher/calendario-letivo', [
             'title'   => 'Calendário Letivo - EducaTudo',
             'user'    => $this->auth->getUser(),
             'ano'     => $ano,
             'eventos' => $eventos,
+            'tipoLabels' => $visuais['labels'],
+            'tipoBg' => $visuais['bg'],
+            'tipoText' => $visuais['text'],
         ]);
     }
 }

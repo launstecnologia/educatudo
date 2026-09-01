@@ -140,12 +140,21 @@ class CalendarioWidget implements WidgetDashboard
     {
         $map = [
             'feriado' => 'Feriado',
-            'recesso' => 'Feriado',
+            'recesso' => 'Recesso',
             'avaliacao' => 'Prova',
             'evento' => 'Evento escolar',
-            'reposicao' => 'Evento escolar',
-            'suspensao' => 'Evento escolar',
+            'reposicao' => 'Reposição',
+            'suspensao' => 'Suspensão',
         ];
+        try {
+            require_once dirname(__DIR__, 3) . '/Services/SchoolCalendarService.php';
+            $service = new \SchoolCalendarService();
+            foreach ($service->tipos() as $slug => $t) {
+                $map[$slug] = (string) ($t['nome'] ?? $slug);
+            }
+        } catch (\Throwable $e) {
+            // fallback nos rótulos padrão
+        }
         return $map[$tipo] ?? 'Evento escolar';
     }
 }

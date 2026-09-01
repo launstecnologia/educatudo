@@ -8181,11 +8181,15 @@ if (!class_exists('StudentController')) {
         $cfg     = $service->getAno($ano);
         $todos   = $cfg ? $service->eventos((int) $cfg['id']) : [];
         $eventos = array_values(array_filter($todos, fn($e) => (int) ($e['visivel_aluno'] ?? 0) === 1));
+        $visuais = $service->visuaisTipos();
         $this->viewWithLayout('student', 'student/calendario-letivo', [
             'title'   => 'Calendário Letivo - EducaTudo',
             'user'    => $this->auth->getUser(),
             'ano'     => $ano,
             'eventos' => $eventos,
+            'tipoLabels' => $visuais['labels'],
+            'tipoBg' => $visuais['bg'],
+            'tipoText' => $visuais['text'],
         ]);
     }
 }
