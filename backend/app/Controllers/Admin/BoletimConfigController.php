@@ -4090,6 +4090,12 @@ class BoletimConfigController extends BaseController
                 $materiasAgrupadas[$midHer] = true;
             }
         }
+        $this->absorverFaltasDeMateriasOcultas(
+            $matrizPorCodigo,
+            $materiaNomesPorId,
+            $materiasAgrupadas,
+            $componentesRegra
+        );
         $gruposVirtualMids = is_array($grp['grupos_virtual_mids'] ?? null) ? $grp['grupos_virtual_mids'] : [];
 
         $colunas = [];
@@ -4488,6 +4494,10 @@ class BoletimConfigController extends BaseController
             }
         }
 
+        if ($codigosFaltas !== []) {
+            $this->consolidarFaltasDuplicadasPorNome($matrizPorCodigo, $materiaNomesPorId, $codigosFaltas, true);
+        }
+
         if ($componentGroupByCode === []) {
             return [
                 'matriz_por_codigo' => $matrizPorCodigo,
@@ -4506,6 +4516,7 @@ class BoletimConfigController extends BaseController
             $groupKeysAtivos[(string) $gk] = true;
         }
 
+        $linhasPropriasForaDoGrupo = [];
         foreach ($matrizPorCodigo as $codigoScan => $mapScan) {
             if (!is_array($mapScan)) {
                 continue;
@@ -4514,18 +4525,34 @@ class BoletimConfigController extends BaseController
             $idsGrupoScan = is_array($grupoScan)
                 ? array_fill_keys(array_map('intval', (array) ($grupoScan['materias_ids'] ?? [])), true)
                 : [];
+            $nkGrupoScan = is_array($grupoScan)
+                ? $this->canonicalMateriaNomeKey((string) ($grupoScan['label'] ?? $grupoScan['key'] ?? ''))
+                : '';
             foreach ($mapScan as $midScan => $valorScan) {
                 $midScan = (int) $midScan;
                 if ($midScan <= 0 || !is_numeric($valorScan)) {
                     continue;
                 }
                 if ($grupoScan !== null && !isset($idsGrupoScan[$midScan])) {
+                    $nkScan = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[$midScan] ?? ''));
+                    $duplicataRotuloGrupo = ($nkGrupoScan !== '' && $nkScan === $nkGrupoScan);
                     $materiasComValorForaDeGrupo[$midScan] = true;
+                    if (!$duplicataRotuloGrupo && !isset($codigosFaltas[(string) $codigoScan])) {
+                        $linhasPropriasForaDoGrupo[$midScan] = true;
+                    }
                 }
                 if (isset($materiasComFormulaPropria[$midScan])) {
                     $materiasComValorForaDeGrupo[$midScan] = true;
                 }
             }
+        }
+
+        $faltasFontePorCodigo = [];
+        foreach ($matrizPorCodigo as $codFonte => $mapFonte) {
+            if (!isset($codigosFaltas[$codFonte]) || !is_array($mapFonte)) {
+                continue;
+            }
+            $faltasFontePorCodigo[(string) $codFonte] = $mapFonte;
         }
 
         foreach ($matrizPorCodigo as $codigo => $map) {
@@ -4575,7 +4602,7 @@ class BoletimConfigController extends BaseController
                     : [];
                 foreach ($cfg['materias_ids'] as $midSel) {
                     $midSel = (int) $midSel;
-                    if ($ehFaltasCol && $midSel > 0 && isset($materiasComValorForaDeGrupo[$midSel])) {
+                    if ($ehFaltasCol && $midSel > 0 && isset($linhasPropriasForaDoGrupo[$midSel])) {
                         continue;
                     }
                     if (isset($matrizPorCodigo[$codigo][$midSel]) && is_numeric($matrizPorCodigo[$codigo][$midSel])) {
@@ -4669,7 +4696,7 @@ class BoletimConfigController extends BaseController
                     $vals = [];
                     foreach ((array) ($meta['materias_ids'] ?? []) as $midSel) {
                         $midSel = (int) $midSel;
-                        if ($midSel <= 0 || ($ehFaltasCol && isset($materiasComValorForaDeGrupo[$midSel]))) {
+                        if ($midSel <= 0 || ($ehFaltasCol && isset($linhasPropriasForaDoGrupo[$midSel]))) {
                             continue;
                         }
                         if (isset($mapOriginal[$midSel]) && is_numeric($mapOriginal[$midSel])) {
@@ -4694,6 +4721,19 @@ class BoletimConfigController extends BaseController
             $matrizPorCodigo[$codigo] = $map;
         }
 
+        $this->recomputarSomaFaltasDosGrupos(
+            $matrizPorCodigo,
+            $faltasFontePorCodigo,
+            $groupMetaByKey,
+            $groupMidByKey,
+            $materiaNomesPorId,
+            $linhasPropriasForaDoGrupo,
+            $codigosFaltas
+        );
+        if ($codigosFaltas !== []) {
+            $this->consolidarFaltasDuplicadasPorNome($matrizPorCodigo, $materiaNomesPorId, $codigosFaltas, false);
+        }
+
         $materiasAgrupadasAtivas = [];
         foreach ($groupMetaByKey as $gk => $meta) {
             if (empty($groupKeysAtivos[(string) $gk])) {
@@ -4701,10 +4741,31 @@ class BoletimConfigController extends BaseController
             }
             foreach ((array) ($meta['materias_ids'] ?? []) as $midSel) {
                 $midSel = (int) $midSel;
-                if ($midSel > 0 && !isset($materiasComValorForaDeGrupo[$midSel])) {
+                if ($midSel > 0 && !isset($linhasPropriasForaDoGrupo[$midSel])) {
                     $materiasAgrupadasAtivas[$midSel] = true;
                 }
             }
+        }
+        $nomesRotuloGrupo = [];
+        foreach ($groupMetaByKey as $gk => $meta) {
+            $nkRotulo = $this->canonicalMateriaNomeKey((string) ($meta['label'] ?? $gk));
+            if ($nkRotulo !== '') {
+                $nomesRotuloGrupo[$nkRotulo] = true;
+            }
+        }
+        foreach ($materiaNomesPorId as $midNome => $nomeMat) {
+            $midNome = (int) $midNome;
+            if ($midNome <= 0 || isset($materiasAgrupadasAtivas[$midNome])) {
+                continue;
+            }
+            $nomeKeyDup = $this->canonicalMateriaNomeKey((string) $nomeMat);
+            if ($nomeKeyDup === '' || !isset($nomesRotuloGrupo[$nomeKeyDup])) {
+                continue;
+            }
+            if ($this->midTemNotaForaDeFaltas($midNome, $matrizPorCodigo, $codigosFaltas)) {
+                continue;
+            }
+            $materiasAgrupadasAtivas[$midNome] = true;
         }
 
         $gruposVirtualMids = [];
@@ -4726,6 +4787,363 @@ class BoletimConfigController extends BaseController
             'materias_agrupadas' => $materiasAgrupadasAtivas,
             'grupos_virtual_mids' => $gruposVirtualMids,
         ];
+    }
+
+    /**
+     * Faltas costumam estar num cadastro/ID diferente da nota (grade horária vs
+     * grupo do boletim, Redação duplicada, Língua Portuguesa vs Português).
+     * Junta valores de mesmo nome canônico na linha que o quadro já usa.
+     *
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<string, bool> $codigosFaltas
+     */
+    private function consolidarFaltasDuplicadasPorNome(
+        array &$matrizPorCodigo,
+        array $materiaNomesPorId,
+        array $codigosFaltas,
+        bool $somar = true
+    ): void {
+        if ($codigosFaltas === []) {
+            return;
+        }
+
+        foreach ($matrizPorCodigo as $codigo => $map) {
+            if (!isset($codigosFaltas[(string) $codigo]) || !is_array($map)) {
+                continue;
+            }
+            $porNome = [];
+            foreach ($map as $mid => $valor) {
+                $mid = (int) $mid;
+                if (!is_numeric($valor)) {
+                    continue;
+                }
+                $nomeKey = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[$mid] ?? ''));
+                if ($nomeKey === '') {
+                    continue;
+                }
+                $porNome[$nomeKey][$mid] = (float) $valor;
+            }
+            foreach ($porNome as $nomeKey => $valsPorMid) {
+                if (count($valsPorMid) < 2) {
+                    continue;
+                }
+                $destino = $this->midDestinoFaltasMesmoNome(
+                    array_keys($valsPorMid),
+                    $matrizPorCodigo,
+                    $codigosFaltas,
+                    !$somar
+                );
+                if ($destino === 0) {
+                    continue;
+                }
+                $valorDestino = null;
+                foreach ($valsPorMid as $midOrigem => $valorOrigem) {
+                    $midOrigem = (int) $midOrigem;
+                    if ($somar) {
+                        $valorDestino = ($valorDestino ?? 0.0) + (float) $valorOrigem;
+                    } elseif ($midOrigem === $destino) {
+                        $valorDestino = (float) $valorOrigem;
+                    } elseif ($valorDestino === null) {
+                        $valorDestino = (float) $valorOrigem;
+                    }
+                    if ($midOrigem !== $destino) {
+                        unset($map[$midOrigem]);
+                    }
+                }
+                if ($valorDestino !== null) {
+                    $map[$destino] = $valorDestino;
+                }
+            }
+            $matrizPorCodigo[(string) $codigo] = $map;
+        }
+    }
+
+    /**
+     * @param list<int> $mids
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @param array<string, bool> $codigosFaltas
+     */
+    private function midDestinoFaltasMesmoNome(
+        array $mids,
+        array $matrizPorCodigo,
+        array $codigosFaltas,
+        bool $preferirSintetico = false
+    ): int {
+        $melhorMid = 0;
+        $melhorScore = -1;
+        foreach ($mids as $mid) {
+            $mid = (int) $mid;
+            $score = 0;
+            if ($mid < 0) {
+                $score += $preferirSintetico ? 50 : 5;
+            }
+            foreach ($matrizPorCodigo as $cod => $map) {
+                if (!is_array($map)) {
+                    continue;
+                }
+                if (!isset($map[$mid]) || !is_numeric($map[$mid])) {
+                    continue;
+                }
+                if (isset($codigosFaltas[(string) $cod])) {
+                    $score += 1;
+                } else {
+                    $score += 10;
+                }
+            }
+            if ($score > $melhorScore) {
+                $melhorScore = $score;
+                $melhorMid = $mid;
+            }
+        }
+
+        return $melhorMid;
+    }
+
+    /**
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @param array<string, bool> $codigosFaltas
+     */
+    private function midTemNotaForaDeFaltas(int $mid, array $matrizPorCodigo, array $codigosFaltas): bool
+    {
+        if ($mid === 0) {
+            return false;
+        }
+        foreach ($matrizPorCodigo as $cod => $map) {
+            if (!is_array($map) || isset($codigosFaltas[(string) $cod])) {
+                continue;
+            }
+            if (isset($map[$mid]) && is_numeric($map[$mid])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Depois que filhas herdadas são ocultadas, sobe a falta delas para a linha
+     * agrupada já visível (id negativo) se essa célula ainda estiver vazia.
+     *
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<int, bool> $materiasAgrupadas
+     * @param list<array<string, mixed>> $componentesRegra
+     */
+    private function absorverFaltasDeMateriasOcultas(
+        array &$matrizPorCodigo,
+        array $materiaNomesPorId,
+        array $materiasAgrupadas,
+        array $componentesRegra
+    ): void {
+        if ($materiasAgrupadas === []) {
+            return;
+        }
+        $codigosFaltas = [];
+        $membrosPorRotulo = [];
+        foreach ($componentesRegra as $comp) {
+            $cod = trim((string) ($comp['codigo'] ?? ''));
+            if ($cod !== '' && $this->componenteContaComoFalta($comp)) {
+                $codigosFaltas[$cod] = true;
+            }
+            $grp = $this->parseGroupLineConfigFromComponente($comp);
+            if ($grp === null) {
+                continue;
+            }
+            $nkGrupo = $this->canonicalMateriaNomeKey((string) ($grp['label'] ?? $grp['key'] ?? ''));
+            if ($nkGrupo === '') {
+                continue;
+            }
+            foreach ((array) ($grp['materias_ids'] ?? []) as $midMembro) {
+                $midMembro = (int) $midMembro;
+                if ($midMembro > 0) {
+                    $membrosPorRotulo[$nkGrupo][$midMembro] = true;
+                }
+            }
+        }
+        if ($codigosFaltas === []) {
+            return;
+        }
+        $destinos = [];
+        foreach ($materiaNomesPorId as $midNome => $nomeMat) {
+            $midNome = (int) $midNome;
+            if ($midNome >= 0) {
+                continue;
+            }
+            $nk = $this->canonicalMateriaNomeKey((string) $nomeMat);
+            if ($nk !== '') {
+                $destinos[$nk] = $midNome;
+            }
+        }
+        if ($destinos === []) {
+            return;
+        }
+        foreach ($matrizPorCodigo as $codigo => $map) {
+            if (!isset($codigosFaltas[(string) $codigo]) || !is_array($map)) {
+                continue;
+            }
+            foreach ($destinos as $nkDest => $vmid) {
+                $vmid = (int) $vmid;
+                if (isset($map[$vmid]) && is_numeric($map[$vmid])) {
+                    continue;
+                }
+                $idsMembros = $membrosPorRotulo[$nkDest] ?? [];
+                $soma = 0.0;
+                $tem = false;
+                foreach ($map as $mid => $valor) {
+                    $mid = (int) $mid;
+                    if ($mid <= 0 || !isset($materiasAgrupadas[$mid]) || !is_numeric($valor)) {
+                        continue;
+                    }
+                    $nkMid = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[$mid] ?? ''));
+                    $entra = isset($idsMembros[$mid]) || ($nkMid !== '' && $nkMid === $nkDest);
+                    if (!$entra && $nkMid !== '') {
+                        foreach (array_keys($idsMembros) as $midMembro) {
+                            $nkMembro = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[(int) $midMembro] ?? ''));
+                            if ($nkMembro !== '' && $nkMembro === $nkMid) {
+                                $entra = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$entra) {
+                        continue;
+                    }
+                    $soma += (float) $valor;
+                    $tem = true;
+                    unset($map[$mid]);
+                }
+                if ($tem) {
+                    $map[$vmid] = $soma;
+                }
+            }
+            $matrizPorCodigo[(string) $codigo] = $map;
+        }
+    }
+
+    /**
+     * Recalcula a linha agrupada nas colunas de faltas: soma filhas (por id ou nome),
+     * inclusive cadastros duplicados e a matéria com o rótulo do grupo.
+     *
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @param array<string, array<int, float>> $faltasFontePorCodigo
+     * @param array<string, array<string, mixed>> $groupMetaByKey
+     * @param array<string, int> $groupMidByKey
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<int, bool> $linhasPropriasForaDoGrupo
+     * @param array<string, bool> $codigosFaltas
+     */
+    private function recomputarSomaFaltasDosGrupos(
+        array &$matrizPorCodigo,
+        array $faltasFontePorCodigo,
+        array $groupMetaByKey,
+        array $groupMidByKey,
+        array $materiaNomesPorId,
+        array $linhasPropriasForaDoGrupo,
+        array $codigosFaltas
+    ): void {
+        if ($faltasFontePorCodigo === [] || $groupMetaByKey === []) {
+            return;
+        }
+
+        $nomesProprios = [];
+        foreach (array_keys($linhasPropriasForaDoGrupo) as $midProp) {
+            $nkProp = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[(int) $midProp] ?? ''));
+            if ($nkProp !== '') {
+                $nomesProprios[$nkProp] = true;
+            }
+        }
+
+        foreach ($codigosFaltas as $codigo => $_ehFaltas) {
+            $codigo = (string) $codigo;
+            $fonte = $faltasFontePorCodigo[$codigo] ?? ($matrizPorCodigo[$codigo] ?? []);
+            if (!is_array($fonte)) {
+                continue;
+            }
+            $map = is_array($matrizPorCodigo[$codigo] ?? null) ? $matrizPorCodigo[$codigo] : [];
+            foreach ($groupMetaByKey as $gk => $meta) {
+                $vmid = (int) ($groupMidByKey[$gk] ?? 0);
+                if ($vmid >= 0) {
+                    continue;
+                }
+                $idsMembros = [];
+                $nomesMembros = [];
+                foreach ((array) ($meta['materias_ids'] ?? []) as $midMembro) {
+                    $midMembro = (int) $midMembro;
+                    if ($midMembro <= 0) {
+                        continue;
+                    }
+                    $idsMembros[$midMembro] = true;
+                    $nkMembro = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[$midMembro] ?? ''));
+                    if ($nkMembro !== '') {
+                        $nomesMembros[$nkMembro] = true;
+                    }
+                }
+                $nkGrupo = $this->canonicalMateriaNomeKey((string) ($meta['label'] ?? $gk));
+                if ($nkGrupo !== '') {
+                    $nomesMembros[$nkGrupo] = true;
+                }
+                $somaFilhas = 0.0;
+                $temFilhas = false;
+                $valorGrupoExistente = null;
+                $contados = [];
+                $absorvidos = [];
+                foreach ($fonte as $midFonte => $valorFonte) {
+                    $midFonte = (int) $midFonte;
+                    if (!is_numeric($valorFonte)) {
+                        continue;
+                    }
+                    $nkFonte = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[$midFonte] ?? ''));
+                    if ($midFonte === $vmid || ($midFonte < 0 && $nkFonte !== '' && $nkFonte === $nkGrupo)) {
+                        if ($valorGrupoExistente === null) {
+                            $valorGrupoExistente = (float) $valorFonte;
+                        }
+                        continue;
+                    }
+                    if ($midFonte < 0) {
+                        continue;
+                    }
+                    if (isset($linhasPropriasForaDoGrupo[$midFonte])) {
+                        continue;
+                    }
+                    if ($nkFonte !== '' && isset($nomesProprios[$nkFonte])) {
+                        continue;
+                    }
+                    $entra = isset($idsMembros[$midFonte])
+                        || ($nkFonte !== '' && isset($nomesMembros[$nkFonte]));
+                    if (!$entra) {
+                        continue;
+                    }
+                    $chaveContagem = $nkFonte !== '' ? ('n:' . $nkFonte . ':' . $midFonte) : ('id:' . $midFonte);
+                    if (isset($contados[$chaveContagem])) {
+                        continue;
+                    }
+                    $contados[$chaveContagem] = true;
+                    $absorvidos[$midFonte] = true;
+                    $somaFilhas += (float) $valorFonte;
+                    $temFilhas = true;
+                }
+                if ($temFilhas) {
+                    $map[$vmid] = $somaFilhas;
+                    foreach (array_keys($absorvidos) as $midAbs) {
+                        unset($map[(int) $midAbs]);
+                    }
+                    foreach (array_keys($map) as $midMap) {
+                        $midMap = (int) $midMap;
+                        if ($midMap === $vmid) {
+                            continue;
+                        }
+                        $nkMap = $this->canonicalMateriaNomeKey((string) ($materiaNomesPorId[$midMap] ?? ''));
+                        if ($midMap < 0 && $nkMap !== '' && $nkMap === $nkGrupo) {
+                            unset($map[$midMap]);
+                        }
+                    }
+                } elseif ($valorGrupoExistente !== null) {
+                    $map[$vmid] = $valorGrupoExistente;
+                }
+            }
+            $matrizPorCodigo[$codigo] = $map;
+        }
     }
 
     private function agruparValoresGrupoLinha(array $valores, string $modo, float $divisor): ?float
