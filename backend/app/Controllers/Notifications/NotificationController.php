@@ -32,7 +32,6 @@ class NotificationController extends BaseController
     public function index()
     {
         $notificacoes = $this->notificacaoModel->getAll();
-        
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/notifications/index', [
             'notificacoes' => $notificacoes,
@@ -40,41 +39,32 @@ class NotificationController extends BaseController
             'page_title' => 'Gerenciar Notificações',
             'user' => $this->auth->getUser(),
             'flash_message' => $flash['message'],
-            'flash_type' => $flash['type']
+            'flash_type' => $flash['type'],
+            'csrf_token' => $this->generateCsrfToken(),
+            'current_page' => 'notifications',
         ]);
     }
-    
+
     /**
      * Formulário para criar notificação
      */
     public function create()
     {
-        // Buscar dados para o formulário
-        $usuarios = $this->getUsuarios();
-        $professores = $this->getProfessores();
-        $alunos = $this->getAlunos();
-        $pais = $this->getPais();
-        $turmas = $this->getTurmas();
-        
-        $this->viewWithLayout('admin', 'admin/notifications/create', [
-            'usuarios' => $usuarios,
-            'professores' => $professores,
-            'alunos' => $alunos,
-            'pais' => $pais,
-            'turmas' => $turmas,
-            'title' => 'Nova Notificação',
-            'page_title' => 'Nova Notificação',
-            'user' => $this->auth->getUser()
-        ]);
+        $this->redirect(URL . '/admin/notifications?novo=1');
     }
-    
+
     /**
      * Salvar nova notificação
      */
     public function store()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $this->redirect('/admin/notifications/create');
+            $this->redirect('/admin/notifications?novo=1');
+        }
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Atualize a página e tente novamente.', 'error');
+            $this->redirect('/admin/notifications?novo=1');
         }
         
         try {
@@ -133,7 +123,7 @@ class NotificationController extends BaseController
             
         } catch (Exception $e) {
             $this->setFlashMessage('Erro: ' . $e->getMessage(), 'error');
-            $this->redirect('/admin/notifications/create');
+            $this->redirect('/admin/notifications?novo=1');
         }
     }
     
@@ -587,7 +577,7 @@ class NotificationController extends BaseController
      */
     private function getUsuarios()
     {
-        $sql = "SELECT id, nome, email FROM usuarios WHERE ativo = 1 ORDER BY nome";
+        $sql = "SELECT id, nome, email, tipo FROM usuarios WHERE ativo = 1 ORDER BY nome";
         return $this->db->fetchAll($sql);
     }
     

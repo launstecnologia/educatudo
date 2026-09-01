@@ -11,6 +11,8 @@ $router->get('/admin/ocorrencias/nova', 'Modulos/ocorrencias/OcorrenciaAdminCont
 $router->post('/admin/ocorrencias', 'Modulos/ocorrencias/OcorrenciaAdminController@salvar');
 $router->post('/admin/ocorrencias/categorias', 'Modulos/ocorrencias/OcorrenciaAdminController@salvarCategoria');
 $router->get('/admin/ocorrencias/buscar-alunos', 'Modulos/ocorrencias/OcorrenciaAdminController@buscarAlunos');
+$router->post('/admin/ocorrencias/{id}/anexos', 'Modulos/ocorrencias/OcorrenciaAdminController@anexar');
+$router->get('/admin/ocorrencias/{id}/anexos/{anexoId}', 'Modulos/ocorrencias/OcorrenciaAdminController@baixarAnexo');
 $router->get('/admin/ocorrencias/{id}', 'Modulos/ocorrencias/OcorrenciaAdminController@show');
 $router->post('/admin/ocorrencias/{id}/status', 'Modulos/ocorrencias/OcorrenciaAdminController@atualizarStatus');
 $router->post('/admin/ocorrencias/{id}/pais', 'Modulos/ocorrencias/OcorrenciaAdminController@atualizarPais');

@@ -1,6 +1,10 @@
 <?php
+$modOn = static function (string $key): bool {
+    return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+};
+
 $hub_title = 'Comunicação';
-$hub_subtitle = 'Fórum, recados, avisos, reuniões e notificações da escola.';
+$hub_subtitle = 'Fórum, recados, avisos, calendário, reuniões e notificações da escola.';
 $hub_cards = [
     [
         'href' => URL . '/admin/comunicacao-escolar',
@@ -9,6 +13,15 @@ $hub_cards = [
         'icon' => 'fa-solid fa-envelope-open-text',
     ],
 ];
+
+if ($modOn('calendario_escolar')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/calendario-escolar',
+        'title' => 'Calendário Escolar',
+        'description' => 'Eventos exibidos aos responsáveis no app.',
+        'icon' => 'fa-regular fa-calendar-days',
+    ];
+}
 
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('forum')) {
     $hub_cards[] = [

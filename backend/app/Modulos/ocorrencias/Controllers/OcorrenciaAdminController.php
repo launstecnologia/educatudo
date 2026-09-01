@@ -39,6 +39,11 @@ class OcorrenciaAdminController extends AdminBaseController
         $page = max(1, min((int) ($_GET['page'] ?? 1), $totalPages));
         $offset = ($page - 1) * $perPage;
 
+        $alunoId = (int) ($_GET['aluno_id'] ?? 0);
+        $aulaId = (int) ($_GET['aula_id'] ?? 0);
+        $aluno = $alunoId > 0 ? $model->dadosAluno($alunoId) : null;
+        $aula = $aulaId > 0 ? (new ClassDiary())->getAula($aulaId) : null;
+
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/ocorrencias/index', [
             'title' => 'Ocorrências - EducaTudo',
@@ -47,8 +52,11 @@ class OcorrenciaAdminController extends AdminBaseController
             'current_page' => 'ocorrencias',
             'ocorrencias' => $model->listar($filtros, $perPage, $offset),
             'categorias' => $model->categorias(false),
+            'categorias_ativas' => $model->categorias(true),
             'turmas' => $model->turmasAtivas(),
             'filtros' => $filtros,
+            'aluno_preenchido' => $aluno,
+            'aula' => $aula,
             'pagination' => [
                 'total' => $total,
                 'per_page' => $perPage,
@@ -56,6 +64,7 @@ class OcorrenciaAdminController extends AdminBaseController
                 'total_pages' => $totalPages,
             ],
             'schema_estendido' => $model->schemaEstendido(),
+            'schema_anexos' => $model->schemaAnexos(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -67,34 +76,16 @@ class OcorrenciaAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('ocorrencias', 'cadastrar', false)) {
             return;
         }
-
-        $model = $this->service()->model();
+        $qs = ['novo' => '1'];
         $alunoId = (int) ($_GET['aluno_id'] ?? 0);
         $aulaId = (int) ($_GET['aula_id'] ?? 0);
-        $aluno = $alunoId > 0 ? $model->dadosAluno($alunoId) : null;
-        $aula = $aulaId > 0 ? (new ClassDiary())->getAula($aulaId) : null;
-
-        $voltar = URL . '/admin/ocorrencias';
         if ($alunoId > 0) {
-            $voltar = URL . '/admin/students/' . $alunoId;
-        } elseif ($aulaId > 0) {
-            $voltar = URL . '/admin/diario/aula?id=' . $aulaId;
+            $qs['aluno_id'] = $alunoId;
         }
-
-        $flash = $this->getFlashMessage();
-        $this->viewWithLayout('admin', 'admin/ocorrencias/form', [
-            'title' => 'Nova ocorrência - EducaTudo',
-            'user' => $this->auth->getUser(),
-            'current_page' => 'ocorrencias',
-            'categorias' => $model->categorias(true),
-            'aluno_preenchido' => $aluno,
-            'aula' => $aula,
-            'voltar_url' => $voltar,
-            'csrf_token' => $this->generateCsrfToken(),
-            'schema_estendido' => $model->schemaEstendido(),
-            'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
-            'flash_message' => $flash['message'] ?? '',
-        ]);
+        if ($aulaId > 0) {
+            $qs['aula_id'] = $aulaId;
+        }
+        $this->redirect('/admin/ocorrencias?' . http_build_query($qs));
     }
 
     public function salvar(): void
@@ -102,28 +93,40 @@ class OcorrenciaAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('ocorrencias', 'cadastrar', false)) {
             return;
         }
+        $qsErro = ['novo' => '1'];
+        $alunoIdErro = (int) ($_POST['aluno_id'] ?? 0);
+        if ($alunoIdErro <= 0) {
+            $alunosPost = $_POST['alunos'] ?? [];
+            if (is_array($alunosPost)) {
+                $alunoIdErro = (int) ($alunosPost[0] ?? 0);
+            }
+        }
+        if ($alunoIdErro > 0) {
+            $qsErro['aluno_id'] = $alunoIdErro;
+        }
+        if ((int) ($_POST['diario_aula_id'] ?? 0) > 0) {
+            $qsErro['aula_id'] = (int) $_POST['diario_aula_id'];
+        }
+        $voltarErro = '/admin/ocorrencias?' . http_build_query($qsErro);
+
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
-            $this->redirect('/admin/ocorrencias/nova');
+            $this->redirect($voltarErro);
             return;
         }
 
         $user = $this->auth->getUser();
-        $result = $this->service()->criar($_POST, (int) ($user['id'] ?? 0), 'admin');
+        $result = $this->service()->criar($_POST, (int) ($user['id'] ?? 0), 'admin', 0, $_FILES['anexos'] ?? []);
         if (!$result['success']) {
             $this->setFlashMessage($result['error'] ?? 'Não foi possível salvar', 'error');
-            $qs = [];
-            if ((int) ($_POST['aluno_id'] ?? 0) > 0) {
-                $qs['aluno_id'] = (int) $_POST['aluno_id'];
-            }
-            if ((int) ($_POST['diario_aula_id'] ?? 0) > 0) {
-                $qs['aula_id'] = (int) $_POST['diario_aula_id'];
-            }
-            $this->redirect('/admin/ocorrencias/nova' . ($qs ? ('?' . http_build_query($qs)) : ''));
+            $this->redirect($voltarErro);
             return;
         }
 
         $this->setFlashMessage('Ocorrência registrada.', 'success');
+        if ((int) ($result['anexos'] ?? 0) < 1 && $this->houveUploadAnexos($_FILES['anexos'] ?? [])) {
+            $this->setFlashMessage('Ocorrência registrada. Nenhum anexo válido foi salvo (JPG, PNG, WebP, GIF, PDF ou Word, até 10 MB).', 'success');
+        }
         $this->redirect('/admin/ocorrencias/' . (int) $result['id']);
     }
 
@@ -146,11 +149,85 @@ class OcorrenciaAdminController extends AdminBaseController
             'current_page' => 'ocorrencias',
             'ocorrencia' => $item,
             'historico' => $model->historico((int) $id),
+            'anexos' => $model->listarAnexos((int) $id),
             'schema_estendido' => $model->schemaEstendido(),
+            'schema_anexos' => $model->schemaAnexos(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
         ]);
+    }
+
+    public function anexar($id): void
+    {
+        if (!$this->enforceAdminPermissionKey('ocorrencias', 'alterar', false)) {
+            return;
+        }
+        $id = (int) $id;
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido.', 'error');
+            $this->redirect('/admin/ocorrencias/' . $id);
+            return;
+        }
+        $item = $this->service()->model()->findById($id);
+        if (!$item) {
+            $this->setFlashMessage('Ocorrência não encontrada.', 'error');
+            $this->redirect('/admin/ocorrencias');
+            return;
+        }
+        if (!$this->service()->model()->schemaAnexos()) {
+            $this->setFlashMessage('Atualize o banco (migration de anexos) para enviar arquivos.', 'error');
+            $this->redirect('/admin/ocorrencias/' . $id);
+            return;
+        }
+        $salvos = $this->service()->salvarAnexos($id, $_FILES['anexos'] ?? []);
+        if ($salvos < 1) {
+            $this->setFlashMessage('Nenhum arquivo válido. Use JPG, PNG, WebP, GIF, PDF ou Word de até 10 MB.', 'error');
+        } else {
+            $this->setFlashMessage($salvos === 1 ? 'Anexo enviado.' : $salvos . ' anexos enviados.', 'success');
+        }
+        $this->redirect('/admin/ocorrencias/' . $id);
+    }
+
+    public function baixarAnexo($id, $anexoId): void
+    {
+        if (!$this->enforceAdminPermissionKey('ocorrencias', 'visualizar', false)) {
+            return;
+        }
+        $id = (int) $id;
+        $anexoId = (int) $anexoId;
+        $anexo = $this->service()->model()->findAnexo($id, $anexoId);
+        if (!$anexo) {
+            $this->setFlashMessage('Anexo não encontrado.', 'error');
+            $this->redirect('/admin/ocorrencias/' . $id);
+            return;
+        }
+        $path = $this->service()->caminhoFisicoAnexo((string) ($anexo['caminho'] ?? ''));
+        if ($path === null) {
+            $this->setFlashMessage('Arquivo não encontrado no servidor.', 'error');
+            $this->redirect('/admin/ocorrencias/' . $id);
+            return;
+        }
+        $mimePermitidos = [
+            'image/jpeg' => true,
+            'image/png' => true,
+            'image/webp' => true,
+            'image/gif' => true,
+            'application/pdf' => true,
+            'application/msword' => true,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => true,
+        ];
+        $mime = (string) ($anexo['mime'] ?? '');
+        if (!isset($mimePermitidos[$mime])) {
+            $mime = 'application/octet-stream';
+        }
+        $nome = (string) ($anexo['nome'] ?? 'anexo');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . str_replace(['"', "\r", "\n"], '', $nome) . '"');
+        header('Content-Length: ' . (string) filesize($path));
+        readfile($path);
+        exit;
     }
 
     public function atualizarStatus($id): void
@@ -230,6 +307,26 @@ class OcorrenciaAdminController extends AdminBaseController
             (int) ($_GET['turma_id'] ?? 0)
         );
         $this->json(['success' => true, 'alunos' => $alunos]);
+    }
+
+    /**
+     * @param array<string,mixed> $files
+     */
+    private function houveUploadAnexos(array $files): bool
+    {
+        $names = $files['name'] ?? null;
+        if ($names === null || $names === '' || $names === []) {
+            return false;
+        }
+        if (!is_array($names)) {
+            return trim((string) $names) !== '';
+        }
+        foreach ($names as $n) {
+            if (trim((string) $n) !== '') {
+                return true;
+            }
+        }
+        return false;
     }
 }
 }

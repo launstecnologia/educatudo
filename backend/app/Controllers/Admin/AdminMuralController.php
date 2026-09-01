@@ -130,18 +130,31 @@ class AdminMuralController extends BaseController
 
     public function criar()
     {
-        $user = $this->authManager->getUser();
-        $data = [
-            'title' => 'Novo Recado - Mural',
-            'page_title' => 'Novo Recado - Mural',
-            'user' => $user,
-            'turmas_opcoes' => $this->getTurmasAll(),
-            'recado' => null,
-            'current_page' => 'mural-recados',
-            'base_url' => URL . '/admin/mural-recados',
-            'csrf_token' => $this->generateCsrfToken(),
-        ];
-        $this->viewWithLayout('admin', 'admin/mural-recados/form', $data);
+        $this->redirect(URL . '/admin/mural-recados?novo=1');
+    }
+
+    public function dados($id)
+    {
+        $id = (int) $id;
+        $recado = $this->db->fetch("SELECT * FROM mural_recados WHERE id = :id", ['id' => $id]);
+        if (!$recado) {
+            $this->json(['success' => false, 'error' => 'Recado não encontrado.'], 404);
+            return;
+        }
+        $turmas = array_map('intval', array_column(
+            $this->db->fetchAll("SELECT turma_id FROM mural_recados_turmas WHERE mural_recado_id = :id", ['id' => $id]),
+            'turma_id'
+        ));
+        $this->json([
+            'success' => true,
+            'item' => [
+                'id' => (int) $recado['id'],
+                'titulo' => (string) ($recado['titulo'] ?? ''),
+                'conteudo' => (string) ($recado['conteudo'] ?? ''),
+                'enviar_para_todos' => !empty($recado['enviar_para_todos']) ? 1 : 0,
+                'turmas' => $turmas,
+            ],
+        ]);
     }
 
     public function salvar()
@@ -157,11 +170,11 @@ class AdminMuralController extends BaseController
         $turmas_ids = isset($_POST['turmas']) && is_array($_POST['turmas']) ? array_map('intval', array_filter($_POST['turmas'])) : [];
         if ($titulo === '') {
             $this->setFlashMessage('Título é obrigatório.', 'error');
-            $this->redirect(URL . '/admin/mural-recados/criar');
+            $this->redirect(URL . '/admin/mural-recados?novo=1');
         }
         if (!$enviar_para_todos && empty($turmas_ids)) {
             $this->setFlashMessage('Selecione ao menos uma turma ou marque "Enviar para todos".', 'error');
-            $this->redirect(URL . '/admin/mural-recados/criar');
+            $this->redirect(URL . '/admin/mural-recados?novo=1');
         }
         $data_sai = date('Y-m-d', strtotime('+30 days'));
         $id = $this->db->insert(
@@ -185,30 +198,8 @@ class AdminMuralController extends BaseController
 
     public function editar()
     {
-        $id = (int)($_GET['id'] ?? 0);
-        if (!$id) {
-            $this->setFlashMessage('Recado não encontrado.', 'error');
-            $this->redirect(URL . '/admin/mural-recados');
-        }
-        $user = $this->authManager->getUser();
-        $recado = $this->db->fetch("SELECT * FROM mural_recados WHERE id = :id", ['id' => $id]);
-        if (!$recado) {
-            $this->setFlashMessage('Recado não encontrado.', 'error');
-            $this->redirect(URL . '/admin/mural-recados');
-        }
-        $turmas_ids = $this->db->fetchAll("SELECT turma_id FROM mural_recados_turmas WHERE mural_recado_id = :id", ['id' => $id]);
-        $recado['turmas_ids'] = array_column($turmas_ids, 'turma_id');
-        $data = [
-            'title' => 'Editar Recado - Mural',
-            'page_title' => 'Editar Recado - Mural',
-            'user' => $user,
-            'recado' => $recado,
-            'turmas_opcoes' => $this->getTurmasAll(),
-            'current_page' => 'mural-recados',
-            'base_url' => URL . '/admin/mural-recados',
-            'csrf_token' => $this->generateCsrfToken(),
-        ];
-        $this->viewWithLayout('admin', 'admin/mural-recados/form', $data);
+        $id = (int) ($_GET['id'] ?? 0);
+        $this->redirect(URL . '/admin/mural-recados' . ($id > 0 ? ('?recado=' . $id) : ''));
     }
 
     public function atualizar()
@@ -229,11 +220,11 @@ class AdminMuralController extends BaseController
         $turmas_ids = isset($_POST['turmas']) && is_array($_POST['turmas']) ? array_map('intval', array_filter($_POST['turmas'])) : [];
         if ($titulo === '') {
             $this->setFlashMessage('Título é obrigatório.', 'error');
-            $this->redirect(URL . '/admin/mural-recados/editar?id=' . $id);
+            $this->redirect(URL . '/admin/mural-recados?recado=' . $id);
         }
         if (!$enviar_para_todos && empty($turmas_ids)) {
             $this->setFlashMessage('Selecione ao menos uma turma ou marque "Enviar para todos".', 'error');
-            $this->redirect(URL . '/admin/mural-recados/editar?id=' . $id);
+            $this->redirect(URL . '/admin/mural-recados?recado=' . $id);
         }
         $data_sai = date('Y-m-d', strtotime('+30 days'));
         $this->db->query(

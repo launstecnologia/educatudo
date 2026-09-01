@@ -732,10 +732,7 @@ class ExamBlock
             if (!empty($data['professores']) && is_array($data['professores'])) {
                 $turmasDoBloco = isset($data['turmas']) && is_array($data['turmas']) ? $data['turmas'] : [];
                 foreach ($data['professores'] as $professorData) {
-                    $qtdQuestoes = (int)($professorData['quantidade_questoes'] ?? $professorData['numero_questoes'] ?? 5);
-                    if ($qtdQuestoes < 1) {
-                        $qtdQuestoes = 5;
-                    }
+                    $qtdQuestoes = $this->resolverQuantidadeQuestoes($professorData, $data);
                     // Insere relacionamento bloco-professor-matéria
                     $blocoProfessorId = $this->db->insert(
                         "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
@@ -827,6 +824,7 @@ class ExamBlock
                 'turma_id = :turma_id',
                 'ativo = :ativo',
                 'liberado = :liberado',
+                'prazo_entrega_professor = :prazo_entrega_professor',
                 "status = CASE WHEN :liberado_status = 1 THEN 'liberado' ELSE status END"
             ];
             $formatoEvento = $data['formato_evento'] ?? 'online_questoes';
@@ -852,7 +850,8 @@ class ExamBlock
                 'turma_id' => $data['turma_id'] ?? null,
                 'ativo' => $data['ativo'] ?? 1,
                 'liberado' => $data['liberado'] ?? 0,
-                'liberado_status' => $data['liberado'] ?? 0
+                'liberado_status' => $data['liberado'] ?? 0,
+                'prazo_entrega_professor' => $data['prazo_entrega_professor'] ?? null
             ];
 
             if ($this->hasProvasBlocosColumn('ano_letivo')) {
@@ -922,10 +921,7 @@ class ExamBlock
             if (!empty($data['professores']) && is_array($data['professores'])) {
                 $turmasDoBloco = isset($data['turmas']) && is_array($data['turmas']) ? $data['turmas'] : [];
                 foreach ($data['professores'] as $professorData) {
-                    $qtdQuestoes = (int) ($professorData['quantidade_questoes'] ?? $professorData['numero_questoes'] ?? 5);
-                    if ($qtdQuestoes < 1) {
-                        $qtdQuestoes = 5;
-                    }
+                    $qtdQuestoes = $this->resolverQuantidadeQuestoes($professorData, $data);
                     // Insere relacionamento bloco-professor-matéria
                     $blocoProfessorId = $this->db->insert(
                         "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
@@ -1452,6 +1448,22 @@ class ExamBlock
         }
     }
     
+    /**
+     * Quantidade de questões só é fixa na prova online atribuída ao professor.
+     * Lançamento de nota (cheia) e prova elaborada pela coordenação ficam sem quantidade obrigatória (0).
+     */
+    private function resolverQuantidadeQuestoes(array $professorData, array $data): int
+    {
+        $formato = (string) ($data['formato_evento'] ?? 'online_questoes');
+        $configNota = (string) ($data['configuracao_nota'] ?? 'professor_por_questao');
+        $exigeQtd = ($formato === 'online_questoes' && $configNota === 'professor_por_questao');
+        if (!$exigeQtd) {
+            return 0;
+        }
+        $qtd = (int) ($professorData['quantidade_questoes'] ?? $professorData['numero_questoes'] ?? 5);
+        return $qtd < 1 ? 5 : $qtd;
+    }
+
     /**
      * Busca provas pendentes (aguardando agrupamento)
      * Inclui apenas provas com status 'enviada' que ainda não estão em blocos

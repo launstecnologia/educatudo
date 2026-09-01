@@ -15,13 +15,17 @@ $aulasOnline = is_array($aulas_online ?? null) ? $aulas_online : [];
 
 $tem = static fn (string $k): bool => in_array($k, $widgets, true);
 
-$page_header_title = 'Dashboard Acadêmico';
-$page_header_subtitle = 'Central de gestão escolar — leitura dos módulos oficiais, sem recálculo de regras.';
+$filtrosExtrasAtivos = ((int) ($filtro['curso_id'] ?? 0) > 0)
+    || ((int) ($filtro['serie_id'] ?? 0) > 0)
+    || (($filtro['turno'] ?? '') !== '');
+
+$page_header_title = 'Dashboard';
+$page_header_subtitle = 'Visão da escola neste recorte.';
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 ?>
 
 <form id="dash-filtros" class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6" method="get">
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Ano letivo</label>
             <select name="ano_letivo_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
@@ -40,6 +44,22 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                 <?php endfor; ?>
             </select>
         </div>
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Turma</label>
+            <select name="turma_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
+                <option value="">Todas</option>
+                <?php foreach ($turmas as $t): ?>
+                    <option value="<?= (int) $t['id'] ?>" <?= ((int) ($filtro['turma_id'] ?? 0) === (int) $t['id']) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) $t['nome']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <button type="button" id="dash-mais-filtros" class="mt-3 text-sm font-medium text-gray-600 hover:text-gray-900">
+        <?= $filtrosExtrasAtivos ? 'Menos filtros' : 'Mais filtros' ?>
+    </button>
+    <div id="dash-filtros-extra" class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3 <?= $filtrosExtrasAtivos ? '' : 'hidden' ?>">
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Curso</label>
             <select name="curso_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
@@ -63,17 +83,6 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
             </select>
         </div>
         <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Turma</label>
-            <select name="turma_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
-                <option value="">Todas</option>
-                <?php foreach ($turmas as $t): ?>
-                    <option value="<?= (int) $t['id'] ?>" <?= ((int) ($filtro['turma_id'] ?? 0) === (int) $t['id']) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string) $t['nome']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
             <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Turno</label>
             <select name="turno" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
                 <option value="">Todos</option>
@@ -87,7 +96,9 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
     </div>
 </form>
 
+<?php if ($alunosOnline > 0 || (int) $alertasNovos > 0): ?>
 <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
+    <?php if ($alunosOnline > 0): ?>
     <a href="<?= URL ?>/admin/alunos-online" class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between gap-3">
             <div>
@@ -99,7 +110,8 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
             </div>
         </div>
     </a>
-    <?php if ($alertasNovos !== null): ?>
+    <?php endif; ?>
+    <?php if ((int) $alertasNovos > 0): ?>
     <a href="<?= URL ?>/admin/monitoramento/alertas" class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between gap-3">
             <div>
@@ -113,6 +125,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
     </a>
     <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <?php if ($aulasOnline !== []): ?>
 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
@@ -150,7 +163,8 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 
     <?php if ($tem('pendencias')): ?>
     <div class="mb-6">
-        <h3 class="text-sm font-semibold text-gray-900 mb-3">Pendências acadêmicas</h3>
+        <h3 class="text-sm font-semibold text-gray-900 mb-1">Para fazer</h3>
+        <p class="text-xs text-gray-500 mb-3">Diários e ocorrências: últimos 7 dias. Notas: bimestre.</p>
         <div data-widget="pendencias"><?php include __DIR__ . '/_skeleton_cards.php'; ?></div>
     </div>
     <?php endif; ?>
@@ -178,55 +192,26 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <?php if ($tem('diarios')): ?>
-        <div data-widget="diarios" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 min-h-[200px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
-        <?php endif; ?>
         <?php if ($tem('avaliacoes')): ?>
         <div data-widget="avaliacoes" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 min-h-[200px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
         <?php endif; ?>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <?php if ($tem('conselho')): ?>
         <div data-widget="conselho" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 min-h-[180px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
         <?php endif; ?>
-        <?php if ($tem('ocorrencias')): ?>
-        <div data-widget="ocorrencias" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 min-h-[180px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
-        <?php endif; ?>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <?php if ($tem('ocorrencias')): ?>
+        <div data-widget="ocorrencias" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 min-h-[180px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
+        <?php endif; ?>
         <?php if ($tem('matriculas')): ?>
         <div data-widget="matriculas" class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 min-h-[180px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
         <?php endif; ?>
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Atalhos</h3>
-            <div class="grid grid-cols-2 gap-2">
-                <?php
-                $atalhos = [
-                    ['Alunos', '/admin/students', 'fa-user-graduate'],
-                    ['Professores', '/admin/teachers', 'fa-chalkboard-user'],
-                    ['Turmas', '/admin/turmas', 'fa-school'],
-                    ['Diários', '/admin/diario', 'fa-book-open'],
-                    ['Avaliações', '/admin/provas', 'fa-file-lines'],
-                    ['Calendário', '/admin/calendario-escolar', 'fa-calendar-days'],
-                    ['Conselho', '/admin/conselhos', 'fa-users'],
-                    ['Relatórios', '/admin/reports', 'fa-chart-column'],
-                ];
-                foreach ($atalhos as $atalho):
-                ?>
-                <a href="<?= URL . $atalho[1] ?>" class="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    <i class="fa-solid <?= $atalho[2] ?> text-gray-400 w-4 text-center"></i>
-                    <?= htmlspecialchars($atalho[0]) ?>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="<?= URL ?>/public/static/js/dashboard-gestao.js?v=1"></script>
+<script src="<?= URL ?>/public/static/js/dashboard-gestao.js?v=2"></script>
 <script>
 (() => {
     const countEl = document.getElementById('alunos-online-count');

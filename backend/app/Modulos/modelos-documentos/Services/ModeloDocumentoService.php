@@ -157,6 +157,12 @@ class ModeloDocumentoService
         'total_alunos' => 'Total de alunos (ata/relatório)',
         'total_homologados' => 'Total homologados',
         'total_pendencias' => 'Total de pendências críticas',
+        'destinatario' => 'Destinatário do ofício',
+        'cargo_destinatario' => 'Cargo do destinatário',
+        'instituicao' => 'Instituição do destinatário',
+        'assunto' => 'Assunto do ofício',
+        'data_oficio' => 'Data do ofício',
+        'corpo_oficio_html' => 'Corpo do ofício (HTML)',
     ];
 
     /** Cargos disponíveis na assinatura do layout padrão. */
@@ -276,6 +282,7 @@ class ModeloDocumentoService
         'vida_escolar_pacote',
         'vida_escolar_sed',
         'vida_escolar_historico',
+        'vida_escolar_oficio',
     ];
 
     private $db;

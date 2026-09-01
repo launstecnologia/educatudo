@@ -74,6 +74,7 @@
   };
 
   var paper = null;
+  var editando = null;
   var saveTimer = null;
   var saveP = null;
   var saveAgain = false;
@@ -91,8 +92,114 @@
       Array.prototype.slice.call(n.attributes).forEach(function (a) {
         if (/^on/i.test(a.name) || /javascript:/i.test(a.value)) n.removeAttribute(a.name);
       });
+      var st = n.getAttribute('style');
+      if (st && corInvisivelNoPapel(st)) {
+        n.setAttribute('style', st.replace(/color\s*:[^;]+;?/gi, '').replace(/-webkit-text-fill-color\s*:[^;]+;?/gi, ''));
+      }
+    });
+    Array.prototype.slice.call(d.querySelectorAll('font')).forEach(function (f) {
+      var span = document.createElement('span');
+      if (f.style && f.style.fontSize) span.style.fontSize = f.style.fontSize;
+      while (f.firstChild) span.appendChild(f.firstChild);
+      f.parentNode.replaceChild(span, f);
+    });
+    Array.prototype.slice.call(d.querySelectorAll('img')).forEach(function (img) {
+      var src = img.getAttribute('src') || '';
+      if (!/^data:image\/(png|jpeg|jpg|gif|webp);base64,/i.test(src) || src.length > 400000) {
+        img.remove();
+      } else {
+        img.setAttribute('alt', img.getAttribute('alt') || '');
+        img.setAttribute('style', 'max-width:100%;height:auto;');
+      }
     });
     return d.innerHTML;
+  }
+
+  function corInvisivelNoPapel(st) {
+    return /(?:^|;)\s*(?:color|-webkit-text-fill-color)\s*:\s*(#fff(?:fff)?|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*1(?:\.0+)?\s*\))/i.test(st);
+  }
+
+  var IMG_DATA_MAX = 350000;
+
+  function arquivoDoClipboard(dt) {
+    if (!dt) return null;
+    var i;
+    if (dt.files && dt.files.length) {
+      for (i = 0; i < dt.files.length; i++) {
+        if (/^image\//i.test(dt.files[i].type)) return dt.files[i];
+      }
+    }
+    if (dt.items) {
+      for (i = 0; i < dt.items.length; i++) {
+        if (dt.items[i].kind === 'file' && /^image\//i.test(dt.items[i].type)) {
+          return dt.items[i].getAsFile();
+        }
+      }
+    }
+    return null;
+  }
+
+  function arquivoParaDataUri(file, cb) {
+    if (!file || !/^image\/(png|jpeg|jpg|gif|webp)$/i.test(file.type || '')) {
+      cb(null, 'Use PNG, JPG, GIF ou WebP.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () { cb(null, 'Não foi possível ler a imagem.'); };
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var maxW = 900;
+        var w = img.naturalWidth || img.width || 1;
+        var h = img.naturalHeight || img.height || 1;
+        var scale = w > maxW ? maxW / w : 1;
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var q = 0.82;
+        var out = canvas.toDataURL('image/jpeg', q);
+        while (out.length > IMG_DATA_MAX && q > 0.4) {
+          q -= 0.12;
+          out = canvas.toDataURL('image/jpeg', q);
+        }
+        if (out.length > IMG_DATA_MAX) {
+          canvas.width = Math.max(1, Math.round(canvas.width * 0.55));
+          canvas.height = Math.max(1, Math.round(canvas.height * 0.55));
+          ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          out = canvas.toDataURL('image/jpeg', 0.68);
+        }
+        if (out.length > IMG_DATA_MAX) {
+          cb(null, 'Imagem grande demais. Use um arquivo menor.');
+          return;
+        }
+        cb(out);
+      };
+      img.onerror = function () { cb(null, 'Imagem inválida.'); };
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function htmlImgData(uri) {
+    return '<img src="' + String(uri).replace(/"/g, '') + '" alt="" style="max-width:100%;height:auto;">';
+  }
+
+  function selecaoCobreTudo(rte) {
+    try {
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) return false;
+      var r = sel.getRangeAt(0);
+      var all = document.createRange();
+      all.selectNodeContents(rte);
+      return r.toString().replace(/\s+/g, '') === (rte.innerText || '').replace(/\s+/g, '')
+        || (r.compareBoundaryPoints(Range.START_TO_START, all) <= 0
+          && r.compareBoundaryPoints(Range.END_TO_END, all) >= 0);
+    } catch (err) {
+      return false;
+    }
   }
   function uid(p) {
     return (p || 'n') + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
@@ -219,6 +326,331 @@
     return 'display:flex;justify-content:' + j + ';align-items:' + a + ';width:100%;';
   }
 
+  function htmlTextoInterno(el, fallback) {
+    var p = el.props || {};
+    var tx = p.html || p.text || fallback || '';
+    if (String(tx).indexOf('<') >= 0) {
+      return ph(sanitizeHtml(tx));
+    }
+    return ph(esc(tx).replace(/\n/g, '<br>'));
+  }
+
+  function htmlParaEditor(el) {
+    var p = el.props || {};
+    var tx = p.html || p.text || '';
+    if (!tx) return '';
+    if (String(tx).indexOf('<') >= 0) return sanitizeHtml(tx);
+    return esc(tx).replace(/\n/g, '<br>');
+  }
+
+  function htmlDoEditor(node) {
+    if (!node) return '';
+    var clone = node.cloneNode(true);
+    $all('.edoc-ph', clone).forEach(function (s) {
+      s.replaceWith(document.createTextNode(s.textContent || ''));
+    });
+    return sanitizeHtml(clone.innerHTML);
+  }
+
+  function inserirQuebraLinha() {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+      document.execCommand('insertLineBreak');
+      return;
+    }
+    var range = sel.getRangeAt(0);
+    range.deleteContents();
+    var br = document.createElement('br');
+    range.insertNode(br);
+    if (br.parentNode && br === br.parentNode.lastChild) {
+      br.parentNode.appendChild(document.createElement('br'));
+    }
+    range.setStartAfter(br);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function estaDigitando(el) {
+    if (!el) return false;
+    var tag = (el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return true;
+    return !!(el.closest && el.closest('[contenteditable="true"]'));
+  }
+
+  function corpoDoElemento(node) {
+    if (!node) return null;
+    var body = node.querySelector('.edoc-el-body');
+    if (body) return body;
+    var kids = node.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].classList.contains('edoc-el-toolbar')) continue;
+      if (kids[i].classList.contains('edoc-el-handles')) continue;
+      return kids[i];
+    }
+    return null;
+  }
+
+  function ehTextoEditavel(tipo) {
+    return ['titulo', 'texto', 'texto_rico', 'html'].indexOf(tipo) >= 0;
+  }
+
+  function htmlBarraFmt(comImagem) {
+    return '<button type="button" data-fmt="bold" title="Negrito (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>'
+      + '<button type="button" data-fmt="italic" title="Itálico (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>'
+      + '<button type="button" data-fmt="underline" title="Sublinhado (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>'
+      + '<span class="edoc-fmt-sep"></span>'
+      + '<button type="button" data-fmt="justifyLeft" title="Alinhar à esquerda"><i class="fa-solid fa-align-left"></i></button>'
+      + '<button type="button" data-fmt="justifyCenter" title="Centralizar"><i class="fa-solid fa-align-center"></i></button>'
+      + '<button type="button" data-fmt="justifyRight" title="Alinhar à direita"><i class="fa-solid fa-align-right"></i></button>'
+      + '<button type="button" data-fmt="justifyFull" title="Justificar"><i class="fa-solid fa-align-justify"></i></button>'
+      + '<span class="edoc-fmt-sep"></span>'
+      + '<button type="button" data-fmt="fontDec" title="Diminuir fonte">A−</button>'
+      + '<span class="edoc-fmt-size" data-fmt-size>12</span>'
+      + '<button type="button" data-fmt="fontInc" title="Aumentar fonte">A+</button>'
+      + (comImagem ? '<span class="edoc-fmt-sep"></span><button type="button" id="edoc-rte-img" title="Inserir imagem"><i class="fa-solid fa-image"></i></button>' : '');
+  }
+
+  function tamanhoFontePt(el, body) {
+    var n = el && el.style ? parseInt(el.style.fontSize, 10) : 0;
+    if (n >= 8) return n;
+    if (body && body.style && body.style.fontSize) {
+      n = parseInt(body.style.fontSize, 10);
+      if (n >= 8) return n;
+    }
+    if (body && body.isConnected) {
+      var px = parseFloat(window.getComputedStyle(body).fontSize) || 16;
+      return Math.max(8, Math.round(px * 72 / 96));
+    }
+    return 12;
+  }
+
+  function atualizarLabelFonte(pt) {
+    $all('[data-fmt-size]').forEach(function (n) { n.textContent = String(pt); });
+  }
+
+  function aplicarTamanhoFonte(pt, el, body) {
+    pt = Math.max(8, Math.min(48, parseInt(pt, 10) || 12));
+    var sel = window.getSelection();
+    var temSel = sel && !sel.isCollapsed && sel.rangeCount && body && body.contains(sel.anchorNode);
+    if (temSel) {
+      try { document.execCommand('styleWithCSS', false, true); } catch (err) {}
+      document.execCommand('fontSize', false, '7');
+      $all('font', body).forEach(function (f) {
+        var span = document.createElement('span');
+        span.style.fontSize = pt + 'pt';
+        while (f.firstChild) span.appendChild(f.firstChild);
+        f.parentNode.replaceChild(span, f);
+      });
+      $all('span', body).forEach(function (s) {
+        var fs = (s.style && s.style.fontSize) || '';
+        if (fs === 'xxx-large' || fs === 'xx-large' || fs === '-webkit-xxx-large') {
+          s.style.fontSize = pt + 'pt';
+        }
+      });
+    } else {
+      el.style = el.style || {};
+      el.style.fontSize = pt;
+      if (body) body.style.fontSize = pt + 'pt';
+      var folha = paper && el.id ? corpoDoElemento(paper.querySelector('.edoc-el[data-id="' + el.id + '"]')) : null;
+      if (folha && folha !== body) folha.style.fontSize = pt + 'pt';
+    }
+    atualizarLabelFonte(pt);
+  }
+
+  function executarFmt(cmd, el, body) {
+    if (!el || !body) return;
+    body.focus();
+    if (cmd === 'bold' || cmd === 'italic' || cmd === 'underline') {
+      document.execCommand(cmd, false, null);
+      return;
+    }
+    if (cmd === 'justifyLeft' || cmd === 'justifyCenter' || cmd === 'justifyRight' || cmd === 'justifyFull') {
+      document.execCommand(cmd, false, null);
+      var map = { justifyLeft: 'left', justifyCenter: 'center', justifyRight: 'right', justifyFull: 'justify' };
+      var align = map[cmd];
+      el.style = el.style || {};
+      el.props = el.props || {};
+      el.style.textAlign = align;
+      el.props.align = align;
+      body.style.textAlign = align;
+      var folha = paper && el.id ? corpoDoElemento(paper.querySelector('.edoc-el[data-id="' + el.id + '"]')) : null;
+      if (folha && folha !== body) folha.style.textAlign = align;
+      return;
+    }
+    if (cmd === 'fontInc' || cmd === 'fontDec') {
+      var atual = tamanhoFontePt(el, body);
+      aplicarTamanhoFonte(cmd === 'fontInc' ? atual + 2 : atual - 2, el, body);
+    }
+  }
+
+  function persistirEdicaoSeHouver() {
+    if (!editando) return;
+    var body = corpoDoElemento(editando.node);
+    var path = findPath(editando.id);
+    if (path && path.element && body) {
+      path.element.props = path.element.props || {};
+      path.element.props.html = htmlDoEditor(body);
+      delete path.element.props.text;
+    }
+    esconderBarraInline();
+    editando = null;
+  }
+
+  function sincronizarBloco(el, body) {
+    if (!el || !body) return;
+    el.props = el.props || {};
+    el.props.html = htmlDoEditor(body);
+    delete el.props.text;
+    state.dirty = true;
+    scheduleSave();
+    var rte = document.querySelector('.edoc-rte');
+    if (rte && state.selected && state.selected.id === el.id) {
+      rte.innerHTML = htmlParaEditor(el);
+    }
+  }
+
+  function colocarCaretNoPonto(root, x, y) {
+    if (!root) return;
+    var r = null;
+    if (document.caretRangeFromPoint) {
+      r = document.caretRangeFromPoint(x, y);
+    } else if (document.caretPositionFromPoint) {
+      var pos = document.caretPositionFromPoint(x, y);
+      if (pos) {
+        r = document.createRange();
+        r.setStart(pos.offsetNode, pos.offset);
+        r.collapse(true);
+      }
+    }
+    var body = corpoDoElemento(root) || root;
+    if (!r || !body.contains(r.startContainer)) {
+      body.focus();
+      return;
+    }
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    body.focus();
+  }
+
+  function garantirBarraInline() {
+    var bar = $('#edoc-inline-bar');
+    if (bar) return bar;
+    bar = document.createElement('div');
+    bar.id = 'edoc-inline-bar';
+    bar.className = 'edoc-inline-bar';
+    bar.innerHTML = htmlBarraFmt(false);
+    document.body.appendChild(bar);
+    $all('[data-fmt]', bar).forEach(function (b) {
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); e.stopPropagation(); });
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!editando) return;
+        var body = corpoDoElemento(editando.node);
+        var path = findPath(editando.id);
+        if (!body || !path || !path.element) return;
+        body.focus();
+        executarFmt(b.getAttribute('data-fmt'), path.element, body);
+        sincronizarBloco(path.element, body);
+      });
+    });
+    return bar;
+  }
+
+  function mostrarBarraInline(elNode) {
+    var bar = garantirBarraInline();
+    bar.classList.add('is-open');
+    function pos() {
+      var body = corpoDoElemento(elNode);
+      var r = (body || elNode).getBoundingClientRect();
+      bar.style.left = Math.max(8, r.left) + 'px';
+      bar.style.top = Math.max(8, r.top - 42) + 'px';
+    }
+    pos();
+    if (bar._off) bar._off();
+    var stage = $('.edoc-stage');
+    if (stage) {
+      stage.addEventListener('scroll', pos);
+      window.addEventListener('resize', pos);
+      bar._off = function () {
+        stage.removeEventListener('scroll', pos);
+        window.removeEventListener('resize', pos);
+      };
+    }
+  }
+
+  function esconderBarraInline() {
+    var bar = $('#edoc-inline-bar');
+    if (!bar) return;
+    bar.classList.remove('is-open');
+    if (bar._off) { bar._off(); bar._off = null; }
+  }
+
+  function iniciarEdicaoNaFolha(node) {
+    if (!node || state.preview) return;
+    var id = node.getAttribute('data-id');
+    var path = findPath(id);
+    if (!path || !path.element || !ehTextoEditavel(path.element.type)) return;
+    var body = corpoDoElemento(node);
+    if (!body) return;
+    editando = { id: id, node: node };
+    node.classList.add('is-editing');
+    body.contentEditable = 'true';
+    body.setAttribute('spellcheck', 'true');
+    mostrarBarraInline(node);
+    atualizarLabelFonte(tamanhoFontePt(path.element, body));
+    body.focus();
+    body.onkeydown = function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        inserirQuebraLinha();
+        sincronizarBloco(path.element, body);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B' || e.key === 'i' || e.key === 'I' || e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        var cmd = (e.key === 'b' || e.key === 'B') ? 'bold' : ((e.key === 'i' || e.key === 'I') ? 'italic' : 'underline');
+        document.execCommand(cmd);
+        sincronizarBloco(path.element, body);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        persistirEdicaoSeHouver();
+        render();
+      }
+    };
+    body.oninput = function () { sincronizarBloco(path.element, body); };
+    body.onpaste = function (e) {
+      var file = arquivoDoClipboard(e.clipboardData);
+      if (file) {
+        e.preventDefault();
+        e.stopPropagation();
+        arquivoParaDataUri(file, function (uri, err) {
+          if (err || !uri) { setStatus(err || 'Não foi possível colar a imagem.'); return; }
+          if (selecaoCobreTudo(body)) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            var fim = document.createRange();
+            fim.selectNodeContents(body);
+            fim.collapse(false);
+            sel.addRange(fim);
+          }
+          document.execCommand('insertHTML', false, '<br>' + htmlImgData(uri) + '<br>');
+          sincronizarBloco(path.element, body);
+        });
+        return;
+      }
+      var html = (e.clipboardData && e.clipboardData.getData('text/html')) || '';
+      if (!html) return;
+      e.preventDefault();
+      var clean = sanitizeHtml(html);
+      if (!String(clean).replace(/<br\s*\/?>|&nbsp;|\s/gi, '')) return;
+      document.execCommand('insertHTML', false, clean);
+      sincronizarBloco(path.element, body);
+    };
+  }
+
   function htmlElemento(el) {
     var p = el.props || {};
     var st = cssBox(el.style);
@@ -226,13 +658,12 @@
     if (t === 'titulo') {
       var tag = p.tag === 'h2' || p.tag === 'h3' ? p.tag : 'h1';
       var sz = tag === 'h1' ? '16pt' : (tag === 'h2' ? '13pt' : '11pt');
-      return '<' + tag + ' style="margin:0;font-size:' + sz + ';' + st + '">' + ph(esc(p.text || 'Título')) + '</' + tag + '>';
+      return '<' + tag + ' class="edoc-el-body" style="margin:0;font-size:' + sz + ';' + st + '">' + htmlTextoInterno(el, 'Título') + '</' + tag + '>';
     }
     if (t === 'texto' || t === 'texto_rico') {
-      var tx = p.html || p.text || 'Texto';
-      return '<div style="' + st + '">' + ph(String(tx).indexOf('<') >= 0 ? sanitizeHtml(tx) : esc(tx)) + '</div>';
+      return '<div class="edoc-el-body" style="' + st + '">' + htmlTextoInterno(el, 'Texto') + '</div>';
     }
-    if (t === 'html') return '<div class="edoc-html-raw" style="' + st + '">' + ph(sanitizeHtml(p.html || '')) + '</div>';
+    if (t === 'html') return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">' + htmlTextoInterno(el) + '</div>';
     if (t === 'logo') {
       var w = p.width || 120;
       var img = (C.logoPreview || '');
@@ -324,6 +755,7 @@
   }
 
   function render() {
+    persistirEdicaoSeHouver();
     var pg = mmPage();
     var z = state.zoom / 100;
     paper = $('#edoc-paper');
@@ -332,9 +764,10 @@
     paper.style.width = pg.w + 'mm';
     paper.style.minHeight = pg.h + 'mm';
     paper.style.padding = pg.margin.top + 'mm ' + pg.margin.right + 'mm ' + pg.margin.bottom + 'mm ' + pg.margin.left + 'mm';
-    paper.style.transform = 'scale(' + z + ')';
-    wrap.style.width = (pg.w * z) + 'mm';
-    wrap.style.minHeight = (pg.h * z) + 'mm';
+    paper.style.transform = 'none';
+    wrap.style.zoom = String(z);
+    wrap.style.width = pg.w + 'mm';
+    wrap.style.minHeight = pg.h + 'mm';
     paper.classList.toggle('edoc-preview', !!state.preview);
 
     var html = '';
@@ -362,8 +795,30 @@
     return '';
   }
 
+  function marcarSelecionado(elNode, id) {
+    state.selected = { id: id, kind: 'element' };
+    $all('.is-selected', paper).forEach(function (n) { n.classList.remove('is-selected'); });
+    if (elNode) elNode.classList.add('is-selected');
+  }
+
   function bindCanvas() {
     if (!paper) return;
+    paper.onmousedown = function (e) {
+      if (state.preview) return;
+      if (e.button && e.button !== 0) return;
+      if (e.target.closest('[data-act]') || e.target.closest('.edoc-el-toolbar') || e.target.closest('#edoc-inline-bar')) return;
+      var elNode = e.target.closest('.edoc-el');
+      var tipo = elNode ? elNode.getAttribute('data-type') : '';
+      if (!elNode || !ehTextoEditavel(tipo)) return;
+      var id = elNode.getAttribute('data-id');
+      if (editando && editando.id === id) return;
+      persistirEdicaoSeHouver();
+      marcarSelecionado(elNode, id);
+      iniciarEdicaoNaFolha(elNode);
+      renderProps();
+      var body = corpoDoElemento(elNode);
+      if (body) body.focus();
+    };
     paper.onclick = onCanvasClick;
     $all('.edoc-col', paper).forEach(function (col) {
       col.addEventListener('dragover', function (e) {
@@ -383,6 +838,8 @@
           insertVariavel(col.getAttribute('data-id'), chave);
         } else if (tipo) {
           insertElement(col.getAttribute('data-id'), tipo);
+        } else if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          inserirArquivoNaColuna(col.getAttribute('data-id'), e.dataTransfer.files[0]);
         }
       });
     });
@@ -407,20 +864,37 @@
   }
 
   function onCanvasClick(e) {
+    if (e.target.closest && e.target.closest('#edoc-inline-bar')) return;
+    e.stopPropagation();
     var act = e.target.closest('[data-act]');
     var node = e.target.closest('[data-id]');
     if (act && node) {
-      e.stopPropagation();
+      persistirEdicaoSeHouver();
       runAct(act.getAttribute('data-act'), node.getAttribute('data-id'));
       return;
     }
+    if (editando && editando.node && editando.node.contains(e.target) && e.target.closest('[contenteditable="true"]')) {
+      return;
+    }
+    var elNode = e.target.closest('.edoc-el');
+    var tipo = elNode ? elNode.getAttribute('data-type') : '';
+    if (!state.preview && elNode && ehTextoEditavel(tipo) && !e.target.closest('.edoc-el-toolbar')) {
+      var id = elNode.getAttribute('data-id');
+      if (editando && editando.id === id) return;
+      persistirEdicaoSeHouver();
+      marcarSelecionado(elNode, id);
+      iniciarEdicaoNaFolha(elNode);
+      colocarCaretNoPonto(elNode, e.clientX, e.clientY);
+      renderProps();
+      return;
+    }
+    persistirEdicaoSeHouver();
     if (node) {
       state.selected = { id: node.getAttribute('data-id'), kind: node.getAttribute('data-kind') };
       render();
     } else {
       state.selected = null;
-      renderProps();
-      $all('.is-selected', paper).forEach(function (n) { n.classList.remove('is-selected'); });
+      render();
     }
   }
 
@@ -545,15 +1019,20 @@
 
   function insertVariavelIntoSelection(chave) {
     var token = tokenDaChave(chave);
+    var rte = document.querySelector('.edoc-rte');
+    if (rte && state.selected) {
+      if (typeof rte._edocRestore === 'function') rte._edocRestore();
+      else rte.focus();
+      document.execCommand('insertText', false, token);
+      if (typeof rte._edocSync === 'function') rte._edocSync(true);
+      return;
+    }
     var sel = state.selected ? findPath(state.selected.id) : null;
     if (sel && sel.element && ['titulo', 'texto', 'texto_rico', 'html'].indexOf(sel.element.type) >= 0) {
       sel.element.props = sel.element.props || {};
       var cur = sel.element.props.html || sel.element.props.text || '';
-      if (sel.element.type === 'html' || (sel.element.props.html != null && String(sel.element.props.html).indexOf('<') >= 0)) {
-        sel.element.props.html = cur + token;
-      } else {
-        sel.element.props.text = cur + token;
-      }
+      sel.element.props.html = cur + token;
+      delete sel.element.props.text;
       pushHist();
       render();
       return;
@@ -575,6 +1054,44 @@
     state.selected = { id: el.id, kind: 'element' };
     if (!skipHist) pushHist();
     render();
+    return el;
+  }
+
+  function inserirArquivoNaColuna(colId, file) {
+    arquivoParaDataUri(file, function (uri, err) {
+      if (err || !uri) { setStatus(err || 'Falha ao carregar imagem.'); return; }
+      var path = findPath(colId);
+      if (!path || !path.column) return;
+      var el = defaultElement('imagem');
+      el.props.src = uri;
+      path.column.elements = path.column.elements || [];
+      path.column.elements.push(el);
+      state.selected = { id: el.id, kind: 'element' };
+      pushHist();
+      render();
+      setStatus('Imagem adicionada');
+    });
+  }
+
+  function aplicarImagemColada(file) {
+    var sel = state.selected ? findPath(state.selected.id) : null;
+    if (sel && sel.element && sel.element.type === 'imagem') {
+      arquivoParaDataUri(file, function (uri, err) {
+        if (err || !uri) { setStatus(err || 'Não foi possível colar a imagem.'); return; }
+        sel.element.props = sel.element.props || {};
+        sel.element.props.src = uri;
+        pushHist();
+        render();
+        setStatus('Imagem adicionada');
+      });
+      return;
+    }
+    var colId = (sel && sel.column) ? sel.column.id : primeiraColuna();
+    if (!colId) {
+      addSection('body', [100]);
+      colId = areaOf('body').sections.slice(-1)[0].columns[0].id;
+    }
+    inserirArquivoNaColuna(colId, file);
   }
 
   function addSection(role, widths) {
@@ -692,14 +1209,23 @@
     var st = el.style || {};
     var html = '<div class="edoc-sec-label">' + labelTipo(el.type).toUpperCase() + '</div>';
     if (el.type === 'titulo' || el.type === 'texto' || el.type === 'texto_rico' || el.type === 'html') {
-      html += '<label>Conteúdo</label><textarea data-f="text" rows="5">' + String(p.text || p.html || '').replace(/</g, '&lt;') + '</textarea>';
+      html += '<label>Conteúdo</label>';
+      html += '<div class="edoc-rte-wrap">'
+        + '<div class="edoc-rte-bar">' + htmlBarraFmt(true) + '</div>'
+        + '<div class="edoc-rte" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true"></div>'
+        + '</div>';
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
+      html += '<p class="edoc-hint" style="margin-top:8px">Clique no texto da folha para digitar. Use a barra para centralizar e A+ / A− para o tamanho da fonte.</p>';
     }
     if (el.type === 'tabela_notas') {
       html += '<p class="edoc-hint">Quadro com 1º ao 4º bimestre e final (nota e falta). O tamanho do texto abaixo vale para a tabela inteira — diminua para caber em uma folha.</p>';
     }
     if (el.type === 'titulo') {
       html += '<label>Nível</label><select data-f="tag"><option value="h1">Título</option><option value="h2">Subtítulo</option><option value="h3">Seção</option></select>';
+    }
+    if (el.type === 'imagem') {
+      html += '<label>Arquivo</label><input type="file" id="edoc-img-file" accept="image/png,image/jpeg,image/gif,image/webp">';
+      html += '<p class="edoc-hint">Cole com Ctrl+V, escolha um arquivo ou arraste a imagem para a folha.</p>';
     }
     if (el.type === 'logo' || el.type === 'imagem') {
       html += '<label>Largura (px)</label>' + inp('width', p.width || 120, 'type="number" min="24" max="400"');
@@ -725,7 +1251,7 @@
     if (el.type !== 'logo' && el.type !== 'imagem') {
       html += '<div class="edoc-sec-label">TIPOGRAFIA</div><div class="edoc-prop-row">'
         + '<div><label>Tamanho (pt)</label>' + inp('fontSize', st.fontSize || '', 'type="number" min="8" max="48"') + '</div>'
-        + '<div><label>Peso</label><select data-f="fontWeight"><option value="">Normal</option><option value="bold">Negrito</option></select></div></div>'
+        + '<div><label>Peso do bloco</label><select data-f="fontWeight"><option value="">Normal</option><option value="bold">Negrito</option></select></div></div>'
         + '<label>Cor</label>' + inp('color', st.color || '#111111', 'type="color"');
     }
     html += '<div class="edoc-sec-label">MARGEM</div><div class="edoc-box4">'
@@ -791,7 +1317,10 @@
       });
     });
     var varBtn = $('#edoc-insert-var', box);
-    if (varBtn) varBtn.addEventListener('click', function () { openVars(target); });
+    if (varBtn) {
+      varBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      varBtn.addEventListener('click', function () { openVars(target, box.querySelector('.edoc-rte')); });
+    }
     if (kind === 'element' && target.type === 'titulo') {
       var tag = box.querySelector('[data-f="tag"]');
       if (tag) tag.value = (target.props || {}).tag || 'h1';
@@ -802,6 +1331,163 @@
       var fw = box.querySelector('[data-f="fontWeight"]');
       if (fw) fw.value = (target.style || {}).fontWeight || '';
     }
+    if (kind === 'element') bindRte(box, target);
+    if (kind === 'element' && target.type === 'imagem') {
+      var imgFile = $('#edoc-img-file', box);
+      if (imgFile) {
+        imgFile.addEventListener('change', function () {
+          if (!imgFile.files || !imgFile.files[0]) return;
+          arquivoParaDataUri(imgFile.files[0], function (uri, err) {
+            imgFile.value = '';
+            if (err || !uri) { setStatus(err || 'Falha ao carregar imagem.'); return; }
+            target.props = target.props || {};
+            target.props.src = uri;
+            pushHist();
+            render();
+            setStatus('Imagem adicionada');
+          });
+        });
+      }
+    }
+  }
+
+  function atualizarBotoesRte(box) {
+    $all('[data-fmt]', box).forEach(function (b) {
+      var cmd = b.getAttribute('data-fmt');
+      if (cmd === 'fontInc' || cmd === 'fontDec' || cmd === 'justifyLeft' || cmd === 'justifyCenter' || cmd === 'justifyRight' || cmd === 'justifyFull') return;
+      var on = false;
+      try { on = document.queryCommandState(cmd); } catch (err) { on = false; }
+      b.classList.toggle('active', !!on);
+    });
+  }
+
+  function bindRte(box, target) {
+    var rte = box.querySelector('.edoc-rte');
+    if (!rte) return;
+    rte.innerHTML = htmlParaEditor(target);
+    atualizarLabelFonte(tamanhoFontePt(target, rte));
+    var savedRange = null;
+    function saveRange() {
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount && rte.contains(sel.anchorNode)) {
+        savedRange = sel.getRangeAt(0).cloneRange();
+      }
+    }
+    function restoreRange() {
+      rte.focus();
+      if (!savedRange) return;
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+    function sync(silent) {
+      target.props = target.props || {};
+      target.props.html = htmlDoEditor(rte);
+      delete target.props.text;
+      if (!silent) { pushHist(); render(); return; }
+      state.dirty = true;
+      scheduleSave();
+      var node = paper && paper.querySelector('[data-id="' + target.id + '"]');
+      var inner = corpoDoElemento(node);
+      if (inner) inner.innerHTML = htmlTextoInterno(target);
+    }
+    rte._edocRestore = restoreRange;
+    rte._edocSync = sync;
+    rte.addEventListener('keyup', saveRange);
+    rte.addEventListener('mouseup', saveRange);
+    rte.addEventListener('input', function () { saveRange(); sync(true); });
+    rte.addEventListener('paste', function (e) {
+      var file = arquivoDoClipboard(e.clipboardData);
+      if (file) {
+        e.preventDefault();
+        inserirArquivoNoRte(file);
+        return;
+      }
+      var html = (e.clipboardData && e.clipboardData.getData('text/html')) || '';
+      if (!html) return;
+      e.preventDefault();
+      var clean = sanitizeHtml(html);
+      if (!String(clean).replace(/<br\s*\/?>|&nbsp;|\s/gi, '')) {
+        setStatus('O conteúdo colado estava vazio ou a imagem não é suportada.');
+        return;
+      }
+      document.execCommand('insertHTML', false, clean);
+      saveRange();
+      sync(true);
+    });
+    function inserirArquivoNoRte(file) {
+      arquivoParaDataUri(file, function (uri, err) {
+        if (err || !uri) {
+          setStatus(err || 'Não foi possível colar a imagem.');
+          return;
+        }
+        rte.focus();
+        if (selecaoCobreTudo(rte)) {
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          var fim = document.createRange();
+          fim.selectNodeContents(rte);
+          fim.collapse(false);
+          sel.addRange(fim);
+        }
+        document.execCommand('insertHTML', false, '<br>' + htmlImgData(uri) + '<br>');
+        saveRange();
+        sync(true);
+        setStatus('Imagem inserida no texto');
+      });
+    }
+    var imgBtn = $('#edoc-rte-img', box);
+    if (imgBtn) {
+      var fileInp = document.createElement('input');
+      fileInp.type = 'file';
+      fileInp.accept = 'image/png,image/jpeg,image/gif,image/webp';
+      fileInp.hidden = true;
+      box.appendChild(fileInp);
+      imgBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      imgBtn.addEventListener('click', function () { fileInp.click(); });
+      fileInp.addEventListener('change', function () {
+        if (fileInp.files && fileInp.files[0]) inserirArquivoNoRte(fileInp.files[0]);
+        fileInp.value = '';
+      });
+    }
+    rte.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        inserirQuebraLinha();
+        saveRange();
+        sync(true);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B' || e.key === 'i' || e.key === 'I' || e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        var cmd = (e.key === 'b' || e.key === 'B') ? 'bold' : ((e.key === 'i' || e.key === 'I') ? 'italic' : 'underline');
+        document.execCommand(cmd);
+        saveRange();
+        sync(true);
+        atualizarBotoesRte(box);
+      }
+    });
+    $all('[data-fmt]', box).forEach(function (b) {
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () {
+        restoreRange();
+        executarFmt(b.getAttribute('data-fmt'), target, rte);
+        saveRange();
+        sync(true);
+        atualizarBotoesRte(box);
+      });
+    });
+    function onSelChange() {
+      if (!rte.isConnected) {
+        document.removeEventListener('selectionchange', onSelChange);
+        return;
+      }
+      if (rte.contains(document.activeElement) || (window.getSelection() && rte.contains(window.getSelection().anchorNode))) {
+        saveRange();
+        atualizarBotoesRte(box);
+      }
+    }
+    document.addEventListener('selectionchange', onSelChange);
   }
 
   function applyField(kind, target, f, silent) {
@@ -817,8 +1503,13 @@
       target.props = target.props || {};
       target.style = target.style || {};
       if (name === 'text' || name === 'html') {
-        if (target.type === 'html' || (String(val).indexOf('<') >= 0)) target.props.html = val;
-        else target.props.text = val;
+        if (target.type === 'html' || (String(val).indexOf('<') >= 0)) {
+          target.props.html = val;
+          delete target.props.text;
+        } else {
+          target.props.text = val;
+          delete target.props.html;
+        }
       } else if (name === 'width' || name === 'height' || name === 'tag') {
         target.props[name] = name === 'tag' ? val : (parseInt(val, 10) || 0);
       } else if (name.indexOf('m_') === 0 || name.indexOf('p_') === 0) {
@@ -842,23 +1533,31 @@
       scheduleSave();
       var node = paper && paper.querySelector('[data-id="' + target.id + '"]');
       if (node && (name === 'text' || name === 'html')) {
-        var inner = node.querySelector('h1,h2,h3,div,p');
-        if (inner) inner.innerHTML = ph(val);
+        var inner = corpoDoElemento(node);
+        if (inner) inner.innerHTML = htmlTextoInterno(target);
       }
     }
   }
 
-  function openVars(target) {
+  function openVars(target, rte) {
     var modal = $('#edoc-vars');
     modal.classList.add('open');
     modal.onclick = function (e) { if (e.target === modal) modal.classList.remove('open'); };
     $all('[data-var]', modal).forEach(function (b) {
       b.onclick = function () {
         var token = tokenDaChave(b.getAttribute('data-var'));
-        target.props = target.props || {};
-        var cur = target.props.text || target.props.html || '';
-        target.props.text = cur + token;
         modal.classList.remove('open');
+        if (rte) {
+          if (typeof rte._edocRestore === 'function') rte._edocRestore();
+          else rte.focus();
+          document.execCommand('insertText', false, token);
+          if (typeof rte._edocSync === 'function') rte._edocSync(true);
+          return;
+        }
+        target.props = target.props || {};
+        var cur = target.props.html || target.props.text || '';
+        target.props.html = cur + token;
+        delete target.props.text;
         pushHist(); render();
       };
     });
@@ -1023,11 +1722,20 @@
       });
     });
     document.addEventListener('edoc-tree', renderTree);
+    document.addEventListener('paste', function (e) {
+      if (estaDigitando(e.target)) return;
+      var file = arquivoDoClipboard(e.clipboardData);
+      if (!file) return;
+      e.preventDefault();
+      aplicarImagemColada(file);
+    });
     document.addEventListener('keydown', function (e) {
       var meta = e.metaKey || e.ctrlKey;
+      var typing = estaDigitando(e.target);
+      if (meta && e.key === 's') { e.preventDefault(); save(); return; }
+      if (typing) return;
       if (meta && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       if (meta && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
-      if (meta && e.key === 's') { e.preventDefault(); save(); }
       if (meta && e.key === 'd' && state.selected) {
         e.preventDefault();
         runAct('dup', state.selected.id);
@@ -1039,24 +1747,11 @@
     });
     var stage = $('.edoc-stage');
     if (stage) {
-      stage.addEventListener('dblclick', function (e) {
-        var node = e.target.closest('.edoc-el');
-        if (!node) return;
-        var path = findPath(node.getAttribute('data-id'));
-        if (!path || !path.element) return;
-        if (['titulo', 'texto', 'texto_rico', 'html'].indexOf(path.element.type) < 0) return;
-        var editable = node.querySelector('h1,h2,h3,div,p');
-        if (!editable) return;
-        editable.contentEditable = 'true';
-        editable.focus();
-        editable.onblur = function () {
-          editable.contentEditable = 'false';
-          var txt = editable.innerHTML;
-          path.element.props = path.element.props || {};
-          if (path.element.type === 'html' || txt.indexOf('<') >= 0) path.element.props.html = txt;
-          else path.element.props.text = editable.innerText;
-          pushHist();
-        };
+      stage.addEventListener('click', function (e) {
+        if (e.target !== stage) return;
+        if (!editando) return;
+        persistirEdicaoSeHouver();
+        render();
       });
     }
   }

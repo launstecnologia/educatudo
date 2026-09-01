@@ -22,6 +22,7 @@ class FrequenciaHojeWidget implements WidgetDashboard
             return [
                 'ok' => true,
                 'disponivel' => true,
+                'vazio' => true,
                 'resumo' => [
                     'percentual' => null,
                     'presentes' => 0,
@@ -33,9 +34,9 @@ class FrequenciaHojeWidget implements WidgetDashboard
                 ],
                 'links' => [
                     'presenca' => (class_exists('LayoutHelper', false) && \LayoutHelper::isModuleEnabled('presenca')) ? '/admin/presenca' : null,
+                    'diario' => '/admin/diario',
                     'chamadas' => '/admin/diario',
                 ],
-                'nota' => 'Fonte: Diário de Classe (chamada por aula). Gestão de Presença aplica a chamada; o consolidado pedagógico vem daqui.',
             ];
         }
 
@@ -58,12 +59,13 @@ class FrequenciaHojeWidget implements WidgetDashboard
         return [
             'ok' => true,
             'disponivel' => true,
+            'vazio' => ((int) ($resumo['aulas_finalizadas'] ?? 0) === 0),
             'resumo' => $resumo,
             'links' => [
                 'presenca' => $presencaOn ? '/admin/presenca' : null,
+                'diario' => '/admin/diario?' . $qs,
                 'chamadas' => '/admin/diario?' . $qs,
             ],
-            'nota' => 'Fonte: Diário de Classe (chamada por aula). Gestão de Presença aplica a chamada; o consolidado pedagógico vem daqui.',
         ];
     }
 }

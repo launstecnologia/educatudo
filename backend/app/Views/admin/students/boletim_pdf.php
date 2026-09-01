@@ -17,6 +17,10 @@ $anoLetivo = isset($ano_letivo) ? (int) $ano_letivo : (int) date('Y');
 $logoData = isset($logo_data) ? (string) $logo_data : '';
 $geradoEm = isset($gerado_em) ? (string) $gerado_em : date('d/m/Y H:i');
 
+if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+    require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
+}
+
 // Reutiliza o agrupador de colunas (mesma lógica do partial).
 $buildGroupedBoletimHeader = static function (array $cols): array {
     $groupOrder = ['b1', 'b2', 'b3', 'b4', 'final', 'outros'];
@@ -269,7 +273,10 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
             if ($cols === [] || $linhas === []) {
                 continue;
             }
-            $groupedHeader = $buildGroupedBoletimHeader($cols);
+            $exibirEmEv = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
+            $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
+                ? $buildGroupedBoletimHeader($cols)
+                : ['enabled' => false, 'groups' => []];
             ?>
             <table class="boletim">
                 <thead>

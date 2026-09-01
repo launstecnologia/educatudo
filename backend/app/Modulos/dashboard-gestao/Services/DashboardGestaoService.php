@@ -164,6 +164,9 @@ class DashboardGestaoService
     {
         $out = [];
         foreach (array_keys(self::WIDGETS) as $chave) {
+            if ($chave === 'diarios') {
+                continue;
+            }
             if ($this->podeVer($chave, $user)) {
                 $out[] = $chave;
             }
@@ -216,6 +219,7 @@ class DashboardGestaoService
             $filtro->serieId,
             $filtro->turmaId,
             $filtro->turno,
+            $filtro->hoje,
         ]));
     }
 }

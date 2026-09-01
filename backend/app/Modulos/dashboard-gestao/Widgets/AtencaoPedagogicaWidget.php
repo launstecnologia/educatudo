@@ -41,7 +41,7 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
             'ok' => true,
             'disponivel' => true,
             'linhas' => $linhas,
-            'nota' => 'Não exibe ocorrências. Frequência: mínimo legal 75%. Componentes: situação homologada (recuperação/reprovação).',
+            'nota' => 'Frequência abaixo de 75% ou componente em recuperação/reprovação.',
         ];
     }
 

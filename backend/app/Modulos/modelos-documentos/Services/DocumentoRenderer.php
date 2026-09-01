@@ -299,7 +299,7 @@ class DocumentoRenderer
         if (str_contains($raw, '<')) {
             $txt = self::htmlPermitido($raw);
         } else {
-            $txt = '<p>' . $this->textoComPlaceholders($raw) . '</p>';
+            $txt = '<p>' . nl2br($this->textoComPlaceholders($raw), false) . '</p>';
         }
         return '<div style="' . $css . '">' . $txt . '</div>';
     }

@@ -2,11 +2,21 @@
 $bloco = $bloco ?? [];
 $linhas = $linhas ?? [];
 $materiasFiltro = $materias_filtro ?? [];
+$turmasFiltro = $turmas_filtro ?? [];
+$seriesFiltro = $series_filtro ?? [];
 $materiaIdFiltro = (int) ($materia_id_filtro ?? 0);
+$turmaIdFiltro = (int) ($turma_id_filtro ?? 0);
+$serieIdFiltro = (int) ($serie_id_filtro ?? 0);
+$ordenarFiltro = (string) ($ordenar_filtro ?? 'nome');
+if (!in_array($ordenarFiltro, ['nome', 'chamada', 'sexo'], true)) {
+    $ordenarFiltro = 'nome';
+}
 $csrfToken = $csrf_token ?? '';
 $flash = $flash ?? [];
 $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
-$fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importacao_notas : [];
+$colunasTabela = ($notaUnicaTodasMaterias ? 4 : 6) + 1;
+$blocoId = (int) ($bloco['id'] ?? 0);
+$actionFiltro = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
 ?>
 
 <div class="mb-8 flex flex-wrap justify-between items-center gap-4">
@@ -14,8 +24,8 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
         <h2 class="text-2xl font-bold text-gray-900">Lançamento de notas (Coordenação)</h2>
         <p class="text-gray-600 mt-1"><?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?></p>
     </div>
-    <a href="<?= URL ?>/admin/provas/blocos/<?= (int) ($bloco['id'] ?? 0) ?>/gerenciar"
-       class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">← Voltar ao painel</a>
+    <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/gerenciar"
+       class="text-gray-600 hover:text-gray-900">← Voltar ao painel</a>
 </div>
 
 <?php if (!empty($flash['message'])): ?>
@@ -25,11 +35,11 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
 <?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-lg p-5 mb-6">
-    <?php if (!$notaUnicaTodasMaterias): ?>
-    <form method="get" action="<?= URL ?>/admin/provas/blocos/<?= (int) ($bloco['id'] ?? 0) ?>/lancar-notas-coordenacao" class="flex flex-wrap items-end gap-3">
+    <form method="get" action="<?= htmlspecialchars($actionFiltro) ?>" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 items-end">
+        <?php if (!$notaUnicaTodasMaterias): ?>
         <div>
             <label for="materia_id" class="block text-sm font-medium text-gray-700 mb-1">Matéria</label>
-            <select id="materia_id" name="materia_id" class="px-3 py-2 border border-gray-300 rounded-lg" style="min-width:260px;">
+            <select id="materia_id" name="materia_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
                 <option value="0" <?= $materiaIdFiltro === 0 ? 'selected' : '' ?>>Todas as matérias</option>
                 <?php foreach ($materiasFiltro as $mid => $mnome): ?>
                     <option value="<?= (int) $mid ?>" <?= $materiaIdFiltro === (int) $mid ? 'selected' : '' ?>>
@@ -38,107 +48,55 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
                 <?php endforeach; ?>
             </select>
         </div>
-        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Aplicar filtro</button>
+        <?php endif; ?>
+        <div>
+            <label for="serie_id" class="block text-sm font-medium text-gray-700 mb-1">Série</label>
+            <select id="serie_id" name="serie_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <option value="0" <?= $serieIdFiltro === 0 ? 'selected' : '' ?>>Todas as séries</option>
+                <?php foreach ($seriesFiltro as $sid => $snome): ?>
+                    <option value="<?= (int) $sid ?>" <?= $serieIdFiltro === (int) $sid ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) $snome) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="turma_id" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+            <select id="turma_id" name="turma_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <option value="0" <?= $turmaIdFiltro === 0 ? 'selected' : '' ?>>Todas as turmas</option>
+                <?php foreach ($turmasFiltro as $tid => $tnome): ?>
+                    <option value="<?= (int) $tid ?>" <?= $turmaIdFiltro === (int) $tid ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) $tnome) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="ordenar" class="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
+            <select id="ordenar" name="ordenar" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <option value="nome" <?= $ordenarFiltro === 'nome' ? 'selected' : '' ?>>Nome (A–Z)</option>
+                <option value="chamada" <?= $ordenarFiltro === 'chamada' ? 'selected' : '' ?>>Número da chamada</option>
+                <option value="sexo" <?= $ordenarFiltro === 'sexo' ? 'selected' : '' ?>>Sexo</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn-primary-custom w-full inline-flex items-center justify-center px-4 py-2 rounded-lg font-semibold hover:opacity-90">
+                Aplicar filtro
+            </button>
+        </div>
     </form>
-    <?php endif; ?>
-    <p class="text-xs text-gray-500 mt-2">Informe a nota de 0 a 10. Deixe em branco para manter sem nota.</p>
+    <p class="text-xs text-gray-500 mt-3">Informe a nota de 0 a 10. Deixe em branco para manter sem nota.</p>
     <?php if ($notaUnicaTodasMaterias): ?>
     <p class="text-xs text-violet-800 mt-2">Configuração ativa: mesma nota para todas as matérias do evento. Ao salvar, a nota informada para o aluno é replicada nas demais matérias.</p>
     <?php endif; ?>
 </div>
 
-<div class="bg-white rounded-xl shadow-lg p-5 mb-6 border-l-4 border-indigo-500">
-    <div class="mb-4">
-        <h3 class="text-lg font-semibold text-gray-900">Importar notas de outro evento</h3>
-        <p class="text-sm text-gray-600 mt-1">
-            A nota será gravada na <strong>mesma matéria e no mesmo professor</strong> exibidos na opção escolhida.
-            <?php if ($materiaIdFiltro > 0 && isset($materiasFiltro[$materiaIdFiltro])): ?>
-                Destino atual: <strong><?= htmlspecialchars((string) $materiasFiltro[$materiaIdFiltro]) ?></strong>.
-            <?php endif; ?>
-        </p>
-    </div>
-
-    <?php if (empty($fontesImportacao)): ?>
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Nenhum outro evento possui notas compatíveis para o professor e a matéria deste filtro.
-        </div>
-    <?php else: ?>
-        <form method="post"
-              action="<?= URL ?>/admin/provas/blocos/<?= (int) ($bloco['id'] ?? 0) ?>/importar-notas-internas"
-              class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-end"
-              id="formImportacaoNotasLancamento">
-            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken) ?>">
-            <input type="hidden" name="retornar_lancamento" value="1">
-            <input type="hidden" name="materia_id_filtro" value="<?= (int) $materiaIdFiltro ?>">
-            <input type="hidden" name="fonte_bloco_id" id="importFonteBlocoId" value="">
-            <input type="hidden" name="fonte_professor_id" id="importFonteProfessorId" value="">
-            <input type="hidden" name="fonte_materia_id" id="importFonteMateriaId" value="">
-
-            <div>
-                <label for="importFonteCompleta" class="block text-sm font-medium text-gray-700 mb-1">
-                    Evento de origem → destino neste lançamento
-                </label>
-                <select id="importFonteCompleta" required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">Selecione o evento, professor e matéria</option>
-                    <?php foreach ($fontesImportacao as $fonte): ?>
-                        <?php
-                        $fonteBlocoId = (int) ($fonte['bloco_id'] ?? 0);
-                        $fonteProfessorId = (int) ($fonte['professor_id'] ?? 0);
-                        $fonteMateriaId = (int) ($fonte['materia_id'] ?? 0);
-                        $fonteBimestre = (int) ($fonte['bimestre'] ?? 0);
-                        $fonteData = !empty($fonte['data_prova']) ? date('d/m/Y', strtotime((string) $fonte['data_prova'])) : '';
-                        ?>
-                        <option value="<?= $fonteBlocoId ?>_<?= $fonteProfessorId ?>_<?= $fonteMateriaId ?>"
-                                data-bloco="<?= $fonteBlocoId ?>"
-                                data-professor="<?= $fonteProfessorId ?>"
-                                data-materia="<?= $fonteMateriaId ?>">
-                            <?= htmlspecialchars((string) ($fonte['bloco_titulo'] ?? ('Evento #' . $fonteBlocoId))) ?>
-                            <?= $fonteBimestre > 0 ? ' · ' . $fonteBimestre . 'º bimestre' : '' ?>
-                            <?= $fonteData !== '' ? ' · ' . htmlspecialchars($fonteData) : '' ?>
-                            → <?= htmlspecialchars((string) ($fonte['materia_nome'] ?? 'Matéria')) ?>
-                            · <?= htmlspecialchars((string) ($fonte['professor_nome'] ?? 'Professor')) ?>
-                            (<?= (int) ($fonte['total_notas'] ?? 0) ?> notas)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <label class="inline-flex items-start gap-2 text-sm text-gray-700 mt-3 cursor-pointer">
-                    <input type="checkbox" name="sobrescrever" value="1"
-                           class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    <span>Sobrescrever notas que já existem neste lançamento</span>
-                </label>
-            </div>
-
-            <button type="submit" id="btnImportarNotasLancamento" disabled
-                    class="btn-primary-custom inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                <i class="fa-solid fa-file-import" aria-hidden="true"></i>
-                Importar para esta matéria
-            </button>
-        </form>
-
-        <script>
-        (function () {
-            var select = document.getElementById('importFonteCompleta');
-            var bloco = document.getElementById('importFonteBlocoId');
-            var professor = document.getElementById('importFonteProfessorId');
-            var materia = document.getElementById('importFonteMateriaId');
-            var botao = document.getElementById('btnImportarNotasLancamento');
-            if (!select || !bloco || !professor || !materia || !botao) return;
-            select.addEventListener('change', function () {
-                var option = select.options[select.selectedIndex];
-                bloco.value = option && option.dataset.bloco ? option.dataset.bloco : '';
-                professor.value = option && option.dataset.professor ? option.dataset.professor : '';
-                materia.value = option && option.dataset.materia ? option.dataset.materia : '';
-                botao.disabled = !bloco.value || !professor.value || !materia.value;
-            });
-        })();
-        </script>
-    <?php endif; ?>
-</div>
-
-<form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int) ($bloco['id'] ?? 0) ?>/lancar-notas-coordenacao" class="space-y-4">
+<form method="post" action="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/lancar-notas-coordenacao" class="space-y-4">
     <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken) ?>">
-    <input type="hidden" name="materia_id_filtro" value="<?= (int) $materiaIdFiltro ?>">
+    <input type="hidden" name="materia_id_filtro" value="<?= $materiaIdFiltro ?>">
+    <input type="hidden" name="turma_id_filtro" value="<?= $turmaIdFiltro ?>">
+    <input type="hidden" name="serie_id_filtro" value="<?= $serieIdFiltro ?>">
+    <input type="hidden" name="ordenar_filtro" value="<?= htmlspecialchars($ordenarFiltro) ?>">
 
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
         <div class="overflow-x-auto">
@@ -150,6 +108,7 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
                         <?php endif; ?>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turma</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-16">Nº</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-36">Nota</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Observação</th>
@@ -158,7 +117,7 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($linhas)): ?>
                     <tr>
-                        <td colspan="<?= $notaUnicaTodasMaterias ? '4' : '6' ?>" class="px-4 py-8 text-center text-gray-500">Nenhum aluno encontrado para o filtro selecionado.</td>
+                        <td colspan="<?= (int) $colunasTabela ?>" class="px-4 py-8 text-center text-gray-500">Nenhum aluno encontrado para o filtro selecionado.</td>
                     </tr>
                     <?php else: ?>
                         <?php foreach ($linhas as $ln): ?>
@@ -170,6 +129,7 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
                             $notaStr = ($ln['nota'] !== null && $ln['nota'] !== '')
                                 ? number_format((float) $ln['nota'], 2, '.', '')
                                 : '';
+                            $nChamada = (int) ($ln['numero_chamada'] ?? 0);
                             ?>
                             <tr class="hover:bg-gray-50">
                                 <?php if (!$notaUnicaTodasMaterias): ?>
@@ -177,13 +137,14 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
                                 <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars((string) ($ln['professor_nome'] ?? '')) ?></td>
                                 <?php endif; ?>
                                 <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars((string) ($ln['turma_nome'] ?? '')) ?></td>
+                                <td class="px-4 py-3 text-center text-gray-700 font-semibold"><?= $nChamada > 0 ? $nChamada : '—' ?></td>
                                 <td class="px-4 py-3 text-gray-900 font-medium"><?= htmlspecialchars((string) ($ln['aluno_nome'] ?? '')) ?></td>
                                 <td class="px-4 py-3">
                                     <input type="text"
                                            inputmode="decimal"
                                            name="notas[<?= $pid ?>][<?= $mid ?>][<?= $tid ?>][<?= $aid ?>]"
                                            value="<?= htmlspecialchars($notaStr) ?>"
-                                           class="w-full border border-gray-300 rounded-lg px-2 py-1.5"
+                                           class="w-full px-2 py-1.5 border border-gray-300 rounded-lg"
                                            placeholder="—"
                                            autocomplete="off">
                                 </td>
@@ -191,7 +152,7 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
                                     <input type="text"
                                            name="observacoes[<?= $pid ?>][<?= $mid ?>][<?= $tid ?>][<?= $aid ?>]"
                                            value="<?= htmlspecialchars((string) ($ln['observacao'] ?? '')) ?>"
-                                           class="w-full border border-gray-300 rounded-lg px-2 py-1.5"
+                                           class="w-full px-2 py-1.5 border border-gray-300 rounded-lg"
                                            maxlength="500"
                                            placeholder="Opcional">
                                 </td>
@@ -208,7 +169,7 @@ $fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importa
         <button type="submit" class="btn-primary-custom inline-flex items-center px-6 py-3 rounded-lg font-semibold hover:opacity-90">
             Salvar notas
         </button>
-        <a href="<?= URL ?>/admin/provas/blocos/<?= (int) ($bloco['id'] ?? 0) ?>/gerenciar"
+        <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/gerenciar"
            class="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">
             Cancelar
         </a>

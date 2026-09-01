@@ -50,14 +50,13 @@ class VidaEscolarAdminController extends AdminBaseController
             $anoLetivo = (int) ($anos[0] ?? date('Y'));
         }
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
-        $fichas = $turmaId > 0 ? $svc->model()->listarFichasTurma($turmaId, $anoLetivo) : [];
+        $alunos = $turmaId > 0 ? $svc->model()->listarAlunosTurmaDocumentos($turmaId, $anoLetivo) : [];
+        $perPage = 10;
+        $totalAlunos = count($alunos);
+        $totalPages = max(1, (int) ceil($totalAlunos / $perPage));
+        $page = max(1, min((int) ($_GET['page'] ?? 1), $totalPages));
+        $alunos = array_slice($alunos, ($page - 1) * $perPage, $perPage);
         $flash = $this->getFlashMessage();
-        if (!$svc->model()->schemaPronto() && empty($flash['message'])) {
-            $flash = [
-                'message' => 'Execute a migration da Vida Escolar (painel Master) antes de usar o módulo.',
-                'type' => 'error',
-            ];
-        }
         $this->viewWithLayout('admin', 'admin/vida-escolar/index', [
             'title' => 'Vida Escolar - EducaTudo',
             'user' => $this->auth->getUser(),
@@ -66,7 +65,12 @@ class VidaEscolarAdminController extends AdminBaseController
             'ano_letivo' => $anoLetivo,
             'turma_id' => $turmaId,
             'turmas' => $svc->model()->turmasAtivas($anoLetivo),
-            'fichas' => $fichas,
+            'alunos' => $alunos,
+            'pagination' => [
+                'total' => $totalAlunos,
+                'page' => $page,
+                'total_pages' => $totalPages,
+            ],
             'schema_pronto' => $svc->model()->schemaPronto(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),

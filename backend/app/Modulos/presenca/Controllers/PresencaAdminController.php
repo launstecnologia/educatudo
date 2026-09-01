@@ -44,19 +44,22 @@ class PresencaAdminController extends AdminBaseController
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $lista = $this->eventos->listar($data, $page, 10);
         $flash = $this->getFlashMessage();
+        $total = (int) ($lista['total'] ?? 0);
         $this->viewWithLayout('admin', 'admin/presenca/index', [
             'title' => 'Gestão de Presença — EducaTudo',
             'user' => $this->auth->getUser(),
             'current_page' => 'presenca',
             'flash_message' => $flash['message'] ?? '',
             'flash_type' => $flash['type'] ?? '',
+            'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),
             'schema_pronto' => $this->eventos->tabelasProntas(),
             'csrf_token' => $this->generateCsrfToken(),
             'data_filtro' => $data,
             'eventos' => $lista['rows'],
-            'total' => $lista['total'],
+            'total' => $total,
             'page' => $page,
             'per_page' => 10,
+            'total_pages' => max(1, (int) ceil($total / 10)),
             'token_gerado' => $_SESSION['presenca_token_gerado'] ?? null,
             'webhook_url' => rtrim((string) (defined('URL') ? URL : ''), '/') . '/api/webhooks/presenca',
         ]);
@@ -77,6 +80,7 @@ class PresencaAdminController extends AdminBaseController
         $tipo = (string) ($_POST['tipo'] ?? '');
         $quando = trim((string) ($_POST['ocorrido_em'] ?? ''));
         $dataRedirect = $this->dataValida(substr($quando, 0, 10) ?: date('Y-m-d'));
+        $ok = false;
         try {
             if ($alunoId <= 0) {
                 throw new InvalidArgumentException('Selecione o aluno.');
@@ -99,13 +103,18 @@ class PresencaAdminController extends AdminBaseController
                 'registrado_por' => isset($user['id']) ? (int) $user['id'] : null,
             ]);
             $this->setFlashMessage('Registro de ' . ($tipo === 'entrada' ? 'entrada' : 'saída') . ' aplicado nas aulas do dia.', 'success');
+            $ok = true;
         } catch (InvalidArgumentException | RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
         } catch (Throwable $e) {
             error_log('PresencaAdminController::registrar: ' . $e->getMessage());
             $this->setFlashMessage('Não foi possível registrar a entrada/saída.', 'error');
         }
-        $this->redirect('/admin/presenca?data=' . urlencode($dataRedirect));
+        $qs = 'data=' . urlencode($dataRedirect);
+        if (!$ok) {
+            $qs .= '&novo=1';
+        }
+        $this->redirect('/admin/presenca?' . $qs);
     }
 
     public function buscarAlunos(): void

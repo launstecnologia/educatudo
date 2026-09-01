@@ -32,8 +32,9 @@ class DesempenhoWidget implements WidgetDashboard
             return [
                 'ok' => true,
                 'disponivel' => false,
-                'motivo' => 'Resultado acadêmico ainda não está disponível nesta escola (rode a migration de resultados finais).',
+                'motivo' => 'Resultados finais ainda não estão disponíveis nesta escola.',
                 'href' => '/admin/resultados-finais',
+                'link_rotulo' => 'Abrir Resultados Finais',
             ];
         }
 
@@ -43,6 +44,7 @@ class DesempenhoWidget implements WidgetDashboard
                 'disponivel' => false,
                 'motivo' => 'Nenhuma turma neste recorte.',
                 'href' => '/admin/resultados-finais',
+                'link_rotulo' => 'Abrir Resultados Finais',
                 'buckets' => [
                     'dentro_criterio' => 0,
                     'atencao' => 0,
@@ -88,8 +90,9 @@ class DesempenhoWidget implements WidgetDashboard
             return [
                 'ok' => true,
                 'disponivel' => false,
-                'motivo' => 'Não há resultados homologados neste período. O Dashboard não calcula média própria — use Resultados Finais após o motor de regras.',
+                'motivo' => 'Ainda não há resultado homologado neste período.',
                 'href' => '/admin/resultados-finais?' . http_build_query($filtro->queryModulo()),
+                'link_rotulo' => 'Abrir Resultados Finais',
                 'buckets' => $buckets,
             ];
         }
@@ -100,7 +103,6 @@ class DesempenhoWidget implements WidgetDashboard
             'total' => $total,
             'buckets' => $buckets,
             'href' => '/admin/resultados-finais?' . http_build_query($filtro->queryModulo()),
-            'nota' => 'Agrupamento das situações oficiais do ResultadoAcademicoService no snapshot homologado. Sem recálculo de média.',
             'rotulos' => [
                 'dentro_criterio' => 'Dentro do critério',
                 'atencao' => 'Em atenção',

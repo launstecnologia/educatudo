@@ -259,8 +259,7 @@ class ExamBlockController extends BaseController
                 }
             }
             $exigeDataHoraProva = ($formatoEvento === 'online_questoes');
-            $exigePrazoProfessor = ($formatoEvento === 'online_questoes')
-                || ($formatoEvento === 'lancamento_nota' && $configuracaoNota === 'professor_por_questao');
+            $exigePrazoProfessor = ($configuracaoNota === 'professor_por_questao');
             
             if (empty($postData['titulo'])) {
                 $errors['titulo'] = 'Título é obrigatório';
@@ -516,8 +515,7 @@ class ExamBlockController extends BaseController
                 }
             }
             $exigeDataHoraProva = ($formatoEvento === 'online_questoes');
-            $exigePrazoProfessor = ($formatoEvento === 'online_questoes')
-                || ($formatoEvento === 'lancamento_nota' && $configuracaoNota === 'professor_por_questao');
+            $exigePrazoProfessor = ($configuracaoNota === 'professor_por_questao');
             
             if (empty($postData['titulo'])) {
                 $errors['titulo'] = 'Título é obrigatório';

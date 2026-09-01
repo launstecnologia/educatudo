@@ -229,4 +229,28 @@ class DashboardFiltro
         }
         return $q;
     }
+
+    /**
+     * Janela curta para “o que fazer”: 7 dias até hoje (ou até o fim do período, se o bimestre já acabou).
+     * Bimestre futuro: janela vazia.
+     *
+     * @return array{0:string,1:string}
+     */
+    public function recorteCurto(): array
+    {
+        $hoje = $this->hoje !== '' ? $this->hoje : date('Y-m-d');
+        if ($this->inicio === '' || $this->fim === '') {
+            return [date('Y-m-d', strtotime($hoje . ' -6 days')), $hoje];
+        }
+        if ($hoje < $this->inicio) {
+            return ['', ''];
+        }
+        $fim = $hoje > $this->fim ? $this->fim : $hoje;
+        $inicio = date('Y-m-d', strtotime($fim . ' -6 days'));
+        if ($inicio < $this->inicio) {
+            $inicio = $this->inicio;
+        }
+
+        return [$inicio, $fim];
+    }
 }

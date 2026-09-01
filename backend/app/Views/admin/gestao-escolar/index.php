@@ -161,6 +161,15 @@ if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || LayoutHel
     ];
 }
 
+if ($podeHub('vida_escolar') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'))) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/vida-escolar',
+        'title' => 'Vida Escolar',
+        'description' => 'Histórico, boletim, ficha individual, prontuário e ofícios.',
+        'icon' => 'fa-solid fa-scroll',
+    ];
+}
+
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('saude_academica')) {
     $hub_cards[] = [
         'href' => URL . '/admin/saude-academica',

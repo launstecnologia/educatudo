@@ -61,7 +61,7 @@ class OcorrenciasWidget implements WidgetDashboard
             'abertas' => $abertas,
             'por_categoria' => $porCategoria,
             'href' => '/admin/ocorrencias',
-            'nota' => 'Somente contagens. Detalhes sensíveis não são exibidos.',
+            'nota' => 'Por privacidade, detalhes ficam no módulo de Ocorrências.',
         ];
     }
 

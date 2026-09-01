@@ -6,6 +6,7 @@ use App\Modulos\Ocorrencias\Models\Ocorrencia;
 $oc = is_array($ocorrencia ?? null) ? $ocorrencia : [];
 $historico = is_array($historico ?? null) ? $historico : [];
 $schemaEstendido = !empty($schema_estendido);
+$schemaAnexos = !empty($schema_anexos);
 $csrf_token = $csrf_token ?? '';
 $id = (int) ($oc['id'] ?? 0);
 $status = (string) ($oc['status'] ?? '');
@@ -69,12 +70,62 @@ $acoesHistorico = [
             <dd class="mt-1 text-gray-900"><?= htmlspecialchars((string) ($oc['criado_por_nome'] ?? '—')) ?></dd>
         </div>
     </dl>
+    <?php if (!empty($oc['testemunhas'])): ?>
+    <div class="mb-4">
+        <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Testemunhas</h3>
+        <p class="text-sm text-gray-800 whitespace-pre-line"><?= htmlspecialchars((string) $oc['testemunhas']) ?></p>
+    </div>
+    <?php endif; ?>
     <div class="mb-4">
         <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Descrição</h3>
         <p class="text-sm text-gray-800 whitespace-pre-line"><?= htmlspecialchars((string) ($oc['detalhe'] ?? '')) ?></p>
     </div>
     <?php if (!empty($oc['diario_aula_id'])): ?>
         <a href="<?= URL ?>/admin/diario/aula?id=<?= (int) $oc['diario_aula_id'] ?>" class="text-sm text-purple-700 hover:underline">Ver aula do Diário ↗</a>
+    <?php endif; ?>
+</div>
+
+<?php $anexos = is_array($anexos ?? null) ? $anexos : []; ?>
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-900 mb-4">Fotos e documentos</h3>
+    <?php if (empty($anexos)): ?>
+        <p class="text-sm text-gray-500 mb-4">Nenhum anexo ainda.</p>
+    <?php else: ?>
+        <ul class="space-y-3 mb-4">
+            <?php foreach ($anexos as $anexo):
+                $mime = (string) ($anexo['mime'] ?? '');
+                $isImage = strpos($mime, 'image/') === 0;
+                $icon = $isImage ? 'fa-image' : ($mime === 'application/pdf' ? 'fa-file-pdf' : 'fa-file');
+                $href = URL . '/admin/ocorrencias/' . $id . '/anexos/' . (int) $anexo['id'];
+            ?>
+            <li class="flex items-center gap-3">
+                <?php if ($isImage): ?>
+                    <a href="<?= $href ?>" target="_blank" rel="noopener" class="flex-shrink-0">
+                        <img src="<?= $href ?>" alt="" class="h-16 w-16 object-cover rounded-lg border border-gray-200">
+                    </a>
+                <?php else: ?>
+                    <span class="flex-shrink-0 w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 inline-flex items-center justify-center">
+                        <i class="fa-solid <?= $icon ?> text-gray-400"></i>
+                    </span>
+                <?php endif; ?>
+                <a href="<?= $href ?>" target="_blank" rel="noopener" class="text-sm text-blue-700 hover:underline">
+                    <?= htmlspecialchars((string) ($anexo['nome'] ?? 'arquivo')) ?>
+                </a>
+            </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+    <?php if ($schemaAnexos): ?>
+    <form method="POST" action="<?= URL ?>/admin/ocorrencias/<?= $id ?>/anexos" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <div class="flex-1 w-full">
+            <label for="show_anexos" class="block text-sm font-medium text-gray-700 mb-1">Adicionar</label>
+            <input type="file" id="show_anexos" name="anexos[]" multiple accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <p class="text-xs text-gray-500 mt-1">JPG, PNG, WebP, GIF, PDF ou Word. Até 8 arquivos, 10 MB cada.</p>
+        </div>
+        <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Enviar</button>
+    </form>
     <?php endif; ?>
 </div>
 

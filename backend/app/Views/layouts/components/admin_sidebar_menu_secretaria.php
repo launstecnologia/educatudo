@@ -35,7 +35,7 @@ $avaliacoesOpen = in_array($cur, [
 $gestaoOpen = in_array($cur, [
     'gestao_escolar', 'censo_escolar', 'conselho_classe', 'diario_classe',
     'faltas', 'presenca', 'modelos_documentos', 'ocorrencias',
-    'almoxarifado', 'patrimonio', 'resultados-finais', 'vida_escolar', 'saude_academica',
+    'almoxarifado', 'patrimonio', 'resultados-finais', 'vida_escolar', 'vida_escolar_oficios', 'saude_academica',
 ], true) || $curMovimentacao;
 ?>
 <?php if ($secCan(['dashboard'])): ?>
@@ -288,10 +288,22 @@ $gestaoOpen = in_array($cur, [
         </a>
         <?php endif; ?>
         <?php if ($secCan(['vida_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'))): ?>
-        <a href="<?= $urlBase ?>/admin/vida-escolar" class="<?= $linkCls($cur === 'vida_escolar') ?>">
-            <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Vida Escolar</span>
-        </a>
+        <div class="flex items-center rounded-lg <?= in_array($cur, ['vida_escolar', 'vida_escolar_oficios'], true) ? 'bg-white/20' : '' ?>">
+            <a href="<?= $urlBase ?>/admin/vida-escolar" class="flex-1 <?= $linkCls(in_array($cur, ['vida_escolar', 'vida_escolar_oficios'], true)) ?>">
+                <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Vida Escolar</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('vida-escolar')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="vida-escolar-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="vida-escolar-nested" class="<?= in_array($cur, ['vida_escolar', 'vida_escolar_oficios'], true) ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <a href="<?= $urlBase ?>/admin/vida-escolar/oficios" class="<?= $linkCls($cur === 'vida_escolar_oficios') ?>">
+                <span class="sidebar-text text-sm">Ofícios</span>
+            </a>
+        </div>
         <?php endif; ?>
         <?php if ($secCan(['saude_academica']) && $modOn('saude_academica') && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
         <a href="<?= $urlBase ?>/admin/saude-academica" class="<?= $linkCls($cur === 'saude_academica') ?>">

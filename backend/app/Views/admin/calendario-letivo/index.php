@@ -73,9 +73,9 @@ ob_start();
         <span id="labelMes" class="text-sm font-semibold text-gray-700 w-28 text-center"></span>
         <button onclick="navMes(+1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></button>
     </div>
-    <button onclick="document.getElementById('modalConfig').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-gear mr-2"></i>Configurar ano</button>
+    <button type="button" onclick="openConfigDrawer()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-gear mr-2"></i>Configurar ano</button>
     <?php if ($config): ?>
-    <button onclick="document.getElementById('modalEvento').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-green-600 hover:bg-green-700"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
+    <button type="button" onclick="openEventoDrawer()" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
     <?php endif; ?>
 </div>
 <?php
@@ -281,51 +281,62 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 </div>
 <?php endif; ?>
 
-<!-- Modal: Configurar ano -->
-<div id="modalConfig" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6">
-        <div class="flex items-center justify-between mb-5">
-            <h3 class="text-lg font-bold text-gray-900">Configurar ano letivo</h3>
-            <button onclick="document.getElementById('modalConfig').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
-        </div>
-        <form method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-ano" class="space-y-4">
-            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Ano</label>
-                    <input type="number" name="ano" value="<?= $ano ?>" min="2000" max="2100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Dias letivos (meta)</label>
-                    <input type="number" name="dias_meta" value="<?= (int) ($config['dias_meta'] ?? 200) ?>" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Carga horária (meta)</label>
-                    <input type="number" name="carga_horaria_meta" value="<?= (int) ($config['carga_horaria_meta'] ?? 800) ?>" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Observação</label>
-                <input type="text" name="observacao" value="<?= htmlspecialchars((string) ($config['observacao'] ?? '')) ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-            </div>
-            <?php if ($status): ?>
-            <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-sm text-gray-600">Dias letivos previstos</span>
-                    <span class="text-sm font-bold <?= $pct >= 100 ? 'text-green-600' : ($pct >= 90 ? 'text-amber-600' : 'text-red-600') ?>"><?= (int) $status['dias_letivos'] ?>/<?= (int) $status['dias_meta'] ?></span>
-                </div>
-                <div class="w-full h-2 rounded-full bg-gray-200 overflow-hidden">
-                    <div class="h-full <?= $pct >= 100 ? 'bg-green-500' : ($pct >= 90 ? 'bg-amber-500' : 'bg-red-500') ?>" style="width:<?= min(100, (float)$pct) ?>%"></div>
-                </div>
-            </div>
-            <?php endif; ?>
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="document.getElementById('modalConfig').classList.add('hidden')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Salvar</button>
-            </div>
-        </form>
+<!-- Offcanvas: Configurar ano -->
+<div id="configDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeConfigDrawer()"></div>
+<aside id="configDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+        <h2 class="text-xl font-bold text-gray-900">Configurar ano letivo</h2>
+        <button type="button" onclick="closeConfigDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
     </div>
-</div>
+    <form method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-ano" class="flex flex-col flex-1 overflow-hidden">
+        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Metas do ano</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ano</label>
+                        <input type="number" name="ano" value="<?= $ano ?>" min="2000" max="2100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Dias letivos (meta)</label>
+                        <input type="number" name="dias_meta" value="<?= (int) ($config['dias_meta'] ?? 200) ?>" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Carga horária (meta)</label>
+                        <input type="number" name="carga_horaria_meta" value="<?= (int) ($config['carga_horaria_meta'] ?? 800) ?>" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observação</label>
+                        <input type="text" name="observacao" value="<?= htmlspecialchars((string) ($config['observacao'] ?? '')) ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                </div>
+            </section>
+            <?php if ($status): ?>
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Situação prevista</h3>
+                <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-gray-600">Dias letivos previstos</span>
+                        <span class="text-sm font-bold <?= $pct >= 100 ? 'text-green-600' : ($pct >= 90 ? 'text-amber-600' : 'text-red-600') ?>"><?= (int) $status['dias_letivos'] ?>/<?= (int) $status['dias_meta'] ?></span>
+                    </div>
+                    <div class="w-full h-2 rounded-full bg-gray-200 overflow-hidden">
+                        <div class="h-full <?= $pct >= 100 ? 'bg-green-500' : ($pct >= 90 ? 'bg-amber-500' : 'bg-red-500') ?>" style="width:<?= min(100, (float)$pct) ?>%"></div>
+                    </div>
+                </div>
+            </section>
+            <?php endif; ?>
+        </div>
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button type="button" onclick="closeConfigDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Salvar</button>
+        </div>
+    </form>
+</aside>
 
 <!-- Modal: Detalhe do dia -->
 <div id="modalDia" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
@@ -339,80 +350,98 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
         </div>
         <div id="modalDiaBody" class="px-6 pb-6 space-y-3 max-h-80 overflow-y-auto"></div>
         <div class="px-6 pb-5">
-            <button onclick="closeDayModal(); document.getElementById('modalEvento').classList.remove('hidden');" class="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento neste dia</button>
+            <button type="button" onclick="closeDayModal(); openEventoDrawer({keepDates: true});" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento neste dia</button>
         </div>
     </div>
 </div>
 
-<!-- Modal: Adicionar evento -->
-<div id="modalEvento" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-gray-100 rounded-t-2xl">
-            <h3 class="text-lg font-bold text-gray-900">Adicionar evento</h3>
-            <button onclick="document.getElementById('modalEvento').classList.add('hidden')" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
-        </div>
-        <form method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-evento" class="p-6 space-y-4">
-            <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-            <input type="hidden" name="ano" value="<?= $ano ?>">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Início <span class="text-red-500">*</span></label>
-                    <input type="date" name="data_inicio" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+<!-- Offcanvas: Adicionar evento -->
+<div id="eventoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeEventoDrawer()"></div>
+<aside id="eventoDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+        <h2 id="eventoDrawerTitle" class="text-xl font-bold text-gray-900">Adicionar evento</h2>
+        <button type="button" onclick="closeEventoDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <form id="evento-form" method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-evento" class="flex flex-col flex-1 overflow-hidden">
+        <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+        <input type="hidden" name="ano" value="<?= $ano ?>">
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do evento</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                    <div>
+                        <label for="evento_data_inicio" class="block text-sm font-medium text-gray-700 mb-1">Início <span class="text-red-500">*</span></label>
+                        <input type="date" id="evento_data_inicio" name="data_inicio" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label for="evento_data_fim" class="block text-sm font-medium text-gray-700 mb-1">Fim</label>
+                        <input type="date" id="evento_data_fim" name="data_fim" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <?php foreach ($tipoLabels as $k => $v): ?>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="tipo" value="<?= $k ?>" class="sr-only peer" <?= $k === 'feriado' ? 'checked' : '' ?>>
+                                <div class="text-center text-xs font-semibold px-2 py-2 rounded-lg border-2 border-transparent peer-checked:border-green-500 <?= $tipoClasses[$k] ?> hover:opacity-90 transition-all"><?= $v ?></div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="evento_descricao" class="block text-sm font-medium text-gray-700 mb-1">Descrição <span class="text-red-500">*</span></label>
+                        <input type="text" id="evento_descricao" name="descricao" required maxlength="255" placeholder="Ex: Feriado Nacional - Tiradentes" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label for="evento_local" class="block text-sm font-medium text-gray-700 mb-1"><i class="fa-solid fa-location-dot mr-1 text-gray-400"></i>Local</label>
+                        <input type="text" id="evento_local" name="local_evento" placeholder="Ex: Ginásio, Sala 3..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm">
+                    </div>
+                    <div>
+                        <label for="evento_link" class="block text-sm font-medium text-gray-700 mb-1"><i class="fa-solid fa-link mr-1 text-gray-400"></i>Link (reunião / meet)</label>
+                        <input type="url" id="evento_link" name="link_reuniao" placeholder="https://meet.google.com/..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Fim</label>
-                    <input type="date" name="data_fim" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <?php foreach ($tipoLabels as $k => $v): ?>
-                    <label class="cursor-pointer">
-                        <input type="radio" name="tipo" value="<?= $k ?>" class="sr-only peer" <?= $k === 'feriado' ? 'checked' : '' ?>>
-                        <div class="text-center text-xs font-semibold px-2 py-2 rounded-lg border-2 border-transparent peer-checked:border-green-500 <?= $tipoClasses[$k] ?> hover:opacity-90 transition-all"><?= $v ?></div>
-                    </label>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Descrição <span class="text-red-500">*</span></label>
-                <input type="text" name="descricao" required placeholder="Ex: Feriado Nacional - Tiradentes" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5"><i class="fa-solid fa-location-dot mr-1 text-gray-400"></i>Local</label>
-                    <input type="text" name="local_evento" placeholder="Ex: Ginásio, Sala 3..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1.5"><i class="fa-solid fa-link mr-1 text-gray-400"></i>Link (reunião / meet)</label>
-                    <input type="url" name="link_reuniao" placeholder="https://meet.google.com/..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm">
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2"><i class="fa-solid fa-eye mr-1 text-gray-400"></i>Visível para</label>
-                <div class="flex flex-wrap gap-3">
+            </section>
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Visibilidade</h3>
+                <p class="text-sm text-gray-600 mb-3">Quem vê este evento no calendário letivo.</p>
+                <div class="flex flex-wrap gap-4 mb-5">
                     <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" name="visivel_aluno" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                        <input type="checkbox" id="evento_visivel_aluno" name="visivel_aluno" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                         <span class="text-sm text-gray-700">Alunos</span>
                     </label>
                     <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" name="visivel_professor" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                        <input type="checkbox" id="evento_visivel_professor" name="visivel_professor" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                         <span class="text-sm text-gray-700">Professores</span>
                     </label>
                     <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-                        <input type="checkbox" name="visivel_pais" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                        <input type="checkbox" id="evento_visivel_pais" name="visivel_pais" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                         <span class="text-sm text-gray-700">Pais / Responsáveis</span>
                     </label>
                 </div>
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button type="button" onclick="document.getElementById('modalEvento').classList.add('hidden')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" class="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700"><i class="fa-solid fa-plus mr-2"></i>Adicionar</button>
-            </div>
-        </form>
-    </div>
-</div>
+                <?php if (!empty($pode_publicar_escolar)): ?>
+                <label class="flex items-start gap-3 cursor-pointer select-none rounded-lg border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100">
+                    <input type="checkbox" id="evento_publicar_escolar" name="publicar_calendario_escolar" value="1" class="mt-0.5 w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                    <span>
+                        <span class="block text-sm font-medium text-gray-900">Publicar também no Calendário Escolar</span>
+                        <span class="block text-xs text-gray-600 mt-0.5">O evento aparece para os responsáveis no app e gera notificação.</span>
+                    </span>
+                </label>
+                <?php endif; ?>
+            </section>
+        </div>
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button type="button" onclick="closeEventoDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
+                <i class="fa-solid fa-plus mr-2"></i>Adicionar
+            </button>
+        </div>
+    </form>
+</aside>
 
 <script>
 // ── View anual / mensal ───────────────────────────────────────────────────────
@@ -673,11 +702,11 @@ function openDayModal(payloadStr) {
         body.appendChild(div);
     });
 
-    // Preenche a data de início do modal de evento com o dia clicado
+    // Preenche a data de início do drawer de evento com o dia clicado
     var parts = data.date.split('/');
     var isoDate = parts[2] + '-' + parts[1] + '-' + parts[0];
-    var inpInicio = document.querySelector('#modalEvento input[name="data_inicio"]');
-    var inpFim    = document.querySelector('#modalEvento input[name="data_fim"]');
+    var inpInicio = document.getElementById('evento_data_inicio');
+    var inpFim    = document.getElementById('evento_data_fim');
     if (inpInicio) inpInicio.value = isoDate;
     if (inpFim)    inpFim.value    = isoDate;
 
@@ -692,27 +721,64 @@ function escHtml(str) {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Fechar modais com Esc
+function showDrawer(backdropId, drawerId) {
+    document.getElementById(backdropId).classList.remove('hidden');
+    var drawer = document.getElementById(drawerId);
+    drawer.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(function () { drawer.classList.remove('translate-x-full'); });
+    document.body.style.overflow = 'hidden';
+}
+function hideDrawer(backdropId, drawerId) {
+    document.getElementById(backdropId).classList.add('hidden');
+    var drawer = document.getElementById(drawerId);
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+
+function openConfigDrawer() { showDrawer('configDrawerBackdrop', 'configDrawer'); }
+function closeConfigDrawer() { hideDrawer('configDrawerBackdrop', 'configDrawer'); }
+
+function openEventoDrawer(opts) {
+    opts = opts || {};
+    var form = document.getElementById('evento-form');
+    var savedInicio = opts.keepDates ? document.getElementById('evento_data_inicio').value : '';
+    var savedFim = opts.keepDates ? document.getElementById('evento_data_fim').value : '';
+    form.reset();
+    var feriado = form.querySelector('input[name="tipo"][value="feriado"]');
+    if (feriado) feriado.checked = true;
+    if (opts.keepDates) {
+        document.getElementById('evento_data_inicio').value = savedInicio;
+        document.getElementById('evento_data_fim').value = savedFim;
+    }
+    showDrawer('eventoDrawerBackdrop', 'eventoDrawer');
+}
+function closeEventoDrawer() { hideDrawer('eventoDrawerBackdrop', 'eventoDrawer'); }
+
+var chkPublicar = document.getElementById('evento_publicar_escolar');
+if (chkPublicar) {
+    chkPublicar.addEventListener('change', function () {
+        if (this.checked) {
+            document.getElementById('evento_visivel_pais').checked = true;
+        }
+    });
+}
+
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        document.getElementById('modalConfig').classList.add('hidden');
-        document.getElementById('modalEvento').classList.add('hidden');
+        closeConfigDrawer();
+        closeEventoDrawer();
         closeDayModal();
     }
 });
-// Clique fora do modal fecha
-['modalConfig','modalEvento','modalDia'].forEach(function(id) {
-    document.getElementById(id).addEventListener('click', function(e) {
-        if (e.target === this) this.classList.add('hidden');
-    });
+document.getElementById('modalDia').addEventListener('click', function(e) {
+    if (e.target === this) closeDayModal();
 });
-// Sincroniza data_fim com data_inicio quando data_fim está vazio
-document.querySelector('#modalEvento input[name="data_inicio"]').addEventListener('change', function() {
-    var fim = document.querySelector('#modalEvento input[name="data_fim"]');
+document.getElementById('evento_data_inicio').addEventListener('change', function() {
+    var fim = document.getElementById('evento_data_fim');
     if (!fim.value) fim.value = this.value;
 });
-// Abre modal de config se não tem config ainda
 <?php if (!$config): ?>
-document.getElementById('modalConfig').classList.remove('hidden');
+openConfigDrawer();
 <?php endif; ?>
 </script>

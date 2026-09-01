@@ -17,6 +17,7 @@ class VidaEscolarPdfService
     public const CODIGO_PACOTE = 'vida_escolar_pacote';
     public const CODIGO_SED = 'vida_escolar_sed';
     public const CODIGO_HISTORICO = 'vida_escolar_historico';
+    public const CODIGO_OFICIO = 'vida_escolar_oficio';
 
     private ModeloDocumentoService $modelos;
     private $db;
@@ -122,6 +123,21 @@ class VidaEscolarPdfService
     public function emitirSed(array $prontuario, array $periodos, ?array $config, string $filename): void
     {
         $this->emitir(self::CODIGO_SED, 'Planilha SED', $prontuario, $periodos, $config, $filename);
+    }
+
+    /**
+     * @param array<string,mixed> $oficio
+     * @param array<string,mixed>|null $config
+     */
+    public function emitirOficio(array $oficio, ?array $config, string $filename): void
+    {
+        $this->garantirModelos();
+        $modelo = $this->modelos->findByCodigo(self::CODIGO_OFICIO);
+        if (!$modelo) {
+            throw new \RuntimeException('Modelo vida_escolar_oficio indisponível. Cadastre-o em Layout de documentos.');
+        }
+        $html = $this->modelos->renderHtml($modelo, $this->varsDoOficio($oficio), 'auto', $config);
+        $this->enviarPdf($html, $filename, $modelo);
     }
 
     /**
@@ -524,6 +540,67 @@ class VidaEscolarPdfService
     }
 
     /**
+     * @param array<string,mixed> $oficio
+     * @return array<string,string>
+     */
+    private function varsDoOficio(array $oficio): array
+    {
+        $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+        $aluno = [];
+        $unidade = [];
+        $alunoId = (int) ($oficio['aluno_id'] ?? 0);
+        if ($alunoId > 0) {
+            try {
+                require_once dirname(__DIR__, 3) . '/Services/DeclarationService.php';
+                $decl = new \App\Services\DeclarationService($this->db);
+                $encontrado = $decl->getAluno($alunoId);
+                $aluno = is_array($encontrado) ? $encontrado : [];
+                $uni = $aluno !== [] ? $decl->getUnidadeForAluno($aluno) : null;
+                $unidade = is_array($uni) ? $uni : [];
+            } catch (\Throwable $e) {
+                $aluno = ['nome' => (string) ($oficio['aluno_nome'] ?? '')];
+            }
+        }
+        $numero = (int) ($oficio['numero'] ?? 0);
+        $ano = (int) ($oficio['ano'] ?? date('Y'));
+        $titulo = $numero > 0 ? ('Ofício nº ' . $numero . '/' . $ano) : 'Ofício (rascunho)';
+        $vars = $this->modelos->varsFromDeclaracao([
+            'tipo' => 'oficio',
+            'titulo' => $titulo,
+            'dados' => [
+                'aluno' => $aluno,
+                'unidade' => $unidade,
+                'matricula' => [],
+            ],
+            'numero' => $numero,
+            'ano' => $ano,
+            'gerado_em' => date('d/m/Y'),
+            'cidade_data' => $this->cidadeData($unidade),
+        ]);
+        $vars['titulo'] = $esc($titulo);
+        $vars['doc_rotulo'] = $esc($titulo);
+        $vars['numero'] = $numero > 0 ? (string) $numero : '—';
+        $vars['ano'] = (string) $ano;
+        $vars['destinatario'] = $esc($oficio['destinatario'] ?? '');
+        $vars['cargo_destinatario'] = $esc($oficio['cargo_destinatario'] ?? '');
+        $vars['instituicao'] = $esc($oficio['instituicao'] ?? '');
+        $vars['assunto'] = $esc($oficio['assunto'] ?? '');
+        $data = substr((string) ($oficio['data_oficio'] ?? ''), 0, 10);
+        $dt = \DateTime::createFromFormat('Y-m-d', $data);
+        $vars['data_oficio'] = $dt ? $esc($dt->format('d/m/Y')) : $esc($data);
+        $vars['corpo_oficio_html'] = nl2br($esc(trim((string) ($oficio['corpo'] ?? ''))), false);
+        if (trim((string) ($aluno['nome'] ?? '')) !== '') {
+            $vars['aluno_nome'] = $esc($aluno['nome']);
+        } elseif (!empty($oficio['aluno_nome'])) {
+            $vars['aluno_nome'] = $esc($oficio['aluno_nome']);
+        }
+        if (!empty($oficio['turma_nome'])) {
+            $vars['turma_nome'] = $esc($oficio['turma_nome']);
+        }
+        return $vars;
+    }
+
+    /**
      * @param array<string,mixed> $modelo
      */
     private function enviarPdf(string $html, string $filename, array $modelo): void
@@ -666,6 +743,28 @@ class VidaEscolarPdfService
                     . '{{historico_html}}<p>{{observacoes}}</p>',
                 'rodape_html' => $rodape,
                 'orientacao' => 'paisagem',
+                'ativo' => 1,
+                'usar_layout_padrao' => 1,
+            ],
+            [
+                'codigo' => self::CODIGO_OFICIO,
+                'nome' => 'Ofício da secretaria',
+                'descricao' => 'Correspondência oficial numerada. Placeholders: {{destinatario}}, {{assunto}}, {{corpo_oficio_html}}.',
+                'cabecalho_html' => $cab,
+                'corpo_html' => '<div class="doc-num">Ofício nº {{numero}}/{{ano}}</div>'
+                    . '<h1 class="doc-title">Ofício</h1>'
+                    . '<p style="text-align:right;font-size:10pt;">{{cidade_data}}</p>'
+                    . '<table class="dados">'
+                    . '<tr><td class="label">Destinatário</td><td>{{destinatario}}</td></tr>'
+                    . '<tr><td class="label">Cargo</td><td>{{cargo_destinatario}}</td></tr>'
+                    . '<tr><td class="label">Instituição</td><td>{{instituicao}}</td></tr>'
+                    . '<tr><td class="label">Assunto</td><td>{{assunto}}</td></tr>'
+                    . '<tr><td class="label">Aluno(a)</td><td>{{aluno_nome}}</td></tr>'
+                    . '<tr><td class="label">Turma</td><td>{{turma_nome}}</td></tr>'
+                    . '</table>'
+                    . '<p>{{corpo_oficio_html}}</p>',
+                'rodape_html' => $rodape,
+                'orientacao' => 'retrato',
                 'ativo' => 1,
                 'usar_layout_padrao' => 1,
             ],

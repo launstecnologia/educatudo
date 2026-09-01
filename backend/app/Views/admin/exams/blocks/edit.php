@@ -261,14 +261,14 @@
         <?php $fmtEv = $bloco['formato_evento'] ?? 'online_questoes'; ?>
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
-                Formato do evento <span class="text-red-500">*</span>
+                Tipo de Evento <span class="text-red-500">*</span>
             </label>
-            <p class="text-xs text-gray-500 mb-2">Lançamento de notas: sem questões no sistema; as notas podem ser lançadas por professor ou coordenação.</p>
+            <p class="text-xs text-gray-500 mb-2">Em <strong>lançamento de notas</strong> não há prova com questões: a nota cheia é lançada por professor ou coordenação.</p>
             <div class="flex flex-wrap gap-6">
                 <label class="flex items-center">
                     <input type="radio" name="formato_evento" value="online_questoes" <?= $fmtEv !== 'lancamento_nota' ? 'checked' : '' ?>
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Prova online (questões)</span>
+                    <span class="ml-2 text-gray-700">Prova online</span>
                 </label>
                 <label class="flex items-center">
                     <input type="radio" name="formato_evento" value="lancamento_nota" <?= $fmtEv === 'lancamento_nota' ? 'checked' : '' ?>
@@ -278,19 +278,21 @@
             </div>
         </div>
 
-        <!-- Configuração de Nota -->
+        <!-- Responsável -->
         <?php
         $cfgNota = (string) ($bloco['configuracao_nota'] ?? 'professor_por_questao');
         $isFmtLanc = $fmtEv === 'lancamento_nota';
         ?>
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Configuração de Nota / Responsável <span class="text-red-500">*</span>
+        <div id="responsavelEventoBox" class="mb-6">
+            <label id="labelResponsavelEvento" class="block text-sm font-medium text-gray-700 mb-2">
+                <?= $isFmtLanc ? 'Quem lança a nota' : 'Quem elabora a prova' ?> <span class="text-red-500">*</span>
             </label>
+            <p id="helpResponsavelEvento" class="text-xs text-gray-500 mb-2">
+                <?= $isFmtLanc
+                    ? 'Atribua ao professor ou deixe a coordenação lançar a nota cheia.'
+                    : 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.' ?>
+            </p>
             <?php
-            // Mesmo name="configuracao_nota" nos dois grupos: só um grupo pode ter "checked" no HTML,
-            // senão o navegador deixa o checked no primeiro (online), oculto em lançamento — o JS achava
-            // "professor por questão" e desmarcava nota única antes de salvar.
             $chkOnlineProf = !$isFmtLanc && ($cfgNota === 'professor_por_questao' || !in_array($cfgNota, ['professor_por_questao', 'coordenacao_calcula'], true));
             $chkOnlineCoord = !$isFmtLanc && $cfgNota === 'coordenacao_calcula';
             $chkLancCoord = $isFmtLanc && ($cfgNota === 'coordenacao_calcula' || !in_array($cfgNota, ['coordenacao_calcula', 'professor_por_questao'], true));
@@ -298,38 +300,38 @@
             ?>
             <div id="cfgOnlineOptions" class="flex flex-wrap gap-6 <?= $isFmtLanc ? 'hidden' : '' ?>">
                 <label class="flex items-center">
-                    <input type="radio" 
-                           name="configuracao_nota" 
-                           value="professor_por_questao" 
+                    <input type="radio"
+                           name="configuracao_nota"
+                           value="professor_por_questao"
                            <?= $chkOnlineProf ? 'checked' : '' ?>
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Professor coloca por questão</span>
+                    <span class="ml-2 text-gray-700">Atribuir professor</span>
                 </label>
                 <label class="flex items-center">
-                    <input type="radio" 
-                           name="configuracao_nota" 
+                    <input type="radio"
+                           name="configuracao_nota"
                            value="coordenacao_calcula"
                            <?= $chkOnlineCoord ? 'checked' : '' ?>
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Coordenação faz o cálculo</span>
+                    <span class="ml-2 text-gray-700">Coordenação faz a prova</span>
                 </label>
             </div>
             <div id="cfgLancamentoOptions" class="flex flex-wrap gap-6 <?= $isFmtLanc ? '' : 'hidden' ?>">
                 <label class="flex items-center">
                     <input type="radio"
                            name="configuracao_nota"
-                           value="coordenacao_calcula"
-                           <?= $chkLancCoord ? 'checked' : '' ?>
+                           value="professor_por_questao"
+                           <?= $chkLancProf ? 'checked' : '' ?>
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Coordenação lança as notas dos alunos</span>
+                    <span class="ml-2 text-gray-700">Atribuir ao professor</span>
                 </label>
                 <label class="flex items-center">
                     <input type="radio"
                            name="configuracao_nota"
-                           value="professor_por_questao"
-                           <?= $chkLancProf ? 'checked' : '' ?>
+                           value="coordenacao_calcula"
+                           <?= $chkLancCoord ? 'checked' : '' ?>
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Professor lança as notas dos alunos</span>
+                    <span class="ml-2 text-gray-700">Coordenação lança a nota</span>
                 </label>
             </div>
         </div>
@@ -412,7 +414,7 @@
 
         <!-- Prazo de Entrega do Professor (prova online e lançamento por professor) -->
         <div id="prazoProfessorContainer" class="hidden mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label id="labelPrazoProfessor" class="block text-sm font-medium text-gray-700 mb-2">
                 Prazo para Professores Enviarem Provas <span class="text-red-500">*</span>
             </label>
             <input type="datetime-local"
@@ -455,7 +457,11 @@ function adicionarProfessor(professorData = null) {
     const profId = professorData ? (professorData.professor_id ?? '') : '';
     const matId = professorData ? (professorData.materia_id ?? '') : '';
     const materiaNome = professorData ? (professorData.materia_nome || '') : '';
-    const quantidadeQuestoes = professorData ? (parseInt(professorData.quantidade_questoes, 10) || 5) : 5;
+    const quantidadeQuestoes = professorData
+        ? (Number.isFinite(parseInt(professorData.quantidade_questoes, 10))
+            ? Math.max(0, parseInt(professorData.quantidade_questoes, 10))
+            : 5)
+        : 5;
     const turmasProfessorSelecionadas = professorData && Array.isArray(professorData.turmas)
         ? professorData.turmas.map(t => parseInt((typeof t === 'object' && t !== null) ? (t.id || 0) : t, 10)).filter(id => id > 0)
         : [];
@@ -500,7 +506,7 @@ function adicionarProfessor(professorData = null) {
                     <option value="">Selecione primeiro o professor</option>
                 </select>
             </div>
-            <div>
+            <div class="campo-numero-questoes">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Quantidade de questões <span class="text-red-500">*</span>
                 </label>
@@ -531,6 +537,7 @@ function adicionarProfessor(professorData = null) {
     `;
     
     container.appendChild(professorDiv);
+    atualizarCamposPassoProfessores();
 
     // Se há dados do professor do bloco, preenche matéria após o DOM estar pronto
     if (professorData && profId) {
@@ -607,6 +614,32 @@ function carregarMateriasProfessor(professorIndex) {
     }
 }
 
+function getFormatoEvento() {
+    return document.querySelector('input[name="formato_evento"]:checked')?.value || 'online_questoes';
+}
+
+function atribuirAoProfessor() {
+    return (inputConfiguracaoNotaNoFormatoAtual()?.value || '') === 'professor_por_questao';
+}
+
+function exigeNumeroQuestoes() {
+    return getFormatoEvento() === 'online_questoes' && atribuirAoProfessor();
+}
+
+function atualizarCamposPassoProfessores() {
+    const showQtd = exigeNumeroQuestoes();
+    document.querySelectorAll('.campo-numero-questoes').forEach(el => {
+        el.classList.toggle('hidden', !showQtd);
+        const input = el.querySelector('input');
+        if (input) {
+            input.required = showQtd;
+            if (!showQtd) {
+                input.removeAttribute('required');
+            }
+        }
+    });
+}
+
 function inputConfiguracaoNotaNoFormatoAtual() {
     const formatoSel = document.querySelector('input[name="formato_evento"]:checked')?.value || 'online_questoes';
     const onlineBox = document.getElementById('cfgOnlineOptions');
@@ -620,7 +653,9 @@ function inputConfiguracaoNotaNoFormatoAtual() {
 }
 
 function ajustarOpcoesConfiguracaoNotaPorFormato() {
-    const formatoSel = document.querySelector('input[name="formato_evento"]:checked')?.value || 'online_questoes';
+    const formatoSel = getFormatoEvento();
+    const labelResp = document.getElementById('labelResponsavelEvento');
+    const helpResp = document.getElementById('helpResponsavelEvento');
     const onlineBox = document.getElementById('cfgOnlineOptions');
     const lancBox = document.getElementById('cfgLancamentoOptions');
     const notaUnicaBox = document.getElementById('notaUnicaTodasMateriasBox');
@@ -632,31 +667,45 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
     const horaFimInput = document.getElementById('hora_fim');
     const prazoInput = document.getElementById('prazo_entrega_professor');
 
+    const cfgAnterior = document.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
+
     if (formatoSel === 'lancamento_nota') {
         onlineBox.classList.add('hidden');
         lancBox.classList.remove('hidden');
+        if (labelResp) labelResp.innerHTML = 'Quem lança a nota <span class="text-red-500">*</span>';
+        if (helpResp) helpResp.textContent = 'Atribua ao professor ou deixe a coordenação lançar a nota cheia.';
         let cfgChecked = lancBox.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
         if (!['coordenacao_calcula', 'professor_por_questao'].includes(cfgChecked)) {
-            const def = lancBox.querySelector('input[name="configuracao_nota"][value="coordenacao_calcula"]');
+            const prefer = ['coordenacao_calcula', 'professor_por_questao'].includes(cfgAnterior)
+                ? cfgAnterior
+                : 'professor_por_questao';
+            const def = lancBox.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
             if (def) def.checked = true;
         }
+        onlineBox.querySelectorAll('input[name="configuracao_nota"]').forEach(el => { el.checked = false; });
     } else {
         onlineBox.classList.remove('hidden');
         lancBox.classList.add('hidden');
+        if (labelResp) labelResp.innerHTML = 'Quem elabora a prova <span class="text-red-500">*</span>';
+        if (helpResp) helpResp.textContent = 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.';
         notaUnicaBox.classList.add('hidden');
         if (msgCoord) msgCoord.classList.add('hidden');
         const notaUnicaInput = document.getElementById('nota_unica_todas_materias');
         if (notaUnicaInput) notaUnicaInput.checked = false;
         let cfgChecked = onlineBox.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
         if (!['professor_por_questao', 'coordenacao_calcula'].includes(cfgChecked)) {
-            const def = onlineBox.querySelector('input[name="configuracao_nota"][value="professor_por_questao"]');
+            const prefer = ['coordenacao_calcula', 'professor_por_questao'].includes(cfgAnterior)
+                ? cfgAnterior
+                : 'professor_por_questao';
+            const def = onlineBox.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
             if (def) def.checked = true;
         }
+        lancBox.querySelectorAll('input[name="configuracao_nota"]').forEach(el => { el.checked = false; });
     }
 
     const cfgFinal = inputConfiguracaoNotaNoFormatoAtual()?.value || '';
     const showDataHora = (formatoSel === 'online_questoes');
-    const showPrazo = (formatoSel === 'online_questoes') || (formatoSel === 'lancamento_nota' && cfgFinal === 'professor_por_questao');
+    const showPrazo = cfgFinal === 'professor_por_questao';
     const showNotaUnica = (formatoSel === 'lancamento_nota' && cfgFinal === 'coordenacao_calcula');
     if (notaUnicaBox) notaUnicaBox.classList.toggle('hidden', !showNotaUnica);
     const notaUnicaInput = document.getElementById('nota_unica_todas_materias');
@@ -668,6 +717,13 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
     if (horaFimInput) horaFimInput.required = showDataHora;
     if (prazoInput) prazoInput.required = showPrazo;
     if (msgCoord) msgCoord.classList.toggle('hidden', !showNotaUnica);
+    const prazoLabel = document.getElementById('labelPrazoProfessor');
+    if (prazoLabel) {
+        prazoLabel.innerHTML = formatoSel === 'lancamento_nota'
+            ? 'Prazo para o professor lançar as notas <span class="text-red-500">*</span>'
+            : 'Prazo para Professores Enviarem Provas <span class="text-red-500">*</span>';
+    }
+    atualizarCamposPassoProfessores();
 }
 
 // Carrega professores existentes ao carregar a página
@@ -830,7 +886,13 @@ function atualizarBloco(event, blocoId) {
             return;
         }
         const qtdQuestoesInput = div.querySelector('input[name*="[quantidade_questoes]"]');
-        const quantidadeQuestoes = qtdQuestoesInput ? (parseInt(qtdQuestoesInput.value, 10) || 5) : 5;
+        const quantidadeQuestoes = exigeNumeroQuestoes()
+            ? (qtdQuestoesInput ? (parseInt(qtdQuestoesInput.value, 10) || 0) : 0)
+            : 0;
+        if (exigeNumeroQuestoes() && quantidadeQuestoes < 1) {
+            professoresInvalidos = true;
+            return;
+        }
         const turmasProfessor = Array.from(div.querySelectorAll('.turma-professor-checkbox:checked'))
             .map(cb => parseInt(cb.value, 10))
             .filter(id => id > 0);
@@ -842,12 +904,14 @@ function atualizarBloco(event, blocoId) {
         professores.push({
             professor_id: parseInt(professorId),
             materia_id: parseInt(materiaId),
-            quantidade_questoes: Math.max(1, quantidadeQuestoes),
+            quantidade_questoes: exigeNumeroQuestoes() ? Math.max(1, quantidadeQuestoes) : 0,
             turmas: turmasProfessor
         });
     });
     if (professoresInvalidos) {
-        alert('Preencha professor e matéria para todos os professores adicionados');
+        alert(exigeNumeroQuestoes()
+            ? 'Preencha professor, matéria e quantidade de questões para todos os professores adicionados'
+            : 'Preencha professor e matéria para todos os professores adicionados');
         return;
     }
     if (turmasProfessorInvalidas) {

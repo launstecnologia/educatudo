@@ -33,7 +33,7 @@ class OcorrenciaService
      * @param array<string,mixed> $input
      * @return array{success: bool, id?: int, error?: string}
      */
-    public function criar(array $input, int $usuarioId, string $perfil = 'admin', int $professorId = 0): array
+    public function criar(array $input, int $usuarioId, string $perfil = 'admin', int $professorId = 0, array $files = []): array
     {
         $alunos = $input['alunos'] ?? [];
         if (!is_array($alunos)) {
@@ -144,6 +144,7 @@ class OcorrenciaService
                 'materia_id' => $materiaId > 0 ? $materiaId : null,
                 'local' => mb_substr(trim((string) ($input['local'] ?? '')), 0, 120) ?: null,
                 'encaminhamento' => trim((string) ($input['encaminhamento'] ?? '')) ?: null,
+                'testemunhas' => trim((string) ($input['testemunhas'] ?? '')) ?: null,
                 'retorno_em' => $retornoSql,
                 'enviar_pais' => $enviarPais,
                 'responsavel_comunicado_em' => $enviarPais ? date('Y-m-d H:i:s') : null,
@@ -155,7 +156,14 @@ class OcorrenciaService
             return ['success' => false, 'error' => 'Não foi possível salvar a ocorrência'];
         }
 
-        return ['success' => true, 'id' => $id];
+        $anexosSalvos = 0;
+        try {
+            $anexosSalvos = $this->salvarAnexos($id, $files);
+        } catch (Throwable $e) {
+            error_log('OcorrenciaService: falha ao anexar arquivos — ' . $e->getMessage());
+        }
+
+        return ['success' => true, 'id' => $id, 'anexos' => $anexosSalvos];
     }
 
     /**
@@ -222,6 +230,123 @@ class OcorrenciaService
         }
         $id = $this->ocorrencia->criarCategoria(mb_substr($nome, 0, 80));
         return ['success' => true, 'id' => $id];
+    }
+
+    /**
+     * @param array<string,mixed> $files Campo $_FILES['anexos']
+     * @return int Quantidade de arquivos gravados
+     */
+    public function salvarAnexos(int $ocorrenciaId, array $files): int
+    {
+        if ($ocorrenciaId <= 0 || empty($files['name']) || !$this->ocorrencia->schemaAnexos()) {
+            return 0;
+        }
+        $names = $files['name'];
+        if (!is_array($names)) {
+            $names = [$names];
+            $files = [
+                'name' => $names,
+                'tmp_name' => (array) ($files['tmp_name'] ?? []),
+                'error' => (array) ($files['error'] ?? []),
+                'size' => (array) ($files['size'] ?? []),
+                'type' => (array) ($files['type'] ?? []),
+            ];
+        }
+        $count = count($names);
+        if ($count > 8) {
+            $count = 8;
+        }
+        $gravados = 0;
+        for ($i = 0; $i < $count; $i++) {
+            if ((int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            $tmp = (string) ($files['tmp_name'][$i] ?? '');
+            $nome = basename((string) ($names[$i] ?? 'arquivo'));
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                continue;
+            }
+            $gravado = $this->gravarArquivoAnexo($ocorrenciaId, $tmp, $nome, (int) ($files['size'][$i] ?? 0));
+            if ($gravado) {
+                $this->ocorrencia->inserirAnexo(
+                    $ocorrenciaId,
+                    $gravado['nome'],
+                    $gravado['caminho'],
+                    $gravado['mime'],
+                    $gravado['tamanho']
+                );
+                $gravados++;
+            }
+        }
+        return $gravados;
+    }
+
+    /**
+     * @return array{nome:string,caminho:string,mime:string,tamanho:int}|null
+     */
+    private function gravarArquivoAnexo(int $ocorrenciaId, string $tmp, string $nomeOriginal, int $tamanho): ?array
+    {
+        $allowed = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        ];
+        if ($tamanho <= 0 || $tamanho > 10 * 1024 * 1024) {
+            return null;
+        }
+        if (!function_exists('finfo_open')) {
+            return null;
+        }
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? (string) finfo_file($finfo, $tmp) : '';
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        if (!isset($allowed[$mime])) {
+            return null;
+        }
+        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        if ($slug === '') {
+            return null;
+        }
+        $dir = dirname(__DIR__, 4) . '/storage/uploads/' . $slug . '/ocorrencias/' . $ocorrenciaId;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return null;
+        }
+        $filename = $slug . '_' . uniqid('', true) . '.' . $allowed[$mime];
+        $dest = $dir . '/' . $filename;
+        if (!move_uploaded_file($tmp, $dest)) {
+            return null;
+        }
+        return [
+            'nome' => $nomeOriginal !== '' ? $nomeOriginal : $filename,
+            'caminho' => $slug . '/ocorrencias/' . $ocorrenciaId . '/' . $filename,
+            'mime' => $mime,
+            'tamanho' => $tamanho,
+        ];
+    }
+
+    public function caminhoFisicoAnexo(string $caminho): ?string
+    {
+        $caminho = str_replace('\\', '/', $caminho);
+        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        if ($slug === '' || $caminho === '' || strpos($caminho, '..') !== false) {
+            return null;
+        }
+        if (strpos($caminho, $slug . '/') !== 0) {
+            return null;
+        }
+        $base = realpath(dirname(__DIR__, 4) . '/storage/uploads');
+        $full = realpath(dirname(__DIR__, 4) . '/storage/uploads/' . $caminho);
+        $prefix = $base !== false ? rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : '';
+        if ($base === false || $full === false || $prefix === '' || strpos($full, $prefix) !== 0) {
+            return null;
+        }
+        return is_file($full) ? $full : null;
     }
 
     public function aulaDoProfessor(int $aulaId, int $professorId): ?array

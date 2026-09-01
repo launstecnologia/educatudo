@@ -6,6 +6,15 @@
  */
 
 $router->get('/admin/vida-escolar', 'Modulos/vida-escolar/VidaEscolarAdminController@index');
+$router->get('/admin/vida-escolar/oficios', 'Modulos/vida-escolar/OficioAdminController@index');
+$router->get('/admin/vida-escolar/oficios/novo', 'Modulos/vida-escolar/OficioAdminController@form');
+$router->get('/admin/vida-escolar/oficios/alunos', 'Modulos/vida-escolar/OficioAdminController@alunosJson');
+$router->post('/admin/vida-escolar/oficios', 'Modulos/vida-escolar/OficioAdminController@salvar');
+$router->get('/admin/vida-escolar/oficios/{id}/editar', 'Modulos/vida-escolar/OficioAdminController@form');
+$router->get('/admin/vida-escolar/oficios/{id}/pdf', 'Modulos/vida-escolar/OficioAdminController@pdf');
+$router->post('/admin/vida-escolar/oficios/{id}/emitir', 'Modulos/vida-escolar/OficioAdminController@emitir');
+$router->post('/admin/vida-escolar/oficios/{id}/cancelar', 'Modulos/vida-escolar/OficioAdminController@cancelar');
+$router->post('/admin/vida-escolar/oficios/{id}', 'Modulos/vida-escolar/OficioAdminController@salvar');
 $router->get('/admin/students/{id}/vida-escolar', 'Modulos/vida-escolar/VidaEscolarAdminController@aluno');
 $router->post('/admin/students/{id}/vida-escolar/garantir', 'Modulos/vida-escolar/VidaEscolarAdminController@garantir');
 $router->post('/admin/students/{id}/vida-escolar/alimentar', 'Modulos/vida-escolar/VidaEscolarAdminController@alimentar');

@@ -24,11 +24,11 @@ foreach ([$filtro_materia ?? 0, $filtro_professor ?? 0, $filtro_turma ?? 0, $fil
                 <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
                 <?php endif; ?>
             </button>
-            <a href="<?= $base ?>/criar"
+            <button type="button" onclick="openMuralDrawer()"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo Recado
-            </a>
+            </button>
         </div>
     </div>
 </div>
@@ -116,6 +116,77 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
     </form>
 </aside>
 
+<div id="muralDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeMuralDrawer()"></div>
+<aside id="muralDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+        <h2 id="muralDrawerTitle" class="text-xl font-bold text-gray-900">Novo Recado</h2>
+        <button type="button" onclick="closeMuralDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <form id="mural-form" method="post" action="<?= htmlspecialchars($base) ?>/salvar" class="flex flex-col flex-1 overflow-hidden" data-mode="create">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+        <input type="hidden" name="id" id="mural_id" value="" disabled>
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Recado</h3>
+                <div class="grid grid-cols-1 gap-y-5">
+                    <div>
+                        <label for="mural_titulo" class="block text-sm font-medium text-gray-700 mb-1">Título <span class="text-red-500">*</span></label>
+                        <input type="text" id="mural_titulo" name="titulo" required maxlength="255"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Conteúdo</label>
+                        <textarea name="conteudo" id="mural_conteudo" class="hidden"></textarea>
+                        <div id="editor-conteudo-mural" class="quill-editor-wrapper border border-gray-300 rounded-lg overflow-hidden bg-white" style="min-height: 180px;"></div>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Destinatários</h3>
+                <div class="flex flex-wrap gap-5 mb-4">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="enviar_para_todos" value="1" checked class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Enviar para todos</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="enviar_para_todos" value="0" id="mural_radio_turmas" class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Selecionar turmas</span>
+                    </label>
+                </div>
+                <div id="mural_turmas_container" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Turmas</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        <?php foreach ($turmas_opcoes ?? [] as $t): ?>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="turmas[]" value="<?= (int)$t['id'] ?>" class="mural-turma-check rounded border-gray-300 text-green-600">
+                            <?= htmlspecialchars($t['nome']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button type="button" onclick="closeMuralDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
+                <span id="mural-form-submit-label">Publicar</span>
+            </button>
+        </div>
+    </form>
+</aside>
+
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<style>
+.quill-editor-wrapper .ql-container { font-size: 1rem; }
+.quill-editor-wrapper .ql-editor { min-height: 160px; }
+.quill-editor-wrapper .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
+.quill-editor-wrapper .ql-container.ql-snow { border: none; }
+</style>
+
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
@@ -149,9 +220,9 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
                     <button type="button" class="btn-visualizar-recado flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" data-titulo="<?= htmlspecialchars($r['titulo'], ENT_QUOTES, 'UTF-8') ?>" data-data-pub="<?= htmlspecialchars($data_pub, ENT_QUOTES, 'UTF-8') ?>" data-conteudo="<?= htmlspecialchars($r['conteudo'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-autor="<?= htmlspecialchars($autor_nome, ENT_QUOTES, 'UTF-8') ?>">
                         <i class="fa-solid fa-eye text-gray-400 w-4 text-center"></i> Visualizar
                     </button>
-                    <a href="<?= $base ?>/editar?id=<?= (int)$r['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <button type="button" onclick="openMuralDrawer(<?= (int)$r['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
-                    </a>
+                    </button>
                     <div class="border-t border-gray-100 my-1"></div>
                     <button type="button"
                             class="btn-abrir-excluir-mural flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -256,6 +327,7 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
         </div>
     </div>
 </div>
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 <script>
 (function() {
     var baseExcluir = <?= json_encode($base ?? (URL . '/admin/mural-recados'), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>;
@@ -401,6 +473,118 @@ function closeFilterDrawer() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeFilterDrawer();
+        closeMuralDrawer();
     }
 });
+
+var muralQuill = null;
+function getMuralQuill() {
+    if (muralQuill) return muralQuill;
+    var editor = document.getElementById('editor-conteudo-mural');
+    if (!editor || typeof Quill === 'undefined') return null;
+    muralQuill = new Quill('#editor-conteudo-mural', {
+        theme: 'snow',
+        placeholder: 'Digite o conteúdo do recado...',
+        modules: { toolbar: [['bold', 'italic', 'underline'], [{ 'list': 'ordered'}, { 'list': 'bullet' }], ['link'], ['clean']] }
+    });
+    muralQuill.on('text-change', function() {
+        var el = document.getElementById('mural_conteudo');
+        if (el) el.value = muralQuill.root.innerHTML;
+    });
+    return muralQuill;
+}
+function setMuralConteudo(html) {
+    var el = document.getElementById('mural_conteudo');
+    if (el) el.value = html || '';
+    var q = getMuralQuill();
+    if (q) q.root.innerHTML = html || '';
+}
+function toggleMuralTurmas() {
+    var todos = document.querySelector('#mural-form [name="enviar_para_todos"]:checked');
+    var paraTodos = !todos || todos.value === '1';
+    document.getElementById('mural_turmas_container').classList.toggle('hidden', paraTodos);
+}
+document.querySelectorAll('#mural-form [name="enviar_para_todos"]').forEach(function(r) {
+    r.addEventListener('change', toggleMuralTurmas);
+});
+function showMuralDrawer() {
+    document.getElementById('muralDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('muralDrawer');
+    drawer.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(function() { drawer.classList.remove('translate-x-full'); });
+    document.body.style.overflow = 'hidden';
+}
+function closeMuralDrawer() {
+    document.getElementById('muralDrawerBackdrop').classList.add('hidden');
+    var drawer = document.getElementById('muralDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+function openMuralDrawer(id) {
+    var form = document.getElementById('mural-form');
+    var idInput = document.getElementById('mural_id');
+    form.reset();
+    idInput.value = '';
+    idInput.disabled = true;
+    setMuralConteudo('');
+    document.querySelectorAll('.mural-turma-check').forEach(function(c) { c.checked = false; });
+    document.querySelector('#mural-form [name="enviar_para_todos"][value="1"]').checked = true;
+    toggleMuralTurmas();
+
+    if (!id) {
+        form.dataset.mode = 'create';
+        form.action = <?= json_encode(($base ?? (URL . '/admin/mural-recados')) . '/salvar', JSON_UNESCAPED_SLASHES) ?>;
+        document.getElementById('muralDrawerTitle').textContent = 'Novo Recado';
+        document.getElementById('mural-form-submit-label').textContent = 'Publicar';
+        showMuralDrawer();
+        return;
+    }
+
+    form.dataset.mode = 'edit';
+    form.action = <?= json_encode(($base ?? (URL . '/admin/mural-recados')) . '/atualizar', JSON_UNESCAPED_SLASHES) ?>;
+    document.getElementById('muralDrawerTitle').textContent = 'Editar Recado';
+    document.getElementById('mural-form-submit-label').textContent = 'Atualizar';
+    showMuralDrawer();
+
+    fetch(<?= json_encode($base ?? (URL . '/admin/mural-recados'), JSON_UNESCAPED_SLASHES) ?> + '/' + id + '/dados', {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (!data.success) {
+            alert('Erro: ' + (data.error || 'Não foi possível carregar o recado.'));
+            closeMuralDrawer();
+            return;
+        }
+        var item = data.item || {};
+        idInput.value = item.id || id;
+        idInput.disabled = false;
+        document.getElementById('mural_titulo').value = item.titulo || '';
+        setMuralConteudo(item.conteudo || '');
+        var paraTodos = Number(item.enviar_para_todos) === 1;
+        document.querySelector('#mural-form [name="enviar_para_todos"][value="' + (paraTodos ? '1' : '0') + '"]').checked = true;
+        var turmas = item.turmas || [];
+        document.querySelectorAll('.mural-turma-check').forEach(function(c) {
+            c.checked = turmas.indexOf(parseInt(c.value, 10)) !== -1;
+        });
+        toggleMuralTurmas();
+    }).catch(function() {
+        alert('Erro de conexão ao carregar o recado.');
+        closeMuralDrawer();
+    });
+}
+document.getElementById('mural-form').addEventListener('submit', function() {
+    var el = document.getElementById('mural_conteudo');
+    var q = getMuralQuill();
+    if (el && q) el.value = q.root.innerHTML;
+});
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('novo') === '1') {
+        openMuralDrawer();
+        return;
+    }
+    var recadoId = parseInt(params.get('recado') || '0', 10);
+    if (recadoId > 0) openMuralDrawer(recadoId);
+})();
 </script>

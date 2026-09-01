@@ -83,7 +83,7 @@ class DashboardGestaoAdminController extends AdminBaseController
         }
 
         $this->viewWithLayout('admin', 'admin/dashboard-gestao/index', [
-            'title' => 'Dashboard Acadêmico - EducaTudo',
+            'title' => 'Dashboard - EducaTudo',
             'user' => $user,
             'current_page' => 'dashboard',
             'csrf_token' => $this->generateCsrfToken(),

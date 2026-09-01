@@ -94,7 +94,7 @@
         $showAlunosMenu = $canViewSidebar(['alunos']);
         $showUsuariosGroup = $canViewSidebar(['administradores']);
         $showAcademicoGroup = $canViewSidebar([
-            'alunos', 'ano_letivo', 'calendario_escolar', 'calendario_letivo', 'materias',
+            'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
             'curso', 'grade_horaria', 'matriz_curricular', 'professores', 'notas_semanais',
             'regras_academicas', 'salas', 'series', 'turmas',
         ]);
@@ -106,7 +106,7 @@
         $forumAtivo = strpos($uriAtual, '/forum') !== false && !$forumDenunciasAtivo;
         $permissoesAtivo = strpos($uriAtual, '/admin/permissoes-perfis') !== false;
         $academicoOpen = in_array($cp, [
-            'academico', 'students', 'ano_letivo', 'school-calendar', 'calendario_letivo',
+            'academico', 'students', 'ano_letivo', 'calendario_letivo',
             'componentes-curriculares', 'curso', 'grade_horaria', 'matriz-curricular',
             'teachers', 'notas_semanais', 'regras-academicas', 'salas', 'serie', 'turmas',
         ], true);
@@ -116,7 +116,7 @@
             'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao', 'relatorios',
         ], true);
         $comunicacaoOpen = in_array($cp, [
-            'comunicacao', 'school-communication', 'mural-recados', 'notifications',
+            'comunicacao', 'school-communication', 'school-calendar', 'mural-recados', 'notifications',
             'notificacoes-push', 'reunioes_geral', 'reunioes',
         ], true) || $forumAtivo || $forumDenunciasAtivo;
         $conteudoOpen = in_array($cp, ['conteudo', 'arquivos', 'apostilas-ia', 'expo-colag'], true);
@@ -125,7 +125,7 @@
             'diario_classe', 'faltas', 'presenca', 'documentos_institucionais',
             'assinatura_digital', 'modelos_documentos', 'enrollment', 'enrollment_config',
             'ocorrencias', 'almoxarifado', 'patrimonio', 'resultados-finais',
-            'vida_escolar',
+            'vida_escolar', 'vida_escolar_oficios',
             'saude_academica', 'tudicoins_escola', 'creditos_pacotes',
         ], true) || $curMovimentacao;
         $monitoramentoOpen = in_array($cp, ['monitoramento', 'monitoramento_alertas', 'tentativas_login'], true);
@@ -141,6 +141,7 @@
         $matriculasNestedOpen = in_array($cp, ['enrollment', 'enrollment_config'], true) || $curMovimentacao;
         $recursosNestedOpen = in_array($cp, ['almoxarifado', 'patrimonio'], true);
         $tudicoinsNestedOpen = in_array($cp, ['tudicoins_escola', 'creditos_pacotes'], true);
+        $vidaEscolarNestedOpen = in_array($cp, ['vida_escolar', 'vida_escolar_oficios'], true);
         $cobrancasNestedOpen = in_array($cp, ['finance_charges', 'finance_charge_batch'], true);
         $finPages = [
             'finance', 'finance_contracts', 'finance_plans', 'finance_charges', 'finance_charge_batch',
@@ -638,7 +639,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'academico': 'academico',
         'students': 'academico',
         'ano_letivo': 'academico',
-        'school-calendar': 'academico',
         'calendario_letivo': 'academico',
         'componentes-curriculares': 'academico',
         'curso': 'academico',
@@ -665,6 +665,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'relatorios': 'avaliacoes',
         'comunicacao': 'comunicacao',
         'school-communication': 'comunicacao',
+        'school-calendar': 'comunicacao',
         'mural-recados': 'comunicacao',
         'notifications': 'comunicacao',
         'notificacoes-push': 'comunicacao',
@@ -693,6 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'patrimonio': 'gestao-escolar',
         'resultados-finais': 'gestao-escolar',
         'vida_escolar': 'gestao-escolar',
+        'vida_escolar_oficios': 'gestao-escolar',
         'saude_academica': 'gestao-escolar',
         'tudicoins_escola': 'gestao-escolar',
         'creditos_pacotes': 'gestao-escolar',

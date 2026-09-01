@@ -394,7 +394,12 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     $matrizSim = $simulacao['matriz_materias'] ?? null;
                     $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
                     $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
-                    $groupedHeader = $buildGroupedBoletimHeader((array) $matrizColunas);
+                    if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                        require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
+                    }
+                    $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial((string) $exibirEm)
+                        ? $buildGroupedBoletimHeader((array) $matrizColunas)
+                        : ['enabled' => false, 'groups' => []];
                     ?>
                     <?php if (!empty($matrizLinhas) && !empty($matrizColunas)): ?>
                         <?php
@@ -941,7 +946,12 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 $matrizSim = $simulacao['matriz_materias'] ?? null;
                 $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
                 $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
-                $groupedHeader = $buildGroupedBoletimHeader((array) $matrizColunas);
+                if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                    require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
+                }
+                $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial((string) $exibirEm)
+                    ? $buildGroupedBoletimHeader((array) $matrizColunas)
+                    : ['enabled' => false, 'groups' => []];
                 ?>
                 <?php if (!empty($matrizLinhas) && !empty($matrizColunas)): ?>
                     <?php

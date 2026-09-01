@@ -62,12 +62,6 @@ $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ??
             <i class="fa-regular fa-calendar w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Ano Letivo</span>
         </a>
-        <?php if ($modOn('calendario_escolar')): ?>
-        <a href="<?= URL ?>/admin/calendario-escolar" class="<?= $linkCls($cp === 'school-calendar') ?>">
-            <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Calendário Escolar</span>
-        </a>
-        <?php endif; ?>
         <?php if ($modOn('calendario_letivo')): ?>
         <a href="<?= URL ?>/admin/calendario-letivo" class="<?= $linkCls($cp === 'calendario_letivo') ?>">
             <i class="fa-solid fa-calendar-check w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -200,7 +194,7 @@ $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ??
 <?php endif; ?>
 
 <!-- Comunicação -->
-<?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('comunicacao')): ?>
+<?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('comunicacao') || $modOn('calendario_escolar')): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'comunicacao' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/comunicacao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -218,6 +212,12 @@ $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ??
             <i class="fa-solid fa-envelope-open-text w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Comunicação Escolar</span>
         </a>
+        <?php if ($modOn('calendario_escolar')): ?>
+        <a href="<?= URL ?>/admin/calendario-escolar" class="<?= $linkCls($cp === 'school-calendar') ?>">
+            <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Calendário Escolar</span>
+        </a>
+        <?php endif; ?>
         <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('forum')): ?>
         <div class="flex items-center rounded-lg <?= $forumAtivo ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/forum" class="flex-1 <?= $linkCls($forumAtivo) ?>">
@@ -492,10 +492,22 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['vida_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'))): ?>
-        <a href="<?= URL ?>/admin/vida-escolar" class="<?= $linkCls($cp === 'vida_escolar') ?>">
-            <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Vida Escolar</span>
-        </a>
+        <div class="flex items-center rounded-lg <?= in_array($cp, ['vida_escolar', 'vida_escolar_oficios'], true) ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/vida-escolar" class="flex-1 <?= $linkCls(in_array($cp, ['vida_escolar', 'vida_escolar_oficios'], true)) ?>">
+                <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Vida Escolar</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('vida-escolar')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="vida-escolar-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="vida-escolar-nested" class="<?= !empty($vidaEscolarNestedOpen) ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <a href="<?= URL ?>/admin/vida-escolar/oficios" class="<?= $linkCls($cp === 'vida_escolar_oficios') ?>">
+                <span class="sidebar-text text-sm">Ofícios</span>
+            </a>
+        </div>
         <?php endif; ?>
         <?php if ($modOn('saude_academica')): ?>
         <a href="<?= URL ?>/admin/saude-academica" class="<?= $linkCls($cp === 'saude_academica') ?>">

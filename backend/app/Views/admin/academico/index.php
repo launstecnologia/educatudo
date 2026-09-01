@@ -20,15 +20,6 @@ $hub_cards = [
     ],
 ];
 
-if ($modOn('calendario_escolar')) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/calendario-escolar',
-        'title' => 'Calendário Escolar',
-        'description' => 'Eventos, feriados e datas comemorativas da escola.',
-        'icon' => 'fa-regular fa-calendar-days',
-    ];
-}
-
 if ($modOn('calendario_letivo')) {
     $hub_cards[] = [
         'href' => URL . '/admin/calendario-letivo',

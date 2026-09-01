@@ -70,7 +70,7 @@ class AdminPermissionMatrix
             'notificacoes_push' => ['label' => 'Notificações Push', 'prefixes' => ['/admin/push-notifications']],
 
             'configuracao_boletim' => ['label' => 'Configuração Boletim', 'prefixes' => ['/admin/boletim', '/admin/boletim-configuracao']],
-            'vida_escolar' => ['label' => 'Vida Escolar (prontuário do aluno)', 'prefixes' => [
+            'vida_escolar' => ['label' => 'Vida Escolar (documentos e prontuário)', 'prefixes' => [
                 '/admin/vida-escolar',
                 '/admin/students/%id%/vida-escolar',
             ]],
@@ -178,7 +178,7 @@ class AdminPermissionMatrix
         return [
             'dashboard' => ['label' => 'Dashboard', 'items' => ['dashboard', 'assistente']],
             'academico' => ['label' => 'Acadêmico', 'items' => [
-                'alunos', 'ano_letivo', 'calendario_escolar', 'calendario_letivo', 'materias',
+                'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
                 'curso', 'grade_horaria', 'matriz_curricular', 'professores', 'notas_semanais',
                 'regras_academicas', 'salas', 'series', 'turmas',
             ]],
@@ -187,7 +187,7 @@ class AdminPermissionMatrix
                 'configuracao_boletim', 'guia_boletim', 'exercicios', 'listagem_avaliacoes', 'relatorio_avaliacoes', 'relatorios_gerais',
             ]],
             'comunicacao' => ['label' => 'Comunicação', 'items' => [
-                'comunicacao_escolar', 'forum', 'denuncias_forum', 'mural_recados',
+                'comunicacao_escolar', 'calendario_escolar', 'forum', 'denuncias_forum', 'mural_recados',
                 'notificacoes', 'notificacoes_push',
             ]],
             'conteudo' => ['label' => 'Conteúdo', 'items' => ['arquivos', 'educahits_portal', 'apostilas_ia', 'apostilas', 'expo_colag']],

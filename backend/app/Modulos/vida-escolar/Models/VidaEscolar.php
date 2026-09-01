@@ -996,4 +996,72 @@ class VidaEscolar
             return null;
         }
     }
+
+    /**
+     * Alunos da turma com status da ficha e do histórico oficial (hub de documentos).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listarAlunosTurmaDocumentos(int $turmaId, int $anoLetivo): array
+    {
+        if ($turmaId <= 0) {
+            return [];
+        }
+        $params = ['turma_id' => $turmaId];
+        $fichaSelect = 'NULL AS ficha_id, NULL AS ficha_status, NULL AS ficha_versao';
+        $fichaJoin = '';
+        if ($this->schemaPronto() && $anoLetivo > 0) {
+            $fichaSelect = 'f.id AS ficha_id, f.status AS ficha_status, f.versao AS ficha_versao';
+            $fichaJoin = 'LEFT JOIN (
+                    SELECT aluno_id, MAX(id) AS id
+                    FROM boletim_fichas
+                    WHERE turma_id = :turma_ficha AND ano_letivo = :ano_ficha
+                    GROUP BY aluno_id
+                ) fu ON fu.aluno_id = a.id
+                LEFT JOIN boletim_fichas f ON f.id = fu.id';
+            $params['turma_ficha'] = $turmaId;
+            $params['ano_ficha'] = $anoLetivo;
+        }
+        $histSelect = 'NULL AS historico_id, NULL AS historico_status';
+        $histJoin = '';
+        if ($this->tabelaExiste('historico_documentos')) {
+            $histSelect = 'h.id AS historico_id, h.status AS historico_status';
+            $histJoin = 'LEFT JOIN (
+                    SELECT aluno_id, MAX(id) AS id
+                    FROM historico_documentos
+                    GROUP BY aluno_id
+                ) hu ON hu.aluno_id = a.id
+                LEFT JOIN historico_documentos h ON h.id = hu.id';
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT a.id, a.nome, a.ra, a.ativo,
+                    {$fichaSelect},
+                    {$histSelect}
+             FROM alunos a
+             {$fichaJoin}
+             {$histJoin}
+             WHERE a.turma_id = :turma_id AND (a.ativo = 1 OR a.ativo IS NULL)
+             ORDER BY a.nome ASC",
+            $params
+        );
+        return is_array($rows) ? $rows : [];
+    }
+
+    private function tabelaExiste(string $tabela): bool
+    {
+        $tabela = preg_replace('/[^a-z0-9_]/i', '', $tabela) ?? '';
+        if ($tabela === '') {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name = :t LIMIT 1",
+                ['t' => $tabela]
+            );
+            return !empty($row['ok']);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
 }

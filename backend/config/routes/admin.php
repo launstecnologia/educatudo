@@ -153,7 +153,10 @@ $router->post('/admin/reunioes/aluno/salvar',   'Admin/MeetingController@alunoSa
 $router->post('/admin/reunioes/aluno/excluir',  'Admin/MeetingController@alunoExcluir');
 $router->get('/admin/reunioes/geral',           'Admin/MeetingController@geralIndex');
 $router->post('/admin/reunioes/geral/salvar',   'Admin/MeetingController@geralSalvar');
+$router->post('/admin/reunioes/geral/atualizar','Admin/MeetingController@geralAtualizar');
 $router->post('/admin/reunioes/geral/excluir',  'Admin/MeetingController@geralExcluir');
+$router->get('/admin/reunioes/geral/{id}/dados','Admin/MeetingController@geralDados');
+$router->get('/admin/reunioes/geral/{id}/pdf',  'Admin/MeetingController@geralPdf');
 
 $router->get('/admin/resultados-finais', 'Admin/ResultadoFinalAdminController@index');
 $router->get('/admin/resultados-finais/relatorios', 'Admin/ResultadoFinalAdminController@relatorios');
@@ -249,6 +252,7 @@ $router->post('/admin/jornadas/modulos/salvar-tema-redacao', 'Education/AdminJou
 $router->get('/admin/mural-recados', 'Admin/AdminMuralController@index');
 $router->get('/admin/mural-recados/criar', 'Admin/AdminMuralController@criar');
 $router->post('/admin/mural-recados/salvar', 'Admin/AdminMuralController@salvar');
+$router->get('/admin/mural-recados/{id}/dados', 'Admin/AdminMuralController@dados');
 $router->get('/admin/mural-recados/editar', 'Admin/AdminMuralController@editar');
 $router->post('/admin/mural-recados/atualizar', 'Admin/AdminMuralController@atualizar');
 $router->post('/admin/mural-recados/excluir', 'Admin/AdminMuralController@excluir');
@@ -261,6 +265,7 @@ $router->get('/admin/comunicacao-escolar/{id}', 'Admin/SchoolCommunicationContro
 $router->post('/admin/comunicacao-escolar/{id}/responder', 'Admin/SchoolCommunicationController@reply');
 $router->get('/admin/calendario-escolar', 'Admin/SchoolCommunicationController@calendar');
 $router->get('/admin/calendario-escolar/novo', 'Admin/SchoolCommunicationController@calendarCreate');
+$router->get('/admin/calendario-escolar/{id}/dados', 'Admin/SchoolCommunicationController@calendarDados');
 $router->get('/admin/calendario-escolar/{id}/editar', 'Admin/SchoolCommunicationController@calendarEdit');
 $router->post('/admin/calendario-escolar', 'Admin/SchoolCommunicationController@calendarStore');
 $router->post('/admin/calendario-escolar/{id}', 'Admin/SchoolCommunicationController@calendarUpdate');

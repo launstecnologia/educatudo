@@ -138,6 +138,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <span id="edoc-zoom-label" style="font-size:12px;min-width:48px;text-align:center">90%</span>
                 <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-zoom-in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="edoc-btn" id="edoc-zoom-fit">Ajustar à tela</button>
+                <span class="edoc-canvas-hint">Clique no texto da folha para digitar</span>
                 <?php if (!empty($layout_sugerido)): ?>
                 <button type="button" class="edoc-btn" id="edoc-layout-sugerido" title="Monta cabeçalho, identificação, notas e assinaturas lado a lado">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Montar boletim

@@ -1,6 +1,6 @@
 <?php
 /**
- * Manifest do módulo Vida Escolar (prontuário do aluno: boletim, histórico, SED/INEP).
+ * Manifest do módulo Vida Escolar (prontuário e documentos oficiais do aluno).
  * Opcional por escola (Master). Default ligado.
  */
 return [
@@ -20,6 +20,7 @@ return [
     'feature_gate' => true,
     'rotas' => [
         '/admin/vida-escolar' => 'vida_escolar',
+        '/admin/vida-escolar/oficios' => 'vida_escolar',
     ],
     'menu' => [
         'admin' => [

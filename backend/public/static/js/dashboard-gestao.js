@@ -61,14 +61,17 @@
     }
 
     function cardsGrid(cards) {
-        return '<div class="grid grid-cols-2 xl:grid-cols-4 gap-3">' + (cards || []).map(cardHtml).join('') + '</div>';
+        var n = (cards || []).length;
+        var colCls = n <= 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 xl:grid-cols-4';
+        return '<div class="grid ' + colCls + ' gap-3">' + (cards || []).map(cardHtml).join('') + '</div>';
     }
 
     function indisponivel(data) {
+        var rotulo = data.link_rotulo || 'Abrir';
         var link = data.href
-            ? '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(data.href)) + '">Abrir módulo</a>'
+            ? '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(data.href)) + '">' + esc(rotulo) + '</a>'
             : '';
-        return '<div class="text-sm text-gray-500"><p>' + esc(data.motivo || 'Bloco indisponível neste recorte.') + '</p>' +
+        return '<div class="text-sm text-gray-500"><p>' + esc(data.motivo || 'Nada para mostrar neste recorte.') + '</p>' +
             (link ? '<p class="mt-2">' + link + '</p>' : '') + '</div>';
     }
 
@@ -97,18 +100,22 @@
         if (data.links && data.links.presenca) {
             links += '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(data.links.presenca)) + '">Gestão de Presença</a>';
         }
-        if (data.links && data.links.chamadas) {
-            links += (links ? ' · ' : '') + '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(data.links.chamadas)) + '">Chamadas pendentes</a>';
+        var diarioHref = (data.links && (data.links.diario || data.links.chamadas)) || '';
+        if (diarioHref) {
+            links += (links ? ' · ' : '') + '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(diarioHref)) + '">Diário</a>';
+        }
+        if (data.vazio || !data.disponivel) {
+            el.innerHTML = titulo('Frequência hoje', links) +
+                '<p class="text-sm text-gray-500">Nenhuma chamada encerrada hoje.</p>';
+            return;
         }
         el.innerHTML = titulo('Frequência hoje', links) +
             metricas([
                 { label: 'Percentual', valor: r.percentual == null ? '—' : r.percentual + '%' },
                 { label: 'Presentes', valor: fmtNum(r.presentes) },
                 { label: 'Ausentes', valor: fmtNum(r.ausentes) },
-                { label: 'Faltas justificadas', valor: fmtNum(r.justificadas) },
-                { label: 'Chamadas pendentes', valor: fmtNum(r.chamadas_pendentes) }
-            ]) +
-            (data.nota ? '<p class="mt-3 text-xs text-gray-400">' + esc(data.nota) + '</p>' : '');
+                { label: 'Faltas justificadas', valor: fmtNum(r.justificadas) }
+            ]);
     }
 
     function renderDesempenho(el, data) {
@@ -118,15 +125,14 @@
         }
         var b = data.buckets || {};
         var rotulos = data.rotulos || {};
-        var link = data.href ? '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(data.href)) + '">Resultados</a>' : '';
+        var link = data.href ? '<a class="text-sm text-primary-600 hover:underline" href="' + esc(href(data.href)) + '">Resultados Finais</a>' : '';
         el.innerHTML = titulo('Desempenho acadêmico', link) +
             metricas([
                 { label: rotulos.dentro_criterio || 'Dentro do critério', valor: fmtNum(b.dentro_criterio) },
                 { label: rotulos.atencao || 'Em atenção', valor: fmtNum(b.atencao) },
                 { label: rotulos.recuperacao || 'Recuperação', valor: fmtNum(b.recuperacao) },
                 { label: rotulos.risco || 'Risco acadêmico', valor: fmtNum(b.risco) }
-            ]) +
-            (data.nota ? '<p class="mt-3 text-xs text-gray-400">' + esc(data.nota) + '</p>' : '');
+            ]);
     }
 
     function renderEvolucao(el, data) {
@@ -361,6 +367,14 @@
             ev.preventDefault();
             carregarTodos();
         });
+        var btnMais = document.getElementById('dash-mais-filtros');
+        var extra = document.getElementById('dash-filtros-extra');
+        if (btnMais && extra) {
+            btnMais.addEventListener('click', function () {
+                extra.classList.toggle('hidden');
+                btnMais.textContent = extra.classList.contains('hidden') ? 'Mais filtros' : 'Menos filtros';
+            });
+        }
     }
 
     carregarTodos();

@@ -24,9 +24,9 @@
 $ui = __DIR__ . '/../../_partials/ui';
 $ui_wizard_steps = [
     ['label' => 'Dados', 'sub' => 'Identificação'],
+    ['label' => 'Configuração', 'sub' => 'Tipo e prazos'],
     ['label' => 'Turmas', 'sub' => 'Participantes'],
     ['label' => 'Professores', 'sub' => 'Matérias'],
-    ['label' => 'Configuração', 'sub' => 'Formato e prazos'],
     ['label' => 'Revisão', 'sub' => 'Confirmar'],
 ];
 $ui_wizard_current = 1;
@@ -183,30 +183,7 @@ $ui_wizard_current = 1;
         </div>
         </section>
 
-        <section class="step-panel hidden" data-step-panel="2">
-        <!-- Bloco Professores (opcional) -->
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Bloco Professores (Opcional)
-            </label>
-            <select id="bloco_modelo_id" 
-                    name="bloco_modelo_id"
-                    onchange="carregarModelo(this.value)"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">-- Selecione um bloco de professores (opcional) --</option>
-                <?php if (!empty($blocosModelo)): ?>
-                    <?php foreach ($blocosModelo as $modelo): ?>
-                        <option value="<?= $modelo['id'] ?>">
-                            <?= htmlspecialchars($modelo['nome']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </select>
-            <p class="text-xs text-gray-500 mt-1">
-                Selecione um bloco de professores para preencher automaticamente os professores, matérias e número de questões
-            </p>
-        </div>
-
+        <section class="step-panel hidden" data-step-panel="3">
         <!-- Turmas do Bloco -->
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -236,38 +213,6 @@ $ui_wizard_current = 1;
         </div>
 
         <div class="flex items-center justify-between pt-2">
-            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="1">
-                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
-            </button>
-            <button type="button"
-                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
-                Próximo
-                <i class="fa-solid fa-arrow-right ml-2"></i>
-            </button>
-        </div>
-        </section>
-
-        <section class="step-panel hidden" data-step-panel="3">
-        <!-- Professores e Matérias (Múltiplos) -->
-        <div class="mb-6">
-            <div class="flex items-center justify-between mb-4">
-                <label class="block text-sm font-medium text-gray-700">
-                    Professores e Matérias <span class="text-red-500">*</span>
-                </label>
-                <button type="button" 
-                        onclick="adicionarProfessor()"
-                        class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
-                    + Adicionar Professor
-                </button>
-            </div>
-            <p class="text-sm text-gray-500 mb-4">Adicione um ou mais professores com suas matérias:</p>
-            
-            <div id="professoresContainer" class="space-y-4">
-                <!-- Primeiro professor será adicionado aqui via JavaScript -->
-            </div>
-        </div>
-
-        <div class="flex items-center justify-between pt-2">
             <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="2">
                 <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
             </button>
@@ -280,6 +225,60 @@ $ui_wizard_current = 1;
         </section>
 
         <section class="step-panel hidden" data-step-panel="4">
+        <div id="blocoProfessoresContainer" class="mb-6 hidden">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Bloco de professores (opcional)
+            </label>
+            <select id="bloco_modelo_id"
+                    name="bloco_modelo_id"
+                    onchange="carregarModelo(this.value)"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">-- Selecione um bloco de professores (opcional) --</option>
+                <?php if (!empty($blocosModelo)): ?>
+                    <?php foreach ($blocosModelo as $modelo): ?>
+                        <option value="<?= $modelo['id'] ?>">
+                            <?= htmlspecialchars($modelo['nome']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">
+                Preenche automaticamente professor e matéria a partir de um bloco pronto.
+            </p>
+        </div>
+
+        <!-- Professores e Matérias (Múltiplos) -->
+        <div class="mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <label class="block text-sm font-medium text-gray-700">
+                    Professores e Matérias <span class="text-red-500">*</span>
+                </label>
+                <button type="button" 
+                        onclick="adicionarProfessor()"
+                        class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
+                    + Adicionar Professor
+                </button>
+            </div>
+            <p id="hintPassoProfessores" class="text-sm text-gray-500 mb-4">Adicione um ou mais professores com suas matérias.</p>
+            
+            <div id="professoresContainer" class="space-y-4">
+                <!-- Primeiro professor será adicionado aqui via JavaScript -->
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="3">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Revisar
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="2">
         <!-- Visível no portal do aluno -->
         <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <label class="flex items-start cursor-pointer">
@@ -320,61 +319,62 @@ $ui_wizard_current = 1;
             </div>
         </div>
 
-        <!-- Formato do evento (online vs nota manual) -->
+        <!-- Tipo de Evento (online vs lançamento) -->
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
-                Formato do evento <span class="text-red-500">*</span>
+                Tipo de Evento <span class="text-red-500">*</span>
             </label>
-            <p class="text-xs text-gray-500 mb-2">Em <strong>lançamento de notas</strong>, não há prova com questões: as notas são lançadas diretamente por professor ou coordenação.</p>
+            <p class="text-xs text-gray-500 mb-2">Em <strong>lançamento de notas</strong> não há prova com questões: a nota cheia é lançada por professor ou coordenação.</p>
             <div class="flex flex-wrap gap-6">
                 <label class="flex items-center">
                     <input type="radio" name="formato_evento" value="online_questoes"
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Prova online (professor cria questões)</span>
+                    <span class="ml-2 text-gray-700">Prova online</span>
                 </label>
                 <label class="flex items-center">
                     <input type="radio" name="formato_evento" value="lancamento_nota"
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Lançamento de notas (sem questões)</span>
+                    <span class="ml-2 text-gray-700">Lançamento de notas</span>
                 </label>
             </div>
         </div>
 
-        <!-- Configuração de Nota -->
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Configuração de Nota / Responsável <span class="text-red-500">*</span>
+        <!-- Responsável (depende do tipo de evento) -->
+        <div id="responsavelEventoBox" class="mb-6 hidden">
+            <label id="labelResponsavelEvento" class="block text-sm font-medium text-gray-700 mb-2">
+                Responsável <span class="text-red-500">*</span>
             </label>
-            <div id="cfgOnlineOptions" class="flex flex-wrap gap-6">
+            <p id="helpResponsavelEvento" class="text-xs text-gray-500 mb-2"></p>
+            <div id="cfgOnlineOptions" class="flex flex-wrap gap-6 hidden">
                 <label class="flex items-center">
-                    <input type="radio" 
-                           name="configuracao_nota" 
-                           value="professor_por_questao" 
+                    <input type="radio"
+                           name="configuracao_nota"
+                           value="professor_por_questao"
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Professor coloca por questão</span>
+                    <span class="ml-2 text-gray-700">Atribuir professor</span>
                 </label>
                 <label class="flex items-center">
-                    <input type="radio" 
-                           name="configuracao_nota" 
+                    <input type="radio"
+                           name="configuracao_nota"
                            value="coordenacao_calcula"
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Coordenação faz o cálculo</span>
+                    <span class="ml-2 text-gray-700">Coordenação faz a prova</span>
                 </label>
             </div>
             <div id="cfgLancamentoOptions" class="flex flex-wrap gap-6 hidden">
                 <label class="flex items-center">
                     <input type="radio"
                            name="configuracao_nota"
-                           value="coordenacao_calcula"
+                           value="professor_por_questao"
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Coordenação lança as notas dos alunos</span>
+                    <span class="ml-2 text-gray-700">Atribuir ao professor</span>
                 </label>
                 <label class="flex items-center">
                     <input type="radio"
                            name="configuracao_nota"
-                           value="professor_por_questao"
+                           value="coordenacao_calcula"
                            class="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500">
-                    <span class="ml-2 text-gray-700">Professor lança as notas dos alunos</span>
+                    <span class="ml-2 text-gray-700">Coordenação lança a nota</span>
                 </label>
             </div>
         </div>
@@ -435,24 +435,24 @@ $ui_wizard_current = 1;
         <!-- Prazo de Entrega do Professor (prova online e lançamento por professor) -->
         <div id="prazoProfessorContainer" class="hidden">
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
+                <label id="labelPrazoProfessor" class="block text-sm font-medium text-gray-700 mb-2">
                     Prazo para Professores Enviarem Provas <span class="text-red-500">*</span>
                 </label>
                 <input type="datetime-local"
                        id="prazo_entrega_professor"
                        name="prazo_entrega_professor"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <p class="text-xs text-gray-500 mt-1">Após este prazo, provas não enviadas serão automaticamente marcadas como "Não Enviadas" e travadas</p>
+                    <p class="text-xs text-gray-500 mt-1">Após este prazo, provas não enviadas serão automaticamente marcadas como "Não Enviadas" e travadas</p>
             </div>
         </div>
 
         <div class="flex items-center justify-between pt-2">
-            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="3">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="1">
                 <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
             </button>
             <button type="button"
                     class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
-                Revisar
+                Próximo
                 <i class="fa-solid fa-arrow-right ml-2"></i>
             </button>
         </div>
@@ -492,7 +492,7 @@ const professores = <?= json_encode($professores ?? []) ?>;
 const materias = <?= json_encode($materias ?? []) ?>;
 const turmas = <?= json_encode($turmas ?? []) ?>;
 let professorCounter = 0;
-const draftStorageKey = `educatudo:prova-evento:create:${window.location.host}:${window.location.pathname}`;
+const draftStorageKey = `educatudo:prova-evento:create:v2:${window.location.host}:${window.location.pathname}`;
 let draftSaveTimer = null;
 let restoringDraft = false;
 let wizardCurrentStep = 1;
@@ -587,19 +587,6 @@ function validateWizardStep(step) {
         });
         message = 'Preencha os dados obrigatórios do evento antes de avançar.';
     } else if (step === 2) {
-        ok = getTurmasBlocoSelecionadas().length > 0;
-        message = 'Selecione pelo menos uma turma para o evento.';
-    } else if (step === 3) {
-        const professorDivs = Array.from(document.querySelectorAll('[id^="professor_"]'));
-        ok = professorDivs.length > 0 && professorDivs.every(div => {
-            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
-            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
-            const numeroQuestoes = parseInt(div.querySelector('input[name*="[numero_questoes]"]')?.value || '0', 10);
-            const turmasProfessor = div.querySelectorAll('.turma-professor-checkbox:checked').length;
-            return professorId && materiaId && numeroQuestoes > 0 && turmasProfessor > 0;
-        });
-        message = 'Informe professor, matéria, quantidade de questões e turmas para cada professor.';
-    } else if (step === 4) {
         const formato = document.querySelector('input[name="formato_evento"]:checked')?.value || '';
         const configuracao = inputConfiguracaoNotaNoFormatoAtual()?.value || '';
         const dataHoraVisible = !document.getElementById('agendamentoDataHoraContainer')?.classList.contains('hidden');
@@ -611,7 +598,27 @@ function validateWizardStep(step) {
         if (ok && prazoVisible) {
             ok = String(document.getElementById('prazo_entrega_professor')?.value || '').trim() !== '';
         }
-        message = 'Complete formato, responsável pelas notas e prazos necessários.';
+        message = 'Complete o tipo de evento, o responsável e os prazos necessários.';
+    } else if (step === 3) {
+        ok = getTurmasBlocoSelecionadas().length > 0;
+        message = 'Selecione pelo menos uma turma para o evento.';
+    } else if (step === 4) {
+        const needQtd = exigeNumeroQuestoes();
+        const professorDivs = Array.from(document.querySelectorAll('[id^="professor_"]'));
+        ok = professorDivs.length > 0 && professorDivs.every(div => {
+            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
+            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
+            const turmasProfessor = div.querySelectorAll('.turma-professor-checkbox:checked').length;
+            if (!professorId || !materiaId || turmasProfessor === 0) return false;
+            if (needQtd) {
+                const numeroQuestoes = parseInt(div.querySelector('input[name*="[numero_questoes]"]')?.value || '0', 10);
+                return numeroQuestoes > 0;
+            }
+            return true;
+        });
+        message = needQtd
+            ? 'Informe professor, matéria, quantidade de questões e turmas para cada professor.'
+            : 'Informe professor, matéria e turmas para cada item.';
     }
 
     wizardErrorSteps[step] = !ok;
@@ -664,8 +671,12 @@ function atualizarResumoWizard() {
         const materia = div.querySelector('select[name*="[materia_id]"] option:checked')?.textContent?.trim() || 'Matéria não selecionada';
         const qtd = div.querySelector('input[name*="[numero_questoes]"]')?.value || '0';
         const turmasQtd = div.querySelectorAll('.turma-professor-checkbox:checked').length;
-        return `<li>${escapeResumo(professor)} · ${escapeResumo(materia)} · ${escapeResumo(qtd)} questão(ões) · ${turmasQtd} turma(s)</li>`;
+        const qtdTxt = exigeNumeroQuestoes() ? ` · ${escapeResumo(qtd)} questão(ões)` : '';
+        return `<li>${escapeResumo(professor)} · ${escapeResumo(materia)}${qtdTxt} · ${turmasQtd} turma(s)</li>`;
     }).join('');
+
+    const formatoTxt = document.querySelector('input[name="formato_evento"]:checked')?.parentElement?.textContent?.trim() || '';
+    const respTxt = inputConfiguracaoNotaNoFormatoAtual()?.parentElement?.textContent?.trim() || '';
 
     out.innerHTML = `
         <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -673,8 +684,9 @@ function atualizarResumoWizard() {
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Ano/Bimestre</dt><dd>${escapeResumo(document.getElementById('ano_letivo')?.value)} · ${escapeResumo(selectedText('#bimestre'))}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de avaliação</dt><dd>${escapeResumo(selectedText('#tipo_avaliacao_id'))}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Semana</dt><dd>${escapeResumo(selectedText('#semana') || '—')}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de evento</dt><dd>${escapeResumo(formatoTxt)}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Responsável</dt><dd>${escapeResumo(respTxt)}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Turmas do evento</dt><dd>${getTurmasBlocoSelecionadas().length} turma(s)</dd></div>
-            <div><dt class="text-xs font-medium text-gray-500 uppercase">Formato</dt><dd>${escapeResumo(document.querySelector('input[name="formato_evento"]:checked')?.parentElement?.textContent?.trim() || '')}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Portal do aluno</dt><dd>${document.getElementById('visivel_no_portal_aluno')?.checked ? 'Visível' : 'Oculto'}</dd></div>
         </dl>
         <div class="mt-5">
@@ -690,8 +702,9 @@ function getRadioValue(name) {
 
 function setRadioValue(name, value) {
     if (!value) return;
-    const el = Array.from(document.querySelectorAll(`input[name="${name}"]`))
-        .find(input => input.value === String(value));
+    const all = Array.from(document.querySelectorAll(`input[name="${name}"]`));
+    const visible = all.find(input => input.value === String(value) && !input.closest('.hidden'));
+    const el = visible || all.find(input => input.value === String(value));
     if (el) el.checked = true;
 }
 
@@ -795,7 +808,9 @@ function restaurarRascunhoEvento() {
     preencherCampo('prazo_entrega_professor', campos.prazo_entrega_professor);
     setRadioValue('tipo_prova', campos.tipo_prova);
     setRadioValue('formato_evento', campos.formato_evento);
+    ajustarOpcoesConfiguracaoNotaPorFormato();
     setRadioValue('configuracao_nota', campos.configuracao_nota);
+    ajustarOpcoesConfiguracaoNotaPorFormato();
     const portal = document.getElementById('visivel_no_portal_aluno');
     if (portal) portal.checked = !!campos.visivel_no_portal_aluno;
     const notaUnica = document.getElementById('nota_unica_todas_materias');
@@ -897,7 +912,7 @@ function adicionarProfessor() {
                     <option value="">Selecione primeiro o professor</option>
                 </select>
             </div>
-            <div>
+            <div class="campo-numero-questoes">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Número de Questões <span class="text-red-500">*</span>
                 </label>
@@ -929,6 +944,7 @@ function adicionarProfessor() {
     `;
     
     container.appendChild(professorDiv);
+    atualizarCamposPassoProfessores();
 }
 
 function removerProfessor(id) {
@@ -1092,7 +1108,7 @@ function adicionarProfessorDoModelo(profModelo) {
                     `).join('')}
                 </select>
             </div>
-            <div>
+            <div class="campo-numero-questoes">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
                     Número de Questões <span class="text-red-500">*</span>
                 </label>
@@ -1124,6 +1140,7 @@ function adicionarProfessorDoModelo(profModelo) {
     `;
     
     container.appendChild(professorDiv);
+    atualizarCamposPassoProfessores();
 }
 
 // Adiciona o primeiro professor automaticamente ao carregar
@@ -1252,8 +1269,56 @@ function esconderAgendaAteEscolhaInicial() {
     if (prazoInput) prazoInput.required = false;
 }
 
+function getFormatoEvento() {
+    return document.querySelector('input[name="formato_evento"]:checked')?.value || '';
+}
+
+function atribuirAoProfessor() {
+    return (inputConfiguracaoNotaNoFormatoAtual()?.value || '') === 'professor_por_questao';
+}
+
+function exigeNumeroQuestoes() {
+    return getFormatoEvento() === 'online_questoes' && atribuirAoProfessor();
+}
+
+function atualizarCamposPassoProfessores() {
+    const formato = getFormatoEvento();
+    const atribuir = atribuirAoProfessor();
+    const blocoBox = document.getElementById('blocoProfessoresContainer');
+    if (blocoBox) {
+        blocoBox.classList.toggle('hidden', !(formato && atribuir));
+    }
+
+    const showQtd = exigeNumeroQuestoes();
+    document.querySelectorAll('.campo-numero-questoes').forEach(el => {
+        el.classList.toggle('hidden', !showQtd);
+        const input = el.querySelector('input');
+        if (input) {
+            input.required = showQtd;
+            if (!showQtd) {
+                input.removeAttribute('required');
+            }
+        }
+    });
+
+    const hint = document.getElementById('hintPassoProfessores');
+    if (hint) {
+        if (!formato) {
+            hint.textContent = 'Adicione um ou mais professores com suas matérias.';
+        } else if (formato === 'lancamento_nota' && !atribuir) {
+            hint.textContent = 'Selecione matéria e professor. A coordenação lança a nota cheia — sem quantidade de questões.';
+        } else if (formato === 'lancamento_nota') {
+            hint.textContent = 'Selecione o professor e, se quiser, um bloco. A nota será lançada cheia, sem quantidade de questões.';
+        } else if (atribuir) {
+            hint.textContent = 'Selecione o professor, o bloco (opcional) e a quantidade de questões que ele deve criar.';
+        } else {
+            hint.textContent = 'Selecione matéria e professor. A coordenação elabora a prova — sem quantidade fixa de questões.';
+        }
+    }
+}
+
 function inputConfiguracaoNotaNoFormatoAtual() {
-    const formatoSel = document.querySelector('input[name="formato_evento"]:checked')?.value || '';
+    const formatoSel = getFormatoEvento();
     const onlineBox = document.getElementById('cfgOnlineOptions');
     const lancBox = document.getElementById('cfgLancamentoOptions');
     if (!formatoSel) {
@@ -1269,7 +1334,10 @@ function inputConfiguracaoNotaNoFormatoAtual() {
 }
 
 function ajustarOpcoesConfiguracaoNotaPorFormato() {
-    const formatoSel = document.querySelector('input[name="formato_evento"]:checked')?.value || '';
+    const formatoSel = getFormatoEvento();
+    const respBox = document.getElementById('responsavelEventoBox');
+    const labelResp = document.getElementById('labelResponsavelEvento');
+    const helpResp = document.getElementById('helpResponsavelEvento');
     const onlineBox = document.getElementById('cfgOnlineOptions');
     const lancBox = document.getElementById('cfgLancamentoOptions');
     const notaUnicaBox = document.getElementById('notaUnicaTodasMateriasBox');
@@ -1282,7 +1350,8 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
     const prazoInput = document.getElementById('prazo_entrega_professor');
 
     if (!formatoSel) {
-        onlineBox.classList.remove('hidden');
+        if (respBox) respBox.classList.add('hidden');
+        onlineBox.classList.add('hidden');
         lancBox.classList.add('hidden');
         if (notaUnicaBox) notaUnicaBox.classList.add('hidden');
         if (msgCoord) msgCoord.classList.add('hidden');
@@ -1292,32 +1361,51 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
         if (horaInicioInput) horaInicioInput.required = false;
         if (horaFimInput) horaFimInput.required = false;
         if (prazoInput) prazoInput.required = false;
+        atualizarCamposPassoProfessores();
         return;
-    } else if (formatoSel === 'lancamento_nota') {
+    }
+
+    if (respBox) respBox.classList.remove('hidden');
+
+    const cfgAnterior = document.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
+
+    if (formatoSel === 'lancamento_nota') {
         onlineBox.classList.add('hidden');
         lancBox.classList.remove('hidden');
+        if (labelResp) labelResp.innerHTML = 'Quem lança a nota <span class="text-red-500">*</span>';
+        if (helpResp) helpResp.textContent = 'Atribua ao professor ou deixe a coordenação lançar a nota cheia.';
         let cfgChecked = lancBox.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
         if (!['coordenacao_calcula', 'professor_por_questao'].includes(cfgChecked)) {
-            const def = lancBox.querySelector('input[name="configuracao_nota"][value="coordenacao_calcula"]');
+            const prefer = ['coordenacao_calcula', 'professor_por_questao'].includes(cfgAnterior)
+                ? cfgAnterior
+                : 'professor_por_questao';
+            const def = lancBox.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
             if (def) def.checked = true;
         }
+        onlineBox.querySelectorAll('input[name="configuracao_nota"]').forEach(el => { el.checked = false; });
     } else {
         onlineBox.classList.remove('hidden');
         lancBox.classList.add('hidden');
-        notaUnicaBox.classList.add('hidden');
+        if (labelResp) labelResp.innerHTML = 'Quem elabora a prova <span class="text-red-500">*</span>';
+        if (helpResp) helpResp.textContent = 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.';
+        if (notaUnicaBox) notaUnicaBox.classList.add('hidden');
         if (msgCoord) msgCoord.classList.add('hidden');
         const notaUnicaInput = document.getElementById('nota_unica_todas_materias');
         if (notaUnicaInput) notaUnicaInput.checked = false;
         let cfgChecked = onlineBox.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
         if (!['professor_por_questao', 'coordenacao_calcula'].includes(cfgChecked)) {
-            const def = onlineBox.querySelector('input[name="configuracao_nota"][value="professor_por_questao"]');
+            const prefer = ['coordenacao_calcula', 'professor_por_questao'].includes(cfgAnterior)
+                ? cfgAnterior
+                : 'professor_por_questao';
+            const def = onlineBox.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
             if (def) def.checked = true;
         }
+        lancBox.querySelectorAll('input[name="configuracao_nota"]').forEach(el => { el.checked = false; });
     }
 
     const cfgFinal = inputConfiguracaoNotaNoFormatoAtual()?.value || '';
     const showDataHora = (formatoSel === 'online_questoes');
-    const showPrazo = (formatoSel === 'online_questoes') || (formatoSel === 'lancamento_nota' && cfgFinal === 'professor_por_questao');
+    const showPrazo = cfgFinal === 'professor_por_questao';
     const showNotaUnica = (formatoSel === 'lancamento_nota' && cfgFinal === 'coordenacao_calcula');
     if (notaUnicaBox) notaUnicaBox.classList.toggle('hidden', !showNotaUnica);
     const notaUnicaInput = document.getElementById('nota_unica_todas_materias');
@@ -1329,6 +1417,13 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
     if (horaFimInput) horaFimInput.required = showDataHora;
     if (prazoInput) prazoInput.required = showPrazo;
     if (msgCoord) msgCoord.classList.toggle('hidden', !showNotaUnica);
+    const prazoLabel = document.getElementById('labelPrazoProfessor');
+    if (prazoLabel) {
+        prazoLabel.innerHTML = formatoSel === 'lancamento_nota'
+            ? 'Prazo para o professor lançar as notas <span class="text-red-500">*</span>'
+            : 'Prazo para Professores Enviarem Provas <span class="text-red-500">*</span>';
+    }
+    atualizarCamposPassoProfessores();
 }
 
 function salvarBloco(event) {
@@ -1348,6 +1443,7 @@ function salvarBloco(event) {
     
     let professoresInvalidos = false;
     let turmasProfessorInvalidas = false;
+    const needQtd = exigeNumeroQuestoes();
     professorDivs.forEach(div => {
         const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
         const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
@@ -1358,7 +1454,7 @@ function salvarBloco(event) {
             return;
         }
         
-        if (!numeroQuestoes || parseInt(numeroQuestoes) < 1) {
+        if (needQtd && (!numeroQuestoes || parseInt(numeroQuestoes) < 1)) {
             professoresInvalidos = true;
             return;
         }
@@ -1374,7 +1470,7 @@ function salvarBloco(event) {
         professores.push({
             professor_id: parseInt(professorId),
             materia_id: parseInt(materiaId),
-            numero_questoes: parseInt(numeroQuestoes),
+            numero_questoes: needQtd ? parseInt(numeroQuestoes, 10) : 0,
             turmas: turmasProfessor
         });
     });
@@ -1388,7 +1484,9 @@ function salvarBloco(event) {
     const turmasIds = Array.from(turmasCheckboxes).map(cb => parseInt(cb.value));
     const turmasBlocoSet = new Set(turmasIds);
     if (professoresInvalidos) {
-        alert('Preencha professor, matéria e número de questões para todos os professores adicionados');
+        alert(needQtd
+            ? 'Preencha professor, matéria e número de questões para todos os professores adicionados'
+            : 'Preencha professor e matéria para todos os professores adicionados');
         return;
     }
     if (turmasProfessorInvalidas) {

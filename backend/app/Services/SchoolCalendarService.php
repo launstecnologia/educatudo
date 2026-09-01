@@ -123,6 +123,103 @@ class SchoolCalendarService
         $this->db->query("DELETE FROM calendario_letivo_eventos WHERE id = :id", ['id' => $eventoId]);
     }
 
+    public function tabelaEscolarExiste(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch("SHOW TABLES LIKE 'school_calendar_events'");
+            $cache = $row !== false && !empty($row);
+        } catch (Throwable $e) {
+            $cache = false;
+        }
+        return $cache;
+    }
+
+    /**
+     * Replica o evento letivo no calendário escolar (app da família) e notifica os responsáveis.
+     *
+     * @return int ID do evento escolar criado, ou 0 se não foi possível publicar
+     */
+    public function publicarNoCalendarioEscolar(
+        string $titulo,
+        string $inicio,
+        string $fim,
+        string $tipo,
+        string $local = '',
+        int $autorId = 0
+    ): int {
+        if (!$this->tabelaEscolarExiste() || $titulo === '' || $inicio === '') {
+            return 0;
+        }
+        $mapaCategoria = [
+            'feriado'   => 'feriado',
+            'avaliacao' => 'prova',
+            'recesso'   => 'evento',
+            'reposicao' => 'evento',
+            'evento'    => 'evento',
+            'suspensao' => 'evento',
+        ];
+        $categoria = $mapaCategoria[$tipo] ?? 'evento';
+        $prioridade = in_array($tipo, ['feriado', 'suspensao'], true) ? 'importante' : 'normal';
+        if ($fim === '' || $fim < $inicio) {
+            $fim = $inicio;
+        }
+        $inicioEm = $inicio . ' 00:00:00';
+        $fimEm = $fim . ' 23:59:59';
+        try {
+            $id = (int) $this->db->insert(
+                "INSERT INTO school_calendar_events
+                    (titulo, descricao, categoria, prioridade, local, inicio_em, fim_em, dia_inteiro, publico, status, criado_por, published_at)
+                 VALUES (:title, :description, :category, :priority, :location, :starts, :ends, 1, 'todos', 'publicado', :author, NOW())",
+                [
+                    'title'       => mb_substr($titulo, 0, 255),
+                    'description' => $titulo,
+                    'category'    => $categoria,
+                    'priority'    => $prioridade,
+                    'location'    => $local !== '' ? mb_substr($local, 0, 255) : null,
+                    'starts'      => $inicioEm,
+                    'ends'        => $fimEm,
+                    'author'      => max(0, $autorId),
+                ]
+            );
+        } catch (Throwable $e) {
+            error_log('Calendário letivo: falha ao publicar no calendário escolar: ' . $e->getMessage());
+            return 0;
+        }
+        if ($id <= 0) {
+            return 0;
+        }
+        $this->notificarResponsaveisCalendarioEscolar($id, $titulo, $inicio, $autorId);
+        return $id;
+    }
+
+    private function notificarResponsaveisCalendarioEscolar(int $eventoId, string $titulo, string $inicio, int $autorId): void
+    {
+        try {
+            require_once __DIR__ . '/SchoolCommunicationService.php';
+            $comunicacao = new SchoolCommunicationService($this->db);
+            $pais = $comunicacao->parentIds('todos');
+            if ($pais === []) {
+                return;
+            }
+            $quando = DateTime::createFromFormat('Y-m-d', $inicio);
+            $dataFmt = $quando ? $quando->format('d/m/Y') : $inicio;
+            $comunicacao->push(
+                $pais,
+                'Novo evento: ' . $titulo,
+                $dataFmt,
+                '/calendar-events/' . $eventoId,
+                ['type' => 'calendar_event', 'event_id' => (string) $eventoId],
+                $autorId
+            );
+        } catch (Throwable $e) {
+            error_log('Calendário letivo: falha ao notificar responsáveis do evento escolar #' . $eventoId . ': ' . $e->getMessage());
+        }
+    }
+
     /**
      * Situação do ano vigente (ou null se não configurado).
      *

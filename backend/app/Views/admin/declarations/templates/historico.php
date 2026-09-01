@@ -12,6 +12,10 @@ $historico = is_array($dados['historico'] ?? null) ? $dados['historico'] : [];
 $logoData = (string) ($logo_data ?? '');
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 
+if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+    require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
+}
+
 $nomeUnidade = trim((string) ($unidade['razao_social'] ?? '')) ?: trim((string) ($unidade['nome'] ?? ''));
 if ($nomeUnidade === '') {
     $nomeUnidade = 'Instituição de Ensino';
@@ -171,7 +175,10 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
                     $linhas = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
                     $decimalPlaces = ((int) ($ev['decimal_places'] ?? 2) === 1) ? 1 : 2;
                     if ($cols === [] || $linhas === []) { continue; }
-                    $groupedHeader = $buildGroupedBoletimHeader($cols);
+                    $exibirEmEv = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
+                    $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
+                        ? $buildGroupedBoletimHeader($cols)
+                        : ['enabled' => false, 'groups' => []];
                     ?>
                     <table class="boletim">
                         <thead>

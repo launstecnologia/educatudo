@@ -36,6 +36,7 @@ class SchoolCalendarController extends AdminBaseController
             'eventos' => $eventos,
             'status' => $status,
             'schema_pronto' => $service->tableExists(),
+            'pode_publicar_escolar' => $this->podePublicarCalendarioEscolar($service),
             'csrf_token' => $this->generateCsrfToken(),
         ]);
     }
@@ -79,9 +80,22 @@ class SchoolCalendarController extends AdminBaseController
             $service->salvarAno($ano, 200, 800, '');
             $cfg = $service->getAno($ano);
         }
+        if (!$cfg) {
+            $this->setFlashMessage('Não foi possível preparar o calendário do ano.', 'error');
+            $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+            return;
+        }
         $inicio = $this->sanitizeDate((string) ($_POST['data_inicio'] ?? ''));
         $fim = $this->sanitizeDate((string) ($_POST['data_fim'] ?? '')) ?: $inicio;
         $descricao = trim((string) ($_POST['descricao'] ?? ''));
+        $tipo = (string) ($_POST['tipo'] ?? 'feriado');
+        $tiposValidos = ['feriado', 'recesso', 'reposicao', 'evento', 'suspensao', 'avaliacao'];
+        if (!in_array($tipo, $tiposValidos, true)) {
+            $tipo = 'feriado';
+        }
+        $local = trim((string) ($_POST['local_evento'] ?? ''));
+        $publicarEscolar = !empty($_POST['publicar_calendario_escolar']) && $this->podePublicarCalendarioEscolar($service);
+        $visivelPais = (isset($_POST['visivel_pais']) || $publicarEscolar) ? 1 : 0;
         if ($inicio === '' || $descricao === '') {
             $this->setFlashMessage('Informe data e descrição do evento.', 'error');
             $this->redirect('/admin/calendario-letivo?ano=' . $ano);
@@ -91,15 +105,31 @@ class SchoolCalendarController extends AdminBaseController
             (int) $cfg['id'],
             $inicio,
             $fim,
-            (string) ($_POST['tipo'] ?? 'feriado'),
+            $tipo,
             $descricao,
             trim((string) ($_POST['link_reuniao'] ?? '')),
-            trim((string) ($_POST['local_evento'] ?? '')),
+            $local,
             isset($_POST['visivel_aluno']) ? 1 : 0,
             isset($_POST['visivel_professor']) ? 1 : 0,
-            isset($_POST['visivel_pais']) ? 1 : 0,
+            $visivelPais,
         );
-        $this->setFlashMessage('Evento adicionado ao calendário.', 'success');
+        $msg = 'Evento adicionado ao calendário letivo.';
+        $escolarId = 0;
+        if ($publicarEscolar) {
+            $user = $this->auth->getUser();
+            $escolarId = $service->publicarNoCalendarioEscolar(
+                $descricao,
+                $inicio,
+                $fim,
+                $tipo,
+                $local,
+                (int) ($user['id'] ?? 0)
+            );
+            $msg = $escolarId > 0
+                ? 'Evento adicionado ao calendário letivo e publicado no calendário escolar. Os responsáveis foram notificados.'
+                : 'Evento adicionado ao calendário letivo. Não foi possível publicar no calendário escolar.';
+        }
+        $this->setFlashMessage($msg, $publicarEscolar && $escolarId <= 0 ? 'error' : 'success');
         $this->redirect('/admin/calendario-letivo?ano=' . $ano);
     }
 
@@ -124,6 +154,21 @@ class SchoolCalendarController extends AdminBaseController
         $raw = trim($raw);
         $dt = DateTime::createFromFormat('Y-m-d', $raw);
         return ($dt && $dt->format('Y-m-d') === $raw) ? $raw : '';
+    }
+
+    private function podePublicarCalendarioEscolar(SchoolCalendarService $service): bool
+    {
+        if (!$service->tabelaEscolarExiste()) {
+            return false;
+        }
+        if (class_exists('LayoutHelper') && !LayoutHelper::isModuleEnabled('calendario_escolar')) {
+            return false;
+        }
+        if (!class_exists('AdminPermissionMatrix')) {
+            require_once __DIR__ . '/../../Core/AdminPermissionMatrix.php';
+        }
+        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $this->auth->getUser() ?? []);
+        return AdminPermissionMatrix::can($permissions, 'calendario_escolar', 'cadastrar');
     }
 }
 }

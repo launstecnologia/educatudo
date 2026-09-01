@@ -23,6 +23,15 @@ class BoletimQuadroLayoutHelper
     }
 
     /**
+     * Evento de Notas (exibir_em=notas) usa as colunas na ordem da construção.
+     * O cabeçalho 1º–4º BIMESTRE / OUTROS / FINAL vale só para o boletim oficial.
+     */
+    public static function deveAgruparCabecalhoBoletimOficial(string $exibirEm): bool
+    {
+        return strtolower(trim($exibirEm)) !== 'notas';
+    }
+
+    /**
      * @param list<array<string,mixed>> $cols
      */
     public static function ehLayoutQuadro(array $cols): bool

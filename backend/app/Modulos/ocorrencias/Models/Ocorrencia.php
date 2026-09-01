@@ -175,6 +175,13 @@ class Ocorrencia
             );
         }
 
+        if ($this->colunaExiste('testemunhas') && array_key_exists('testemunhas', $data)) {
+            $this->db->update(
+                "UPDATE alunos_ocorrencias SET testemunhas = :testemunhas WHERE id = :id",
+                ['testemunhas' => $data['testemunhas'] !== '' && $data['testemunhas'] !== null ? $data['testemunhas'] : null, 'id' => $id]
+            );
+        }
+
         foreach ($alunoIds as $alunoId) {
             $this->db->insert(
                 "INSERT INTO alunos_ocorrencias_itens (ocorrencia_id, aluno_id, created_at)
@@ -507,5 +514,57 @@ class Ocorrencia
     private function tabelaExiste(string $tabela): bool
     {
         return $this->db->tableExists($tabela);
+    }
+
+    public function schemaAnexos(): bool
+    {
+        return $this->tabelaExiste('ocorrencias_anexos');
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarAnexos(int $ocorrenciaId): array
+    {
+        if ($ocorrenciaId <= 0 || !$this->tabelaExiste('ocorrencias_anexos')) {
+            return [];
+        }
+        return $this->db->fetchAll(
+            "SELECT id, ocorrencia_id, nome, mime, tamanho, created_at
+             FROM ocorrencias_anexos
+             WHERE ocorrencia_id = :id
+             ORDER BY id ASC",
+            ['id' => $ocorrenciaId]
+        ) ?: [];
+    }
+
+    public function findAnexo(int $ocorrenciaId, int $anexoId): ?array
+    {
+        if ($ocorrenciaId <= 0 || $anexoId <= 0 || !$this->tabelaExiste('ocorrencias_anexos')) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            "SELECT * FROM ocorrencias_anexos WHERE id = :id AND ocorrencia_id = :ocorrencia_id LIMIT 1",
+            ['id' => $anexoId, 'ocorrencia_id' => $ocorrenciaId]
+        );
+        return $row ?: null;
+    }
+
+    public function inserirAnexo(int $ocorrenciaId, string $nome, string $caminho, string $mime, int $tamanho): int
+    {
+        if (!$this->schemaAnexos()) {
+            return 0;
+        }
+        return (int) $this->db->insert(
+            "INSERT INTO ocorrencias_anexos (ocorrencia_id, nome, caminho, mime, tamanho)
+             VALUES (:ocorrencia_id, :nome, :caminho, :mime, :tamanho)",
+            [
+                'ocorrencia_id' => $ocorrenciaId,
+                'nome' => mb_substr($nome, 0, 255),
+                'caminho' => mb_substr($caminho, 0, 500),
+                'mime' => mb_substr($mime, 0, 100),
+                'tamanho' => $tamanho,
+            ]
+        );
     }
 }

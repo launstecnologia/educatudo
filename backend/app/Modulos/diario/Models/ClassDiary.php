@@ -517,10 +517,14 @@ class ClassDiary
         $start = new DateTime($inicio);
         $end = new DateTime($fim);
         if ($end < $start) return [];
-        if ((int) $start->diff($end)->days > 62) $end = (clone $start)->modify('+62 days');
+        if ((int) $start->diff($end)->days > 100) $end = (clone $start)->modify('+100 days');
+        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'));
         $out = [];
         for ($date = clone $start; $date <= $end; $date->modify('+1 day')) {
             $data = $date->format('Y-m-d');
+            if (isset($naoLetivos[$data])) {
+                continue;
+            }
             $params = ['dia_semana' => (int) $date->format('N'), 'data_aula' => $data];
             $profSql = '';
             $turmaSql = '';
@@ -590,16 +594,12 @@ class ClassDiary
         }
         $today = new DateTime(date('Y-m-d'));
         $endAteHoje = $end < $today ? $end : $today;
+        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'));
 
-        // Contagem de cada dia da semana (ISO 1..7) no período total e até hoje.
-        $weekdaysTotal = [];
-        $weekdaysAteHoje = [];
-        for ($iso = 1; $iso <= 7; $iso++) {
-            $weekdaysTotal[$iso] = $this->countWeekday($start, $end, $iso);
-            $weekdaysAteHoje[$iso] = ($endAteHoje >= $start)
-                ? $this->countWeekday($start, $endAteHoje, $iso)
-                : 0;
-        }
+        $weekdaysTotal = $this->contarDiasLetivosPorIso($start, $end, $naoLetivos);
+        $weekdaysAteHoje = ($endAteHoje >= $start)
+            ? $this->contarDiasLetivosPorIso($start, $endAteHoje, $naoLetivos)
+            : [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0];
 
         $params = [];
         $profSql = '';
@@ -740,6 +740,7 @@ class ClassDiary
             $end = (clone $start)->modify('+200 days');
         }
         $today = new DateTime(date('Y-m-d'));
+        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'));
 
         $placeholders = implode(',', array_fill(0, count($gradeIds), '?'));
         $registradas = $this->db->fetchAll(
@@ -765,6 +766,9 @@ class ClassDiary
                 }
                 $data = $date->format('Y-m-d');
                 $registro = $porGradeData[(int) $g['id'] . '|' . $data] ?? null;
+                if (!$registro && isset($naoLetivos[$data])) {
+                    continue;
+                }
                 if ($registro) {
                     $status = (string) $registro['status'];
                     $situacao = $status === 'finalizada' ? 'finalizada' : ($status === 'cancelada' ? 'nao_realizada' : 'rascunho');
@@ -1063,25 +1067,66 @@ class ClassDiary
     }
 
     /**
-     * Número de ocorrências de um dia da semana (ISO 1=segunda..7=domingo)
-     * dentro do intervalo [start, end] (inclusivo), sem iterar dia a dia.
+     * Datas de feriado, recesso ou suspensão no intervalo (inclusive).
+     *
+     * @return array<string,true> mapa Y-m-d => true
      */
-    private function countWeekday(DateTime $start, DateTime $end, int $iso): int
+    private function datasNaoLetivas(string $inicio, string $fim): array
     {
-        if ($end < $start) {
-            return 0;
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT e.data_inicio, e.data_fim
+                 FROM calendario_letivo_eventos e
+                 INNER JOIN calendario_letivo c ON c.id = e.calendario_id
+                 WHERE e.tipo IN ('feriado','recesso','suspensao')
+                   AND e.data_inicio <= :fim
+                   AND e.data_fim >= :inicio",
+                ['inicio' => $inicio, 'fim' => $fim]
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
         }
-        $totalDays = (int) $start->diff($end)->days + 1;
-        $count = intdiv($totalDays, 7);
-        $rem = $totalDays % 7;
-        $startIso = (int) $start->format('N');
-        for ($i = 0; $i < $rem; $i++) {
-            $w = (($startIso - 1 + $i) % 7) + 1;
-            if ($w === $iso) {
-                $count++;
+        $out = [];
+        foreach ($rows as $row) {
+            try {
+                $d = new DateTime((string) ($row['data_inicio'] ?? ''));
+                $limite = new DateTime((string) ($row['data_fim'] ?? ''));
+            } catch (Throwable $e) {
+                continue;
+            }
+            if ($limite < $d) {
+                continue;
+            }
+            for (; $d <= $limite; $d->modify('+1 day')) {
+                $key = $d->format('Y-m-d');
+                if ($key < $inicio || $key > $fim) {
+                    continue;
+                }
+                $out[$key] = true;
             }
         }
-        return $count;
+        return $out;
+    }
+
+    /**
+     * @param array<string,true> $naoLetivos
+     * @return array<int,int> ISO 1..7 => quantidade de dias letivos
+     */
+    private function contarDiasLetivosPorIso(DateTime $start, DateTime $end, array $naoLetivos): array
+    {
+        $weekdays = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0];
+        if ($end < $start) {
+            return $weekdays;
+        }
+        for ($d = clone $start; $d <= $end; $d->modify('+1 day')) {
+            $key = $d->format('Y-m-d');
+            if (isset($naoLetivos[$key])) {
+                continue;
+            }
+            $iso = (int) $d->format('N');
+            $weekdays[$iso]++;
+        }
+        return $weekdays;
     }
 
     private function minutosEntre(string $de, string $ate): int

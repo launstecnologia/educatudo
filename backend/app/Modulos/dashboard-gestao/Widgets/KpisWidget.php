@@ -54,14 +54,6 @@ class KpisWidget implements WidgetDashboard
                     'iconClass' => 'bg-blue-50 text-blue-600',
                 ],
                 [
-                    'label' => 'Professores ativos',
-                    'valor' => $this->consulta->contarProfessoresAtivos($filtro),
-                    'href' => '/admin/teachers',
-                    'icon' => 'fa-user-tie',
-                    'valueClass' => 'text-gray-900',
-                    'iconClass' => 'bg-violet-50 text-violet-600',
-                ],
-                [
                     'label' => 'Frequência geral',
                     'valor' => $freq,
                     'sufixo' => $freq === null ? '' : '%',
@@ -70,7 +62,6 @@ class KpisWidget implements WidgetDashboard
                     'icon' => 'fa-clipboard-check',
                     'valueClass' => 'text-green-700',
                     'iconClass' => 'bg-green-50 text-green-600',
-                    'nota' => 'Fonte: Diário de Classe (aulas finalizadas). Presente + atraso sobre o total de registros.',
                 ],
             ],
         ];

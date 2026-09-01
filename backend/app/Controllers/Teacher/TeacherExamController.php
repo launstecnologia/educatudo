@@ -1709,10 +1709,12 @@ class TeacherExamController extends BaseController
         }
 
         $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
-        $materiaIdFiltro = (int) ($_GET['materia_id'] ?? 0);
-        if ($notaUnicaTodasMaterias) {
-            $materiaIdFiltro = 0;
-        }
+        $filtros = $this->filtrosLancamentoNotasCoordenacao($_GET);
+        $materiaIdFiltro = $notaUnicaTodasMaterias ? 0 : $filtros['materia_id'];
+        $turmaIdFiltro = $filtros['turma_id'];
+        $serieIdFiltro = $filtros['serie_id'];
+        $ordenarFiltro = $filtros['ordenar'];
+        $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
 
         $materiasFiltro = [];
@@ -1742,7 +1744,7 @@ class TeacherExamController extends BaseController
 
         $linhas = [];
         foreach ($combos as $combo) {
-            $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids']);
+            $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], $anoLetivoEvento);
             foreach ($alunos as $al) {
                 $tid = (int) ($al['turma_id'] ?? 0);
                 $aid = (int) ($al['id'] ?? 0);
@@ -1758,6 +1760,10 @@ class TeacherExamController extends BaseController
                     'materia_nome' => $combo['materia_nome'],
                     'turma_id' => $tid,
                     'turma_nome' => (string) ($al['turma_nome'] ?? ''),
+                    'serie_id' => (int) ($al['serie_id'] ?? 0),
+                    'serie_nome' => (string) ($al['serie_nome'] ?? ''),
+                    'numero_chamada' => (int) ($al['numero_chamada'] ?? 0),
+                    'sexo' => (string) ($al['sexo'] ?? ''),
                     'aluno_id' => $aid,
                     'aluno_nome' => (string) ($al['nome'] ?? ''),
                     'nota' => $ant['nota'],
@@ -1765,16 +1771,6 @@ class TeacherExamController extends BaseController
                 ];
             }
         }
-
-        usort($linhas, static function (array $a, array $b): int {
-            $cmp = strcmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
-            if ($cmp !== 0) return $cmp;
-            $cmp = strcmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
-            if ($cmp !== 0) return $cmp;
-            $cmp = strcmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
-            if ($cmp !== 0) return $cmp;
-            return strcmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
-        });
 
         if ($notaUnicaTodasMaterias) {
             $linhasUnicas = [];
@@ -1799,28 +1795,36 @@ class TeacherExamController extends BaseController
                 }
             }
             $linhas = array_values($linhasUnicas);
-            usort($linhas, static function (array $a, array $b): int {
-                $cmp = strcmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
-                if ($cmp !== 0) return $cmp;
-                return strcmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
-            });
         }
 
-        $combosDestinoImportacao = [];
-        foreach ($combos as $combo) {
-            $pidImport = (int) ($combo['professor_id'] ?? 0);
-            $midImport = (int) ($combo['materia_id'] ?? 0);
-            if ($pidImport > 0 && $midImport > 0) {
-                $combosDestinoImportacao[$pidImport . '_' . $midImport] = true;
+        $turmasFiltro = [];
+        $seriesFiltro = [];
+        foreach ($linhas as $ln) {
+            $tidOpt = (int) ($ln['turma_id'] ?? 0);
+            if ($tidOpt > 0) {
+                $turmasFiltro[$tidOpt] = (string) ($ln['turma_nome'] ?? ('Turma #' . $tidOpt));
+            }
+            $sidOpt = (int) ($ln['serie_id'] ?? 0);
+            if ($sidOpt > 0) {
+                $seriesFiltro[$sidOpt] = (string) ($ln['serie_nome'] ?? ('Série #' . $sidOpt));
             }
         }
-        $fontesImportacao = array_values(array_filter(
-            $notasModel->fetchFontesImportacao($blocoId),
-            static function (array $fonte) use ($combosDestinoImportacao): bool {
-                $key = (int) ($fonte['professor_id'] ?? 0) . '_' . (int) ($fonte['materia_id'] ?? 0);
-                return !empty($combosDestinoImportacao[$key]);
-            }
-        ));
+        asort($turmasFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+        asort($seriesFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+
+        if ($turmaIdFiltro > 0 || $serieIdFiltro > 0) {
+            $linhas = array_values(array_filter($linhas, static function (array $ln) use ($turmaIdFiltro, $serieIdFiltro): bool {
+                if ($turmaIdFiltro > 0 && (int) ($ln['turma_id'] ?? 0) !== $turmaIdFiltro) {
+                    return false;
+                }
+                if ($serieIdFiltro > 0 && (int) ($ln['serie_id'] ?? 0) !== $serieIdFiltro) {
+                    return false;
+                }
+                return true;
+            }));
+        }
+
+        $linhas = $this->ordenarLinhasLancamentoCoordenacao($linhas, $ordenarFiltro, $notaUnicaTodasMaterias);
 
         $this->viewWithLayout('admin', 'admin/exams/blocks/lancar_notas_coordenacao', [
             'title' => 'Lançar notas (coordenação) — ' . ($bloco['titulo'] ?? 'Evento'),
@@ -1828,8 +1832,12 @@ class TeacherExamController extends BaseController
             'bloco' => $bloco,
             'linhas' => $linhas,
             'materias_filtro' => $materiasFiltro,
+            'turmas_filtro' => $turmasFiltro,
+            'series_filtro' => $seriesFiltro,
             'materia_id_filtro' => $materiaIdFiltro,
-            'fontes_importacao_notas' => $fontesImportacao,
+            'turma_id_filtro' => $turmaIdFiltro,
+            'serie_id_filtro' => $serieIdFiltro,
+            'ordenar_filtro' => $ordenarFiltro,
             'csrf_token' => $this->generateCsrfToken(),
             'flash' => $this->getFlashMessage(),
             'current_page' => 'provas_blocos',
@@ -1867,17 +1875,21 @@ class TeacherExamController extends BaseController
         }
 
         $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
-        $materiaIdFiltro = (int) ($_POST['materia_id_filtro'] ?? 0);
-        if ($notaUnicaTodasMaterias) {
-            $materiaIdFiltro = 0;
-        }
+        $filtros = $this->filtrosLancamentoNotasCoordenacao($_POST);
+        $materiaIdFiltro = $notaUnicaTodasMaterias ? 0 : $filtros['materia_id'];
+        $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, [
+            'materia_id' => $materiaIdFiltro,
+            'turma_id' => $filtros['turma_id'],
+            'serie_id' => $filtros['serie_id'],
+            'ordenar' => $filtros['ordenar'],
+        ]);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
 
         require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
         $notasModel = new ExamBlockManualGrade();
         if (!$notasModel->tableExists()) {
             $this->setFlashMessage('Tabela de notas ainda não existe. Execute a migração SQL no banco.', 'error');
-            $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+            $this->redirect($urlVolta);
             return;
         }
 
@@ -1899,7 +1911,7 @@ class TeacherExamController extends BaseController
                 if ($pid <= 0 || $mid <= 0) {
                     continue;
                 }
-                $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids']);
+                $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], (int) ($bloco['ano_letivo'] ?? 0));
                 foreach ($alunos as $al) {
                     $tid = (int) ($al['turma_id'] ?? 0);
                     $aid = (int) ($al['id'] ?? 0);
@@ -1916,13 +1928,13 @@ class TeacherExamController extends BaseController
                     if ($valorStr !== '') {
                         if (!is_numeric($valorStr)) {
                             $this->setFlashMessage('Nota inválida para um ou mais alunos.', 'error');
-                            $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+                            $this->redirect($urlVolta);
                             return;
                         }
                         $nf = (float) $valorStr;
                         if ($nf < 0 || $nf > 10) {
                             $this->setFlashMessage('Notas devem estar entre 0 e 10.', 'error');
-                            $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+                            $this->redirect($urlVolta);
                             return;
                         }
                         $notaVal = round($nf, 2);
@@ -1940,7 +1952,7 @@ class TeacherExamController extends BaseController
                 if ($pid <= 0 || $mid <= 0) {
                     continue;
                 }
-                $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids']);
+                $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], (int) ($bloco['ano_letivo'] ?? 0));
                 $linhas = [];
                 foreach ($alunos as $al) {
                     $tid = (int) ($al['turma_id'] ?? 0);
@@ -1959,7 +1971,7 @@ class TeacherExamController extends BaseController
             }
 
             $this->setFlashMessage('Notas salvas e replicadas para todas as matérias do evento.', 'success');
-            $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+            $this->redirect($urlVolta);
             return;
         }
 
@@ -1969,7 +1981,7 @@ class TeacherExamController extends BaseController
             if ($pid <= 0 || $mid <= 0) {
                 continue;
             }
-            $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids']);
+            $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], (int) ($bloco['ano_letivo'] ?? 0));
             $linhas = [];
             foreach ($alunos as $al) {
                 $tid = (int) ($al['turma_id'] ?? 0);
@@ -1977,20 +1989,25 @@ class TeacherExamController extends BaseController
                 if ($tid <= 0 || $aid <= 0) {
                     continue;
                 }
-                $valorRaw = $notasPost[$pid][$mid][$tid][$aid] ?? '';
+                $temNotaPost = isset($notasPost[$pid][$mid][$tid][$aid]);
+                $temObsPost = isset($obsPost[$pid][$mid][$tid][$aid]);
+                if (!$temNotaPost && !$temObsPost) {
+                    continue;
+                }
+                $valorRaw = $temNotaPost ? $notasPost[$pid][$mid][$tid][$aid] : '';
                 $obs = isset($obsPost[$pid][$mid][$tid][$aid]) ? (string) $obsPost[$pid][$mid][$tid][$aid] : '';
                 $valorStr = is_string($valorRaw) ? trim(str_replace(',', '.', $valorRaw)) : '';
                 $notaVal = null;
                 if ($valorStr !== '') {
                     if (!is_numeric($valorStr)) {
                         $this->setFlashMessage('Nota inválida para um ou mais alunos.', 'error');
-                        $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+                        $this->redirect($urlVolta);
                         return;
                     }
                     $nf = (float) $valorStr;
                     if ($nf < 0 || $nf > 10) {
                         $this->setFlashMessage('Notas devem estar entre 0 e 10.', 'error');
-                        $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+                        $this->redirect($urlVolta);
                         return;
                     }
                     $notaVal = round($nf, 2);
@@ -2006,7 +2023,7 @@ class TeacherExamController extends BaseController
         }
 
         $this->setFlashMessage('Notas salvas com sucesso.', 'success');
-        $this->redirect('/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao?materia_id=' . $materiaIdFiltro);
+        $this->redirect($urlVolta);
     }
 
     /**
@@ -2049,7 +2066,7 @@ class TeacherExamController extends BaseController
      * @param array<int, int> $turmaIds
      * @return list<array<string,mixed>>
      */
-    private function alunosAtivosPorTurmas(array $turmaIds): array
+    private function alunosAtivosPorTurmas(array $turmaIds, int $anoLetivoEvento = 0): array
     {
         $turmaIds = array_values(array_filter(array_map('intval', $turmaIds), static function (int $id): bool {
             return $id > 0;
@@ -2058,20 +2075,38 @@ class TeacherExamController extends BaseController
             return [];
         }
         $placeholders = implode(',', array_fill(0, count($turmaIds), '?'));
+        $params = $turmaIds;
 
-        $temMatricula = false;
-        try {
-            $temMatricula = $this->db->fetch("SHOW TABLES LIKE 'matricula'") !== false;
-        } catch (\Throwable $e) {
-            $temMatricula = false;
+        $temSexo = $this->alunosTemColuna('sexo');
+        $sexoSelect = $temSexo ? 'a.sexo' : 'NULL AS sexo';
+
+        $temChamada = $this->tabelaTenantExiste('alunos_turma_chamada');
+
+        $chamadaSelect = 'NULL AS numero_chamada';
+        $chamadaJoin = '';
+        if ($temChamada) {
+            $chamadaSelect = 'c.numero_chamada';
+            $chamadaJoin = "LEFT JOIN alunos_turma_chamada c ON c.aluno_id = a.id AND c.turma_id = t.id
+                   AND c.ano_letivo_id = COALESCE(
+                     (SELECT al.id FROM ano_letivo al
+                      WHERE al.ano = IF(? > 0, ?, t.ano_letivo)
+                      ORDER BY al.id DESC LIMIT 1),
+                     (SELECT al2.id FROM ano_letivo al2 ORDER BY al2.ano DESC LIMIT 1)
+                   )";
+            $params = array_merge([$anoLetivoEvento, $anoLetivoEvento], $turmaIds);
         }
 
+        $temSerie = $this->tabelaTenantExiste('serie');
+        $serieSelect = $temSerie ? 't.serie_id, s.nome AS serie_nome' : 'NULL AS serie_id, NULL AS serie_nome';
+        $serieJoin = $temSerie ? 'LEFT JOIN serie s ON s.id = t.serie_id' : '';
+        $campos = "a.id, a.nome, t.id AS turma_id, t.nome AS turma_nome,
+                    {$serieSelect}, {$sexoSelect}, {$chamadaSelect}";
+
+        $temMatricula = $this->tabelaTenantExiste('matricula');
+
         if ($temMatricula) {
-            // Inclui alunos com turma principal E alunos vinculados por matrícula
-            // (turmas extra/paralelas). O turma_id retornado é sempre a turma do
-            // combo (t.id), não a turma principal do cadastro do aluno.
             $rows = $this->db->fetchAll(
-                "SELECT DISTINCT a.id, a.nome, t.id AS turma_id, t.nome AS turma_nome
+                "SELECT DISTINCT {$campos}
                  FROM turmas t
                  INNER JOIN alunos a ON (
                      a.turma_id = t.id
@@ -2083,24 +2118,164 @@ class TeacherExamController extends BaseController
                            AND m.data_saida IS NULL
                      )
                  )
+                 {$serieJoin}
+                 {$chamadaJoin}
                  WHERE t.id IN ($placeholders)
                    AND (a.ativo = 1 OR a.ativo IS NULL)
                  ORDER BY t.nome ASC, a.nome ASC",
-                $turmaIds
+                $params
             );
             return is_array($rows) ? $rows : [];
         }
 
         $rows = $this->db->fetchAll(
-            "SELECT a.id, a.nome, a.turma_id, t.nome AS turma_nome
+            "SELECT {$campos}
              FROM alunos a
              INNER JOIN turmas t ON t.id = a.turma_id
-             WHERE a.turma_id IN ($placeholders)
+             {$serieJoin}
+             {$chamadaJoin}
+             WHERE t.id IN ($placeholders)
                AND (a.ativo = 1 OR a.ativo IS NULL)
              ORDER BY t.nome ASC, a.nome ASC",
-            $turmaIds
+            $params
         );
         return is_array($rows) ? $rows : [];
+    }
+
+    private function alunosTemColuna(string $coluna): bool
+    {
+        static $cache = [];
+        if (array_key_exists($coluna, $cache)) {
+            return $cache[$coluna];
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c',
+                ['t' => 'alunos', 'c' => $coluna]
+            );
+            $cache[$coluna] = ((int) ($row['n'] ?? 0)) > 0;
+        } catch (\Throwable $e) {
+            $cache[$coluna] = false;
+        }
+        return $cache[$coluna];
+    }
+
+    private function tabelaTenantExiste(string $tabela): bool
+    {
+        static $cache = [];
+        if (array_key_exists($tabela, $cache)) {
+            return $cache[$tabela];
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t',
+                ['t' => $tabela]
+            );
+            $cache[$tabela] = ((int) ($row['n'] ?? 0)) > 0;
+        } catch (\Throwable $e) {
+            $cache[$tabela] = false;
+        }
+        return $cache[$tabela];
+    }
+
+    /**
+     * @param array<string, mixed> $origem
+     * @return array{materia_id:int,turma_id:int,serie_id:int,ordenar:string}
+     */
+    private function filtrosLancamentoNotasCoordenacao(array $origem): array
+    {
+        $materiaId = (int) ($origem['materia_id'] ?? $origem['materia_id_filtro'] ?? 0);
+        $turmaId = (int) ($origem['turma_id'] ?? $origem['turma_id_filtro'] ?? 0);
+        $serieId = (int) ($origem['serie_id'] ?? $origem['serie_id_filtro'] ?? 0);
+        $ordenar = (string) ($origem['ordenar'] ?? $origem['ordenar_filtro'] ?? 'nome');
+        if (!in_array($ordenar, ['nome', 'chamada', 'sexo'], true)) {
+            $ordenar = 'nome';
+        }
+        return [
+            'materia_id' => max(0, $materiaId),
+            'turma_id' => max(0, $turmaId),
+            'serie_id' => max(0, $serieId),
+            'ordenar' => $ordenar,
+        ];
+    }
+
+    /**
+     * @param array{materia_id?:int,turma_id?:int,serie_id?:int,ordenar?:string} $filtros
+     */
+    private function urlLancamentoNotasCoordenacao(int $blocoId, array $filtros = []): string
+    {
+        $qs = http_build_query(array_filter([
+            'materia_id' => !empty($filtros['materia_id']) ? (int) $filtros['materia_id'] : null,
+            'turma_id' => !empty($filtros['turma_id']) ? (int) $filtros['turma_id'] : null,
+            'serie_id' => !empty($filtros['serie_id']) ? (int) $filtros['serie_id'] : null,
+            'ordenar' => (($filtros['ordenar'] ?? 'nome') !== 'nome') ? (string) $filtros['ordenar'] : null,
+        ], static function ($v) {
+            return $v !== null && $v !== '';
+        }));
+        $path = '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
+        return $qs !== '' ? $path . '?' . $qs : $path;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function ordenarLinhasLancamentoCoordenacao(array $linhas, string $ordenar, bool $notaUnica): array
+    {
+        $sexoOrdem = ['F' => 0, 'M' => 1, 'N' => 2];
+        usort($linhas, static function (array $a, array $b) use ($ordenar, $notaUnica, $sexoOrdem): int {
+            if (!$notaUnica) {
+                $cmp = strcmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                $cmp = strcmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+            }
+
+            $cmpTurma = strcasecmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
+            $cmpNome = strcasecmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
+
+            if ($ordenar === 'chamada') {
+                if ($cmpTurma !== 0) {
+                    return $cmpTurma;
+                }
+                $na = (int) ($a['numero_chamada'] ?? 0);
+                $nb = (int) ($b['numero_chamada'] ?? 0);
+                if ($na !== $nb) {
+                    if ($na <= 0) {
+                        return 1;
+                    }
+                    if ($nb <= 0) {
+                        return -1;
+                    }
+                    return $na <=> $nb;
+                }
+                return $cmpNome;
+            }
+
+            if ($ordenar === 'sexo') {
+                $oa = $sexoOrdem[strtoupper((string) ($a['sexo'] ?? ''))] ?? 9;
+                $ob = $sexoOrdem[strtoupper((string) ($b['sexo'] ?? ''))] ?? 9;
+                if ($oa !== $ob) {
+                    return $oa <=> $ob;
+                }
+                if ($cmpTurma !== 0) {
+                    return $cmpTurma;
+                }
+                return $cmpNome;
+            }
+
+            if ($cmpTurma !== 0) {
+                return $cmpTurma;
+            }
+            return $cmpNome;
+        });
+        return $linhas;
     }
 
     /**

@@ -21,6 +21,7 @@ class SchoolCommunicationController extends BaseController
 
     public function index(): void
     {
+        $flash = $this->getFlashMessage();
         $items = $this->db->fetchAll(
             "SELECT c.*,
                 (SELECT COUNT(*) FROM school_communication_reads r WHERE r.communication_id=c.id) read_count,
@@ -30,17 +31,15 @@ class SchoolCommunicationController extends BaseController
         );
         $this->viewWithLayout('admin', 'admin/school-communication/index', [
             'title' => 'Comunicação Escolar', 'page_title' => 'Comunicação Escolar', 'user' => $this->auth->getUser(),
-            'items' => $items, 'current_page' => 'school-communication', 'csrf_token' => $this->generateCsrfToken(),
+            'items' => $items, 'classes' => $this->classes(), 'students' => $this->students(),
+            'current_page' => 'school-communication', 'csrf_token' => $this->generateCsrfToken(),
+            'flash_message' => $flash['message'], 'flash_type' => $flash['type'],
         ]);
     }
 
     public function create(): void
     {
-        $this->viewWithLayout('admin', 'admin/school-communication/form', [
-            'title' => 'Nova comunicação', 'page_title' => 'Nova comunicação', 'user' => $this->auth->getUser(),
-            'classes' => $this->classes(), 'students' => $this->students(), 'current_page' => 'school-communication',
-            'csrf_token' => $this->generateCsrfToken(),
-        ]);
+        $this->redirect(URL . '/admin/comunicacao-escolar?novo=1');
     }
 
     public function store(): void
@@ -52,10 +51,19 @@ class SchoolCommunicationController extends BaseController
         $priority = (string)($_POST['prioridade'] ?? 'normal');
         $classIds = $this->ids($_POST['turmas'] ?? []);
         $studentIds = $this->ids($_POST['alunos'] ?? []);
-        if ($title === '' || $content === '') $this->back('Título e conteúdo são obrigatórios.');
+        if ($title === '' || $content === '') {
+            $this->setFlashMessage('Título e conteúdo são obrigatórios.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar?novo=1');
+        }
         if (!in_array($audience, ['todos','turmas','alunos'], true)) $audience = 'todos';
-        if ($audience === 'turmas' && $classIds === []) $this->back('Selecione ao menos uma turma.');
-        if ($audience === 'alunos' && $studentIds === []) $this->back('Selecione ao menos um aluno.');
+        if ($audience === 'turmas' && $classIds === []) {
+            $this->setFlashMessage('Selecione ao menos uma turma.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar?novo=1');
+        }
+        if ($audience === 'alunos' && $studentIds === []) {
+            $this->setFlashMessage('Selecione ao menos um aluno.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar?novo=1');
+        }
         if (!in_array($priority, ['normal','importante','urgente'], true)) $priority = 'normal';
         $user = $this->auth->getUser();
         $id = (int)$this->db->insert(
@@ -112,36 +120,57 @@ class SchoolCommunicationController extends BaseController
 
     public function calendar(): void
     {
+        $flash = $this->getFlashMessage();
         $events = $this->db->fetchAll('SELECT * FROM school_calendar_events ORDER BY inicio_em DESC LIMIT 300');
         $this->viewWithLayout('admin', 'admin/school-calendar/index', [
             'title'=>'Calendário escolar','page_title'=>'Calendário escolar','user'=>$this->auth->getUser(),'events'=>$events,
+            'classes'=>$this->classes(),'students'=>$this->students(),
             'current_page'=>'school-calendar','csrf_token'=>$this->generateCsrfToken(),
+            'flash_message'=>$flash['message'],'flash_type'=>$flash['type'],
         ]);
     }
 
     public function calendarEdit($id): void
     {
-        $event=$this->db->fetch('SELECT * FROM school_calendar_events WHERE id=:id',['id'=>(int)$id]);
-        if(!$event)$this->redirect(URL.'/admin/calendario-escolar');
-        $selectedClasses=array_map('intval',array_column($this->db->fetchAll('SELECT turma_id FROM school_calendar_event_classes WHERE event_id=:id',['id'=>(int)$id]),'turma_id'));
-        $selectedStudents=array_map('intval',array_column($this->db->fetchAll('SELECT aluno_id FROM school_calendar_event_students WHERE event_id=:id',['id'=>(int)$id]),'aluno_id'));
-        $this->viewWithLayout('admin','admin/school-calendar/form',[
-            'title'=>'Editar evento','page_title'=>'Editar evento','user'=>$this->auth->getUser(),'classes'=>$this->classes(),'students'=>$this->students(),
-            'event'=>$event,'selectedClasses'=>$selectedClasses,'selectedStudents'=>$selectedStudents,'current_page'=>'school-calendar','csrf_token'=>$this->generateCsrfToken(),
-        ]);
+        $this->redirect(URL.'/admin/calendario-escolar?evento='.(int)$id);
     }
 
     public function calendarCreate(): void
     {
-        $this->viewWithLayout('admin', 'admin/school-calendar/form', [
-            'title'=>'Novo evento','page_title'=>'Novo evento','user'=>$this->auth->getUser(),'classes'=>$this->classes(),'students'=>$this->students(),
-            'event'=>null, 'selectedClasses'=>[], 'selectedStudents'=>[], 'current_page'=>'school-calendar','csrf_token'=>$this->generateCsrfToken(),
+        $this->redirect(URL.'/admin/calendario-escolar?novo=1');
+    }
+
+    public function calendarDados($id): void
+    {
+        $event = $this->db->fetch('SELECT * FROM school_calendar_events WHERE id=:id', ['id'=>(int)$id]);
+        if (!$event) {
+            $this->json(['success'=>false,'error'=>'Evento não encontrado.'], 404);
+            return;
+        }
+        $turmas = array_map('intval', array_column($this->db->fetchAll('SELECT turma_id FROM school_calendar_event_classes WHERE event_id=:id', ['id'=>(int)$id]), 'turma_id'));
+        $alunos = array_map('intval', array_column($this->db->fetchAll('SELECT aluno_id FROM school_calendar_event_students WHERE event_id=:id', ['id'=>(int)$id]), 'aluno_id'));
+        $this->json([
+            'success' => true,
+            'item' => [
+                'id' => (int) $event['id'],
+                'titulo' => (string) ($event['titulo'] ?? ''),
+                'descricao' => (string) ($event['descricao'] ?? ''),
+                'categoria' => (string) ($event['categoria'] ?? 'evento'),
+                'prioridade' => (string) ($event['prioridade'] ?? 'normal'),
+                'local' => (string) ($event['local'] ?? ''),
+                'inicio_em' => $this->datetimeLocalValue($event['inicio_em'] ?? null),
+                'fim_em' => $this->datetimeLocalValue($event['fim_em'] ?? null),
+                'dia_inteiro' => !empty($event['dia_inteiro']) ? 1 : 0,
+                'publico' => (string) ($event['publico'] ?? 'todos'),
+                'turmas' => $turmas,
+                'alunos' => $alunos,
+            ],
         ]);
     }
 
     public function calendarStore(): void
     {
-        $this->csrf();
+        $this->csrf(URL.'/admin/calendario-escolar');
         $title = trim((string)($_POST['titulo'] ?? ''));
         $starts = $this->nullableDateTime($_POST['inicio_em'] ?? null);
         $audience = (string)($_POST['publico'] ?? 'todos');
@@ -169,7 +198,7 @@ class SchoolCommunicationController extends BaseController
 
     public function calendarCancel($id): void
     {
-        $this->csrf();
+        $this->csrf(URL.'/admin/calendario-escolar');
         $event=$this->db->fetch('SELECT * FROM school_calendar_events WHERE id=:id',['id'=>(int)$id]);
         if(!$event)$this->redirect(URL.'/admin/calendario-escolar');
         $this->db->update("UPDATE school_calendar_events SET status='cancelado' WHERE id=:id",['id'=>(int)$id]);
@@ -184,7 +213,7 @@ class SchoolCommunicationController extends BaseController
 
     public function calendarUpdate($id): void
     {
-        $this->csrf();
+        $this->csrf(URL.'/admin/calendario-escolar');
         $event=$this->db->fetch('SELECT * FROM school_calendar_events WHERE id=:id',['id'=>(int)$id]);
         if(!$event)$this->redirect(URL.'/admin/calendario-escolar');
         $title=trim((string)($_POST['titulo']??'')); $starts=$this->nullableDateTime($_POST['inicio_em']??null); $audience=(string)($_POST['publico']??'todos');
@@ -213,6 +242,15 @@ class SchoolCommunicationController extends BaseController
     private function ids($values): array { return array_values(array_unique(array_filter(array_map('intval', is_array($values)?$values:[])))); }
     private function nullableDateTime($value): ?string { $value=trim((string)$value); if($value==='')return null; $time=strtotime($value); return $time===false?null:date('Y-m-d H:i:s',$time); }
     private function plainSummary(string $html): string { $text=trim(preg_replace('/\s+/u',' ',strip_tags($html))); return mb_strlen($text)>160?mb_substr($text,0,157).'...':$text; }
-    private function csrf(): void { if(!$this->verifyCsrfToken($_POST['_token']??'')){ $this->setFlashMessage('Sessão expirada. Tente novamente.','error'); $this->redirect(URL.'/admin/comunicacao-escolar'); } }
+    private function datetimeLocalValue($value): string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return '';
+        }
+        $time = strtotime($value);
+        return $time === false ? '' : date('Y-m-d\TH:i', $time);
+    }
+    private function csrf(?string $fallback = null): void { if(!$this->verifyCsrfToken($_POST['_token']??'')){ $this->setFlashMessage('Sessão expirada. Tente novamente.','error'); $this->redirect($fallback ?? (URL.'/admin/comunicacao-escolar')); } }
     private function back(string $message): void { $this->setFlashMessage($message,'error'); $this->redirect($_SERVER['HTTP_REFERER']??(URL.'/admin/comunicacao-escolar')); }
 }
