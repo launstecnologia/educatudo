@@ -286,8 +286,8 @@ class VidaEscolar
             $vigenteSql = '';
         }
         $rows = $this->db->fetchAll(
-            "SELECT g.id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
-                    g.periodo_ref, r.exibir_em, r.bimestre, r.ano_letivo
+            "SELECT g.id, g.regra_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
+                    g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}
@@ -320,8 +320,8 @@ class VidaEscolar
             $ph[] = ':' . $k;
             $params[$k] = $id;
         }
-        $sql = "SELECT g.id, g.aluno_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
-                    g.periodo_ref, r.exibir_em, r.bimestre, r.ano_letivo
+        $sql = "SELECT g.id, g.aluno_id, g.regra_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
+                    g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}";
@@ -499,6 +499,50 @@ class VidaEscolar
                 $params
             );
         }
+    }
+
+    /**
+     * config_json dos blocos das regras que geraram boletim oficial deste aluno no ano.
+     * Usado para reproduzir group_line (ex.: Língua Portuguesa) na ficha.
+     *
+     * @return list<string>
+     */
+    public function listarConfigJsonGruposLinhaDoAluno(int $alunoId, int $anoLetivo): array
+    {
+        if ($alunoId <= 0 || $anoLetivo <= 0 || !$this->temTabelaResultadosGerados()) {
+            return [];
+        }
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'boletim_componentes'");
+            if (!$tem) {
+                return [];
+            }
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $vigenteSql = $this->sqlFiltroVigenteResultados();
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT c.config_json
+             FROM boletim_componentes c
+             INNER JOIN boletim_resultados_gerados g ON g.regra_id = c.regra_id
+             INNER JOIN boletim_regras r ON r.id = c.regra_id
+             WHERE g.aluno_id = :aid
+               AND g.preview = 0
+               {$vigenteSql}
+               AND (r.ano_letivo = :ano OR r.ano_letivo IS NULL OR r.ano_letivo = 0)
+               AND c.config_json IS NOT NULL
+               AND c.config_json <> ''",
+            ['aid' => $alunoId, 'ano' => $anoLetivo]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $raw = trim((string) ($row['config_json'] ?? ''));
+            if ($raw !== '') {
+                $out[] = $raw;
+            }
+        }
+
+        return $out;
     }
 
     private function temTabelaResultadosGerados(): bool

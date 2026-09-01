@@ -24,6 +24,8 @@ class VidaEscolarService
     private array $regraAcadCache = [];
     /** @var array<string, array<string, int>> alunoId_materiaId => faltas, chave ano:bimestre */
     private array $faltasLancadasCache = [];
+    /** @var array<string, list<array{label:string,materias_ids:list<int>}>> */
+    private array $gruposLinhaCache = [];
 
     public function __construct(?VidaEscolar $model = null)
     {
@@ -156,9 +158,19 @@ class VidaEscolarService
             $lid = (int) $c['linha_id'];
             $porLinha[$lid][(int) $c['periodo_numero']] = $c;
         }
+        $idsOcultos = $this->materiaIdsOcultosPorAgrupamento(
+            (int) ($ficha['aluno_id'] ?? 0),
+            (int) ($ficha['ano_letivo'] ?? 0),
+            $linhas,
+            $porLinha
+        );
         $grid = [];
         foreach ($linhas as $l) {
             $lid = (int) $l['id'];
+            $mid = (int) ($l['materia_id'] ?? 0);
+            if ($mid > 0 && isset($idsOcultos[$mid])) {
+                continue;
+            }
             $grid[] = [
                 'linha' => $l,
                 'celulas' => $porLinha[$lid] ?? [],
@@ -471,10 +483,23 @@ class VidaEscolarService
                 continue;
             }
             $mid = (int) ($row['materia_id'] ?? 0);
-            $nome = mb_strtolower(trim((string) ($row['materia_nome'] ?? '')));
-            $linha = ($mid > 0 ? ($porId[$mid] ?? null) : null) ?? ($porNome[$nome] ?? null);
+            $nomeExibir = trim((string) ($row['materia_nome'] ?? ''));
+            $linha = $this->resolverLinhaFichaParaResultado(
+                (int) $fichaId,
+                $mid,
+                $nomeExibir,
+                $porId,
+                $porNome,
+                $linhas,
+                $alunoId,
+                $ano,
+                (int) ($row['ordem_linha'] ?? 0)
+            );
             if (!$linha) {
                 continue;
+            }
+            if ((int) ($linha['id'] ?? 0) > 0 && !$this->linhaEstaNaLista($linhas, (int) $linha['id'])) {
+                $linhas[] = $linha;
             }
             $linhaId = (int) $linha['id'];
             $periodosGerados = $this->periodosDaLinhaGerada($row);
@@ -490,7 +515,7 @@ class VidaEscolarService
                     continue;
                 }
                 $faltas = $vals['faltas'] ?? null;
-                if ($faltas === null) {
+                if ($faltas === null && $mid > 0) {
                     $faltas = $this->faltasLancadasAlunoMateria($alunoId, $mid, $periodo, $ano);
                 }
                 if ($this->aplicarCelulaCalculada(
@@ -633,12 +658,32 @@ class VidaEscolarService
                         continue;
                     }
                     $mid = (int) ($row['materia_id'] ?? 0);
-                    $nome = mb_strtolower(trim((string) ($row['materia_nome'] ?? '')));
-                    $linha = ($mid > 0 ? ($porId[$mid] ?? null) : null) ?? ($porNome[$nome] ?? null);
+                    $nomeExibir = trim((string) ($row['materia_nome'] ?? ''));
+                    $linha = $this->resolverLinhaFichaParaResultado(
+                        $fid,
+                        $mid,
+                        $nomeExibir,
+                        $porId,
+                        $porNome,
+                        $linhas,
+                        $aid,
+                        (int) $ano,
+                        (int) ($row['ordem_linha'] ?? 0)
+                    );
                     if (!$linha) {
                         continue;
                     }
-                    $linhaId = (int) $linha['id'];
+                    $linhaId = (int) ($linha['id'] ?? 0);
+                    if ($linhaId <= 0) {
+                        continue;
+                    }
+                    if (!$this->linhaEstaNaLista($linhas, $linhaId)) {
+                        $linhas[] = $linha;
+                        $linhasPorFicha[$fid][] = $linha;
+                        foreach ($this->model->listarCelulasPorLinhas([$linhaId]) as $chaveCelNova => $celNova) {
+                            $celulas[$chaveCelNova] = $celNova;
+                        }
+                    }
                     $periodosGerados = $this->periodosDaLinhaGerada($row);
                     $bimRow = (int) ($row['bimestre'] ?? 0);
                     if ($bimRow < 1 || $bimRow > 4) {
@@ -653,7 +698,7 @@ class VidaEscolarService
                             continue;
                         }
                         $faltas = $vals['faltas'] ?? null;
-                        if ($faltas === null) {
+                        if ($faltas === null && $mid > 0) {
                             $faltas = $this->faltasLancadasAlunoMateria($aid, $mid, $periodo, (int) $ano);
                         }
                         $chaveCel = $linhaId . ':' . $periodo;
@@ -1508,6 +1553,289 @@ class VidaEscolarService
             return 'Cursando';
         }
         return 'Aprovado';
+    }
+
+    /**
+     * Encaixa a linha do boletim gerado na ficha. Linha agrupada (group_line,
+     * materia_id nulo) é criada com o nome do grupo (ex.: Língua Portuguesa).
+     *
+     * @param array<int, array<string,mixed>> $porId
+     * @param array<string, array<string,mixed>> $porNome
+     * @param list<array<string,mixed>> $linhasExistentes
+     * @return array<string,mixed>|null
+     */
+    private function resolverLinhaFichaParaResultado(
+        int $fichaId,
+        int $materiaId,
+        string $materiaNome,
+        array &$porId,
+        array &$porNome,
+        array $linhasExistentes,
+        int $alunoId = 0,
+        int $anoLetivo = 0,
+        int $ordemGerada = 0
+    ): ?array {
+        $nomeKey = mb_strtolower(trim($materiaNome));
+        $linha = ($materiaId > 0 ? ($porId[$materiaId] ?? null) : null);
+        if (!$linha && $nomeKey !== '') {
+            $linha = $porNome[$nomeKey] ?? null;
+        }
+        if ($linha) {
+            return $linha;
+        }
+        $nomeExibir = trim($materiaNome);
+        if ($fichaId <= 0 || $nomeExibir === '') {
+            return null;
+        }
+        $ordemMax = 0;
+        $ordemGrupo = null;
+        $filhosGrupo = [];
+        if ($materiaId <= 0 && $alunoId > 0 && $anoLetivo > 0 && $nomeKey !== '') {
+            foreach ($this->gruposLinhaDoAluno($alunoId, $anoLetivo) as $g) {
+                if (mb_strtolower(trim((string) ($g['label'] ?? ''))) === $nomeKey) {
+                    $filhosGrupo = array_fill_keys(array_map('intval', (array) ($g['materias_ids'] ?? [])), true);
+                    break;
+                }
+            }
+        }
+        foreach ($linhasExistentes as $ln) {
+            if (!is_array($ln)) {
+                continue;
+            }
+            $ordemLn = (int) ($ln['ordem'] ?? 0);
+            $ordemMax = max($ordemMax, $ordemLn);
+            $midLn = (int) ($ln['materia_id'] ?? 0);
+            if ($midLn > 0 && isset($filhosGrupo[$midLn])) {
+                $ordemGrupo = $ordemGrupo === null ? $ordemLn : min($ordemGrupo, $ordemLn);
+            }
+        }
+        foreach ($porNome as $ln) {
+            if (!is_array($ln)) {
+                continue;
+            }
+            $ordemMax = max($ordemMax, (int) ($ln['ordem'] ?? 0));
+        }
+        if ($ordemGrupo !== null) {
+            $ordem = $ordemGrupo;
+        } elseif ($ordemGerada > 0) {
+            $ordem = $ordemGerada;
+        } else {
+            $ordem = $ordemMax + 1;
+        }
+        $nova = $this->criarLinhaFichaCompleta(
+            $fichaId,
+            $materiaId > 0 ? $materiaId : null,
+            $nomeExibir,
+            $ordem
+        );
+        if (!$nova) {
+            return null;
+        }
+        if ($materiaId > 0) {
+            $porId[$materiaId] = $nova;
+        }
+        if ($nomeKey !== '') {
+            $porNome[$nomeKey] = $nova;
+        }
+
+        return $nova;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function criarLinhaFichaCompleta(int $fichaId, ?int $materiaId, string $nome, int $ordem): ?array
+    {
+        $nome = trim($nome);
+        if ($fichaId <= 0 || $nome === '') {
+            return null;
+        }
+        $linhaId = $this->model->criarLinha([
+            'ficha_id' => $fichaId,
+            'materia_id' => ($materiaId !== null && $materiaId > 0) ? $materiaId : null,
+            'componente_nome' => $nome,
+            'carga_horaria' => null,
+            'ordem' => $ordem,
+        ]);
+        if ($linhaId <= 0) {
+            return null;
+        }
+        foreach ([1, 2, 3, 4, 0] as $periodo) {
+            $this->model->criarCelula([
+                'linha_id' => $linhaId,
+                'periodo_numero' => $periodo,
+                'origem' => 'vazia',
+                'status' => 'aberta',
+            ]);
+        }
+
+        return $this->model->findLinha($linhaId);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     */
+    private function linhaEstaNaLista(array $linhas, int $linhaId): bool
+    {
+        if ($linhaId <= 0) {
+            return false;
+        }
+        foreach ($linhas as $ln) {
+            if (is_array($ln) && (int) ($ln['id'] ?? 0) === $linhaId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Filhos do group_line (ex.: Literatura) somem do quadro quando a linha
+     * agrupada já existe na ficha e o filho não tem lançamento próprio.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @param array<int, array<int, array<string,mixed>>> $porLinha
+     * @return array<int, true>
+     */
+    private function materiaIdsOcultosPorAgrupamento(
+        int $alunoId,
+        int $anoLetivo,
+        array $linhas,
+        array $porLinha
+    ): array {
+        if ($alunoId <= 0 || $anoLetivo <= 0) {
+            return [];
+        }
+        $grupos = $this->gruposLinhaDoAluno($alunoId, $anoLetivo);
+        if ($grupos === []) {
+            return [];
+        }
+        $nomesNaFicha = [];
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $n = mb_strtolower(trim((string) ($l['componente_nome'] ?? '')));
+            if ($n !== '') {
+                $nomesNaFicha[$n] = true;
+            }
+        }
+        $ocultar = [];
+        foreach ($grupos as $g) {
+            $label = mb_strtolower(trim((string) ($g['label'] ?? '')));
+            if ($label === '' || !isset($nomesNaFicha[$label])) {
+                continue;
+            }
+            foreach ((array) ($g['materias_ids'] ?? []) as $mid) {
+                $mid = (int) $mid;
+                if ($mid > 0) {
+                    $ocultar[$mid] = true;
+                }
+            }
+        }
+        if ($ocultar === []) {
+            return [];
+        }
+        $out = [];
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $mid = (int) ($l['materia_id'] ?? 0);
+            if ($mid <= 0 || !isset($ocultar[$mid])) {
+                continue;
+            }
+            $lid = (int) ($l['id'] ?? 0);
+            if ($this->celulasLinhaTemValor($porLinha[$lid] ?? [])) {
+                continue;
+            }
+            $out[$mid] = true;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array{label:string,materias_ids:list<int>}>
+     */
+    private function gruposLinhaDoAluno(int $alunoId, int $anoLetivo): array
+    {
+        $cacheKey = $alunoId . ':' . $anoLetivo;
+        if (isset($this->gruposLinhaCache[$cacheKey])) {
+            return $this->gruposLinhaCache[$cacheKey];
+        }
+        $out = [];
+        $vistos = [];
+        foreach ($this->model->listarConfigJsonGruposLinhaDoAluno($alunoId, $anoLetivo) as $raw) {
+            $grp = $this->parseGroupLineConfigJson($raw);
+            if ($grp === null) {
+                continue;
+            }
+            $chave = mb_strtolower($grp['label']) . ':' . implode(',', $grp['materias_ids']);
+            if (isset($vistos[$chave])) {
+                continue;
+            }
+            $vistos[$chave] = true;
+            $out[] = $grp;
+        }
+        $this->gruposLinhaCache[$cacheKey] = $out;
+
+        return $out;
+    }
+
+    /**
+     * @return array{label:string,materias_ids:list<int>}|null
+     */
+    private function parseGroupLineConfigJson(string $raw): ?array
+    {
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $grp = $decoded['group_line'] ?? null;
+        if (!is_array($grp) || empty($grp['enabled'])) {
+            return null;
+        }
+        $label = trim((string) ($grp['label'] ?? $grp['nome'] ?? ''));
+        if ($label === '') {
+            $label = trim((string) ($grp['key'] ?? ''));
+        }
+        $ids = [];
+        foreach ((array) ($grp['materias_ids'] ?? []) as $v) {
+            $id = (int) $v;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        if ($label === '' || $ids === []) {
+            return null;
+        }
+
+        return ['label' => $label, 'materias_ids' => $ids];
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $celulas
+     */
+    private function celulasLinhaTemValor(array $celulas): bool
+    {
+        foreach ($celulas as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if (($c['nota'] ?? null) !== null && $c['nota'] !== '') {
+                return true;
+            }
+            if (trim((string) ($c['conceito'] ?? '')) !== '') {
+                return true;
+            }
+            if (($c['faltas'] ?? null) !== null && $c['faltas'] !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function notaOuNull($v): ?float

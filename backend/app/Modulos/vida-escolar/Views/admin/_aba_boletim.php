@@ -118,7 +118,7 @@ $fmtNota = static function ($c): string {
                                 <form id="<?= $esc($formId) ?>" method="post" action="<?= $base ?>/celula/<?= (int) $c['id'] ?>"></form>
                                 <input type="hidden" form="<?= $esc($formId) ?>" name="_token" value="<?= $esc($token) ?>">
                                 <span class="inline-flex items-center justify-center gap-1">
-                                    <input form="<?= $esc($formId) ?>" name="nota" value="<?= $c['nota'] !== null && $c['nota'] !== '' ? $esc($c['nota']) : '' ?>" class="w-14 h-8 border border-gray-300 rounded-md px-1 text-center text-sm tabular-nums" placeholder="—">
+                                    <input form="<?= $esc($formId) ?>" name="nota" value="<?= $c['nota'] !== null && $c['nota'] !== '' ? $esc(number_format((float) $c['nota'], 1, ',', '')) : '' ?>" class="w-14 h-8 border border-gray-300 rounded-md px-1 text-center text-sm tabular-nums" placeholder="—">
                                     <?php if ($origem === 'externa'): ?><sup class="text-violet-700">¹</sup><?php endif; ?>
                                     <button type="submit" form="<?= $esc($formId) ?>" class="text-indigo-600 hover:text-indigo-800 p-0.5" title="Salvar" aria-label="Salvar">
                                         <i class="fa-solid fa-check text-xs"></i>
