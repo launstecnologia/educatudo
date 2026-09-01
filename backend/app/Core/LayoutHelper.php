@@ -750,7 +750,36 @@ class LayoutHelper
     {
         return self::get('system_subtitle', 'Sistema Educacional');
     }
-    
+
+    /**
+     * Primeiro nome em title case (DIOGO → Diogo). Usado na saudação do portal do aluno.
+     */
+    public static function primeiroNome(string $nomeCompleto): string
+    {
+        $nomeCompleto = trim(preg_replace('/\s+/u', ' ', $nomeCompleto) ?? '');
+        if ($nomeCompleto === '') {
+            return '';
+        }
+        $partes = preg_split('/\s+/u', $nomeCompleto, 2) ?: [];
+        $primeiro = trim((string) ($partes[0] ?? ''));
+        if ($primeiro === '') {
+            return '';
+        }
+        return mb_convert_case($primeiro, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    /**
+     * Saudação curta para o card do aluno: "Olá, Diogo!".
+     */
+    public static function saudacaoPrimeiroNome(?string $nomeCompleto, string $fallback = 'Aluno'): string
+    {
+        $primeiro = self::primeiroNome((string) $nomeCompleto);
+        if ($primeiro === '') {
+            $primeiro = $fallback;
+        }
+        return 'Olá, ' . $primeiro . '!';
+    }
+
     /**
      * Obter nome da IA (chat)
      */

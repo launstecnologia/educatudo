@@ -567,8 +567,8 @@
                             <span class="text-white font-semibold text-sm"><?= strtoupper(substr($user['nome'] ?? 'Aluno', 0, 2)) ?></span>
                         <?php endif; ?>
                     </div>
-                    <div class="sidebar-text-container">
-                        <p id="sidebar-user-name" class="text-sm font-medium text-white sidebar-text"><?= htmlspecialchars($user['nome'] ?? '') ?></p>
+                    <div class="sidebar-text-container min-w-0">
+                        <p id="sidebar-user-name" class="text-sm font-medium text-white sidebar-text truncate"><?= htmlspecialchars(LayoutHelper::saudacaoPrimeiroNome($user['nome'] ?? '')) ?></p>
                         <p class="text-xs text-purple-100 sidebar-text">Aluno</p>
                     </div>
                 </div>
@@ -1481,7 +1481,7 @@
                     </button>
                     <div class="flex-1 min-w-0">
                         <h1 class="text-lg md:text-2xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_title ?? 'Portal do Aluno') ?></h1>
-                        <p class="text-xs md:text-sm text-gray-600 truncate">Bem-vindo, <?= htmlspecialchars($user['nome'] ?? 'Aluno') ?>!</p>
+                        <p class="text-xs md:text-sm text-gray-600 truncate"><?= htmlspecialchars(LayoutHelper::saudacaoPrimeiroNome($user['nome'] ?? 'Aluno')) ?></p>
                     </div>
                     <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
                         <div class="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
@@ -2776,14 +2776,17 @@
             var el = document.querySelector('header p.text-gray-600, header .truncate');
             if (!el) return '';
             var t = (el.textContent || '').trim();
-            // "Bem-vindo, NOME!" → NOME
-            var m = t.match(/Bem-vindo,\s*(.+?)!?\s*$/i);
+            // "Olá, Nome!" ou legado "Bem-vindo, NOME!"
+            var m = t.match(/^(?:Olá|Bem-vindo),\s*(.+?)!?\s*$/i);
             return m ? m[1].trim() : '';
         }
 
         function sidebarName() {
             var el = document.getElementById('sidebar-user-name');
-            return el ? (el.textContent || '').trim() : '';
+            if (!el) return '';
+            var t = (el.textContent || '').trim();
+            var m = t.match(/^(?:Olá|Bem-vindo),\s*(.+?)!?\s*$/i);
+            return m ? m[1].trim() : t;
         }
 
         function ensureIdentityConsistent() {
