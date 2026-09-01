@@ -4425,6 +4425,13 @@ class BoletimConfigController extends BaseController
         $materiasComFormulaPropria = [];
         $nextVirtualMid = -1;
         $calcCfgByCode = [];
+        $codigosFaltas = [];
+        foreach ($componentesRegra as $compF) {
+            $codF = trim((string) ($compF['codigo'] ?? ''));
+            if ($codF !== '' && $this->componenteContaComoFalta($compF)) {
+                $codigosFaltas[$codF] = true;
+            }
+        }
 
         foreach ($componentesRegra as $comp) {
             $codigo = trim((string) ($comp['codigo'] ?? ''));
@@ -4499,6 +4506,28 @@ class BoletimConfigController extends BaseController
             $groupKeysAtivos[(string) $gk] = true;
         }
 
+        foreach ($matrizPorCodigo as $codigoScan => $mapScan) {
+            if (!is_array($mapScan)) {
+                continue;
+            }
+            $grupoScan = $componentGroupByCode[$codigoScan] ?? null;
+            $idsGrupoScan = is_array($grupoScan)
+                ? array_fill_keys(array_map('intval', (array) ($grupoScan['materias_ids'] ?? [])), true)
+                : [];
+            foreach ($mapScan as $midScan => $valorScan) {
+                $midScan = (int) $midScan;
+                if ($midScan <= 0 || !is_numeric($valorScan)) {
+                    continue;
+                }
+                if ($grupoScan !== null && !isset($idsGrupoScan[$midScan])) {
+                    $materiasComValorForaDeGrupo[$midScan] = true;
+                }
+                if (isset($materiasComFormulaPropria[$midScan])) {
+                    $materiasComValorForaDeGrupo[$midScan] = true;
+                }
+            }
+        }
+
         foreach ($matrizPorCodigo as $codigo => $map) {
             if (!is_array($map)) {
                 continue;
@@ -4514,18 +4543,7 @@ class BoletimConfigController extends BaseController
             $idsGrupoDoComponente = is_array($grupoDoComponente)
                 ? array_fill_keys(array_map('intval', (array) ($grupoDoComponente['materias_ids'] ?? [])), true)
                 : [];
-            foreach ($mapOriginal as $midOriginal => $valorOriginal) {
-                $midOriginal = (int) $midOriginal;
-                if ($midOriginal <= 0 || !is_numeric($valorOriginal)) {
-                    continue;
-                }
-                if ($grupoDoComponente !== null && !isset($idsGrupoDoComponente[$midOriginal])) {
-                    $materiasComValorForaDeGrupo[$midOriginal] = true;
-                }
-                if (isset($materiasComFormulaPropria[$midOriginal])) {
-                    $materiasComValorForaDeGrupo[$midOriginal] = true;
-                }
-            }
+            $ehFaltasCol = isset($codigosFaltas[$codigo]);
 
             foreach (array_keys($materiasAgrupadas) as $midRem) {
                 $midRem = (int) $midRem;
@@ -4536,7 +4554,13 @@ class BoletimConfigController extends BaseController
                         isset($materiasComFormulaPropria[$midRem])
                         || ($grupoDoComponente !== null && !isset($idsGrupoDoComponente[$midRem]))
                     );
-                if (!$temValorIndependenteNesteComponente) {
+                if ($ehFaltasCol) {
+                    // Falta da linha visível (ex.: Redação) permanece nela; só some
+                    // a falta das filhas ocultas, que entra na soma do grupo.
+                    if (!$temValorIndependenteNesteComponente && !isset($materiasComValorForaDeGrupo[$midRem])) {
+                        unset($map[$midRem]);
+                    }
+                } elseif (!$temValorIndependenteNesteComponente) {
                     unset($map[$midRem]);
                 }
             }
@@ -4550,6 +4574,10 @@ class BoletimConfigController extends BaseController
                     ? $matrizPercentStatsPorCodigo[$codigo]
                     : [];
                 foreach ($cfg['materias_ids'] as $midSel) {
+                    $midSel = (int) $midSel;
+                    if ($ehFaltasCol && $midSel > 0 && isset($materiasComValorForaDeGrupo[$midSel])) {
+                        continue;
+                    }
                     if (isset($matrizPorCodigo[$codigo][$midSel]) && is_numeric($matrizPorCodigo[$codigo][$midSel])) {
                         $vals[] = (float) $matrizPorCodigo[$codigo][$midSel];
                     }
@@ -4559,7 +4587,9 @@ class BoletimConfigController extends BaseController
                     }
                 }
                 $agr = null;
-                if (!empty($cfg['usar_percentual']) && strtolower((string) $cfg['mode']) === 'media' && $sumQuestoes > 0) {
+                if ($ehFaltasCol) {
+                    $agr = $this->agruparValoresGrupoLinha($vals, 'soma', 0.0);
+                } elseif (!empty($cfg['usar_percentual']) && strtolower((string) $cfg['mode']) === 'media' && $sumQuestoes > 0) {
                     $agr = ($sumAcertos / $sumQuestoes) * 10.0;
                 } else {
                     $divisorCfg = (float) ($cfg['divisor'] ?? 0);
@@ -4639,14 +4669,18 @@ class BoletimConfigController extends BaseController
                     $vals = [];
                     foreach ((array) ($meta['materias_ids'] ?? []) as $midSel) {
                         $midSel = (int) $midSel;
-                        if ($midSel > 0 && isset($mapOriginal[$midSel]) && is_numeric($mapOriginal[$midSel])) {
+                        if ($midSel <= 0 || ($ehFaltasCol && isset($materiasComValorForaDeGrupo[$midSel]))) {
+                            continue;
+                        }
+                        if (isset($mapOriginal[$midSel]) && is_numeric($mapOriginal[$midSel])) {
                             $vals[] = (float) $mapOriginal[$midSel];
                         }
                     }
+                    $modoGrupo = $ehFaltasCol ? 'soma' : (string) ($meta['mode'] ?? 'media');
                     $agr = $this->agruparValoresGrupoLinha(
                         $vals,
-                        (string) ($meta['mode'] ?? 'media'),
-                        strtolower((string) ($meta['mode'] ?? 'media')) === 'media'
+                        $modoGrupo,
+                        ($ehFaltasCol || strtolower((string) ($meta['mode'] ?? 'media')) === 'media')
                             ? 0.0
                             : (float) ($meta['divisor'] ?? 0)
                     );
