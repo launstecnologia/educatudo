@@ -15,9 +15,9 @@ use Exception;
  *      enunciados, alternativas e explicações.
  *   2. Validação estrutural: exatamente 1 alternativa correta, mínimo 2 opções,
  *      sem opções vazias ou textos duplicados.
- *   3. Distribuição balanceada de gabarito: embaralha/distribui a posição da
- *      alternativa correta entre A, B, C, D, E ao longo do lote para evitar
- *      vícios de gabarito (como 100% C) e sincroniza a explicação/gabarito.
+ *   3. Embaralhamento do gabarito: sorteia a posição da alternativa correta
+ *      (e das distratoras) em cada questão, com teto para não viciar numa letra
+ *      só, sem sequência previsível e sem cota fixa que o aluno consiga contar.
  *
  * Contexto esperado (entrada):
  *   - questoes_geradas (array, formato canônico do GeradorQuestaoAgent)
@@ -70,7 +70,7 @@ class ValidadorQuestaoAgent implements AgenteIAInterface
             throw new Exception('ValidadorQuestaoAgent: todas as questões geradas falharam na validação');
         }
 
-        // Garante e valida que a distribuição estatística de gabarito não viole limites (100% PHP)
+        // Embaralha gabarito e distratoras em PHP (sorteio + teto, sem sequência)
         $validas = $this->validarEAssegurarDistribuicaoGabarito($validas);
 
         return $contexto
@@ -119,57 +119,147 @@ class ValidadorQuestaoAgent implements AgenteIAInterface
     }
 
     /**
-     * Valida e assegura que a distribuição de gabarito respeite os limites estatísticos
-     * estritamente em PHP, sem depender do LLM.
+     * Embaralha alternativas (incluindo a correta) em PHP, sem depender do LLM.
+     * Cada questão sorteia a letra do gabarito de forma independente; um teto
+     * evita concentração numa única letra, sem forçar cota exata (o aluno não
+     * consegue contar "faltam duas E") nem sequência 1=A, 2=B, 3=C.
      */
     private function validarEAssegurarDistribuicaoGabarito(array $questoes): array
     {
-        $totalMC = 0;
-        foreach ($questoes as $q) {
-            if (($q['tipo'] ?? '') === 'multipla_escolha' && !empty($q['alternativas'])) {
-                $totalMC++;
+        $indicesMC = [];
+        $totaisAlts = [];
+        foreach ($questoes as $i => $q) {
+            $alternativas = $q['alternativas'] ?? [];
+            if (($q['tipo'] ?? '') === 'multipla_escolha' && is_array($alternativas) && count($alternativas) >= 2) {
+                $indicesMC[] = $i;
+                $totaisAlts[] = count($alternativas);
             }
         }
 
-        if ($totalMC < 2) {
+        $totalMC = count($indicesMC);
+        if ($totalMC === 0) {
             return $questoes;
         }
 
-        // Aplica rotação estrita das alternativas para cada questão de múltipla escolha
-        $ajustadas = [];
-        $mcIdx = 0;
-        foreach ($questoes as $q) {
-            if (($q['tipo'] ?? '') === 'multipla_escolha' && !empty($q['alternativas'])) {
-                $ajustadas[] = $this->balancearAlternativas($q, $mcIdx);
-                $mcIdx++;
-            } else {
-                $ajustadas[] = $q;
-            }
-        }
-        $questoes = $ajustadas;
+        $limiteMaximo = $this->tetoGabaritoPorLetra($totalMC);
+        $posicoesAlvo = $this->sortearPosicoesGabarito($totaisAlts, $limiteMaximo);
 
-        // Validação final de contagem estrita em PHP
-        $gabaritos = [];
-        foreach ($questoes as $q) {
-            if (($q['tipo'] ?? '') === 'multipla_escolha' && !empty($q['alternativas'])) {
-                foreach ($q['alternativas'] as $idx => $alt) {
-                    if (!empty($alt['correta'])) {
-                        $gabaritos[] = self::LETRAS[$idx] ?? 'A';
-                        break;
-                    }
-                }
-            }
-        }
-
-        $limiteMaximo = ($totalMC <= 4) ? 1 : (int) ceil($totalMC / 2.5);
-        $contagem = array_count_values($gabaritos);
-        foreach ($contagem as $letra => $quantidade) {
-            if ($quantidade > $limiteMaximo) {
-                throw new Exception("Distribuição inválida: letra {$letra} aparece {$quantidade} vezes no conjunto (máximo permitido: {$limiteMaximo}).");
-            }
+        foreach ($indicesMC as $mcIdx => $questaoIdx) {
+            $questoes[$questaoIdx] = $this->balancearAlternativas($questoes[$questaoIdx], (int) $posicoesAlvo[$mcIdx]);
         }
 
         return $questoes;
+    }
+
+    /**
+     * Teto por letra: no máximo metade do lote (mínimo 2 em lote maior que 1).
+     * Folga de propósito — cota exata (ex.: 2 de cada) vaza o gabarito no fim.
+     */
+    private function tetoGabaritoPorLetra(int $totalMC): int
+    {
+        if ($totalMC <= 1) {
+            return 1;
+        }
+        return max(2, (int) ceil($totalMC / 2));
+    }
+
+    /**
+     * Sorteia a posição da correta para cada questão. Rejeita o lote inteiro se
+     * alguma letra passar do teto ou se cair na rotação sequencial antiga.
+     *
+     * @param list<int> $totaisAlts
+     * @return list<int>
+     */
+    private function sortearPosicoesGabarito(array $totaisAlts, int $limiteMaximo): array
+    {
+        $n = count($totaisAlts);
+        if ($n === 0) {
+            return [];
+        }
+
+        $maxTentativas = 40;
+        for ($tentativa = 0; $tentativa < $maxTentativas; $tentativa++) {
+            $posicoes = [];
+            $contagem = [];
+            foreach ($totaisAlts as $totalAlts) {
+                $pos = random_int(0, $totalAlts - 1);
+                $posicoes[] = $pos;
+                $contagem[$pos] = ($contagem[$pos] ?? 0) + 1;
+            }
+
+            $estouraTeto = false;
+            foreach ($contagem as $quantidade) {
+                if ($quantidade > $limiteMaximo) {
+                    $estouraTeto = true;
+                    break;
+                }
+            }
+            if ($estouraTeto) {
+                continue;
+            }
+            if ($this->ehRotacaoSequencial($posicoes, $totaisAlts)) {
+                continue;
+            }
+
+            return $posicoes;
+        }
+
+        for ($fallback = 0; $fallback < 10; $fallback++) {
+            $posicoes = $this->sortearPosicoesComTeto($totaisAlts, $limiteMaximo);
+            if (!$this->ehRotacaoSequencial($posicoes, $totaisAlts)) {
+                return $posicoes;
+            }
+        }
+
+        return $posicoes;
+    }
+
+    /**
+     * Fallback raro: sorteia entre letras que ainda cabem no teto (não é cota
+     * mínima — letras pouco usadas podem simplesmente não aparecer).
+     *
+     * @param list<int> $totaisAlts
+     * @return list<int>
+     */
+    private function sortearPosicoesComTeto(array $totaisAlts, int $limiteMaximo): array
+    {
+        $posicoes = [];
+        $contagem = [];
+        foreach ($totaisAlts as $totalAlts) {
+            $candidatos = [];
+            for ($p = 0; $p < $totalAlts; $p++) {
+                if (($contagem[$p] ?? 0) < $limiteMaximo) {
+                    $candidatos[] = $p;
+                }
+            }
+            if ($candidatos === []) {
+                $candidatos = range(0, $totalAlts - 1);
+            }
+            $pos = $candidatos[random_int(0, count($candidatos) - 1)];
+            $posicoes[] = $pos;
+            $contagem[$pos] = ($contagem[$pos] ?? 0) + 1;
+        }
+        return $posicoes;
+    }
+
+    /**
+     * Detecta o padrão antigo Q1=A, Q2=B, Q3=C… (índice % quantidade).
+     *
+     * @param list<int> $posicoes
+     * @param list<int> $totaisAlts
+     */
+    private function ehRotacaoSequencial(array $posicoes, array $totaisAlts): bool
+    {
+        if (count($posicoes) < 3) {
+            return false;
+        }
+        foreach ($posicoes as $i => $pos) {
+            $k = (int) $totaisAlts[$i];
+            if ($k < 1 || $pos !== ($i % $k)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -322,23 +412,21 @@ class ValidadorQuestaoAgent implements AgenteIAInterface
     }
 
     /**
-     * Embaralha as alternativas garantindo que a alternativa correta seja
-     * distribuída de forma equilibrada entre as letras (A, B, C, D, E) no lote,
-     * e remapeia as referências de letras na explicação.
+     * Reordena as alternativas: a correta vai para $posicaoAlvo (sorteada) e
+     * as distratoras ocupam o restante em ordem aleatória. Remapeia a explicação.
      */
-    private function balancearAlternativas(array $questao, int $ordemNoLote): array
+    private function balancearAlternativas(array $questao, int $posicaoAlvo): array
     {
         if (($questao['tipo'] ?? '') !== 'multipla_escolha' || empty($questao['alternativas'])) {
             return $questao;
         }
 
-        $alternativas = $questao['alternativas'];
+        $alternativas = array_values($questao['alternativas']);
         $totalAlts = count($alternativas);
         if ($totalAlts < 2) {
             return $questao;
         }
 
-        // Identifica índice original da alternativa correta
         $indiceCorretaOriginal = -1;
         foreach ($alternativas as $idx => $alt) {
             if (!empty($alt['correta'])) {
@@ -350,17 +438,14 @@ class ValidadorQuestaoAgent implements AgenteIAInterface
             return $questao;
         }
 
-        // Define a posição alvo da correta com base na ordem no lote (ex.: Q0->A, Q1->B, Q2->C, Q3->D, Q4->E...)
-        $posicaoAlvo = $ordemNoLote % $totalAlts;
+        $posicaoAlvo = max(0, min($totalAlts - 1, $posicaoAlvo));
 
-        // Monta os novos índices reordenados
         $indicesIncorretas = [];
         foreach ($alternativas as $idx => $alt) {
             if ($idx !== $indiceCorretaOriginal) {
                 $indicesIncorretas[] = $idx;
             }
         }
-        // Embaralha as incorretas
         shuffle($indicesIncorretas);
 
         $novoMapeamento = [];
