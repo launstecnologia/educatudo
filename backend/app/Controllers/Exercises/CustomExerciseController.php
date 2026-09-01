@@ -1102,6 +1102,50 @@ class CustomExerciseController extends BaseController
             ['lista_id' => $listaId, 'aluno_id' => $user['id']]
         );
 
+        foreach ($sessoes as &$sessaoItem) {
+            $sessaoItem['total_respostas'] = 0;
+            $sessaoItem['corretas'] = 0;
+            $sessaoItem['percentual'] = 0;
+        }
+        unset($sessaoItem);
+
+        if (!empty($sessoes)) {
+            $paramsStats = ['aluno_id' => (int) $user['id']];
+            $placeholders = [];
+            foreach (array_values($sessoes) as $i => $sessaoItem) {
+                $chave = 'sid' . $i;
+                $placeholders[] = ':' . $chave;
+                $paramsStats[$chave] = (int) $sessaoItem['id'];
+            }
+            $statsSessoes = $this->db->fetchAll(
+                "SELECT sessao_id,
+                        COUNT(*) AS total_respostas,
+                        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS corretas
+                 FROM listas_personalizadas_respostas
+                 WHERE aluno_id = :aluno_id
+                   AND sessao_id IN (" . implode(', ', $placeholders) . ")
+                 GROUP BY sessao_id",
+                $paramsStats
+            );
+            $statsPorId = [];
+            foreach ($statsSessoes as $stat) {
+                $statsPorId[(int) $stat['sessao_id']] = $stat;
+            }
+            foreach ($sessoes as &$sessaoItem) {
+                $stat = $statsPorId[(int) $sessaoItem['id']] ?? null;
+                $totalSessao = $stat ? (int) $stat['total_respostas'] : 0;
+                $corretasSessao = $stat ? (int) $stat['corretas'] : 0;
+                $sessaoItem['total_respostas'] = $totalSessao;
+                $sessaoItem['corretas'] = $corretasSessao;
+                $sessaoItem['percentual'] = $totalSessao > 0 ? (int) round(($corretasSessao / $totalSessao) * 100) : 0;
+            }
+            unset($sessaoItem);
+        }
+
+        if ($sessaoId === '' && !empty($sessoes)) {
+            $sessaoId = (string) $sessoes[0]['id'];
+        }
+
         // Se uma sessão específica foi escolhida, buscar seus dados
         $sessao_selecionada = null;
         $questoes_com_respostas = [];
@@ -1132,6 +1176,7 @@ class CustomExerciseController extends BaseController
             'aluno' => $aluno,
             'lista' => $lista,
             'sessoes' => $sessoes,
+            'sessao_id' => $sessaoId,
             'sessao_selecionada' => $sessao_selecionada,
             'questoes' => $questoes_com_respostas,
             'current_page' => 'exercises',

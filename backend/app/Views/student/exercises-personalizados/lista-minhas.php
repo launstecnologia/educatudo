@@ -1,83 +1,96 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-8">
-        <a href="<?= URL ?>/exercicios-personalizados" class="text-purple-600 hover:text-purple-800 flex items-center mb-4">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
+        <a href="<?= URL ?>/exercicios-personalizados" class="text-gray-600 hover:text-gray-900 inline-flex items-center mb-4">
+            <i class="fa-solid fa-arrow-left mr-2"></i>
             Voltar
         </a>
-        <h1 class="text-4xl font-bold text-gray-900 mb-2">Minhas Listas de Exercícios</h1>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Minhas listas de exercícios</h1>
         <p class="text-lg text-gray-600">Gerencie e faça seus exercícios personalizados</p>
     </div>
 
     <div class="mb-6">
         <a href="<?= URL ?>/exercicios-personalizados/criar" class="btn-ai-primary inline-flex items-center px-6 py-3 rounded-xl font-semibold transition-all duration-300">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Criar Nova Lista
+            <i class="fa-solid fa-plus mr-2"></i>
+            Criar nova lista
         </a>
     </div>
 
     <?php if (empty($listas)): ?>
-        <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
-            <svg class="mx-auto h-24 w-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+            <i class="fa-regular fa-folder-open text-5xl text-gray-300"></i>
             <h3 class="mt-4 text-xl font-semibold text-gray-900">Nenhuma lista criada ainda</h3>
             <p class="mt-2 text-gray-600">Comece criando sua primeira lista de exercícios personalizados</p>
-            <a href="<?= URL ?>/exercicios-personalizados/criar" class="btn-ai-primary mt-6 inline-flex items-center px-6 py-3 rounded-xl font-semibold transition-colors">
-                Criar Primeira Lista
+            <a href="<?= URL ?>/exercicios-personalizados/criar" class="btn-ai-primary mt-6 inline-flex items-center px-6 py-3 rounded-xl font-semibold">
+                Criar primeira lista
             </a>
         </div>
     <?php else: ?>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
             <?php foreach ($listas as $lista): ?>
-                <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow flex flex-col h-full min-w-0"
                      <?= $lista['status'] === 'gerando' ? 'data-lista-gerando="' . (int) $lista['id'] . '"' : '' ?>>
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="flex-1">
-                            <h3 class="text-lg font-bold text-gray-900 mb-1"><?= htmlspecialchars($lista['titulo']) ?></h3>
-                            <p class="text-sm text-gray-600"><?= htmlspecialchars($lista['materia']) ?></p>
+                    <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-lg font-bold text-gray-900 leading-snug line-clamp-2 break-words" title="<?= htmlspecialchars($lista['titulo']) ?>">
+                                <?= htmlspecialchars($lista['titulo']) ?>
+                            </h3>
+                            <?php if (!empty($lista['materia'])): ?>
+                                <p class="text-sm text-gray-600 mt-1 truncate"><?= htmlspecialchars($lista['materia']) ?></p>
+                            <?php endif; ?>
                         </div>
-                        <span class="px-3 py-1 text-xs font-semibold rounded-full <?= $lista['status'] === 'concluido' ? 'bg-green-100 text-green-800' : ($lista['status'] === 'gerando' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') ?>">
+                        <span class="flex-shrink-0 px-3 py-1 text-xs font-semibold rounded-full <?= $lista['status'] === 'concluido' ? 'bg-green-100 text-green-800' : ($lista['status'] === 'gerando' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800') ?>">
                             <?php
-                            if ($lista['status'] === 'concluido') echo '✅ Pronta';
-                            elseif ($lista['status'] === 'gerando') echo '⏳ Gerando';
-                            else echo '❌ Erro';
+                            if ($lista['status'] === 'concluido') {
+                                echo '<i class="fa-solid fa-check mr-1"></i>Pronta';
+                            } elseif ($lista['status'] === 'gerando') {
+                                echo '<i class="fa-solid fa-clock mr-1"></i>Gerando';
+                            } else {
+                                echo '<i class="fa-solid fa-xmark mr-1"></i>Erro';
+                            }
                             ?>
                         </span>
                     </div>
 
-                    <div class="flex items-center space-x-4 text-sm text-gray-600 mb-1">
-                        <span>📚 <?= htmlspecialchars($lista['tema']) ?></span>
-                        <span>📊 <?= $lista['total_questoes'] ?> questões</span>
+                    <div class="text-sm text-gray-600 space-y-1 mb-3">
+                        <?php if (!empty($lista['tema'])): ?>
+                            <p class="flex items-start gap-2 min-w-0">
+                                <i class="fa-solid fa-book text-gray-400 mt-0.5 flex-shrink-0"></i>
+                                <span class="line-clamp-1 break-words min-w-0" title="<?= htmlspecialchars($lista['tema']) ?>"><?= htmlspecialchars($lista['tema']) ?></span>
+                            </p>
+                        <?php endif; ?>
+                        <p class="flex items-center gap-2">
+                            <i class="fa-solid fa-list-ol text-gray-400 flex-shrink-0"></i>
+                            <?= (int) $lista['total_questoes'] ?> questões
+                        </p>
                     </div>
-                    <p class="text-xs text-gray-400 mb-1">
+                    <p class="text-xs text-gray-400">
                         Solicitada em <?= !empty($lista['created_at']) ? date('d/m/Y \à\s H:i', strtotime($lista['created_at'])) : '—' ?>
                     </p>
                     <p class="text-xs text-gray-400 mb-4">
                         <?php if ($lista['status'] === 'concluido' && !empty($lista['updated_at'])): ?>
-                        Entregue em <?= date('d/m/Y \à\s H:i', strtotime($lista['updated_at'])) ?>
+                            Entregue em <?= date('d/m/Y \à\s H:i', strtotime($lista['updated_at'])) ?>
+                        <?php else: ?>
+                            &nbsp;
                         <?php endif; ?>
                     </p>
 
+                    <div class="mt-auto space-y-2">
                     <?php if ($lista['status'] === 'concluido'): ?>
-                        <div class="space-y-2">
-                            <button onclick="iniciarExercicio(<?= $lista['id'] ?>); return false;" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-semibold">
-                                🚀 Iniciar Exercício
+                            <button type="button" onclick="iniciarExercicio(<?= (int) $lista['id'] ?>); return false;" class="w-full btn-ai-primary py-2 px-4 rounded-lg font-semibold inline-flex items-center justify-center">
+                                <i class="fa-solid fa-play mr-2"></i>
+                                Iniciar exercício
                             </button>
                             <?php if ($lista['total_sessoes'] > 0): ?>
-                            <a href="<?= URL ?>/exercicios-personalizados/historico?lista_id=<?= $lista['id'] ?>"
-                               class="block w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors font-semibold text-center text-sm">
-                                📚 Ver Histórico
+                            <a href="<?= URL ?>/exercicios-personalizados/historico?lista_id=<?= (int) $lista['id'] ?>"
+                               class="block w-full border border-gray-300 bg-white text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-center text-sm">
+                                <i class="fa-solid fa-clock-rotate-left mr-1"></i>
+                                Ver histórico
                             </a>
                             <?php endif; ?>
-                        </div>
                     <?php elseif ($lista['status'] === 'gerando'): ?>
                         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                            <div class="flex items-center text-sm">
-                                <svg class="animate-spin h-4 w-4 text-yellow-600 mr-2" fill="none" viewBox="0 0 24 24">
+                            <div class="flex items-start text-sm">
+                                <svg class="animate-spin h-4 w-4 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -86,17 +99,20 @@
                         </div>
                     <?php else: ?>
                         <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
-                            <p class="text-xs text-red-800">Ops, não consegui gerar: <?= htmlspecialchars($lista['mensagem_erro'] ?? 'erro desconhecido') ?></p>
+                            <p class="text-xs text-red-800 line-clamp-3" title="<?= htmlspecialchars($lista['mensagem_erro'] ?? 'erro desconhecido') ?>">Ops, não consegui gerar: <?= htmlspecialchars($lista['mensagem_erro'] ?? 'erro desconhecido') ?></p>
                         </div>
-                        <button onclick="tentarNovamente(<?= $lista['id'] ?>, this); return false;" class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm">
-                            🔁 Tentar novamente
+                        <button type="button" onclick="tentarNovamente(<?= (int) $lista['id'] ?>, this); return false;" class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors font-semibold text-sm inline-flex items-center justify-center">
+                            <i class="fa-solid fa-rotate-right mr-2"></i>
+                            Tentar novamente
                         </button>
                     <?php endif; ?>
+                    </div>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 </div>
+
 
 <script>
 function mostrarErro(mensagem) {
@@ -201,14 +217,14 @@ function iniciarExercicio(listaId) {
                 mostrarErro('Erro: sessao_id não encontrado na resposta do servidor');
                 if (button) {
                     button.disabled = false;
-                    button.textContent = '🚀 Iniciar Exercício';
+                    button.innerHTML = '<i class="fa-solid fa-play mr-2"></i>Iniciar exercício';
                 }
             }
         } else {
             mostrarErro('Erro: ' + (data.error || 'Não foi possível iniciar os exercícios'));
             if (button) {
                 button.disabled = false;
-                button.textContent = '🚀 Iniciar Exercício';
+                button.innerHTML = '<i class="fa-solid fa-play mr-2"></i>Iniciar exercício';
             }
         }
     })
@@ -217,7 +233,7 @@ function iniciarExercicio(listaId) {
         mostrarErro('Erro ao iniciar exercícios: ' + error.message);
         if (button) {
             button.disabled = false;
-            button.textContent = '🚀 Iniciar Exercício';
+            button.innerHTML = '<i class="fa-solid fa-play mr-2"></i>Iniciar exercício';
         }
     });
     
@@ -241,7 +257,7 @@ function tentarNovamente(listaId, botao) {
             mostrarErro('Erro: ' + (data.error || 'Não foi possível reenviar.'));
             if (botao) {
                 botao.disabled = false;
-                botao.textContent = '🔁 Tentar novamente';
+                botao.innerHTML = '<i class="fa-solid fa-rotate-right mr-2"></i>Tentar novamente';
             }
             return;
         }
@@ -251,7 +267,7 @@ function tentarNovamente(listaId, botao) {
         mostrarErro('Erro ao reenviar: ' + error.message);
         if (botao) {
             botao.disabled = false;
-            botao.textContent = '🔁 Tentar novamente';
+            botao.innerHTML = '<i class="fa-solid fa-rotate-right mr-2"></i>Tentar novamente';
         }
     });
 }
