@@ -143,6 +143,14 @@ class AnoLetivoController extends BaseController
     public function zConfiguracao()
     {
         $user = $this->auth->getUser();
+        if (!class_exists('AdminPermissionMatrix')) {
+            require_once dirname(__DIR__, 2) . '/Core/AdminPermissionMatrix.php';
+        }
+        $perms = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        if (!AdminPermissionMatrix::usuarioPodeVerZConfiguracao($perms)) {
+            $this->redirect('/admin/dashboard');
+            return;
+        }
         $this->viewWithLayout('admin', 'admin/z-configuracao/index', [
             'title'        => 'Z-Configuração - EducaTudo',
             'user'         => $user,

@@ -33,19 +33,23 @@ if ($podeHub('unidades')) {
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/maintenance/painel',
-    'title' => 'Modo Manutenção',
-    'description' => 'Ative o modo manutenção e avise a comunidade escolar.',
-    'icon' => 'fa-solid fa-screwdriver-wrench',
-];
+if ($podeHub('modo_manutencao')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/maintenance/painel',
+        'title' => 'Modo Manutenção',
+        'description' => 'Ative o modo manutenção e avise a comunidade escolar.',
+        'icon' => 'fa-solid fa-screwdriver-wrench',
+    ];
+}
 
-$hub_cards[] = [
-    'href' => URL . '/admin/settings#slider-dashboard',
-    'title' => 'Slider Dashboard',
-    'description' => 'Banners e imagens do slider na área do aluno.',
-    'icon' => 'fa-solid fa-images',
-];
+if ($podeHub('slider_dashboard')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/settings#slider-dashboard',
+        'title' => 'Slider Dashboard',
+        'description' => 'Banners e imagens do slider na área do aluno.',
+        'icon' => 'fa-solid fa-images',
+    ];
+}
 
 if (($user['perfil_admin'] ?? '') === 'dev') {
     $hub_cards[] = [

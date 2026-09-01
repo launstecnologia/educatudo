@@ -162,6 +162,9 @@ class StudentAdminController extends AdminBaseController
 
     public function painelManutencao()
     {
+        if (!$this->enforceAdminPermissionKey('modo_manutencao', 'visualizar', false)) {
+            return;
+        }
         $user = $this->auth->getUser();
         $data = [
             'title' => 'Painel de Manutenção - EducaTudo',
@@ -177,6 +180,9 @@ class StudentAdminController extends AdminBaseController
 
     public function toggleMaintenance()
     {
+        if (!$this->enforceAdminPermissionKey('modo_manutencao', 'alterar', false)) {
+            return;
+        }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->redirect('/admin/maintenance/painel');
             return;

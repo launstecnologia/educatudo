@@ -173,6 +173,20 @@ class AuthMiddleware
         if ($permissions === []) {
             return false;
         }
+        $permissions = AdminPermissionMatrix::aplicarRestricaoZConfiguracao(
+            (string) ($user['perfil_admin'] ?? ''),
+            $permissions
+        );
+
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+        if (is_string($path) && ($path === '/admin/z-configuracao' || str_starts_with($path, '/admin/z-configuracao/'))) {
+            if (!AdminPermissionMatrix::usuarioPodeVerZConfiguracao($permissions)) {
+                http_response_code(302);
+                header('Location: ' . URL . '/admin/dashboard');
+                exit;
+            }
+            return true;
+        }
 
         $resolved = AdminPermissionMatrix::resolveModuleAndAction((string) ($_SERVER['REQUEST_URI'] ?? ''), (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
         $moduleKey = $resolved['module_key'] ?? null;

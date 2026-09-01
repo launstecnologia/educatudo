@@ -685,7 +685,8 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
 </div>
 <?php endif; ?>
 
-<!-- Z-Configuração -->
+<?php if ($canViewSidebar(['dev_settings', 'unidades', 'modo_manutencao', 'slider_dashboard'])): ?>
+<!-- Z-Configuração: só direção e dev -->
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'z_configuracao' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/z-configuracao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -711,14 +712,18 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">Instituição</span>
         </a>
         <?php endif; ?>
+        <?php if ($canViewSidebar(['modo_manutencao'])): ?>
         <a href="<?= URL ?>/admin/maintenance/painel" class="<?= $linkCls($cp === 'maintenance_panel') ?>">
             <i class="fa-solid fa-screwdriver-wrench w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Modo Manutenção</span>
         </a>
+        <?php endif; ?>
+        <?php if ($canViewSidebar(['slider_dashboard'])): ?>
         <a href="<?= URL ?>/admin/settings#slider-dashboard" class="<?= $linkCls($cp === 'settings') ?>">
             <i class="fa-solid fa-images w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Slider Dashboard</span>
         </a>
+        <?php endif; ?>
         <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
         <a href="<?= URL ?>/admin/configuracao/ui-modelos" class="<?= $linkCls($cp === 'ui_modelos') ?>">
             <i class="fa-solid fa-palette w-4 h-4 mr-3"></i>
@@ -727,3 +732,4 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>

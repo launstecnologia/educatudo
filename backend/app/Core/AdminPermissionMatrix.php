@@ -241,9 +241,9 @@ class AdminPermissionMatrix
                     'dashboard', 'alunos', 'assistente', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor', 'inclusao', 'listagem_avaliacoes', 'relatorio_avaliacoes',
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
-                    'configuracao_boletim', 'notas_semanais', 'guia_boletim', 'modo_manutencao', 'slider_dashboard',
+                    'configuracao_boletim', 'notas_semanais', 'guia_boletim',
                     'apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'minicursos', 'planos_aula', 'ava',
-                    'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'unidades', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
+                    'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
                     'alertas_sensiveis', 'alunos_online', 'reconhecimento_facial',
                     'relatorios_gerais',
                     'administradores', 'professores', 'transferencia', 'lista_chamada',
@@ -265,7 +265,7 @@ class AdminPermissionMatrix
                 return self::onlyModules($all, [
                     'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor',
-                    'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'unidades', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
+                    'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
                     'professores', 'transferencia', 'lista_chamada', 'reconhecimento_facial',
                     'acao_rapida_ativar_desativar',
                     'responsaveis_vinculados', 'matriculas_aluno', 'processos_matricula', 'declaracoes_aluno', 'documentos_aluno',
@@ -374,7 +374,7 @@ class AdminPermissionMatrix
 
         $userId = (int) ($user['id'] ?? 0);
         if ($userId <= 0) {
-            return $base;
+            return self::aplicarRestricaoZConfiguracao($perfil, $base);
         }
 
         try {
@@ -395,7 +395,7 @@ class AdminPermissionMatrix
                 );
             }
         } catch (\Throwable $e) {
-            return $base;
+            return self::aplicarRestricaoZConfiguracao($perfil, $base);
         }
 
         $raw = trim((string) ($row['permissoes_admin_json'] ?? ''));
@@ -403,12 +403,58 @@ class AdminPermissionMatrix
             $raw = trim((string) ($row['perfil_permissoes_json'] ?? ''));
         }
         if ($raw === '') {
-            return $base;
+            return self::aplicarRestricaoZConfiguracao($perfil, $base);
         }
 
         $decoded = json_decode($raw, true);
         $sanitized = self::sanitizePermissions($decoded);
-        return $sanitized === [] ? $base : $sanitized;
+        $efetivas = $sanitized === [] ? $base : $sanitized;
+
+        return self::aplicarRestricaoZConfiguracao($perfil, $efetivas);
+    }
+
+    /**
+     * Instituição, manutenção, slider e Dev Settings: só direção e dev.
+     *
+     * @return list<string>
+     */
+    public static function chavesZConfiguracao(): array
+    {
+        return ['dev_settings', 'unidades', 'modo_manutencao', 'slider_dashboard'];
+    }
+
+    public static function perfilPodeAcessarZConfiguracao(string $perfil): bool
+    {
+        return in_array($perfil, ['dev', 'diretor'], true);
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $permissions
+     */
+    public static function usuarioPodeVerZConfiguracao(array $permissions): bool
+    {
+        foreach (self::chavesZConfiguracao() as $chave) {
+            if (!empty($permissions[$chave]['visualizar'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * JSON de perfil salvo não pode reabrir Z-Configuração para coordenador/secretaria.
+     *
+     * @param array<string, array<string, bool>> $permissions
+     * @return array<string, array<string, bool>>
+     */
+    public static function aplicarRestricaoZConfiguracao(string $perfil, array $permissions): array
+    {
+        if (self::perfilPodeAcessarZConfiguracao($perfil)) {
+            return $permissions;
+        }
+
+        return self::denyModules($permissions, self::chavesZConfiguracao());
     }
 
     /**

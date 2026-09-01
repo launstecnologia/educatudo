@@ -11,6 +11,9 @@ class SchoolSettingsAdminController extends AdminBaseController
 {
     public function configuracoes()
     {
+        if (!$this->enforceAdminPermissionKey('slider_dashboard', 'visualizar', false)) {
+            return;
+        }
         $turmas = $this->db->fetchAll("SELECT * FROM turmas ORDER BY nome ASC");
         $materias = $this->db->fetchAll("SELECT * FROM materias ORDER BY nome ASC");
         $usuarios_admin = $this->db->fetchAll(
@@ -44,6 +47,9 @@ class SchoolSettingsAdminController extends AdminBaseController
 
     public function salvarSlidersDashboard()
     {
+        if (!$this->enforceAdminPermissionKey('slider_dashboard', 'alterar', false)) {
+            return;
+        }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->redirect('/admin/settings');
             return;
