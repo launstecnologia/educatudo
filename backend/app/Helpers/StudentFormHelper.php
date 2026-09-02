@@ -222,14 +222,43 @@ class StudentFormHelper
     }
 
     /**
+     * True se a coluna alunos.nome_social existir neste tenant.
+     * $db precisa expor fetch(); o resultado é cacheado por request.
+     */
+    public static function colunaNomeSocialExiste($db): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        if ($db === null || !method_exists($db, 'fetch')) {
+            $cache = false;
+
+            return false;
+        }
+        try {
+            $cache = $db->fetch("SHOW COLUMNS FROM alunos LIKE 'nome_social'") !== false;
+        } catch (\Throwable $e) {
+            $cache = false;
+        }
+
+        return $cache;
+    }
+
+    /**
      * Expressão SQL do nome de exibição (social ou civil).
      * $alias só aceita identificador simples (ex.: a).
+     * Passe $db para cair em `{alias}.nome` quando a coluna ainda não existir no tenant.
      */
-    public static function sqlNomeExibicao(string $alias = 'a'): string
+    public static function sqlNomeExibicao(string $alias = 'a', $db = null): string
     {
         $a = preg_replace('/[^a-zA-Z0-9_]/', '', $alias);
         if ($a === '') {
             $a = 'a';
+        }
+
+        if ($db !== null && !self::colunaNomeSocialExiste($db)) {
+            return "{$a}.nome";
         }
 
         return "COALESCE(NULLIF(TRIM({$a}.nome_social), ''), {$a}.nome)";

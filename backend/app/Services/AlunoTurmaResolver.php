@@ -322,11 +322,7 @@ class AlunoTurmaResolver
 
     private function sqlOrdemNomeAluno(): string
     {
-        if (!$this->hasNomeSocialColumn()) {
-            return 'a.nome ASC';
-        }
-
-        return \StudentFormHelper::sqlNomeExibicao('a') . ' ASC';
+        return \StudentFormHelper::sqlNomeExibicao('a', $this->db) . ' ASC';
     }
 
     /**
@@ -344,20 +340,5 @@ class AlunoTurmaResolver
         }
 
         return $out;
-    }
-
-    private function hasNomeSocialColumn(): bool
-    {
-        static $cache = null;
-        if ($cache !== null) {
-            return $cache;
-        }
-        try {
-            $cache = $this->db->fetch("SHOW COLUMNS FROM alunos LIKE 'nome_social'") !== false;
-        } catch (\Exception $e) {
-            $cache = false;
-        }
-
-        return $cache;
     }
 }

@@ -374,6 +374,7 @@ if (!class_exists('TeacherController')) {
         $pontos_atencao = [];
         
         // Alunos com muitas atividades pendentes
+        $nomeExibicaoSql = $this->sqlNomeExibicaoAluno();
         $alunos_pendentes = $this->db->fetchAll(
             "WITH professor_turmas AS (
                 SELECT DISTINCT j.turma_id
@@ -381,7 +382,7 @@ if (!class_exists('TeacherController')) {
                 WHERE j.professor_id = :prof_id_1
             ),
             alunos_base AS (
-                SELECT a.id, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome, a.ra, t.nome AS turma_nome
+                SELECT a.id, {$nomeExibicaoSql} AS nome, a.ra, t.nome AS turma_nome
                 FROM alunos a
                 JOIN turmas t ON t.id = a.turma_id
                 JOIN professor_turmas pt ON pt.turma_id = a.turma_id
@@ -2186,8 +2187,9 @@ if (!class_exists('TeacherController')) {
             ['pid' => $professorId]
         );
 
+        $nomeExibicaoSql = $this->sqlNomeExibicaoAluno();
         $alunos = $this->db->fetchAll(
-            "SELECT DISTINCT a.id, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome, a.ra, t.nome AS turma_nome
+            "SELECT DISTINCT a.id, {$nomeExibicaoSql} AS nome, a.ra, t.nome AS turma_nome
              FROM alunos a
              INNER JOIN turmas t ON a.turma_id = t.id
              WHERE a.ativo = 1
@@ -2195,7 +2197,7 @@ if (!class_exists('TeacherController')) {
                   SELECT DISTINCT j2.turma_id FROM jornadas j2
                   WHERE j2.professor_id = :pid AND (j2.ativo = 1 OR j2.ativo IS NULL)
                )
-             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
+             ORDER BY {$nomeExibicaoSql} ASC",
             ['pid' => $professorId]
         );
 
@@ -2322,6 +2324,13 @@ if (!class_exists('TeacherController')) {
             $result['tenant'] = trim((string) $params['tenant']);
         }
         return $result;
+    }
+
+    private function sqlNomeExibicaoAluno(string $alias = 'a'): string
+    {
+        require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
+
+        return StudentFormHelper::sqlNomeExibicao($alias, $this->db);
     }
 
     public function calendarioLetivo(): void
