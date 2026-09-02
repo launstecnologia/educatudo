@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../Models/User/Parent.php';
 require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
 require_once __DIR__ . '/../../Services/StudentStatusService.php';
 require_once __DIR__ . '/../../Services/MatriculaSchemaHelper.php';
+require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
 require_once __DIR__ . '/../../Core/LayoutHelper.php';
 require_once __DIR__ . '/AdminBaseController.php';
 
@@ -222,9 +223,13 @@ class StudentAdminController extends AdminBaseController
         $params = [];
         
         if ($filtros['nome'] !== '') {
-            $where_clause .= " AND (a.nome LIKE :nome OR a.nome_social LIKE :nome_social)";
             $params['nome'] = '%' . $filtros['nome'] . '%';
-            $params['nome_social'] = '%' . $filtros['nome'] . '%';
+            if ($this->colunaAlunoCadastroCompletoExiste()) {
+                $where_clause .= " AND (a.nome LIKE :nome OR a.nome_social LIKE :nome_social)";
+                $params['nome_social'] = '%' . $filtros['nome'] . '%';
+            } else {
+                $where_clause .= " AND a.nome LIKE :nome";
+            }
         }
         
         if ($filtros['ra'] !== '') {
@@ -619,9 +624,13 @@ class StudentAdminController extends AdminBaseController
         $params = [];
 
         if (!empty($filtros['nome'])) {
-            $where_clause .= " AND (a.nome LIKE :nome OR a.nome_social LIKE :nome_social)";
             $params['nome'] = '%' . $filtros['nome'] . '%';
-            $params['nome_social'] = '%' . $filtros['nome'] . '%';
+            if ($this->colunaAlunoCadastroCompletoExiste()) {
+                $where_clause .= " AND (a.nome LIKE :nome OR a.nome_social LIKE :nome_social)";
+                $params['nome_social'] = '%' . $filtros['nome'] . '%';
+            } else {
+                $where_clause .= " AND a.nome LIKE :nome";
+            }
         }
 
         if (!empty($filtros['ra'])) {
@@ -2117,13 +2126,13 @@ class StudentAdminController extends AdminBaseController
         }
         $parts[] = 't.nome ASC';
         if ($includeAlunoNome) {
-            $parts[] = "COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC";
+            $parts[] = StudentFormHelper::sqlNomeExibicao('a', $this->db) . ' ASC';
         }
 
         if (count($parts) <= 2 && !$hasSerie && !$hasCurso) {
             $parts = ['t.serie ASC', 't.nome ASC'];
             if ($includeAlunoNome) {
-                $parts[] = "COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC";
+                $parts[] = StudentFormHelper::sqlNomeExibicao('a', $this->db) . ' ASC';
             }
         }
 
