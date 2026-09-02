@@ -35,7 +35,9 @@ class VidaEscolar
     public function findFicha(int $id): ?array
     {
         $row = $this->db->fetch(
-            "SELECT f.*, a.nome AS aluno_nome, a.cpf AS aluno_cpf, a.data_nasc AS aluno_data_nasc,
+            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome,
+                    a.nome AS aluno_nome_civil, a.nome_social,
+                    a.cpf AS aluno_cpf, a.data_nasc AS aluno_data_nasc,
                     t.nome AS turma_nome, t.serie AS turma_serie, t.matriz_curricular_id
              FROM boletim_fichas f
              INNER JOIN alunos a ON a.id = f.aluno_id
@@ -78,11 +80,11 @@ class VidaEscolar
     public function listarFichasTurma(int $turmaId, int $anoLetivo): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT f.*, a.nome AS aluno_nome
+            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome
              FROM boletim_fichas f
              INNER JOIN alunos a ON a.id = f.aluno_id
              WHERE f.turma_id = :turma_id AND f.ano_letivo = :ano
-             ORDER BY a.nome ASC",
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             ['turma_id' => $turmaId, 'ano' => $anoLetivo]
         );
         return is_array($rows) ? $rows : [];
@@ -115,16 +117,16 @@ class VidaEscolar
             $params[$chave] = $id;
         }
         $rows = $this->db->fetchAll(
-            'SELECT f.*, a.nome AS aluno_nome
+            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome
              FROM boletim_fichas f
              INNER JOIN (
                 SELECT aluno_id, MAX(id) AS id
                 FROM boletim_fichas
-                WHERE ano_letivo = :ano AND aluno_id IN (' . implode(',', $placeholders) . ')
+                WHERE ano_letivo = :ano AND aluno_id IN (" . implode(',', $placeholders) . ")
                 GROUP BY aluno_id
              ) ult ON ult.id = f.id
              INNER JOIN alunos a ON a.id = f.aluno_id
-             ORDER BY a.nome ASC',
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             $params
         );
         return is_array($rows) ? $rows : [];
@@ -147,18 +149,18 @@ class VidaEscolar
             $params['turma_id'] = $turmaId;
         }
         $rows = $this->db->fetchAll(
-            'SELECT f.*, a.nome AS aluno_nome, a.ra, t.nome AS turma_nome
+            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome, a.ra, t.nome AS turma_nome
              FROM boletim_fichas f
              INNER JOIN (
                 SELECT aluno_id, MAX(id) AS id
                 FROM boletim_fichas
-                WHERE ano_letivo = :ano' . $whereTurmaSub . '
+                WHERE ano_letivo = :ano" . $whereTurmaSub . "
                 GROUP BY aluno_id
              ) ult ON ult.id = f.id
              INNER JOIN alunos a ON a.id = f.aluno_id
              LEFT JOIN turmas t ON t.id = f.turma_id
              WHERE a.ativo = 1
-             ORDER BY t.nome ASC, a.nome ASC',
+             ORDER BY t.nome ASC, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             $params
         );
         return is_array($rows) ? $rows : [];

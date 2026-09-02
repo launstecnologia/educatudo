@@ -28,7 +28,7 @@ if ($mode !== 'readonly') {
 
 $fotoUrl = $student['foto_display_url'] ?? null;
 $initials = htmlspecialchars($student['foto_initials'] ?? '?');
-$nome = htmlspecialchars($student['nome'] ?? 'Aluno');
+$nome = htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? 'Aluno');
 $studentId = (int) ($student['id'] ?? 0);
 
 $sizeClasses = [

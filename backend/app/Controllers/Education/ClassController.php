@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../Models/Education/ClassRoom.php';
 require_once __DIR__ . '/../../Models/Education/MatrizCurricular.php';
 require_once __DIR__ . '/../../Models/Education/Sala.php';
 require_once __DIR__ . '/../../Helpers/AdminPasswordHelper.php';
+require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
 
 if (!class_exists('ClassController')) {
 class ClassController extends BaseController
@@ -686,6 +687,9 @@ class ClassController extends BaseController
             }
         }
         $selectList = 'a.id, a.nome, a.ativo, t.nome AS turma_nome';
+        if (in_array('nome_social', $searchFields, true)) {
+            $selectList .= ', a.nome_social';
+        }
         if ($selectExtras !== []) {
             $selectList .= ', ' . implode(', ', $selectExtras);
         }
@@ -710,15 +714,27 @@ class ClassController extends BaseController
                 ) OR a.turma_id = :turma_id_principal)"
             : '(a.turma_id = :turma_id_principal)';
 
+        $orderNome = in_array('nome_social', $searchFields, true)
+            ? StudentFormHelper::sqlNomeExibicao('a')
+            : 'a.nome';
         $sql = "SELECT {$selectList},
                        {$jaVinculadoSql} AS ja_vinculado
                 FROM alunos a
                 LEFT JOIN turmas t ON t.id = a.turma_id
                 WHERE " . implode(' AND ', $termGroups) . $statusFilter . "
-                ORDER BY a.ativo DESC, a.nome ASC
+                ORDER BY a.ativo DESC, {$orderNome} ASC
                 LIMIT " . max(1, min(50, $limit));
 
-        return $this->db->fetchAll($sql, $params) ?: [];
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $out[] = StudentFormHelper::aplicarNomeExibicao($row, true);
+        }
+
+        return $out;
     }
 
     /**
@@ -745,7 +761,7 @@ class ClassController extends BaseController
         }
 
         $searchFields = ['nome'];
-        foreach (['nickname', 'email', 'ra', 'codigo_aluno', 'cpf'] as $field) {
+        foreach (['nome_social', 'nickname', 'email', 'ra', 'codigo_aluno', 'cpf'] as $field) {
             if (!empty($available[$field])) {
                 $searchFields[] = $field;
             }
@@ -1000,7 +1016,7 @@ class ClassController extends BaseController
         foreach ($alunos as $a) {
             $vinculo = ($a['vinculo_tipo'] ?? 'principal') === 'principal' ? 'Principal' : 'Matriculado';
             fputcsv($out, [
-                (string) ($a['nome'] ?? ''),
+                StudentFormHelper::nomeExibicao($a),
                 (string) ($a['ra'] ?? ''),
                 $vinculo,
                 !empty($a['ativo']) ? 'Sim' : 'Não',

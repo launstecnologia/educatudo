@@ -84,7 +84,9 @@ class ListaChamadaService
 
         return $this->db->fetchAll(
             "SELECT c.numero_chamada, c.entrada_tardia, c.marcado_tr, c.data_entrada_turma,
-                    a.id AS aluno_id, a.nome, a.ra, {$sexoSql}, a.ativo
+                    a.id AS aluno_id,
+                    COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome,
+                    a.nome AS nome_civil, a.nome_social, a.ra, {$sexoSql}, a.ativo
              FROM alunos_turma_chamada c
              INNER JOIN alunos a ON a.id = c.aluno_id
              WHERE c.turma_id = :t AND c.ano_letivo_id = :a
@@ -239,7 +241,9 @@ class ListaChamadaService
 
         $sexoSql = $this->sqlSexoAluno();
         $alunos = $this->db->fetchAll(
-            "SELECT c.id AS chamada_id, c.aluno_id, c.data_entrada_turma, c.marcado_tr, a.nome, {$sexoSql}
+            "SELECT c.id AS chamada_id, c.aluno_id, c.data_entrada_turma, c.marcado_tr,
+                    COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome,
+                    a.nome AS nome_civil, a.nome_social, {$sexoSql}
              FROM alunos_turma_chamada c
              INNER JOIN alunos a ON a.id = c.aluno_id
              WHERE c.turma_id = :t AND c.ano_letivo_id = :a",

@@ -91,7 +91,8 @@ class ParentController extends BaseController
         if (!$pai) {
             return [];
         }
-        return $this->db->fetchAll(
+        require_once dirname(__DIR__, 2) . '/Helpers/StudentFormHelper.php';
+        $filhos = $this->db->fetchAll(
             "SELECT a.*, t.nome as turma_nome, t.serie
              FROM alunos a
              LEFT JOIN turmas t ON a.turma_id = t.id
@@ -106,12 +107,13 @@ class ParentController extends BaseController
                           AND ar.ativo = 1
                     )
                )
-             ORDER BY a.nome ASC",
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             [
                 'pai_id_legacy' => $pai['id'],
                 'pai_id_rel' => $pai['id']
             ]
-        );
+        ) ?: [];
+        return array_map(static fn ($row) => \StudentFormHelper::aplicarNomeExibicao($row, true), $filhos);
     }
 
     /**
@@ -628,14 +630,14 @@ class ParentController extends BaseController
                           AND ar.ativo = 1
                     )
                )
-             ORDER BY a.nome ASC",
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             [
                 'pai_id_legacy' => $pai['id'],
                 'pai_id_rel' => $pai['id']
             ]
         );
-        
-        // Estatísticas dos filhos
+        require_once dirname(__DIR__, 2) . '/Helpers/StudentFormHelper.php';
+        $filhos = array_map(static fn ($row) => \StudentFormHelper::aplicarNomeExibicao($row, true), $filhos ?: []);
         $stats = [
             'total_filhos' => count($filhos),
             'total_jornadas' => 0,

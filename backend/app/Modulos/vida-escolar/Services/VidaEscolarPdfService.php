@@ -589,8 +589,9 @@ class VidaEscolarPdfService
         $dt = \DateTime::createFromFormat('Y-m-d', $data);
         $vars['data_oficio'] = $dt ? $esc($dt->format('d/m/Y')) : $esc($data);
         $vars['corpo_oficio_html'] = nl2br($esc(trim((string) ($oficio['corpo'] ?? ''))), false);
-        if (trim((string) ($aluno['nome'] ?? '')) !== '') {
-            $vars['aluno_nome'] = $esc($aluno['nome']);
+        require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
+        if (\StudentFormHelper::nomeExibicao($aluno) !== '') {
+            $vars['aluno_nome'] = $esc(\StudentFormHelper::nomeOficialLinha($aluno));
         } elseif (!empty($oficio['aluno_nome'])) {
             $vars['aluno_nome'] = $esc($oficio['aluno_nome']);
         }

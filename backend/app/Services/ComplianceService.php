@@ -23,7 +23,7 @@ class ComplianceService
     private $db;
 
     /** Documentos considerados essenciais para o indicador de documentação. */
-    private const DOCS_ESSENCIAIS = ['rg', 'cpf', 'certidao_nascimento', 'comprovante_residencia'];
+    private const DOCS_ESSENCIAIS = ['cpf', 'certidao_nascimento', 'comprovante_residencia'];
 
     public function __construct(?Database $db = null)
     {

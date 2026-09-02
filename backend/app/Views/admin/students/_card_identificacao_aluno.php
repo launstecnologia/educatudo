@@ -20,7 +20,7 @@ $turmaAnoLabel = $turmaAnoLabel ?? $turmaDisplay;
         </div>
         <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-                <h2 class="text-base font-bold text-slate-900 truncate"><?= safe_htmlspecialchars($student['nome'] ?? '', 'Aluno') ?></h2>
+                <h2 class="text-base font-bold text-slate-900 truncate"><?= safe_htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? '', 'Aluno') ?></h2>
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold <?= $statusBadgeClass ?>"><?= safe_htmlspecialchars($statusBadgeLabel) ?></span>
                 <?php if (!$matriculaPendente && !$matriculaEncerrada): ?>
                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-800"><?= safe_htmlspecialchars($turmaAnoLabel) ?></span>
@@ -56,7 +56,7 @@ $turmaAnoLabel = $turmaAnoLabel ?? $turmaDisplay;
             ?>
             <div class="min-w-0 flex-1">
                 <h2 class="student-name-display text-xl md:text-[1.5rem] font-bold text-slate-900 leading-tight truncate">
-                    <?= safe_htmlspecialchars($student['nome'] ?? '', 'Aluno') ?>
+                    <?= safe_htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? '', 'Aluno') ?>
                 </h2>
                 <div class="flex flex-wrap items-center gap-1.5 mt-2">
                     <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $statusBadgeClass ?>">

@@ -11,7 +11,7 @@ $fmtData = static function ($d): string {
     $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     return $dt ? $dt->format('d/m/Y') : '—';
 };
-$nome = trim((string) ($aluno['nome'] ?? ''));
+$nome = \StudentFormHelper::nomeOficialLinha($aluno);
 $turma = trim((string) ($mat['turma_nome'] ?? $aluno['turma_nome'] ?? ''));
 $ini = $fmtData($periodo['inicio'] ?? '');
 $fim = $fmtData($periodo['fim'] ?? '');

@@ -9,7 +9,7 @@ $fmtData = static function ($d): string {
     $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     return $dt ? $dt->format('d/m/Y') : '—';
 };
-$nome = trim((string) ($aluno['nome'] ?? ''));
+$nome = \StudentFormHelper::nomeOficialLinha($aluno);
 $cpf = trim((string) ($aluno['cpf'] ?? ''));
 $nasc = $fmtData($aluno['data_nasc'] ?? '');
 $codigo = trim((string) ($aluno['codigo_aluno'] ?? $aluno['ra'] ?? ''));

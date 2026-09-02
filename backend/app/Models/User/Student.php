@@ -125,7 +125,7 @@ class Student
              LEFT JOIN responsaveis rp ON rp.id = ar.responsavel_id
              LEFT JOIN responsaveis p ON a.responsavel_id = p.id
              GROUP BY a.id
-             ORDER BY a.nome ASC"
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC"
         );
     }
     
@@ -144,7 +144,7 @@ class Student
              LEFT JOIN responsaveis p ON a.responsavel_id = p.id
              WHERE a.ativo = 1
              GROUP BY a.id
-             ORDER BY a.nome ASC"
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC"
         );
     }
     
@@ -473,7 +473,7 @@ class Student
              FROM alunos a
              LEFT JOIN turmas t ON a.turma_id = t.id
              WHERE a.turma_id = :turma_id AND a.ativo = 1
-             ORDER BY a.nome ASC",
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             ['turma_id' => $turmaId]
         );
     }
@@ -489,7 +489,7 @@ class Student
              LEFT JOIN turmas t ON a.turma_id = t.id
              LEFT JOIN alunos_responsaveis ar ON ar.aluno_id = a.id AND ar.ativo = 1
              WHERE (a.responsavel_id = :resp_a OR ar.responsavel_id = :resp_ar) AND a.ativo = 1
-             ORDER BY a.nome ASC",
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             ['resp_a' => $responsavelId, 'resp_ar' => $responsavelId]
         );
     }

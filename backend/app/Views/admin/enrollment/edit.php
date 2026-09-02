@@ -46,7 +46,7 @@ include __DIR__ . '/../_partials/page_header_list.php'; ?>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input type="text" name="aluno_nome" value="<?= $val('aluno_nome') ?>" required class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm">
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN</label>
                 <input type="text" name="aluno_cpf" value="<?= $val('aluno_cpf') ?>" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm"></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Nascimento</label>
                 <input type="date" name="aluno_data_nasc" value="<?= $val('aluno_data_nasc') ?>" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm"></div>
@@ -64,7 +64,7 @@ include __DIR__ . '/../_partials/page_header_list.php'; ?>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input type="text" name="resp_nome" value="<?= $val('resp_nome') ?>" required class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm">
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN</label>
                 <input type="text" name="resp_cpf" value="<?= $val('resp_cpf') ?>" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm"></div>
             <div><label class="block text-sm font-medium text-gray-700 mb-1">Parentesco</label>
                 <input type="text" name="resp_parentesco" value="<?= $val('resp_parentesco') ?>" class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm"></div>

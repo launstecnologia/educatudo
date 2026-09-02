@@ -1,4 +1,7 @@
 <?php
+if (!class_exists('StudentFormHelper', false)) {
+    require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
+}
 $esc = $esc ?? static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $aluno = is_array($aluno ?? null) ? $aluno : [];
 $matricula = is_array($matricula ?? null) ? $matricula : [];
@@ -31,8 +34,11 @@ $dataBr = static function ($v): string {
         <a href="<?= URL . ($links['cadastro'] ?? '/admin/students/' . (int) ($aluno['id'] ?? 0)) ?>" class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50">Abrir cadastro</a>
     </div>
     <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <?php $campo('Nome', $aluno['nome'] ?? ''); ?>
-        <?php $campo('CPF', $aluno['cpf'] ?? ''); ?>
+        <?php $campo('Nome', \StudentFormHelper::nomeExibicao($aluno)); ?>
+        <?php if (\StudentFormHelper::temNomeSocial($aluno)): ?>
+        <?php $campo('Nome civil', \StudentFormHelper::nomeCivil($aluno)); ?>
+        <?php endif; ?>
+        <?php $campo('CPF / CIN', $aluno['cpf'] ?? ''); ?>
         <?php $campo('RG', $aluno['rg'] ?? ''); ?>
         <?php $campo('Nascimento', $dataBr($aluno['data_nasc'] ?? null)); ?>
         <?php $campo('Nome da mãe', $aluno['nome_mae'] ?? ''); ?>

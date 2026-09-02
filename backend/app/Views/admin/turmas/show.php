@@ -169,16 +169,20 @@ include __DIR__ . '/../_partials/page_header_list.php';
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <?php foreach ($alunos as $aluno): ?>
+                                        <?php
+                                        $nomeAluno = (string) ($aluno['nome_exibicao'] ?? $aluno['nome'] ?? '');
+                                        $iniciais = strtoupper(mb_substr($nomeAluno !== '' ? $nomeAluno : '?', 0, 2));
+                                        ?>
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <div class="flex-shrink-0 h-10 w-10">
                                                         <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
-                                                            <span class="text-sm font-medium text-slate-600"><?= strtoupper(substr($aluno['nome'] ?? '', 0, 2)) ?></span>
+                                                            <span class="text-sm font-medium text-slate-600"><?= htmlspecialchars($iniciais) ?></span>
                                                         </div>
                                                     </div>
                                                     <div class="ml-4">
-                                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($aluno['nome'] ?? '') ?></div>
+                                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($nomeAluno) ?></div>
                                                     </div>
                                                 </div>
                                             </td>

@@ -105,12 +105,11 @@ class StudentPhotoHelper
      */
     public static function resolveForList(array $aluno): array
     {
-        $nome = (string) ($aluno['nome'] ?? '');
         $url = self::resolveDisplayUrl($aluno);
 
         return [
             'foto_display_url' => $url,
-            'foto_initials' => self::initialsFromName($nome),
+            'foto_initials' => self::initialsFromName(self::nomeParaIniciais($aluno)),
         ];
     }
 
@@ -119,7 +118,6 @@ class StudentPhotoHelper
      */
     public static function resolveForShow(array $aluno): array
     {
-        $nome = (string) ($aluno['nome'] ?? '');
         $url = self::resolveDisplayUrl($aluno);
 
         if ($url === null && !empty($aluno['FotoAluno'])) {
@@ -128,7 +126,7 @@ class StudentPhotoHelper
 
         return [
             'foto_display_url' => $url,
-            'foto_initials' => self::initialsFromName($nome),
+            'foto_initials' => self::initialsFromName(self::nomeParaIniciais($aluno)),
         ];
     }
 
@@ -137,11 +135,22 @@ class StudentPhotoHelper
      */
     public static function enrichStudent(array $aluno, bool $includeBlob = false): array
     {
+        require_once __DIR__ . '/StudentFormHelper.php';
+        $aluno = \StudentFormHelper::aplicarNomeExibicao($aluno, false);
         $resolved = $includeBlob ? self::resolveForShow($aluno) : self::resolveForList($aluno);
         $aluno['foto_display_url'] = $resolved['foto_display_url'];
         $aluno['foto_initials'] = $resolved['foto_initials'];
 
         return $aluno;
+    }
+
+    /** @param array<string, mixed> $aluno */
+    private static function nomeParaIniciais(array $aluno): string
+    {
+        require_once __DIR__ . '/StudentFormHelper.php';
+        $nome = \StudentFormHelper::nomeExibicao($aluno);
+
+        return $nome !== '' ? $nome : (string) ($aluno['nome'] ?? '');
     }
 
     private static function isPlausiblePhotoReference(string $raw): bool

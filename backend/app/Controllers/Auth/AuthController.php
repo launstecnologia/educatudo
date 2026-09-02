@@ -305,23 +305,24 @@ if (!class_exists('AuthController')) {
         } else {
             if ($turmaObrigatoria && $turmaId > 0) {
                 $alunos = $db->fetchAll(
-                    "SELECT id, nome, nickname, senha_hash, primeiro_acesso 
+                    "SELECT id, nome, nome_social, nickname, senha_hash, primeiro_acesso 
                      FROM alunos 
-                     WHERE turma_id = :turma_id AND LOWER(TRIM(nome)) = LOWER(:nome)",
-                    ['turma_id' => $turmaId, 'nome' => $alunoNome]
+                     WHERE turma_id = :turma_id AND (LOWER(TRIM(nome)) = LOWER(:nome) OR LOWER(TRIM(IFNULL(nome_social,''))) = LOWER(:nome_social))",
+                    ['turma_id' => $turmaId, 'nome' => $alunoNome, 'nome_social' => $alunoNome]
                 );
             } else {
                 $alunos = $db->fetchAll(
-                    "SELECT id, nome, nickname, senha_hash, primeiro_acesso 
+                    "SELECT id, nome, nome_social, nickname, senha_hash, primeiro_acesso 
                      FROM alunos 
-                     WHERE LOWER(TRIM(nome)) = LOWER(:nome)",
-                    ['nome' => $alunoNome]
+                     WHERE LOWER(TRIM(nome)) = LOWER(:nome) OR LOWER(TRIM(IFNULL(nome_social,''))) = LOWER(:nome_social)",
+                    ['nome' => $alunoNome, 'nome_social' => $alunoNome]
                 );
             }
             if (count($alunos) > 1) {
+                require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
                 return [
                     'matches' => array_map(function ($a) {
-                        return ['id' => $a['id'], 'nome' => $a['nome']];
+                        return ['id' => $a['id'], 'nome' => \StudentFormHelper::nomeExibicao($a)];
                     }, $alunos),
                 ];
             }
@@ -1240,9 +1241,10 @@ if (!class_exists('AuthController')) {
                 $user = ['id' => (int) $row['id'], 'nome' => $row['nome'], 'email' => $row['email'], 'tipo' => 'professor'];
             }
         } elseif ($tipo === 'aluno') {
-            $row = $db->fetch("SELECT a.id, a.nome, a.email, a.ra, a.turma_id, a.serie, t.nome AS turma_nome FROM alunos a LEFT JOIN turmas t ON a.turma_id = t.id WHERE a.id = ? AND a.ativo = 1 LIMIT 1", [$userId]);
+            $row = $db->fetch("SELECT a.id, a.nome, a.nome_social, a.email, a.ra, a.turma_id, a.serie, t.nome AS turma_nome FROM alunos a LEFT JOIN turmas t ON a.turma_id = t.id WHERE a.id = ? AND a.ativo = 1 LIMIT 1", [$userId]);
             if ($row) {
-                $user = ['id' => (int) $row['id'], 'nome' => $row['nome'], 'email' => $row['email'], 'ra' => $row['ra'] ?? '', 'turma_id' => $row['turma_id'], 'turma_nome' => $row['turma_nome'] ?? '', 'serie' => $row['serie'] ?? '', 'tipo' => 'aluno'];
+                require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
+                $user = ['id' => (int) $row['id'], 'nome' => StudentFormHelper::nomeExibicao($row), 'email' => $row['email'], 'ra' => $row['ra'] ?? '', 'turma_id' => $row['turma_id'], 'turma_nome' => $row['turma_nome'] ?? '', 'serie' => $row['serie'] ?? '', 'tipo' => 'aluno'];
             }
         } elseif ($tipo === 'pai') {
             $row = $db->fetch("SELECT id, nome, email, cpf, telefone FROM responsaveis WHERE id = ? AND ativo = 1 LIMIT 1", [$userId]);

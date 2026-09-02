@@ -222,8 +222,9 @@ class StudentAdminController extends AdminBaseController
         $params = [];
         
         if ($filtros['nome'] !== '') {
-            $where_clause .= " AND a.nome LIKE :nome";
+            $where_clause .= " AND (a.nome LIKE :nome OR a.nome_social LIKE :nome_social)";
             $params['nome'] = '%' . $filtros['nome'] . '%';
+            $params['nome_social'] = '%' . $filtros['nome'] . '%';
         }
         
         if ($filtros['ra'] !== '') {
@@ -618,8 +619,9 @@ class StudentAdminController extends AdminBaseController
         $params = [];
 
         if (!empty($filtros['nome'])) {
-            $where_clause .= " AND a.nome LIKE :nome";
+            $where_clause .= " AND (a.nome LIKE :nome OR a.nome_social LIKE :nome_social)";
             $params['nome'] = '%' . $filtros['nome'] . '%';
+            $params['nome_social'] = '%' . $filtros['nome'] . '%';
         }
 
         if (!empty($filtros['ra'])) {
@@ -633,7 +635,7 @@ class StudentAdminController extends AdminBaseController
         }
 
         $alunos = $this->db->fetchAll(
-            "SELECT a.id, a.codigo_aluno, a.ra, a.nickname, a.nome, a.cpf, a.email, a.foto_url,
+            "SELECT a.id, a.codigo_aluno, a.ra, a.nickname, a.nome, a.nome_social, a.cpf, a.email, a.foto_url,
                     t.nome as turma_nome, YEAR(CURDATE()) as ano_letivo, a.created_at
              FROM alunos a
              LEFT JOIN turmas t ON a.turma_id = t.id
@@ -650,15 +652,17 @@ class StudentAdminController extends AdminBaseController
         $output = fopen('php://output', 'w');
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
-        fputcsv($output, ['id', 'codigo_aluno', 'ra', 'nickname', 'nome', 'cpf', 'email', 'foto_url', 'turma', 'ano_turma', 'data_cadastro'], ';');
+        fputcsv($output, ['id', 'codigo_aluno', 'ra', 'nickname', 'nome', 'nome_social', 'cpf', 'email', 'foto_url', 'turma', 'ano_turma', 'data_cadastro'], ';');
 
+        require_once __DIR__ . '/../../Helpers/StudentFormHelper.php';
         foreach ($alunos as $aluno) {
             fputcsv($output, [
                 $aluno['id'],
                 $aluno['codigo_aluno'] ?? '',
                 $aluno['ra'] ?? '',
                 $aluno['nickname'] ?? '',
-                $aluno['nome'] ?? '',
+                StudentFormHelper::nomeExibicao($aluno),
+                $aluno['nome_social'] ?? '',
                 $aluno['cpf'] ?? '',
                 $aluno['email'] ?? '',
                 $aluno['foto_url'] ?? '',
@@ -2113,13 +2117,13 @@ class StudentAdminController extends AdminBaseController
         }
         $parts[] = 't.nome ASC';
         if ($includeAlunoNome) {
-            $parts[] = 'a.nome ASC';
+            $parts[] = "COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC";
         }
 
         if (count($parts) <= 2 && !$hasSerie && !$hasCurso) {
             $parts = ['t.serie ASC', 't.nome ASC'];
             if ($includeAlunoNome) {
-                $parts[] = 'a.nome ASC';
+                $parts[] = "COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC";
             }
         }
 
@@ -3154,10 +3158,10 @@ class StudentAdminController extends AdminBaseController
 
             // Validações
             if (empty($alunoId) || empty($nome) || empty($cpf)) {
-                throw new Exception('Nome e CPF são obrigatórios');
+                throw new Exception('Nome e CPF/CIN são obrigatórios');
             }
             if (strlen($cpf) < 11) {
-                throw new Exception('CPF inválido');
+                throw new Exception('CPF/CIN inválido');
             }
             
             // Verifica se o aluno existe

@@ -177,9 +177,10 @@ class AuthManager
             return null;
         }
 
+        require_once __DIR__ . '/../Helpers/StudentFormHelper.php';
         return [
             'id' => $aluno['id'],
-            'nome' => $aluno['nome'],
+            'nome' => StudentFormHelper::nomeExibicao($aluno),
             'email' => $aluno['email'],
             'ra' => $aluno['ra'],
             'turma_id' => $aluno['turma_id'],

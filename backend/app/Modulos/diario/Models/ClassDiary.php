@@ -562,11 +562,13 @@ class ClassDiary
     public function frequenciasDetalhadas(int $aulaId, int $turmaId): array
     {
         return $this->db->fetchAll(
-            "SELECT a.id AS aluno_id, a.nome, df.situacao, df.nota, df.observacao
+            "SELECT a.id AS aluno_id,
+                    COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome,
+                    df.situacao, df.nota, df.observacao
              FROM alunos a
              LEFT JOIN diario_frequencias df ON df.diario_aula_id = :aula_id AND df.aluno_id = a.id
              WHERE a.turma_id = :turma_id AND a.ativo = 1
-             ORDER BY a.nome ASC",
+             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             ['aula_id' => $aulaId, 'turma_id' => $turmaId]
         ) ?: [];
     }

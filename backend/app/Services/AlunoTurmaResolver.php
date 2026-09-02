@@ -4,6 +4,7 @@ namespace App\Services;
 
 require_once __DIR__ . '/../Core/Database.php';
 require_once __DIR__ . '/ListaChamadaService.php';
+require_once __DIR__ . '/../Helpers/StudentFormHelper.php';
 
 class AlunoTurmaResolver
 {
@@ -139,7 +140,8 @@ class AlunoTurmaResolver
         }
 
         if ($this->supportsMatricula()) {
-            return $this->db->fetchAll(
+            $orderBy = $this->sqlOrdemNomeAluno();
+            $rows = $this->db->fetchAll(
                 "SELECT DISTINCT a.*,
                         CASE WHEN a.turma_id = :tid_principal THEN 'principal' ELSE 'matriculado' END AS vinculo_tipo
                  FROM alunos a
@@ -148,22 +150,25 @@ class AlunoTurmaResolver
                     AND m.status = 'ativa'
                     AND m.data_saida IS NULL
                  WHERE a.turma_id = :tid_where OR m.id IS NOT NULL
-                 ORDER BY a.nome ASC",
+                 ORDER BY {$orderBy}",
                 [
                     'tid_principal' => $turmaId,
                     'tid_mat' => $turmaId,
                     'tid_where' => $turmaId,
                 ]
             ) ?: [];
+            return $this->enriquecerAlunosParaListagem($rows);
         }
 
-        return $this->db->fetchAll(
+        $orderBy = $this->sqlOrdemNomeAluno();
+        $rows = $this->db->fetchAll(
             "SELECT a.*, 'principal' AS vinculo_tipo
              FROM alunos a
              WHERE a.turma_id = :id
-             ORDER BY a.nome ASC",
+             ORDER BY {$orderBy}",
             ['id' => $turmaId]
         ) ?: [];
+        return $this->enriquecerAlunosParaListagem($rows);
     }
 
     public function contarAlunosPorTurma(int $turmaId): int
@@ -313,5 +318,46 @@ class AlunoTurmaResolver
         }
 
         return 'Paralela';
+    }
+
+    private function sqlOrdemNomeAluno(): string
+    {
+        if (!$this->hasNomeSocialColumn()) {
+            return 'a.nome ASC';
+        }
+
+        return \StudentFormHelper::sqlNomeExibicao('a') . ' ASC';
+    }
+
+    /**
+     * @param list<array<string, mixed>> $alunos
+     * @return list<array<string, mixed>>
+     */
+    private function enriquecerAlunosParaListagem(array $alunos): array
+    {
+        $out = [];
+        foreach ($alunos as $aluno) {
+            if (!is_array($aluno)) {
+                continue;
+            }
+            $out[] = \StudentFormHelper::aplicarNomeExibicao($aluno, true);
+        }
+
+        return $out;
+    }
+
+    private function hasNomeSocialColumn(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $cache = $this->db->fetch("SHOW COLUMNS FROM alunos LIKE 'nome_social'") !== false;
+        } catch (\Exception $e) {
+            $cache = false;
+        }
+
+        return $cache;
     }
 }

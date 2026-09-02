@@ -19,7 +19,8 @@ class ModeloDocumentoService
         'escola_docs' => 'CNPJ / INEP / telefone',
         'escola_origem' => 'Escola de origem do aluno',
         'logo_html' => 'Logo (HTML img)',
-        'aluno_nome' => 'Nome do aluno',
+        'aluno_nome' => 'Nome do aluno (social, se houver)',
+        'aluno_nome_civil' => 'Nome civil do aluno',
         'aluno_cpf' => 'CPF do aluno',
         'aluno_rg' => 'RG do aluno',
         'aluno_cpf_frase' => 'Frase “, CPF nº …”',
@@ -2494,7 +2495,9 @@ HTML;
             trim((string) ($unidade['telefone'] ?? '')) !== '' ? 'Tel.: ' . $unidade['telefone'] : '',
         ])));
 
-        $alunoNome = trim((string) ($aluno['nome'] ?? ''));
+        require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
+        $alunoNome = \StudentFormHelper::nomeOficialLinha($aluno);
+        $alunoNomeCivil = \StudentFormHelper::nomeCivil($aluno);
         $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
         $alunoRg = trim((string) ($aluno['rg'] ?? $aluno['documento_rg'] ?? ''));
         $pickAluno = static function (array $arr, array $keys): string {
@@ -2615,6 +2618,7 @@ HTML;
             'escola_docs' => $esc($linhaDocs),
             'logo_html' => $logoHtml,
             'aluno_nome' => $esc($alunoNome),
+            'aluno_nome_civil' => $esc($alunoNomeCivil !== '' ? $alunoNomeCivil : '—'),
             'aluno_cpf' => $esc($alunoCpf !== '' ? $alunoCpf : '—'),
             'aluno_rg' => $esc($alunoRg !== '' ? $alunoRg : '—'),
             'aluno_cpf_frase' => $alunoCpf !== '' ? ', inscrito(a) no CPF sob o nº ' . $esc($alunoCpf) : '',
@@ -2696,6 +2700,7 @@ HTML;
             'escola_docs' => 'CNPJ 00.000.000/0001-00 · Tel. (16) 3941-5257',
             'escola_origem' => 'Escola Municipal Exemplo',
             'aluno_nome' => 'Maria Eduarda Silva',
+            'aluno_nome_civil' => 'Maria Eduarda Silva',
             'aluno_cpf' => '123.456.789-00',
             'aluno_rg' => '12.345.678-9',
             'aluno_cpf_frase' => ', CPF nº 123.456.789-00',

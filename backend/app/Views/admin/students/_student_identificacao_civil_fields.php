@@ -36,13 +36,6 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 <div class="md:col-span-2 pt-2">
     <h4 class="text-base font-semibold text-gray-900 mb-4">Identificação civil</h4>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="md:col-span-2">
-            <label for="nome_social" class="block text-sm font-medium text-gray-700 mb-2">Nome social</label>
-            <input type="text" id="nome_social" name="nome_social"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                   value="<?= $esc($student['nome_social'] ?? '') ?>"
-                   placeholder="Nome social (se houver)">
-        </div>
         <div>
             <label for="nacionalidade" class="block text-sm font-medium text-gray-700 mb-2">Nacionalidade</label>
             <input type="text" id="nacionalidade" name="nacionalidade"

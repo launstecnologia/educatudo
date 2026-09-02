@@ -16,8 +16,7 @@ class PendencyService
     private $db;
 
     private const DOCS_ESSENCIAIS = [
-        'rg' => 'RG',
-        'cpf' => 'CPF',
+        'cpf' => 'CPF/CIN',
         'certidao_nascimento' => 'Certidão de nascimento',
         'comprovante_residencia' => 'Comprovante de residência',
     ];
@@ -110,7 +109,7 @@ class PendencyService
         $cols = $this->colunas('alunos');
         $mapa = [
             'codigo_inep' => 'código INEP',
-            'cpf' => 'CPF',
+            'cpf' => 'CPF/CIN',
             'nome_mae' => 'nome da mãe',
             'cor_raca' => 'cor/raça',
             'data_nasc' => 'data de nascimento',

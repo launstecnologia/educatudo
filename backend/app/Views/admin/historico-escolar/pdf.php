@@ -17,6 +17,9 @@ $labels = is_array($resultado_labels ?? null) ? $resultado_labels : [];
 $logoData = (string) ($logo_data ?? '');
 $validationUrl = (string) ($validation_url ?? '');
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+if (!class_exists('StudentFormHelper', false)) {
+    require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
+}
 $fmtData = static function ($d): string {
     $d = trim((string) $d);
     if ($d === '' || $d === '0000-00-00') {
@@ -315,7 +318,7 @@ if ($cidadeDataTxt === '') {
             <table class="ident">
                 <tr>
                     <td class="lab">Nome completo:</td>
-                    <td colspan="3"><strong><?= $esc($aluno['nome'] ?? '—') ?></strong></td>
+                    <td colspan="3"><?= \StudentFormHelper::nomeOficialHtml($aluno, $esc) ?></td>
                 </tr>
                 <tr>
                     <td class="lab">RG / RNE:</td>

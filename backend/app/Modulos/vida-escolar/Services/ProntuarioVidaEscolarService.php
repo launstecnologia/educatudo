@@ -2,7 +2,7 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../../../Services/DeclarationService.php';
+require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
 require_once __DIR__ . '/../../../Services/HistoricoEscolarService.php';
 require_once __DIR__ . '/../../../Models/User/StudentDocument.php';
 require_once __DIR__ . '/../../../Models/Education/HistoricoDocumento.php';
@@ -119,8 +119,8 @@ class ProntuarioVidaEscolarService
         $historico = is_array($prontuario['historicos'][0] ?? null) ? $prontuario['historicos'][0] : [];
 
         return [
-            ['campo' => 'Nome do aluno', 'valor' => (string) ($aluno['nome'] ?? '')],
-            ['campo' => 'CPF', 'valor' => (string) ($aluno['cpf'] ?? '')],
+            ['campo' => 'Nome do aluno', 'valor' => (string) (\StudentFormHelper::nomeExibicao($aluno))],
+            ['campo' => 'CPF / CIN', 'valor' => (string) ($aluno['cpf'] ?? '')],
             ['campo' => 'RG', 'valor' => (string) ($aluno['rg'] ?? '')],
             ['campo' => 'Data de nascimento', 'valor' => $this->dataBr($aluno['data_nasc'] ?? null)],
             ['campo' => 'Nome da mãe', 'valor' => (string) ($aluno['nome_mae'] ?? '')],

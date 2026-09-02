@@ -37,7 +37,13 @@ $fmt = static function ($c): string {
 <body>
     <h1><?= $esc($ficha['turma_nome'] ?? 'Escola') ?></h1>
     <h2>Boletim Escolar</h2>
-    <p class="muted"><?= $esc($ficha['aluno_nome'] ?? '') ?> · <?= (int) ($ficha['ano_letivo'] ?? 0) ?> · <?= $esc($ficha['serie_nome'] ?? $ficha['turma_serie'] ?? '') ?></p>
+    <p class="muted"><?= $esc($ficha['aluno_nome'] ?? '') ?><?php
+        $civilFicha = trim((string) ($ficha['aluno_nome_civil'] ?? ''));
+        $exibFicha = trim((string) ($ficha['aluno_nome'] ?? ''));
+        if ($civilFicha !== '' && strcasecmp($civilFicha, $exibFicha) !== 0) {
+            echo '<br>Nome civil: ' . $esc($civilFicha);
+        }
+    ?> · <?= (int) ($ficha['ano_letivo'] ?? 0) ?> · <?= $esc($ficha['serie_nome'] ?? $ficha['turma_serie'] ?? '') ?></p>
     <table>
         <thead>
             <tr>

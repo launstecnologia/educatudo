@@ -1021,13 +1021,13 @@ function formatarAnalise(analise) {
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                             <div>
-                                <label for="resp_edit_cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                                <label for="resp_edit_cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN</label>
                                 <input type="text" id="resp_edit_cpf" name="cpf" maxlength="14"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                        placeholder="000.000.000-00">
                             </div>
                             <div>
-                                <label for="resp_edit_rg" class="block text-sm font-medium text-gray-700 mb-1">RG</label>
+                                <label for="resp_edit_rg" class="block text-sm font-medium text-gray-700 mb-1">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                                 <input type="text" id="resp_edit_rg" name="rg" maxlength="20"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                        placeholder="00.000.000-0">
@@ -1283,7 +1283,7 @@ function formatarAnalise(analise) {
 
         <div class="px-6 py-3 bg-blue-50 border-b border-blue-100 text-sm text-blue-700">
             <i class="fa-solid fa-circle-info mr-1"></i>
-            Se o responsável <strong>já tem cadastro</strong> (ex: outro filho na escola), informe o CPF — ele será vinculado automaticamente sem criar novo registro.
+            Se o responsável <strong>já tem cadastro</strong> (ex: outro filho na escola), informe o CPF/CIN — ele será vinculado automaticamente sem criar novo registro.
         </div>
 
         <div class="p-6">
@@ -1306,13 +1306,13 @@ function formatarAnalise(analise) {
                         </div>
                         <div class="grid grid-cols-2 gap-3 mt-3">
                             <div>
-                                <label for="pai_cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF *</label>
+                                <label for="pai_cpf" class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN *</label>
                                 <input type="text" id="pai_cpf" name="cpf" required maxlength="14"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                        placeholder="000.000.000-00">
                             </div>
                             <div>
-                                <label for="pai_rg" class="block text-sm font-medium text-gray-700 mb-1">RG</label>
+                                <label for="pai_rg" class="block text-sm font-medium text-gray-700 mb-1">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                                 <input type="text" id="pai_rg" name="rg" maxlength="20"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                        placeholder="00.000.000-0">

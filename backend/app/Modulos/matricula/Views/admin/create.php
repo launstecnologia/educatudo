@@ -321,11 +321,11 @@ $steps = [
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">CPF <?= $isEdit ? '<span class="text-red-500">*</span>' : '' ?></label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">CPF / CIN <?= $isEdit ? '<span class="text-red-500">*</span>' : '' ?></label>
                         <input type="text" name="aluno_cpf" id="aluno_cpf" value="<?= $val('aluno_cpf') ?>" class="<?= $clsCampo('aluno_cpf') ?>" inputmode="numeric" placeholder="000.000.000-00" data-obrigatorio-enturmar="cpf">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">RG</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                         <input type="text" name="aluno_rg" id="aluno_rg" value="<?= $val('aluno_rg') ?>" class="<?= $inputClass ?>">
                     </div>
                 </div>
@@ -478,11 +478,11 @@ $steps = [
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN</label>
                                 <input type="text" name="responsaveis[__INDEX__][cpf]" class="resp-cpf <?= $inputClass ?>" inputmode="numeric" placeholder="000.000.000-00">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">RG</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                                 <input type="text" name="responsaveis[__INDEX__][rg]" class="resp-rg <?= $inputClass ?>">
                             </div>
                         </div>

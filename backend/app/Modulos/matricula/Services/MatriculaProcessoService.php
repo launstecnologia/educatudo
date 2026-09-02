@@ -180,7 +180,7 @@ class MatriculaProcessoService
 
         $alunoCpf = preg_replace('/\D+/', '', (string) ($input['aluno_cpf'] ?? '')) ?? '';
         if (strlen($alunoCpf) !== 11) {
-            throw new \InvalidArgumentException('Informe o CPF do aluno com 11 dígitos.');
+            throw new \InvalidArgumentException('Informe o CPF/CIN do aluno com 11 dígitos.');
         }
 
         $anoLetivoId = (int) ($input['ano_letivo_id'] ?? 0);
@@ -2179,7 +2179,7 @@ HTML;
         }
         $alunoCpf = preg_replace('/\D+/', '', (string) ($enrollment['aluno_cpf'] ?? '')) ?? '';
         if (strlen($alunoCpf) !== 11) {
-            $faltando[] = 'Aluno: CPF';
+            $faltando[] = 'Aluno: CPF/CIN';
         }
         $nasc = trim((string) ($enrollment['aluno_data_nasc'] ?? ''));
         if ($nasc === '' || $nasc === '0000-00-00') {

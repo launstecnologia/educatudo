@@ -172,6 +172,98 @@ class StudentFormHelper
         return $v !== '' ? $v : null;
     }
 
+    /** Nome de registro (civil). */
+    public static function nomeCivil(array $aluno): string
+    {
+        $civil = trim((string) ($aluno['nome_civil'] ?? ''));
+        if ($civil !== '') {
+            return $civil;
+        }
+
+        return trim((string) ($aluno['nome'] ?? ''));
+    }
+
+    public static function nomeSocial(array $aluno): string
+    {
+        return trim((string) ($aluno['nome_social'] ?? ''));
+    }
+
+    public static function temNomeSocial(array $aluno): bool
+    {
+        return self::nomeSocial($aluno) !== '';
+    }
+
+    /** Nome usado na plataforma: social se houver, senão o civil. */
+    public static function nomeExibicao(array $aluno): string
+    {
+        $social = self::nomeSocial($aluno);
+
+        return $social !== '' ? $social : self::nomeCivil($aluno);
+    }
+
+    /**
+     * Preenche nome_civil e nome_exibicao. Com $substituirNome, troca `nome` pelo social
+     * (listagens/sessão). Nunca usar no formulário de edição — lá `nome` é o civil.
+     *
+     * @param array<string, mixed> $aluno
+     * @return array<string, mixed>
+     */
+    public static function aplicarNomeExibicao(array $aluno, bool $substituirNome = false): array
+    {
+        if (!array_key_exists('nome_civil', $aluno) || trim((string) $aluno['nome_civil']) === '') {
+            $aluno['nome_civil'] = trim((string) ($aluno['nome'] ?? ''));
+        }
+        $aluno['nome_exibicao'] = self::nomeExibicao($aluno);
+        if ($substituirNome && self::temNomeSocial($aluno)) {
+            $aluno['nome'] = $aluno['nome_exibicao'];
+        }
+
+        return $aluno;
+    }
+
+    /**
+     * Expressão SQL do nome de exibição (social ou civil).
+     * $alias só aceita identificador simples (ex.: a).
+     */
+    public static function sqlNomeExibicao(string $alias = 'a'): string
+    {
+        $a = preg_replace('/[^a-zA-Z0-9_]/', '', $alias);
+        if ($a === '') {
+            $a = 'a';
+        }
+
+        return "COALESCE(NULLIF(TRIM({$a}.nome_social), ''), {$a}.nome)";
+    }
+
+    /** Texto para documentos oficiais: social como principal + civil ao lado, se houver. */
+    public static function nomeOficialLinha(array $aluno): string
+    {
+        $exibicao = self::nomeExibicao($aluno);
+        $civil = self::nomeCivil($aluno);
+        if (self::temNomeSocial($aluno) && $civil !== '' && strcasecmp($exibicao, $civil) !== 0) {
+            return $exibicao . ' (nome civil: ' . $civil . ')';
+        }
+
+        return $exibicao;
+    }
+
+    /**
+     * HTML para cabeçalho de boletim/histórico: social em destaque e civil abaixo.
+     *
+     * @param callable(string):string $esc
+     */
+    public static function nomeOficialHtml(array $aluno, callable $esc): string
+    {
+        $exibicao = self::nomeExibicao($aluno);
+        $civil = self::nomeCivil($aluno);
+        $html = '<strong>' . $esc($exibicao !== '' ? $exibicao : '—') . '</strong>';
+        if (self::temNomeSocial($aluno) && $civil !== '' && strcasecmp($exibicao, $civil) !== 0) {
+            $html .= '<br><span style="font-size:0.85em;font-weight:normal;">Nome civil: ' . $esc($civil) . '</span>';
+        }
+
+        return $html;
+    }
+
     /** @return list<string> */
     public static function ufsBrasil(): array
     {

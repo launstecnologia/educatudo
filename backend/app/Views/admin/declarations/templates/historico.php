@@ -12,6 +12,10 @@ $historico = is_array($dados['historico'] ?? null) ? $dados['historico'] : [];
 $logoData = (string) ($logo_data ?? '');
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 
+if (!class_exists('StudentFormHelper', false)) {
+    require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
+}
+
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
     require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
@@ -31,7 +35,7 @@ $linhaDocs = trim(implode(' • ', array_filter([
     trim((string) ($unidade['inep'] ?? '')) !== '' ? 'INEP: ' . $unidade['inep'] : '',
 ])));
 
-$alunoNome = trim((string) ($aluno['nome'] ?? '—'));
+$alunoNome = \StudentFormHelper::nomeOficialLinha($aluno);
 $alunoRa = trim((string) ($aluno['codigo_aluno'] ?? $aluno['ra'] ?? ''));
 $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
 

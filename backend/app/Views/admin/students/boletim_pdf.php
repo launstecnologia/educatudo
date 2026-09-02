@@ -20,6 +20,9 @@ $geradoEm = isset($gerado_em) ? (string) $gerado_em : date('d/m/Y H:i');
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
     require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
+if (!class_exists('StudentFormHelper', false)) {
+    require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
+}
 
 // Reutiliza o agrupador de colunas (mesma lógica do partial).
 $buildGroupedBoletimHeader = static function (array $cols): array {
@@ -251,7 +254,7 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
         <div class="title-cell">
             <h1>Boletim Escolar - <?= (int) $anoLetivo ?></h1>
             <h2>
-                <?= htmlspecialchars((string) ($aluno['nome'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
+                <?= \StudentFormHelper::nomeOficialHtml($aluno, static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8')) ?>
                 <?php if (!empty($aluno['turma_nome'])): ?>
                     &nbsp;|&nbsp; <?= htmlspecialchars((string) $aluno['turma_nome'], ENT_QUOTES, 'UTF-8') ?>
                 <?php endif; ?>

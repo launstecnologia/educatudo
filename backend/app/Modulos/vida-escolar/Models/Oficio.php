@@ -44,7 +44,7 @@ class Oficio
             return null;
         }
         $row = $this->db->fetch(
-            "SELECT o.*, a.nome AS aluno_nome, t.nome AS turma_nome
+            "SELECT o.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome, t.nome AS turma_nome
              FROM secretaria_oficios o
              LEFT JOIN alunos a ON a.id = o.aluno_id
              LEFT JOIN turmas t ON t.id = o.turma_id
@@ -65,7 +65,7 @@ class Oficio
             return [];
         }
         [$where, $params] = $this->montarFiltros($filtros);
-        $sql = "SELECT o.*, a.nome AS aluno_nome, t.nome AS turma_nome
+        $sql = "SELECT o.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome, t.nome AS turma_nome
                 FROM secretaria_oficios o
                 LEFT JOIN alunos a ON a.id = o.aluno_id
                 LEFT JOIN turmas t ON t.id = o.turma_id

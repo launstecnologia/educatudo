@@ -78,7 +78,7 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
                                     <?php endif; ?>
                                 </div>
                                 <div class="ml-4 min-w-0">
-                                    <div class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars($student['nome'] ?? '') ?></div>
+                                    <div class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? '') ?></div>
                                 </div>
                             </div>
                         </td>
@@ -172,7 +172,7 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div>
-                <label for="filtro_cpf" class="block text-sm font-medium text-gray-700 mb-1.5">CPF</label>
+                <label for="filtro_cpf" class="block text-sm font-medium text-gray-700 mb-1.5">CPF / CIN</label>
                 <input type="text" id="filtro_cpf" name="cpf"
                        value="<?= htmlspecialchars($filtros['cpf'] ?? '') ?>"
                        placeholder="Somente números"

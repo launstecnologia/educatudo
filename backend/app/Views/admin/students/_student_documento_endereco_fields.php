@@ -9,14 +9,14 @@ $dataNasc = StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null
 $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
 ?>
 <div>
-    <label for="cpf" class="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+    <label for="cpf" class="block text-sm font-medium text-gray-700 mb-2">CPF / CIN</label>
     <input type="text" id="cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="off"
            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 js-mask-cpf"
            value="<?= htmlspecialchars($cpfDisplay, ENT_QUOTES, 'UTF-8') ?>"
            placeholder="000.000.000-00">
 </div>
 <div>
-    <label for="rg" class="block text-sm font-medium text-gray-700 mb-2">RG</label>
+    <label for="rg" class="block text-sm font-medium text-gray-700 mb-2">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
     <input type="text" id="rg" name="rg" maxlength="15" autocomplete="off"
            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 js-mask-rg"
            value="<?= htmlspecialchars($rgDisplay, ENT_QUOTES, 'UTF-8') ?>"

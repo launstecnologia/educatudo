@@ -19,7 +19,7 @@ foreach ($ufsBrasil as $ufOpt) {
 
 $tiposDocumento = [
     'rg' => 'RG',
-    'cpf' => 'CPF',
+    'cpf' => 'CPF/CIN',
     'certidao' => 'Certidão de nascimento',
     'comprovante_residencia' => 'Comprovante de residência',
     'historico' => 'Histórico escolar',
@@ -137,11 +137,11 @@ $steps = [
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="aluno_cpf">CPF <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="aluno_cpf">CPF / CIN <span class="text-red-500">*</span></label>
                     <input type="text" id="aluno_cpf" name="aluno_cpf" maxlength="14" inputmode="numeric" placeholder="000.000.000-00" value="<?= $esc($val($old, 'aluno_cpf')) ?>" class="<?= $inputClass ?>">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="aluno_rg">RG</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="aluno_rg">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                     <input type="text" id="aluno_rg" name="aluno_rg" maxlength="30" value="<?= $esc($val($old, 'aluno_rg')) ?>" class="<?= $inputClass ?>">
                 </div>
             </div>
@@ -243,11 +243,11 @@ $steps = [
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN</label>
                             <input type="text" name="responsaveis[0][cpf]" class="resp-cpf <?= $inputClass ?>" inputmode="numeric" placeholder="000.000.000-00" value="<?= $esc($resp0['cpf'] ?? $val($old, 'resp_cpf')) ?>">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">RG</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                             <input type="text" name="responsaveis[0][rg]" class="resp-rg <?= $inputClass ?>" value="<?= $esc($resp0['rg'] ?? '') ?>">
                         </div>
                     </div>
@@ -356,11 +356,11 @@ $steps = [
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">CPF / CIN</label>
                             <input type="text" name="responsaveis[__INDEX__][cpf]" class="resp-cpf <?= $inputClass ?>" inputmode="numeric" placeholder="000.000.000-00">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">RG</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">RG <span class="text-gray-400 font-normal">(opcional)</span></label>
                             <input type="text" name="responsaveis[__INDEX__][rg]" class="resp-rg <?= $inputClass ?>">
                         </div>
                     </div>
@@ -580,7 +580,7 @@ $steps = [
             var cpf = document.getElementById('aluno_cpf');
             var nasc = document.getElementById('aluno_data_nasc');
             if (!nome.value.trim()) { alert('Informe o nome do aluno.'); nome.focus(); return false; }
-            if (onlyDigits(cpf.value).length !== 11) { alert('Informe o CPF do aluno com 11 dígitos.'); cpf.focus(); return false; }
+            if (onlyDigits(cpf.value).length !== 11) { alert('Informe o CPF/CIN do aluno com 11 dígitos.'); cpf.focus(); return false; }
             if (!nasc.value) { alert('Informe a data de nascimento.'); nasc.focus(); return false; }
             return true;
         }

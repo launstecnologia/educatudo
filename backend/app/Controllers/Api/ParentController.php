@@ -58,7 +58,7 @@ class ParentController extends BaseController
         }
 
         $filhos = $this->db->fetchAll(
-            "SELECT a.id, a.nome, t.nome as turma_nome, t.serie
+            "SELECT a.id, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome, t.nome as turma_nome, t.serie
              FROM alunos a
              LEFT JOIN turmas t ON a.turma_id = t.id
              WHERE a.ativo = 1

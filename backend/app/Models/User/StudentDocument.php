@@ -19,7 +19,7 @@ class StudentDocument
     {
         return [
             'rg' => 'RG (cópia)',
-            'cpf' => 'CPF (cópia)',
+            'cpf' => 'CPF/CIN (cópia)',
             'certidao_nascimento' => 'Certidão de nascimento',
             'comprovante_residencia' => 'Comprovante de residência',
             'foto_3x4' => 'Foto 3x4',

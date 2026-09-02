@@ -26,7 +26,7 @@ $podeEnturmar = !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'
 $foco_contrato = !empty($foco_contrato) || (($_GET['foco'] ?? '') === 'contrato');
 $tiposDocumentoLabel = [
     'rg' => 'RG',
-    'cpf' => 'CPF',
+    'cpf' => 'CPF/CIN',
     'comprovante_residencia' => 'Comprovante de residência',
     'historico' => 'Histórico escolar',
     'certidao' => 'Certidão de nascimento',
@@ -381,7 +381,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-gray-400 text-xs">CPF</dt>
+                    <dt class="text-gray-400 text-xs">CPF / CIN</dt>
                     <?php
                     $cpfShowDigits = preg_replace('/\D+/', '', (string) ($enrollment['aluno_cpf'] ?? '')) ?? '';
                     $cpfVazio = strlen($cpfShowDigits) !== 11;
@@ -444,7 +444,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
             <h3 class="font-semibold text-gray-800 mb-4">Responsável Legal</h3>
             <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                 <div class="col-span-2"><dt class="text-gray-400 text-xs">Nome</dt><dd class="font-medium text-gray-800"><?= $esc($enrollment['resp_nome']) ?></dd></div>
-                <div><dt class="text-gray-400 text-xs">CPF</dt><dd class="text-gray-700"><?= $esc($enrollment['resp_cpf'] ?? '—') ?></dd></div>
+                <div><dt class="text-gray-400 text-xs">CPF / CIN</dt><dd class="text-gray-700"><?= $esc($enrollment['resp_cpf'] ?? '—') ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">Parentesco</dt><dd class="text-gray-700"><?= $esc($enrollment['resp_parentesco'] ?? '—') ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">E-mail</dt><dd class="text-gray-700"><?= $esc($enrollment['resp_email'] ?? '—') ?></dd></div>
                 <div><dt class="text-gray-400 text-xs">WhatsApp</dt><dd class="text-gray-700"><?= $esc($enrollment['resp_telefone'] ?? '—') ?></dd></div>
@@ -548,7 +548,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                     <select name="tipo_documento" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white">
                         <option value="rg">RG</option>
-                        <option value="cpf">CPF</option>
+                        <option value="cpf">CPF/CIN</option>
                         <option value="certidao">Certidão de nascimento</option>
                         <option value="comprovante_residencia">Comprovante de residência</option>
                         <option value="historico">Histórico escolar</option>

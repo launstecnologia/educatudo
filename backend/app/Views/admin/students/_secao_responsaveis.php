@@ -27,7 +27,7 @@
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <p class="font-semibold text-slate-900 text-sm leading-snug"><?= safe_htmlspecialchars($respNome, '-') ?></p>
-                                    <p class="text-xs text-slate-500 mt-1 break-words"><?= safe_htmlspecialchars($respCpf, 'CPF não informado') ?></p>
+                                    <p class="text-xs text-slate-500 mt-1 break-words"><?= safe_htmlspecialchars($respCpf, 'CPF/CIN não informado') ?></p>
                                     <p class="text-xs text-slate-500 break-all"><?= safe_htmlspecialchars($respEmail, 'Sem email') ?><?php if ($respTelefone !== ''): ?> · <?= safe_htmlspecialchars($respTelefone) ?><?php endif; ?></p>
                                 </div>
                                 </div>

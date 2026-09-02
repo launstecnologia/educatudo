@@ -135,7 +135,7 @@ $isRem   = ($tipo ?? 'nova') === 'rematricula';
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">CPF / CIN</label>
                     <input type="text" name="aluno_cpf" value="<?= $val('aluno_cpf') ?>"
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 </div>
@@ -208,7 +208,7 @@ $isRem   = ($tipo ?? 'nova') === 'rematricula';
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">CPF</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">CPF / CIN</label>
                     <input type="text" name="resp_cpf" id="resp_cpf" value="<?= $val('resp_cpf') ?>"
                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 </div>

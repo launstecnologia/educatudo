@@ -15,8 +15,14 @@
                         <div class="student-info-fields">
                             <div>
                                 <span class="student-field-label">Nome Completo</span>
-                                <p class="student-field-value"><?= safe_htmlspecialchars($student['nome'] ?? '', '') ?></p>
+                                <p class="student-field-value"><?= safe_htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? '', '') ?></p>
                             </div>
+                            <?php if (\StudentFormHelper::temNomeSocial($student)): ?>
+                            <div>
+                                <span class="student-field-label">Nome civil</span>
+                                <p class="student-field-value font-normal"><?= safe_htmlspecialchars(\StudentFormHelper::nomeCivil($student), '') ?></p>
+                            </div>
+                            <?php endif; ?>
                             <div>
                                 <span class="student-field-label">RA / Código</span>
                                 <p class="student-field-value"><?= safe_htmlspecialchars($student['ra'] ?? '', '') ?></p>
@@ -26,7 +32,7 @@
                                 <p class="student-field-value font-normal"><?= safe_htmlspecialchars($student['nickname'] ?? null, 'Não informado') ?></p>
                             </div>
                             <div>
-                                <span class="student-field-label">CPF</span>
+                                <span class="student-field-label">CPF / CIN</span>
                                 <p class="student-field-value font-normal"><?= safe_htmlspecialchars($cpfDisplay ?: null, 'Não informado') ?></p>
                             </div>
                             <div>
@@ -163,16 +169,12 @@
                             <span class="student-field-label">Nome do pai</span>
                             <p class="student-field-value font-normal"><?= safe_htmlspecialchars($student['nome_pai'] ?? null, 'Não informado') ?></p>
                         </div>
-                        <div>
-                            <span class="student-field-label">Código INEP (Censo)</span>
-                            <p class="student-field-value font-normal"><?= safe_htmlspecialchars($student['codigo_inep'] ?? null, 'Não informado') ?></p>
-                        </div>
-                        <div>
-                            <span class="student-field-label">Nome social</span>
-                            <p class="student-field-value font-normal"><?= safe_htmlspecialchars($student['nome_social'] ?? null, 'Não informado') ?></p>
-                        </div>
-                        <div>
-                            <span class="student-field-label">Nacionalidade</span>
+                            <div>
+                                <span class="student-field-label">Código INEP (Censo)</span>
+                                <p class="student-field-value font-normal"><?= safe_htmlspecialchars($student['codigo_inep'] ?? null, 'Não informado') ?></p>
+                            </div>
+                            <div>
+                                <span class="student-field-label">Nacionalidade</span>
                             <p class="student-field-value font-normal"><?= safe_htmlspecialchars($student['nacionalidade'] ?? null, 'Não informado') ?></p>
                         </div>
                         <div>
