@@ -13,7 +13,7 @@ class MediaStorageService
     private $useS3 = false;
 
     /** Tipos que sempre usam storage local (storage/files/{slug}/), mesmo com S3 configurado */
-    private static $localFilesTypes = ['layout', 'avatars', 'professores'];
+    private static $localFilesTypes = ['layout', 'avatars', 'professores', 'notifications'];
 
     /** Tipos que usam S3 quando disponível, mas mantêm isolamento por tenant no fallback local */
     private static $tenantIsolatedLocalTypes = ['dashboard_sliders'];
@@ -37,6 +37,7 @@ class MediaStorageService
         'apostilas' => 'apostilas',
         'provas_marcacao_final' => 'provas/marcacao_final',
         'tickets' => 'tickets',
+        'notifications' => 'notifications',
         'simulados_questoes' => 'simulados/questoes',
         'simulados_alternativas' => 'simulados/alternativas',
     ];

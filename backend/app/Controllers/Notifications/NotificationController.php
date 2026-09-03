@@ -385,8 +385,7 @@ class NotificationController extends BaseController
         $tenantSlug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
         $tenantSlug = $tenantSlug !== '' ? $tenantSlug : 'default';
         $basePath = defined('BASE_PATH') ? rtrim((string) BASE_PATH, '/') : dirname(__DIR__, 3);
-        $relativePath = 'uploads/notifications/' . $tenantSlug . '/';
-        $uploadDir = $basePath . '/public/' . $relativePath;
+        $uploadDir = $basePath . '/storage/files/' . $tenantSlug . '/notifications/';
 
         if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
             $erroSistema = error_get_last();
@@ -396,7 +395,7 @@ class NotificationController extends BaseController
 
         return [
             'dir' => rtrim($uploadDir, '/') . '/',
-            'url' => '/' . $relativePath,
+            'url' => '/media/serve?type=notifications&tenant=' . rawurlencode($tenantSlug) . '&key=',
         ];
     }
 

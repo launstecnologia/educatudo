@@ -28,6 +28,7 @@ class MediaServeController extends BaseController
         'arquivos' => 'arquivos',
         'apostilas' => 'apostilas',
         'tickets' => 'tickets',
+        'notifications' => 'notifications',
         'simulados_questoes' => 'simulados/questoes',
         'simulados_alternativas' => 'simulados/alternativas',
     ];
@@ -55,7 +56,7 @@ class MediaServeController extends BaseController
         $allowedTypes = [
             'layout', 'dashboard_sliders', 'professores', 'avatars', 'essays_proposals',
             'redacoes', 'provas_questoes', 'chat', 'jornadas_exercicios', 'jornadas_documentos',
-            'jornadas_videos', 'arquivos', 'apostilas', 'tickets',
+            'jornadas_videos', 'arquivos', 'apostilas', 'tickets', 'notifications',
         ];
         if ($type === '' || $key === '' || !in_array($type, $allowedTypes, true)) {
             http_response_code(400);
@@ -115,7 +116,7 @@ class MediaServeController extends BaseController
         }
 
         $media = new MediaStorageService($config);
-        $serveLocalTypes = ['layout', 'avatars', 'professores'];
+        $serveLocalTypes = ['layout', 'avatars', 'professores', 'notifications'];
         $serveFromLocal = in_array($type, $serveLocalTypes, true);
         $candidateKeys = $this->buildCandidateKeys($type, $key, $resolvedTenant);
 
