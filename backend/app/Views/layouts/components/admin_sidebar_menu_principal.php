@@ -19,7 +19,9 @@ $showPedagogicoGroup = $modOn('aulas_online')
     || $modOn('bncc')
     || $modOn('aluno_minicursos')
     || $modOn('professor_planos_aula');
-$showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ?? '') === 'dev');
+$showSistemaGroup = $canViewSidebar(['avatares_alunos'])
+    || $modOn('redacao_configuravel')
+    || (($user['perfil_admin'] ?? '') === 'dev');
 ?>
 <!-- Dashboard -->
 <?php if ($showDashboardMenu): ?>
@@ -635,6 +637,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </button>
     </div>
     <div id="sistema-submenu" class="<?= $sistemaOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <?php if ($canViewSidebar(['avatares_alunos'])): ?>
+        <a href="<?= URL ?>/admin/avatares-alunos" class="<?= $linkCls($cp === 'avatares_alunos') ?>">
+            <i class="fa-regular fa-images w-4 h-4 mr-3"></i>
+            <span class="sidebar-text text-sm">Avatares dos Alunos</span>
+        </a>
+        <?php endif; ?>
         <?php if ($modOn('redacao_configuravel')): ?>
         <a href="<?= URL ?>/admin/redacao-configuravel" class="<?= $linkCls($cp === 'essays_config') ?>">
             <i class="fa-solid fa-sliders w-4 h-4 mr-3"></i>

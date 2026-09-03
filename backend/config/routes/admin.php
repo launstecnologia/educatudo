@@ -518,6 +518,12 @@ $router->post('/admin/dev/tutoriais/delete', 'Admin/DevAdminController@deletarTu
 // Tutoriais (Público - para professores)
 $router->get('/tutoriais', 'Admin/DevAdminController@listarTutoriais');
 
+// Avatares dos alunos
+$router->get('/admin/avatares-alunos', 'Admin/AvatarAlunoAdminController@index');
+$router->post('/admin/avatares-alunos/upload', 'Admin/AvatarAlunoAdminController@upload');
+$router->post('/admin/avatares-alunos/excluir', 'Admin/AvatarAlunoAdminController@excluir');
+$router->post('/admin/avatares-alunos/excluir-todos', 'Admin/AvatarAlunoAdminController@excluirTodos');
+
 // Layout do Sistema (Dev Settings)
 $router->get('/admin/dev/layout', 'Admin/SchoolSettingsAdminController@layout');
 $router->post('/admin/dev/layout/save', 'Admin/SchoolSettingsAdminController@saveLayout');

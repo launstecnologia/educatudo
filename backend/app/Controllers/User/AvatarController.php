@@ -10,6 +10,7 @@ class AvatarController extends BaseController
     protected $db;
     protected $authManager;
     private $avatarDir;
+    private $media;
 
     public function __construct()
     {
@@ -18,6 +19,8 @@ class AvatarController extends BaseController
         $this->authManager = new AuthManager();
         // Avatares pré-definidos versionados no git (fora de public/uploads, que é gitignored)
         $this->avatarDir = __DIR__ . '/../../../public/assets/avatars/';
+        require_once __DIR__ . '/../../Services/MediaStorageService.php';
+        $this->media = new MediaStorageService($this->config);
 
         if (!is_dir($this->avatarDir)) {
             mkdir($this->avatarDir, 0755, true);
@@ -73,6 +76,7 @@ class AvatarController extends BaseController
                 'avatar' => $avatar,
                 'onboarding' => $onboarding ?: [],
                 'avatars_predefinidos' => $this->listarAvataresPredefinidos(),
+                'avatares_disponiveis' => $this->listarAvataresDisponiveis(),
                 'current_page' => 'avatar',
                 'csrf_token' => $this->generateCsrfToken()
             ];
@@ -114,19 +118,20 @@ class AvatarController extends BaseController
                 throw new Exception('Avatar não selecionado');
             }
 
-            // Apenas o nome do arquivo; deve existir na pasta de pré-definidos
-            $nomeArquivo = basename($avatarSelecionado);
-            if (!in_array($nomeArquivo, $this->listarAvataresPredefinidos(), true)) {
+            $avataresDisponiveis = $this->listarAvataresDisponiveis();
+            $avatarEscolhido = null;
+            foreach ($avataresDisponiveis as $opcao) {
+                if (($opcao['valor'] ?? '') === $avatarSelecionado) {
+                    $avatarEscolhido = $opcao;
+                    break;
+                }
+            }
+
+            if ($avatarEscolhido === null) {
                 throw new Exception('Avatar inválido');
             }
 
-            $caminhoCompleto = $this->avatarDir . $nomeArquivo;
-            if (!is_file($caminhoCompleto)) {
-                throw new Exception('Avatar não encontrado no servidor');
-            }
-
-            // URL estática versionada (docroot = public/, sem prefixo /public/)
-            $avatarUrl = '/assets/avatars/' . $nomeArquivo;
+            $avatarUrl = (string) $avatarEscolhido['url'];
 
             // Verificar se já existe avatar
             $avatarExistenteId = $this->db->fetch(
@@ -212,9 +217,13 @@ class AvatarController extends BaseController
 
         $extensoes = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
         $arquivos = [];
+        $ocultos = $this->avataresBaseOcultos();
 
         foreach (scandir($this->avatarDir) ?: [] as $arquivo) {
             if ($arquivo === '.' || $arquivo === '..') {
+                continue;
+            }
+            if (in_array($arquivo, $ocultos, true)) {
                 continue;
             }
             if (strpos($arquivo, 'avatar_') === 0) {
@@ -235,6 +244,74 @@ class AvatarController extends BaseController
 
         natcasesort($arquivos);
         return array_values($arquivos);
+    }
+
+    /**
+     * Lista avatares base do sistema e avatares adicionados pela escola.
+     *
+     * @return list<array{valor:string, arquivo:string, url:string}>
+     */
+    private function listarAvataresDisponiveis(): array
+    {
+        $opcoes = [];
+
+        foreach ($this->listarAvataresPredefinidos() as $arquivo) {
+            $opcoes[] = [
+                'valor' => $arquivo,
+                'arquivo' => $arquivo,
+                'url' => '/assets/avatars/' . $arquivo,
+            ];
+        }
+
+        $dirTenant = $this->media->getLocalPath('avatars', 'predefinidos');
+        if (is_string($dirTenant) && is_dir($dirTenant)) {
+            foreach (scandir($dirTenant) ?: [] as $arquivo) {
+                if ($arquivo === '.' || $arquivo === '..') {
+                    continue;
+                }
+                if ($arquivo !== basename($arquivo)) {
+                    continue;
+                }
+                $ext = strtolower(pathinfo($arquivo, PATHINFO_EXTENSION));
+                if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp', 'gif'], true)) {
+                    continue;
+                }
+                $key = 'predefinidos/' . $arquivo;
+                if (!$this->media->exists('avatars', $key)) {
+                    continue;
+                }
+                $opcoes[] = [
+                    'valor' => $key,
+                    'arquivo' => $arquivo,
+                    'url' => $this->media->getDisplayUrl('avatars', $key),
+                ];
+            }
+        }
+
+        return $opcoes;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function avataresBaseOcultos(): array
+    {
+        try {
+            $row = $this->db->fetch(
+                "SELECT config_value FROM config_layout WHERE config_key = :config_key LIMIT 1",
+                ['config_key' => 'student_avatar_base_hidden']
+            );
+            $decoded = json_decode((string) ($row['config_value'] ?? '[]'), true);
+            if (!is_array($decoded)) {
+                return [];
+            }
+
+            return array_values(array_filter(array_map('strval', $decoded), static function (string $arquivo): bool {
+                return $arquivo !== '' && $arquivo === basename($arquivo);
+            }));
+        } catch (Throwable $e) {
+            return [];
+        }
     }
 
     /**
