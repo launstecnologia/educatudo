@@ -12,7 +12,7 @@ $conflitos = $status['conflitos'] ?? ['bloqueios' => [], 'alertas' => [], 'infos
 $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
 ?>
 <div class="max-w-3xl mx-auto px-4 py-6 space-y-6 pb-28">
-    <a href="<?= URL ?>/expo-colag" class="text-sm text-primary hover:underline">← Voltar ao mural</a>
+    <a href="<?= URL ?>/expo-colag" class="text-sm text-accent hover:underline">← Voltar ao mural</a>
 
     <div class="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
         <?php
@@ -115,10 +115,10 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
                 <h2 class="text-sm font-semibold text-gray-800 mb-2">Pesquisa e ideias</h2>
                 <div class="flex flex-wrap gap-2">
                     <?php if (!empty($projeto['educalabs_ativa'])): ?>
-                        <a href="<?= URL ?>/educalabs/access" class="inline-flex px-3 py-1.5 rounded-lg bg-indigo-800 text-white text-sm font-semibold hover:bg-indigo-900">EducaLabs</a>
+                        <a href="<?= URL ?>/educalabs/access" class="btn-primary-custom inline-flex px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">EducaLabs</a>
                     <?php endif; ?>
                     <?php if (!empty($projeto['tudinha_ativa'])): ?>
-                        <a href="<?= URL ?>/chat" class="inline-flex px-3 py-1.5 rounded-lg border border-indigo-800 text-indigo-800 text-sm font-semibold hover:bg-indigo-50">Tudinha</a>
+                        <a href="<?= URL ?>/chat" class="btn-primary-custom inline-flex px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">Tudinha</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -132,7 +132,7 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
                         <li>
                             <?php $href = $m['link_externo'] ?? $m['arquivo_url'] ?? ''; ?>
                             <?php if ($href): ?>
-                                <a href="<?= htmlspecialchars($href) ?>" target="_blank" rel="noopener" class="text-primary hover:underline"><?= htmlspecialchars($m['titulo'] ?? 'Material') ?></a>
+                                <a href="<?= htmlspecialchars($href) ?>" target="_blank" rel="noopener" class="text-accent hover:underline"><?= htmlspecialchars($m['titulo'] ?? 'Material') ?></a>
                             <?php else: ?>
                                 <?= htmlspecialchars($m['titulo'] ?? 'Material') ?>
                             <?php endif; ?>

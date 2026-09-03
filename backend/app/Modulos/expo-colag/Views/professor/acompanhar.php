@@ -5,12 +5,14 @@ $relacoes = $relacoes ?? [];
 $tarefas = $tarefas ?? [];
 $atribuicoes = $atribuicoes ?? [];
 $materiais = $materiais ?? [];
+$pedidos_materiais = $pedidos_materiais ?? [];
+$mensagens = $mensagens ?? [];
 $stand = $stand ?? null;
 $url_qr = $url_qr ?? null;
 $setores = $setores ?? [];
 $csrf_token = $csrf_token ?? '';
 $pid = (int) ($projeto['id'] ?? 0);
-$aba = in_array($aba ?? '', ['geral', 'participantes', 'tarefas', 'materiais', 'stand'], true)
+$aba = in_array($aba ?? '', ['geral', 'participantes', 'grupo', 'tarefas', 'materiais', 'stand'], true)
     ? $aba : 'geral';
 $etapas = $relacoes['etapas'] ?? [];
 $aprovados = array_values(array_filter($inscricoes, static fn($i) => ($i['status'] ?? '') === 'Aprovada'));
@@ -27,13 +29,16 @@ $badge = static function (string $st): string {
         'Concluida' => 'bg-emerald-100 text-emerald-800',
         'Atrasada' => 'bg-red-100 text-red-800',
         'Devolvida' => 'bg-amber-100 text-amber-800',
+        'Aprovado' => 'bg-emerald-100 text-emerald-800',
+        'Recusado' => 'bg-red-100 text-red-800',
     ];
     return $map[$st] ?? 'bg-slate-100 text-slate-700';
 };
 
 $tabs = [
     'geral' => 'Visão geral',
-    'participantes' => 'Participantes',
+    'participantes' => 'Alunos do grupo',
+    'grupo' => 'Conversa',
     'tarefas' => 'Tarefas',
     'materiais' => 'Materiais',
     'stand' => 'Stand / QR',
@@ -46,14 +51,17 @@ foreach ($atribuicoes as $a) {
 <div class="mb-6 space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-            <a href="<?= URL ?>/professor/expo-colag" class="text-sm text-primary hover:underline">← Expo Colag</a>
+            <a href="<?= URL ?>/professor/expo-colag" class="text-sm text-accent hover:underline">← Expo Colag</a>
             <h2 class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h2>
             <p class="text-sm text-gray-600">
-                Status: <?= htmlspecialchars(str_replace('_', ' ', $projeto['status'] ?? '')) ?>
-                · <?= count($aprovados) ?> aprovado(s)
+                Meu painel · <?= htmlspecialchars(str_replace('_', ' ', $projeto['status'] ?? '')) ?>
+                · <?= count($aprovados) ?> aluno(s) no grupo
             </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
+            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
+               target="_blank" rel="noopener"
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">PDF materiais</a>
             <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/editar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Editar</a>
             <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Preview</a>
         </div>
@@ -62,7 +70,7 @@ foreach ($atribuicoes as $a) {
     <nav class="flex flex-wrap gap-1 border-b border-gray-200">
         <?php foreach ($tabs as $key => $label): ?>
             <a href="?aba=<?= $key ?>"
-               class="px-3 py-2 text-sm font-medium rounded-t-lg <?= $aba === $key ? 'bg-white border border-b-white border-gray-200 text-primary -mb-px' : 'text-gray-600 hover:text-gray-900' ?>">
+               class="px-3 py-2 text-sm font-medium rounded-t-lg <?= $aba === $key ? 'bg-white border border-b-white border-gray-200 text-accent -mb-px' : 'text-gray-600 hover:text-gray-900' ?>">
                 <?= htmlspecialchars($label) ?>
             </a>
         <?php endforeach; ?>
@@ -98,7 +106,7 @@ foreach ($atribuicoes as $a) {
                     <h2 class="font-semibold text-gray-900">Materiais do almoxarifado</h2>
                     <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
                        target="_blank" rel="noopener"
-                       class="text-sm font-semibold text-indigo-800 hover:underline">Exportar PDF</a>
+                       class="text-sm font-semibold text-accent hover:underline">Exportar PDF</a>
                 </div>
                 <ul class="text-sm space-y-1">
                     <?php foreach ($listaAlmoxAcomp as $item): ?>
@@ -129,7 +137,7 @@ foreach ($atribuicoes as $a) {
     <?php elseif ($aba === 'participantes'): ?>
         <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
             <?php if (empty($inscricoes)): ?>
-                <p class="px-6 py-8 text-sm text-gray-500">Nenhuma inscrição ainda.</p>
+                <p class="px-6 py-8 text-sm text-gray-500">Nenhum aluno no grupo ainda. Edite o projeto e marque alunos específicos, ou aprove inscrições.</p>
             <?php else: ?>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
@@ -186,12 +194,43 @@ foreach ($atribuicoes as $a) {
             <?php endif; ?>
         </div>
 
+    <?php elseif ($aba === 'grupo'): ?>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <h2 class="font-semibold text-gray-900">Conversa com o grupo</h2>
+            <p class="text-sm text-gray-600">Mensagens para os alunos já incluídos neste projeto — mesmo com as inscrições encerradas.</p>
+            <div class="max-h-80 overflow-y-auto space-y-3 border border-gray-100 rounded-lg p-3 bg-slate-50">
+                <?php if (empty($mensagens)): ?>
+                    <p class="text-sm text-gray-500">Nenhuma mensagem ainda. Envie o primeiro recado ao grupo.</p>
+                <?php else: foreach ($mensagens as $msg): ?>
+                    <?php $ehProf = ($msg['autor_tipo'] ?? '') === 'professor'; ?>
+                    <div class="text-sm <?= $ehProf ? 'text-right' : '' ?>">
+                        <p class="text-xs text-gray-500 mb-0.5">
+                            <?= htmlspecialchars($msg['autor_nome'] ?? ($ehProf ? 'Professor' : 'Aluno')) ?>
+                            <?php if (!empty($msg['created_at'])): ?>
+                                · <?= htmlspecialchars(date('d/m H:i', strtotime($msg['created_at']))) ?>
+                            <?php endif; ?>
+                        </p>
+                        <p class="inline-block max-w-[90%] text-left rounded-lg px-3 py-2 <?= $ehProf ? 'bg-indigo-50 text-indigo-950' : 'bg-white border border-gray-200 text-gray-800' ?>">
+                            <?= nl2br(htmlspecialchars($msg['mensagem'] ?? '')) ?>
+                        </p>
+                    </div>
+                <?php endforeach; endif; ?>
+            </div>
+            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/mensagens" class="space-y-2">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                <textarea name="mensagem" required maxlength="2000" rows="3" placeholder="Escreva para o grupo…"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm"></textarea>
+                <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">Enviar</button>
+            </form>
+        </div>
+
     <?php elseif ($aba === 'tarefas'): ?>
         <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
             <h2 class="font-semibold text-gray-900">Nova tarefa</h2>
+            <p class="text-sm text-gray-600">Cria e atribui ao grupo já formado, mesmo com as inscrições encerradas.</p>
             <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                <input type="hidden" name="atribuir" value="todos">
+                <input type="hidden" name="atribuir" value="<?= $aprovados ? 'selecionados' : 'todos' ?>">
                 <div class="sm:col-span-2">
                     <label class="block text-gray-600 mb-1">Título</label>
                     <input type="text" name="titulo" required class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
@@ -229,8 +268,23 @@ foreach ($atribuicoes as $a) {
                     <textarea name="descricao" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white"></textarea>
                 </div>
                 <div class="sm:col-span-2">
-                    <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Criar e atribuir aos aprovados</button>
-                    <p class="text-xs text-gray-500 mt-1"><?= count($aprovados) ?> aluno(s) aprovado(s) receberão a tarefa.</p>
+                    <label class="block text-gray-600 mb-1">Alunos do grupo</label>
+                    <?php if (empty($aprovados)): ?>
+                        <p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">Nenhum aluno aprovado ainda. Inclua alunos na edição do projeto ou aprove inscrições.</p>
+                    <?php else: ?>
+                        <div class="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border border-gray-200 px-3 py-2">
+                            <?php foreach ($aprovados as $ap): ?>
+                                <label class="inline-flex items-center gap-2 text-gray-800">
+                                    <input type="checkbox" name="inscricao_ids[]" value="<?= (int) $ap['id'] ?>" checked class="rounded border-gray-300">
+                                    <?= htmlspecialchars($ap['aluno_nome'] ?? 'Aluno') ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <div class="sm:col-span-2">
+                    <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90" <?= empty($aprovados) ? 'disabled' : '' ?>>Criar tarefa</button>
+                    <p class="text-xs text-gray-500 mt-1">Desmarque quem não deve receber esta tarefa.</p>
                 </div>
             </form>
         </div>
@@ -272,19 +326,19 @@ foreach ($atribuicoes as $a) {
                                         <p class="mt-1 text-gray-600 whitespace-pre-line"><?= htmlspecialchars($a['entrega_conteudo']) ?></p>
                                     <?php endif; ?>
                                     <?php if (!empty($a['entrega_arquivo_url'])): ?>
-                                        <a href="<?= htmlspecialchars($a['entrega_arquivo_url']) ?>" target="_blank" rel="noopener" class="text-primary hover:underline text-xs">Abrir entrega</a>
+                                        <a href="<?= htmlspecialchars($a['entrega_arquivo_url']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs">Abrir entrega</a>
                                     <?php endif; ?>
                                     <?php if (!empty($a['comentario_professor'])): ?>
                                         <p class="mt-1 text-xs text-amber-800">Feedback: <?= htmlspecialchars($a['comentario_professor']) ?></p>
                                     <?php endif; ?>
                                 </div>
-                                <?php if (($a['status'] ?? '') === 'Entregue'): ?>
+                                <?php if (($a['status'] ?? '') !== 'Concluida'): ?>
                                     <div class="flex flex-col gap-2 min-w-[180px]">
                                         <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas/decidir">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                             <input type="hidden" name="atribuicao_id" value="<?= (int) $a['id'] ?>">
                                             <input type="hidden" name="acao" value="concluir">
-                                            <button type="submit" class="text-xs font-medium text-emerald-700 hover:underline">Concluir</button>
+                                            <button type="submit" class="btn-primary-custom px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90">Concluir</button>
                                         </form>
                                         <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas/decidir" class="space-y-1"
                                               onsubmit="var c=this.querySelector('[name=comentario]'); if(!c.value.trim()){alert('Comentário obrigatório'); return false;}">
@@ -304,6 +358,60 @@ foreach ($atribuicoes as $a) {
         <?php endforeach; endif; ?>
 
     <?php elseif ($aba === 'materiais'): ?>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-gray-600">Lista para autorização da coordenação e retirada no almoxarifado.</p>
+            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
+               target="_blank" rel="noopener"
+               class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Gerar PDF</a>
+        </div>
+        <?php if (!empty($pedidos_materiais)): ?>
+        <div class="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
+            <div class="px-5 py-3">
+                <h2 class="font-semibold text-gray-900">Pedidos dos alunos</h2>
+            </div>
+            <?php foreach ($pedidos_materiais as $pedido): ?>
+                <?php $stPedido = (string) ($pedido['status'] ?? 'Pendente'); ?>
+                <div class="px-5 py-3 text-sm space-y-2">
+                    <div class="flex flex-wrap justify-between gap-2">
+                        <div>
+                            <p class="font-medium text-gray-900"><?= htmlspecialchars($pedido['titulo'] ?? '') ?>
+                                <?php if (!empty($pedido['quantidade'])): ?>
+                                    <span class="text-gray-500 font-normal"> · <?= htmlspecialchars($pedido['quantidade']) ?></span>
+                                <?php endif; ?>
+                            </p>
+                            <p class="text-xs text-gray-500"><?= htmlspecialchars($pedido['aluno_nome'] ?? 'Aluno') ?>
+                                <?php if (!empty($pedido['observacao'])): ?>
+                                    · <?= htmlspecialchars($pedido['observacao']) ?>
+                                <?php endif; ?>
+                            </p>
+                            <?php if (!empty($pedido['resposta_professor'])): ?>
+                                <p class="text-xs text-gray-600 mt-1">Resposta: <?= htmlspecialchars($pedido['resposta_professor']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs h-fit <?= $badge($stPedido) ?>"><?= htmlspecialchars($stPedido) ?></span>
+                    </div>
+                    <?php if ($stPedido === 'Pendente'): ?>
+                        <div class="flex flex-wrap gap-2">
+                            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/pedidos-materiais/decidir">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                                <input type="hidden" name="pedido_id" value="<?= (int) $pedido['id'] ?>">
+                                <input type="hidden" name="acao" value="aprovar">
+                                <button type="submit" class="btn-primary-custom px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90">Aprovar</button>
+                            </form>
+                            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/pedidos-materiais/decidir" class="flex flex-wrap gap-2 items-center"
+                                  onsubmit="var c=this.querySelector('[name=resposta]'); if(!c.value.trim()){alert('Informe o motivo da recusa'); return false;}">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                                <input type="hidden" name="pedido_id" value="<?= (int) $pedido['id'] ?>">
+                                <input type="hidden" name="acao" value="recusar">
+                                <input type="text" name="resposta" placeholder="Motivo da recusa" class="border border-gray-300 rounded-lg px-2 py-1 text-xs bg-white">
+                                <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">Recusar</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
             <h2 class="font-semibold text-gray-900">Adicionar material</h2>
             <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
@@ -331,7 +439,7 @@ foreach ($atribuicoes as $a) {
                         <?php
                         $link = $m['link_externo'] ?: ($m['arquivo_url'] ?? '');
                         if ($link): ?>
-                            <a href="<?= htmlspecialchars($link) ?>" target="_blank" rel="noopener" class="text-primary hover:underline text-xs">Abrir</a>
+                            <a href="<?= htmlspecialchars($link) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs">Abrir</a>
                         <?php endif; ?>
                     </div>
                     <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais/remover" onsubmit="return confirm('Remover?');">
@@ -383,7 +491,7 @@ foreach ($atribuicoes as $a) {
             <?php if ($url_qr): ?>
                 <div class="rounded-lg bg-slate-50 border border-slate-200 p-4 text-sm space-y-2">
                     <p class="font-medium text-gray-900">URL do QR</p>
-                    <a href="<?= htmlspecialchars($url_qr) ?>" target="_blank" rel="noopener" class="text-primary break-all hover:underline"><?= htmlspecialchars($url_qr) ?></a>
+                    <a href="<?= htmlspecialchars($url_qr) ?>" target="_blank" rel="noopener" class="text-accent break-all hover:underline"><?= htmlspecialchars($url_qr) ?></a>
                     <p class="text-xs text-gray-500">Imprima este link como QR no dia do evento. Token: <code><?= htmlspecialchars($stand['qr_token'] ?? '') ?></code></p>
                 </div>
             <?php endif; ?>

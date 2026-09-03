@@ -78,7 +78,7 @@ $badgeStatus = static function (string $st): string {
                     <input type="hidden" name="voltar" value="index">
                     <button type="submit" class="text-emerald-700 font-medium hover:underline">Aprovar</button>
                 </form>
-                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $pend['projeto_id'] ?>/acompanhar?aba=participantes" class="text-primary font-medium hover:underline">Ver</a>
+                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $pend['projeto_id'] ?>/acompanhar?aba=participantes" class="text-accent font-medium hover:underline">Ver</a>
             </div>
         </li>
         <?php endforeach; ?>
@@ -122,9 +122,13 @@ $badgeStatus = static function (string $st): string {
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-600"><?= (int) ($p['vagas_totais'] ?? 0) ?></td>
                             <td class="px-4 py-3 text-sm text-right whitespace-nowrap">
-                                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/acompanhar" class="text-primary font-medium hover:underline">Acompanhar</a>
+                                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/acompanhar"
+                                   class="btn-primary-custom inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90">Meu painel</a>
+                                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/materiais-pdf"
+                                   target="_blank" rel="noopener"
+                                   class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 text-gray-800 bg-white hover:bg-gray-50 ml-1">PDF materiais</a>
                                 <span class="text-gray-300 mx-1">·</span>
-                                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/editar" class="text-gray-600 hover:underline">Editar</a>
+                                <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/editar" class="text-accent hover:underline">Editar</a>
                                 <span class="text-gray-300 mx-1">·</span>
                                 <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) $p['id'] ?>/preview" class="text-gray-600 hover:underline">Preview</a>
                                 <?php if ($st !== 'Concluido'): ?>

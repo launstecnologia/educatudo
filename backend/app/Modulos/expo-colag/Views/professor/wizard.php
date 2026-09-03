@@ -551,7 +551,7 @@ $steps = [
         <!-- Bloco 4 -->
         <section data-step="4" class="wizard-step hidden rounded-xl border border-gray-200 bg-white p-6 space-y-4">
             <h2 class="text-lg font-semibold text-gray-900">4. Visibilidade e inscrições</h2>
-            <p class="text-sm text-gray-600">Marque séries e/ou turmas. Opcionalmente refine por aluno.</p>
+            <p class="text-sm text-gray-600">Marque a série/turma e, se quiser um grupo fechado, escolha alunos específicos.</p>
             <div id="arvoreVisibilidade" class="space-y-3 max-h-80 overflow-y-auto border border-gray-100 rounded-lg p-3">
                 <?php foreach ($series as $serie): ?>
                     <?php
@@ -580,7 +580,7 @@ $steps = [
                                         <input type="checkbox" class="vis-turma" data-turma-id="<?= (int) $turma['id'] ?>" <?= in_array((int) $turma['id'], $visTurmas, true) ? 'checked' : '' ?>>
                                         <?= htmlspecialchars($turma['nome']) ?>
                                     </label>
-                                    <button type="button" class="btn-load-alunos text-xs text-primary ml-2" data-turma-id="<?= (int) $turma['id'] ?>">alunos</button>
+                                    <button type="button" class="btn-load-alunos btn-subir-capa ml-2" data-turma-id="<?= (int) $turma['id'] ?>">Escolher alunos</button>
                                     <div class="alunos-box ml-4 mt-1 space-y-1 hidden" data-turma-id="<?= (int) $turma['id'] ?>"></div>
                                 </div>
                             <?php endforeach; ?>
@@ -594,6 +594,10 @@ $steps = [
                     <input type="hidden" class="vis-aluno-seed" data-aluno-id="<?= (int) $aid ?>" value="<?= (int) $aid ?>">
                 <?php endforeach; ?>
             </div>
+            <label class="inline-flex items-start gap-2 text-sm text-gray-800">
+                <input type="checkbox" name="incluir_alunos_grupo" value="1" class="mt-0.5" checked>
+                <span>Incluir os alunos marcados no grupo agora (aprovados). Use isso para fechar o grupo sem esperar inscrição no mural.</span>
+            </label>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Inscrições — início</label>
@@ -1203,28 +1207,44 @@ $steps = [
     });
 
     // Alunos por turma
-    root.querySelectorAll('.btn-load-alunos').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var tid = btn.getAttribute('data-turma-id');
-            var box = root.querySelector('.alunos-box[data-turma-id="' + tid + '"]');
-            if (!box) return;
-            box.classList.remove('hidden');
-            if (box.dataset.loaded === '1') return;
-            box.textContent = 'Carregando…';
-            fetch(root.getAttribute('data-alunos-url') + '?turma_id=' + encodeURIComponent(tid))
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    box.innerHTML = '';
+    function carregarAlunosTurma(btn) {
+        var tid = btn.getAttribute('data-turma-id');
+        var box = root.querySelector('.alunos-box[data-turma-id="' + tid + '"]');
+        if (!box) return;
+        box.classList.remove('hidden');
+        if (box.dataset.loaded === '1') return;
+        box.textContent = 'Carregando…';
+        fetch(root.getAttribute('data-alunos-url') + '?turma_id=' + encodeURIComponent(tid))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                box.innerHTML = '';
                     (data.alunos || []).forEach(function (a) {
                         var lab = document.createElement('label');
-                        lab.className = 'inline-flex items-center gap-2 text-xs text-gray-600 mr-3';
-                        var checked = alunosSeed.indexOf(parseInt(a.id, 10)) >= 0 ? ' checked' : '';
-                        lab.innerHTML = '<input type="checkbox" class="vis-aluno" data-aluno-id="' + a.id + '"' + checked + '> ' + a.nome;
+                        lab.className = 'inline-flex items-center gap-2 text-xs text-gray-700 mr-3';
+                        var inp = document.createElement('input');
+                        inp.type = 'checkbox';
+                        inp.className = 'vis-aluno';
+                        inp.setAttribute('data-aluno-id', String(a.id));
+                        if (alunosSeed.indexOf(parseInt(a.id, 10)) >= 0) {
+                            inp.checked = true;
+                        }
+                        lab.appendChild(inp);
+                        lab.appendChild(document.createTextNode(' ' + String(a.nome || '')));
                         box.appendChild(lab);
+                        root.querySelectorAll('.vis-aluno-seed[data-aluno-id="' + a.id + '"]').forEach(function (s) { s.remove(); });
                     });
-                    box.dataset.loaded = '1';
-                });
-        });
+                if (!(data.alunos || []).length) {
+                    box.textContent = 'Nenhum aluno nesta turma.';
+                }
+                box.dataset.loaded = '1';
+            })
+            .catch(function () {
+                box.textContent = 'Não foi possível carregar os alunos.';
+            });
+    }
+    root.querySelectorAll('.btn-load-alunos').forEach(function (btn) {
+        btn.addEventListener('click', function () { carregarAlunosTurma(btn); });
+        carregarAlunosTurma(btn);
     });
 
     function collectJsonFields() {

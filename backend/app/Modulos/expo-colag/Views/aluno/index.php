@@ -1,6 +1,6 @@
 <?php
 $projetos = $projetos ?? [];
-$secoes = $secoes ?? ['destaques' => [], 'abertas' => [], 'meus' => [], 'encerrando' => []];
+$secoes = $secoes ?? ['abertas' => [], 'meus' => []];
 $filtros = $filtros ?? [];
 $areas = $areas ?? [];
 $edicao = $edicao ?? null;
@@ -13,11 +13,8 @@ $renderCard = static function (array $p): void {
     $barClass = $pct >= 100 ? 'bg-red-500' : ($pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500');
     ?>
     <a href="<?= URL ?>/expo-colag/projeto/<?= (int) $p['id'] ?>"
-       class="block rounded-xl border border-gray-200 bg-white p-4 hover:border-primary hover:shadow-md transition">
+       class="block rounded-xl border border-gray-200 bg-white p-4 hover:border-accent hover:shadow-md transition">
         <div class="flex flex-wrap gap-1 mb-2">
-            <?php if (!empty($p['destaque'])): ?>
-                <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Destaque</span>
-            <?php endif; ?>
             <?php if (!empty($p['minha_inscricao'])): ?>
                 <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Meu projeto</span>
             <?php endif; ?>
@@ -82,41 +79,58 @@ $renderCard = static function (array $p): void {
         <label class="inline-flex items-center gap-2 text-sm pb-2">
             <input type="checkbox" name="so_com_vagas" value="1" <?= !empty($filtros['so_com_vagas']) ? 'checked' : '' ?>> Só com vagas
         </label>
-        <label class="inline-flex items-center gap-2 text-sm pb-2">
-            <input type="checkbox" name="encerrando" value="1" <?= !empty($filtros['encerrando']) ? 'checked' : '' ?>> Encerrando em breve
-        </label>
         <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Filtrar</button>
     </form>
 
-    <?php if (!empty($minhas)): ?>
-    <div class="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
-        <h2 class="text-sm font-semibold text-emerald-900 mb-2">Minhas inscrições</h2>
-        <ul class="text-sm space-y-1">
-            <?php foreach ($minhas as $m): ?>
-                <?php if (!in_array($m['status'] ?? '', ['Aguardando', 'Aprovada', 'Lista_espera'], true)) continue; ?>
-                <li>
-                    <a href="<?= URL ?>/expo-colag/projeto/<?= (int) $m['projeto_id'] ?>" class="text-primary hover:underline font-medium">
-                        <?= htmlspecialchars($m['projeto_titulo'] ?? '') ?>
-                    </a>
-                    <span class="text-gray-500">· <?= htmlspecialchars(str_replace('_', ' ', $m['status'] ?? '')) ?></span>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    </div>
+    <?php
+    $meusCards = $secoes['meus'] ?? [];
+    $minhasAtivas = [];
+    foreach ($minhas as $m) {
+        if (in_array($m['status'] ?? '', ['Aguardando', 'Aprovada', 'Lista_espera'], true)) {
+            $minhasAtivas[] = $m;
+        }
+    }
+    ?>
+    <?php if ($meusCards !== [] || $minhasAtivas !== []): ?>
+        <section>
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">Meus projetos</h2>
+            <?php if ($meusCards !== []): ?>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <?php foreach ($meusCards as $p) { $renderCard($p); } ?>
+                </div>
+            <?php else: ?>
+                <div class="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+                    <ul class="text-sm space-y-1">
+                        <?php foreach ($minhasAtivas as $m): ?>
+                            <li>
+                                <a href="<?= URL ?>/expo-colag/projeto/<?= (int) $m['projeto_id'] ?>" class="text-accent hover:underline font-medium">
+                                    <?= htmlspecialchars($m['projeto_titulo'] ?? '') ?>
+                                </a>
+                                <span class="text-gray-500">· <?= htmlspecialchars(str_replace('_', ' ', $m['status'] ?? '')) ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </section>
     <?php endif; ?>
 
     <?php
     $blocos = [
-        ['key' => 'destaques', 'titulo' => 'Destaques'],
         ['key' => 'abertas', 'titulo' => 'Inscrições abertas'],
-        ['key' => 'meus', 'titulo' => 'Meus projetos'],
-        ['key' => 'encerrando', 'titulo' => 'Encerrando em breve'],
     ];
-    $algum = false;
+    $algum = $meusCards !== [] || $minhasAtivas !== [];
+    $idsMostrados = [];
+    foreach ($meusCards as $p) {
+        $idsMostrados[(int) ($p['id'] ?? 0)] = true;
+    }
     foreach ($blocos as $b):
         $lista = $secoes[$b['key']] ?? [];
         if ($lista === []) continue;
         $algum = true;
+        foreach ($lista as $p) {
+            $idsMostrados[(int) ($p['id'] ?? 0)] = true;
+        }
     ?>
         <section>
             <h2 class="text-lg font-semibold text-gray-900 mb-3"><?= htmlspecialchars($b['titulo']) ?></h2>
@@ -126,16 +140,24 @@ $renderCard = static function (array $p): void {
         </section>
     <?php endforeach; ?>
 
-    <?php if (!$algum && empty($projetos)): ?>
+    <?php
+    $outros = [];
+    foreach ($projetos as $p) {
+        if (empty($idsMostrados[(int) ($p['id'] ?? 0)])) {
+            $outros[] = $p;
+        }
+    }
+    ?>
+    <?php if ($outros !== []): ?>
+        <section>
+            <h2 class="text-lg font-semibold text-gray-900 mb-3"><?= $algum ? 'Outros projetos' : 'Todos os projetos' ?></h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <?php foreach ($outros as $p) { $renderCard($p); } ?>
+            </div>
+        </section>
+    <?php elseif (!$algum): ?>
         <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
             Nenhum projeto disponível com esses filtros.
         </div>
-    <?php elseif (!$algum && !empty($projetos)): ?>
-        <section>
-            <h2 class="text-lg font-semibold text-gray-900 mb-3">Todos os projetos</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <?php foreach ($projetos as $p) { $renderCard($p); } ?>
-            </div>
-        </section>
     <?php endif; ?>
 </div>

@@ -9,6 +9,8 @@ require_once __DIR__ . '/../Models/ExpoColagTarefa.php';
 require_once __DIR__ . '/../Models/ExpoColagStand.php';
 require_once __DIR__ . '/../Models/ExpoColagProgramacao.php';
 require_once __DIR__ . '/../Models/ExpoColagEdicao.php';
+require_once __DIR__ . '/../Models/ExpoColagPedidoMaterial.php';
+require_once __DIR__ . '/../Models/ExpoColagMensagem.php';
 require_once __DIR__ . '/ExpoColagService.php';
 
 class ExpoColagExecucaoService
@@ -18,6 +20,8 @@ class ExpoColagExecucaoService
     private ExpoColagTarefa $tarefaModel;
     private ExpoColagStand $standModel;
     private ExpoColagProgramacao $programacaoModel;
+    private ExpoColagPedidoMaterial $pedidoModel;
+    private ExpoColagMensagem $mensagemModel;
     private ExpoColagEdicao $edicaoModel;
     private ExpoColagService $expoService;
     private $db;
@@ -34,6 +38,8 @@ class ExpoColagExecucaoService
         $this->standModel = new ExpoColagStand();
         $this->programacaoModel = new ExpoColagProgramacao();
         $this->edicaoModel = new ExpoColagEdicao();
+        $this->pedidoModel = new ExpoColagPedidoMaterial();
+        $this->mensagemModel = new ExpoColagMensagem();
         $this->expoService = new ExpoColagService();
         $this->db = Database::getInstance();
     }
@@ -74,6 +80,8 @@ class ExpoColagExecucaoService
             'tarefas' => $this->tarefaModel->listarPorProjeto($projetoId),
             'atribuicoes' => $this->tarefaModel->listarAtribuicoesProjeto($projetoId),
             'materiais' => $this->listarMateriais($projetoId),
+            'pedidos_materiais' => $this->listarPedidosProjetoSeguro($projetoId),
+            'mensagens' => $this->listarMensagensSeguro($projetoId),
             'stand' => $stand,
             'url_qr' => $stand ? $this->urlPublicaStand((string) $stand['qr_token']) : null,
             'setores' => $this->programacaoModel->listarSetores((int) ($projeto['edicao_id'] ?? 0)),
@@ -96,6 +104,8 @@ class ExpoColagExecucaoService
         $concluidas = count(array_filter($tarefas, static fn($t) => ($t['status'] ?? '') === 'Concluida'));
         $stand = $this->standModel->findByProjeto($projetoId);
 
+        $solicitacao = $this->statusSolicitacaoMateriais($projeto, $insc);
+
         return [
             'success' => true,
             'projeto' => $projeto,
@@ -107,6 +117,10 @@ class ExpoColagExecucaoService
                 'concluidas' => $concluidas,
             ],
             'materiais' => $this->listarMateriais($projetoId),
+            'pedidos' => $this->listarPedidosAlunoSeguro($alunoId, $projetoId),
+            'pode_solicitar_materiais' => !empty($solicitacao['pode']),
+            'motivo_solicitacao' => (string) ($solicitacao['motivo'] ?? ''),
+            'mensagens' => $this->listarMensagensSeguro($projetoId),
             'stand' => $stand,
             'url_qr' => $stand ? $this->urlPublicaStand((string) $stand['qr_token']) : null,
         ];
@@ -147,6 +161,26 @@ class ExpoColagExecucaoService
             }
         }
 
+        $atribuir = (string) ($input['atribuir'] ?? 'todos');
+        $idsSelecionados = [];
+        if ($atribuir === 'selecionados') {
+            $ids = $input['inscricao_ids'] ?? [];
+            if (is_string($ids)) {
+                $ids = array_filter(array_map('intval', explode(',', $ids)));
+            }
+            if (is_array($ids)) {
+                foreach ($ids as $iid) {
+                    $insc = $this->inscricaoModel->findById((int) $iid);
+                    if ($insc && (int) $insc['projeto_id'] === $projetoId && ($insc['status'] ?? '') === 'Aprovada') {
+                        $idsSelecionados[] = (int) $iid;
+                    }
+                }
+            }
+            if ($idsSelecionados === []) {
+                return ['success' => false, 'error' => 'Selecione pelo menos um aluno do grupo.'];
+            }
+        }
+
         $id = $this->tarefaModel->create([
             'projeto_id' => $projetoId,
             'etapa_id' => $etapaId,
@@ -158,24 +192,10 @@ class ExpoColagExecucaoService
             'criada_por' => $professorId,
         ]);
 
-        $atribuir = (string) ($input['atribuir'] ?? 'todos');
-        if ($atribuir === 'todos') {
+        if ($atribuir === 'selecionados') {
+            $this->tarefaModel->atribuirInscricoes($id, $idsSelecionados);
+        } else {
             $this->tarefaModel->atribuirAprovados($id, $projetoId);
-        } elseif ($atribuir === 'selecionados') {
-            $ids = $input['inscricao_ids'] ?? [];
-            if (is_string($ids)) {
-                $ids = array_filter(array_map('intval', explode(',', $ids)));
-            }
-            if (is_array($ids)) {
-                $validos = [];
-                foreach ($ids as $iid) {
-                    $insc = $this->inscricaoModel->findById((int) $iid);
-                    if ($insc && (int) $insc['projeto_id'] === $projetoId && ($insc['status'] ?? '') === 'Aprovada') {
-                        $validos[] = (int) $iid;
-                    }
-                }
-                $this->tarefaModel->atribuirInscricoes($id, $validos);
-            }
         }
 
         return ['success' => true, 'id' => $id];
@@ -325,6 +345,195 @@ class ExpoColagExecucaoService
         }
         $this->db->query('DELETE FROM expo_colag_projeto_materiais WHERE id = :id', ['id' => $materialId]);
         return ['success' => true];
+    }
+
+    /**
+     * @return array{pode:bool,motivo?:string}
+     */
+    private function statusSolicitacaoMateriais(array $projeto, ?array $inscricao = null): array
+    {
+        if (!$inscricao || ($inscricao['status'] ?? '') !== 'Aprovada') {
+            return ['pode' => false, 'motivo' => 'Somente participantes aprovados podem solicitar materiais.'];
+        }
+        if (empty($projeto['permite_solicitacao_recursos'])) {
+            return ['pode' => false, 'motivo' => 'Este projeto não aceita solicitação de materiais.'];
+        }
+        $ed = $this->expoService->obterOuCriarEdicaoAtiva();
+        $config = $ed['edicao']['config_decoded'] ?? ExpoColagService::configPadrao();
+        $limite = trim((string) ($config['limite_solicitacao_recursos'] ?? ''));
+        if ($limite !== '') {
+            $fim = strtotime($limite . ' 23:59:59');
+            if ($fim && time() > $fim) {
+                return ['pode' => false, 'motivo' => 'O prazo para solicitar materiais já encerrou.'];
+            }
+        }
+        return ['pode' => true];
+    }
+
+    public function solicitarMaterialAluno(int $projetoId, int $alunoId, array $input): array
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto || empty($projeto['ativo']) || ($projeto['status'] ?? '') === 'Cancelado') {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+        $insc = $this->assertAlunoAprovado($projetoId, $alunoId);
+        if (!$insc) {
+            return ['success' => false, 'error' => 'Você precisa estar aprovado neste projeto.'];
+        }
+        $status = $this->statusSolicitacaoMateriais($projeto, $insc);
+        if (empty($status['pode'])) {
+            return ['success' => false, 'error' => $status['motivo'] ?? 'Não é possível solicitar materiais agora.'];
+        }
+        $titulo = trim((string) ($input['titulo'] ?? ''));
+        if ($titulo === '') {
+            return ['success' => false, 'error' => 'Informe o material solicitado.'];
+        }
+        try {
+            $id = $this->pedidoModel->create([
+                'projeto_id' => $projetoId,
+                'aluno_id' => $alunoId,
+                'inscricao_id' => (int) $insc['id'],
+                'titulo' => $titulo,
+                'quantidade' => $input['quantidade'] ?? null,
+                'observacao' => $input['observacao'] ?? null,
+            ]);
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'Não foi possível registrar o pedido. Peça à coordenação para atualizar o módulo.'];
+        }
+        return ['success' => true, 'id' => $id];
+    }
+
+    public function decidirPedidoMaterial(
+        int $pedidoId,
+        int $professorId,
+        string $acao,
+        ?string $resposta = null,
+        ?int $projetoIdEsperado = null
+    ): array {
+        $pedido = $this->pedidoModel->findById($pedidoId);
+        if (!$pedido || !$this->assertProjetoProfessor((int) $pedido['projeto_id'], $professorId)) {
+            return ['success' => false, 'error' => 'Pedido não encontrado.'];
+        }
+        if ($projetoIdEsperado !== null && (int) $pedido['projeto_id'] !== $projetoIdEsperado) {
+            return ['success' => false, 'error' => 'Pedido não encontrado.'];
+        }
+        if (($pedido['status'] ?? '') !== 'Pendente') {
+            return ['success' => false, 'error' => 'Este pedido já foi decidido.'];
+        }
+        $status = $acao === 'aprovar' ? 'Aprovado' : ($acao === 'recusar' ? 'Recusado' : '');
+        if ($status === '') {
+            return ['success' => false, 'error' => 'Ação inválida.'];
+        }
+        $respostaTrim = trim((string) $resposta);
+        if ($status === 'Recusado' && $respostaTrim === '') {
+            return ['success' => false, 'error' => 'Informe o motivo da recusa.'];
+        }
+        $ok = $this->pedidoModel->decidir($pedidoId, $status, $professorId, $respostaTrim !== '' ? $respostaTrim : null);
+        if (!$ok) {
+            return ['success' => false, 'error' => 'Este pedido já foi decidido.'];
+        }
+        return ['success' => true];
+    }
+
+    /** @return list<array> */
+    private function listarPedidosAlunoSeguro(int $alunoId, int $projetoId): array
+    {
+        try {
+            return $this->pedidoModel->listarPorAlunoProjeto($alunoId, $projetoId);
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /** @return list<array> */
+    private function listarPedidosProjetoSeguro(int $projetoId): array
+    {
+        try {
+            return $this->pedidoModel->listarPorProjeto($projetoId);
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /** @return list<array> */
+    private function listarMensagensSeguro(int $projetoId): array
+    {
+        try {
+            return $this->mensagemModel->listarPorProjeto($projetoId);
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    public function enviarMensagemProfessor(int $projetoId, int $professorId, string $texto): array
+    {
+        $projeto = $this->assertProjetoProfessor($projetoId, $professorId);
+        if (!$projeto) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+        if (($projeto['status'] ?? '') === 'Cancelado') {
+            return ['success' => false, 'error' => 'Este projeto foi cancelado.'];
+        }
+        return $this->gravarMensagem($projetoId, 'professor', $professorId, $texto);
+    }
+
+    public function enviarMensagemAluno(int $projetoId, int $alunoId, string $texto): array
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto || empty($projeto['ativo']) || ($projeto['status'] ?? '') === 'Cancelado') {
+            return ['success' => false, 'error' => 'Este projeto não está disponível.'];
+        }
+        if (!$this->assertAlunoAprovado($projetoId, $alunoId)) {
+            return ['success' => false, 'error' => 'Você precisa estar no grupo deste projeto.'];
+        }
+        return $this->gravarMensagem($projetoId, 'aluno', $alunoId, $texto);
+    }
+
+    private function gravarMensagem(int $projetoId, string $tipo, int $autorId, string $texto): array
+    {
+        $texto = trim($texto);
+        if ($texto === '') {
+            return ['success' => false, 'error' => 'Escreva uma mensagem.'];
+        }
+        try {
+            $this->mensagemModel->create([
+                'projeto_id' => $projetoId,
+                'autor_tipo' => $tipo,
+                'autor_id' => $autorId,
+                'mensagem' => $texto,
+            ]);
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => 'Não foi possível enviar. Peça à coordenação para atualizar o módulo.'];
+        }
+        return ['success' => true];
+    }
+
+    /** @return list<array{nome:string,quantidade:string,observacao:string}> */
+    public function itensPdfAlmoxarifado(int $projetoId): array
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        $itens = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+        $out = [];
+        foreach ($itens as $item) {
+            $out[] = [
+                'nome' => (string) ($item['nome'] ?? ''),
+                'quantidade' => (string) ($item['quantidade'] ?? ''),
+                'observacao' => (string) ($item['observacao'] ?? ''),
+            ];
+        }
+        foreach ($this->listarPedidosProjetoSeguro($projetoId) as $pedido) {
+            if (($pedido['status'] ?? '') !== 'Aprovado') {
+                continue;
+            }
+            $obs = trim((string) ($pedido['observacao'] ?? ''));
+            $aluno = trim((string) ($pedido['aluno_nome'] ?? 'aluno'));
+            $out[] = [
+                'nome' => (string) ($pedido['titulo'] ?? ''),
+                'quantidade' => (string) ($pedido['quantidade'] ?? ''),
+                'observacao' => trim('Pedido de ' . $aluno . ($obs !== '' ? ' — ' . $obs : '')),
+            ];
+        }
+        return $out;
     }
 
     public function garantirStand(int $projetoId, int $professorId, array $input = []): array

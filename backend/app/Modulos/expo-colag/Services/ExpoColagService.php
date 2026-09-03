@@ -319,6 +319,16 @@ class ExpoColagService
         $this->db->query('DELETE FROM expo_colag_projeto_encontros WHERE projeto_id = :id', $params);
         $this->db->query('DELETE FROM expo_colag_projeto_rubrica WHERE projeto_id = :id', $params);
         $this->db->query('DELETE FROM expo_colag_projeto_materiais WHERE projeto_id = :id', $params);
+        try {
+            $this->db->query('DELETE FROM expo_colag_pedidos_materiais WHERE projeto_id = :id', $params);
+        } catch (Throwable $e) {
+            // tabela ainda não migrada
+        }
+        try {
+            $this->db->query('DELETE FROM expo_colag_mensagens WHERE projeto_id = :id', $params);
+        } catch (Throwable $e) {
+            // tabela ainda não migrada
+        }
     }
 
     public function indicadoresProfessor(int $professorId): array
@@ -343,14 +353,13 @@ class ExpoColagService
     }
 
     /**
-     * @param array{area?:string,so_com_vagas?:bool,encerrando?:bool,q?:string} $filtros
+     * @param array{area?:string,so_com_vagas?:bool,q?:string} $filtros
      */
     public function listarMuralAluno(int $alunoId = 0, array $filtros = []): array
     {
         $projetos = $this->projetoModel->listarPublicados();
         $ctx = $alunoId > 0 ? $this->contextoVisibilidadeAluno($alunoId) : null;
         $minhasAtivas = $alunoId > 0 ? $this->inscricaoModel->projetosAtivosIds($alunoId) : [];
-        $agora = time();
         $out = [];
         foreach ($projetos as $p) {
             if ($ctx && !$this->alunoPodeVerProjeto((int) $p['id'], $ctx)) {
@@ -370,12 +379,6 @@ class ExpoColagService
             if (!empty($filtros['so_com_vagas']) && !empty($p['lotado'])) {
                 continue;
             }
-            if (!empty($filtros['encerrando'])) {
-                $fim = !empty($p['inscricoes_fim']) ? strtotime((string) $p['inscricoes_fim']) : false;
-                if (!$fim || $fim < $agora || ($fim - $agora) > 7 * 86400) {
-                    continue;
-                }
-            }
             if (!empty($filtros['q'])) {
                 $q = mb_strtolower(trim((string) $filtros['q']));
                 $hay = mb_strtolower(($p['titulo'] ?? '') . ' ' . ($p['subtitulo'] ?? '') . ' ' . ($p['area'] ?? '') . ' ' . ($p['professor_nome'] ?? ''));
@@ -389,30 +392,21 @@ class ExpoColagService
         return $out;
     }
 
-    /** @return array{destaques:list,abertas:list,meus:list,encerrando:list} */
+    /** @return array{abertas:list,meus:list} */
     public function organizarMural(array $projetos): array
     {
-        $agora = time();
-        $destaques = [];
         $abertas = [];
         $meus = [];
-        $encerrando = [];
         foreach ($projetos as $p) {
             if (!empty($p['minha_inscricao'])) {
                 $meus[] = $p;
-            }
-            if (!empty($p['destaque'])) {
-                $destaques[] = $p;
+                continue;
             }
             if (!empty($p['janela_aberta']) && empty($p['lotado'])) {
                 $abertas[] = $p;
             }
-            $fim = !empty($p['inscricoes_fim']) ? strtotime((string) $p['inscricoes_fim']) : false;
-            if ($fim && $fim >= $agora && ($fim - $agora) <= 7 * 86400) {
-                $encerrando[] = $p;
-            }
         }
-        return compact('destaques', 'abertas', 'meus', 'encerrando');
+        return compact('abertas', 'meus');
     }
 
     /**
@@ -1222,12 +1216,78 @@ class ExpoColagService
             return ['success' => false, 'error' => 'Falha ao salvar relações do projeto. Tente novamente.'];
         }
 
+        if (!empty($input['incluir_alunos_grupo'])) {
+            $alunoIds = [];
+            foreach ($visibilidade as $v) {
+                if (($v['escopo'] ?? '') === 'Aluno') {
+                    $alunoIds[] = (int) ($v['referencia_id'] ?? 0);
+                }
+            }
+            $this->incluirAlunosNoGrupo($projetoId, $professorId, $alunoIds);
+        }
+
         return [
             'success' => true,
             'id' => $projetoId,
             'capa_url' => $capaUrl,
             'capa_src' => self::resolverUrlCapa($capaUrl, $projetoId),
         ];
+    }
+
+    /**
+     * Inclui alunos marcados no wizard como aprovados no grupo (convite do professor).
+     *
+     * @param list<int> $alunoIds
+     */
+    public function incluirAlunosNoGrupo(int $projetoId, int $professorId, array $alunoIds): void
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto || (int) $projeto['professor_id'] !== $professorId) {
+            return;
+        }
+        $ids = [];
+        foreach ($alunoIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return;
+        }
+        foreach ($ids as $alunoId) {
+            $aluno = $this->db->fetch(
+                'SELECT id FROM alunos WHERE id = :id AND ativo = 1',
+                ['id' => $alunoId]
+            );
+            if (!$aluno) {
+                continue;
+            }
+            $existente = $this->inscricaoModel->findByProjetoAluno($projetoId, $alunoId);
+            if (!$existente) {
+                $this->inscricaoModel->create([
+                    'projeto_id' => $projetoId,
+                    'aluno_id' => $alunoId,
+                    'status' => 'Aprovada',
+                    'justificativa' => 'Incluído pelo professor',
+                ]);
+                continue;
+            }
+            $statusAtual = (string) ($existente['status'] ?? '');
+            if ($statusAtual === 'Aprovada') {
+                continue;
+            }
+            // Não reabre recusa, cancelamento do aluno ou remoção do professor.
+            if (!in_array($statusAtual, ['Aguardando', 'Lista_espera'], true)) {
+                continue;
+            }
+            $this->inscricaoModel->atualizarStatus(
+                (int) $existente['id'],
+                'Aprovada',
+                $professorId,
+                null
+            );
+        }
     }
 
     /**

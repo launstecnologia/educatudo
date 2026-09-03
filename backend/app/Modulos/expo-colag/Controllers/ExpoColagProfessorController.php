@@ -78,13 +78,15 @@ class ExpoColagProfessorController extends BaseController
         $this->viewWithLayout('professor', 'professor/expo-colag/acompanhar', [
             'user' => $user,
             'current_page' => 'expo-colag',
-            'page_title' => 'Acompanhar projeto',
+            'page_title' => 'Meu painel',
             'projeto' => $painel['projeto'],
             'relacoes' => $painel['relacoes'],
             'inscricoes' => $painel['inscricoes'],
             'tarefas' => $painel['tarefas'],
             'atribuicoes' => $painel['atribuicoes'],
             'materiais' => $painel['materiais'],
+            'pedidos_materiais' => $painel['pedidos_materiais'] ?? [],
+            'mensagens' => $painel['mensagens'] ?? [],
             'stand' => $painel['stand'],
             'url_qr' => $painel['url_qr'],
             'setores' => $painel['setores'],
@@ -177,6 +179,48 @@ class ExpoColagProfessorController extends BaseController
             $result['success'] ? 'success' : 'error'
         );
         $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
+    }
+
+    public function decidirPedidoMaterial($id): void
+    {
+        $user = $this->requireProfessor();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
+            return;
+        }
+        $result = $this->execucao->decidirPedidoMaterial(
+            (int) ($_POST['pedido_id'] ?? 0),
+            (int) $user['id'],
+            trim((string) ($_POST['acao'] ?? '')),
+            trim((string) ($_POST['resposta'] ?? '')) ?: null,
+            (int) $id
+        );
+        $this->setFlashMessage(
+            $result['success'] ? 'Pedido atualizado.' : ($result['error'] ?? 'Erro.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
+    }
+
+    public function enviarMensagem($id): void
+    {
+        $user = $this->requireProfessor();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=grupo');
+            return;
+        }
+        $result = $this->execucao->enviarMensagemProfessor(
+            (int) $id,
+            (int) $user['id'],
+            (string) ($_POST['mensagem'] ?? '')
+        );
+        $this->setFlashMessage(
+            $result['success'] ? 'Mensagem enviada.' : ($result['error'] ?? 'Erro ao enviar.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=grupo');
     }
 
     public function salvarStand($id): void
@@ -383,7 +427,7 @@ class ExpoColagProfessorController extends BaseController
         }
 
         $projeto = $completo['projeto'];
-        $itens = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+        $itens = $this->execucao->itensPdfAlmoxarifado((int) $id);
         $escola = class_exists('LayoutHelper')
             ? (string) LayoutHelper::getSystemTitle()
             : 'Escola';

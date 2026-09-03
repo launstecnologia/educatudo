@@ -37,7 +37,6 @@ class ExpoColagAlunoController extends BaseController
         $filtros = [
             'area' => trim((string) ($_GET['area'] ?? '')),
             'so_com_vagas' => !empty($_GET['so_com_vagas']),
-            'encerrando' => !empty($_GET['encerrando']),
             'q' => trim((string) ($_GET['q'] ?? '')),
         ];
         $projetos = $this->service->listarMuralAluno((int) $user['id'], $filtros);
@@ -181,11 +180,51 @@ class ExpoColagAlunoController extends BaseController
             'tarefas' => $painel['tarefas'],
             'progresso' => $painel['progresso'],
             'materiais' => $painel['materiais'],
+            'pedidos' => $painel['pedidos'] ?? [],
+            'pode_solicitar_materiais' => !empty($painel['pode_solicitar_materiais']),
+            'motivo_solicitacao' => $painel['motivo_solicitacao'] ?? '',
+            'mensagens' => $painel['mensagens'] ?? [],
             'stand' => $painel['stand'],
             'url_qr' => $painel['url_qr'],
-            'aba' => trim((string) ($_GET['aba'] ?? 'painel')),
+            'aba' => trim((string) ($_GET['aba'] ?? 'progresso')),
             'csrf_token' => $this->generateCsrfToken(),
         ]);
+    }
+
+    public function solicitarMaterial($id): void
+    {
+        $user = $this->requireAluno();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/expo-colag/projeto/' . (int) $id . '/painel?aba=materiais');
+            return;
+        }
+        $result = $this->execucao->solicitarMaterialAluno((int) $id, (int) $user['id'], $_POST);
+        $this->setFlashMessage(
+            $result['success'] ? 'Pedido enviado ao professor.' : ($result['error'] ?? 'Erro ao solicitar.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/expo-colag/projeto/' . (int) $id . '/painel?aba=materiais');
+    }
+
+    public function enviarMensagem($id): void
+    {
+        $user = $this->requireAluno();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/expo-colag/projeto/' . (int) $id . '/painel?aba=grupo');
+            return;
+        }
+        $result = $this->execucao->enviarMensagemAluno(
+            (int) $id,
+            (int) $user['id'],
+            (string) ($_POST['mensagem'] ?? '')
+        );
+        $this->setFlashMessage(
+            $result['success'] ? 'Mensagem enviada.' : ($result['error'] ?? 'Erro ao enviar.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/expo-colag/projeto/' . (int) $id . '/painel?aba=grupo');
     }
 
     public function entregarTarefa($id): void

@@ -5,7 +5,7 @@ $ainda_nao_publica = !empty($ainda_nao_publica);
 ?>
 <div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
     <div>
-        <a href="<?= URL ?>/expo-colag" class="text-sm text-primary hover:underline">← Expo Colag</a>
+        <a href="<?= URL ?>/expo-colag" class="text-sm text-accent hover:underline">← Expo Colag</a>
         <h1 class="text-2xl font-bold text-gray-900 mt-1">Programação</h1>
         <?php if ($edicao): ?>
             <p class="text-sm text-gray-600"><?= htmlspecialchars($edicao['nome'] ?? 'Expo Colag') ?>

@@ -14,6 +14,8 @@ $router->get('/expo-colag/projeto/{id}/painel', 'Modulos/expo-colag/ExpoColagAlu
 $router->post('/expo-colag/projeto/{id}/inscrever', 'Modulos/expo-colag/ExpoColagAlunoController@inscrever');
 $router->post('/expo-colag/projeto/{id}/cancelar-inscricao', 'Modulos/expo-colag/ExpoColagAlunoController@cancelarInscricao');
 $router->post('/expo-colag/projeto/{id}/entregar-tarefa', 'Modulos/expo-colag/ExpoColagAlunoController@entregarTarefa');
+$router->post('/expo-colag/projeto/{id}/solicitar-material', 'Modulos/expo-colag/ExpoColagAlunoController@solicitarMaterial');
+$router->post('/expo-colag/projeto/{id}/mensagens', 'Modulos/expo-colag/ExpoColagAlunoController@enviarMensagem');
 
 // Professor — criar / acompanhar / tarefas / materiais / stand
 $router->get('/professor/expo-colag', 'Modulos/expo-colag/ExpoColagProfessorController@index');
@@ -32,6 +34,8 @@ $router->post('/professor/expo-colag/projetos/{id}/tarefas/excluir', 'Modulos/ex
 $router->post('/professor/expo-colag/projetos/{id}/tarefas/decidir', 'Modulos/expo-colag/ExpoColagProfessorController@decidirAtribuicao');
 $router->post('/professor/expo-colag/projetos/{id}/materiais', 'Modulos/expo-colag/ExpoColagProfessorController@adicionarMaterial');
 $router->post('/professor/expo-colag/projetos/{id}/materiais/remover', 'Modulos/expo-colag/ExpoColagProfessorController@removerMaterial');
+$router->post('/professor/expo-colag/projetos/{id}/pedidos-materiais/decidir', 'Modulos/expo-colag/ExpoColagProfessorController@decidirPedidoMaterial');
+$router->post('/professor/expo-colag/projetos/{id}/mensagens', 'Modulos/expo-colag/ExpoColagProfessorController@enviarMensagem');
 $router->post('/professor/expo-colag/projetos/{id}/stand', 'Modulos/expo-colag/ExpoColagProfessorController@salvarStand');
 $router->post('/professor/expo-colag/projetos/rascunho', 'Modulos/expo-colag/ExpoColagProfessorController@salvarRascunho');
 $router->get('/professor/expo-colag/alunos-turma', 'Modulos/expo-colag/ExpoColagProfessorController@alunosTurma');
