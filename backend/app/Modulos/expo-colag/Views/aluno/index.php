@@ -61,7 +61,7 @@ $renderCard = static function (array $p): void {
     <?php
 };
 ?>
-<div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+<div class="w-full space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Expo Colag</h1>
