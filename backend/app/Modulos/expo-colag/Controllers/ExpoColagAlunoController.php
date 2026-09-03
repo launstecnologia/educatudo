@@ -180,6 +180,7 @@ class ExpoColagAlunoController extends BaseController
             'tarefas' => $painel['tarefas'],
             'progresso' => $painel['progresso'],
             'materiais' => $painel['materiais'],
+            'conteudos' => $painel['conteudos'] ?? [],
             'pedidos' => $painel['pedidos'] ?? [],
             'pode_solicitar_materiais' => !empty($painel['pode_solicitar_materiais']),
             'motivo_solicitacao' => $painel['motivo_solicitacao'] ?? '',

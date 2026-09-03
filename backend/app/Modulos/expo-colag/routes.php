@@ -33,7 +33,10 @@ $router->post('/professor/expo-colag/projetos/{id}/tarefas', 'Modulos/expo-colag
 $router->post('/professor/expo-colag/projetos/{id}/tarefas/excluir', 'Modulos/expo-colag/ExpoColagProfessorController@excluirTarefa');
 $router->post('/professor/expo-colag/projetos/{id}/tarefas/decidir', 'Modulos/expo-colag/ExpoColagProfessorController@decidirAtribuicao');
 $router->post('/professor/expo-colag/projetos/{id}/materiais', 'Modulos/expo-colag/ExpoColagProfessorController@adicionarMaterial');
+$router->post('/professor/expo-colag/projetos/{id}/materiais/salvar-itens', 'Modulos/expo-colag/ExpoColagProfessorController@salvarMateriais');
 $router->post('/professor/expo-colag/projetos/{id}/materiais/remover', 'Modulos/expo-colag/ExpoColagProfessorController@removerMaterial');
+$router->post('/professor/expo-colag/projetos/{id}/conteudos', 'Modulos/expo-colag/ExpoColagProfessorController@adicionarConteudo');
+$router->post('/professor/expo-colag/projetos/{id}/conteudos/remover', 'Modulos/expo-colag/ExpoColagProfessorController@removerConteudo');
 $router->post('/professor/expo-colag/projetos/{id}/pedidos-materiais/decidir', 'Modulos/expo-colag/ExpoColagProfessorController@decidirPedidoMaterial');
 $router->post('/professor/expo-colag/projetos/{id}/mensagens', 'Modulos/expo-colag/ExpoColagProfessorController@enviarMensagem');
 $router->post('/professor/expo-colag/projetos/{id}/stand', 'Modulos/expo-colag/ExpoColagProfessorController@salvarStand');
@@ -57,7 +60,10 @@ $router->post('/admin/expo-colag/projetos/{id}/tarefas', 'Modulos/expo-colag/Exp
 $router->post('/admin/expo-colag/projetos/{id}/tarefas/excluir', 'Modulos/expo-colag/ExpoColagAdminController@excluirTarefa');
 $router->post('/admin/expo-colag/projetos/{id}/tarefas/decidir', 'Modulos/expo-colag/ExpoColagAdminController@decidirAtribuicao');
 $router->post('/admin/expo-colag/projetos/{id}/materiais', 'Modulos/expo-colag/ExpoColagAdminController@adicionarMaterial');
+$router->post('/admin/expo-colag/projetos/{id}/materiais/salvar-itens', 'Modulos/expo-colag/ExpoColagAdminController@salvarMateriais');
 $router->post('/admin/expo-colag/projetos/{id}/materiais/remover', 'Modulos/expo-colag/ExpoColagAdminController@removerMaterial');
+$router->post('/admin/expo-colag/projetos/{id}/conteudos', 'Modulos/expo-colag/ExpoColagAdminController@adicionarConteudo');
+$router->post('/admin/expo-colag/projetos/{id}/conteudos/remover', 'Modulos/expo-colag/ExpoColagAdminController@removerConteudo');
 $router->post('/admin/expo-colag/projetos/{id}/pedidos-materiais/decidir', 'Modulos/expo-colag/ExpoColagAdminController@decidirPedidoMaterial');
 $router->post('/admin/expo-colag/projetos/{id}/mensagens', 'Modulos/expo-colag/ExpoColagAdminController@enviarMensagem');
 $router->post('/admin/expo-colag/projetos/{id}/stand', 'Modulos/expo-colag/ExpoColagAdminController@salvarStand');

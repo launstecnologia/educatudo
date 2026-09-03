@@ -176,6 +176,7 @@ class ExpoColagAdminController extends BaseController
             'tarefas' => $painel['tarefas'],
             'atribuicoes' => $painel['atribuicoes'],
             'materiais' => $painel['materiais'],
+            'conteudos' => $painel['conteudos'] ?? [],
             'pedidos_materiais' => $painel['pedidos_materiais'] ?? [],
             'mensagens' => $painel['mensagens'] ?? [],
             'stand' => $painel['stand'],
@@ -298,6 +299,9 @@ class ExpoColagAdminController extends BaseController
         $projeto = $completo['projeto'];
         $itens = $this->execucao->itensPdfAlmoxarifado((int) $id);
         $escola = class_exists('LayoutHelper') ? (string) LayoutHelper::getSystemTitle() : 'Escola';
+        $logo_url = class_exists('LayoutHelper') && method_exists('LayoutHelper', 'getDocumentLogoUrl')
+            ? (string) LayoutHelper::getDocumentLogoUrl()
+            : '';
         $viewFile = $this->resolveViewPath('professor/expo-colag/materiais_pdf');
         if ($viewFile === null) {
             $this->setFlashMessage('Modelo do PDF não encontrado.', 'error');
@@ -362,11 +366,32 @@ class ExpoColagAdminController extends BaseController
         }, 'Material adicionado.');
     }
 
+    public function salvarMateriais($id): void
+    {
+        $this->executarAcaoProjeto((int) $id, 'materiais', function (array $projeto) use ($id): array {
+            return $this->execucao->salvarItensMateriais((int) $id, (int) $projeto['professor_id'], $_POST);
+        }, 'Materiais salvos.');
+    }
+
     public function removerMaterial($id): void
     {
         $this->executarAcaoProjeto((int) $id, 'materiais', function (array $projeto): array {
             return $this->execucao->removerMaterial((int) ($_POST['material_id'] ?? 0), (int) $projeto['professor_id']);
         }, 'Material removido.');
+    }
+
+    public function adicionarConteudo($id): void
+    {
+        $this->executarAcaoProjeto((int) $id, 'conteudos', function (array $projeto) use ($id): array {
+            return $this->execucao->adicionarConteudo((int) $id, (int) $projeto['professor_id'], $_POST, $_FILES['anexo'] ?? null);
+        }, 'Conteúdo adicionado.');
+    }
+
+    public function removerConteudo($id): void
+    {
+        $this->executarAcaoProjeto((int) $id, 'conteudos', function (array $projeto): array {
+            return $this->execucao->removerConteudo((int) ($_POST['conteudo_id'] ?? 0), (int) $projeto['professor_id']);
+        }, 'Conteúdo removido.');
     }
 
     public function decidirPedidoMaterial($id): void

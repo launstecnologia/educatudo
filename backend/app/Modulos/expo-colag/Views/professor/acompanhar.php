@@ -5,6 +5,7 @@ $relacoes = $relacoes ?? [];
 $tarefas = $tarefas ?? [];
 $atribuicoes = $atribuicoes ?? [];
 $materiais = $materiais ?? [];
+$conteudos = $conteudos ?? [];
 $pedidos_materiais = $pedidos_materiais ?? [];
 $mensagens = $mensagens ?? [];
 $stand = $stand ?? null;
@@ -14,10 +15,11 @@ $csrf_token = $csrf_token ?? '';
 $modoAdmin = !empty($modo_admin);
 $baseUrlExpo = rtrim((string) ($base_url_expo ?? (URL . '/professor/expo-colag')), '/');
 $pid = (int) ($projeto['id'] ?? 0);
-$aba = in_array($aba ?? '', ['geral', 'participantes', 'grupo', 'tarefas', 'materiais', 'stand'], true)
+$aba = in_array($aba ?? '', ['geral', 'participantes', 'grupo', 'tarefas', 'materiais', 'conteudos', 'stand'], true)
     ? $aba : 'geral';
 $etapas = $relacoes['etapas'] ?? [];
 $aprovados = array_values(array_filter($inscricoes, static fn($i) => ($i['status'] ?? '') === 'Aprovada'));
+$listaAlmox = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
 
 $badge = static function (string $st): string {
     $map = [
@@ -43,6 +45,7 @@ $tabs = [
     'grupo' => 'Conversa',
     'tarefas' => 'Tarefas',
     'materiais' => 'Materiais',
+    'conteudos' => 'Conteúdo',
     'stand' => 'Stand / QR',
 ];
 $atrPorTarefa = [];
@@ -97,15 +100,14 @@ foreach ($atribuicoes as $a) {
             </div>
             <div class="rounded-xl border border-gray-200 bg-white p-4">
                 <p class="text-xs text-gray-500">Materiais</p>
-                <p class="text-2xl font-bold"><?= count($materiais) ?></p>
+                <p class="text-2xl font-bold"><?= count($listaAlmox) ?></p>
             </div>
         </div>
         <?php if (!empty($projeto['descricao'])): ?>
             <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-700 whitespace-pre-line"><?= htmlspecialchars($projeto['descricao']) ?></div>
         <?php endif; ?>
         <?php
-        $listaAlmoxAcomp = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
-        if ($listaAlmoxAcomp): ?>
+        if ($listaAlmox): ?>
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <div class="flex items-center justify-between gap-2 mb-3">
                     <h2 class="font-semibold text-gray-900">Materiais do almoxarifado</h2>
@@ -114,7 +116,7 @@ foreach ($atribuicoes as $a) {
                        class="text-sm font-semibold text-accent hover:underline">Exportar PDF</a>
                 </div>
                 <ul class="text-sm space-y-1">
-                    <?php foreach ($listaAlmoxAcomp as $item): ?>
+                    <?php foreach ($listaAlmox as $item): ?>
                         <li>
                             <?= htmlspecialchars($item['nome']) ?>
                             <?php if ($item['quantidade'] !== ''): ?>
@@ -364,10 +366,37 @@ foreach ($atribuicoes as $a) {
 
     <?php elseif ($aba === 'materiais'): ?>
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <p class="text-sm text-gray-600">Lista para autorização da coordenação e retirada no almoxarifado.</p>
+            <p class="text-sm text-gray-600">Itens para autorização da coordenação e retirada no almoxarifado.</p>
             <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais-pdf"
                target="_blank" rel="noopener"
                class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Gerar PDF</a>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <div>
+                <h2 class="font-semibold text-gray-900">Lista de materiais</h2>
+                <p class="text-sm text-gray-500 mt-1">Adicione item e quantidade. Esses dados entram no PDF de solicitação.</p>
+            </div>
+            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais/salvar-itens" class="space-y-3" id="expoMateriaisForm">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                <div class="space-y-2" id="expoMateriaisRows">
+                    <?php $itensMateriais = $listaAlmox ?: [['nome' => '', 'quantidade' => '', 'observacao' => '']]; ?>
+                    <?php foreach ($itensMateriais as $item): ?>
+                        <div class="expo-material-row grid grid-cols-1 md:grid-cols-12 gap-2 text-sm">
+                            <input type="text" name="item_nome[]" value="<?= htmlspecialchars($item['nome'] ?? '') ?>" placeholder="Item"
+                                   class="md:col-span-5 border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                            <input type="text" name="item_quantidade[]" value="<?= htmlspecialchars($item['quantidade'] ?? '') ?>" placeholder="Qtd."
+                                   class="md:col-span-2 border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                            <input type="text" name="item_observacao[]" value="<?= htmlspecialchars($item['observacao'] ?? '') ?>" placeholder="Observação"
+                                   class="md:col-span-4 border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                            <button type="button" class="expo-remove-material md:col-span-1 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Remover</button>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" id="expoAddMaterialRow" class="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">+ Adicionar item</button>
+                    <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Salvar materiais</button>
+                </div>
+            </form>
         </div>
         <?php if (!empty($pedidos_materiais)): ?>
         <div class="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
@@ -417,39 +446,75 @@ foreach ($atribuicoes as $a) {
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
-            <h2 class="font-semibold text-gray-900">Adicionar material</h2>
-            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+
+    <?php elseif ($aba === 'conteudos'): ?>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+            <div>
+                <h2 class="font-semibold text-gray-900">Adicionar conteúdo</h2>
+                <p class="text-sm text-gray-500 mt-1">Referências para os alunos: texto, anexo, link externo ou YouTube. Anexos até 20 MB.</p>
+            </div>
+            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/conteudos" enctype="multipart/form-data" class="space-y-3 text-sm" id="expoConteudoForm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                <input type="text" name="titulo" required placeholder="Título" class="border border-gray-300 rounded-lg px-3 py-2 bg-white">
-                <select name="tipo" class="border border-gray-300 rounded-lg px-3 py-2 bg-white">
-                    <option value="link">Link</option>
-                    <option value="arquivo">Arquivo</option>
-                    <option value="texto">Texto / referência</option>
-                </select>
-                <input type="url" name="link_externo" placeholder="https://..." class="border border-gray-300 rounded-lg px-3 py-2 bg-white">
-                <div class="sm:col-span-3">
-                    <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Salvar material</button>
+                <div>
+                    <label class="block text-gray-600 mb-1">Título</label>
+                    <input type="text" name="titulo" required maxlength="255" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
                 </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">Texto de referência</label>
+                    <div class="flex flex-wrap gap-1 mb-2">
+                        <button type="button" class="expo-editor-btn px-2 py-1 rounded border border-gray-300 text-xs" data-cmd="bold">B</button>
+                        <button type="button" class="expo-editor-btn px-2 py-1 rounded border border-gray-300 text-xs italic" data-cmd="italic">I</button>
+                        <button type="button" class="expo-editor-btn px-2 py-1 rounded border border-gray-300 text-xs" data-cmd="insertUnorderedList">Lista</button>
+                    </div>
+                    <div id="expoConteudoEditor" contenteditable="true" class="min-h-32 rounded-lg border border-gray-300 bg-white px-3 py-2 prose prose-sm max-w-none focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                    <textarea name="descricao_html" id="expoConteudoDescricao" class="hidden"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-gray-600 mb-1">Anexo</label>
+                        <input type="file" name="anexo" accept=".pdf,.doc,.docx,image/*,video/mp4,video/webm,video/quicktime" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                        <p class="text-xs text-gray-500 mt-1">PDF, Word, imagem ou vídeo até 20 MB.</p>
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 mb-1">Link externo</label>
+                        <input type="url" name="link_externo" placeholder="https://..." class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 mb-1">Link do YouTube</label>
+                        <input type="url" name="youtube_url" placeholder="https://youtube.com/..." class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Salvar conteúdo</button>
             </form>
         </div>
         <div class="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
-            <?php if (empty($materiais)): ?>
-                <p class="px-5 py-6 text-sm text-gray-500">Nenhum material.</p>
-            <?php else: foreach ($materiais as $m): ?>
-                <div class="px-5 py-3 flex flex-wrap justify-between gap-2 text-sm">
-                    <div>
+            <?php if (empty($conteudos)): ?>
+                <p class="px-5 py-6 text-sm text-gray-500">Nenhum conteúdo disponível ainda.</p>
+            <?php else: foreach ($conteudos as $m): ?>
+                <?php $meta = is_array($m['meta'] ?? null) ? $m['meta'] : (json_decode((string) ($m['visibilidade'] ?? ''), true) ?: []); ?>
+                <div class="px-5 py-4 flex flex-wrap justify-between gap-3 text-sm">
+                    <div class="min-w-0 space-y-1">
                         <p class="font-medium text-gray-900"><?= htmlspecialchars($m['titulo'] ?? '') ?></p>
-                        <p class="text-xs text-gray-500"><?= htmlspecialchars($m['tipo'] ?? '') ?> · <?= htmlspecialchars($m['origem'] ?? 'Wizard') ?></p>
-                        <?php
-                        $link = $m['link_externo'] ?: ($m['arquivo_url'] ?? '');
-                        if ($link): ?>
-                            <a href="<?= htmlspecialchars($link) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs">Abrir</a>
+                        <?php if (!empty($meta['descricao_html'])): ?>
+                            <div class="text-gray-700 text-sm leading-relaxed"><?= $meta['descricao_html'] ?></div>
                         <?php endif; ?>
+                        <div class="flex flex-wrap gap-3 text-xs">
+                            <?php if (!empty($m['link_externo'])): ?>
+                                <a href="<?= htmlspecialchars($m['link_externo']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline">Abrir link</a>
+                            <?php endif; ?>
+                            <?php if (!empty($meta['youtube_url'])): ?>
+                                <a href="<?= htmlspecialchars($meta['youtube_url']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline">Abrir YouTube</a>
+                            <?php endif; ?>
+                            <?php if (!empty($m['arquivo_url'])): ?>
+                                <a href="<?= htmlspecialchars($m['arquivo_url']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline">
+                                    <?= htmlspecialchars($meta['arquivo_nome'] ?? 'Abrir anexo') ?>
+                                </a>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais/remover" onsubmit="return confirm('Remover?');">
+                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/conteudos/remover" onsubmit="return confirm('Remover conteúdo?');">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                        <input type="hidden" name="material_id" value="<?= (int) $m['id'] ?>">
+                        <input type="hidden" name="conteudo_id" value="<?= (int) $m['id'] ?>">
                         <button type="submit" class="text-xs text-red-600 hover:underline">Remover</button>
                     </form>
                 </div>
@@ -494,12 +559,78 @@ foreach ($atribuicoes as $a) {
                 </div>
             </form>
             <?php if ($url_qr): ?>
-                <div class="rounded-lg bg-slate-50 border border-slate-200 p-4 text-sm space-y-2">
-                    <p class="font-medium text-gray-900">URL do QR</p>
-                    <a href="<?= htmlspecialchars($url_qr) ?>" target="_blank" rel="noopener" class="text-accent break-all hover:underline"><?= htmlspecialchars($url_qr) ?></a>
-                    <p class="text-xs text-gray-500">Imprima este link como QR no dia do evento. Token: <code><?= htmlspecialchars($stand['qr_token'] ?? '') ?></code></p>
+                <?php $qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . rawurlencode((string) $url_qr); ?>
+                <div class="rounded-lg bg-slate-50 border border-slate-200 p-4 text-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-[160px,1fr] gap-4 items-center">
+                        <div class="mx-auto md:mx-0 rounded-xl border border-slate-200 bg-white p-3">
+                            <a href="<?= htmlspecialchars($url_qr) ?>" target="_blank" rel="noopener" title="Abrir página pública do QR">
+                                <img src="<?= htmlspecialchars($qrImageUrl) ?>" alt="QR Code do stand" class="w-32 h-32 object-contain">
+                            </a>
+                        </div>
+                        <div class="space-y-2 min-w-0">
+                            <p class="font-medium text-gray-900">URL do QR</p>
+                            <a href="<?= htmlspecialchars($url_qr) ?>" target="_blank" rel="noopener" class="text-accent break-all hover:underline"><?= htmlspecialchars($url_qr) ?></a>
+                            <p class="text-xs text-gray-500">Escaneie o QR Code ou imprima para o dia do evento. Token: <code><?= htmlspecialchars($stand['qr_token'] ?? '') ?></code></p>
+                            <div class="flex flex-wrap gap-2 pt-1">
+                                <a href="<?= htmlspecialchars($url_qr) ?>" target="_blank" rel="noopener"
+                                   class="btn-primary-custom inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90">Abrir link</a>
+                                <a href="<?= htmlspecialchars($qrImageUrl) ?>" target="_blank" rel="noopener"
+                                   class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-semibold border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Abrir QR Code</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
     <?php endif; ?>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var rows = document.getElementById('expoMateriaisRows');
+    var add = document.getElementById('expoAddMaterialRow');
+
+    function bindRemoveMaterialRows() {
+        if (!rows) return;
+        rows.querySelectorAll('.expo-remove-material').forEach(function (btn) {
+            btn.onclick = function () {
+                var allRows = rows.querySelectorAll('.expo-material-row');
+                if (allRows.length <= 1) {
+                    var row = btn.closest('.expo-material-row');
+                    row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+                    return;
+                }
+                btn.closest('.expo-material-row').remove();
+            };
+        });
+    }
+
+    if (add && rows) {
+        add.addEventListener('click', function () {
+            var row = document.createElement('div');
+            row.className = 'expo-material-row grid grid-cols-1 md:grid-cols-12 gap-2 text-sm';
+            row.innerHTML = '<input type="text" name="item_nome[]" placeholder="Item" class="md:col-span-5 border border-gray-300 rounded-lg px-3 py-2 bg-white">' +
+                '<input type="text" name="item_quantidade[]" placeholder="Qtd." class="md:col-span-2 border border-gray-300 rounded-lg px-3 py-2 bg-white">' +
+                '<input type="text" name="item_observacao[]" placeholder="Observação" class="md:col-span-4 border border-gray-300 rounded-lg px-3 py-2 bg-white">' +
+                '<button type="button" class="expo-remove-material md:col-span-1 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Remover</button>';
+            rows.appendChild(row);
+            bindRemoveMaterialRows();
+        });
+        bindRemoveMaterialRows();
+    }
+
+    var formConteudo = document.getElementById('expoConteudoForm');
+    var editor = document.getElementById('expoConteudoEditor');
+    var hidden = document.getElementById('expoConteudoDescricao');
+    document.querySelectorAll('.expo-editor-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.execCommand(btn.dataset.cmd, false, null);
+            if (editor) editor.focus();
+        });
+    });
+    if (formConteudo && editor && hidden) {
+        formConteudo.addEventListener('submit', function () {
+            hidden.value = editor.innerHTML;
+        });
+    }
+});
+</script>

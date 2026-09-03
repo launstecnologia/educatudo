@@ -182,15 +182,21 @@ $renderParticipacao = static function () use ($insc, $status, $projeto, $csrf_to
 
         <?php if ($materiais): ?>
             <div>
-                <h2 class="text-sm font-semibold text-gray-800 mb-2">Materiais</h2>
-                <ul class="text-sm space-y-1">
+                <h2 class="text-sm font-semibold text-gray-800 mb-2">Conteúdo de referência</h2>
+                <ul class="text-sm space-y-3">
                     <?php foreach ($materiais as $m): ?>
+                        <?php $meta = json_decode((string) ($m['visibilidade'] ?? ''), true) ?: []; ?>
                         <li>
                             <?php $href = $m['link_externo'] ?? $m['arquivo_url'] ?? ''; ?>
+                            <p class="font-medium text-gray-900"><?= htmlspecialchars($m['titulo'] ?? 'Material') ?></p>
+                            <?php if (!empty($meta['descricao_html'])): ?>
+                                <div class="text-gray-700 leading-relaxed"><?= $meta['descricao_html'] ?></div>
+                            <?php endif; ?>
                             <?php if ($href): ?>
-                                <a href="<?= htmlspecialchars($href) ?>" target="_blank" rel="noopener" class="text-accent hover:underline"><?= htmlspecialchars($m['titulo'] ?? 'Material') ?></a>
-                            <?php else: ?>
-                                <?= htmlspecialchars($m['titulo'] ?? 'Material') ?>
+                                <a href="<?= htmlspecialchars($href) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs">Abrir link</a>
+                            <?php endif; ?>
+                            <?php if (!empty($meta['youtube_url'])): ?>
+                                <a href="<?= htmlspecialchars($meta['youtube_url']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs ml-2">Abrir YouTube</a>
                             <?php endif; ?>
                         </li>
                     <?php endforeach; ?>

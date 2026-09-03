@@ -85,6 +85,7 @@ class ExpoColagProfessorController extends BaseController
             'tarefas' => $painel['tarefas'],
             'atribuicoes' => $painel['atribuicoes'],
             'materiais' => $painel['materiais'],
+            'conteudos' => $painel['conteudos'] ?? [],
             'pedidos_materiais' => $painel['pedidos_materiais'] ?? [],
             'mensagens' => $painel['mensagens'] ?? [],
             'stand' => $painel['stand'],
@@ -165,6 +166,22 @@ class ExpoColagProfessorController extends BaseController
         $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
     }
 
+    public function salvarMateriais($id): void
+    {
+        $user = $this->requireProfessor();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
+            return;
+        }
+        $result = $this->execucao->salvarItensMateriais((int) $id, (int) $user['id'], $_POST);
+        $this->setFlashMessage(
+            $result['success'] ? 'Materiais salvos.' : ($result['error'] ?? 'Erro.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
+    }
+
     public function removerMaterial($id): void
     {
         $user = $this->requireProfessor();
@@ -179,6 +196,38 @@ class ExpoColagProfessorController extends BaseController
             $result['success'] ? 'success' : 'error'
         );
         $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=materiais');
+    }
+
+    public function adicionarConteudo($id): void
+    {
+        $user = $this->requireProfessor();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=conteudos');
+            return;
+        }
+        $result = $this->execucao->adicionarConteudo((int) $id, (int) $user['id'], $_POST, $_FILES['anexo'] ?? null);
+        $this->setFlashMessage(
+            $result['success'] ? 'Conteúdo adicionado.' : ($result['error'] ?? 'Erro.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=conteudos');
+    }
+
+    public function removerConteudo($id): void
+    {
+        $user = $this->requireProfessor();
+        if (!$this->validateCsrf($_POST['csrf_token'] ?? '')) {
+            $this->setFlashMessage('Token de segurança inválido.', 'error');
+            $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=conteudos');
+            return;
+        }
+        $result = $this->execucao->removerConteudo((int) ($_POST['conteudo_id'] ?? 0), (int) $user['id']);
+        $this->setFlashMessage(
+            $result['success'] ? 'Conteúdo removido.' : ($result['error'] ?? 'Erro.'),
+            $result['success'] ? 'success' : 'error'
+        );
+        $this->redirect('/professor/expo-colag/projetos/' . (int) $id . '/acompanhar?aba=conteudos');
     }
 
     public function decidirPedidoMaterial($id): void
@@ -442,6 +491,9 @@ class ExpoColagProfessorController extends BaseController
         $escola = class_exists('LayoutHelper')
             ? (string) LayoutHelper::getSystemTitle()
             : 'Escola';
+        $logo_url = class_exists('LayoutHelper') && method_exists('LayoutHelper', 'getDocumentLogoUrl')
+            ? (string) LayoutHelper::getDocumentLogoUrl()
+            : '';
 
         $viewFile = $this->resolveViewPath('professor/expo-colag/materiais_pdf');
         if ($viewFile === null) {

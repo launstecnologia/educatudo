@@ -119,6 +119,47 @@ class ExpoColagStand
         return $token;
     }
 
+    public function registrarAvaliacao(int $standId, int $projetoId, int $nota, ?string $mensagem, ?string $ipHash, ?string $userAgent): int
+    {
+        try {
+            return (int) $this->db->insert(
+                'INSERT INTO expo_colag_stand_avaliacoes
+                    (stand_id, projeto_id, nota, mensagem, ip_hash, user_agent)
+                 VALUES
+                    (:stand_id, :projeto_id, :nota, :mensagem, :ip_hash, :user_agent)',
+                [
+                    'stand_id' => $standId,
+                    'projeto_id' => $projetoId,
+                    'nota' => $nota,
+                    'mensagem' => $mensagem,
+                    'ip_hash' => $ipHash,
+                    'user_agent' => $userAgent,
+                ]
+            );
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
+    public function resumoAvaliacoes(int $standId): array
+    {
+        try {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS total, AVG(nota) AS media
+                 FROM expo_colag_stand_avaliacoes
+                 WHERE stand_id = :stand_id',
+                ['stand_id' => $standId]
+            ) ?: [];
+        } catch (Throwable $e) {
+            $row = [];
+        }
+
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'media' => $row['media'] !== null ? round((float) $row['media'], 1) : null,
+        ];
+    }
+
     /** Primeiros nomes dos alunos aprovados (sem sobrenome). */
     public function primeirosNomesAprovados(int $projetoId): array
     {

@@ -3242,6 +3242,24 @@ CREATE TABLE IF NOT EXISTS `expo_colag_stands` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- expo_colag_stand_avaliacoes
+--
+CREATE TABLE IF NOT EXISTS `expo_colag_stand_avaliacoes` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `stand_id` int unsigned NOT NULL,
+  `projeto_id` int unsigned NOT NULL,
+  `nota` tinyint unsigned NOT NULL,
+  `mensagem` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ip_hash` char(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_expo_colag_avaliacoes_stand` (`stand_id`),
+  KEY `idx_expo_colag_avaliacoes_projeto` (`projeto_id`),
+  KEY `idx_expo_colag_avaliacoes_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- facial_device_pairing_codes
 --
 CREATE TABLE IF NOT EXISTS `facial_device_pairing_codes` (

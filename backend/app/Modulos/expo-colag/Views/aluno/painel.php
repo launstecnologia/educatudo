@@ -3,6 +3,7 @@ $projeto = $projeto ?? [];
 $user = $user ?? [];
 $tarefas = $tarefas ?? [];
 $materiais = $materiais ?? [];
+$conteudos = $conteudos ?? [];
 $pedidos = $pedidos ?? [];
 $mensagens = $mensagens ?? [];
 $progresso = $progresso ?? ['total' => 0, 'concluidas' => 0];
@@ -12,7 +13,7 @@ $abaRaw = (string) ($aba ?? 'progresso');
 if ($abaRaw === 'painel' || $abaRaw === 'stand') {
     $abaRaw = 'progresso';
 }
-$aba = in_array($abaRaw, ['progresso', 'tarefas', 'grupo', 'materiais'], true) ? $abaRaw : 'progresso';
+$aba = in_array($abaRaw, ['progresso', 'tarefas', 'grupo', 'conteudos', 'materiais'], true) ? $abaRaw : 'progresso';
 $total = max(0, (int) ($progresso['total'] ?? 0));
 $ok = (int) ($progresso['concluidas'] ?? 0);
 $pct = $total > 0 ? (int) round(($ok / $total) * 100) : 0;
@@ -32,7 +33,7 @@ $badge = static function (string $st): string {
     ];
     return $map[$st] ?? 'bg-slate-100 text-slate-700';
 };
-$tabs = ['progresso' => 'Progresso', 'tarefas' => 'Minhas tarefas', 'grupo' => 'Grupo', 'materiais' => 'Materiais'];
+$tabs = ['progresso' => 'Progresso', 'tarefas' => 'Minhas tarefas', 'grupo' => 'Grupo', 'conteudos' => 'Conteúdo', 'materiais' => 'Materiais'];
 $concluida = static function (string $st): bool {
     return in_array($st, ['Concluida', 'Entregue'], true);
 };
@@ -157,6 +158,34 @@ $concluida = static function (string $st): bool {
             </form>
         </div>
 
+    <?php elseif ($aba === 'conteudos'): ?>
+        <div class="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
+            <?php if (empty($conteudos)): ?>
+                <p class="px-5 py-6 text-sm text-gray-500">Nenhum conteúdo disponível ainda.</p>
+            <?php else: foreach ($conteudos as $m): ?>
+                <?php $meta = is_array($m['meta'] ?? null) ? $m['meta'] : (json_decode((string) ($m['visibilidade'] ?? ''), true) ?: []); ?>
+                <div class="px-5 py-4 text-sm space-y-2">
+                    <p class="font-semibold text-gray-900"><?= htmlspecialchars($m['titulo'] ?? '') ?></p>
+                    <?php if (!empty($meta['descricao_html'])): ?>
+                        <div class="text-gray-700 leading-relaxed"><?= $meta['descricao_html'] ?></div>
+                    <?php endif; ?>
+                    <div class="flex flex-wrap gap-3 text-xs">
+                        <?php if (!empty($m['link_externo'])): ?>
+                            <a href="<?= htmlspecialchars($m['link_externo']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline">Abrir link</a>
+                        <?php endif; ?>
+                        <?php if (!empty($meta['youtube_url'])): ?>
+                            <a href="<?= htmlspecialchars($meta['youtube_url']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline">Abrir YouTube</a>
+                        <?php endif; ?>
+                        <?php if (!empty($m['arquivo_url'])): ?>
+                            <a href="<?= htmlspecialchars($m['arquivo_url']) ?>" target="_blank" rel="noopener" class="text-accent hover:underline">
+                                <?= htmlspecialchars($meta['arquivo_nome'] ?? 'Abrir anexo') ?>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endforeach; endif; ?>
+        </div>
+
     <?php else: ?>
         <?php if ($podeSolicitar): ?>
             <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
@@ -211,18 +240,5 @@ $concluida = static function (string $st): bool {
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
-
-        <div class="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100">
-            <?php if (empty($materiais)): ?>
-                <p class="px-5 py-6 text-sm text-gray-500">Nenhum material disponível ainda.</p>
-            <?php else: foreach ($materiais as $m): ?>
-                <div class="px-5 py-3 text-sm">
-                    <p class="font-medium text-gray-900"><?= htmlspecialchars($m['titulo'] ?? '') ?></p>
-                    <?php $link = $m['link_externo'] ?: ($m['arquivo_url'] ?? ''); if ($link): ?>
-                        <a href="<?= htmlspecialchars($link) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs">Abrir</a>
-                    <?php endif; ?>
-                </div>
-            <?php endforeach; endif; ?>
-        </div>
     <?php endif; ?>
 </div>

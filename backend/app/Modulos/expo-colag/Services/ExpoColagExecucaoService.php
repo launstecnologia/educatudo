@@ -12,6 +12,7 @@ require_once __DIR__ . '/../Models/ExpoColagEdicao.php';
 require_once __DIR__ . '/../Models/ExpoColagPedidoMaterial.php';
 require_once __DIR__ . '/../Models/ExpoColagMensagem.php';
 require_once __DIR__ . '/ExpoColagService.php';
+require_once dirname(__DIR__, 3) . '/Utils/HtmlSanitizer.php';
 
 class ExpoColagExecucaoService
 {
@@ -29,6 +30,7 @@ class ExpoColagExecucaoService
     private const TIPOS_ENTREGAVEL = ['Nenhum', 'Arquivo', 'Texto', 'Link'];
     private const STATUS_ATR_ALUNO = ['Pendente', 'Em_andamento', 'Entregue', 'Atrasada', 'Devolvida'];
     private const STATUS_ATR_PROF = ['Pendente', 'Em_andamento', 'Entregue', 'Concluida', 'Atrasada', 'Devolvida'];
+    private const MAX_CONTEUDO_BYTES = 20 * 1024 * 1024;
 
     public function __construct()
     {
@@ -80,6 +82,7 @@ class ExpoColagExecucaoService
             'tarefas' => $this->tarefaModel->listarPorProjeto($projetoId),
             'atribuicoes' => $this->tarefaModel->listarAtribuicoesProjeto($projetoId),
             'materiais' => $this->listarMateriais($projetoId),
+            'conteudos' => $this->listarConteudos($projetoId),
             'pedidos_materiais' => $this->listarPedidosProjetoSeguro($projetoId),
             'mensagens' => $this->listarMensagensSeguro($projetoId),
             'stand' => $stand,
@@ -107,6 +110,7 @@ class ExpoColagExecucaoService
             'tarefas' => $this->tarefaModel->listarPorProjeto($projetoId),
             'atribuicoes' => $this->tarefaModel->listarAtribuicoesProjeto($projetoId),
             'materiais' => $this->listarMateriais($projetoId),
+            'conteudos' => $this->listarConteudos($projetoId),
             'pedidos_materiais' => $this->listarPedidosProjetoSeguro($projetoId),
             'mensagens' => $this->listarMensagensSeguro($projetoId),
             'stand' => $stand,
@@ -144,6 +148,7 @@ class ExpoColagExecucaoService
                 'concluidas' => $concluidas,
             ],
             'materiais' => $this->listarMateriais($projetoId),
+            'conteudos' => $this->listarConteudos($projetoId),
             'pedidos' => $this->listarPedidosAlunoSeguro($alunoId, $projetoId),
             'pode_solicitar_materiais' => !empty($solicitacao['pode']),
             'motivo_solicitacao' => (string) ($solicitacao['motivo'] ?? ''),
@@ -161,6 +166,18 @@ class ExpoColagExecucaoService
              WHERE projeto_id = :id ORDER BY origem ASC, id ASC',
             ['id' => $projetoId]
         ) ?: [];
+    }
+
+    /** @return list<array> */
+    public function listarConteudos(int $projetoId): array
+    {
+        $rows = $this->listarMateriais($projetoId);
+        foreach ($rows as &$row) {
+            $meta = json_decode((string) ($row['visibilidade'] ?? ''), true);
+            $row['meta'] = is_array($meta) ? $meta : [];
+        }
+        unset($row);
+        return $rows;
     }
 
     public function criarTarefa(int $projetoId, int $professorId, array $input): array
@@ -359,6 +376,97 @@ class ExpoColagExecucaoService
             ]
         );
         return ['success' => true, 'id' => $id];
+    }
+
+    public function salvarItensMateriais(int $projetoId, int $professorId, array $input): array
+    {
+        if (!$this->assertProjetoProfessor($projetoId, $professorId)) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+        $nomes = is_array($input['item_nome'] ?? null) ? $input['item_nome'] : [];
+        $quantidades = is_array($input['item_quantidade'] ?? null) ? $input['item_quantidade'] : [];
+        $observacoes = is_array($input['item_observacao'] ?? null) ? $input['item_observacao'] : [];
+        $itens = [];
+        foreach ($nomes as $idx => $nomeRaw) {
+            $nome = trim((string) $nomeRaw);
+            if ($nome === '') {
+                continue;
+            }
+            if (count($itens) >= 50) {
+                break;
+            }
+            $itens[] = [
+                'nome' => mb_substr($nome, 0, 180),
+                'quantidade' => mb_substr(trim((string) ($quantidades[$idx] ?? '')), 0, 80),
+                'observacao' => mb_substr(trim((string) ($observacoes[$idx] ?? '')), 0, 255),
+            ];
+        }
+
+        $this->projetoModel->update($projetoId, [
+            'materiais_necessarios' => $itens !== [] ? json_encode($itens, JSON_UNESCAPED_UNICODE) : null,
+        ]);
+        return ['success' => true];
+    }
+
+    public function adicionarConteudo(int $projetoId, int $professorId, array $input, ?array $arquivo = null): array
+    {
+        if (!$this->assertProjetoProfessor($projetoId, $professorId)) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+
+        $titulo = trim((string) ($input['titulo'] ?? ''));
+        if ($titulo === '') {
+            return ['success' => false, 'error' => 'Título é obrigatório.'];
+        }
+
+        $descricao = \App\Utils\HtmlSanitizer::clean((string) ($input['descricao_html'] ?? ''));
+        $linkRaw = trim((string) ($input['link_externo'] ?? ''));
+        $youtubeRaw = trim((string) ($input['youtube_url'] ?? ''));
+        $link = $linkRaw !== '' ? $this->urlHttpSegura($linkRaw) : null;
+        $youtube = $youtubeRaw !== '' ? $this->urlYoutubeSeguro($youtubeRaw) : null;
+        if (($linkRaw !== '' && $link === null) || ($youtubeRaw !== '' && $youtube === null)) {
+            return ['success' => false, 'error' => 'Informe links http(s) válidos.'];
+        }
+
+        $upload = $this->salvarArquivoConteudo($projetoId, $arquivo);
+        if (!empty($upload['error'])) {
+            return ['success' => false, 'error' => $upload['error']];
+        }
+
+        $arquivoUrl = $upload['url'] ?? null;
+        if ($descricao === '' && $link === null && $youtube === null && $arquivoUrl === null) {
+            return ['success' => false, 'error' => 'Informe um texto, link, YouTube ou anexo.'];
+        }
+
+        $meta = [
+            'descricao_html' => $descricao,
+            'youtube_url' => $youtube,
+            'arquivo_nome' => $upload['nome_original'] ?? null,
+            'arquivo_tamanho' => $upload['tamanho'] ?? null,
+            'arquivo_mime' => $upload['mime'] ?? null,
+        ];
+
+        $id = (int) $this->db->insert(
+            'INSERT INTO expo_colag_projeto_materiais
+                (projeto_id, etapa_id, titulo, tipo, arquivo_url, link_externo, visibilidade, enviado_por, versao, origem)
+             VALUES
+                (:pid, NULL, :titulo, :tipo, :arquivo_url, :link_externo, :visibilidade, :enviado_por, 1, \'Execucao\')',
+            [
+                'pid' => $projetoId,
+                'titulo' => mb_substr($titulo, 0, 255),
+                'tipo' => 'conteudo',
+                'arquivo_url' => $arquivoUrl,
+                'link_externo' => $link,
+                'visibilidade' => json_encode($meta, JSON_UNESCAPED_UNICODE),
+                'enviado_por' => $professorId,
+            ]
+        );
+        return ['success' => true, 'id' => $id];
+    }
+
+    public function removerConteudo(int $conteudoId, int $professorId): array
+    {
+        return $this->removerMaterial($conteudoId, $professorId);
     }
 
     public function removerMaterial(int $materialId, int $professorId): array
@@ -625,6 +733,7 @@ class ExpoColagExecucaoService
         return [
             'success' => true,
             'stand' => [
+                'id' => (int) ($stand['id'] ?? 0),
                 'numero' => $stand['numero'] ?? null,
                 'setor' => $stand['setor_nome'] ?? null,
                 'horario_apresentacao' => $stand['horario_apresentacao'] ?? null,
@@ -637,7 +746,38 @@ class ExpoColagExecucaoService
                 'participantes' => $nomes,
                 'professor_nome' => $this->primeiroNome((string) ($stand['professor_nome'] ?? '')),
             ],
+            'avaliacoes' => $this->standModel->resumoAvaliacoes((int) ($stand['id'] ?? 0)),
         ];
+    }
+
+    public function registrarAvaliacaoStand(string $token, array $input): array
+    {
+        if (!$this->featureAtiva()) {
+            return ['success' => false, 'error' => 'Indisponível.'];
+        }
+        $stand = $this->standModel->findByToken($token);
+        if (!$stand || empty($stand['ativo']) || empty($stand['projeto_ativo']) || ($stand['projeto_status'] ?? '') === 'Cancelado') {
+            return ['success' => false, 'error' => 'Stand não encontrado.'];
+        }
+        $nota = (int) ($input['nota'] ?? 0);
+        if ($nota < 5 || $nota > 10) {
+            return ['success' => false, 'error' => 'Escolha uma nota de 5 a 10.'];
+        }
+        $mensagem = mb_substr(trim((string) ($input['mensagem'] ?? '')), 0, 500);
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        $ua = mb_substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+        $id = $this->standModel->registrarAvaliacao(
+            (int) $stand['id'],
+            (int) $stand['projeto_id'],
+            $nota,
+            $mensagem !== '' ? $mensagem : null,
+            $ip !== '' ? hash('sha256', $ip) : null,
+            $ua !== '' ? $ua : null
+        );
+        if ($id <= 0) {
+            return ['success' => false, 'error' => 'Não foi possível salvar a avaliação agora.'];
+        }
+        return ['success' => true];
     }
 
     public function listarProgramacaoPublica(): array
@@ -803,5 +943,119 @@ class ExpoColagExecucaoService
             return null;
         }
         return $url;
+    }
+
+    private function urlYoutubeSeguro(?string $url): ?string
+    {
+        $url = $this->urlHttpSegura($url);
+        if ($url === null) {
+            return null;
+        }
+        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+        $host = preg_replace('/^www\./', '', $host) ?? $host;
+        if (!in_array($host, ['youtube.com', 'youtu.be', 'm.youtube.com'], true)) {
+            return null;
+        }
+        return $url;
+    }
+
+    private function salvarArquivoConteudo(int $projetoId, ?array $file): array
+    {
+        if (!$file || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return [];
+        }
+        $erro = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+        if ($erro !== UPLOAD_ERR_OK) {
+            return ['error' => 'Não foi possível enviar o anexo.'];
+        }
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_file($tmp)) {
+            return ['error' => 'Anexo inválido.'];
+        }
+        $tamanho = (int) ($file['size'] ?? filesize($tmp));
+        if ($tamanho <= 0 || $tamanho > self::MAX_CONTEUDO_BYTES) {
+            return ['error' => 'Anexo deve ter no máximo 20 MB.'];
+        }
+
+        $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : false;
+        $mime = $finfo ? (string) finfo_file($finfo, $tmp) : (string) ($file['type'] ?? '');
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        $permitidos = [
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+            'video/mp4' => 'mp4',
+            'video/webm' => 'webm',
+            'video/quicktime' => 'mov',
+        ];
+        if (!isset($permitidos[$mime])) {
+            return ['error' => 'Use PDF, Word, imagem ou vídeo em formato comum.'];
+        }
+
+        $slug = $this->slugTenant();
+        $filename = 'conteudo_' . $projetoId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $permitidos[$mime];
+        $relDir = 'expo-colag/' . $slug . '/conteudos';
+        $backend = $this->raizBackend();
+        $publicDir = $backend . '/public/uploads/' . $relDir;
+        if (!$this->garantirPasta($publicDir)) {
+            return ['error' => 'Não foi possível preparar a pasta de uploads.'];
+        }
+
+        $destPublic = $publicDir . '/' . $filename;
+        $moveu = @move_uploaded_file($tmp, $destPublic);
+        if (!$moveu) {
+            $moveu = @copy($tmp, $destPublic);
+        }
+        if (!$moveu || !is_file($destPublic) || filesize($destPublic) <= 0) {
+            return ['error' => 'Não foi possível gravar o anexo.'];
+        }
+        @chmod($destPublic, 0644);
+
+        $storageDir = $backend . '/storage/uploads/' . $relDir;
+        if ($this->garantirPasta($storageDir)) {
+            @copy($destPublic, $storageDir . '/' . $filename);
+        }
+
+        return [
+            'url' => '/uploads/' . $relDir . '/' . $filename,
+            'nome_original' => mb_substr((string) ($file['name'] ?? $filename), 0, 255),
+            'tamanho' => $tamanho,
+            'mime' => $mime,
+        ];
+    }
+
+    private function slugTenant(): string
+    {
+        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-zA-Z0-9_-]/', '', (string) TENANT_SLUG) : 'tenant';
+        return $slug !== '' ? $slug : 'tenant';
+    }
+
+    private function raizBackend(): string
+    {
+        if (defined('BASE_PATH') && (string) BASE_PATH !== '') {
+            return rtrim((string) BASE_PATH, '/');
+        }
+        return dirname(__DIR__, 4);
+    }
+
+    private function garantirPasta(string $dir): bool
+    {
+        if (is_dir($dir)) {
+            return true;
+        }
+        $old = umask(0002);
+        @mkdir($dir, 0775, true);
+        umask($old);
+        if (!is_dir($dir)) {
+            return false;
+        }
+        @chmod($dir, 0775);
+        return true;
     }
 }

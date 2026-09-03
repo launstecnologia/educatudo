@@ -33,6 +33,7 @@ $router->get('/validar/historico/{hash}', 'Public/HistoricoValidacaoController@v
 
 // Expo Colag — página pública do stand via QR (sem login)
 $router->get('/expo-colag/s/{token}', 'Modulos/expo-colag/ExpoColagPublicoController@stand');
+$router->post('/expo-colag/s/{token}/avaliar', 'Modulos/expo-colag/ExpoColagPublicoController@avaliarStand');
 $router->get('/expo-colag/midia/{id}/capa', 'Modulos/expo-colag/ExpoColagPublicoController@capa');
 
 $router->get('/manifest-aluno.json', 'Pwa/PwaController@manifestAluno');

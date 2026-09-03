@@ -2,9 +2,25 @@
 $projeto = is_array($projeto ?? null) ? $projeto : [];
 $itens = is_array($itens ?? null) ? $itens : [];
 $escola = (string) ($escola ?? 'Escola');
+$logoUrl = (string) ($logo_url ?? '');
 $user = is_array($user ?? null) ? $user : [];
 $geradoEm = (string) ($geradoEm ?? date('d/m/Y H:i'));
 $professor = (string) ($projeto['professor_nome'] ?? $user['nome'] ?? '—');
+$logoData = '';
+if ($logoUrl !== '') {
+    $path = (string) (parse_url($logoUrl, PHP_URL_PATH) ?: $logoUrl);
+    if (strpos($path, '/uploads/') === 0 || strpos($path, '/public/uploads/') === 0 || strpos($path, '/assets/') === 0) {
+        $rel = ltrim(preg_replace('#^/public/#', '', $path) ?? $path, '/');
+        $full = (defined('BASE_PATH') ? rtrim((string) BASE_PATH, '/') : dirname(__DIR__, 5)) . '/public/' . $rel;
+        if (is_file($full) && is_readable($full)) {
+            $mime = function_exists('mime_content_type') ? (string) mime_content_type($full) : 'image/png';
+            $bin = @file_get_contents($full);
+            if (is_string($bin) && $bin !== '') {
+                $logoData = 'data:' . $mime . ';base64,' . base64_encode($bin);
+            }
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -16,6 +32,10 @@ $professor = (string) ($projeto['professor_nome'] ?? $user['nome'] ?? '—');
         h1 { font-size: 16pt; margin: 0 0 4px; }
         h2 { font-size: 12pt; margin: 18px 0 8px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
         .muted { color: #64748b; font-size: 9pt; }
+        .header { display: table; width: 100%; margin-bottom: 14px; }
+        .header-left { display: table-cell; vertical-align: middle; }
+        .header-right { display: table-cell; vertical-align: middle; text-align: right; }
+        .logo { max-height: 44px; max-width: 160px; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border: 1px solid #94a3b8; padding: 6px 8px; text-align: left; vertical-align: top; }
         th { background: #e2e8f0; font-size: 9pt; }
@@ -26,7 +46,16 @@ $professor = (string) ($projeto['professor_nome'] ?? $user['nome'] ?? '—');
     </style>
 </head>
 <body>
-    <p class="muted"><?= htmlspecialchars($escola) ?> · Expo Colag</p>
+    <div class="header">
+        <div class="header-left">
+            <p class="muted"><?= htmlspecialchars($escola) ?> · Expo Colag</p>
+        </div>
+        <?php if ($logoData !== ''): ?>
+            <div class="header-right">
+                <img src="<?= htmlspecialchars($logoData) ?>" class="logo" alt="">
+            </div>
+        <?php endif; ?>
+    </div>
     <h1>Solicitação de materiais — almoxarifado</h1>
     <p class="muted">Gerado em <?= htmlspecialchars($geradoEm) ?></p>
 
