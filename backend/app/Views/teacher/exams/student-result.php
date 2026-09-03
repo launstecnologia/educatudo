@@ -203,8 +203,16 @@ if (!class_exists('LayoutHelper')) {
                         </div>
                     </div>
                 <?php endif; ?>
+
+                <?php if (!empty($questao['explicacao'])): ?>
+                    <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Comentário do gabarito</p>
+                        <div class="space-y-3">
+                            <?= LayoutHelper::renderComentarioGabarito($questao['explicacao']) ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>
 </div>
-

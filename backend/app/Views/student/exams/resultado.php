@@ -162,6 +162,17 @@ $percentual = $totalQuestoes > 0 ? ($acertos / $totalQuestoes) * 100 : 0;
                         </span>
                     </div>
                 <?php endif; ?>
+
+                <?php if (!empty($questao['explicacao'])): ?>
+                    <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Comentário do gabarito</p>
+                        </div>
+                        <div class="space-y-3">
+                            <?= LayoutHelper::renderComentarioGabarito($questao['explicacao']) ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>
@@ -174,4 +185,3 @@ $percentual = $totalQuestoes > 0 ? ($acertos / $totalQuestoes) * 100 : 0;
         Voltar para Provas
     </a>
 </div>
-
