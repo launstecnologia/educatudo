@@ -506,7 +506,7 @@
     $studentAccessibilityEnabled = (($user['tipo'] ?? '') === 'aluno' && empty($preview));
     ?>
 </head>
-<body class="bg-white font-sans antialiased overflow-hidden flex flex-col mobile-spacing-<?= htmlspecialchars($mobileSpacing) ?> mobile-font-<?= htmlspecialchars($mobileFontSize) ?>"
+<body class="bg-gray-50 font-sans antialiased overflow-hidden flex flex-col mobile-spacing-<?= htmlspecialchars($mobileSpacing) ?> mobile-font-<?= htmlspecialchars($mobileFontSize) ?>"
       style="height: 100vh;"
       data-mobile-enabled="<?= $mobileEnabled ? '1' : '0' ?>"
       data-auth-user="<?= htmlspecialchars((string)(($user['tipo'] ?? '') . ':' . (int)($user['id'] ?? 0)), ENT_QUOTES, 'UTF-8') ?>"
