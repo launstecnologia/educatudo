@@ -119,7 +119,8 @@
             'comunicacao', 'school-communication', 'school-calendar', 'mural-recados', 'notifications',
             'notificacoes-push', 'reunioes_geral', 'reunioes',
         ], true) || $forumAtivo || $forumDenunciasAtivo;
-        $conteudoOpen = in_array($cp, ['conteudo', 'arquivos', 'apostilas-ia', 'expo-colag'], true);
+        $conteudoOpen = in_array($cp, ['conteudo', 'arquivos', 'apostilas-ia'], true);
+        $escolaOpen = in_array($cp, ['expo-colag'], true);
         $gestaoOpen = in_array($cp, [
             'gestao_escolar', 'censo_escolar', 'conformidade', 'conselho_classe',
             'diario_classe', 'faltas', 'presenca', 'documentos_institucionais',
@@ -585,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure compact mode always starts with closed groups (visual cleanliness)
     function closeAllMenuGroupsWhenCollapsed() {
         if (!sidebar.classList.contains('collapsed')) return;
-        const menuGroups = ['academico', 'avaliacoes', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
+        const menuGroups = ['academico', 'avaliacoes', 'comunicacao', 'conteudo', 'escola', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
         menuGroups.forEach(group => {
             const submenu = document.getElementById(`${group}-submenu`);
             const arrow = document.getElementById(`${group}-arrow`);
@@ -630,7 +631,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Menu groups functionality
-    const menuGroups = ['academico', 'avaliacoes', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
+    const menuGroups = ['academico', 'avaliacoes', 'comunicacao', 'conteudo', 'escola', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
 
     // Auto-open menu group if current page is inside it
     const currentPage = '<?= addslashes($current_page ?? '') ?>';
@@ -674,7 +675,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'conteudo': 'conteudo',
         'arquivos': 'conteudo',
         'apostilas-ia': 'conteudo',
-        'expo-colag': 'conteudo',
+        'expo-colag': 'escola',
         'gestao_escolar': 'gestao-escolar',
         'censo_escolar': 'gestao-escolar',
         'conformidade': 'gestao-escolar',

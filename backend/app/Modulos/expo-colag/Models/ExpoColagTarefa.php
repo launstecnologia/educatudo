@@ -262,6 +262,16 @@ class ExpoColagTarefa
         return (int) ($row['total'] ?? 0);
     }
 
+    public function contarAtrasadasTodos(): int
+    {
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total
+             FROM expo_colag_projeto_tarefa_atribuicoes
+             WHERE status = 'Atrasada'"
+        );
+        return (int) ($row['total'] ?? 0);
+    }
+
     public function contarPendentesAvaliacaoProfessor(int $professorId): int
     {
         $row = $this->db->fetch(
@@ -271,6 +281,16 @@ class ExpoColagTarefa
              INNER JOIN expo_colag_projetos p ON p.id = t.projeto_id
              WHERE p.professor_id = :professor_id AND a.status = 'Entregue'",
             ['professor_id' => $professorId]
+        );
+        return (int) ($row['total'] ?? 0);
+    }
+
+    public function contarPendentesAvaliacaoTodos(): int
+    {
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total
+             FROM expo_colag_projeto_tarefa_atribuicoes
+             WHERE status = 'Entregue'"
         );
         return (int) ($row['total'] ?? 0);
     }

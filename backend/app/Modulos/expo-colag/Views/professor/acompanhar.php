@@ -11,6 +11,8 @@ $stand = $stand ?? null;
 $url_qr = $url_qr ?? null;
 $setores = $setores ?? [];
 $csrf_token = $csrf_token ?? '';
+$modoAdmin = !empty($modo_admin);
+$baseUrlExpo = rtrim((string) ($base_url_expo ?? (URL . '/professor/expo-colag')), '/');
 $pid = (int) ($projeto['id'] ?? 0);
 $aba = in_array($aba ?? '', ['geral', 'participantes', 'grupo', 'tarefas', 'materiais', 'stand'], true)
     ? $aba : 'geral';
@@ -51,19 +53,22 @@ foreach ($atribuicoes as $a) {
 <div class="mb-6 space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-            <a href="<?= URL ?>/professor/expo-colag" class="text-sm text-accent hover:underline">← Expo Colag</a>
+            <a href="<?= htmlspecialchars($baseUrlExpo) ?>" class="text-sm text-accent hover:underline">← Expo Colag</a>
             <h2 class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h2>
             <p class="text-sm text-gray-600">
-                Meu painel · <?= htmlspecialchars(str_replace('_', ' ', $projeto['status'] ?? '')) ?>
+                <?= $modoAdmin ? 'Painel administrativo' : 'Meu painel' ?> · <?= htmlspecialchars(str_replace('_', ' ', $projeto['status'] ?? '')) ?>
                 · <?= count($aprovados) ?> aluno(s) no grupo
+                <?php if ($modoAdmin): ?>
+                    · Professor: <?= htmlspecialchars($projeto['professor_nome'] ?? '—') ?>
+                <?php endif; ?>
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
+            <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais-pdf"
                target="_blank" rel="noopener"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">PDF materiais</a>
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/editar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Editar</a>
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/preview" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Preview</a>
+            <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/editar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Editar</a>
+            <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/preview" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Preview</a>
         </div>
     </div>
 
@@ -104,7 +109,7 @@ foreach ($atribuicoes as $a) {
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <div class="flex items-center justify-between gap-2 mb-3">
                     <h2 class="font-semibold text-gray-900">Materiais do almoxarifado</h2>
-                    <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
+                    <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais-pdf"
                        target="_blank" rel="noopener"
                        class="text-sm font-semibold text-accent hover:underline">Exportar PDF</a>
                 </div>
@@ -165,14 +170,14 @@ foreach ($atribuicoes as $a) {
                                     <td class="px-4 py-3">
                                         <?php if (in_array($st, ['Aguardando', 'Lista_espera'], true)): ?>
                                             <div class="flex flex-wrap gap-2">
-                                                <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/inscricoes/decidir">
+                                                <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/inscricoes/decidir">
                                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                                     <input type="hidden" name="inscricao_id" value="<?= (int) $i['id'] ?>">
                                                     <input type="hidden" name="decisao" value="aprovar">
                                                     <button type="submit" class="text-xs font-medium text-emerald-700 hover:underline">Aprovar</button>
                                                 </form>
                                                 <?php if ($st === 'Aguardando'): ?>
-                                                <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/inscricoes/decidir" class="flex items-center gap-1"
+                                                <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/inscricoes/decidir" class="flex items-center gap-1"
                                                       onsubmit="var m=this.querySelector('[name=motivo_recusa]'); if(!m.value.trim()){alert('Informe o motivo'); return false;}">
                                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                                     <input type="hidden" name="inscricao_id" value="<?= (int) $i['id'] ?>">
@@ -216,7 +221,7 @@ foreach ($atribuicoes as $a) {
                     </div>
                 <?php endforeach; endif; ?>
             </div>
-            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/mensagens" class="space-y-2">
+            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/mensagens" class="space-y-2">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <textarea name="mensagem" required maxlength="2000" rows="3" placeholder="Escreva para o grupo…"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm"></textarea>
@@ -228,7 +233,7 @@ foreach ($atribuicoes as $a) {
         <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
             <h2 class="font-semibold text-gray-900">Nova tarefa</h2>
             <p class="text-sm text-gray-600">Cria e atribui ao grupo já formado, mesmo com as inscrições encerradas.</p>
-            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/tarefas" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <input type="hidden" name="atribuir" value="<?= $aprovados ? 'selecionados' : 'todos' ?>">
                 <div class="sm:col-span-2">
@@ -305,7 +310,7 @@ foreach ($atribuicoes as $a) {
                             <?php endif; ?>
                         </p>
                     </div>
-                    <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas/excluir" onsubmit="return confirm('Remover tarefa?');">
+                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/tarefas/excluir" onsubmit="return confirm('Remover tarefa?');">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="tarefa_id" value="<?= $tid ?>">
                         <button type="submit" class="text-xs text-red-600 hover:underline">Excluir</button>
@@ -334,13 +339,13 @@ foreach ($atribuicoes as $a) {
                                 </div>
                                 <?php if (($a['status'] ?? '') !== 'Concluida'): ?>
                                     <div class="flex flex-col gap-2 min-w-[180px]">
-                                        <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas/decidir">
+                                        <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/tarefas/decidir">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                             <input type="hidden" name="atribuicao_id" value="<?= (int) $a['id'] ?>">
                                             <input type="hidden" name="acao" value="concluir">
                                             <button type="submit" class="btn-primary-custom px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90">Concluir</button>
                                         </form>
-                                        <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/tarefas/decidir" class="space-y-1"
+                                        <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/tarefas/decidir" class="space-y-1"
                                               onsubmit="var c=this.querySelector('[name=comentario]'); if(!c.value.trim()){alert('Comentário obrigatório'); return false;}">
                                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                             <input type="hidden" name="atribuicao_id" value="<?= (int) $a['id'] ?>">
@@ -360,7 +365,7 @@ foreach ($atribuicoes as $a) {
     <?php elseif ($aba === 'materiais'): ?>
         <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-sm text-gray-600">Lista para autorização da coordenação e retirada no almoxarifado.</p>
-            <a href="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais-pdf"
+            <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais-pdf"
                target="_blank" rel="noopener"
                class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Gerar PDF</a>
         </div>
@@ -392,13 +397,13 @@ foreach ($atribuicoes as $a) {
                     </div>
                     <?php if ($stPedido === 'Pendente'): ?>
                         <div class="flex flex-wrap gap-2">
-                            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/pedidos-materiais/decidir">
+                            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/pedidos-materiais/decidir">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                 <input type="hidden" name="pedido_id" value="<?= (int) $pedido['id'] ?>">
                                 <input type="hidden" name="acao" value="aprovar">
                                 <button type="submit" class="btn-primary-custom px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-90">Aprovar</button>
                             </form>
-                            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/pedidos-materiais/decidir" class="flex flex-wrap gap-2 items-center"
+                            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/pedidos-materiais/decidir" class="flex flex-wrap gap-2 items-center"
                                   onsubmit="var c=this.querySelector('[name=resposta]'); if(!c.value.trim()){alert('Informe o motivo da recusa'); return false;}">
                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                 <input type="hidden" name="pedido_id" value="<?= (int) $pedido['id'] ?>">
@@ -414,7 +419,7 @@ foreach ($atribuicoes as $a) {
         <?php endif; ?>
         <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
             <h2 class="font-semibold text-gray-900">Adicionar material</h2>
-            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais" class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <input type="text" name="titulo" required placeholder="Título" class="border border-gray-300 rounded-lg px-3 py-2 bg-white">
                 <select name="tipo" class="border border-gray-300 rounded-lg px-3 py-2 bg-white">
@@ -442,7 +447,7 @@ foreach ($atribuicoes as $a) {
                             <a href="<?= htmlspecialchars($link) ?>" target="_blank" rel="noopener" class="text-accent hover:underline text-xs">Abrir</a>
                         <?php endif; ?>
                     </div>
-                    <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/materiais/remover" onsubmit="return confirm('Remover?');">
+                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/materiais/remover" onsubmit="return confirm('Remover?');">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="material_id" value="<?= (int) $m['id'] ?>">
                         <button type="submit" class="text-xs text-red-600 hover:underline">Remover</button>
@@ -455,7 +460,7 @@ foreach ($atribuicoes as $a) {
         <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
             <h2 class="font-semibold text-gray-900">Stand e QR público</h2>
             <p class="text-sm text-gray-600">Visitantes escaneiam o QR e veem só o resumo público (sem sobrenome, turma ou foto dos alunos).</p>
-            <form method="post" action="<?= URL ?>/professor/expo-colag/projetos/<?= $pid ?>/stand" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/stand" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <div>
                     <label class="block text-gray-600 mb-1">Número do stand</label>

@@ -263,10 +263,10 @@ class ExpoColagService
      *
      * @return array{success: bool, error?: string}
      */
-    public function excluirProjeto(int $projetoId, int $professorId): array
+    public function excluirProjeto(int $projetoId, int $professorId, bool $modoAdmin = false): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto || (int) $projeto['professor_id'] !== $professorId) {
+        if (!$projeto || (!$modoAdmin && (int) $projeto['professor_id'] !== $professorId)) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
         if ((string) ($projeto['status'] ?? '') === 'Concluido') {
@@ -347,9 +347,31 @@ class ExpoColagService
         ];
     }
 
+    public function indicadoresAdmin(): array
+    {
+        $porStatus = $this->projetoModel->contarPorStatusTodos();
+        $ativos = 0;
+        foreach ($porStatus as $status => $total) {
+            if (!in_array($status, ['Cancelado', 'Concluido'], true)) {
+                $ativos += $total;
+            }
+        }
+
+        return [
+            'ativos' => $ativos,
+            'inscricoes_pendentes' => $this->contarInscricoesPendentes(),
+            'por_status' => $porStatus,
+        ];
+    }
+
     public function listarProjetosProfessor(int $professorId): array
     {
         return $this->projetoModel->listarPorProfessor($professorId);
+    }
+
+    public function listarProjetosAdmin(array $filtros = []): array
+    {
+        return $this->projetoModel->listarTodos($filtros);
     }
 
     /**
@@ -967,10 +989,10 @@ class ExpoColagService
         }
     }
 
-    public function listarInscricoesProjeto(int $projetoId, int $professorId): array
+    public function listarInscricoesProjeto(int $projetoId, int $professorId, bool $modoAdmin = false): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto || (int) $projeto['professor_id'] !== $professorId) {
+        if (!$projeto || (!$modoAdmin && (int) $projeto['professor_id'] !== $professorId)) {
             return [];
         }
         return $this->inscricaoModel->listarPorProjeto($projetoId);
@@ -979,6 +1001,19 @@ class ExpoColagService
     public function listarPendentesProfessor(int $professorId): array
     {
         return $this->inscricaoModel->listarPendentesPorProfessor($professorId);
+    }
+
+    public function listarPendentesAdmin(): array
+    {
+        return $this->db->fetchAll(
+            "SELECT i.*, a.nome AS aluno_nome, p.titulo AS projeto_titulo, p.professor_id, pr.nome AS professor_nome
+             FROM expo_colag_inscricoes i
+             INNER JOIN alunos a ON a.id = i.aluno_id
+             INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
+             LEFT JOIN professores pr ON pr.id = p.professor_id
+             WHERE i.status IN ('Aguardando', 'Lista_espera')
+             ORDER BY i.inscrito_em ASC"
+        ) ?: [];
     }
 
     public function listarInscricoesAluno(int $alunoId): array
@@ -1044,13 +1079,13 @@ class ExpoColagService
      *
      * @return array{success:bool,projeto?:array,relacoes?:array,error?:string}
      */
-    public function carregarProjetoCompleto(int $projetoId, ?int $professorId = null): array
+    public function carregarProjetoCompleto(int $projetoId, ?int $professorId = null, bool $modoAdmin = false): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
         if (!$projeto) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
-        if ($professorId !== null && (int) $projeto['professor_id'] !== $professorId) {
+        if (!$modoAdmin && $professorId !== null && (int) $projeto['professor_id'] !== $professorId) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
         $projeto['capa_src'] = self::resolverUrlCapa((string) ($projeto['capa_url'] ?? ''), $projetoId);
@@ -1067,7 +1102,7 @@ class ExpoColagService
      * @param array<string, mixed> $input
      * @return array{success:bool,id?:int,capa_url?:string,capa_src?:string,error?:string}
      */
-    public function salvarProjetoCompleto(int $professorId, array $input, ?array $capaFile = null): array
+    public function salvarProjetoCompleto(int $professorId, array $input, ?array $capaFile = null, bool $modoAdmin = false): array
     {
         $titulo = trim((string) ($input['titulo'] ?? ''));
         if ($titulo === '') {
@@ -1081,18 +1116,25 @@ class ExpoColagService
         }
         $edicao = $edicaoResult['edicao'];
         $config = $edicao['config_decoded'] ?? self::configPadrao();
+        $professorResponsavelId = $this->resolverProfessorResponsavel($input, $professorId, $modoAdmin);
+        if ($professorResponsavelId <= 0) {
+            return ['success' => false, 'error' => 'Selecione um professor responsável válido.'];
+        }
 
         $existente = null;
         if ($projetoId > 0) {
             $existente = $this->projetoModel->findById($projetoId);
-            if (!$existente || (int) $existente['professor_id'] !== $professorId) {
+            if (!$existente || (!$modoAdmin && (int) $existente['professor_id'] !== $professorId)) {
                 return ['success' => false, 'error' => 'Projeto não encontrado.'];
             }
             if (($existente['status'] ?? '') === 'Cancelado') {
                 return ['success' => false, 'error' => 'Projeto cancelado não pode ser editado.'];
             }
+            if (!$modoAdmin) {
+                $professorResponsavelId = (int) $existente['professor_id'];
+            }
         } else {
-            $rascunho = $this->salvarRascunhoProjeto($professorId, $input);
+            $rascunho = $this->salvarRascunhoProjeto($professorResponsavelId, $input);
             if (!$rascunho['success']) {
                 return $rascunho;
             }
@@ -1148,6 +1190,9 @@ class ExpoColagService
             'destaque' => !empty($input['destaque']) ? 1 : 0,
             'ativo' => !empty($input['ativo']) ? 1 : 0,
         ];
+        if ($modoAdmin) {
+            $dados['professor_id'] = $professorResponsavelId;
+        }
         if ($capaUrl !== '') {
             $dados['capa_url'] = $capaUrl;
         }
@@ -1207,7 +1252,7 @@ class ExpoColagService
             if (array_key_exists('rubrica', $input)) {
                 $this->relacoesModel->sincronizarRubrica($projetoId, $this->parseJsonOrArray($input['rubrica']));
             }
-            $this->relacoesModel->sincronizarMateriais($projetoId, $materiais, $professorId);
+            $this->relacoesModel->sincronizarMateriais($projetoId, $materiais, $professorResponsavelId);
             $this->db->commit();
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -1223,7 +1268,7 @@ class ExpoColagService
                     $alunoIds[] = (int) ($v['referencia_id'] ?? 0);
                 }
             }
-            $this->incluirAlunosNoGrupo($projetoId, $professorId, $alunoIds);
+            $this->incluirAlunosNoGrupo($projetoId, $professorResponsavelId, $alunoIds);
         }
 
         return [
@@ -1345,6 +1390,16 @@ class ExpoColagService
         return ['success' => true];
     }
 
+    public function publicarProjetoAdmin(int $projetoId): array
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+
+        return $this->publicarProjeto($projetoId, (int) $projeto['professor_id']);
+    }
+
     /** Catálogos para o wizard. */
     public function catalogosWizard(): array
     {
@@ -1388,6 +1443,32 @@ class ExpoColagService
             'config_edicao' => $config,
             'criterios_banca_padrao' => $config['criterios_banca'] ?? [],
         ];
+    }
+
+    private function contarInscricoesPendentes(): int
+    {
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total
+             FROM expo_colag_inscricoes
+             WHERE status IN ('Aguardando', 'Lista_espera')"
+        );
+        return (int) ($row['total'] ?? 0);
+    }
+
+    private function resolverProfessorResponsavel(array $input, int $professorPadraoId, bool $modoAdmin): int
+    {
+        $id = $modoAdmin ? (int) ($input['professor_id'] ?? 0) : $professorPadraoId;
+        if ($id <= 0) {
+            return 0;
+        }
+
+        try {
+            $row = $this->db->fetch('SELECT id FROM professores WHERE id = :id AND ativo = 1', ['id' => $id]);
+        } catch (Throwable $e) {
+            $row = $this->db->fetch('SELECT id FROM professores WHERE id = :id', ['id' => $id]);
+        }
+
+        return $row ? $id : 0;
     }
 
     /**

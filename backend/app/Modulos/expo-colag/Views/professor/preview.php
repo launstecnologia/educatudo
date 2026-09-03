@@ -3,10 +3,11 @@ $projeto = $projeto ?? [];
 $relacoes = $relacoes ?? [];
 $objetivos = $relacoes['objetivos'] ?? [];
 $etapas = $relacoes['etapas'] ?? [];
+$baseUrlExpo = rtrim((string) ($base_url_expo ?? (URL . '/professor/expo-colag')), '/');
 ?>
 <div class="mb-6 space-y-6">
     <div class="flex items-center justify-between gap-3">
-        <a href="<?= URL ?>/professor/expo-colag/projetos/<?= (int) ($projeto['id'] ?? 0) ?>/editar" class="text-sm text-primary hover:underline">← Voltar ao wizard</a>
+        <a href="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= (int) ($projeto['id'] ?? 0) ?>/editar" class="text-sm text-primary hover:underline">← Voltar ao wizard</a>
         <span class="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-medium">Pré-visualização como aluno</span>
     </div>
 

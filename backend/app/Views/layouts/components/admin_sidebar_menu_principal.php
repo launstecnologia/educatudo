@@ -20,6 +20,17 @@ $showPedagogicoGroup = $modOn('aulas_online')
     || $modOn('aluno_minicursos')
     || $modOn('professor_planos_aula');
 $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ?? '') === 'dev');
+$showEscolaExpoGroup = FeatureGate::isModuleEnabled('expo_colag') && $canViewSidebar(['expo_colag']);
+$nomeMenuEscola = '';
+if (class_exists('LayoutHelper')) {
+    $nomeMenuEscola = trim((string) LayoutHelper::get('menu_colag_nome', ''));
+    if ($nomeMenuEscola === '') {
+        $nomeMenuEscola = trim((string) LayoutHelper::getSystemTitle());
+    }
+}
+if ($nomeMenuEscola === '') {
+    $nomeMenuEscola = 'Escola';
+}
 ?>
 <!-- Dashboard -->
 <?php if ($showDashboardMenu): ?>
@@ -35,6 +46,28 @@ $showSistemaGroup = $modOn('redacao_configuravel') || (($user['perfil_admin'] ??
     <i class="fa-solid fa-comments w-5 h-5 mr-3"></i>
     <span class="sidebar-text">Assistente</span>
 </a>
+<?php endif; ?>
+
+<?php if ($showEscolaExpoGroup): ?>
+<div class="menu-group">
+    <div class="flex items-center rounded-xl <?= !empty($escolaOpen) ? 'bg-white/20' : '' ?>">
+        <a href="<?= URL ?>/admin/expo-colag" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+            <i class="fa-solid fa-school w-5 h-5 mr-3"></i>
+            <span class="sidebar-text"><?= htmlspecialchars($nomeMenuEscola) ?></span>
+        </a>
+        <button type="button" onclick="toggleMenuGroup('escola')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <svg id="escola-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
+    <div id="escola-submenu" class="<?= !empty($escolaOpen) ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <a href="<?= URL ?>/admin/expo-colag" class="<?= $linkCls($cp === 'expo-colag') ?>">
+            <i class="fa-solid fa-flask-vial w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Expo Colag</span>
+        </a>
+    </div>
+</div>
 <?php endif; ?>
 
 <!-- Acadêmico -->

@@ -55,6 +55,40 @@ class ExpoColagProjeto
         ) ?: [];
     }
 
+    public function listarTodos(array $filtros = []): array
+    {
+        $where = [];
+        $params = [];
+
+        $q = trim((string) ($filtros['q'] ?? ''));
+        if ($q !== '') {
+            $where[] = '(p.titulo LIKE :q OR p.subtitulo LIKE :q OR p.area LIKE :q OR pr.nome LIKE :q)';
+            $params['q'] = '%' . $q . '%';
+        }
+
+        $status = trim((string) ($filtros['status'] ?? ''));
+        if ($status !== '') {
+            $where[] = 'p.status = :status';
+            $params['status'] = $status;
+        }
+
+        $professorId = (int) ($filtros['professor_id'] ?? 0);
+        if ($professorId > 0) {
+            $where[] = 'p.professor_id = :professor_id';
+            $params['professor_id'] = $professorId;
+        }
+
+        $sql = 'SELECT p.*, pr.nome AS professor_nome
+                FROM expo_colag_projetos p
+                LEFT JOIN professores pr ON pr.id = p.professor_id';
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY p.updated_at DESC, p.id DESC';
+
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
     /** Projetos visíveis no mural (não rascunho/cancelado). */
     public function listarPublicados(): array
     {
@@ -76,6 +110,20 @@ class ExpoColagProjeto
              WHERE professor_id = :professor_id
              GROUP BY status',
             ['professor_id' => $professorId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(string) $row['status']] = (int) $row['total'];
+        }
+        return $out;
+    }
+
+    public function contarPorStatusTodos(): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT status, COUNT(*) AS total
+             FROM expo_colag_projetos
+             GROUP BY status'
         ) ?: [];
         $out = [];
         foreach ($rows as $row) {
@@ -137,7 +185,7 @@ class ExpoColagProjeto
             'briefing_entrega', 'formatos_aceitos', 'vale_nota', 'evento_avaliativo_id',
             'tudinha_ativa', 'educalabs_ativa', 'tudinha_contexto', 'custo_tudicoins',
             'materiais_necessarios', 'permite_solicitacao_recursos',
-            'destaque', 'ativo', 'status', 'motivo_cancelamento',
+            'destaque', 'ativo', 'status', 'motivo_cancelamento', 'professor_id',
         ];
         foreach ($permitidos as $campo) {
             if (!array_key_exists($campo, $data)) {

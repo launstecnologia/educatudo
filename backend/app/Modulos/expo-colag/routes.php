@@ -43,6 +43,26 @@ $router->get('/professor/expo-colag/bncc', 'Modulos/expo-colag/ExpoColagProfesso
 
 // Admin / coordenação
 $router->get('/admin/expo-colag', 'Modulos/expo-colag/ExpoColagAdminController@index');
+$router->get('/admin/expo-colag/criar', 'Modulos/expo-colag/ExpoColagAdminController@criar');
+$router->get('/admin/expo-colag/projetos', 'Modulos/expo-colag/ExpoColagAdminController@projetos');
+$router->get('/admin/expo-colag/projetos/{id}/editar', 'Modulos/expo-colag/ExpoColagAdminController@editar');
+$router->get('/admin/expo-colag/projetos/{id}/preview', 'Modulos/expo-colag/ExpoColagAdminController@preview');
+$router->get('/admin/expo-colag/projetos/{id}/materiais-pdf', 'Modulos/expo-colag/ExpoColagAdminController@materiaisPdf');
+$router->get('/admin/expo-colag/projetos/{id}/acompanhar', 'Modulos/expo-colag/ExpoColagAdminController@acompanhar');
+$router->post('/admin/expo-colag/projetos/salvar', 'Modulos/expo-colag/ExpoColagAdminController@salvar');
+$router->post('/admin/expo-colag/projetos/{id}/publicar', 'Modulos/expo-colag/ExpoColagAdminController@publicar');
+$router->post('/admin/expo-colag/projetos/{id}/excluir', 'Modulos/expo-colag/ExpoColagAdminController@excluir');
+$router->post('/admin/expo-colag/projetos/{id}/inscricoes/decidir', 'Modulos/expo-colag/ExpoColagAdminController@decidirInscricao');
+$router->post('/admin/expo-colag/projetos/{id}/tarefas', 'Modulos/expo-colag/ExpoColagAdminController@criarTarefa');
+$router->post('/admin/expo-colag/projetos/{id}/tarefas/excluir', 'Modulos/expo-colag/ExpoColagAdminController@excluirTarefa');
+$router->post('/admin/expo-colag/projetos/{id}/tarefas/decidir', 'Modulos/expo-colag/ExpoColagAdminController@decidirAtribuicao');
+$router->post('/admin/expo-colag/projetos/{id}/materiais', 'Modulos/expo-colag/ExpoColagAdminController@adicionarMaterial');
+$router->post('/admin/expo-colag/projetos/{id}/materiais/remover', 'Modulos/expo-colag/ExpoColagAdminController@removerMaterial');
+$router->post('/admin/expo-colag/projetos/{id}/pedidos-materiais/decidir', 'Modulos/expo-colag/ExpoColagAdminController@decidirPedidoMaterial');
+$router->post('/admin/expo-colag/projetos/{id}/mensagens', 'Modulos/expo-colag/ExpoColagAdminController@enviarMensagem');
+$router->post('/admin/expo-colag/projetos/{id}/stand', 'Modulos/expo-colag/ExpoColagAdminController@salvarStand');
+$router->get('/admin/expo-colag/alunos-turma', 'Modulos/expo-colag/ExpoColagAdminController@alunosTurma');
+$router->get('/admin/expo-colag/bncc', 'Modulos/expo-colag/ExpoColagAdminController@buscarBncc');
 $router->get('/admin/expo-colag/configuracao', 'Modulos/expo-colag/ExpoColagAdminController@configuracao');
 $router->post('/admin/expo-colag/configuracao', 'Modulos/expo-colag/ExpoColagAdminController@salvarConfiguracao');
 $router->get('/admin/expo-colag/autorizacoes', 'Modulos/expo-colag/ExpoColagAdminController@autorizacoes');

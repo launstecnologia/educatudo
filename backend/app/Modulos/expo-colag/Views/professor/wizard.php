@@ -4,6 +4,8 @@ $relacoes = $relacoes ?? [];
 $catalogos = $catalogos ?? [];
 $csrf_token = $csrf_token ?? '';
 $user = $user ?? [];
+$modoAdmin = !empty($modo_admin);
+$baseUrlExpo = rtrim((string) ($base_url_expo ?? (URL . '/professor/expo-colag')), '/');
 $config = $catalogos['config_edicao'] ?? [];
 $materias = $catalogos['materias'] ?? [];
 $professores = $catalogos['professores'] ?? [];
@@ -11,7 +13,7 @@ $series = $catalogos['series'] ?? [];
 
 $pid = (int) ($projeto['id'] ?? 0);
 $status = (string) ($projeto['status'] ?? 'Rascunho');
-$profAtualId = (int) ($user['id'] ?? 0);
+$profAtualId = $modoAdmin ? (int) ($projeto['professor_id'] ?? 0) : (int) ($user['id'] ?? 0);
 $capaUrl = (string) ($projeto['capa_url'] ?? '');
 $capaSrc = (string) ($projeto['capa_src'] ?? ExpoColagService::resolverUrlCapa($capaUrl, $pid));
 
@@ -289,11 +291,12 @@ $steps = [
 <div class="mb-6 space-y-6" id="expoWizard"
      data-projeto-id="<?= $pid ?>"
      data-url-base="<?= htmlspecialchars(URL) ?>"
-     data-alunos-url="<?= htmlspecialchars(URL . '/professor/expo-colag/alunos-turma') ?>">
+     data-base-expo="<?= htmlspecialchars($baseUrlExpo) ?>"
+     data-alunos-url="<?= htmlspecialchars($baseUrlExpo . '/alunos-turma') ?>">
 
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="flex items-center gap-3">
-            <a href="<?= URL ?>/professor/expo-colag" class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50" aria-label="Voltar">
+            <a href="<?= htmlspecialchars($baseUrlExpo) ?>" class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50" aria-label="Voltar">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
             </a>
             <div>
@@ -324,7 +327,7 @@ $steps = [
         <?php endforeach; ?>
     </div>
 
-    <form id="expoWizardForm" method="post" action="<?= URL ?>/professor/expo-colag/projetos/salvar" enctype="multipart/form-data" class="space-y-4">
+    <form id="expoWizardForm" method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/salvar" enctype="multipart/form-data" class="space-y-4">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
         <input type="hidden" name="projeto_id" value="<?= $pid ?>">
         <input type="hidden" name="acao" id="campoAcao" value="rascunho">
@@ -368,6 +371,19 @@ $steps = [
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <?php if ($modoAdmin): ?>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Professor responsável *</label>
+                    <select name="professor_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                        <option value="">Selecione</option>
+                        <?php foreach ($professores as $prof): ?>
+                            <option value="<?= (int) $prof['id'] ?>" <?= $profAtualId === (int) $prof['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($prof['nome'] ?? '') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Capa (JPG/PNG/WebP)</label>
                     <div class="capa-box mb-2">
@@ -753,7 +769,7 @@ $steps = [
         <p id="autosaveStatus" class="autosave-status" aria-live="polite"></p>
         <button type="button" id="btnPrev" class="btn-nav" disabled>Anterior</button>
         <button type="button" id="btnNext" class="btn-nav">Próximo</button>
-        <a id="btnPreview" href="<?= $pid > 0 ? htmlspecialchars(URL . '/professor/expo-colag/projetos/' . $pid . '/preview') : '#' ?>"
+        <a id="btnPreview" href="<?= $pid > 0 ? htmlspecialchars($baseUrlExpo . '/projetos/' . $pid . '/preview') : '#' ?>"
            class="btn-nav hidden">Pré-visualizar</a>
         <button type="submit" form="expoWizardForm" id="btnPublicar" data-acao="publicar"
                 class="hidden px-5 py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Publicar</button>
@@ -1109,7 +1125,7 @@ $steps = [
                         setAutosaveStatus('Não foi possível gerar o PDF. Confira se o título está preenchido.', true);
                         return;
                     }
-                    window.open(root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + pidNovo + '/materiais-pdf', '_blank');
+                    window.open(root.getAttribute('data-base-expo') + '/projetos/' + pidNovo + '/materiais-pdf', '_blank');
                 }
             });
         });
@@ -1382,11 +1398,11 @@ $steps = [
         if (id && pidInput && pidAtual <= 0) {
             pidInput.value = String(id);
             root.setAttribute('data-projeto-id', String(id));
-            history.replaceState(null, '', root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + id + '/editar');
+            history.replaceState(null, '', root.getAttribute('data-base-expo') + '/projetos/' + id + '/editar');
         }
         var prev = document.getElementById('btnPreview');
         if (prev && id) {
-            prev.href = root.getAttribute('data-url-base') + '/professor/expo-colag/projetos/' + id + '/preview';
+            prev.href = root.getAttribute('data-base-expo') + '/projetos/' + id + '/preview';
             if (step === maxStep) prev.classList.remove('hidden');
         }
     }

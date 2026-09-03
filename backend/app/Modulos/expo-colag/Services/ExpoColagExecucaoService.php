@@ -88,6 +88,33 @@ class ExpoColagExecucaoService
         ];
     }
 
+    public function painelAdmin(int $projetoId): array
+    {
+        $projeto = $this->projetoModel->findById($projetoId);
+        if (!$projeto) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
+
+        $this->tarefaModel->marcarAtrasadasProjeto($projetoId);
+        $completo = $this->expoService->carregarProjetoCompleto($projetoId, null, true);
+        $stand = $this->standModel->findByProjeto($projetoId);
+
+        return [
+            'success' => true,
+            'projeto' => $projeto,
+            'relacoes' => $completo['relacoes'] ?? [],
+            'inscricoes' => $this->expoService->listarInscricoesProjeto($projetoId, 0, true),
+            'tarefas' => $this->tarefaModel->listarPorProjeto($projetoId),
+            'atribuicoes' => $this->tarefaModel->listarAtribuicoesProjeto($projetoId),
+            'materiais' => $this->listarMateriais($projetoId),
+            'pedidos_materiais' => $this->listarPedidosProjetoSeguro($projetoId),
+            'mensagens' => $this->listarMensagensSeguro($projetoId),
+            'stand' => $stand,
+            'url_qr' => $stand ? $this->urlPublicaStand((string) $stand['qr_token']) : null,
+            'setores' => $this->programacaoModel->listarSetores((int) ($projeto['edicao_id'] ?? 0)),
+        ];
+    }
+
     public function painelAluno(int $projetoId, int $alunoId): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
@@ -700,6 +727,14 @@ class ExpoColagExecucaoService
         return [
             'tarefas_atrasadas' => $this->tarefaModel->contarAtrasadasProfessor($professorId),
             'entregas_avaliar' => $this->tarefaModel->contarPendentesAvaliacaoProfessor($professorId),
+        ];
+    }
+
+    public function indicadoresExtrasAdmin(): array
+    {
+        return [
+            'tarefas_atrasadas' => $this->tarefaModel->contarAtrasadasTodos(),
+            'entregas_avaliar' => $this->tarefaModel->contarPendentesAvaliacaoTodos(),
         ];
     }
 
