@@ -131,7 +131,7 @@
         ], true) || $curMovimentacao;
         $monitoramentoOpen = in_array($cp, ['monitoramento', 'monitoramento_alertas', 'tentativas_login'], true);
         $pedagogicoOpen = in_array($cp, ['pedagogico', 'aulas_online', 'planos-aula', 'ava', 'minicursos', 'bncc'], true);
-        $sistemaOpen = in_array($cp, ['sistema', 'essays_config', 'dev_tickets'], true);
+        $sistemaOpen = in_array($cp, ['sistema', 'avatares_alunos', 'essays_config', 'dev_tickets'], true);
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
         $zConfigOpen = in_array($cp, ['z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos'], true);
         $boletimNestedOpen = in_array($cp, ['boletim_config', 'boletim_guia'], true);

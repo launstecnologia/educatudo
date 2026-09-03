@@ -78,6 +78,7 @@ class AdminPermissionMatrix
             'guia_boletim' => ['label' => 'Guia do Boletim', 'prefixes' => ['/admin/boletim-guia', '/admin/boletim_guia']],
             'modo_manutencao' => ['label' => 'Modo Manutenção', 'prefixes' => ['/admin/maintenance']],
             'slider_dashboard' => ['label' => 'Slider Dashboard', 'prefixes' => ['/admin/settings']],
+            'avatares_alunos' => ['label' => 'Avatares dos Alunos', 'prefixes' => ['/admin/avatares-alunos']],
             'dev_settings' => ['label' => 'Dev Settings (dev)', 'prefixes' => ['/admin/dev']],
             'tickets_dev' => ['label' => 'Tickets (dev)', 'prefixes' => ['/admin/dev/tickets', '/admin/tickets']],
 
@@ -200,7 +201,7 @@ class AdminPermissionMatrix
             ]],
             'monitoramento' => ['label' => 'Monitoramento', 'items' => ['alertas_sensiveis', 'alunos_online', 'tentativas_login', 'reconhecimento_facial']],
             'pedagogico' => ['label' => 'Pedagógico', 'items' => ['planos_aula', 'ava', 'bncc', 'minicursos']],
-            'sistema' => ['label' => 'Sistema', 'items' => ['configuracao_prompt', 'tickets_dev']],
+            'sistema' => ['label' => 'Sistema', 'items' => ['avatares_alunos', 'configuracao_prompt', 'tickets_dev']],
             'usuarios' => ['label' => 'Usuários', 'items' => ['administradores', 'lista_chamada']],
             'configuracoes' => ['label' => 'Z-Configuração', 'items' => [
                 'dev_settings', 'unidades', 'modo_manutencao', 'slider_dashboard',
@@ -241,7 +242,7 @@ class AdminPermissionMatrix
                     'dashboard', 'alunos', 'assistente', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor', 'inclusao', 'listagem_avaliacoes', 'relatorio_avaliacoes',
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
-                    'configuracao_boletim', 'notas_semanais', 'guia_boletim',
+                    'configuracao_boletim', 'notas_semanais', 'guia_boletim', 'avatares_alunos',
                     'apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'minicursos', 'planos_aula', 'ava',
                     'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
                     'alertas_sensiveis', 'alunos_online', 'reconhecimento_facial',

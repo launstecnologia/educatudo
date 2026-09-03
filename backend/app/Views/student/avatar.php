@@ -171,10 +171,20 @@
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                     <?php
                     $avatarSelecionadoAtual = '';
+                    $avataresDisponiveis = is_array($avatares_disponiveis ?? null) ? $avatares_disponiveis : [];
                     if (!empty($avatar['avatar_url'])) {
-                        $candidato = basename(parse_url((string) $avatar['avatar_url'], PHP_URL_PATH) ?: (string) $avatar['avatar_url']);
-                        if (in_array($candidato, $avatars_predefinidos ?? [], true)) {
-                            $avatarSelecionadoAtual = $candidato;
+                        $avatarUrlAtual = (string) $avatar['avatar_url'];
+                        foreach ($avataresDisponiveis as $opcaoAtual) {
+                            $valorAtual = (string) ($opcaoAtual['valor'] ?? '');
+                            $urlAtual = (string) ($opcaoAtual['url'] ?? '');
+                            if ($valorAtual !== '' && (
+                                $avatarUrlAtual === $urlAtual
+                                || basename(parse_url($avatarUrlAtual, PHP_URL_PATH) ?: $avatarUrlAtual) === basename($valorAtual)
+                                || (strpos($valorAtual, 'predefinidos/') === 0 && strpos($avatarUrlAtual, 'key=' . rawurlencode($valorAtual)) !== false)
+                            )) {
+                                $avatarSelecionadoAtual = $valorAtual;
+                                break;
+                            }
                         }
                     }
                     ?>
@@ -182,25 +192,25 @@
 
                     <h3 class="text-lg font-semibold text-gray-800 mb-4">Escolha um avatar:</h3>
 
-                    <?php if (empty($avatars_predefinidos)): ?>
+                    <?php if (empty($avataresDisponiveis)): ?>
                         <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                            Nenhum avatar disponível no momento. Peça ao suporte para adicionar imagens em
-                            <code class="text-xs">public/assets/avatars/</code> (URL: /assets/avatars/).
+                            Nenhum avatar disponível no momento.
                         </div>
                     <?php else: ?>
                     <div class="grid grid-cols-5 gap-4 mb-6">
-                        <?php foreach ($avatars_predefinidos as $avatarFile): ?>
+                        <?php foreach ($avataresDisponiveis as $avatarOpcao): ?>
                             <?php
-                            $avatarUrl = URL . '/assets/avatars/' . rawurlencode($avatarFile);
-                            $avatarUrlAtual = (string) ($avatar['avatar_url'] ?? '');
-                            $isSelected = $avatarUrlAtual !== '' && (
-                                basename(parse_url($avatarUrlAtual, PHP_URL_PATH) ?: $avatarUrlAtual) === $avatarFile
-                                || substr($avatarUrlAtual, -strlen($avatarFile)) === $avatarFile
-                            );
+                            $avatarValor = (string) ($avatarOpcao['valor'] ?? '');
+                            $avatarFile = (string) ($avatarOpcao['arquivo'] ?? $avatarValor);
+                            $avatarUrlBase = (string) ($avatarOpcao['url'] ?? '');
+                            $avatarUrl = preg_match('#^https?://#i', $avatarUrlBase)
+                                ? $avatarUrlBase
+                                : rtrim((string) URL, '/') . '/' . ltrim($avatarUrlBase, '/');
+                            $isSelected = $avatarSelecionadoAtual !== '' && $avatarSelecionadoAtual === $avatarValor;
                             ?>
                             <div class="avatar-option cursor-pointer <?= $isSelected ? 'ring-4 ring-purple-500' : 'hover:ring-2 hover:ring-purple-300' ?> rounded-lg p-2 transition-all"
-                                 data-avatar="<?= htmlspecialchars($avatarFile) ?>"
-                                 onclick="selecionarAvatar('<?= htmlspecialchars($avatarFile, ENT_QUOTES) ?>')">
+                                 data-avatar="<?= htmlspecialchars($avatarValor) ?>"
+                                 onclick="selecionarAvatar('<?= htmlspecialchars($avatarValor, ENT_QUOTES) ?>', '<?= htmlspecialchars($avatarUrl, ENT_QUOTES) ?>')">
                                 <img src="<?= htmlspecialchars($avatarUrl) ?>"
                                      alt="Avatar"
                                      class="w-full h-auto rounded-lg">
@@ -244,7 +254,7 @@
 </div>
 
 <script>
-function selecionarAvatar(avatarFile) {
+function selecionarAvatar(avatarFile, avatarUrl) {
     // Remover seleção anterior
     document.querySelectorAll('.avatar-option').forEach(option => {
         option.classList.remove('ring-4', 'ring-purple-500');
@@ -268,7 +278,6 @@ function selecionarAvatar(avatarFile) {
         selectedOption.appendChild(selectedText);
         
         // Atualizar preview
-        const avatarUrl = '<?= URL ?>/assets/avatars/' + encodeURIComponent(avatarFile);
         const preview = document.getElementById('avatar-preview');
         const placeholder = document.getElementById('avatar-placeholder');
         
