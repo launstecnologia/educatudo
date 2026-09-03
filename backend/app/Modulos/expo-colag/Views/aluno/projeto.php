@@ -81,7 +81,7 @@ $renderParticipacao = static function () use ($insc, $status, $projeto, $csrf_to
     <?php
 };
 ?>
-<div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+<div class="w-full space-y-6">
     <a href="<?= URL ?>/expo-colag" class="text-sm text-accent hover:underline">← Voltar ao mural</a>
 
     <div class="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
