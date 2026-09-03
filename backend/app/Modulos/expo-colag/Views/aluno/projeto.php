@@ -180,20 +180,6 @@ $renderParticipacao = static function () use ($insc, $status, $projeto, $csrf_to
             </div>
         <?php endif; ?>
 
-        <?php if (!empty($projeto['educalabs_ativa']) || !empty($projeto['tudinha_ativa'])): ?>
-            <div>
-                <h2 class="text-sm font-semibold text-gray-800 mb-2">Pesquisa e ideias</h2>
-                <div class="flex flex-wrap gap-2">
-                    <?php if (!empty($projeto['educalabs_ativa'])): ?>
-                        <a href="<?= URL ?>/educalabs/access" class="btn-primary-custom inline-flex px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">EducaLabs</a>
-                    <?php endif; ?>
-                    <?php if (!empty($projeto['tudinha_ativa'])): ?>
-                        <a href="<?= URL ?>/chat" class="btn-primary-custom inline-flex px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">Tudinha</a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        <?php endif; ?>
-
         <?php if ($materiais): ?>
             <div>
                 <h2 class="text-sm font-semibold text-gray-800 mb-2">Materiais</h2>
