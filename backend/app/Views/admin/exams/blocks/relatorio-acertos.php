@@ -13,27 +13,6 @@ $totalQuestoesRespondidas = 0;
 foreach ($stats as $s) {
     $totalQuestoesRespondidas = max($totalQuestoesRespondidas, $s['total']);
 }
-
-if (!function_exists('normalizarNomeAlunoRelatorioProva')) {
-    function normalizarNomeAlunoRelatorioProva($nome): string
-    {
-        $nome = trim(preg_replace('/\s+/u', ' ', (string) $nome) ?? (string) $nome);
-        if ($nome === '') {
-            return '';
-        }
-
-        $nome = function_exists('mb_convert_case')
-            ? mb_convert_case(mb_strtolower($nome, 'UTF-8'), MB_CASE_TITLE, 'UTF-8')
-            : ucwords(strtolower($nome));
-
-        $particulas = ['Da', 'Das', 'De', 'Del', 'Do', 'Dos', 'E'];
-        foreach ($particulas as $particula) {
-            $nome = preg_replace('/\b' . $particula . '\b/u', mb_strtolower($particula, 'UTF-8'), $nome) ?? $nome;
-        }
-
-        return $nome;
-    }
-}
 ?>
 
 <style>
@@ -272,8 +251,7 @@ if (!function_exists('normalizarNomeAlunoRelatorioProva')) {
             <?php foreach ($alunosData as $idx => $al): ?>
             <tr>
                 <td class="col-num"><?= $idx + 1 ?></td>
-                <?php $nomeAlunoNormalizado = normalizarNomeAlunoRelatorioProva($al['nome'] ?? ''); ?>
-                <td class="col-nome" title="<?= htmlspecialchars($nomeAlunoNormalizado) ?>"><?= htmlspecialchars($nomeAlunoNormalizado) ?></td>
+                <td class="col-nome" title="<?= htmlspecialchars($al['nome']) ?>"><?= htmlspecialchars($al['nome']) ?></td>
                 <?php foreach ($materias as $mat): ?>
                     <?php foreach ($mat['questoes'] as $q): ?>
                         <?php
@@ -308,23 +286,12 @@ if (!function_exists('normalizarNomeAlunoRelatorioProva')) {
             <p class="text-sm font-semibold text-gray-700 mb-1">Resposta do aluno:</p>
             <p id="modal-questao-resp-texto" class="text-sm text-gray-600"></p>
         </div>
-        <div id="modal-questao-alunos-erros" class="hidden border-t border-gray-200 pt-4 mt-4">
-            <p id="modal-questao-alunos-erros-titulo" class="text-sm font-medium text-gray-800 mb-3"></p>
-            <div id="modal-questao-alunos-erros-lista" class="rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden"></div>
-        </div>
     </div>
 </div>
 
 <script>
 (function() {
     var questoesData = <?= json_encode($questoesAlt, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
-    var alunosData = <?= json_encode(array_map(static function ($aluno) {
-        return [
-            'id' => (int) ($aluno['id'] ?? 0),
-            'nome' => normalizarNomeAlunoRelatorioProva($aluno['nome'] ?? ''),
-            'respostas' => $aluno['respostas'] ?? [],
-        ];
-    }, $alunosData), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     var materiasMap = {};
     <?php foreach ($materias as $mat): ?>
@@ -386,58 +353,8 @@ if (!function_exists('normalizarNomeAlunoRelatorioProva')) {
             respSection.classList.add('hidden');
         }
 
-        renderAlunosQueErraram(q, questaoId);
-
         modal.style.display = 'flex';
         modal.classList.remove('hidden');
-    }
-
-    function alternativaMarcadaLabel(q, altId) {
-        if (!altId || !q.alternativas) return 'Marcou -';
-        var letras = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-        for (var i = 0; i < q.alternativas.length; i++) {
-            if (parseInt(q.alternativas[i].id) === parseInt(altId)) {
-                return 'Marcou ' + (letras[i] || (i + 1));
-            }
-        }
-        return 'Marcou -';
-    }
-
-    function renderAlunosQueErraram(q, questaoId) {
-        var box = document.getElementById('modal-questao-alunos-erros');
-        var titulo = document.getElementById('modal-questao-alunos-erros-titulo');
-        var lista = document.getElementById('modal-questao-alunos-erros-lista');
-        if (!box || !titulo || !lista) return;
-
-        var alunosErraram = alunosData.filter(function(aluno) {
-            var resposta = aluno.respostas && aluno.respostas[questaoId];
-            return resposta && parseInt(resposta.correta) !== 1;
-        });
-
-        if (!alunosErraram.length) {
-            box.classList.add('hidden');
-            lista.innerHTML = '';
-            return;
-        }
-
-        titulo.textContent = alunosErraram.length + (alunosErraram.length === 1 ? ' aluno errou' : ' alunos erraram');
-        lista.innerHTML = alunosErraram.map(function(aluno) {
-            var resposta = aluno.respostas[questaoId] || {};
-            return '<div class="flex items-center justify-between gap-3 px-3 py-2 text-sm">'
-                + '<span class="font-medium text-slate-800">' + escapeHtml(aluno.nome || 'Aluno') + '</span>'
-                + '<span class="text-xs font-semibold text-slate-600 whitespace-nowrap">' + escapeHtml(alternativaMarcadaLabel(q, resposta.alternativa_id)) + '</span>'
-                + '</div>';
-        }).join('');
-        box.classList.remove('hidden');
-    }
-
-    function escapeHtml(value) {
-        return String(value == null ? '' : value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
     }
 
     function fecharModal() {
