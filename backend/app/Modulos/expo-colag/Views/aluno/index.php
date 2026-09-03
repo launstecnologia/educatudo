@@ -11,6 +11,9 @@ $renderCard = static function (array $p): void {
     $totais = max(1, (int) ($p['vagas_totais'] ?? 1));
     $pct = min(100, (int) round((($totais - $restantes) / $totais) * 100));
     $barClass = $pct >= 100 ? 'bg-red-500' : ($pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500');
+    $inicioInscricao = !empty($p['inscricoes_inicio']) ? strtotime((string) $p['inscricoes_inicio']) : null;
+    $fimInscricao = !empty($p['inscricoes_fim']) ? strtotime((string) $p['inscricoes_fim']) : null;
+    $hoje = strtotime(date('Y-m-d'));
     ?>
     <a href="<?= URL ?>/expo-colag/projeto/<?= (int) $p['id'] ?>"
        class="block rounded-xl border border-gray-200 bg-white p-4 hover:border-accent hover:shadow-md transition">
@@ -20,6 +23,14 @@ $renderCard = static function (array $p): void {
             <?php endif; ?>
             <?php if (!empty($p['janela_aberta']) && empty($p['lotado'])): ?>
                 <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">Inscrições abertas</span>
+            <?php elseif (!empty($p['lotado'])): ?>
+                <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Lotado</span>
+            <?php elseif ($fimInscricao && $fimInscricao < $hoje): ?>
+                <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Inscrições encerradas</span>
+            <?php elseif ($inicioInscricao && $inicioInscricao > $hoje): ?>
+                <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">Inscrições em breve</span>
+            <?php else: ?>
+                <span class="inline-flex text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">Inscrições indisponíveis</span>
             <?php endif; ?>
         </div>
         <?php if (!empty($p['capa_url'])): ?>
@@ -150,7 +161,12 @@ $renderCard = static function (array $p): void {
     ?>
     <?php if ($outros !== []): ?>
         <section>
-            <h2 class="text-lg font-semibold text-gray-900 mb-3"><?= $algum ? 'Outros projetos' : 'Todos os projetos' ?></h2>
+            <div class="mb-3">
+                <h2 class="text-lg font-semibold text-gray-900"><?= $algum ? 'Projetos publicados' : 'Todos os projetos' ?></h2>
+                <?php if ($algum): ?>
+                    <p class="text-sm text-gray-500 mt-1">Projetos visíveis no mural, mas sem inscrição aberta no momento.</p>
+                <?php endif; ?>
+            </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <?php foreach ($outros as $p) { $renderCard($p); } ?>
             </div>

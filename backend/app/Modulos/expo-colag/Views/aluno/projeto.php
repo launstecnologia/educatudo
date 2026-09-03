@@ -10,8 +10,78 @@ $papeis = $relacoes['papeis'] ?? [];
 $insc = $status['inscricao'] ?? null;
 $conflitos = $status['conflitos'] ?? ['bloqueios' => [], 'alertas' => [], 'infos' => []];
 $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
+$renderParticipacao = static function () use ($insc, $status, $projeto, $csrf_token, $papeis, $conflitos): void {
+    ?>
+    <div class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900">Participação</h2>
+            <p class="text-sm text-gray-500 mt-1">Acompanhe sua inscrição ou solicite uma vaga neste projeto.</p>
+        </div>
+        <?php if ($insc && in_array($insc['status'] ?? '', ['Aguardando', 'Aprovada', 'Lista_espera'], true)): ?>
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
+                <p class="text-sm text-emerald-900">
+                    Status:
+                    <span class="font-semibold"><?= htmlspecialchars(str_replace('_', ' ', $insc['status'])) ?></span>
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <?php if (($insc['status'] ?? '') === 'Aprovada'): ?>
+                        <a href="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/painel"
+                           class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Acessar painel</a>
+                    <?php endif; ?>
+                    <form method="post" action="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/cancelar-inscricao"
+                          onsubmit="return confirm('Deseja realmente cancelar sua inscrição?');">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                        <input type="hidden" name="inscricao_id" value="<?= (int) $insc['id'] ?>">
+                        <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium border border-emerald-200 text-emerald-900 bg-white hover:bg-emerald-50">Cancelar inscrição</button>
+                    </form>
+                </div>
+            </div>
+        <?php elseif (!empty($status['pode_inscrever'])): ?>
+            <form method="post" action="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/inscrever" class="space-y-3">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                <?php if (!empty($status['exige_justificativa'])): ?>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Por que você quer participar?</label>
+                        <textarea name="justificativa" required rows="3" placeholder="Conte brevemente seu interesse pelo projeto."
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm"></textarea>
+                    </div>
+                <?php endif; ?>
+                <?php if ($papeis): ?>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Papel no projeto</label>
+                        <select name="papel_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">
+                            <option value="">Escolher depois</option>
+                            <?php foreach ($papeis as $papel): ?>
+                                <option value="<?= (int) $papel['id'] ?>"><?= htmlspecialchars($papel['nome'] ?? '') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+                <?php if (!empty($conflitos['alertas'])): ?>
+                    <label class="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                        <input type="checkbox" name="confirmar_apresentacao" value="1" required class="mt-1">
+                        <span><?= htmlspecialchars($conflitos['alertas'][0]) ?></span>
+                    </label>
+                <?php endif; ?>
+                <?php if (!empty($status['lotado'])): ?>
+                    <p class="text-xs text-amber-700">Projeto lotado. Sua solicitação entrará na lista de espera.</p>
+                <?php endif; ?>
+                <button type="submit" class="btn-primary-custom w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold">
+                    Solicitar participação
+                </button>
+            </form>
+        <?php else: ?>
+            <div class="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3">
+                <p class="text-sm text-gray-600">
+                    <?= htmlspecialchars($status['motivo'] ?? 'Inscrições indisponíveis no momento.') ?>
+                </p>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php
+};
 ?>
-<div class="max-w-3xl mx-auto px-4 py-6 space-y-6 pb-28">
+<div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
     <a href="<?= URL ?>/expo-colag" class="text-sm text-accent hover:underline">← Voltar ao mural</a>
 
     <div class="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
@@ -148,62 +218,6 @@ $vagasRest = (int) ($status['vagas_restantes'] ?? 0);
             </div>
         <?php endif; ?>
     </div>
-</div>
 
-<!-- CTA fixo -->
-<div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-gray-200 backdrop-blur z-40">
-    <div class="max-w-3xl mx-auto px-4 py-3">
-        <?php if ($insc && in_array($insc['status'] ?? '', ['Aguardando', 'Aprovada', 'Lista_espera'], true)): ?>
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm text-gray-700">
-                    Status:
-                    <span class="font-semibold"><?= htmlspecialchars(str_replace('_', ' ', $insc['status'])) ?></span>
-                </p>
-                <div class="flex flex-wrap gap-2">
-                    <?php if (($insc['status'] ?? '') === 'Aprovada'): ?>
-                        <a href="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/painel"
-                           class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Meu painel</a>
-                    <?php endif; ?>
-                    <form method="post" action="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/cancelar-inscricao"
-                          onsubmit="return confirm('Deseja realmente cancelar sua inscrição?');">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                        <input type="hidden" name="inscricao_id" value="<?= (int) $insc['id'] ?>">
-                        <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar inscrição</button>
-                    </form>
-                </div>
-            </div>
-        <?php elseif (!empty($status['pode_inscrever'])): ?>
-            <form method="post" action="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/inscrever" class="space-y-2">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                <?php if (!empty($status['exige_justificativa'])): ?>
-                    <textarea name="justificativa" required rows="2" placeholder="Por que você quer participar?"
-                              class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm"></textarea>
-                <?php endif; ?>
-                <?php if ($papeis): ?>
-                    <select name="papel_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm">
-                        <option value="">Papel (opcional)</option>
-                        <?php foreach ($papeis as $papel): ?>
-                            <option value="<?= (int) $papel['id'] ?>"><?= htmlspecialchars($papel['nome'] ?? '') ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                <?php endif; ?>
-                <?php if (!empty($conflitos['alertas'])): ?>
-                    <label class="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                        <input type="checkbox" name="confirmar_apresentacao" value="1" required class="mt-1">
-                        <span><?= htmlspecialchars($conflitos['alertas'][0]) ?></span>
-                    </label>
-                <?php endif; ?>
-                <?php if (!empty($status['lotado'])): ?>
-                    <p class="text-xs text-amber-700">Projeto lotado — você entrará na lista de espera.</p>
-                <?php endif; ?>
-                <button type="submit" class="w-full btn-primary-custom px-4 py-3 rounded-lg text-sm font-semibold">
-                    Quero participar
-                </button>
-            </form>
-        <?php else: ?>
-            <p class="text-sm text-gray-600 text-center py-1">
-                <?= htmlspecialchars($status['motivo'] ?? 'Inscrições indisponíveis no momento.') ?>
-            </p>
-        <?php endif; ?>
-    </div>
+    <?php $renderParticipacao(); ?>
 </div>
