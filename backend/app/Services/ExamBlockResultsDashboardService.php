@@ -32,7 +32,6 @@ class ExamBlockResultsDashboardService
         }
 
         $placeholders = implode(',', array_fill(0, count($provaIds), '?'));
-        $totalQuestoesBloco = $this->countQuestoes($provaIds);
         $eligible = $this->fetchEligibleStudents($blocoId, $bloco);
         $eligibleById = [];
         foreach ($eligible as $a) {
@@ -104,8 +103,7 @@ class ExamBlockResultsDashboardService
             $aggByAlunoId,
             $realByAluno,
             $provas,
-            count($provaIds),
-            $totalQuestoesBloco
+            count($provaIds)
         );
 
         $indicadores = $this->buildIndicadores($alunos, $eligibleById);
@@ -203,22 +201,6 @@ class ExamBlockResultsDashboardService
         $ph = implode(',', array_fill(0, count($provaIds), '?'));
         $cnt = $this->db->fetch(
             "SELECT COUNT(*) as total FROM provas_realizacoes pr WHERE pr.prova_id IN ($ph) AND pr.status = 'cancelada'",
-            $provaIds
-        );
-        return (int) ($cnt['total'] ?? 0);
-    }
-
-    /**
-     * @param list<int> $provaIds
-     */
-    private function countQuestoes(array $provaIds): int
-    {
-        if (empty($provaIds)) {
-            return 0;
-        }
-        $ph = implode(',', array_fill(0, count($provaIds), '?'));
-        $cnt = $this->db->fetch(
-            "SELECT COUNT(*) as total FROM provas_questoes q WHERE q.prova_id IN ($ph)",
             $provaIds
         );
         return (int) ($cnt['total'] ?? 0);
@@ -401,8 +383,7 @@ class ExamBlockResultsDashboardService
         array $aggByAlunoId,
         array $realByAluno,
         array $provas,
-        int $totalProvasBloco,
-        int $totalQuestoesBloco
+        int $totalProvasBloco
     ): array {
         $allIds = array_unique(array_merge(array_keys($eligibleById), array_keys($aggByAlunoId)));
         $alunos = [];
@@ -430,9 +411,7 @@ class ExamBlockResultsDashboardService
             $total = $agg ? (int) $agg['total_respostas'] : 0;
             $acertos = $agg ? (int) $agg['total_acertos'] : 0;
             $erros = $total - $acertos;
-            $pendentes = max(0, $totalQuestoesBloco - $total);
-            $percent = $totalQuestoesBloco > 0 ? round(100 * $acertos / $totalQuestoesBloco, 1) : 0.0;
-            $percentRespondidas = $total > 0 ? round(100 * $acertos / $total, 1) : 0.0;
+            $percent = $total > 0 ? round(100 * $acertos / $total, 1) : 0.0;
 
             $reals = $realByAluno[$alunoId] ?? [];
             $status = $this->resolveStatusAluno($reals, $totalProvasBloco, $total > 0);
@@ -460,10 +439,7 @@ class ExamBlockResultsDashboardService
                 'total_respostas' => $total,
                 'total_acertos' => $acertos,
                 'total_erros' => $erros,
-                'total_pendentes' => $pendentes,
-                'total_questoes_bloco' => $totalQuestoesBloco,
                 'percentual' => $percent,
-                'percentual_respondidas' => $percentRespondidas,
                 'tempo_segundos' => $tempoSeg,
                 'tempo_label' => $this->formatTempo($tempoSeg),
                 'status' => $status,

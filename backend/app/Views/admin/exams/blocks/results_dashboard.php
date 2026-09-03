@@ -167,9 +167,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                         <th class="px-3 py-2 text-left font-medium text-gray-500">Turma</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-500">Acertos</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-500">Erros</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500">Pendentes</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500">Respondidas</th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500">% geral</th>
+                        <th class="px-3 py-2 text-left font-medium text-gray-500">%</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-500">Tempo</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-500">Status</th>
                         <th class="px-3 py-2 text-left font-medium text-gray-500">Ações</th>
@@ -437,8 +435,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                 '<p class="text-xs text-gray-500">' + esc(a.turma_nome) + ' · RA ' + esc(a.ra || '—') + '</p>' +
                 '<div class="flex flex-wrap gap-2 mt-2 text-xs">' +
                 '<span class="px-2 py-0.5 rounded ' + statusBadge(a.status) + '">' + esc(a.status_label) + '</span>' +
-                '<span class="text-gray-600">' + (a.total_respostas || 0) + '/' + (a.total_questoes_bloco || 0) + ' respondidas · ' + (a.total_pendentes || 0) + ' pendentes</span>' +
-                '<span class="text-gray-600">' + (a.percentual || 0) + '% geral · ' + esc(a.tempo_label) + '</span></div>' +
+                '<span class="text-gray-600">' + (a.percentual || 0) + '% · ' + esc(a.tempo_label) + '</span></div>' +
                 '<a href="' + BASE_URL + '/admin/provas/blocos/' + BLOCO_ID + '/aluno/' + a.aluno_id + '/resultado" class="mt-3 inline-block text-sm text-violet-600 hover:text-violet-800 font-medium">Ver resultado →</a></div>';
         }).join('');
         renderPaginacao('rd-atencao-paginacao', state.pageAtencao, pg.pages, function(p) { state.pageAtencao = p; renderAtencao(); });
@@ -453,14 +450,6 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
         el.innerHTML = '<ol class="space-y-2">' + items.map(function(item, i) {
             var label = tipo === 'turma' ? item.turma_nome : item.nome;
             var pct = item.percentual || 0;
-            if (tipo === 'aluno') {
-                return '<li class="flex items-start gap-3 text-sm border-b border-gray-100 last:border-b-0 py-2">' +
-                    '<span class="w-6 h-6 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold flex-shrink-0">' + (i+1) + '</span>' +
-                    '<span class="flex-1 min-w-0"><span class="block font-medium text-gray-800">' + esc(label) + '</span>' +
-                    '<span class="block text-xs text-gray-500">' + (item.total_acertos || 0) + ' acertos · ' + (item.total_erros || 0) + ' erros · ' + (item.total_pendentes || 0) + ' pendentes</span>' +
-                    '<span class="block text-xs text-gray-500">' + (item.total_respostas || 0) + '/' + (item.total_questoes_bloco || 0) + ' respondidas · ' + (item.percentual_respondidas || 0) + '% das respondidas</span></span>' +
-                    '<span class="font-semibold text-indigo-600 whitespace-nowrap">' + pct + '% geral</span></li>';
-            }
             return '<li class="flex items-center gap-3 text-sm"><span class="w-6 h-6 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold">' + (i+1) + '</span>' +
                 '<span class="flex-1 font-medium text-gray-800">' + esc(label) + '</span>' +
                 '<span class="font-semibold text-indigo-600">' + pct + '%</span></li>';
@@ -472,7 +461,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
         var pg = paginate(list, state.pageTabela, state.pageSize);
         var tbody = document.getElementById('rd-tabela-body');
         if (!pg.items.length) {
-            tbody.innerHTML = '<tr><td colspan="12" class="px-3 py-8 text-center text-gray-500">Nenhum aluno encontrado.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10" class="px-3 py-8 text-center text-gray-500">Nenhum aluno encontrado.</td></tr>';
             renderPaginacao('rd-tabela-paginacao', 1, 1, function() {});
             return;
         }
@@ -485,8 +474,6 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                 '<td class="px-3 py-2 text-gray-600">' + esc(a.turma_nome) + '</td>' +
                 '<td class="px-3 py-2 text-green-700">' + (a.total_acertos || 0) + '</td>' +
                 '<td class="px-3 py-2 text-red-600">' + (a.total_erros || 0) + '</td>' +
-                '<td class="px-3 py-2 text-gray-600">' + (a.total_pendentes || 0) + '</td>' +
-                '<td class="px-3 py-2 text-gray-600">' + (a.total_respostas || 0) + '/' + (a.total_questoes_bloco || 0) + '</td>' +
                 '<td class="px-3 py-2 font-semibold ' + pctCls + '">' + (a.percentual || 0) + '%</td>' +
                 '<td class="px-3 py-2 text-gray-600">' + esc(a.tempo_label) + '</td>' +
                 '<td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-xs ' + statusBadge(a.status) + '">' + esc(a.status_label) + '</span></td>' +
@@ -519,7 +506,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
             ['Média geral', (ind.media_geral || 0) + '%'],
             ['Tempo médio', ind.tempo_medio_label || '—'],
             [],
-            ['Nome', 'RA', 'Série', 'Turma', 'Acertos', 'Erros', 'Pendentes', 'Respondidas', 'Percentual geral', 'Percentual respondidas', 'Tempo', 'Status']
+            ['Nome', 'RA', 'Série', 'Turma', 'Acertos', 'Erros', 'Percentual', 'Tempo', 'Status']
         ];
         list.forEach(function(a) {
             linhas.push([
@@ -529,10 +516,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                 a.turma_nome || '',
                 a.total_acertos || 0,
                 a.total_erros || 0,
-                a.total_pendentes || 0,
-                (a.total_respostas || 0) + '/' + (a.total_questoes_bloco || 0),
                 (a.percentual || 0) + '%',
-                (a.percentual_respondidas || 0) + '%',
                 a.tempo_label || '—',
                 a.status_label || ''
             ]);
