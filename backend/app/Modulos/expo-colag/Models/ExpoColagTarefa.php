@@ -256,7 +256,7 @@ class ExpoColagTarefa
              FROM expo_colag_projeto_tarefa_atribuicoes a
              INNER JOIN expo_colag_projeto_tarefas t ON t.id = a.tarefa_id
              INNER JOIN expo_colag_projetos p ON p.id = t.projeto_id
-             WHERE p.professor_id = :professor_id AND a.status = 'Atrasada'",
+             WHERE p.professor_id = :professor_id AND p.ativo = 1 AND a.status = 'Atrasada'",
             ['professor_id' => $professorId]
         );
         return (int) ($row['total'] ?? 0);
@@ -266,8 +266,10 @@ class ExpoColagTarefa
     {
         $row = $this->db->fetch(
             "SELECT COUNT(*) AS total
-             FROM expo_colag_projeto_tarefa_atribuicoes
-             WHERE status = 'Atrasada'"
+             FROM expo_colag_projeto_tarefa_atribuicoes a
+             INNER JOIN expo_colag_projeto_tarefas t ON t.id = a.tarefa_id
+             INNER JOIN expo_colag_projetos p ON p.id = t.projeto_id
+             WHERE p.ativo = 1 AND a.status = 'Atrasada'"
         );
         return (int) ($row['total'] ?? 0);
     }
@@ -279,7 +281,7 @@ class ExpoColagTarefa
              FROM expo_colag_projeto_tarefa_atribuicoes a
              INNER JOIN expo_colag_projeto_tarefas t ON t.id = a.tarefa_id
              INNER JOIN expo_colag_projetos p ON p.id = t.projeto_id
-             WHERE p.professor_id = :professor_id AND a.status = 'Entregue'",
+             WHERE p.professor_id = :professor_id AND p.ativo = 1 AND a.status = 'Entregue'",
             ['professor_id' => $professorId]
         );
         return (int) ($row['total'] ?? 0);
@@ -289,8 +291,10 @@ class ExpoColagTarefa
     {
         $row = $this->db->fetch(
             "SELECT COUNT(*) AS total
-             FROM expo_colag_projeto_tarefa_atribuicoes
-             WHERE status = 'Entregue'"
+             FROM expo_colag_projeto_tarefa_atribuicoes a
+             INNER JOIN expo_colag_projeto_tarefas t ON t.id = a.tarefa_id
+             INNER JOIN expo_colag_projetos p ON p.id = t.projeto_id
+             WHERE p.ativo = 1 AND a.status = 'Entregue'"
         );
         return (int) ($row['total'] ?? 0);
     }

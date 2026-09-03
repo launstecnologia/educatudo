@@ -95,8 +95,8 @@
         $showUsuariosGroup = $canViewSidebar(['administradores']);
         $showAcademicoGroup = $canViewSidebar([
             'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
-            'curso', 'grade_horaria', 'matriz_curricular', 'professores', 'notas_semanais',
-            'regras_academicas', 'salas', 'series', 'turmas',
+            'curso', 'grade_horaria', 'matriz_curricular', 'professores',
+            'grupos_regras_notas', 'agrupamentos_componentes', 'regras_academicas', 'configuracao_boletim', 'salas', 'series', 'turmas',
         ]);
         $showInventoryGroup = $modOn('recursos_fisicos') && $canViewSidebar(['almoxarifado', 'patrimonio']);
         $cp = $current_page ?? '';
@@ -108,7 +108,7 @@
         $academicoOpen = in_array($cp, [
             'academico', 'students', 'ano_letivo', 'calendario_letivo',
             'componentes-curriculares', 'curso', 'grade_horaria', 'matriz-curricular',
-            'teachers', 'notas_semanais', 'regras-academicas', 'salas', 'serie', 'turmas',
+            'teachers', 'grupos-regras-notas', 'agrupamentos-componentes', 'regras-academicas', 'boletins', 'salas', 'serie', 'turmas',
         ], true);
         $avaliacoesOpen = in_array($cp, [
             'avaliacoes', 'inclusao', 'provas', 'provas_blocos', 'exercises',
@@ -586,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure compact mode always starts with closed groups (visual cleanliness)
     function closeAllMenuGroupsWhenCollapsed() {
         if (!sidebar.classList.contains('collapsed')) return;
-        const menuGroups = ['academico', 'avaliacoes', 'comunicacao', 'conteudo', 'escola', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
+        const menuGroups = ['academico', 'avaliacoes', 'escola', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
         menuGroups.forEach(group => {
             const submenu = document.getElementById(`${group}-submenu`);
             const arrow = document.getElementById(`${group}-arrow`);
@@ -631,7 +631,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Menu groups functionality
-    const menuGroups = ['academico', 'avaliacoes', 'comunicacao', 'conteudo', 'escola', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
+    const menuGroups = ['academico', 'avaliacoes', 'escola', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-avaliacoes', 'sec-gestao-escolar'];
 
     // Auto-open menu group if current page is inside it
     const currentPage = '<?= addslashes($current_page ?? '') ?>';
@@ -646,7 +646,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'grade_horaria': 'academico',
         'matriz-curricular': 'academico',
         'teachers': 'academico',
-        'notas_semanais': 'academico',
+        'grupos-regras-notas': 'academico',
+        'agrupamentos-componentes': 'academico',
+        'boletins': 'academico',
         'regras-academicas': 'academico',
         'salas': 'academico',
         'serie': 'academico',

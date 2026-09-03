@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../Services/ExpoColagService.php';
 require_once __DIR__ . '/../Services/ExpoColagExecucaoService.php';
 require_once __DIR__ . '/../../../Core/FeatureGate.php';
+require_once __DIR__ . '/../../../Helpers/AdminPasswordHelper.php';
 
 if (!class_exists('ExpoColagAdminController')) {
 class ExpoColagAdminController extends BaseController
@@ -53,6 +54,8 @@ class ExpoColagAdminController extends BaseController
             'q' => trim((string) ($_GET['q'] ?? '')),
             'status' => trim((string) ($_GET['status'] ?? '')),
             'professor_id' => (int) ($_GET['professor_id'] ?? 0),
+            'page' => max(1, (int) ($_GET['page'] ?? 1)),
+            'per_page' => 10,
         ];
         $result = $this->service->obterOuCriarEdicaoAtiva();
         $authResumo = [];
@@ -69,6 +72,8 @@ class ExpoColagAdminController extends BaseController
             $indicadores['tarefas_atrasadas'] = 0;
             $indicadores['entregas_avaliar'] = 0;
         }
+        $pagination = $this->montarPaginacaoProjetos($filtros);
+        $filtros['page'] = $pagination['page'];
 
         $this->viewWithLayout('admin', 'professor/expo-colag/index', [
             'user' => $this->auth->getUser(),
@@ -80,12 +85,31 @@ class ExpoColagAdminController extends BaseController
             'indicadores' => $indicadores,
             'projetos' => $this->service->listarProjetosAdmin($filtros),
             'pendentes' => $this->service->listarPendentesAdmin(),
+            'pagination' => $pagination,
             'professores' => $catalogos['professores'] ?? [],
             'filtros' => $filtros,
             'modo_admin' => true,
             'base_url_expo' => URL . '/admin/expo-colag',
             'csrf_token' => $this->generateCsrfToken(),
         ]);
+    }
+
+    private function montarPaginacaoProjetos(array $filtros): array
+    {
+        $total = $this->service->contarProjetosAdmin($filtros);
+        $perPage = max(1, (int) ($filtros['per_page'] ?? 10));
+        $page = max(1, (int) ($filtros['page'] ?? 1));
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+
+        return [
+            'total' => $total,
+            'per_page' => $perPage,
+            'page' => $page,
+            'total_pages' => $totalPages,
+        ];
     }
 
     public function projetos(): void
@@ -223,9 +247,20 @@ class ExpoColagAdminController extends BaseController
             $this->redirect('/admin/expo-colag');
             return;
         }
+        $senha = trim((string) ($_POST['senha'] ?? ''));
+        if ($senha === '') {
+            $this->setFlashMessage('Digite sua senha para confirmar a exclusão.', 'error');
+            $this->redirect('/admin/expo-colag');
+            return;
+        }
+        if (!AdminPasswordHelper::verifyAdminPassword(Database::getInstance(), $this->auth->getUser() ?? [], $senha)) {
+            $this->setFlashMessage('Senha incorreta.', 'error');
+            $this->redirect('/admin/expo-colag');
+            return;
+        }
         $result = $this->service->excluirProjeto((int) $id, 0, true);
         $this->setFlashMessage(
-            $result['success'] ? 'Projeto excluído.' : ($result['error'] ?? 'Não foi possível excluir.'),
+            $result['success'] ? 'Projeto removido da listagem.' : ($result['error'] ?? 'Não foi possível excluir.'),
             $result['success'] ? 'success' : 'error'
         );
         $this->redirect('/admin/expo-colag');

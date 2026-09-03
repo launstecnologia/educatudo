@@ -41,7 +41,7 @@ class ExpoColagProjeto
         if ($edicaoId !== null && $edicaoId > 0) {
             return $this->db->fetchAll(
                 'SELECT * FROM expo_colag_projetos
-                 WHERE professor_id = :professor_id AND edicao_id = :edicao_id
+                 WHERE professor_id = :professor_id AND edicao_id = :edicao_id AND ativo = 1
                  ORDER BY updated_at DESC',
                 ['professor_id' => $professorId, 'edicao_id' => $edicaoId]
             ) ?: [];
@@ -49,13 +49,44 @@ class ExpoColagProjeto
 
         return $this->db->fetchAll(
             'SELECT * FROM expo_colag_projetos
-             WHERE professor_id = :professor_id
+             WHERE professor_id = :professor_id AND ativo = 1
              ORDER BY updated_at DESC',
             ['professor_id' => $professorId]
         ) ?: [];
     }
 
     public function listarTodos(array $filtros = []): array
+    {
+        [$where, $params] = $this->montarFiltrosTodos($filtros);
+        $page = max(1, (int) ($filtros['page'] ?? 1));
+        $perPage = max(1, min(100, (int) ($filtros['per_page'] ?? 10)));
+        $offset = ($page - 1) * $perPage;
+
+        $sql = 'SELECT p.*, pr.nome AS professor_nome
+                FROM expo_colag_projetos p
+                LEFT JOIN professores pr ON pr.id = p.professor_id';
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY p.updated_at DESC, p.id DESC LIMIT ' . $perPage . ' OFFSET ' . $offset;
+
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    public function contarTodos(array $filtros = []): int
+    {
+        [$where, $params] = $this->montarFiltrosTodos($filtros);
+        $sql = 'SELECT COUNT(*) AS total
+                FROM expo_colag_projetos p
+                LEFT JOIN professores pr ON pr.id = p.professor_id';
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $row = $this->db->fetch($sql, $params);
+        return (int) ($row['total'] ?? 0);
+    }
+
+    private function montarFiltrosTodos(array $filtros): array
     {
         $where = [];
         $params = [];
@@ -77,16 +108,9 @@ class ExpoColagProjeto
             $where[] = 'p.professor_id = :professor_id';
             $params['professor_id'] = $professorId;
         }
+        $where[] = 'p.ativo = 1';
 
-        $sql = 'SELECT p.*, pr.nome AS professor_nome
-                FROM expo_colag_projetos p
-                LEFT JOIN professores pr ON pr.id = p.professor_id';
-        if ($where !== []) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-        $sql .= ' ORDER BY p.updated_at DESC, p.id DESC';
-
-        return $this->db->fetchAll($sql, $params) ?: [];
+        return [$where, $params];
     }
 
     /** Projetos visíveis no mural (não rascunho/cancelado). */
@@ -107,7 +131,7 @@ class ExpoColagProjeto
         $rows = $this->db->fetchAll(
             'SELECT status, COUNT(*) AS total
              FROM expo_colag_projetos
-             WHERE professor_id = :professor_id
+             WHERE professor_id = :professor_id AND ativo = 1
              GROUP BY status',
             ['professor_id' => $professorId]
         ) ?: [];
@@ -123,6 +147,7 @@ class ExpoColagProjeto
         $rows = $this->db->fetchAll(
             'SELECT status, COUNT(*) AS total
              FROM expo_colag_projetos
+             WHERE ativo = 1
              GROUP BY status'
         ) ?: [];
         $out = [];
@@ -211,6 +236,6 @@ class ExpoColagProjeto
 
     public function excluir(int $id): void
     {
-        $this->db->query('DELETE FROM expo_colag_projetos WHERE id = :id', ['id' => $id]);
+        $this->db->query('UPDATE expo_colag_projetos SET ativo = 0 WHERE id = :id', ['id' => $id]);
     }
 }

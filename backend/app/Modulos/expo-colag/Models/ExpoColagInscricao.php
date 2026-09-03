@@ -54,7 +54,7 @@ class ExpoColagInscricao
              FROM expo_colag_inscricoes i
              INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
              LEFT JOIN alunos a ON a.id = i.aluno_id
-             WHERE p.professor_id = :professor_id AND i.status = 'Aguardando'
+             WHERE p.professor_id = :professor_id AND p.ativo = 1 AND i.status = 'Aguardando'
              ORDER BY i.inscrito_em ASC",
             ['professor_id' => $professorId]
         ) ?: [];
@@ -68,7 +68,7 @@ class ExpoColagInscricao
              FROM expo_colag_inscricoes i
              INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
              LEFT JOIN professores pr ON pr.id = p.professor_id
-             WHERE i.aluno_id = :aluno_id
+             WHERE i.aluno_id = :aluno_id AND p.ativo = 1
              ORDER BY i.inscrito_em DESC',
             ['aluno_id' => $alunoId]
         ) ?: [];
@@ -105,7 +105,7 @@ class ExpoColagInscricao
             "SELECT COUNT(*) AS total
              FROM expo_colag_inscricoes i
              INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
-             WHERE p.professor_id = :professor_id AND i.status = 'Aguardando'",
+             WHERE p.professor_id = :professor_id AND p.ativo = 1 AND i.status = 'Aguardando'",
             ['professor_id' => $professorId]
         );
         return (int) ($row['total'] ?? 0);
@@ -230,9 +230,12 @@ class ExpoColagInscricao
     public function projetosAtivosIds(int $alunoId): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT projeto_id FROM expo_colag_inscricoes
-             WHERE aluno_id = :aluno_id
-               AND status IN ('Aguardando','Aprovada','Lista_espera')",
+            "SELECT i.projeto_id
+             FROM expo_colag_inscricoes i
+             INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
+             WHERE i.aluno_id = :aluno_id
+               AND i.status IN ('Aguardando','Aprovada','Lista_espera')
+               AND p.ativo = 1",
             ['aluno_id' => $alunoId]
         ) ?: [];
         return array_map(static fn($r) => (int) $r['projeto_id'], $rows);

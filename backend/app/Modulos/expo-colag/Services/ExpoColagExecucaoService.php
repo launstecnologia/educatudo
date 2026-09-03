@@ -47,7 +47,7 @@ class ExpoColagExecucaoService
     private function assertProjetoProfessor(int $projetoId, int $professorId): ?array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto || (int) $projeto['professor_id'] !== $professorId) {
+        if (!$projeto || empty($projeto['ativo']) || (int) $projeto['professor_id'] !== $professorId) {
             return null;
         }
         return $projeto;
@@ -91,7 +91,7 @@ class ExpoColagExecucaoService
     public function painelAdmin(int $projetoId): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto) {
+        if (!$projeto || empty($projeto['ativo'])) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
 

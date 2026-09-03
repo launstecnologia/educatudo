@@ -233,7 +233,7 @@ class ExpoColagService
     public function alterarStatusProjeto(int $projetoId, int $professorId, string $novoStatus, ?string $motivo = null): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto || (int) $projeto['professor_id'] !== $professorId) {
+        if (!$projeto || empty($projeto['ativo']) || (int) $projeto['professor_id'] !== $professorId) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
 
@@ -259,7 +259,7 @@ class ExpoColagService
     }
 
     /**
-     * Remove o projeto e dependências. Bloqueia se houver inscrição ativa.
+     * Oculta o projeto das telas, preservando o registro e dependências no banco.
      *
      * @return array{success: bool, error?: string}
      */
@@ -269,26 +269,15 @@ class ExpoColagService
         if (!$projeto || (!$modoAdmin && (int) $projeto['professor_id'] !== $professorId)) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
+        if (empty($projeto['ativo'])) {
+            return ['success' => false, 'error' => 'Projeto não encontrado.'];
+        }
         if ((string) ($projeto['status'] ?? '') === 'Concluido') {
             return ['success' => false, 'error' => 'Projeto concluído não pode ser excluído.'];
         }
         try {
-            $this->db->beginTransaction();
-            $this->db->fetch(
-                'SELECT id FROM expo_colag_projetos WHERE id = :id FOR UPDATE',
-                ['id' => $projetoId]
-            );
-            if ($this->inscricaoModel->contarAtivasPorProjeto($projetoId) > 0) {
-                $this->db->rollback();
-                return ['success' => false, 'error' => 'Há alunos inscritos neste projeto. Cancele as inscrições antes de excluir.'];
-            }
-            $this->apagarDependenciasProjeto($projetoId);
             $this->projetoModel->excluir($projetoId);
-            $this->db->commit();
         } catch (Throwable $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollback();
-            }
             error_log('ExpoColagService::excluirProjeto: ' . $e->getMessage());
             return ['success' => false, 'error' => 'Não foi possível excluir o projeto.'];
         }
@@ -372,6 +361,11 @@ class ExpoColagService
     public function listarProjetosAdmin(array $filtros = []): array
     {
         return $this->projetoModel->listarTodos($filtros);
+    }
+
+    public function contarProjetosAdmin(array $filtros = []): int
+    {
+        return $this->projetoModel->contarTodos($filtros);
     }
 
     /**
@@ -992,7 +986,7 @@ class ExpoColagService
     public function listarInscricoesProjeto(int $projetoId, int $professorId, bool $modoAdmin = false): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto || (!$modoAdmin && (int) $projeto['professor_id'] !== $professorId)) {
+        if (!$projeto || empty($projeto['ativo']) || (!$modoAdmin && (int) $projeto['professor_id'] !== $professorId)) {
             return [];
         }
         return $this->inscricaoModel->listarPorProjeto($projetoId);
@@ -1008,10 +1002,10 @@ class ExpoColagService
         return $this->db->fetchAll(
             "SELECT i.*, a.nome AS aluno_nome, p.titulo AS projeto_titulo, p.professor_id, pr.nome AS professor_nome
              FROM expo_colag_inscricoes i
-             INNER JOIN alunos a ON a.id = i.aluno_id
-             INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
-             LEFT JOIN professores pr ON pr.id = p.professor_id
-             WHERE i.status IN ('Aguardando', 'Lista_espera')
+            INNER JOIN alunos a ON a.id = i.aluno_id
+            INNER JOIN expo_colag_projetos p ON p.id = i.projeto_id
+            LEFT JOIN professores pr ON pr.id = p.professor_id
+             WHERE p.ativo = 1 AND i.status IN ('Aguardando', 'Lista_espera')
              ORDER BY i.inscrito_em ASC"
         ) ?: [];
     }
@@ -1068,6 +1062,9 @@ class ExpoColagService
     public function obterProjeto(int $id): ?array
     {
         $row = $this->projetoModel->findById($id);
+        if ($row && empty($row['ativo'])) {
+            return null;
+        }
         if ($row) {
             $row['capa_src'] = self::resolverUrlCapa((string) ($row['capa_url'] ?? ''), $id);
         }
@@ -1082,7 +1079,7 @@ class ExpoColagService
     public function carregarProjetoCompleto(int $projetoId, ?int $professorId = null, bool $modoAdmin = false): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto) {
+        if (!$projeto || empty($projeto['ativo'])) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
         if (!$modoAdmin && $professorId !== null && (int) $projeto['professor_id'] !== $professorId) {
@@ -1124,7 +1121,7 @@ class ExpoColagService
         $existente = null;
         if ($projetoId > 0) {
             $existente = $this->projetoModel->findById($projetoId);
-            if (!$existente || (!$modoAdmin && (int) $existente['professor_id'] !== $professorId)) {
+            if (!$existente || empty($existente['ativo']) || (!$modoAdmin && (int) $existente['professor_id'] !== $professorId)) {
                 return ['success' => false, 'error' => 'Projeto não encontrado.'];
             }
             if (($existente['status'] ?? '') === 'Cancelado') {
@@ -1393,7 +1390,7 @@ class ExpoColagService
     public function publicarProjetoAdmin(int $projetoId): array
     {
         $projeto = $this->projetoModel->findById($projetoId);
-        if (!$projeto) {
+        if (!$projeto || empty($projeto['ativo'])) {
             return ['success' => false, 'error' => 'Projeto não encontrado.'];
         }
 

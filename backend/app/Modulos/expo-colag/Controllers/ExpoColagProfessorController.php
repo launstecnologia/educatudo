@@ -389,9 +389,20 @@ class ExpoColagProfessorController extends BaseController
             $this->redirect('/professor/expo-colag');
             return;
         }
+        $senha = trim((string) ($_POST['senha'] ?? ''));
+        if ($senha === '') {
+            $this->setFlashMessage('Digite sua senha para confirmar a exclusão.', 'error');
+            $this->redirect('/professor/expo-colag');
+            return;
+        }
+        if (!$this->validarSenhaProfessorAtual((int) $user['id'], $senha)) {
+            $this->setFlashMessage('Senha incorreta.', 'error');
+            $this->redirect('/professor/expo-colag');
+            return;
+        }
         $result = $this->service->excluirProjeto((int) $id, (int) $user['id']);
         $this->setFlashMessage(
-            $result['success'] ? 'Projeto excluído.' : ($result['error'] ?? 'Não foi possível excluir.'),
+            $result['success'] ? 'Projeto removido da listagem.' : ($result['error'] ?? 'Não foi possível excluir.'),
             $result['success'] ? 'success' : 'error'
         );
         $this->redirect('/professor/expo-colag');
@@ -515,6 +526,18 @@ class ExpoColagProfessorController extends BaseController
         return strpos($accept, 'application/json') !== false
             || strtolower($xrw) === 'xmlhttprequest'
             || !empty($_POST['ajax']);
+    }
+
+    private function validarSenhaProfessorAtual(int $professorId, string $senha): bool
+    {
+        if ($professorId <= 0 || $senha === '') {
+            return false;
+        }
+        $professor = Database::getInstance()->fetch(
+            'SELECT senha_hash FROM professores WHERE id = :id',
+            ['id' => $professorId]
+        );
+        return $professor && password_verify($senha, (string) ($professor['senha_hash'] ?? ''));
     }
 
     /**
