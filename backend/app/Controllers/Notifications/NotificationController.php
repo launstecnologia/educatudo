@@ -184,6 +184,9 @@ class NotificationController extends BaseController
             
             // Validar dados
             $dados = $this->validarDadosUpdate($_POST);
+            $dados['arquivo_url'] = $notificacao['arquivo_url'] ?? null;
+            $dados['arquivo_nome'] = $notificacao['arquivo_nome'] ?? null;
+            $dados['arquivo_tamanho'] = $notificacao['arquivo_tamanho'] ?? null;
             
             // Upload de nova imagem se enviada
             if (!empty($_FILES['arquivo_imagem']['name'])) {
@@ -337,33 +340,34 @@ class NotificationController extends BaseController
      */
     private function uploadImagem($arquivo)
     {
-        $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/');
-        $uploadDir = $docRoot ? $docRoot . '/uploads/notifications/' : __DIR__ . '/../../public/uploads/notifications/';
-        $webPath = '/uploads/notifications/';
-        if (!is_dir($uploadDir) && $docRoot && is_dir($docRoot . '/public/uploads/notifications/')) {
-            $uploadDir = $docRoot . '/public/uploads/notifications/';
-            $webPath = '/public/uploads/notifications/';
-        }
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $this->validarErroUpload($arquivo, 'imagem');
+
+        $upload = $this->getNotificationsUploadPath();
+        $uploadDir = $upload['dir'];
+        $webPath = $upload['url'];
+
+        $allowedTypes = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+        ];
         $maxSize = 10 * 1024 * 1024; // 10MB
-        
-        if (!in_array($arquivo['type'], $allowedTypes)) {
-            throw new Exception('Tipo de imagem não permitido');
-        }
         
         if ($arquivo['size'] > $maxSize) {
             throw new Exception('Imagem muito grande (máximo 10MB)');
         }
+
+        $mimeReal = $this->detectarMimeReal($arquivo['tmp_name']);
+        if (!isset($allowedTypes[$mimeReal])) {
+            throw new Exception('Tipo de imagem não permitido');
+        }
         
-        $extension = pathinfo($arquivo['name'], PATHINFO_EXTENSION);
+        $extension = $allowedTypes[$mimeReal];
         $filename = 'notification_img_' . time() . '_' . uniqid() . '.' . $extension;
         $filepath = $uploadDir . $filename;
         
-        if (move_uploaded_file($arquivo['tmp_name'], $filepath)) {
+        if (@move_uploaded_file($arquivo['tmp_name'], $filepath)) {
             return [
                 'url' => $webPath . $filename,
                 'nome' => $arquivo['name'],
@@ -371,7 +375,70 @@ class NotificationController extends BaseController
             ];
         }
         
-        throw new Exception('Erro ao fazer upload da imagem');
+        $erroSistema = error_get_last();
+        error_log('Notification upload imagem: falha ao gravar em ' . $filepath . ' | ' . (($erroSistema['message'] ?? '') ?: 'sem detalhe do PHP'));
+        throw new Exception('Não foi possível salvar a imagem enviada. Verifique as permissões da pasta de uploads.');
+    }
+
+    private function getNotificationsUploadPath()
+    {
+        $tenantSlug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        $tenantSlug = $tenantSlug !== '' ? $tenantSlug : 'default';
+        $basePath = defined('BASE_PATH') ? rtrim((string) BASE_PATH, '/') : dirname(__DIR__, 3);
+        $relativePath = 'uploads/notifications/' . $tenantSlug . '/';
+        $uploadDir = $basePath . '/public/' . $relativePath;
+
+        if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+            $erroSistema = error_get_last();
+            error_log('Notification upload: não foi possível criar diretório ' . $uploadDir . ' | ' . (($erroSistema['message'] ?? '') ?: 'sem detalhe do PHP'));
+            throw new Exception('Não foi possível preparar a pasta de uploads.');
+        }
+
+        return [
+            'dir' => rtrim($uploadDir, '/') . '/',
+            'url' => '/' . $relativePath,
+        ];
+    }
+
+    private function validarErroUpload($arquivo, $tipo)
+    {
+        $erro = (int) ($arquivo['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($erro === UPLOAD_ERR_OK) {
+            return;
+        }
+
+        $mensagens = [
+            UPLOAD_ERR_INI_SIZE => ucfirst($tipo) . ' maior que o limite configurado no servidor.',
+            UPLOAD_ERR_FORM_SIZE => ucfirst($tipo) . ' maior que o limite permitido pelo formulário.',
+            UPLOAD_ERR_PARTIAL => 'O upload da ' . $tipo . ' foi interrompido. Tente enviar novamente.',
+            UPLOAD_ERR_NO_FILE => 'Selecione uma ' . $tipo . ' para enviar.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Servidor sem pasta temporária para upload.',
+            UPLOAD_ERR_CANT_WRITE => 'Servidor não conseguiu gravar o arquivo temporário.',
+            UPLOAD_ERR_EXTENSION => 'Upload bloqueado por uma extensão do PHP.',
+        ];
+
+        throw new Exception($mensagens[$erro] ?? 'Erro no upload da ' . $tipo . ' (código ' . $erro . ').');
+    }
+
+    private function detectarMimeReal($tmpPath)
+    {
+        if (!is_string($tmpPath) || $tmpPath === '' || !is_file($tmpPath)) {
+            return '';
+        }
+
+        if (!function_exists('finfo_open')) {
+            return '';
+        }
+
+        $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+        if (!$finfo) {
+            return '';
+        }
+
+        $mime = @finfo_file($finfo, $tmpPath) ?: '';
+        @finfo_close($finfo);
+
+        return (string) $mime;
     }
     
     /**
