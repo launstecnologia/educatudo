@@ -51,7 +51,11 @@ $renderCard = static function (array $p): void {
             </div>
         </div>
         <?php if (!empty($p['inscricoes_fim'])): ?>
-            <p class="text-xs text-gray-400 mt-2">Inscrições até <?= htmlspecialchars(date('d/m/Y', strtotime($p['inscricoes_fim']))) ?></p>
+            <?php if ($fimInscricao && $fimInscricao < $hoje): ?>
+                <p class="text-xs text-gray-400 mt-2">Encerradas em <?= htmlspecialchars(date('d/m/Y', $fimInscricao)) ?></p>
+            <?php else: ?>
+                <p class="text-xs text-gray-400 mt-2">Inscrições até <?= htmlspecialchars(date('d/m/Y', strtotime($p['inscricoes_fim']))) ?></p>
+            <?php endif; ?>
         <?php endif; ?>
     </a>
     <?php
@@ -153,18 +157,29 @@ $renderCard = static function (array $p): void {
 
     <?php
     $outros = [];
+    $outrosEncerrados = 0;
     foreach ($projetos as $p) {
         if (empty($idsMostrados[(int) ($p['id'] ?? 0)])) {
             $outros[] = $p;
+            $fim = !empty($p['inscricoes_fim']) ? strtotime((string) $p['inscricoes_fim']) : null;
+            if ($fim && $fim < strtotime(date('Y-m-d'))) {
+                $outrosEncerrados++;
+            }
         }
+    }
+    $tituloOutros = $algum ? 'Sem inscrição aberta' : 'Todos os projetos';
+    $textoOutros = 'Projetos visíveis no mural, mas que não aceitam novas inscrições agora.';
+    if ($outros !== [] && $outrosEncerrados === count($outros)) {
+        $tituloOutros = 'Inscrições encerradas';
+        $textoOutros = 'Projetos que continuam visíveis para consulta, mas cujo prazo de inscrição já terminou.';
     }
     ?>
     <?php if ($outros !== []): ?>
         <section>
             <div class="mb-3">
-                <h2 class="text-lg font-semibold text-gray-900"><?= $algum ? 'Projetos publicados' : 'Todos os projetos' ?></h2>
+                <h2 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars($tituloOutros) ?></h2>
                 <?php if ($algum): ?>
-                    <p class="text-sm text-gray-500 mt-1">Projetos visíveis no mural, mas sem inscrição aberta no momento.</p>
+                    <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($textoOutros) ?></p>
                 <?php endif; ?>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
