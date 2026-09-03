@@ -521,7 +521,7 @@
         <!-- Sidebar: no mobile fica fixo e desliza (igual ao Professor) -->
         <?php $__sbInline = LayoutHelper::getSidebarColors(); ?>
         <aside id="sidebar"
-               class="w-64 md:w-64 sidebar-custom shadow-2xl h-screen max-h-screen flex flex-col transition-all duration-300 ease-in-out fixed md:relative md:left-0 left-0 z-50"
+               class="w-64 md:w-64 sidebar-custom shadow-[4px_0_10px_-6px_rgba(0,0,0,0.25)] h-screen max-h-screen flex flex-col transition-all duration-300 ease-in-out fixed md:relative md:left-0 left-0 z-50"
                style="color: <?= htmlspecialchars($__sbInline['text'], ENT_QUOTES, 'UTF-8') ?>; --sidebar-text-color: <?= htmlspecialchars($__sbInline['text'], ENT_QUOTES, 'UTF-8') ?>; --sidebar-bg-color: <?= htmlspecialchars($__sbInline['bg'], ENT_QUOTES, 'UTF-8') ?>;"
                data-sidebar-text="<?= htmlspecialchars($__sbInline['text'], ENT_QUOTES, 'UTF-8') ?>">
             <div class="sidebar-scroll p-6 flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
