@@ -37,7 +37,7 @@ $concluida = static function (string $st): bool {
     return in_array($st, ['Concluida', 'Entregue'], true);
 };
 ?>
-<div class="max-w-3xl mx-auto px-4 py-6 space-y-6 pb-16">
+<div class="w-full space-y-6 pb-16">
     <div>
         <a href="<?= URL ?>/expo-colag/projeto/<?= $pid ?>" class="text-sm text-accent hover:underline">← Voltar ao projeto</a>
         <h1 class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars($projeto['titulo'] ?? '') ?></h1>
