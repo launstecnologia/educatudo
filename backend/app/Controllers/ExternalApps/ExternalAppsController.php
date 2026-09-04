@@ -24,6 +24,7 @@ class ExternalAppsController extends BaseController
     private const TOKENS_TABLE_LEGACY = 'notes_tokens';
     private const EDUCAPROF_DEFAULT_URL = 'https://educaprof.educatudo.com';
     private const CREDIT_ACTION_MAP = [
+        'tudinha2:tudinha' => 'app_externo_tudinha2',
         'tudinha2:chat' => 'app_externo_tudinha2',
         'tudinha2:mensagem' => 'app_externo_tudinha2',
         'tudinha2:message' => 'app_externo_tudinha2',
