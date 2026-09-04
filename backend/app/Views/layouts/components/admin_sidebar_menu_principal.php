@@ -121,12 +121,6 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Grupos de regras de notas</span>
         </a>
         <?php endif; ?>
-        <?php if ($modOn('boletim') && $canViewSidebar(['configuracao_boletim'])): ?>
-        <a href="<?= URL ?>/admin/boletins" class="<?= $linkCls($cp === 'boletins') ?>">
-            <i class="fa-solid fa-clipboard-list w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Boletins</span>
-        </a>
-        <?php endif; ?>
         <?php if ($modOn('regras_academicas') && $canViewSidebar(['regras_academicas'])): ?>
         <a href="<?= URL ?>/admin/regras-academicas" class="<?= $linkCls($cp === 'regras-academicas') ?>">
             <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>

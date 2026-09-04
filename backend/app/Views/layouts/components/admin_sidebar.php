@@ -96,7 +96,7 @@
         $showAcademicoGroup = $canViewSidebar([
             'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
             'curso', 'grade_horaria', 'matriz_curricular', 'professores',
-            'grupos_regras_notas', 'agrupamentos_componentes', 'regras_academicas', 'configuracao_boletim', 'salas', 'series', 'turmas',
+            'grupos_regras_notas', 'agrupamentos_componentes', 'regras_academicas', 'salas', 'series', 'turmas',
         ]);
         $showInventoryGroup = $modOn('recursos_fisicos') && $canViewSidebar(['almoxarifado', 'patrimonio']);
         $cp = $current_page ?? '';
@@ -108,7 +108,7 @@
         $academicoOpen = in_array($cp, [
             'academico', 'students', 'ano_letivo', 'calendario_letivo',
             'componentes-curriculares', 'curso', 'grade_horaria', 'matriz-curricular',
-            'teachers', 'grupos-regras-notas', 'agrupamentos-componentes', 'regras-academicas', 'boletins', 'salas', 'serie', 'turmas',
+            'teachers', 'grupos-regras-notas', 'agrupamentos-componentes', 'regras-academicas', 'salas', 'serie', 'turmas',
         ], true);
         $avaliacoesOpen = in_array($cp, [
             'avaliacoes', 'inclusao', 'provas', 'provas_blocos', 'exercises',
@@ -648,7 +648,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'teachers': 'academico',
         'grupos-regras-notas': 'academico',
         'agrupamentos-componentes': 'academico',
-        'boletins': 'academico',
         'regras-academicas': 'academico',
         'salas': 'academico',
         'serie': 'academico',
