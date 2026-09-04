@@ -47,6 +47,8 @@ $router->post('/master/asaas/reconciliar', 'Master/MasterAsaasConfigController@r
 $router->get('/master/asaas/reconciliar-cron', 'Master/MasterAsaasConfigController@reconciliarCron');
 $router->get('/master/asaas/cancelar-pendentes-cron', 'Master/MasterAsaasConfigController@cancelarPendentesCron');
 $router->get('/master/faturamento', 'Master/MasterFaturamentoController@index');
+$router->get('/master/creditos/alunos', 'Master/MasterCreditosAlunosController@index');
+$router->post('/master/creditos/alunos/creditar', 'Master/MasterCreditosAlunosController@creditar');
 $router->get('/master/creditos/extrato', 'Master/MasterCreditosExtratoController@index');
 $router->get('/master/llm-custos', 'Master/MasterLlmCustosController@index');
 $router->get('/master/fila-ia', 'Master/MasterFilaIaController@index');

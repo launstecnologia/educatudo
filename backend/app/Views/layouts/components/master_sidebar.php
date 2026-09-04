@@ -79,9 +79,10 @@ $iconClass = static function (bool $active): string {
                 'creditos_catalogo_tabelas',
                 'creditos_catalogo_pacotes',
             ], true);
+            $activeAlunosCreditos = ($current_page ?? '') === 'creditos_alunos';
             $activeExtrato = ($current_page ?? '') === 'creditos_extrato';
             $activeLlmCustos = ($current_page ?? '') === 'llm_custos';
-            $tudicoinsOpen = $activePrecif || $activeExtrato || $activeLlmCustos;
+            $tudicoinsOpen = $activePrecif || $activeAlunosCreditos || $activeExtrato || $activeLlmCustos;
             ?>
             <div class="space-y-1">
                 <button type="button"
@@ -102,6 +103,9 @@ $iconClass = static function (bool $active): string {
                 <div id="tudicoins-submenu" class="<?= $tudicoinsOpen ? '' : 'hidden' ?> ml-4 space-y-1 border-l border-slate-200 pl-2">
                     <a href="<?= URL ?>/master/creditos-catalogo/tabelas" class="<?= $subItemClass($activePrecif) ?>">
                         <span>Precificação</span>
+                    </a>
+                    <a href="<?= URL ?>/master/creditos/alunos" class="<?= $subItemClass($activeAlunosCreditos) ?>">
+                        <span>Alunos</span>
                     </a>
                     <a href="<?= URL ?>/master/creditos/extrato" class="<?= $subItemClass($activeExtrato) ?>">
                         <span>Extrato</span>
