@@ -11,7 +11,6 @@
     <p class="font-medium"><?= htmlspecialchars($flash_message) ?></p>
 </div>
 <?php endif; ?>
-
 <!-- Provas Individuais -->
 <?php
 $temProvasIndividuais = isset($provas) && is_array($provas) && count($provas) > 0;
@@ -78,7 +77,7 @@ $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blo
                     </div>
 
                     <?php if ($finalizada): ?>
-                        <a href="<?= URL ?>/aluno/provas/resultado/<?= $provaId ?>" class="block w-full bg-green-600 text-white text-center py-3 rounded-lg hover:bg-green-700 font-medium">
+                        <a href="<?= URL ?>/aluno/provas/resultado/<?= $provaId ?>" class="block w-full bg-primary text-primary text-center py-3 rounded-lg hover:opacity-90 font-semibold transition-opacity">
                             Visualizar resultado
                         </a>
                     <?php elseif ($cancelada): ?>
@@ -86,7 +85,7 @@ $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blo
                             Cancelada – aguarde liberação
                         </span>
                     <?php else: ?>
-                        <a href="<?= URL ?>/aluno/provas/realizar/<?= $provaAcessoId ?>" data-iniciar-prova class="block w-full bg-indigo-700 text-white text-center py-3 rounded-lg hover:bg-indigo-800 font-medium border-2 border-indigo-800 no-underline">
+                        <a href="<?= URL ?>/aluno/provas/realizar/<?= $provaAcessoId ?>" data-iniciar-prova class="block w-full bg-primary text-primary text-center py-3 rounded-lg hover:opacity-90 font-semibold transition-opacity no-underline">
                             <?= $iniciada ? 'Continuar prova' : 'Iniciar prova' ?>
                         </a>
                         <?php if (!empty($prova['ei_adapted'])): ?>
@@ -163,176 +162,199 @@ $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blo
 <?php endif; ?>
 
 <!-- Blocos de Provas -->
-<?php 
+<?php
 $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blocosComProvas) > 0;
+$clsCtaPrimario = 'block w-full bg-primary text-primary text-center py-3 rounded-lg hover:opacity-90 font-semibold transition-opacity no-underline';
+$clsCtaInativo = 'block w-full bg-gray-200 text-gray-600 text-center py-3 rounded-lg font-medium cursor-not-allowed';
 ?>
 <?php if ($temBlocos): ?>
-    <div class="mb-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">
-            Blocos de Provas 
-            <span class="text-sm font-normal text-gray-500">(<?= count($blocosComProvas) ?> bloco(s))</span>
-        </h2>
+    <div class="mb-8" id="secao-blocos-provas">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">
+                Blocos de Provas
+                <span class="text-sm font-normal text-gray-500">(<?= count($blocosComProvas) ?> bloco(s))</span>
+            </h2>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        id="btn-mostrar-blocos"
+                        class="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                    <i class="fa-solid fa-eye text-gray-500"></i>
+                    Mostrar todos
+                </button>
+                <button type="button"
+                        id="btn-esconder-blocos"
+                        class="inline-flex items-center gap-2 px-3 py-2 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
+                    <i class="fa-solid fa-eye-slash"></i>
+                    Esconder todos
+                </button>
+            </div>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <?php foreach ($blocosComProvas as $idx => $bloco): ?>
-                <?php 
-                // Debug: verificar estrutura
+                <?php
                 if (!isset($bloco['id'])) {
                     if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
                         error_log("DEBUG: Bloco #{$idx} sem ID: " . print_r($bloco, true));
                     }
                     continue;
                 }
+                $blocoId = (int) $bloco['id'];
+                $qtdProvasBloco = count($bloco['provas'] ?? []);
+                $todasFinalizadas = !empty($bloco['todas_finalizadas']);
+                $algumaCancelada = !empty($bloco['alguma_cancelada']);
+                $dentroPeriodo = !empty($bloco['dentro_periodo']);
+                $disponivelEm = $bloco['disponivel_em'] ?? null;
+                $blocoLiberado = !empty($bloco['liberado']) && !empty($bloco['ativo']);
+                $blocoAbertoPorPadrao = true;
+                $dataProvaTs = !empty($bloco['data_prova']) ? strtotime((string) $bloco['data_prova']) : false;
+                $horaInicioTs = !empty($bloco['hora_inicio']) ? strtotime((string) $bloco['hora_inicio']) : false;
+                $horaFimTs = !empty($bloco['hora_fim']) ? strtotime((string) $bloco['hora_fim']) : false;
                 ?>
-                <?php 
-                // Debug individual do bloco
-                if (defined('DEBUG') && DEBUG) {
-                    if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                        error_log("DEBUG View: Renderizando bloco ID " . ($bloco['id'] ?? 'N/A') . " - " . ($bloco['titulo'] ?? 'Sem título'));
-                    }
-                }
-                ?>
-                <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-gray-900">
-                            <?= htmlspecialchars($bloco['titulo']) ?>
-                        </h3>
-                        <span class="px-3 py-1 bg-purple-600 text-white text-xs font-semibold rounded-full">
-                            <?= count($bloco['provas'] ?? []) ?> prova(s)
-                        </span>
-                    </div>
-                    
-                    <?php if ($bloco['descricao']): ?>
-                        <p class="text-sm text-gray-600 mb-4"><?= htmlspecialchars($bloco['descricao']) ?></p>
-                    <?php endif; ?>
-                    
-                    <div class="space-y-2 mb-4">
-                        <div class="flex items-center text-sm text-gray-700">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                            <?= date('d/m/Y', strtotime($bloco['data_prova'])) ?>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                    <div class="h-1.5 bg-primary"></div>
+                    <button type="button"
+                            class="w-full text-left p-5 pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                            data-bloco-toggle="<?= $blocoId ?>"
+                            aria-expanded="<?= $blocoAbertoPorPadrao ? 'true' : 'false' ?>"
+                            aria-controls="bloco-corpo-<?= $blocoId ?>">
+                        <div class="flex items-start justify-between gap-3">
+                            <h3 class="text-lg font-bold text-gray-900 leading-snug min-w-0">
+                                <?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>
+                            </h3>
+                            <i class="fa-solid fa-chevron-down text-accent mt-1 shrink-0 transition-transform duration-200 <?= $blocoAbertoPorPadrao ? '' : '-rotate-90' ?>"
+                               data-bloco-chevron="<?= $blocoId ?>"></i>
                         </div>
-                        <div class="flex items-center text-sm text-gray-700">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            <?= date('H:i', strtotime($bloco['hora_inicio'])) ?> - <?= date('H:i', strtotime($bloco['hora_fim'])) ?>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <span class="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                                <i class="fa-regular fa-calendar text-accent"></i>
+                                <?= $dataProvaTs ? date('d/m/Y', $dataProvaTs) : '—' ?>
+                            </span>
+                            <span class="text-gray-300">·</span>
+                            <span class="inline-flex items-center gap-1.5 text-sm text-gray-600">
+                                <i class="fa-regular fa-clock text-accent"></i>
+                                <?= $horaInicioTs ? date('H:i', $horaInicioTs) : '--:--' ?>
+                                –
+                                <?= $horaFimTs ? date('H:i', $horaFimTs) : '--:--' ?>
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 ml-auto px-2.5 py-1 rounded-lg bg-primary text-primary text-xs font-semibold">
+                                <i class="fa-solid fa-file-lines"></i>
+                                <?= $qtdProvasBloco ?> <?= $qtdProvasBloco === 1 ? 'prova' : 'provas' ?>
+                            </span>
                         </div>
-                    </div>
-                    
-                    <!-- Lista de Provas do Bloco -->
-                    <?php if (!empty($bloco['provas'])): ?>
-                    <div class="mb-4">
-                        <p class="text-xs font-semibold text-gray-700 mb-2">Provas deste bloco:</p>
-                        <div class="space-y-2">
-                            <?php foreach ($bloco['provas'] as $prova): ?>
-                                <div class="bg-white rounded-lg p-3 border border-purple-100">
-                                    <div class="flex items-center justify-between gap-3 flex-wrap">
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($prova['materia_nome'] ?? $prova['titulo']) ?></p>
-                                            <p class="text-xs text-gray-500"><?= !empty($prova['professor_nome']) ? 'Prof. ' . htmlspecialchars($prova['professor_nome']) : '—' ?></p>
+                    </button>
+
+                    <div id="bloco-corpo-<?= $blocoId ?>"
+                         data-bloco-corpo="<?= $blocoId ?>"
+                         class="<?= $blocoAbertoPorPadrao ? '' : 'hidden' ?> px-5 pb-5 flex-1 flex flex-col">
+                        <?php if (!empty($bloco['descricao'])): ?>
+                            <p class="text-sm text-gray-600 mb-3"><?= htmlspecialchars((string) $bloco['descricao']) ?></p>
+                        <?php endif; ?>
+
+                        <?php if (!empty($bloco['provas'])): ?>
+                        <div class="mb-4">
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Provas deste bloco</p>
+                            <div class="space-y-2">
+                                <?php foreach ($bloco['provas'] as $prova): ?>
+                                    <div class="rounded-lg p-3 border border-gray-100 bg-slate-50">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div class="flex-1 min-w-0">
+                                                <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) ($prova['materia_nome'] ?? $prova['titulo'] ?? 'Prova')) ?></p>
+                                                <p class="text-xs text-gray-500 truncate"><?= !empty($prova['professor_nome']) ? 'Prof. ' . htmlspecialchars((string) $prova['professor_nome']) : '—' ?></p>
+                                            </div>
+                                            <?php if (isset($prova['realizacao_status']) && $prova['realizacao_status'] === 'finalizado'): ?>
+                                                <span class="shrink-0 inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full font-semibold">
+                                                    <i class="fa-solid fa-check"></i> Finalizada
+                                                </span>
+                                            <?php elseif (isset($prova['realizacao_status']) && $prova['realizacao_status'] === 'iniciado'): ?>
+                                                <span class="shrink-0 inline-flex items-center text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">Em andamento</span>
+                                            <?php elseif (isset($prova['realizacao_status']) && $prova['realizacao_status'] === 'cancelada'): ?>
+                                                <span class="shrink-0 inline-flex items-center text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">Cancelada</span>
+                                            <?php endif; ?>
                                         </div>
-                                        <?php if (isset($prova['realizacao_status']) && $prova['realizacao_status'] === 'finalizado'): ?>
-                                            <span class="text-xs text-green-600 font-semibold">✓ Finalizada</span>
-                                        <?php elseif (isset($prova['realizacao_status']) && $prova['realizacao_status'] === 'iniciado'): ?>
-                                            <span class="text-xs text-yellow-600 font-semibold">Em andamento</span>
-                                        <?php elseif (isset($prova['realizacao_status']) && $prova['realizacao_status'] === 'cancelada'): ?>
-                                            <span class="text-xs text-amber-600 font-semibold">Cancelada – aguarde liberação</span>
-                                        <?php endif; ?>
                                     </div>
-                                </div>
-                            <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                    </div>
-                    <?php else: ?>
-                    <div class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <p class="text-xs text-yellow-800">Não há prova disponível para a sua turma neste bloco.</p>
-                    </div>
-                    <?php endif; ?>
-                    
-                    <?php if (!empty($bloco['provas'])): ?>
-                    <?php 
-                    $todasFinalizadas = !empty($bloco['todas_finalizadas']);
-                    $algumaCancelada = !empty($bloco['alguma_cancelada']);
-                    $dentroPeriodo = !empty($bloco['dentro_periodo']);
-                    $disponivelEm = $bloco['disponivel_em'] ?? null;
-                    $fimBloco = (!empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) ? strtotime($bloco['data_prova'] . ' ' . $bloco['hora_fim']) : 0;
-                    $blocoTerminou = $fimBloco > 0 && time() >= $fimBloco;
-                    $blocoLiberado = !empty($bloco['liberado']) && !empty($bloco['ativo']);
-                    ?>
-                    <div class="space-y-2">
-                        <?php if (!$blocoLiberado && !$todasFinalizadas): ?>
-                            <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center font-medium">
-                                Aguardando liberação pelo coordenador. O bloco aparecerá aqui quando estiver disponível.
-                            </p>
-                            <span class="block w-full bg-gray-400 text-white text-center py-3 rounded-lg font-medium cursor-not-allowed opacity-75">
-                                Bloco não liberado
-                            </span>
-                        <?php elseif (!$blocoLiberado && $todasFinalizadas): ?>
-                            <?php if (!empty($bloco['gabarito_liberado'])): ?>
-                            <a href="<?= URL ?>/aluno/provas/bloco/<?= $bloco['id'] ?>/resultados" 
-                               class="block w-full bg-green-600 text-white text-center py-3 rounded-lg hover:bg-green-700 font-medium">
-                                Visualizar resposta
-                            </a>
-                            <?php else: ?>
-                            <div>
-                                <span class="block w-full bg-gray-400 text-white text-center py-3 rounded-lg font-medium cursor-not-allowed opacity-90">
-                                    Gabarito aguardando liberação
+                        <?php else: ?>
+                        <div class="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p class="text-xs text-amber-800">Não há prova disponível para a sua turma neste bloco.</p>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($bloco['provas'])): ?>
+                        <div class="space-y-2 mt-auto">
+                            <?php if (!$blocoLiberado && !$todasFinalizadas): ?>
+                                <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center font-medium">
+                                    Aguardando liberação pelo coordenador. O bloco aparecerá aqui quando estiver disponível.
+                                </p>
+                                <span class="<?= $clsCtaInativo ?>">
+                                    Bloco não liberado
                                 </span>
-                                <p class="text-xs text-gray-500 text-center mt-1">A coordenação ainda não liberou o gabarito deste bloco.</p>
-                            </div>
-                            <?php endif; ?>
-                        <?php elseif ($blocoLiberado && !empty($disponivelEm)): ?>
-                            <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center font-medium">
-                                ⏳ Aguardando liberação — Disponível em <?= date('d/m/Y', strtotime($disponivelEm)) ?> às <?= date('H:i', strtotime($disponivelEm)) ?>
-                            </p>
-                            <span class="block w-full bg-gray-400 text-white text-center py-3 rounded-lg font-medium cursor-not-allowed opacity-75">
-                                Iniciar prova (aguarde o horário)
-                            </span>
-                        <?php elseif ($blocoLiberado && $algumaCancelada): ?>
-                            <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center font-medium">
-                                Cancelada – aguarde liberação do coordenador
-                            </p>
-                            <span class="block w-full bg-amber-100 text-amber-800 text-center py-3 rounded-lg font-medium cursor-not-allowed border border-amber-300 pointer-events-none">
-                                Cancelada
-                            </span>
-                        <?php elseif ($blocoLiberado && $dentroPeriodo && !$todasFinalizadas): ?>
-                            <?php $urlIniciar = URL . '/aluno/provas/bloco/' . (int)$bloco['id'] . '/iniciar-seguro'; ?>
-                            <a href="<?= htmlspecialchars($urlIniciar) ?>" data-iniciar-prova class="block w-full bg-indigo-700 text-white text-center py-3 rounded-lg hover:bg-indigo-800 font-medium border-2 border-indigo-800 cursor-pointer no-underline">
-                                Iniciar prova
-                            </a>
-                            <p class="text-xs text-gray-500 text-center">Tela cheia, sem sair até finalizar. Escolha a matéria na ordem que quiser.</p>
-                        <?php elseif ($blocoLiberado && !$dentroPeriodo && !$todasFinalizadas): ?>
-                            <p class="text-sm text-gray-600 bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-center font-medium">
-                                ⏹ Expirado — O período para realizar esta prova já encerrou.
-                            </p>
-                            <span class="block w-full bg-gray-400 text-white text-center py-3 rounded-lg font-medium cursor-not-allowed opacity-75">
-                                Não foi possível realizar no prazo
-                            </span>
-                        <?php elseif ($blocoLiberado && $todasFinalizadas): ?>
-                            <?php if (!empty($bloco['gabarito_liberado'])): ?>
-                            <a href="<?= URL ?>/aluno/provas/bloco/<?= $bloco['id'] ?>/resultados" 
-                               class="block w-full bg-green-600 text-white text-center py-3 rounded-lg hover:bg-green-700 font-medium">
-                                Visualizar resposta
-                            </a>
-                            <?php else: ?>
-                            <div>
-                                <span class="block w-full bg-gray-400 text-white text-center py-3 rounded-lg font-medium cursor-not-allowed opacity-90">
-                                    Gabarito aguardando liberação
+                            <?php elseif (!$blocoLiberado && $todasFinalizadas): ?>
+                                <?php if (!empty($bloco['gabarito_liberado'])): ?>
+                                <a href="<?= URL ?>/aluno/provas/bloco/<?= $blocoId ?>/resultados"
+                                   class="<?= $clsCtaPrimario ?>">
+                                    Visualizar resposta
+                                </a>
+                                <?php else: ?>
+                                <div>
+                                    <span class="<?= $clsCtaInativo ?>">
+                                        Gabarito aguardando liberação
+                                    </span>
+                                    <p class="text-xs text-gray-500 text-center mt-1">A coordenação ainda não liberou o gabarito deste bloco.</p>
+                                </div>
+                                <?php endif; ?>
+                            <?php elseif ($blocoLiberado && !empty($disponivelEm)): ?>
+                                <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center font-medium">
+                                    Aguardando liberação — Disponível em <?= date('d/m/Y', strtotime($disponivelEm)) ?> às <?= date('H:i', strtotime($disponivelEm)) ?>
+                                </p>
+                                <span class="<?= $clsCtaInativo ?>">
+                                    Iniciar prova (aguarde o horário)
                                 </span>
-                                <p class="text-xs text-gray-500 text-center mt-1">A coordenação ainda não liberou o gabarito deste bloco.</p>
-                            </div>
+                            <?php elseif ($blocoLiberado && $algumaCancelada): ?>
+                                <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center font-medium">
+                                    Cancelada – aguarde liberação do coordenador
+                                </p>
+                                <span class="block w-full bg-amber-100 text-amber-800 text-center py-3 rounded-lg font-medium cursor-not-allowed border border-amber-300 pointer-events-none">
+                                    Cancelada
+                                </span>
+                            <?php elseif ($blocoLiberado && $dentroPeriodo && !$todasFinalizadas): ?>
+                                <?php $urlIniciar = URL . '/aluno/provas/bloco/' . $blocoId . '/iniciar-seguro'; ?>
+                                <a href="<?= htmlspecialchars($urlIniciar) ?>" data-iniciar-prova class="<?= $clsCtaPrimario ?> cursor-pointer">
+                                    Iniciar prova
+                                </a>
+                                <p class="text-xs text-gray-500 text-center">Tela cheia, sem sair até finalizar. Escolha a matéria na ordem que quiser.</p>
+                            <?php elseif ($blocoLiberado && !$dentroPeriodo && !$todasFinalizadas): ?>
+                                <p class="text-sm text-gray-600 bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-center font-medium">
+                                    Expirado — O período para realizar esta prova já encerrou.
+                                </p>
+                                <span class="<?= $clsCtaInativo ?>">
+                                    Não foi possível realizar no prazo
+                                </span>
+                            <?php elseif ($blocoLiberado && $todasFinalizadas): ?>
+                                <?php if (!empty($bloco['gabarito_liberado'])): ?>
+                                <a href="<?= URL ?>/aluno/provas/bloco/<?= $blocoId ?>/resultados"
+                                   class="<?= $clsCtaPrimario ?>">
+                                    Visualizar resposta
+                                </a>
+                                <?php else: ?>
+                                <div>
+                                    <span class="<?= $clsCtaInativo ?>">
+                                        Gabarito aguardando liberação
+                                    </span>
+                                    <p class="text-xs text-gray-500 text-center mt-1">A coordenação ainda não liberou o gabarito deste bloco.</p>
+                                </div>
+                                <?php endif; ?>
                             <?php endif; ?>
+                        </div>
                         <?php endif; ?>
                     </div>
-                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     </div>
     <script>
     (function() {
-        var baseUrl = '<?= addslashes(URL) ?>';
         try {
             var ultimo = sessionStorage.getItem('ultimo_clique_iniciar');
             if (ultimo) {
@@ -340,7 +362,7 @@ $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blo
                 sessionStorage.removeItem('ultimo_clique_iniciar');
             }
         } catch (e) {}
-        // Força navegação ao clicar em Iniciar prova
+
         document.querySelectorAll('a[data-iniciar-prova]').forEach(function(link) {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -349,6 +371,44 @@ $temBlocos = isset($blocosComProvas) && is_array($blocosComProvas) && count($blo
                 if (url) window.location.href = url;
             });
         });
+
+        function definirBlocoAberto(id, aberto) {
+            var corpo = document.getElementById('bloco-corpo-' + id);
+            var chevron = document.querySelector('[data-bloco-chevron="' + id + '"]');
+            var toggle = document.querySelector('[data-bloco-toggle="' + id + '"]');
+            if (!corpo) return;
+            corpo.classList.toggle('hidden', !aberto);
+            if (toggle) toggle.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+            if (chevron) {
+                chevron.classList.toggle('-rotate-90', !aberto);
+            }
+        }
+
+        document.querySelectorAll('[data-bloco-toggle]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var id = this.getAttribute('data-bloco-toggle');
+                var corpo = document.getElementById('bloco-corpo-' + id);
+                if (!corpo) return;
+                definirBlocoAberto(id, corpo.classList.contains('hidden'));
+            });
+        });
+
+        var btnMostrar = document.getElementById('btn-mostrar-blocos');
+        var btnEsconder = document.getElementById('btn-esconder-blocos');
+        if (btnMostrar) {
+            btnMostrar.addEventListener('click', function() {
+                document.querySelectorAll('[data-bloco-corpo]').forEach(function(el) {
+                    definirBlocoAberto(el.getAttribute('data-bloco-corpo'), true);
+                });
+            });
+        }
+        if (btnEsconder) {
+            btnEsconder.addEventListener('click', function() {
+                document.querySelectorAll('[data-bloco-corpo]').forEach(function(el) {
+                    definirBlocoAberto(el.getAttribute('data-bloco-corpo'), false);
+                });
+            });
+        }
     })();
     </script>
 <?php endif; ?>

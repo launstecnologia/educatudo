@@ -2623,6 +2623,17 @@ class ExamController extends BaseController
             $bloco['provas'] = $provasDoBloco;
             $blocosComProvas[] = $bloco;
         }
+
+        usort($blocosComProvas, static function (array $a, array $b): int {
+            $ta = strtotime(trim(($a['data_prova'] ?? '') . ' ' . ($a['hora_inicio'] ?? '00:00:00')));
+            $tb = strtotime(trim(($b['data_prova'] ?? '') . ' ' . ($b['hora_inicio'] ?? '00:00:00')));
+            $ta = $ta === false ? 0 : $ta;
+            $tb = $tb === false ? 0 : $tb;
+            if ($ta === $tb) {
+                return ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
+            }
+            return $tb <=> $ta;
+        });
         
         // Debug: informações sobre blocos
         if (defined('DEBUG') && DEBUG) {
@@ -2769,6 +2780,17 @@ class ExamController extends BaseController
             // Reindexa o array
             $provas = array_values($provas);
         }
+
+        usort($provas, static function (array $a, array $b): int {
+            $ta = strtotime((string) ($a['data_inicio'] ?? ''));
+            $tb = strtotime((string) ($b['data_inicio'] ?? ''));
+            $ta = $ta === false ? 0 : $ta;
+            $tb = $tb === false ? 0 : $tb;
+            if ($ta === $tb) {
+                return ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
+            }
+            return $tb <=> $ta;
+        });
         
         // Diagnóstico (apenas com ?debug=1): mostra IDs de turma do aluno x dos blocos
         // para identificar mismatch de turma (ex.: "1ºA" do Fundamental x "1ª A" do EM).
