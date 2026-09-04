@@ -36,63 +36,66 @@ $tiposRes = ['multipla_escolha' => 'Múltipla Escolha', 'verdadeiro_falso' => 'V
         overflow: hidden;
     }
     .resultado-questoes-track {
-        display: flex;
-        transition: transform 240ms ease;
-        will-change: transform;
+        position: relative;
     }
     .resultado-questao-slide {
-        flex: 0 0 100%;
-        min-width: 100%;
+        display: none;
+        animation: resultadoQuestaoEntrar 180ms ease;
+    }
+    .resultado-questao-slide.is-active {
+        display: block;
     }
     .resultado-questao-dot {
         cursor: pointer;
     }
+    @keyframes resultadoQuestaoEntrar {
+        from {
+            opacity: 0;
+            transform: translateX(14px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
 </style>
 
-<!-- Resultado: acertos, erros e percentual -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <div class="text-center">
-        <h3 class="text-lg font-semibold text-gray-700 mb-4">Seu Resultado</h3>
-        <div class="flex justify-center gap-8 mb-4">
-            <div>
-                <div class="text-sm text-gray-600">Acertos</div>
-                <div class="text-3xl font-bold text-green-600"><?= $acertos ?></div>
-            </div>
-            <div>
-                <div class="text-sm text-gray-600">Erros</div>
-                <div class="text-3xl font-bold text-red-600"><?= $erros ?></div>
-            </div>
+<!-- Resultado e detalhes -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-5">
+    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Resumo da prova</h3>
+            <p class="text-sm text-gray-500 mt-1"><?= $totalQuestoes ?> questão(ões) corrigida(s)</p>
         </div>
-        <div class="mt-4">
-            <?php $classPercentual = $percentual >= 70 ? 'bg-green-600' : ($percentual >= 50 ? 'bg-yellow-600' : 'bg-red-600'); ?>
-            <span class="px-4 py-2 rounded-full text-white font-semibold <?= $classPercentual ?>">
-                <?= number_format($percentual, 1) ?>%
-            </span>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 xl:min-w-[520px]">
+            <div class="rounded-lg bg-green-50 border border-green-100 px-4 py-3">
+                <p class="text-xs font-medium text-green-800">Acertos</p>
+                <p class="text-2xl font-bold text-green-700 leading-tight"><?= $acertos ?></p>
+            </div>
+            <div class="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
+                <p class="text-xs font-medium text-red-800">Erros</p>
+                <p class="text-2xl font-bold text-red-700 leading-tight"><?= $erros ?></p>
+            </div>
+            <div class="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
+                <p class="text-xs font-medium text-blue-800">Percentual</p>
+                <p class="text-2xl font-bold text-blue-700 leading-tight"><?= number_format($percentual, 1) ?>%</p>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- Detalhes da Realização -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">Detalhes</h3>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-            <p class="text-sm text-gray-600">Data de Início</p>
-            <p class="text-lg font-semibold">
-                <?= date('d/m/Y H:i', strtotime($realizacao['iniciado_em'])) ?>
-            </p>
+    <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3 border-t border-gray-100 pt-4">
+        <div class="rounded-lg bg-gray-50 px-4 py-3">
+            <p class="text-xs font-medium text-gray-500">Data de Início</p>
+            <p class="text-sm font-semibold text-gray-900 mt-1"><?= date('d/m/Y H:i', strtotime($realizacao['iniciado_em'])) ?></p>
         </div>
-        <div>
-            <p class="text-sm text-gray-600">Data de Finalização</p>
-            <p class="text-lg font-semibold">
-                <?= $realizacao['finalizado_em'] ? date('d/m/Y H:i', strtotime($realizacao['finalizado_em'])) : '-' ?>
-            </p>
+        <div class="rounded-lg bg-gray-50 px-4 py-3">
+            <p class="text-xs font-medium text-gray-500">Data de Finalização</p>
+            <p class="text-sm font-semibold text-gray-900 mt-1"><?= $realizacao['finalizado_em'] ? date('d/m/Y H:i', strtotime($realizacao['finalizado_em'])) : '-' ?></p>
         </div>
-        <div>
-            <p class="text-sm text-gray-600">Tempo Gasto</p>
-            <p class="text-lg font-semibold">
-                <?= $realizacao['tempo_gasto'] ? $realizacao['tempo_gasto'] . ' minutos' : '-' ?>
-            </p>
+        <div class="rounded-lg bg-gray-50 px-4 py-3">
+            <p class="text-xs font-medium text-gray-500">Tempo Gasto</p>
+            <p class="text-sm font-semibold text-gray-900 mt-1"><?= $realizacao['tempo_gasto'] ? $realizacao['tempo_gasto'] . ' minutos' : '-' ?></p>
         </div>
     </div>
 </div>
@@ -129,7 +132,7 @@ $tiposRes = ['multipla_escolha' => 'Múltipla Escolha', 'verdadeiro_falso' => 'V
         <div id="resultadoQuestoesTrack" class="resultado-questoes-track">
         <?php foreach ($questoes as $index => $questao): ?>
             <?php $resposta = $questao['resposta'] ?? null; ?>
-            <div class="resultado-questao-slide pr-0">
+            <div class="resultado-questao-slide <?= $index === 0 ? 'is-active' : '' ?>">
                 <div class="border rounded-xl p-5 <?= $resposta && $resposta['correta'] ? 'bg-green-50 border-green-300' : ($resposta && !$resposta['correta'] ? 'bg-red-50 border-red-300' : 'border-gray-200 bg-white') ?>">
                     <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4">
                         <div>
@@ -257,7 +260,10 @@ $tiposRes = ['multipla_escolha' => 'Múltipla Escolha', 'verdadeiro_falso' => 'V
 
     function atualizar() {
         if (!track) return;
-        track.style.transform = 'translateX(-' + (atual * 100) + '%)';
+        var slides = track.querySelectorAll('.resultado-questao-slide');
+        slides.forEach(function(slide, index) {
+            slide.classList.toggle('is-active', index === atual);
+        });
         if (indicadorAtual) indicadorAtual.textContent = String(atual + 1);
         if (progresso) progresso.style.width = (((atual + 1) / total) * 100) + '%';
         if (btnAnterior) btnAnterior.disabled = atual === 0;
