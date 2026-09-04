@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../Models/Education/OnlineClass.php';
 require_once __DIR__ . '/../../Services/PandaVideoLiveService.php';
 require_once __DIR__ . '/../../Services/JaasMeetService.php';
+require_once __DIR__ . '/../../Services/AulaOnlineGravacaoService.php';
 
 if (!class_exists('OnlineClassController')) {
 class OnlineClassController extends BaseController
@@ -11,6 +12,7 @@ class OnlineClassController extends BaseController
     private $onlineClass;
     private $pandaLive;
     private $jaasMeet;
+    private $gravacaoService;
 
     public function __construct()
     {
@@ -19,6 +21,7 @@ class OnlineClassController extends BaseController
         $this->onlineClass = new OnlineClass();
         $this->pandaLive = new PandaVideoLiveService();
         $this->jaasMeet = new JaasMeetService();
+        $this->gravacaoService = new AulaOnlineGravacaoService($this->onlineClass, $this->jaasMeet);
 
         if (!$this->auth->isLoggedIn()) {
             $this->redirect('/');
@@ -229,6 +232,57 @@ class OnlineClassController extends BaseController
 
         $this->setFlashMessage('Integração Panda concluída com sucesso.', 'success');
         $this->redirect('/admin/aulas-online');
+    }
+
+    public function sincronizarGravacoes(): void
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido.', 'error');
+            $this->redirect('/admin/aulas-online');
+        }
+
+        $aulaId = (int) ($_POST['id'] ?? 0);
+        $voltarEdicao = $aulaId > 0;
+        $resultado = $this->gravacaoService->sincronizar($voltarEdicao ? $aulaId : null);
+
+        $destino = $voltarEdicao
+            ? '/admin/aulas-online/editar?id=' . $aulaId
+            : '/admin/aulas-online';
+
+        if (!empty($resultado['erro'])) {
+            $this->setFlashMessage('Não foi possível atualizar as gravações. Tente novamente.', 'error');
+            $this->redirect($destino);
+        }
+
+        $atualizadas = (int) ($resultado['atualizadas'] ?? 0);
+        $jaTinham = (int) ($resultado['ja_tinham'] ?? 0);
+        $naoEncontradas = (int) ($resultado['nao_encontradas'] ?? 0);
+
+        if ($voltarEdicao) {
+            if ($atualizadas > 0) {
+                $this->setFlashMessage('Gravação encontrada e vinculada a esta aula.', 'success');
+            } elseif ($jaTinham > 0) {
+                $this->setFlashMessage('Esta aula já possui URL de gravação.', 'success');
+            } else {
+                $this->setFlashMessage('Nenhuma gravação encontrada para esta aula na API.', 'error');
+            }
+            $this->redirect($destino);
+        }
+
+        if ($atualizadas > 0) {
+            $msg = $atualizadas === 1
+                ? '1 gravação vinculada à aula correspondente.'
+                : $atualizadas . ' gravações vinculadas às aulas correspondentes.';
+            if ($naoEncontradas > 0) {
+                $msg .= ' ' . $naoEncontradas . ' aula(s) ainda sem correspondência na API.';
+            }
+            $this->setFlashMessage($msg, 'success');
+        } elseif ($jaTinham > 0 && $naoEncontradas === 0) {
+            $this->setFlashMessage('Todas as aulas com gravação na API já estavam atualizadas.', 'success');
+        } else {
+            $this->setFlashMessage('Nenhuma gravação nova encontrada para as aulas desta escola.', 'error');
+        }
+        $this->redirect($destino);
     }
 
     public function excluir(): void

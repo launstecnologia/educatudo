@@ -279,6 +279,7 @@ $router->post('/admin/aulas-online/chat/enviar', 'Admin/OnlineClassController@ch
 $router->post('/admin/aulas-online/salvar', 'Admin/OnlineClassController@salvar');
 $router->post('/admin/aulas-online/atualizar', 'Admin/OnlineClassController@atualizar');
 $router->post('/admin/aulas-online/retry-integracao', 'Admin/OnlineClassController@retryIntegracao');
+$router->post('/admin/aulas-online/sincronizar-gravacoes', 'Admin/OnlineClassController@sincronizarGravacoes');
 $router->post('/admin/aulas-online/excluir', 'Admin/OnlineClassController@excluir');
 $router->post('/admin/aulas-online/arquivo/upload', 'Admin/OnlineClassController@uploadArquivo');
 $router->post('/admin/aulas-online/arquivo/excluir', 'Admin/OnlineClassController@excluirArquivo');

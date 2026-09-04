@@ -7,11 +7,21 @@
             <h2 class="text-2xl font-bold text-gray-900 mb-1">Aulas Online</h2>
             <p class="text-gray-600 text-sm">Gerencie as aulas ao vivo da escola.</p>
         </div>
-        <a href="<?= URL ?>/admin/aulas-online/criar"
-           class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
-            <i class="fa-solid fa-plus mr-2"></i>
-            Nova aula online
-        </a>
+        <div class="flex items-center gap-3 flex-shrink-0">
+            <form method="post" action="<?= URL ?>/admin/aulas-online/sincronizar-gravacoes">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                    <i class="fa-solid fa-cloud-arrow-down mr-2 text-gray-500"></i>
+                    Atualizar gravações
+                </button>
+            </form>
+            <a href="<?= URL ?>/admin/aulas-online/criar"
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                <i class="fa-solid fa-plus mr-2"></i>
+                Nova aula online
+            </a>
+        </div>
     </div>
 </div>
 
@@ -47,8 +57,9 @@
                         $itemPlatformLower = mb_strtolower((string) ($item['plataforma'] ?? ''), 'UTF-8');
                         $isJitsiItem = $itemPlatformLower === 'jitsi meet';
                         $itemLink = trim((string) ($item['link_aula'] ?? ''));
+                        $itemLinkGravacao = trim((string) ($item['link_gravacao'] ?? ''));
                         $statusIntegracao = (string) ($item['panda_integracao_status'] ?? 'nao_solicitada');
-                        $temGravacao = trim((string) ($item['link_gravacao'] ?? '')) !== ''
+                        $temGravacao = $itemLinkGravacao !== ''
                                     || trim((string) ($item['jaas_recording_path'] ?? '')) !== ''
                                     || trim((string) ($item['panda_recording_player'] ?? '')) !== '';
                         $fimTs = !empty($item['fim_em']) ? strtotime((string) $item['fim_em']) : false;
@@ -97,9 +108,16 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <?php if ($temGravacao): ?>
-                                    <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
-                                        <i class="fa-solid fa-circle-play mr-1"></i> Disponível
-                                    </span>
+                                    <?php if ($itemLinkGravacao !== ''): ?>
+                                        <a href="<?= htmlspecialchars($itemLinkGravacao) ?>" target="_blank" rel="noopener noreferrer"
+                                           class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
+                                            <i class="fa-solid fa-circle-play mr-1"></i> Assistir
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                                            <i class="fa-solid fa-circle-play mr-1"></i> Disponível
+                                        </span>
+                                    <?php endif; ?>
                                 <?php elseif ($encerrada): ?>
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-600">Aguardando</span>
                                 <?php else: ?>

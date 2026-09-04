@@ -37,6 +37,20 @@ class JaasMeetService
         return $this->appId !== '' && $this->apiKeyId !== '' && $this->privateKey !== '';
     }
 
+    public function nomeSala(int $aulaId, string $title = '', string $roomKind = 'aula'): string
+    {
+        if ($aulaId <= 0) {
+            return '';
+        }
+
+        return $this->roomName($aulaId, $title, $roomKind);
+    }
+
+    public function urlApiGravacoes(): string
+    {
+        return $this->publicBaseUrl . '/api/gravacoes.json';
+    }
+
     public function baseMeetingUrl(int $aulaId, string $title = '', string $roomKind = 'aula'): string
     {
         if ($aulaId <= 0) {

@@ -471,12 +471,46 @@ class OnlineClass
             return 0;
         }
 
-        $row = $this->db->fetch(
-            "SELECT id FROM aulas_online WHERE ativo = 1 AND link_aula LIKE ? ORDER BY data_inicio DESC LIMIT 1",
-            ['%' . $sala . '%']
-        );
+        if (preg_match('/educatudo-aula-(\d+)/', $sala, $m)) {
+            $id = (int) $m[1];
+            $aula = $id > 0 ? $this->getById($id) : null;
+            if ($aula) {
+                $path = (string) (parse_url((string) ($aula['link_aula'] ?? ''), PHP_URL_PATH) ?? '');
+                $segmento = rawurldecode(trim(basename($path), '/'));
+                if ($segmento === $sala) {
+                    return $id;
+                }
+            }
+        }
 
-        return (int) ($row['id'] ?? 0);
+        $rows = $this->db->fetchAll(
+            "SELECT id, link_aula FROM aulas_online
+             WHERE ativo = 1 AND link_aula LIKE :sala
+             ORDER BY inicio_em DESC
+             LIMIT 50",
+            ['sala' => '%' . str_replace(['%', '_'], ['\\%', '\\_'], $sala) . '%']
+        ) ?: [];
+
+        foreach ($rows as $row) {
+            $path = (string) (parse_url((string) ($row['link_aula'] ?? ''), PHP_URL_PATH) ?? '');
+            $segmento = rawurldecode(trim(basename($path), '/'));
+            if ($segmento === $sala) {
+                return (int) ($row['id'] ?? 0);
+            }
+        }
+
+        return 0;
+    }
+
+    public function listarParaSincronizarGravacao(): array
+    {
+        return $this->db->fetchAll(
+            "SELECT id, titulo, plataforma, link_aula, link_gravacao, inicio_em, fim_em
+             FROM aulas_online
+             WHERE ativo = 1
+             ORDER BY inicio_em DESC
+             LIMIT 1000"
+        ) ?: [];
     }
 
     public function updateJitsiRecording(int $id, string $url): void

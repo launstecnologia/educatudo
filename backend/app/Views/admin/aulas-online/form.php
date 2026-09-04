@@ -32,6 +32,13 @@ if (!empty($aula['turmas']) && is_array($aula['turmas'])) {
 
 <?php include __DIR__ . '/../_partials/flash_message.php'; ?>
 
+<?php if ($editing): ?>
+<form id="form-sync-gravacao" method="post" action="<?= URL ?>/admin/aulas-online/sincronizar-gravacoes" class="hidden">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+    <input type="hidden" name="id" value="<?= (int) ($aula['id'] ?? 0) ?>">
+</form>
+<?php endif; ?>
+
 <!-- Formulário -->
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
     <form method="post"
@@ -161,11 +168,18 @@ if (!empty($aula['turmas']) && is_array($aula['turmas'])) {
                     <i class="fa-solid fa-circle-play mr-1 text-emerald-600"></i>
                     URL da gravação
                 </label>
-                <input type="url" name="link_gravacao"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                       placeholder="https://meet.launs.com.br/gravacoes/..."
-                       value="<?= htmlspecialchars((string) ($aula['link_gravacao'] ?? '')) ?>">
-                <p class="mt-1 text-xs text-gray-500">Cole a URL do vídeo gravado. O aluno verá automaticamente após o fim da aula.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="url" name="link_gravacao"
+                           class="flex-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                           placeholder="https://meet.launs.com.br/gravacoes/..."
+                           value="<?= htmlspecialchars((string) ($aula['link_gravacao'] ?? '')) ?>">
+                    <button type="submit" form="form-sync-gravacao"
+                            class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors whitespace-nowrap">
+                        <i class="fa-solid fa-cloud-arrow-down mr-2 text-gray-500"></i>
+                        Buscar gravação
+                    </button>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Cole a URL do vídeo gravado ou busque automaticamente na API. O aluno verá automaticamente após o fim da aula.</p>
             </div>
             <?php endif; ?>
 
