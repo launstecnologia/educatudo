@@ -6963,6 +6963,70 @@ Retorne APENAS um JSON válido no seguinte formato:
     }
 
     /**
+     * Motivo da saída do modo seguro enviado pelo navegador (query, POST ou JSON).
+     * Só aceita códigos conhecidos — o texto do log nunca vem cru do cliente.
+     */
+    private function descreverMotivoSaidaSeguro(): string
+    {
+        $body = null;
+        $candidato = '';
+        if (isset($_GET['motivo']) && is_string($_GET['motivo']) && $_GET['motivo'] !== '') {
+            $candidato = $_GET['motivo'];
+        }
+        if ($candidato === '' && isset($_POST['motivo']) && is_string($_POST['motivo'])) {
+            $candidato = $_POST['motivo'];
+        }
+        $raw = file_get_contents('php://input');
+        $body = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
+        if ($candidato === '' && is_array($body) && isset($body['motivo']) && is_string($body['motivo'])) {
+            $candidato = $body['motivo'];
+        }
+        $candidato = strtolower((string) preg_replace('/[^a-z0-9_]/i', '', $candidato));
+
+        $origem = '';
+        if (isset($_GET['origem']) && is_string($_GET['origem']) && $_GET['origem'] !== '') {
+            $origem = $_GET['origem'];
+        }
+        if ($origem === '' && isset($_POST['origem']) && is_string($_POST['origem'])) {
+            $origem = $_POST['origem'];
+        }
+        if ($origem === '' && is_array($body) && isset($body['origem']) && is_string($body['origem'])) {
+            $origem = $body['origem'];
+        }
+        $origem = strtolower((string) preg_replace('/[^a-z0-9_]/i', '', $origem));
+
+        $mapa = [
+            'tecla_esc' => 'pressionou a tecla Esc',
+            'tecla_f11' => 'pressionou a tecla F11',
+            'atalho_fechar_aba' => 'usou o atalho para fechar a aba (Ctrl/Cmd+W)',
+            'atalho_nova_aba' => 'usou o atalho para abrir nova aba (Ctrl/Cmd+T)',
+            'aba_trocada' => 'trocou de aba ou minimizou a janela',
+            'aba_fechada' => 'fechou a aba ou saiu da página',
+            'janela_perdeu_foco' => 'a janela perdeu o foco (outro aplicativo na frente)',
+            'saiu_tela_cheia' => 'saiu da tela cheia (Esc, botão do navegador ou gesto — o navegador não informa qual)',
+            'timeout_aviso_tela_cheia' => 'não voltou à tela cheia após o aviso de 10 segundos',
+            'segunda_saida_tela_cheia' => 'saiu da tela cheia pela segunda vez',
+            'botao_voltar' => 'usou o botão Voltar do navegador',
+            'desconhecido' => 'motivo não identificado pelo navegador',
+        ];
+
+        if ($candidato !== '' && isset($mapa[$candidato])) {
+            $texto = $mapa[$candidato];
+            if (
+                $candidato === 'timeout_aviso_tela_cheia'
+                && $origem !== ''
+                && $origem !== $candidato
+                && isset($mapa[$origem])
+            ) {
+                $texto .= ' (saída original: ' . $mapa[$origem] . ')';
+            }
+            return $texto;
+        }
+
+        return 'motivo não identificado pelo navegador';
+    }
+
+    /**
      * Cancela o bloco em modo seguro por saída da tela cheia/aba/navegador.
      * Marca todas as realizações não finalizadas do aluno no bloco como 'cancelada'.
      * Só o coordenador pode liberar nova tentativa.
@@ -6995,11 +7059,13 @@ Retorne APENAS um JSON válido no seguinte formato:
         }
 
         $afetadas = $this->provaModel->cancelarRealizacoesBlocoSeguro($blocoId, (int) $aluno['id']);
+        $motivoSaida = $this->descreverMotivoSaidaSeguro();
         $this->logProvas('Cancelamento modo seguro', [
             'bloco_id' => $blocoId,
             'aluno_id' => (int) $aluno['id'],
             'method' => $_SERVER['REQUEST_METHOD'] ?? 'GET',
             'afetadas' => $afetadas,
+            'motivo' => $motivoSaida,
         ]);
         // O cliente dispara essa chamada de até 3 formas em paralelo (img ping, sendBeacon,
         // fetch) de propósito — a aba pode fechar antes de qualquer uma completar, então
@@ -7025,7 +7091,7 @@ Retorne APENAS um JSON válido no seguinte formato:
             $this->registrarLogProva('saida_modo_seguro', [
                 'aluno_id' => (int) $aluno['id'],
                 'bloco_id' => $blocoId,
-                'detalhe' => 'Saiu do modo seguro (aba trocada/fechada) — ' . (int) $afetadas . ' realização(ões) cancelada(s).',
+                'detalhe' => 'Saiu do modo seguro — ' . $motivoSaida . ' — ' . (int) $afetadas . ' realização(ões) cancelada(s).',
             ]);
         }
         $this->json(['success' => true, 'afetadas' => $afetadas]);

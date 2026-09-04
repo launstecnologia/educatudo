@@ -132,6 +132,71 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
     // EducaInclui: acomodações do aluno (resolvidas no controller)
     var ocultarCronometro = <?= !empty($acessibilidade_hide_timer) ? 'true' : 'false' ?>;
     var modoSeguroAtivo = <?= !empty($acessibilidade_relax_secure) ? 'false' : 'true' ?>;
+    var ultimaAcaoSeguranca = { motivo: '', em: 0 };
+
+    function registrarAcaoSeguranca(motivo) {
+        if (!motivo) return;
+        ultimaAcaoSeguranca = { motivo: String(motivo), em: Date.now() };
+    }
+    // O iframe da prova chama isso de forma síncrona (mesma origem) para o Esc
+    // chegar ao pai antes do evento fullscreenchange.
+    window.registrarAcaoSeguranca = registrarAcaoSeguranca;
+
+    function motivoSaidaRecente(fallback) {
+        if (ultimaAcaoSeguranca.motivo && (Date.now() - ultimaAcaoSeguranca.em) < 2000) {
+            return ultimaAcaoSeguranca.motivo;
+        }
+        return fallback || 'desconhecido';
+    }
+
+    function rotuloMotivoSaida(motivo) {
+        var mapa = {
+            tecla_esc: 'pressionou a tecla Esc',
+            tecla_f11: 'pressionou a tecla F11',
+            atalho_fechar_aba: 'usou o atalho para fechar a aba (Ctrl/Cmd+W)',
+            atalho_nova_aba: 'usou o atalho para abrir nova aba (Ctrl/Cmd+T)',
+            aba_trocada: 'trocou de aba ou minimizou a janela',
+            aba_fechada: 'fechou a aba ou saiu da página',
+            janela_perdeu_foco: 'a janela perdeu o foco (outro aplicativo na frente)',
+            saiu_tela_cheia: 'saiu da tela cheia (Esc, botão do navegador ou gesto)',
+            timeout_aviso_tela_cheia: 'não voltou à tela cheia após o aviso de 10 segundos',
+            segunda_saida_tela_cheia: 'saiu da tela cheia pela segunda vez',
+            botao_voltar: 'usou o botão Voltar do navegador',
+            desconhecido: 'motivo não identificado pelo navegador'
+        };
+        return mapa[motivo] || mapa.desconhecido;
+    }
+
+    function registrarLogSeguranca(tipoEvento, detalhe) {
+        try {
+            var payload = JSON.stringify({
+                tipo_evento: tipoEvento,
+                bloco_id: blocoIdCancelar,
+                detalhe: detalhe || ''
+            });
+            var urlLog = '<?= URL ?>/aluno/provas/log-evento';
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(urlLog, new Blob([payload], { type: 'application/json' }));
+            } else {
+                fetch(urlLog, {
+                    method: 'POST',
+                    body: payload,
+                    headers: { 'Content-Type': 'application/json' },
+                    keepalive: true,
+                    credentials: 'same-origin'
+                }).catch(function() {});
+            }
+        } catch (e) {}
+    }
+
+    function capturarAcaoTeclado(e) {
+        var mod = e.ctrlKey || e.metaKey;
+        if (e.key === 'Escape') registrarAcaoSeguranca('tecla_esc');
+        else if (e.key === 'F11') registrarAcaoSeguranca('tecla_f11');
+        else if (mod && (e.key === 'w' || e.key === 'W')) registrarAcaoSeguranca('atalho_fechar_aba');
+        else if (mod && (e.key === 't' || e.key === 'T')) registrarAcaoSeguranca('atalho_nova_aba');
+    }
+    document.addEventListener('keydown', capturarAcaoTeclado, true);
 
     function fecharIframeProva() {
         try {
@@ -152,22 +217,34 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         if (conteudo) conteudo.style.display = 'flex';
     }
 
-    function cancelarBlocoSeguroAgora() {
+    function cancelarBlocoSeguroAgora(motivo, origem) {
+        motivo = motivo || motivoSaidaRecente('desconhecido');
+        registrarAcaoSeguranca(motivo);
         fecharIframeProva();
         var url = '<?= URL ?>/aluno/provas/bloco/' + blocoIdCancelar + '/cancelar-seguro';
         if (cancelamentoServidorEnviado) {
             return Promise.resolve(true);
         }
         cancelamentoServidorEnviado = true;
+        origem = origem || '';
+        var qs = 'motivo=' + encodeURIComponent(motivo) + '&_=' + Date.now();
+        if (origem) {
+            qs += '&origem=' + encodeURIComponent(origem);
+        }
+        var corpoObj = { motivo: motivo };
+        if (origem) {
+            corpoObj.origem = origem;
+        }
+        var corpo = JSON.stringify(corpoObj);
 
         try {
             var img = new Image();
-            img.src = url + '?_=' + Date.now();
+            img.src = url + '?' + qs;
         } catch (e) {}
 
         try {
             if (navigator.sendBeacon) {
-                navigator.sendBeacon(url, new Blob(['{}'], { type: 'application/json' }));
+                navigator.sendBeacon(url, new Blob([corpo], { type: 'application/json' }));
             }
         } catch (e) {}
 
@@ -180,10 +257,10 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: '{}'
+            body: corpo
         }).then(function(r) {
             if (r.ok) return true;
-            return fetch(url, {
+            return fetch(url + '?' + qs, {
                 method: 'GET',
                 credentials: 'same-origin',
                 keepalive: true,
@@ -193,7 +270,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
                 }
             }).then(function(r2) { return r2.ok; });
         }).catch(function() {
-            return fetch(url, {
+            return fetch(url + '?' + qs, {
                 method: 'GET',
                 credentials: 'same-origin',
                 keepalive: true,
@@ -240,7 +317,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             }
             cancelamentoIniciado = true;
             fecharIframeProva();
-            cancelarBlocoSeguroAgora().finally(function() {
+            cancelarBlocoSeguroAgora('timeout_aviso_tela_cheia', window._motivoPrimeiraSaidaSeguro || '').finally(function() {
                 permitirSair = true;
                 window.location.href = '<?= URL ?>/aluno/provas?cancelar_bloco=' + blocoIdCancelar;
             });
@@ -265,9 +342,10 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
     }
 
     function mostrarModalCancelarProva() {
+        var motivo = motivoSaidaRecente('segunda_saida_tela_cheia');
         cancelamentoIniciado = true;
         fecharIframeProva();
-        cancelarBlocoSeguroAgora();
+        cancelarBlocoSeguroAgora(motivo);
         var el = document.getElementById('modal-aviso');
         if (!el) return;
         document.getElementById('modal-aviso-titulo').textContent = 'Prova cancelada';
@@ -338,6 +416,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
         document.addEventListener('cut', function(e) { e.preventDefault(); });
         document.addEventListener('paste', function(e) { e.preventDefault(); });
         document.addEventListener('keydown', function(e) {
+            capturarAcaoTeclado(e);
             if (modoSeguroAtivo && estaEmFullscreen() && !permitirSair) {
                 var el = document.activeElement;
                 var tag = el && el.tagName ? el.tagName.toLowerCase() : '';
@@ -493,8 +572,15 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             mostrarOverlayTelaCheia();
             return;
         }
+        var motivoFullscreen = motivoSaidaRecente('saiu_tela_cheia');
+        registrarAcaoSeguranca(motivoFullscreen);
         if (saiuFullscreenContagem === 0) {
             saiuFullscreenContagem = 1;
+            window._motivoPrimeiraSaidaSeguro = motivoFullscreen;
+            registrarLogSeguranca(
+                'tentativa_sair_tela_cheia',
+                'Primeira saída da tela cheia: ' + rotuloMotivoSaida(motivoFullscreen) + '.'
+            );
             mostrarModalPrimeiraSaida();
         } else {
             cancelamentoIniciado = true;
@@ -592,24 +678,43 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             if (document.visibilityState === 'hidden' && !permitirSair && !cancelamentoIniciado) {
                 cancelamentoIniciado = true;
                 fecharIframeProva();
-                cancelarBlocoSeguroAgora();
+                cancelarBlocoSeguroAgora(motivoSaidaRecente('aba_trocada'));
             }
+        });
+        window.addEventListener('pagehide', function() {
+            if (!modoSeguroAtivo) return;
+            if (!entrouFullscreenUmaVez) return;
+            if (transicaoMateria || aguardandoProximaMateria) return;
+            if (permitirSair || cancelamentoIniciado) return;
+            cancelamentoIniciado = true;
+            fecharIframeProva();
+            cancelarBlocoSeguroAgora(motivoSaidaRecente('aba_fechada'));
         });
         window.addEventListener('beforeunload', function(e) {
             if (!modoSeguroAtivo) return;
             if (!entrouFullscreenUmaVez) return;
             if (transicaoMateria || aguardandoProximaMateria) return;
             if (permitirSair || cancelamentoIniciado) return;
+            cancelamentoIniciado = true;
             fecharIframeProva();
-            cancelarBlocoSeguroAgora();
+            cancelarBlocoSeguroAgora(motivoSaidaRecente('aba_fechada'));
             e.preventDefault();
             e.returnValue = '';
             return '';
+        });
+        window.addEventListener('blur', function() {
+            if (!modoSeguroAtivo || !entrouFullscreenUmaVez || permitirSair || cancelamentoIniciado) return;
+            if (document.visibilityState === 'hidden') return;
+            registrarAcaoSeguranca('janela_perdeu_foco');
         });
 
         var loadingHtml = '<div class="flex flex-col items-center justify-center py-12 px-6"><div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div><p class="text-gray-600 font-medium">Atualizando lista...</p><p class="text-sm text-gray-500 mt-1">Aguarde um momento.</p></div>';
         window.addEventListener('message', function(e) {
             if (!e.data || !e.data.tipo) return;
+            if (e.data.tipo === 'acao_seguranca' && e.data.motivo) {
+                registrarAcaoSeguranca(e.data.motivo);
+                return;
+            }
             if (e.data.tipo === 'finalizando_materia') {
                 transicaoMateria = true;
                 aguardandoProximaMateria = true;
@@ -639,6 +744,8 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             window.addEventListener('popstate', function() {
                 if (!modoSeguroAtivo) return;
                 history.pushState(null, '', location.href);
+                registrarAcaoSeguranca('botao_voltar');
+                registrarLogSeguranca('tentativa_voltar_navegador', 'Aluno tentou usar o botão Voltar do navegador durante o modo seguro.');
                 mostrarModal('Atenção', 'Você só pode sair após finalizar todas as provas ou clicar em "Sair do modo prova".');
             });
         }

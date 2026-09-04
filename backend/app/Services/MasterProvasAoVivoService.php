@@ -403,7 +403,7 @@ class MasterProvasAoVivoService
             'erro_sessao' => 'Erro de sessão',
             'erro_salvar_resposta' => 'Erro ao salvar resposta',
             'erro_finalizar' => 'Erro ao finalizar',
-            'saida_modo_seguro' => 'Saiu do modo seguro (trocou ou fechou a aba)',
+            'saida_modo_seguro' => 'Saiu do modo seguro',
             'tentativa_sair_tela_cheia' => 'Tentou sair da tela cheia',
             'tentativa_atualizar_pagina' => 'Tentou atualizar a página',
             'tentativa_voltar_navegador' => 'Tentou voltar no navegador',

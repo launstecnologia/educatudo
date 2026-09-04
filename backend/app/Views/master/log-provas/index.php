@@ -104,8 +104,8 @@ $queryBase = array_filter([
                         <span class="block text-xs text-slate-500 mt-0.5 truncate max-w-[14rem]">Bloco: <?= htmlspecialchars($ev['bloco_titulo']) ?></span>
                         <?php endif; ?>
                     </td>
-                    <td class="px-4 py-3 text-sm text-slate-600 max-w-xs">
-                        <span class="block truncate" title="<?= htmlspecialchars($ev['detalhe'] ?? '') ?>"><?= htmlspecialchars($ev['detalhe'] ?? '') ?: '—' ?></span>
+                    <td class="px-4 py-3 text-sm text-slate-600 max-w-md">
+                        <span class="block whitespace-normal break-words"><?= htmlspecialchars($ev['detalhe'] ?? '') ?: '—' ?></span>
                     </td>
                     <td class="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
                         <?= !empty($ev['created_at']) ? date('d/m/Y H:i', strtotime($ev['created_at'])) : '—' ?>

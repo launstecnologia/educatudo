@@ -378,19 +378,41 @@ const questoes = <?= !empty($questoes) && is_array($questoes) ? json_encode(arra
 <?php if (!empty($modo_seguro) && !empty($bloco['id'])): ?>
 var blocoIdModoSeguro = <?= (int) $bloco['id'] ?>;
 var cancelamentoBlocoEnviado = false;
-function cancelarBlocoModoSeguroNoServidor() {
+function registrarMotivoSaidaSeguro(motivo) {
+    if (!motivo) return;
+    window._motivoSaidaSeguro = motivo;
+    window._motivoSaidaSeguroEm = Date.now();
+    try {
+        if (window.parent && window.parent !== window) {
+            if (typeof window.parent.registrarAcaoSeguranca === 'function') {
+                window.parent.registrarAcaoSeguranca(motivo);
+            }
+            window.parent.postMessage({ tipo: 'acao_seguranca', motivo: motivo }, '*');
+        }
+    } catch (e) {}
+}
+function motivoSaidaSeguroAtual(fallback) {
+    if (window._motivoSaidaSeguro && window._motivoSaidaSeguroEm && (Date.now() - window._motivoSaidaSeguroEm) < 2000) {
+        return window._motivoSaidaSeguro;
+    }
+    return fallback || '';
+}
+function cancelarBlocoModoSeguroNoServidor(motivo) {
     if (!blocoIdModoSeguro || cancelamentoBlocoEnviado || window._finalizandoProva) {
         return Promise.resolve(false);
     }
     cancelamentoBlocoEnviado = true;
+    motivo = motivo || motivoSaidaSeguroAtual('');
     var url = '<?= URL ?>/aluno/provas/bloco/' + blocoIdModoSeguro + '/cancelar-seguro';
+    var qs = '_=' + Date.now() + (motivo ? '&motivo=' + encodeURIComponent(motivo) : '');
+    var corpo = JSON.stringify(motivo ? { motivo: motivo } : {});
     try {
         var imgPing = new Image();
-        imgPing.src = url + '?_=' + Date.now();
+        imgPing.src = url + '?' + qs;
     } catch (e) {}
     try {
         if (navigator.sendBeacon) {
-            navigator.sendBeacon(url, new Blob(['{}'], { type: 'application/json' }));
+            navigator.sendBeacon(url, new Blob([corpo], { type: 'application/json' }));
         }
     } catch (e) {}
     return fetch(url, {
@@ -402,10 +424,10 @@ function cancelarBlocoModoSeguroNoServidor() {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
         },
-        body: '{}'
+        body: corpo
     }).then(function(r) {
         if (r.ok) return true;
-        return fetch(url, {
+        return fetch(url + '?' + qs, {
             method: 'GET',
             credentials: 'same-origin',
             keepalive: true,
@@ -922,6 +944,9 @@ function aplicarBloqueiosSeguranca() {
         if (e.key === 'Escape' || e.key === 'F11') {
             e.preventDefault();
             e.stopPropagation();
+            if (typeof registrarMotivoSaidaSeguro === 'function') {
+                registrarMotivoSaidaSeguro(e.key === 'Escape' ? 'tecla_esc' : 'tecla_f11');
+            }
             registrarLogProvaEvento('tentativa_sair_tela_cheia', 'Tecla ' + e.key + ' durante prova em modo seguro/embed.');
             mostrarModal('Atenção', 'Para sair da prova, finalize todas as matérias e use o botão "Sair do modo prova" na tela principal.');
         }
@@ -963,7 +988,7 @@ function aplicarBloqueiosSeguranca() {
         <?php if (empty($modo_embed)): ?>
         var urlParamsUnload = new URLSearchParams(window.location.search);
         if (urlParamsUnload.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
-            cancelarBlocoModoSeguroNoServidor();
+            cancelarBlocoModoSeguroNoServidor(typeof motivoSaidaSeguroAtual === 'function' ? motivoSaidaSeguroAtual('aba_fechada') : 'aba_fechada');
         }
         <?php endif; ?>
         return bloquearSaida(e);
@@ -985,6 +1010,12 @@ function aplicarBloqueiosSeguranca() {
     
     var mod = function(e) { return e.ctrlKey || e.metaKey; };
     document.addEventListener('keydown', function(e) {
+        if (typeof registrarMotivoSaidaSeguro === 'function') {
+            if (e.key === 'Escape') registrarMotivoSaidaSeguro('tecla_esc');
+            else if (e.key === 'F11') registrarMotivoSaidaSeguro('tecla_f11');
+            else if (mod(e) && (e.key === 'w' || e.key === 'W')) registrarMotivoSaidaSeguro('atalho_fechar_aba');
+            else if (mod(e) && (e.key === 't' || e.key === 'T')) registrarMotivoSaidaSeguro('atalho_nova_aba');
+        }
         if (mod(e) && (e.key === 'w' || e.key === 'W' || e.key === 't' || e.key === 'T' || e.key === 'n' || e.key === 'N')) {
             e.preventDefault();
             return false;
@@ -1061,6 +1092,9 @@ function aplicarBloqueiosSeguranca() {
     window.history.pushState(null, null, window.location.href);
     window.addEventListener('popstate', function() {
         window.history.pushState(null, null, window.location.href);
+        if (typeof registrarMotivoSaidaSeguro === 'function') {
+            registrarMotivoSaidaSeguro('botao_voltar');
+        }
         registrarLogProvaEvento('tentativa_voltar_navegador', 'Aluno tentou usar o botão Voltar do navegador durante a prova.');
         mostrarModal('Atenção', 'Não é permitido navegar para trás durante a prova.');
     });
@@ -1073,7 +1107,7 @@ function aplicarBloqueiosSeguranca() {
             <?php endif; ?>
             var urlParamsVis = new URLSearchParams(window.location.search);
             if (urlParamsVis.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
-                cancelarBlocoModoSeguroNoServidor();
+                cancelarBlocoModoSeguroNoServidor(typeof motivoSaidaSeguroAtual === 'function' ? motivoSaidaSeguroAtual('aba_trocada') : 'aba_trocada');
             }
             <?php if (!empty($modo_seguro) && empty($modo_embed)): ?>
             if (typeof window.encerrarProvaPorSaida === 'function') {
@@ -1185,6 +1219,9 @@ function bloquearSaida(e) {
         if (e.key === 'Escape' || e.key === 'F11') {
             e.preventDefault();
             e.stopPropagation();
+            if (typeof registrarMotivoSaidaSeguro === 'function') {
+                registrarMotivoSaidaSeguro(e.key === 'Escape' ? 'tecla_esc' : 'tecla_f11');
+            }
             return false;
         }
     }, true);
@@ -1223,9 +1260,9 @@ function bloquearSaida(e) {
         window.addEventListener('beforeunload', function() {
             if (window._encerrandoPorSaida || window._finalizandoProva) return;
             if (typeof cancelarBlocoModoSeguroNoServidor === 'function') {
-                cancelarBlocoModoSeguroNoServidor();
+                cancelarBlocoModoSeguroNoServidor(typeof motivoSaidaSeguroAtual === 'function' ? motivoSaidaSeguroAtual('aba_fechada') : 'aba_fechada');
             } else if (navigator.sendBeacon) {
-                navigator.sendBeacon(urlCancelarBloco, new Blob(['{}'], { type: 'application/json' }));
+                navigator.sendBeacon(urlCancelarBloco, new Blob([JSON.stringify({ motivo: 'aba_fechada' })], { type: 'application/json' }));
             }
         });
     });
