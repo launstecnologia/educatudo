@@ -121,6 +121,11 @@ $percentualGeralFmt = number_format($percentualGeral, 2, ',', '.');
                     <p class="text-sm text-gray-600">
                         <?= htmlspecialchars((string) ($prova['materia_nome'] ?? '')) ?>
                     </p>
+                    <a href="<?= URL ?>/aluno/provas/resultado/<?= (int) ($prova['id'] ?? 0) ?>"
+                       class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-colors">
+                        <i class="fa-solid fa-list-check"></i>
+                        Ver questões
+                    </a>
                 </div>
 
                 <div class="w-full lg:w-[360px]">
