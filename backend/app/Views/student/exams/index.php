@@ -176,13 +176,13 @@ $clsCtaInativo = 'block w-full bg-gray-200 text-gray-600 text-center py-3 rounde
             </h2>
             <div class="flex items-center gap-2">
                 <button type="button"
-                        id="btn-mostrar-blocos"
+                        id="btn-mostrar-provas-blocos"
                         class="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                     <i class="fa-solid fa-eye text-gray-500"></i>
                     Mostrar todos
                 </button>
                 <button type="button"
-                        id="btn-esconder-blocos"
+                        id="btn-esconder-provas-blocos"
                         class="inline-flex items-center gap-2 px-3 py-2 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
                     <i class="fa-solid fa-eye-slash"></i>
                     Esconder todos
@@ -205,24 +205,18 @@ $clsCtaInativo = 'block w-full bg-gray-200 text-gray-600 text-center py-3 rounde
                 $dentroPeriodo = !empty($bloco['dentro_periodo']);
                 $disponivelEm = $bloco['disponivel_em'] ?? null;
                 $blocoLiberado = !empty($bloco['liberado']) && !empty($bloco['ativo']);
-                $blocoAbertoPorPadrao = true;
+                $listaProvasAbertaPorPadrao = true;
                 $dataProvaTs = !empty($bloco['data_prova']) ? strtotime((string) $bloco['data_prova']) : false;
                 $horaInicioTs = !empty($bloco['hora_inicio']) ? strtotime((string) $bloco['hora_inicio']) : false;
                 $horaFimTs = !empty($bloco['hora_fim']) ? strtotime((string) $bloco['hora_fim']) : false;
                 ?>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
                     <div class="h-1.5 bg-primary"></div>
-                    <button type="button"
-                            class="w-full text-left p-5 pb-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                            data-bloco-toggle="<?= $blocoId ?>"
-                            aria-expanded="<?= $blocoAbertoPorPadrao ? 'true' : 'false' ?>"
-                            aria-controls="bloco-corpo-<?= $blocoId ?>">
+                    <div class="p-5 pb-3">
                         <div class="flex items-start justify-between gap-3">
                             <h3 class="text-lg font-bold text-gray-900 leading-snug min-w-0">
                                 <?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>
                             </h3>
-                            <i class="fa-solid fa-chevron-down text-accent mt-1 shrink-0 transition-transform duration-200 <?= $blocoAbertoPorPadrao ? '' : '-rotate-90' ?>"
-                               data-bloco-chevron="<?= $blocoId ?>"></i>
                         </div>
                         <div class="mt-3 flex flex-wrap items-center gap-2">
                             <span class="inline-flex items-center gap-1.5 text-sm text-gray-600">
@@ -241,19 +235,27 @@ $clsCtaInativo = 'block w-full bg-gray-200 text-gray-600 text-center py-3 rounde
                                 <?= $qtdProvasBloco ?> <?= $qtdProvasBloco === 1 ? 'prova' : 'provas' ?>
                             </span>
                         </div>
-                    </button>
+                    </div>
 
-                    <div id="bloco-corpo-<?= $blocoId ?>"
-                         data-bloco-corpo="<?= $blocoId ?>"
-                         class="<?= $blocoAbertoPorPadrao ? '' : 'hidden' ?> px-5 pb-5 flex-1 flex flex-col">
+                    <div class="px-5 pb-5 flex-1 flex flex-col">
                         <?php if (!empty($bloco['descricao'])): ?>
                             <p class="text-sm text-gray-600 mb-3"><?= htmlspecialchars((string) $bloco['descricao']) ?></p>
                         <?php endif; ?>
 
                         <?php if (!empty($bloco['provas'])): ?>
                         <div class="mb-4">
-                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Provas deste bloco</p>
-                            <div class="space-y-2">
+                            <button type="button"
+                                    class="w-full flex items-center justify-between gap-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded"
+                                    data-provas-bloco-toggle="<?= $blocoId ?>"
+                                    aria-expanded="<?= $listaProvasAbertaPorPadrao ? 'true' : 'false' ?>"
+                                    aria-controls="provas-bloco-lista-<?= $blocoId ?>">
+                                <span>Provas deste bloco</span>
+                                <i class="fa-solid fa-chevron-down text-accent shrink-0 transition-transform duration-200 <?= $listaProvasAbertaPorPadrao ? '' : '-rotate-90' ?>"
+                                   data-provas-bloco-chevron="<?= $blocoId ?>"></i>
+                            </button>
+                            <div id="provas-bloco-lista-<?= $blocoId ?>"
+                                 data-provas-bloco-lista="<?= $blocoId ?>"
+                                 class="<?= $listaProvasAbertaPorPadrao ? '' : 'hidden' ?> space-y-2">
                                 <?php foreach ($bloco['provas'] as $prova): ?>
                                     <div class="rounded-lg p-3 border border-gray-100 bg-slate-50">
                                         <div class="flex items-center justify-between gap-3">
@@ -372,40 +374,40 @@ $clsCtaInativo = 'block w-full bg-gray-200 text-gray-600 text-center py-3 rounde
             });
         });
 
-        function definirBlocoAberto(id, aberto) {
-            var corpo = document.getElementById('bloco-corpo-' + id);
-            var chevron = document.querySelector('[data-bloco-chevron="' + id + '"]');
-            var toggle = document.querySelector('[data-bloco-toggle="' + id + '"]');
-            if (!corpo) return;
-            corpo.classList.toggle('hidden', !aberto);
+        function definirListaProvasAberta(id, aberto) {
+            var lista = document.getElementById('provas-bloco-lista-' + id);
+            var chevron = document.querySelector('[data-provas-bloco-chevron="' + id + '"]');
+            var toggle = document.querySelector('[data-provas-bloco-toggle="' + id + '"]');
+            if (!lista) return;
+            lista.classList.toggle('hidden', !aberto);
             if (toggle) toggle.setAttribute('aria-expanded', aberto ? 'true' : 'false');
             if (chevron) {
                 chevron.classList.toggle('-rotate-90', !aberto);
             }
         }
 
-        document.querySelectorAll('[data-bloco-toggle]').forEach(function(btn) {
+        document.querySelectorAll('[data-provas-bloco-toggle]').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                var id = this.getAttribute('data-bloco-toggle');
-                var corpo = document.getElementById('bloco-corpo-' + id);
-                if (!corpo) return;
-                definirBlocoAberto(id, corpo.classList.contains('hidden'));
+                var id = this.getAttribute('data-provas-bloco-toggle');
+                var lista = document.getElementById('provas-bloco-lista-' + id);
+                if (!lista) return;
+                definirListaProvasAberta(id, lista.classList.contains('hidden'));
             });
         });
 
-        var btnMostrar = document.getElementById('btn-mostrar-blocos');
-        var btnEsconder = document.getElementById('btn-esconder-blocos');
+        var btnMostrar = document.getElementById('btn-mostrar-provas-blocos');
+        var btnEsconder = document.getElementById('btn-esconder-provas-blocos');
         if (btnMostrar) {
             btnMostrar.addEventListener('click', function() {
-                document.querySelectorAll('[data-bloco-corpo]').forEach(function(el) {
-                    definirBlocoAberto(el.getAttribute('data-bloco-corpo'), true);
+                document.querySelectorAll('[data-provas-bloco-lista]').forEach(function(el) {
+                    definirListaProvasAberta(el.getAttribute('data-provas-bloco-lista'), true);
                 });
             });
         }
         if (btnEsconder) {
             btnEsconder.addEventListener('click', function() {
-                document.querySelectorAll('[data-bloco-corpo]').forEach(function(el) {
-                    definirBlocoAberto(el.getAttribute('data-bloco-corpo'), false);
+                document.querySelectorAll('[data-provas-bloco-lista]').forEach(function(el) {
+                    definirListaProvasAberta(el.getAttribute('data-provas-bloco-lista'), false);
                 });
             });
         }
