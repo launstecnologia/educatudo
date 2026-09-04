@@ -84,25 +84,11 @@ class StudentEssayController extends BaseController
         $this->ensureEssayModuleEnabled();
         $user = $this->authManager->getUser();
         $studentId = $this->getStudentId();
-        
-        // Debug: verificar turma do aluno - salva em arquivo próprio
-        $logFile = __DIR__ . '/../../../storage/logs/redacao_debug.log';
-        $logDir = dirname($logFile);
-        if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
-        
-        $alunoInfo = $this->db->fetch("SELECT id, nome, turma_id FROM alunos WHERE id = ?", [$studentId]);
-        $turmaInfo = $alunoInfo ? $this->db->fetch("SELECT id, nome FROM turmas WHERE id = ?", [$alunoInfo['turma_id']]) : null;
-        
-        $logMsg = date('Y-m-d H:i:s') . " | aluno_id={$studentId}, aluno_nome=" . ($alunoInfo['nome'] ?? 'NULL') . ", turma_id=" . ($alunoInfo['turma_id'] ?? 'NULL') . ", turma_nome=" . ($turmaInfo['nome'] ?? 'NULL') . "\n";
-        @file_put_contents($logFile, $logMsg, FILE_APPEND);
-        
+
         $proposals = $this->attachMaxTotalScoresToProposals(
             $this->proposalModel->findPublishedForStudent($studentId)
         );
-        
-        $logMsg2 = date('Y-m-d H:i:s') . " | proposals_count=" . count($proposals) . "\n";
-        @file_put_contents($logFile, $logMsg2, FILE_APPEND);
-        
+
         $this->viewWithLayout('student', 'student/essays/index', [
             'title' => 'Jornada da Redação - EducaTudo',
             'page_title' => 'Jornada da Redação',
