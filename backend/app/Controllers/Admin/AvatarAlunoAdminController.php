@@ -170,6 +170,70 @@ class AvatarAlunoAdminController extends AdminBaseController
         $this->redirect('/admin/avatares-alunos');
     }
 
+    public function excluirSelecionados(): void
+    {
+        if (!$this->enforceAdminPermissionKey('avatares_alunos', 'excluir', false)) {
+            return;
+        }
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token invalido. Atualize a pagina e tente novamente.', 'error');
+            $this->redirect('/admin/avatares-alunos');
+            return;
+        }
+
+        $arquivos = $_POST['arquivos'] ?? [];
+        if (!is_array($arquivos)) {
+            $arquivos = [];
+        }
+
+        $arquivos = array_values(array_unique(array_filter(array_map(static function ($arquivo): string {
+            return trim((string) $arquivo);
+        }, $arquivos))));
+
+        if (empty($arquivos)) {
+            $this->setFlashMessage('Selecione pelo menos um avatar para excluir.', 'error');
+            $this->redirect('/admin/avatares-alunos');
+            return;
+        }
+
+        $avataresDisponiveis = [];
+        foreach ($this->listarAvatares() as $avatar) {
+            $arquivo = (string) ($avatar['arquivo'] ?? '');
+            if ($arquivo !== '') {
+                $avataresDisponiveis[$arquivo] = true;
+            }
+        }
+
+        $excluidos = 0;
+        $limpos = 0;
+
+        foreach ($arquivos as $arquivo) {
+            if (!$this->arquivoPermitido($arquivo) || empty($avataresDisponiveis[$arquivo])) {
+                continue;
+            }
+
+            if ($this->isCatalogoTenantKey($arquivo)) {
+                if (!$this->media->delete('avatars', $arquivo)) {
+                    continue;
+                }
+            } else {
+                $this->ocultarAvatarBase($arquivo);
+            }
+
+            $excluidos++;
+            $limpos += $this->limparSelecoesDoAvatar($arquivo);
+        }
+
+        if ($excluidos === 0) {
+            $this->setFlashMessage('Nenhum avatar selecionado foi excluido.', 'error');
+        } else {
+            $this->setFlashMessage($excluidos . ' avatar(es) excluido(s). ' . $limpos . ' selecao(oes) de aluno foram limpas.', 'success');
+        }
+
+        $this->redirect('/admin/avatares-alunos');
+    }
+
     private function listarAvatares(): array
     {
         $avatares = [];

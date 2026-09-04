@@ -40,13 +40,26 @@ $page_header_actions = '
                 <p class="text-sm text-gray-600"><?= count($avatares) ?> avatar(es) exibidos para os alunos.</p>
             </div>
             <?php if (!empty($avatares)): ?>
-            <form method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-todos" onsubmit="return confirm('Excluir todos os avatares disponiveis para alunos? As selecoes atuais dos alunos serao limpas.');">
-                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
-                <button type="submit" class="inline-flex items-center px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors">
-                    <i class="fa-solid fa-trash-can mr-2"></i>
-                    Excluir todos
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="btn-selecionar-avatares" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                    <i class="fa-regular fa-square-check mr-2"></i>
+                    Selecionar todos
                 </button>
-            </form>
+                <form id="form-excluir-selecionados" method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-selecionados" onsubmit="return confirmarExcluirSelecionados();">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+                    <button type="submit" id="btn-excluir-selecionados" disabled class="inline-flex items-center px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-trash-can mr-2"></i>
+                        Excluir selecionados
+                    </button>
+                </form>
+                <form method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-todos" onsubmit="return confirm('Excluir todos os avatares disponiveis para alunos? As selecoes atuais dos alunos serao limpas.');">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+                    <button type="submit" class="inline-flex items-center px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors">
+                        <i class="fa-solid fa-trash-can mr-2"></i>
+                        Excluir todos
+                    </button>
+                </form>
+            </div>
             <?php endif; ?>
         </div>
 
@@ -62,6 +75,14 @@ $page_header_actions = '
             <div class="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
                 <?php foreach ($avatares as $avatar): ?>
                 <div class="border border-gray-200 rounded-lg p-3 bg-white hover:shadow-sm transition-shadow">
+                    <label class="mb-2 inline-flex items-center gap-2 text-xs font-medium text-gray-700">
+                        <input type="checkbox"
+                               name="arquivos[]"
+                               value="<?= htmlspecialchars((string) $avatar['arquivo']) ?>"
+                               form="form-excluir-selecionados"
+                               class="avatar-checkbox rounded border-gray-300 text-primary focus:ring-primary">
+                        Selecionar
+                    </label>
                     <div class="aspect-square rounded-lg bg-gray-50 overflow-hidden border border-gray-100">
                         <img src="<?= htmlspecialchars((string) $avatar['url']) ?>" alt="Avatar" class="w-full h-full object-cover">
                     </div>
@@ -88,3 +109,49 @@ $page_header_actions = '
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+(function() {
+    var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.avatar-checkbox'));
+    var btnExcluir = document.getElementById('btn-excluir-selecionados');
+    var btnSelecionar = document.getElementById('btn-selecionar-avatares');
+
+    function selecionados() {
+        return checkboxes.filter(function(cb) { return cb.checked; }).length;
+    }
+
+    function atualizar() {
+        var total = selecionados();
+        if (btnExcluir) {
+            btnExcluir.disabled = total === 0;
+            btnExcluir.innerHTML = '<i class="fa-solid fa-trash-can mr-2"></i>' + (total > 0 ? 'Excluir ' + total + ' selecionado(s)' : 'Excluir selecionados');
+        }
+        if (btnSelecionar) {
+            var todos = checkboxes.length > 0 && total === checkboxes.length;
+            btnSelecionar.innerHTML = '<i class="fa-regular fa-square-check mr-2"></i>' + (todos ? 'Limpar seleção' : 'Selecionar todos');
+        }
+    }
+
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener('change', atualizar);
+    });
+
+    if (btnSelecionar) {
+        btnSelecionar.addEventListener('click', function() {
+            var marcar = selecionados() !== checkboxes.length;
+            checkboxes.forEach(function(cb) { cb.checked = marcar; });
+            atualizar();
+        });
+    }
+
+    window.confirmarExcluirSelecionados = function() {
+        var total = selecionados();
+        if (total === 0) {
+            return false;
+        }
+        return confirm('Excluir ' + total + ' avatar(es) selecionado(s)? As selecoes atuais dos alunos que usam essas imagens serao limpas.');
+    };
+
+    atualizar();
+})();
+</script>

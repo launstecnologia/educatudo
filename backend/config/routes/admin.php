@@ -523,6 +523,7 @@ $router->get('/tutoriais', 'Admin/DevAdminController@listarTutoriais');
 $router->get('/admin/avatares-alunos', 'Admin/AvatarAlunoAdminController@index');
 $router->post('/admin/avatares-alunos/upload', 'Admin/AvatarAlunoAdminController@upload');
 $router->post('/admin/avatares-alunos/excluir', 'Admin/AvatarAlunoAdminController@excluir');
+$router->post('/admin/avatares-alunos/excluir-selecionados', 'Admin/AvatarAlunoAdminController@excluirSelecionados');
 $router->post('/admin/avatares-alunos/excluir-todos', 'Admin/AvatarAlunoAdminController@excluirTodos');
 
 // Layout do Sistema (Dev Settings)
