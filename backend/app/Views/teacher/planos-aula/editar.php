@@ -179,7 +179,7 @@ $redirect_url = $redirect_url ?? $back_url;
                         Conteúdo
                     </label>
                     <div id="editor-conteudo" class="quill-editor-wrapper"></div>
-                    <textarea id="conteudo" name="conteudo" style="display: none;"><?= htmlspecialchars($plano['conteudo'] ?? '') ?></textarea>
+                    <textarea id="conteudo" name="conteudo" style="display: none;"><?= htmlspecialchars(rich_text_para_editor($plano['conteudo'] ?? '')) ?></textarea>
                 </div>
             </div>
         </div>
@@ -194,7 +194,7 @@ $redirect_url = $redirect_url ?? $back_url;
                         O Aluno deverá ser capaz de:
                     </label>
                     <div id="editor-objetivos" class="quill-editor-wrapper"></div>
-                    <textarea id="objetivos" name="objetivos" style="display: none;"><?= htmlspecialchars($plano['objetivos'] ?? '') ?></textarea>
+                    <textarea id="objetivos" name="objetivos" style="display: none;"><?= htmlspecialchars(rich_text_para_editor($plano['objetivos'] ?? '')) ?></textarea>
                 </div>
             </div>
         </div>
@@ -209,7 +209,7 @@ $redirect_url = $redirect_url ?? $back_url;
                         Ferramentas utilizadas para que os objetivos sejam atingidos:
                     </label>
                     <div id="editor-recursos" class="quill-editor-wrapper"></div>
-                    <textarea id="recursos" name="recursos" style="display: none;"><?= htmlspecialchars($plano['recursos'] ?? '') ?></textarea>
+                    <textarea id="recursos" name="recursos" style="display: none;"><?= htmlspecialchars(rich_text_para_editor($plano['recursos'] ?? '')) ?></textarea>
                 </div>
 
                 <div>
@@ -501,50 +501,40 @@ document.getElementById('planoForm').addEventListener('submit', function(e) {
 // Variáveis globais para os editores Quill
 var quillConteudo, quillObjetivos, quillRecursos;
 
+function carregarHtmlNoQuill(quill, html) {
+    if (!quill || html == null) {
+        return;
+    }
+    var valor = String(html).trim();
+    if (!valor) {
+        return;
+    }
+    if (!/<(p|h[1-6]|ol|ul|div|blockquote)(\s|\/|>)/i.test(valor)) {
+        valor = '<p>' + valor + '</p>';
+    }
+    quill.clipboard.dangerouslyPasteHTML(valor);
+}
+
 // Inicializar Quill.js após o DOM estar pronto
 document.addEventListener('DOMContentLoaded', function() {
-    // Editor de Conteúdo
-    quillConteudo = new Quill('#editor-conteudo', {
-        theme: 'snow'
-    });
-    
-    // Carregar conteúdo existente se houver
+    quillConteudo = new Quill('#editor-conteudo', { theme: 'snow' });
+    quillObjetivos = new Quill('#editor-objetivos', { theme: 'snow' });
+    quillRecursos = new Quill('#editor-recursos', { theme: 'snow' });
+
     var conteudoTextarea = document.getElementById('conteudo');
-    if (conteudoTextarea && conteudoTextarea.value) {
-        quillConteudo.root.innerHTML = conteudoTextarea.value;
-    }
-    
-    // Editor de Objetivos
-    quillObjetivos = new Quill('#editor-objetivos', {
-        theme: 'snow'
-    });
-    
-    // Carregar conteúdo existente se houver
     var objetivosTextarea = document.getElementById('objetivos');
-    if (objetivosTextarea && objetivosTextarea.value) {
-        quillObjetivos.root.innerHTML = objetivosTextarea.value;
-    }
-    
-    // Editor de Recursos
-    quillRecursos = new Quill('#editor-recursos', {
-        theme: 'snow'
-    });
-    
-    // Carregar conteúdo existente se houver
     var recursosTextarea = document.getElementById('recursos');
-    if (recursosTextarea && recursosTextarea.value) {
-        quillRecursos.root.innerHTML = recursosTextarea.value;
-    }
-    
-    // Atualizar textareas hidden quando o conteúdo mudar
+
+    carregarHtmlNoQuill(quillConteudo, conteudoTextarea ? conteudoTextarea.value : '');
+    carregarHtmlNoQuill(quillObjetivos, objetivosTextarea ? objetivosTextarea.value : '');
+    carregarHtmlNoQuill(quillRecursos, recursosTextarea ? recursosTextarea.value : '');
+
     quillConteudo.on('text-change', function() {
         document.getElementById('conteudo').value = quillConteudo.root.innerHTML;
     });
-    
     quillObjetivos.on('text-change', function() {
         document.getElementById('objetivos').value = quillObjetivos.root.innerHTML;
     });
-    
     quillRecursos.on('text-change', function() {
         document.getElementById('recursos').value = quillRecursos.root.innerHTML;
     });

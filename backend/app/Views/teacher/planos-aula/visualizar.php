@@ -135,7 +135,7 @@
     <div class="mb-4">
         <p class="text-sm text-gray-500 mb-2">O Aluno deverá ser capaz de:</p>
         <div class="bg-gray-50 rounded-lg p-4">
-            <div class="text-gray-800 prose prose-sm max-w-none"><?= $plano['objetivos'] ?></div>
+            <div class="text-gray-800 prose prose-sm max-w-none"><?= rich_text_render($plano['objetivos']) ?></div>
         </div>
     </div>
     <?php endif; ?>
@@ -143,7 +143,7 @@
     <div>
         <p class="text-sm text-gray-500 mb-2">Lista de Objetivos Específicos</p>
         <div class="bg-gray-50 rounded-lg p-4">
-            <div class="text-gray-800 prose prose-sm max-w-none"><?= $plano['objetivos_lista'] ?></div>
+            <div class="text-gray-800 prose prose-sm max-w-none"><?= rich_text_render($plano['objetivos_lista']) ?></div>
         </div>
     </div>
     <?php endif; ?>

@@ -425,19 +425,7 @@ class LessonPlanController extends BaseController
                         $anoDisciplina = $turmaNome . ' / ' . $materia['nome'];
                     }
                     
-                    // Processa objetivos para adicionar <br><br> entre elementos
-                    $objetivos = $postData['objetivos'] ?? null;
-                    if (!empty($objetivos)) {
-                        // Substitui fechamento de parágrafo seguido de abertura por <br><br>
-                        $objetivos = preg_replace('/<\/p>\s*<p[^>]*>/i', '<br><br>', $objetivos);
-                        // Substitui fechamento de lista seguido de parágrafo ou outra lista por <br><br>
-                        $objetivos = preg_replace('/<\/[uo]l>\s*<p[^>]*>/i', '<br><br>', $objetivos);
-                        $objetivos = preg_replace('/<\/p>\s*<[uo]l[^>]*>/i', '<br><br>', $objetivos);
-                        // Remove tags <p> restantes no início e fim
-                        $objetivos = preg_replace('/^<p[^>]*>|<\/p>$/i', '', $objetivos);
-                        // Remove tags <p> vazias
-                        $objetivos = preg_replace('/<p[^>]*><\/p>/i', '', $objetivos);
-                    }
+                    $objetivos = $this->htmlDoEditor($postData['objetivos'] ?? null);
                     
                     // Prepara dados para esta turma
                     $data = [
@@ -887,19 +875,7 @@ class LessonPlanController extends BaseController
                 $dataAula = json_encode($datasArray);
             }
             
-            // Processa objetivos para adicionar <br><br> entre elementos
-            $objetivos = $postData['objetivos'] ?? null;
-            if (!empty($objetivos)) {
-                // Substitui fechamento de parágrafo seguido de abertura por <br><br>
-                $objetivos = preg_replace('/<\/p>\s*<p[^>]*>/i', '<br><br>', $objetivos);
-                // Substitui fechamento de lista seguido de parágrafo ou outra lista por <br><br>
-                $objetivos = preg_replace('/<\/[uo]l>\s*<p[^>]*>/i', '<br><br>', $objetivos);
-                $objetivos = preg_replace('/<\/p>\s*<[uo]l[^>]*>/i', '<br><br>', $objetivos);
-                // Remove tags <p> restantes no início e fim
-                $objetivos = preg_replace('/^<p[^>]*>|<\/p>$/i', '', $objetivos);
-                // Remove tags <p> vazias
-                $objetivos = preg_replace('/<p[^>]*><\/p>/i', '', $objetivos);
-            }
+            $objetivos = $this->htmlDoEditor($postData['objetivos'] ?? null);
             
             // Prepara dados
             $data = [
@@ -1325,6 +1301,28 @@ class LessonPlanController extends BaseController
         $this->view('teacher/planos-aula/pdf', $data);
     }
     
+    /**
+     * Mantém o HTML do Quill intacto. Esvaziar o editor grava null,
+     * sem transformar <p> em fragmento (isso impedia recarregar na edição).
+     */
+    private function htmlDoEditor($valor): ?string
+    {
+        if ($valor === null) {
+            return null;
+        }
+        $html = trim((string) $valor);
+        if ($html === '' || preg_match('/^<p>(<br\s*\/?>)?<\/p>$/i', $html)) {
+            return null;
+        }
+
+        $limpo = trim(rich_text_render($html));
+        if ($limpo === '' || preg_match('/^<p>(<br\s*\/?>)?<\/p>$/i', $limpo)) {
+            return null;
+        }
+
+        return $limpo;
+    }
+
     /**
      * Redireciona para o dashboard correto baseado no tipo
      */

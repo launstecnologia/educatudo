@@ -138,6 +138,24 @@ if (!function_exists('rich_text_render')) {
     }
 
     /**
+     * Garante HTML que o Quill consegue carregar na edição.
+     * Fragmentos sem bloco (texto solto / só &lt;br&gt;) são ignorados ou
+     * esvaziados pelo editor — planos antigos chegaram nesse formato.
+     */
+    function rich_text_para_editor(?string $html): string
+    {
+        $html = trim((string) $html);
+        if ($html === '') {
+            return '';
+        }
+        if (preg_match('/<(p|h[1-6]|ol|ul|div|blockquote)(\s|\/|>)/i', $html)) {
+            return $html;
+        }
+
+        return '<p>' . $html . '</p>';
+    }
+
+    /**
      * Texto puro (sem HTML) a partir do conteúdo rico — útil para resumos/listas.
      */
     function rich_text_plain(?string $html, int $limit = 0): string
