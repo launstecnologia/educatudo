@@ -111,7 +111,7 @@ class ModuloArquivoPasta
         if ($this->temColunaParent()) {
             $parentSql = $parentId === null ? 'p.parent_id IS NULL' : 'p.parent_id = :parent_id';
             $params = $parentId === null ? [] : ['parent_id' => $parentId];
-            return $this->db->fetchAll(
+            $pastas = $this->db->fetchAll(
                 "SELECT p.*,
                         (SELECT COUNT(*) FROM modulos_arquivos ma WHERE ma.pasta_id = p.id) AS total_arquivos,
                         (SELECT COUNT(*) FROM modulos_arquivos_pastas sub WHERE sub.parent_id = p.id) AS total_subpastas
@@ -120,6 +120,7 @@ class ModuloArquivoPasta
                  ORDER BY p.ordem ASC, p.nome ASC",
                 $params
             ) ?: [];
+            return $this->aplicarContagemRecursivaAdmin($pastas);
         }
 
         return $this->db->fetchAll(
@@ -132,10 +133,93 @@ class ModuloArquivoPasta
         ) ?: [];
     }
 
+    /**
+     * Troca total_arquivos (só da pasta) pela soma desta pasta + subpastas.
+     *
+     * @param array<int, array<string, mixed>> $pastas
+     * @return array<int, array<string, mixed>>
+     */
+    private function aplicarContagemRecursivaAdmin(array $pastas): array
+    {
+        if ($pastas === []) {
+            return $pastas;
+        }
+        $arvore = $this->db->fetchAll(
+            "SELECT id, parent_id FROM modulos_arquivos_pastas WHERE criado_por_tipo = 'admin'"
+        ) ?: [];
+        $totais = $this->somarArquivosNaArvore($arvore, $this->contarArquivosDiretos());
+        foreach ($pastas as &$pasta) {
+            $pasta['total_arquivos'] = $totais[(int) $pasta['id']] ?? 0;
+        }
+        unset($pasta);
+        return $pastas;
+    }
+
+    /**
+     * @return array<int, int> pasta_id => quantidade
+     */
+    public function contarArquivosDiretos(): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT pasta_id, COUNT(*) AS c FROM modulos_arquivos WHERE pasta_id IS NOT NULL GROUP BY pasta_id'
+        ) ?: [];
+        $mapa = [];
+        foreach ($rows as $row) {
+            $mapa[(int) $row['pasta_id']] = (int) $row['c'];
+        }
+        return $mapa;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $pastas
+     * @param array<int, int> $contagemDireta
+     * @return array<int, int> pasta_id => quantidade incluindo descendentes
+     */
+    public function somarArquivosNaArvore(array $pastas, array $contagemDireta): array
+    {
+        $filhos = [];
+        foreach ($pastas as $pasta) {
+            $id = (int) $pasta['id'];
+            $parentId = isset($pasta['parent_id']) && $pasta['parent_id'] !== null && $pasta['parent_id'] !== ''
+                ? (int) $pasta['parent_id']
+                : 0;
+            $filhos[$parentId][] = $id;
+        }
+        $memo = [];
+        $somar = function (int $id, array $pilha) use (&$somar, &$memo, $contagemDireta, $filhos): int {
+            if (isset($memo[$id])) {
+                return $memo[$id];
+            }
+            if (isset($pilha[$id])) {
+                return $contagemDireta[$id] ?? 0;
+            }
+            $pilha[$id] = true;
+            $total = $contagemDireta[$id] ?? 0;
+            foreach ($filhos[$id] ?? [] as $filhoId) {
+                $total += $somar($filhoId, $pilha);
+            }
+            return $memo[$id] = $total;
+        };
+        $totais = [];
+        foreach ($pastas as $pasta) {
+            $id = (int) $pasta['id'];
+            $totais[$id] = $somar($id, []);
+        }
+        return $totais;
+    }
+
     public function listAllAdmin(): array
     {
+        if ($this->temColunaParent()) {
+            return $this->db->fetchAll(
+                "SELECT p.id, p.nome, p.parent_id
+                 FROM modulos_arquivos_pastas p
+                 WHERE p.criado_por_tipo = 'admin'
+                 ORDER BY p.nome ASC"
+            ) ?: [];
+        }
         return $this->db->fetchAll(
-            "SELECT id, nome FROM modulos_arquivos_pastas
+            "SELECT id, nome, NULL AS parent_id FROM modulos_arquivos_pastas
              WHERE criado_por_tipo = 'admin'
              ORDER BY nome ASC"
         ) ?: [];
@@ -150,7 +234,7 @@ class ModuloArquivoPasta
         return $row ?: null;
     }
 
-    public function breadcrumbAdmin(array $pastaAtual): array
+    public function breadcrumb(array $pastaAtual): array
     {
         if (!$this->temColunaParent()) {
             return [];
@@ -165,6 +249,11 @@ class ModuloArquivoPasta
             array_unshift($breadcrumb, $cur);
         }
         return $breadcrumb;
+    }
+
+    public function breadcrumbAdmin(array $pastaAtual): array
+    {
+        return $this->breadcrumb($pastaAtual);
     }
 }
 }

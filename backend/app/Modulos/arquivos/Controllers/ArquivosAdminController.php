@@ -82,12 +82,15 @@ class ArquivosAdminController extends BaseController
 
     private function formViewData(?array $item, array $turmaIds = []): array
     {
+        $pastaId = (int) ($item['pasta_id'] ?? $_GET['pasta_id'] ?? 0);
         return [
             'title' => ($item ? 'Editar arquivo' : 'Novo arquivo') . ' - Admin',
             'page_title' => $item ? 'Editar arquivo' : 'Novo arquivo',
             'user' => $this->auth->getUser(),
             'item' => $item,
             'turma_ids' => $turmaIds,
+            'pasta_id' => $pastaId > 0 ? $pastaId : null,
+            'todas_pastas' => $this->arquivosService->pastasAdminOpcoes(),
             'anexos' => $item ? $this->arquivosService->getAnexosAdmin((int) $item['id']) : [],
             'turmas' => $this->arquivosService->getTurmasAtivas(),
             'materias' => $this->arquivosService->getMateriasAtivas(),
@@ -256,14 +259,16 @@ class ArquivosAdminController extends BaseController
             $this->redirect('/admin/arquivos/criar');
             return;
         }
+        $pastaIdPost = (int) ($_POST['pasta_id'] ?? 0);
+        $qsPasta = $pastaIdPost > 0 ? '?pasta_id=' . $pastaIdPost : '';
         $result = $this->arquivosService->criarAdmin($_POST, $_FILES['arquivo'] ?? [], $this->config);
         if (!$result['ok']) {
             $this->setFlashMessage($result['error'], 'error');
-            $this->redirect('/admin/arquivos/criar');
+            $this->redirect('/admin/arquivos/criar' . $qsPasta);
             return;
         }
         $this->setFlashMessage('Arquivo enviado com sucesso.', 'success');
-        $this->redirect('/admin/arquivos');
+        $this->redirect('/admin/arquivos' . $qsPasta);
     }
 
     public function update()
@@ -277,6 +282,8 @@ class ArquivosAdminController extends BaseController
             return;
         }
         $id = (int) ($_POST['id'] ?? 0);
+        $pastaIdPost = (int) ($_POST['pasta_id'] ?? 0);
+        $qsPasta = $pastaIdPost > 0 ? '?pasta_id=' . $pastaIdPost : '';
         $result = $this->arquivosService->atualizarAdmin($id, $_POST);
         if (!$result['ok']) {
             $this->setFlashMessage($result['error'], 'error');
@@ -284,7 +291,7 @@ class ArquivosAdminController extends BaseController
             return;
         }
         $this->setFlashMessage('Arquivo atualizado com sucesso.', 'success');
-        $this->redirect('/admin/arquivos');
+        $this->redirect('/admin/arquivos' . $qsPasta);
     }
 
     public function delete()

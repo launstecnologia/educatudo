@@ -165,11 +165,13 @@ class ArquivosProfessorController extends BaseController
     public function create()
     {
         $professor = $this->getProfessor();
+        $pastaAtualId = isset($_GET['pasta_id']) && $_GET['pasta_id'] !== '' ? (int) $_GET['pasta_id'] : null;
         $this->viewWithLayout('professor', 'professor/arquivos/create', [
             'title' => 'Novo arquivo - EducaTudo',
             'user' => $this->auth->getUser(),
             'turmas' => $this->arquivosService->getTurmasProfessor($professor),
             'materias' => $this->arquivosService->getMateriasProfessor($professor),
+            'pasta_id' => $pastaAtualId,
             'current_page' => 'arquivos',
             'csrf_token' => $this->generateCsrfToken(),
         ]);
@@ -191,6 +193,8 @@ class ArquivosProfessorController extends BaseController
             return;
         }
         $professor = $this->getProfessor();
+        $pastaIdPost = (int) ($_POST['pasta_id'] ?? 0);
+        $qsPasta = $pastaIdPost > 0 ? '?pasta_id=' . $pastaIdPost : '';
         $result = $this->arquivosService->criarPublicacaoProfessor(
             (int) $professor['id'],
             $_POST,
@@ -199,11 +203,11 @@ class ArquivosProfessorController extends BaseController
         );
         if (!$result['ok']) {
             $this->setFlashMessage($result['error'], 'error');
-            $this->redirect('/professor/arquivos/criar');
+            $this->redirect('/professor/arquivos/criar' . $qsPasta);
             return;
         }
         $this->setFlashMessage('Arquivo criado com sucesso.', 'success');
-        $this->redirect('/professor/arquivos');
+        $this->redirect('/professor/arquivos' . $qsPasta);
     }
 
     public function edit($id = null)

@@ -63,6 +63,7 @@ class ArquivosPaisController extends BaseController
             'pastas' => $resultado['pastas'],
             'pasta_atual' => $resultado['pasta_atual'],
             'filtro_pasta_id' => $resultado['filtro_pasta_id'],
+            'breadcrumb' => $resultado['breadcrumb'] ?? [],
             'modo_recuperacao' => false,
             'base_path' => $basePath,
             'url_ver_base' => URL . $basePath . '/ver',
@@ -195,6 +196,7 @@ class ArquivosPaisController extends BaseController
             'filtro_materia_id' => null,
             'filtro_professor_id' => null,
             'filtro_titulo' => '',
+            'breadcrumb' => [],
         ];
     }
 

@@ -22,7 +22,7 @@ $turmaIdsSelecionadas = array_map('intval', $turma_ids ?? []);
             <h2 class="text-2xl font-bold text-gray-900"><?= $tituloPagina ?></h2>
             <p class="text-sm text-gray-600 mt-1"><?= $isEdit ? 'Altere os dados do arquivo publicado.' : 'Preencha os dados e envie o arquivo para as turmas selecionadas.' ?></p>
         </div>
-        <a href="<?= URL ?>/admin/arquivos" class="text-gray-600 hover:text-gray-900 text-sm font-medium">← Voltar para listagem</a>
+        <a href="<?= URL ?>/admin/arquivos<?= !empty($pasta_id) ? '?pasta_id=' . (int)$pasta_id : '' ?>" class="text-gray-600 hover:text-gray-900 text-sm font-medium">← Voltar para listagem</a>
     </div>
 
     <div class="bg-white rounded-xl shadow border border-gray-200 p-6">
@@ -82,6 +82,19 @@ $turmaIdsSelecionadas = array_map('intval', $turma_ids ?? []);
             </div>
 
             <div>
+                <label for="pasta_id" class="block text-sm font-medium text-gray-700 mb-1">Pasta</label>
+                <select id="pasta_id" name="pasta_id" class="block w-full text-sm text-gray-700 border border-gray-300 rounded-lg p-2.5">
+                    <option value="">Raiz (sem pasta)</option>
+                    <?php foreach (($todas_pastas ?? []) as $pastaOpcao): ?>
+                        <option value="<?= (int)$pastaOpcao['id'] ?>" <?= ((int)($pasta_id ?? 0) === (int)$pastaOpcao['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string)$pastaOpcao['nome']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">O arquivo aparece dentro da pasta escolhida, não na tela inicial.</p>
+            </div>
+
+            <div>
                 <span class="block text-sm font-medium text-gray-700 mb-2">Turmas que podem visualizar <span class="text-red-500">*</span></span>
                 <div class="max-h-48 overflow-auto border border-gray-300 rounded-lg p-3 space-y-1.5 bg-gray-50">
                     <?php foreach (($turmas ?? []) as $turma): ?>
@@ -127,7 +140,7 @@ $turmaIdsSelecionadas = array_map('intval', $turma_ids ?? []);
                 <button type="submit" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90">
                     <?= $isEdit ? 'Salvar alterações' : 'Enviar arquivo' ?>
                 </button>
-                <a href="<?= URL ?>/admin/arquivos" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">Cancelar</a>
+                <a href="<?= URL ?>/admin/arquivos<?= !empty($pasta_id) ? '?pasta_id=' . (int)$pasta_id : '' ?>" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium">Cancelar</a>
             </div>
         </form>
     </div>

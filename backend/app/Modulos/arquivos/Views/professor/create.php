@@ -24,6 +24,9 @@
 <div class="bg-white rounded-xl shadow-lg border border-gray-200">
     <form method="post" action="<?= URL ?>/professor/arquivos/salvar" enctype="multipart/form-data" class="p-6 space-y-6">
         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <?php if (!empty($pasta_id)): ?>
+        <input type="hidden" name="pasta_id" value="<?= (int) $pasta_id ?>">
+        <?php endif; ?>
 
         <div>
             <label class="flex items-center gap-2 cursor-pointer mb-3">

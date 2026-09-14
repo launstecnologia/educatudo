@@ -131,28 +131,13 @@ class ArquivosService
         $whereSql = implode(' AND ', $where);
 
         $pastas = [];
-        if ($hasPastaTable && $filtroPasta === null && !$filtroMateria && !$filtroProfessor && $filtroTitulo === '') {
-            $pastaWhere = $visibilityCond;
-            $pastaParams = $paramsList;
-            if ($hasRecuperacaoCol) {
-                if ($somenteRecuperacao) {
-                    $pastaWhere .= ' AND ma.recuperacao = 1';
-                } else {
-                    $pastaWhere .= ' AND (ma.recuperacao = 0 OR ma.recuperacao IS NULL)';
-                }
-            } elseif ($somenteRecuperacao) {
-                $pastaWhere .= ' AND 1 = 0';
+        $breadcrumb = [];
+        if ($hasPastaTable && !$filtroMateria && !$filtroProfessor && $filtroTitulo === '') {
+            $pastaParentId = ($filtroPasta !== null && $filtroPasta > 0) ? $filtroPasta : null;
+            $pastas = $this->pastasVisiveisAluno($turmaId, $alunoId, $somenteRecuperacao, $pastaParentId);
+            if ($pastaAtual) {
+                $breadcrumb = $this->pastaModel->breadcrumb($pastaAtual);
             }
-            $pastas = $this->db->fetchAll(
-                "SELECT p.id, p.nome, p.cor,
-                        COUNT(ma.id) as total_arquivos
-                 FROM modulos_arquivos_pastas p
-                 INNER JOIN modulos_arquivos ma ON ma.pasta_id = p.id
-                 WHERE {$pastaWhere}
-                 GROUP BY p.id, p.nome, p.cor
-                 ORDER BY p.ordem ASC, p.nome ASC",
-                $pastaParams
-            ) ?: [];
         }
 
         $total = (int) ($this->db->fetch(
@@ -216,7 +201,74 @@ class ArquivosService
             'filtro_materia_id' => $filtroMateria,
             'filtro_professor_id' => $filtroProfessor,
             'filtro_titulo' => $filtroTitulo,
+            'breadcrumb' => $breadcrumb,
         ];
+    }
+
+    /**
+     * Pastas do nível atual com arquivos visíveis ao aluno (nesta pasta ou em subpastas).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function pastasVisiveisAluno(int $turmaId, int $alunoId, bool $somenteRecuperacao, ?int $parentId): array
+    {
+        $temParent = $this->pastaModel->temColunaParent();
+        $colunas = $temParent
+            ? 'id, parent_id, nome, cor, ordem'
+            : 'id, NULL AS parent_id, nome, cor, ordem';
+        $pastasArvore = $this->db->fetchAll(
+            "SELECT {$colunas} FROM modulos_arquivos_pastas ORDER BY ordem ASC, nome ASC"
+        ) ?: [];
+        if ($pastasArvore === []) {
+            return [];
+        }
+
+        $visibilityCond = ModuloArquivo::sqlVisibilidadeAluno();
+        $params = ['turma_id' => $turmaId, 'turma_id2' => $turmaId, 'aluno_id' => $alunoId];
+        $recSql = '';
+        if ($this->temColunaRecuperacao()) {
+            $recSql = $somenteRecuperacao
+                ? ' AND ma.recuperacao = 1'
+                : ' AND (ma.recuperacao = 0 OR ma.recuperacao IS NULL)';
+        } elseif ($somenteRecuperacao) {
+            return [];
+        }
+
+        $counts = $this->db->fetchAll(
+            "SELECT ma.pasta_id, COUNT(*) AS c
+             FROM modulos_arquivos ma
+             WHERE {$visibilityCond}{$recSql} AND ma.pasta_id IS NOT NULL
+             GROUP BY ma.pasta_id",
+            $params
+        ) ?: [];
+        $diretos = [];
+        foreach ($counts as $row) {
+            $diretos[(int) $row['pasta_id']] = (int) $row['c'];
+        }
+
+        $totais = $this->pastaModel->somarArquivosNaArvore($pastasArvore, $diretos);
+        $parentKey = $parentId === null ? 0 : $parentId;
+        $resultado = [];
+        foreach ($pastasArvore as $pasta) {
+            $id = (int) $pasta['id'];
+            $pid = isset($pasta['parent_id']) && $pasta['parent_id'] !== null && $pasta['parent_id'] !== ''
+                ? (int) $pasta['parent_id']
+                : 0;
+            if ($temParent) {
+                if ($pid !== $parentKey) {
+                    continue;
+                }
+            } elseif ($parentId !== null) {
+                continue;
+            }
+            $n = $totais[$id] ?? 0;
+            if ($n <= 0) {
+                continue;
+            }
+            $pasta['total_arquivos'] = $n;
+            $resultado[] = $pasta;
+        }
+        return $resultado;
     }
 
     public static function urlParaEmbed(string $url): string
@@ -390,6 +442,37 @@ class ArquivosService
     public function pastasAdmin(?int $parentId): array
     {
         return $this->pastaModel->listAdmin($parentId);
+    }
+
+    /**
+     * @return array<int, array{id: int, nome: string}>
+     */
+    public function pastasAdminOpcoes(): array
+    {
+        $pastas = $this->pastaModel->listAllAdmin();
+        $porId = [];
+        foreach ($pastas as $pasta) {
+            $porId[(int) $pasta['id']] = $pasta;
+        }
+        $opcoes = [];
+        foreach ($pastas as $pasta) {
+            $nome = (string) $pasta['nome'];
+            $parentId = (int) ($pasta['parent_id'] ?? 0);
+            $ancoras = [];
+            $cursor = $parentId;
+            $guard = 0;
+            while ($cursor > 0 && isset($porId[$cursor]) && $guard < 8) {
+                array_unshift($ancoras, (string) $porId[$cursor]['nome']);
+                $cursor = (int) ($porId[$cursor]['parent_id'] ?? 0);
+                $guard++;
+            }
+            if ($ancoras !== []) {
+                $nome = implode(' / ', $ancoras) . ' / ' . $nome;
+            }
+            $opcoes[] = ['id' => (int) $pasta['id'], 'nome' => $nome];
+        }
+        usort($opcoes, static fn($a, $b) => strcasecmp($a['nome'], $b['nome']));
+        return $opcoes;
     }
 
     public function breadcrumbAdmin(array $pastaAtual): array
@@ -851,7 +934,7 @@ class ArquivosService
             'pastas' => $pastas,
             'pasta_atual' => $pastaAtual,
             'breadcrumb' => $breadcrumb,
-            'todas_pastas' => $this->pastaModel->listAllAdmin(),
+            'todas_pastas' => $this->pastasAdminOpcoes(),
             'has_parent_col' => $hasParentCol,
         ];
     }
@@ -875,7 +958,16 @@ class ArquivosService
 
     public static function sanitizeDescricao(string $descricao): string
     {
-        return \App\Utils\HtmlSanitizer::clean($descricao);
+        if (!class_exists(\App\Utils\HtmlSanitizer::class)) {
+            $path = __DIR__ . '/../../../Utils/HtmlSanitizer.php';
+            if (is_file($path)) {
+                require_once $path;
+            }
+        }
+        if (class_exists(\App\Utils\HtmlSanitizer::class)) {
+            return \App\Utils\HtmlSanitizer::clean($descricao);
+        }
+        return trim(strip_tags($descricao));
     }
 
     /**
@@ -923,25 +1015,36 @@ class ArquivosService
         $materiaId = (int) ($post['materia_id'] ?? 0);
         $professorId = (int) ($post['professor_id'] ?? 0);
 
-        $moduloId = $this->arquivoModel->create([
-            'turma_id' => $turmaIds[0],
-            'materia_id' => $materiaId > 0 ? $materiaId : null,
-            'professor_id' => $professorId > 0 ? $professorId : null,
-            'aluno_id' => null,
-            'pasta_id' => $pastaId,
-            'titulo' => $titulo,
-            'descricao' => $descricao,
-            'recuperacao' => !empty($post['recuperacao']),
-        ]);
-        $this->arquivoModel->syncTurmas($moduloId, $turmaIds);
-        $this->anexoModel->create([
-            'modulo_arquivo_id' => $moduloId,
-            'caminho' => 'arquivos/' . $safeKey,
-            'nome_original' => $originalName,
-            'extensao' => $ext,
-            'tamanho' => $size,
-            'ordem' => 1,
-        ]);
+        try {
+            $this->db->beginTransaction();
+            $moduloId = $this->arquivoModel->create([
+                'turma_id' => $turmaIds[0],
+                'materia_id' => $materiaId > 0 ? $materiaId : null,
+                'professor_id' => $professorId > 0 ? $professorId : null,
+                'aluno_id' => null,
+                'pasta_id' => $pastaId,
+                'titulo' => $titulo,
+                'descricao' => $descricao,
+                'recuperacao' => !empty($post['recuperacao']),
+            ]);
+            $this->arquivoModel->syncTurmas($moduloId, $turmaIds);
+            $this->anexoModel->create([
+                'modulo_arquivo_id' => $moduloId,
+                'caminho' => 'arquivos/' . $safeKey,
+                'nome_original' => $originalName,
+                'extensao' => $ext,
+                'tamanho' => $size,
+                'ordem' => 1,
+            ]);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            $media->delete('arquivos', $safeKey);
+            error_log('ArquivosService::criarAdmin: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Não foi possível salvar o arquivo. Verifique os dados e tente novamente.'];
+        }
 
         return ['ok' => true, 'id' => $moduloId];
     }
@@ -967,15 +1070,26 @@ class ArquivosService
             return ['ok' => false, 'error' => 'Dados inválidos para atualização.'];
         }
 
-        $this->arquivoModel->updateAdmin($id, [
-            'titulo' => $titulo,
-            'descricao' => $descricao,
-            'materia_id' => (int) ($post['materia_id'] ?? 0),
-            'professor_id' => (int) ($post['professor_id'] ?? 0),
-            'turma_id' => $turmaIds[0],
-            'recuperacao' => !empty($post['recuperacao']),
-        ]);
-        $this->arquivoModel->syncTurmas($id, $turmaIds);
+        try {
+            $this->arquivoModel->updateAdmin($id, [
+                'titulo' => $titulo,
+                'descricao' => $descricao,
+                'materia_id' => (int) ($post['materia_id'] ?? 0),
+                'professor_id' => (int) ($post['professor_id'] ?? 0),
+                'turma_id' => $turmaIds[0],
+                'recuperacao' => !empty($post['recuperacao']),
+            ]);
+            $this->arquivoModel->syncTurmas($id, $turmaIds);
+            $this->arquivoModel->updatePasta(
+                $id,
+                $this->validarPastaAdmin(
+                    isset($post['pasta_id']) && (int) $post['pasta_id'] > 0 ? (int) $post['pasta_id'] : null
+                )
+            );
+        } catch (\Throwable $e) {
+            error_log('ArquivosService::atualizarAdmin: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Não foi possível atualizar o arquivo. Verifique os dados e tente novamente.'];
+        }
 
         return ['ok' => true];
     }

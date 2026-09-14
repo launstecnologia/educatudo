@@ -7,6 +7,7 @@ $materias            = $materias ?? [];
 $professores         = $professores ?? [];
 $pastas              = $pastas ?? [];
 $pasta_atual         = $pasta_atual ?? null;
+$breadcrumb          = $breadcrumb ?? [];
 $total               = (int)($total ?? 0);
 $page                = (int)($page ?? 1);
 $per_page            = (int)($per_page ?? 15);
@@ -53,14 +54,20 @@ if ($filtro_professor_id) {
 <div class="mb-5">
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div class="min-w-0">
-            <?php if ($pasta_atual): ?>
-            <nav class="flex items-center gap-2 text-sm mb-2">
+            <?php if ($pasta_atual || !empty($breadcrumb)): ?>
+            <nav class="flex items-center gap-2 text-sm mb-2 flex-wrap">
                 <a href="<?= htmlspecialchars($baseUrl) ?>" class="text-indigo-600 hover:underline flex items-center gap-1">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
                     <?= htmlspecialchars($tituloLista) ?>
                 </a>
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                <span class="font-medium text-gray-700"><?= htmlspecialchars((string)($pasta_atual['nome'] ?? '')) ?></span>
+                <?php foreach (($breadcrumb ?? []) as $anc): ?>
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <a href="<?= $baseUrl ?>?pasta_id=<?= (int)$anc['id'] ?>" class="text-indigo-600 hover:underline"><?= htmlspecialchars((string)($anc['nome'] ?? '')) ?></a>
+                <?php endforeach; ?>
+                <?php if ($pasta_atual): ?>
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span class="font-medium text-gray-700"><?= htmlspecialchars((string)($pasta_atual['nome'] ?? '')) ?></span>
+                <?php endif; ?>
             </nav>
             <?php endif; ?>
             <h2 class="text-2xl font-bold text-gray-900"><?= $pasta_atual ? htmlspecialchars((string)($pasta_atual['nome'] ?? '')) : htmlspecialchars($tituloLista) ?></h2>
@@ -172,7 +179,7 @@ if ($filtro_professor_id) {
         <?php endif; ?>
     <?php else: ?>
 
-        <!-- Pastas (só na raiz sem filtros) -->
+        <!-- Pastas do nível atual (raiz ou dentro de uma pasta) -->
         <?php if (!$temFiltroAtivo && !empty($pastas)): ?>
             <?php foreach ($pastas as $pasta): ?>
             <a href="<?= $baseUrl ?>?pasta_id=<?= (int)$pasta['id'] ?>"

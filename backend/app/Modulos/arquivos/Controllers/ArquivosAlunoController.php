@@ -173,6 +173,7 @@ class ArquivosAlunoController extends BaseController
             'pastas' => $resultado['pastas'],
             'pasta_atual' => $resultado['pasta_atual'],
             'filtro_pasta_id' => $resultado['filtro_pasta_id'],
+            'breadcrumb' => $resultado['breadcrumb'] ?? [],
             'current_page' => $somenteRecuperacao ? 'recuperacao' : 'arquivos',
             'modo_recuperacao' => $somenteRecuperacao,
             'base_path' => $basePath,
