@@ -40,7 +40,8 @@
 
 <!-- Form -->
 <div class="bg-white rounded-xl shadow-lg p-6">
-    <form id="formBloco" onsubmit="atualizarBloco(event, <?= $bloco['id'] ?>)">
+    <div id="blocoEditAlert" class="hidden mb-6 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 whitespace-pre-line"></div>
+    <form id="formBloco" novalidate>
         <!-- Título -->
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -383,7 +384,6 @@
                     <input type="date"
                            id="data_prova"
                            name="data_prova"
-                           required
                            value="<?= htmlspecialchars($dataProvaVal) ?>"
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 </div>
@@ -394,7 +394,6 @@
                     <input type="time"
                            id="hora_inicio"
                            name="hora_inicio"
-                           required
                            value="<?= htmlspecialchars($horaInicioVal) ?>"
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 </div>
@@ -405,7 +404,6 @@
                     <input type="time"
                            id="hora_fim"
                            name="hora_fim"
-                           required
                            value="<?= htmlspecialchars($horaFimVal) ?>"
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 </div>
@@ -431,7 +429,8 @@
                class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                 Cancelar
             </a>
-            <button type="submit" 
+            <button type="submit"
+                    id="btnSalvarBloco"
                     class="btn-primary-custom px-6 py-2 rounded-lg hover:opacity-90">
                 Salvar Alterações
             </button>
@@ -440,11 +439,44 @@
 </div>
 
 <script>
-const professores = <?= json_encode($professores ?? []) ?>;
-const materias = <?= json_encode($materias ?? []) ?>;
-const turmas = <?= json_encode($turmas ?? []) ?>;
-const blocoProfessores = <?= json_encode($bloco['professores'] ?? []) ?>;
+<?php
+$jsonJsBloco = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE;
+?>
+const professores = <?= json_encode($professores ?? [], $jsonJsBloco) ?: '[]' ?>;
+const materias = <?= json_encode($materias ?? [], $jsonJsBloco) ?: '[]' ?>;
+const turmas = <?= json_encode($turmas ?? [], $jsonJsBloco) ?: '[]' ?>;
+const blocoProfessores = <?= json_encode($bloco['professores'] ?? [], $jsonJsBloco) ?: '[]' ?>;
+const BLOCO_ID = <?= (int) ($bloco['id'] ?? 0) ?>;
 let professorCounter = 0;
+
+function mostrarErroBloco(msg) {
+    const texto = String(msg || 'Não foi possível salvar o bloco.');
+    const el = document.getElementById('blocoEditAlert');
+    if (el) {
+        el.textContent = texto;
+        el.classList.remove('hidden');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    alert(texto);
+}
+
+function escHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function setCampoAgenda(el, ativo) {
+    if (!el) return;
+    el.disabled = !ativo;
+    el.required = !!ativo;
+    if (!ativo) {
+        el.removeAttribute('required');
+    }
+}
 
 function adicionarProfessor(professorData = null) {
     professorCounter++;
@@ -487,10 +519,10 @@ function adicionarProfessor(professorData = null) {
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <option value="">Selecione o professor</option>
                     ${professores.map(p => `
-                        <option value="${p.id}"
-                                data-materias='${JSON.stringify(Array.isArray(p.materias) ? p.materias : [])}'
+                        <option value="${escHtml(p.id)}"
+                                data-materias="${escHtml(JSON.stringify(Array.isArray(p.materias) ? p.materias : []))}"
                                 ${Number(p.id) === Number(profId) ? 'selected' : ''}>
-                            ${p.nome}
+                            ${escHtml(p.nome)}
                         </option>
                     `).join('')}
                 </select>
@@ -632,6 +664,7 @@ function atualizarCamposPassoProfessores() {
         el.classList.toggle('hidden', !showQtd);
         const input = el.querySelector('input');
         if (input) {
+            input.disabled = !showQtd;
             input.required = showQtd;
             if (!showQtd) {
                 input.removeAttribute('required');
@@ -670,37 +703,49 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
     const cfgAnterior = document.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
 
     if (formatoSel === 'lancamento_nota') {
-        onlineBox.classList.add('hidden');
-        lancBox.classList.remove('hidden');
+        onlineBox?.classList.add('hidden');
+        lancBox?.classList.remove('hidden');
         if (labelResp) labelResp.innerHTML = 'Quem lança a nota <span class="text-red-500">*</span>';
         if (helpResp) helpResp.textContent = 'Atribua ao professor ou deixe a coordenação lançar a nota cheia.';
-        let cfgChecked = lancBox.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
+        let cfgChecked = lancBox?.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
         if (!['coordenacao_calcula', 'professor_por_questao'].includes(cfgChecked)) {
             const prefer = ['coordenacao_calcula', 'professor_por_questao'].includes(cfgAnterior)
                 ? cfgAnterior
                 : 'professor_por_questao';
-            const def = lancBox.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
+            const def = lancBox?.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
             if (def) def.checked = true;
         }
-        onlineBox.querySelectorAll('input[name="configuracao_nota"]').forEach(el => { el.checked = false; });
+        onlineBox?.querySelectorAll('input[name="configuracao_nota"]').forEach(el => {
+            el.checked = false;
+            el.disabled = true;
+        });
+        lancBox?.querySelectorAll('input[name="configuracao_nota"]').forEach(el => {
+            el.disabled = false;
+        });
     } else {
-        onlineBox.classList.remove('hidden');
-        lancBox.classList.add('hidden');
+        onlineBox?.classList.remove('hidden');
+        lancBox?.classList.add('hidden');
         if (labelResp) labelResp.innerHTML = 'Quem elabora a prova <span class="text-red-500">*</span>';
         if (helpResp) helpResp.textContent = 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.';
-        notaUnicaBox.classList.add('hidden');
+        notaUnicaBox?.classList.add('hidden');
         if (msgCoord) msgCoord.classList.add('hidden');
         const notaUnicaInput = document.getElementById('nota_unica_todas_materias');
         if (notaUnicaInput) notaUnicaInput.checked = false;
-        let cfgChecked = onlineBox.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
+        let cfgChecked = onlineBox?.querySelector('input[name="configuracao_nota"]:checked')?.value || '';
         if (!['professor_por_questao', 'coordenacao_calcula'].includes(cfgChecked)) {
             const prefer = ['coordenacao_calcula', 'professor_por_questao'].includes(cfgAnterior)
                 ? cfgAnterior
                 : 'professor_por_questao';
-            const def = onlineBox.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
+            const def = onlineBox?.querySelector(`input[name="configuracao_nota"][value="${prefer}"]`);
             if (def) def.checked = true;
         }
-        lancBox.querySelectorAll('input[name="configuracao_nota"]').forEach(el => { el.checked = false; });
+        lancBox?.querySelectorAll('input[name="configuracao_nota"]').forEach(el => {
+            el.checked = false;
+            el.disabled = true;
+        });
+        onlineBox?.querySelectorAll('input[name="configuracao_nota"]').forEach(el => {
+            el.disabled = false;
+        });
     }
 
     const cfgFinal = inputConfiguracaoNotaNoFormatoAtual()?.value || '';
@@ -712,10 +757,10 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
     if (notaUnicaInput && !showNotaUnica) notaUnicaInput.checked = false;
     if (dataHoraBox) dataHoraBox.classList.toggle('hidden', !showDataHora);
     if (prazoBox) prazoBox.classList.toggle('hidden', !showPrazo);
-    if (dataProvaInput) dataProvaInput.required = showDataHora;
-    if (horaInicioInput) horaInicioInput.required = showDataHora;
-    if (horaFimInput) horaFimInput.required = showDataHora;
-    if (prazoInput) prazoInput.required = showPrazo;
+    setCampoAgenda(dataProvaInput, showDataHora);
+    setCampoAgenda(horaInicioInput, showDataHora);
+    setCampoAgenda(horaFimInput, showDataHora);
+    setCampoAgenda(prazoInput, showPrazo);
     if (msgCoord) msgCoord.classList.toggle('hidden', !showNotaUnica);
     const prazoLabel = document.getElementById('labelPrazoProfessor');
     if (prazoLabel) {
@@ -728,13 +773,19 @@ function ajustarOpcoesConfiguracaoNotaPorFormato() {
 
 // Carrega professores existentes ao carregar a página
 document.addEventListener('DOMContentLoaded', function() {
-    if (blocoProfessores && blocoProfessores.length > 0) {
-        blocoProfessores.forEach(prof => {
-            adicionarProfessor(prof);
-        });
-    } else {
-        // Se não há professores, adiciona um vazio
-        adicionarProfessor();
+    try {
+        if (blocoProfessores && blocoProfessores.length > 0) {
+            blocoProfessores.forEach(prof => {
+                adicionarProfessor(prof);
+            });
+        } else {
+            adicionarProfessor();
+        }
+    } catch (e) {
+        console.error('Erro ao carregar professores do bloco:', e);
+        if (!document.querySelector('#professoresContainer [id^="professor_"]')) {
+            adicionarProfessor();
+        }
     }
     manterAgendaNoFinalDoFormulario();
     ajustarOpcoesConfiguracaoNotaPorFormato();
@@ -748,6 +799,9 @@ document.addEventListener('DOMContentLoaded', function() {
         el.addEventListener('change', ajustarOpcoesConfiguracaoNotaPorFormato);
     });
     garantirPrazoProfessorPreenchido();
+    document.getElementById('formBloco')?.addEventListener('submit', function (event) {
+        atualizarBloco(event, BLOCO_ID);
+    });
 });
 
 function getTurmasBlocoSelecionadas() {
@@ -776,7 +830,7 @@ function turmasProfessorHtml(professorIndex, selecionadas = null) {
     return turmasDoEvento.map(t => {
         const turmaId = parseInt(t.id, 10);
         const checked = selecionadasSet.has(turmaId) ? 'checked' : '';
-        const serie = t.serie ? `<span class="block text-xs text-gray-500">Série: ${t.serie}</span>` : '';
+        const serie = t.serie ? `<span class="block text-xs text-gray-500">Série: ${escHtml(t.serie)}</span>` : '';
         return `
             <label class="flex items-start gap-2 p-2 rounded border border-gray-100 hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox"
@@ -785,7 +839,7 @@ function turmasProfessorHtml(professorIndex, selecionadas = null) {
                        data-turma-id="${turmaId}"
                        class="turma-professor-checkbox mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
                 <span class="min-w-0">
-                    <span class="block text-sm font-medium text-gray-800">${t.nome}</span>
+                    <span class="block text-sm font-medium text-gray-800">${escHtml(t.nome)}</span>
                     ${serie}
                 </span>
             </label>
@@ -803,7 +857,7 @@ function marcarTurmasProfessor(professorIndex) {
 
 function sincronizarTurmasProfessoresComBloco() {
     const selecionadas = new Set(getTurmasBlocoSelecionadas());
-    document.querySelectorAll('[id^="professor_"]').forEach(div => {
+    document.querySelectorAll('#professoresContainer [id^="professor_"]').forEach(div => {
         const professorIndex = parseInt(div.id.replace('professor_', ''), 10);
         const checks = Array.from(div.querySelectorAll('.turma-professor-checkbox'));
         const turmasVisiveisAntes = new Set(checks.map(cb => parseInt(cb.dataset.turmaId || cb.value, 10)));
@@ -852,138 +906,208 @@ function garantirPrazoProfessorPreenchido() {
 
 function atualizarBloco(event, blocoId) {
     event.preventDefault();
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    // Coleta turmas gerais do bloco
-    const turmasIds = [];
-    form.querySelectorAll('input[name="turmas[]"]:checked').forEach(checkbox => {
-        turmasIds.push(parseInt(checkbox.value, 10));
-    });
-    if (turmasIds.length === 0) {
-        alert('Selecione pelo menos uma turma para o bloco');
-        return;
-    }
-    const turmasBlocoSet = new Set(turmasIds);
+    event.stopPropagation();
 
-    // Coleta professores com suas matérias
-    const professores = [];
-    const professorDivs = document.querySelectorAll('[id^="professor_"]');
-    let professoresInvalidos = false;
-    let turmasProfessorInvalidas = false;
-    
-    if (professorDivs.length === 0) {
-        alert('Adicione pelo menos um professor');
-        return;
-    }
-    
-    professorDivs.forEach(div => {
-        const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
-        const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
-        if (!professorId || !materiaId) {
-            professoresInvalidos = true;
-            return;
-        }
-        const qtdQuestoesInput = div.querySelector('input[name*="[quantidade_questoes]"]');
-        const quantidadeQuestoes = exigeNumeroQuestoes()
-            ? (qtdQuestoesInput ? (parseInt(qtdQuestoesInput.value, 10) || 0) : 0)
-            : 0;
-        if (exigeNumeroQuestoes() && quantidadeQuestoes < 1) {
-            professoresInvalidos = true;
-            return;
-        }
-        const turmasProfessor = Array.from(div.querySelectorAll('.turma-professor-checkbox:checked'))
-            .map(cb => parseInt(cb.value, 10))
-            .filter(id => id > 0);
-        if (turmasProfessor.length === 0) {
-            turmasProfessorInvalidas = true;
-            return;
-        }
-        
-        professores.push({
-            professor_id: parseInt(professorId),
-            materia_id: parseInt(materiaId),
-            quantidade_questoes: exigeNumeroQuestoes() ? Math.max(1, quantidadeQuestoes) : 0,
-            turmas: turmasProfessor
+    try {
+        ajustarOpcoesConfiguracaoNotaPorFormato();
+        document.getElementById('blocoEditAlert')?.classList.add('hidden');
+
+        const form = document.getElementById('formBloco') || event.target;
+        const formData = new FormData(form);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        const turmasIds = [];
+        form.querySelectorAll('input[name="turmas[]"]:checked').forEach(checkbox => {
+            turmasIds.push(parseInt(checkbox.value, 10));
         });
-    });
-    if (professoresInvalidos) {
-        alert(exigeNumeroQuestoes()
-            ? 'Preencha professor, matéria e quantidade de questões para todos os professores adicionados'
-            : 'Preencha professor e matéria para todos os professores adicionados');
-        return;
-    }
-    if (turmasProfessorInvalidas) {
-        alert('Selecione pelo menos uma turma para cada professor');
-        return;
-    }
-    if (professores.some(prof => prof.turmas.some(turmaId => !turmasBlocoSet.has(turmaId)))) {
-        alert('As turmas de cada professor precisam estar dentro das turmas selecionadas para o evento');
-        return;
-    }
-    
-    const formatoEvInput = form.querySelector('input[name="formato_evento"]:checked');
-    const tipoProvaInput = form.querySelector('input[name="tipo_prova"]:checked');
-    const configNotaInput = inputConfiguracaoNotaNoFormatoAtual();
-    const bimestreEl = document.getElementById('bimestre');
-    const bimestreVal = (bimestreEl && bimestreEl.value) ? parseInt(bimestreEl.value, 10) : (formData.get('bimestre') ? parseInt(formData.get('bimestre'), 10) : null);
+        if (turmasIds.length === 0) {
+            mostrarErroBloco('Selecione pelo menos uma turma para o bloco');
+            return;
+        }
+        const turmasBlocoSet = new Set(turmasIds);
 
-    const data = {
-        titulo: formData.get('titulo'),
-        descricao: formData.get('descricao') || null,
-        ano_letivo: formData.get('ano_letivo') ? parseInt(formData.get('ano_letivo'), 10) : null,
-        bimestre: bimestreVal,
-        tipo_avaliacao_id: formData.get('tipo_avaliacao_id') ? parseInt(formData.get('tipo_avaliacao_id'), 10) : null,
-        semana: formData.get('semana') ? parseInt(formData.get('semana'), 10) : null,
-        turmas: turmasIds,
-        professores: professores,
-        data_prova: formData.get('data_prova') || null,
-        hora_inicio: formData.get('hora_inicio') || null,
-        hora_fim: formData.get('hora_fim') || null,
-        prazo_entrega_professor: formData.get('prazo_entrega_professor') || null,
-        tipo_prova: tipoProvaInput ? tipoProvaInput.value : (formData.get('tipo_prova') || 'original'),
-        formato_evento: formatoEvInput ? formatoEvInput.value : (formData.get('formato_evento') || 'online_questoes'),
-        configuracao_nota: configNotaInput ? configNotaInput.value : formData.get('configuracao_nota'),
-        liberar_gabarito: 'imediatamente',
-        liberado: <?= (int)($bloco['liberado'] ?? 0) ?>,
-        visivel_no_portal_aluno: document.getElementById('visivel_no_portal_aluno')?.checked ? 1 : 0,
-        nota_unica_todas_materias: document.getElementById('nota_unica_todas_materias')?.checked ? 1 : 0
-    };
-    
-    fetch(`<?= URL ?>/admin/provas/blocos/${blocoId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.href = '<?= URL ?>/admin/provas';
-        } else {
-            let msg = data.error || 'Erro desconhecido';
-            if (data.missing_columns && data.missing_columns.length) {
-                msg += '\n\nColunas faltando no banco: ' + data.missing_columns.join(', ');
+        const professoresPayload = [];
+        const professorDivs = document.querySelectorAll('#professoresContainer [id^="professor_"]');
+        let professoresInvalidos = false;
+        let turmasProfessorInvalidas = false;
+
+        if (professorDivs.length === 0) {
+            mostrarErroBloco('Adicione pelo menos um professor');
+            return;
+        }
+
+        professorDivs.forEach(div => {
+            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
+            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
+            if (!professorId || !materiaId) {
+                professoresInvalidos = true;
+                return;
             }
-            if (data.errors && typeof data.errors === 'object') {
-                const detalhes = Object.values(data.errors)
+            const qtdQuestoesInput = div.querySelector('input[name*="[quantidade_questoes]"]');
+            const quantidadeQuestoes = exigeNumeroQuestoes()
+                ? (qtdQuestoesInput ? (parseInt(qtdQuestoesInput.value, 10) || 0) : 0)
+                : 0;
+            if (exigeNumeroQuestoes() && quantidadeQuestoes < 1) {
+                professoresInvalidos = true;
+                return;
+            }
+            const turmasProfessor = Array.from(div.querySelectorAll('.turma-professor-checkbox:checked'))
+                .map(cb => parseInt(cb.value, 10))
+                .filter(id => id > 0);
+            if (turmasProfessor.length === 0) {
+                turmasProfessorInvalidas = true;
+                return;
+            }
+
+            professoresPayload.push({
+                professor_id: parseInt(professorId, 10),
+                materia_id: parseInt(materiaId, 10),
+                quantidade_questoes: exigeNumeroQuestoes() ? Math.max(1, quantidadeQuestoes) : 0,
+                turmas: turmasProfessor
+            });
+        });
+        if (professoresInvalidos) {
+            mostrarErroBloco(exigeNumeroQuestoes()
+                ? 'Preencha professor, matéria e quantidade de questões para todos os professores adicionados'
+                : 'Preencha professor e matéria para todos os professores adicionados');
+            return;
+        }
+        if (turmasProfessorInvalidas) {
+            mostrarErroBloco('Selecione pelo menos uma turma para cada professor');
+            return;
+        }
+        if (professoresPayload.some(prof => prof.turmas.some(turmaId => !turmasBlocoSet.has(turmaId)))) {
+            mostrarErroBloco('As turmas de cada professor precisam estar dentro das turmas selecionadas para o evento');
+            return;
+        }
+
+        const formatoEvInput = form.querySelector('input[name="formato_evento"]:checked');
+        const tipoProvaInput = form.querySelector('input[name="tipo_prova"]:checked');
+        const configNotaInput = inputConfiguracaoNotaNoFormatoAtual();
+        const bimestreEl = document.getElementById('bimestre');
+        const bimestreVal = (bimestreEl && bimestreEl.value) ? parseInt(bimestreEl.value, 10) : (formData.get('bimestre') ? parseInt(formData.get('bimestre'), 10) : null);
+        const formatoEvento = formatoEvInput ? formatoEvInput.value : (formData.get('formato_evento') || 'online_questoes');
+        const configNota = configNotaInput ? configNotaInput.value : formData.get('configuracao_nota');
+
+        if (!formData.get('titulo')) {
+            mostrarErroBloco('Título é obrigatório');
+            return;
+        }
+        if (!formData.get('tipo_avaliacao_id')) {
+            mostrarErroBloco('Tipo de avaliação é obrigatório');
+            return;
+        }
+        if (!formData.get('ano_letivo')) {
+            mostrarErroBloco('Ano letivo é obrigatório');
+            return;
+        }
+        if (!bimestreVal) {
+            mostrarErroBloco('Período letivo é obrigatório');
+            return;
+        }
+        if (formatoEvento === 'online_questoes' && (!formData.get('data_prova') || !formData.get('hora_inicio') || !formData.get('hora_fim'))) {
+            mostrarErroBloco('Data e horário da prova são obrigatórios para prova online');
+            return;
+        }
+        if (configNota === 'professor_por_questao' && !formData.get('prazo_entrega_professor')) {
+            mostrarErroBloco('Informe o prazo para o professor');
+            return;
+        }
+
+        const data = {
+            titulo: formData.get('titulo'),
+            descricao: formData.get('descricao') || null,
+            ano_letivo: formData.get('ano_letivo') ? parseInt(formData.get('ano_letivo'), 10) : null,
+            bimestre: bimestreVal,
+            tipo_avaliacao_id: formData.get('tipo_avaliacao_id') ? parseInt(formData.get('tipo_avaliacao_id'), 10) : null,
+            semana: formData.get('semana') ? parseInt(formData.get('semana'), 10) : null,
+            turmas: turmasIds,
+            professores: professoresPayload,
+            data_prova: formData.get('data_prova') || null,
+            hora_inicio: formData.get('hora_inicio') || null,
+            hora_fim: formData.get('hora_fim') || null,
+            prazo_entrega_professor: formData.get('prazo_entrega_professor') || null,
+            tipo_prova: tipoProvaInput ? tipoProvaInput.value : (formData.get('tipo_prova') || 'original'),
+            formato_evento: formatoEvento,
+            configuracao_nota: configNota,
+            liberar_gabarito: 'imediatamente',
+            liberado: <?= (int)($bloco['liberado'] ?? 0) ?>,
+            visivel_no_portal_aluno: document.getElementById('visivel_no_portal_aluno')?.checked ? 1 : 0,
+            nota_unica_todas_materias: document.getElementById('nota_unica_todas_materias')?.checked ? 1 : 0,
+            _token: csrfToken
+        };
+
+        const btn = document.getElementById('btnSalvarBloco');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+        }
+
+        fetch(`<?= URL ?>/admin/provas/blocos/${blocoId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify(data)
+        })
+        .then(async response => {
+            const raw = await response.text();
+            let payload = null;
+            try {
+                payload = raw ? JSON.parse(raw) : null;
+            } catch (e) {
+                throw new Error(response.ok
+                    ? 'O servidor não retornou JSON ao salvar.'
+                    : ('Erro HTTP ' + response.status + ' ao salvar o bloco.'));
+            }
+            if (!response.ok && payload) {
+                return payload;
+            }
+            if (!payload) {
+                throw new Error('Resposta vazia ao salvar o bloco.');
+            }
+            return payload;
+        })
+        .then(payload => {
+            if (payload.success) {
+                window.location.href = '<?= URL ?>/admin/provas';
+                return;
+            }
+            let msg = payload.error || 'Erro desconhecido';
+            if (payload.missing_columns && payload.missing_columns.length) {
+                msg += '\n\nColunas faltando no banco: ' + payload.missing_columns.join(', ');
+            }
+            if (payload.errors && typeof payload.errors === 'object') {
+                const detalhes = Object.values(payload.errors)
                     .map(v => String(v || '').trim())
                     .filter(v => v !== '');
                 if (detalhes.length > 0) {
                     msg += '\n\n' + detalhes.join('\n');
                 }
             }
-            alert(msg);
-            if (data.errors) {
-                console.error('Erros:', data.errors);
+            if (payload.errors) {
+                console.error('Erros:', payload.errors);
             }
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao atualizar bloco');
-    });
+            mostrarErroBloco(msg);
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Salvar Alterações';
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            mostrarErroBloco(error && error.message ? error.message : 'Erro ao atualizar bloco');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Salvar Alterações';
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao montar salvamento do bloco:', error);
+        mostrarErroBloco(error && error.message ? error.message : 'Erro ao atualizar bloco');
+    }
 }
 </script>
