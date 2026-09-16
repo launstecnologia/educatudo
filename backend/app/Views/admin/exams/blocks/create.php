@@ -660,7 +660,7 @@ function atualizarResumoWizard() {
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Título</dt><dd class="font-semibold text-gray-900">${escapeResumo(document.getElementById('titulo')?.value)}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Ano/Bimestre</dt><dd>${escapeResumo(document.getElementById('ano_letivo')?.value)} · ${escapeResumo(selectedText('#bimestre'))}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de avaliação</dt><dd>${escapeResumo(selectedText('#tipo_avaliacao_id'))}</dd></div>
-            <div><dt class="text-xs font-medium text-gray-500 uppercase">Semana</dt><dd>${escapeResumo(selectedText('#semana') || '—')}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Destino no quadro</dt><dd>${escapeResumo(typeof resumoDestinosQuadro === 'function' ? resumoDestinosQuadro() : (selectedText('#semana') || '—'))}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de evento</dt><dd>${escapeResumo(formatoTxt)}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Responsável</dt><dd>${escapeResumo(respTxt)}</dd></div>
             <div><dt class="text-xs font-medium text-gray-500 uppercase">Turmas do evento</dt><dd>${getTurmasBlocoSelecionadas().length} turma(s)</dd></div>

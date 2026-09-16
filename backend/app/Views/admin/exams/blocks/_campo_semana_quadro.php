@@ -20,20 +20,16 @@ if ($vinculosIni === []) {
 ?>
 <div class="mb-6" id="campo-semana-evento">
     <?php if ($temGruposRegras): ?>
-        <div class="flex items-center justify-between mb-2 gap-3">
+        <div class="mb-2">
             <label class="block text-sm font-medium text-gray-700">Destinos no quadro de notas</label>
-            <button type="button" id="btn-add-vinculo-grupo"
-                    class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
-                + Adicionar destino
-            </button>
+            <p class="text-xs text-gray-500 mt-1">Escolha o quadro e o bloco (A/B). A semana (S1, S2…) entra sozinha neste bimestre.</p>
         </div>
         <div id="lista-vinculos-grupo" class="space-y-3"></div>
-        <button type="button" id="btn-add-vinculo-grupo-baixo"
-                class="mt-3 w-full px-4 py-2 border border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+        <button type="button" id="btn-add-vinculo-grupo"
+                class="mt-3 w-full px-4 py-2.5 border border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             <i class="fa-solid fa-plus mr-2 text-gray-500"></i>Adicionar destino
         </button>
         <input type="hidden" id="semana" name="semana" value="<?= $semanaSel > 0 ? $semanaSel : '' ?>">
-        <p class="text-xs text-gray-500 mt-1">O quadro é anual. Escolha o bloco (A/B): a semana (S1, S2…) entra sozinha conforme as provas já lançadas neste bimestre. Cadastre o molde em Acadêmico → Quadro de Notas.</p>
         <script>
         (function () {
             var catalogo = <?= json_encode($gruposRegrasNotas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
@@ -72,13 +68,51 @@ if ($vinculosIni === []) {
                 };
             }
 
+            function escTxt(s) {
+                return String(s || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
             function setDica(row, texto, erro) {
                 var box = row.querySelector('.dica-semana-quadro');
                 if (!box) return;
-                box.textContent = texto || '';
-                box.classList.toggle('hidden', !texto);
-                box.classList.toggle('text-red-700', !!erro);
-                box.classList.toggle('text-indigo-950', !erro);
+                var selM = row.querySelector('.sel-marca');
+                var opt = selM && selM.options[selM.selectedIndex];
+                var n = opt ? parseInt(opt.getAttribute('data-numero') || '', 10) : 0;
+                var selT = row.querySelector('.sel-tipo');
+                var blocoNome = '';
+                if (selT && selT.selectedIndex > 0) {
+                    blocoNome = (selT.options[selT.selectedIndex].textContent || '').trim();
+                }
+                box.classList.remove('hidden', 'border-indigo-100', 'bg-indigo-50', 'text-indigo-950', 'border-red-200', 'bg-red-50', 'text-red-800', 'border-amber-200', 'bg-amber-50', 'text-amber-900');
+                if (!texto && n <= 0) {
+                    box.classList.add('hidden');
+                    box.innerHTML = '';
+                    return;
+                }
+                if (erro) {
+                    box.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
+                    box.innerHTML = '<div class="flex items-start gap-2"><i class="fa-solid fa-circle-exclamation mt-0.5"></i><span>' + escTxt(texto) + '</span></div>';
+                    return;
+                }
+                if (n > 0) {
+                    var sub = texto || ('S' + n + ' neste período.');
+                    box.classList.add('border-indigo-100', 'bg-indigo-50', 'text-indigo-950');
+                    box.innerHTML =
+                        '<div class="flex items-center gap-3">' +
+                            '<span class="inline-flex h-12 min-w-[3rem] items-center justify-center rounded-xl bg-indigo-600 text-white text-lg font-bold px-3">S' + n + '</span>' +
+                            '<div class="min-w-0">' +
+                                '<p class="font-semibold text-indigo-950 leading-tight">' + escTxt(blocoNome ? ('Vai para S' + n + ' · ' + blocoNome) : ('Vai para S' + n)) + '</p>' +
+                                '<p class="text-xs text-indigo-800 mt-0.5 leading-snug">' + escTxt(sub) + '</p>' +
+                            '</div>' +
+                        '</div>';
+                    return;
+                }
+                box.classList.add('border-amber-200', 'bg-amber-50', 'text-amber-900');
+                box.innerHTML = '<div class="flex items-start gap-2"><i class="fa-solid fa-circle-info mt-0.5"></i><span>' + escTxt(texto) + '</span></div>';
             }
 
             function preencherMarca(row, marcaId, numero, nome) {
@@ -198,16 +232,18 @@ if ($vinculosIni === []) {
             function addLinha(data) {
                 data = data || {};
                 var wrap = document.createElement('div');
-                wrap.className = 'vinculo-grupo-row grid grid-cols-1 md:grid-cols-12 gap-3 items-end border border-gray-200 rounded-lg p-3';
+                wrap.className = 'vinculo-grupo-row rounded-xl border border-gray-200 bg-gray-50/60 p-4 space-y-3';
                 wrap.innerHTML =
-                    '<div class="md:col-span-4"><label class="block text-xs font-medium text-gray-500 mb-1">Quadro</label>' +
+                    '<div class="flex flex-col lg:flex-row gap-3 lg:items-end">' +
+                    '<div class="flex-1 min-w-0"><label class="block text-xs font-medium text-gray-500 mb-1">Quadro</label>' +
                     '<select class="sel-grupo w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></select></div>' +
-                    '<div class="md:col-span-3 wrap-tipo hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Bloco de disciplinas</label>' +
+                    '<div class="flex-1 min-w-0 wrap-tipo hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Bloco de disciplinas</label>' +
                     '<select class="sel-tipo w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"><option value="">Bloco de disciplinas</option></select></div>' +
-                    '<div class="md:col-span-3 wrap-marca hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Coluna</label>' +
+                    '<div class="flex-1 min-w-0 wrap-marca hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Coluna</label>' +
                     '<select class="sel-marca w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"><option value="">Coluna</option></select></div>' +
-                    '<div class="md:col-span-2"><button type="button" class="btn-rm-vinculo w-full px-3 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">Remover</button></div>' +
-                    '<div class="md:col-span-12"><p class="dica-semana-quadro hidden text-sm rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2"></p></div>';
+                    '<div class="shrink-0"><button type="button" class="btn-rm-vinculo w-full lg:w-auto px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50">Remover</button></div>' +
+                    '</div>' +
+                    '<div class="dica-semana-quadro hidden text-sm rounded-xl border px-4 py-3"></div>';
                 var selG = wrap.querySelector('.sel-grupo');
                 fillSelect(selG, 'Nenhum quadro', catalogo, data.grupo_id || '', 'nome');
                 wrap.querySelector('.sel-tipo').setAttribute('data-keep', data.tipo_id || '');
@@ -263,10 +299,39 @@ if ($vinculosIni === []) {
                 return out;
             };
 
+            window.resumoDestinosQuadro = function () {
+                var wrapCampo = document.getElementById('campo-semana-evento');
+                if (wrapCampo && wrapCampo.classList.contains('hidden')) return '—';
+                var itens = [];
+                lista.querySelectorAll('.vinculo-grupo-row').forEach(function (row) {
+                    var selG = row.querySelector('.sel-grupo');
+                    var g = parseInt(selG && selG.value, 10) || 0;
+                    if (!g) return;
+                    var quadro = ((selG.options[selG.selectedIndex] || {}).textContent || '').trim();
+                    var selT = row.querySelector('.sel-tipo');
+                    var wrapT = row.querySelector('.wrap-tipo');
+                    var t = parseInt(selT && selT.value, 10) || 0;
+                    var blocoTxt = (t > 0 && wrapT && !wrapT.classList.contains('hidden'))
+                        ? ((selT.options[selT.selectedIndex] || {}).textContent || '').trim()
+                        : '';
+                    var selM = row.querySelector('.sel-marca');
+                    var m = parseInt(selM && selM.value, 10) || 0;
+                    var optM = selM && selM.options[selM.selectedIndex];
+                    var n = optM ? parseInt(optM.getAttribute('data-numero') || '', 10) : 0;
+                    var s = n > 0 ? ('S' + n) : (m > 0 && optM ? String(optM.textContent || '').trim() : '');
+                    var txt = [quadro, blocoTxt, s].filter(Boolean).join(' · ');
+                    if (txt) itens.push(txt);
+                });
+                if (itens.length) return itens.join('; ');
+                var semanaEl = document.getElementById('semana');
+                if (semanaEl && semanaEl.tagName === 'SELECT' && semanaEl.value) {
+                    return (semanaEl.options[semanaEl.selectedIndex].textContent || '').trim() || '—';
+                }
+                return '—';
+            };
+
             function onAddDestino() { addLinha({}); }
             if (btnAdd) btnAdd.addEventListener('click', onAddDestino);
-            var btnAddBaixo = document.getElementById('btn-add-vinculo-grupo-baixo');
-            if (btnAddBaixo) btnAddBaixo.addEventListener('click', onAddDestino);
             if (vinculosIni.length) {
                 vinculosIni.forEach(function (v) { addLinha(v); });
             } else {

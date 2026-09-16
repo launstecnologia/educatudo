@@ -20,14 +20,62 @@
     outline: none;
 }
 </style>
+<?php
+$ui = __DIR__ . '/../../_partials/ui';
+$ui_wizard_steps = [
+    ['label' => 'Dados', 'sub' => 'Identificação'],
+    ['label' => 'Configuração', 'sub' => 'Tipo e prazos'],
+    ['label' => 'Turmas', 'sub' => 'Participantes'],
+    ['label' => 'Professores', 'sub' => 'Matérias'],
+    ['label' => 'Revisão', 'sub' => 'Confirmar'],
+];
+$ui_wizard_current = 1;
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
+}
+$anoEvento = (int) ($bloco['ano_letivo'] ?? date('Y'));
+$bimSel = (int) ($bloco['bimestre'] ?? 0);
+$periodoEvento = PeriodoLetivo::doAno($anoEvento);
+$dataProvaVal = !empty($bloco['data_prova']) ? date('Y-m-d', strtotime((string)$bloco['data_prova'])) : '';
+$horaInicioVal = !empty($bloco['hora_inicio']) ? date('H:i', strtotime((string)$bloco['hora_inicio'])) : '';
+$horaFimVal = !empty($bloco['hora_fim']) ? date('H:i', strtotime((string)$bloco['hora_fim'])) : '';
+$prazoProfessorVal = !empty($bloco['prazo_entrega_professor']) ? date('Y-m-d\TH:i', strtotime((string)$bloco['prazo_entrega_professor'])) : '';
+$turmasSelecionadasIds = [];
+foreach (($bloco['turmas'] ?? []) as $turmaSel) {
+    $tidSel = is_array($turmaSel) ? (int) ($turmaSel['id'] ?? 0) : (int) $turmaSel;
+    if ($tidSel > 0) {
+        $turmasSelecionadasIds[] = $tidSel;
+    }
+}
+if (empty($turmasSelecionadasIds) && !empty($bloco['professores']) && is_array($bloco['professores'])) {
+    foreach ($bloco['professores'] as $profSel) {
+        foreach (($profSel['turmas'] ?? []) as $turmaProfSel) {
+            $tidProfSel = is_array($turmaProfSel) ? (int) ($turmaProfSel['id'] ?? 0) : (int) $turmaProfSel;
+            if ($tidProfSel > 0) {
+                $turmasSelecionadasIds[] = $tidProfSel;
+            }
+        }
+    }
+}
+$turmasSelecionadasIds = array_values(array_unique($turmasSelecionadasIds));
+$fmtEv = $bloco['formato_evento'] ?? 'online_questoes';
+$cfgNota = (string) ($bloco['configuracao_nota'] ?? 'professor_por_questao');
+$isFmtLanc = $fmtEv === 'lancamento_nota';
+$notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
+$visAluno = isset($bloco['visivel_no_portal_aluno']) ? (int)$bloco['visivel_no_portal_aluno'] === 1 : true;
+$chkOnlineProf = !$isFmtLanc && ($cfgNota === 'professor_por_questao' || !in_array($cfgNota, ['professor_por_questao', 'coordenacao_calcula'], true));
+$chkOnlineCoord = !$isFmtLanc && $cfgNota === 'coordenacao_calcula';
+$chkLancCoord = $isFmtLanc && ($cfgNota === 'coordenacao_calcula' || !in_array($cfgNota, ['coordenacao_calcula', 'professor_por_questao'], true));
+$chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
+?>
 <div class="mb-8">
     <div class="flex justify-between items-center">
         <div>
             <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                Editar Bloco de Provas 📚
+                Editar Evento de Prova 📚
             </h2>
             <p class="text-gray-600">
-                Modifique as informações do bloco de provas
+                Ajuste os dados do evento nas mesmas etapas do cadastro
             </p>
         </div>
 
@@ -38,14 +86,18 @@
     </div>
 </div>
 
-<!-- Form -->
+<div id="provaEventoWizard" class="space-y-6">
+    <?php include $ui . '/wizard_steps.php'; ?>
+
+    <div id="wizardAlert" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 whitespace-pre-line"></div>
+    <div id="blocoEditAlert" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 whitespace-pre-line"></div>
+
 <div class="bg-white rounded-xl shadow-lg p-6">
-    <div id="blocoEditAlert" class="hidden mb-6 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 whitespace-pre-line"></div>
     <form id="formBloco" novalidate>
-        <!-- Título -->
+        <section class="step-panel" data-step-panel="1">
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
-                Título do Bloco <span class="text-red-500">*</span>
+                Título do Evento <span class="text-red-500">*</span>
             </label>
             <input type="text" 
                    id="titulo" 
@@ -57,32 +109,6 @@
         </div>
 
         <div class="mb-6">
-            <div class="flex items-center justify-between mb-2">
-                <label class="block text-sm font-medium text-gray-700">
-                    Tipo de Nota <span class="text-red-500">*</span>
-                </label>
-                <a href="<?= URL ?>/admin/provas/tipos-avaliacao" target="_blank" class="text-xs text-purple-700 hover:text-purple-900">Gerenciar tipos</a>
-            </div>
-            <select id="tipo_avaliacao_id"
-                    name="tipo_avaliacao_id"
-                    required
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Selecione</option>
-                <?php $tipoAvaliacaoSel = (int)($bloco['tipo_avaliacao_id'] ?? 0); ?>
-                <?php foreach (($tiposAvaliacao ?? []) as $tipo): ?>
-                    <option value="<?= (int)$tipo['id'] ?>"
-                            data-chave-quadro="<?= htmlspecialchars((string) ($tipo['chave_quadro'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
-                            <?= $tipoAvaliacaoSel === (int)$tipo['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($tipo['nome']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <?php include __DIR__ . '/_campo_semana_quadro.php'; ?>
-
-        <!-- Descrição -->
-        <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Descrição
             </label>
@@ -90,17 +116,9 @@
                       name="descricao" 
                       rows="3"
                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Descrição opcional do bloco"><?= htmlspecialchars($bloco['descricao'] ?? '') ?></textarea>
+                      placeholder="Descrição opcional do evento"><?= htmlspecialchars($bloco['descricao'] ?? '') ?></textarea>
         </div>
 
-        <?php
-        if (!class_exists('PeriodoLetivo')) {
-            require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
-        }
-        $anoEvento = (int) ($bloco['ano_letivo'] ?? date('Y'));
-        $bimSel = (int) ($bloco['bimestre'] ?? 0);
-        $periodoEvento = PeriodoLetivo::doAno($anoEvento);
-        ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -133,35 +151,41 @@
             </div>
         </div>
 
-        <?php
-        $dataProvaVal = !empty($bloco['data_prova']) ? date('Y-m-d', strtotime((string)$bloco['data_prova'])) : '';
-        $horaInicioVal = !empty($bloco['hora_inicio']) ? date('H:i', strtotime((string)$bloco['hora_inicio'])) : '';
-        $horaFimVal = !empty($bloco['hora_fim']) ? date('H:i', strtotime((string)$bloco['hora_fim'])) : '';
-        $prazoProfessorVal = !empty($bloco['prazo_entrega_professor']) ? date('Y-m-d\TH:i', strtotime((string)$bloco['prazo_entrega_professor'])) : '';
-        ?>
-        <?php
-        $turmasSelecionadasIds = [];
-        foreach (($bloco['turmas'] ?? []) as $turmaSel) {
-            $tidSel = is_array($turmaSel) ? (int) ($turmaSel['id'] ?? 0) : (int) $turmaSel;
-            if ($tidSel > 0) {
-                $turmasSelecionadasIds[] = $tidSel;
-            }
-        }
-        // Fallback para blocos antigos/legado: quando não existe vínculo em provas_blocos_turmas,
-        // usa as turmas vinculadas por professor no bloco.
-        if (empty($turmasSelecionadasIds) && !empty($bloco['professores']) && is_array($bloco['professores'])) {
-            foreach ($bloco['professores'] as $profSel) {
-                foreach (($profSel['turmas'] ?? []) as $turmaProfSel) {
-                    $tidProfSel = is_array($turmaProfSel) ? (int) ($turmaProfSel['id'] ?? 0) : (int) $turmaProfSel;
-                    if ($tidProfSel > 0) {
-                        $turmasSelecionadasIds[] = $tidProfSel;
-                    }
-                }
-            }
-        }
-        $turmasSelecionadasIds = array_values(array_unique($turmasSelecionadasIds));
-        ?>
-        <!-- Turmas do Bloco -->
+        <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    Tipo de Nota <span class="text-red-500">*</span>
+                </label>
+                <a href="<?= URL ?>/admin/provas/tipos-avaliacao" target="_blank" class="text-xs text-purple-700 hover:text-purple-900">Gerenciar tipos</a>
+            </div>
+            <select id="tipo_avaliacao_id"
+                    name="tipo_avaliacao_id"
+                    required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">Selecione</option>
+                <?php $tipoAvaliacaoSel = (int)($bloco['tipo_avaliacao_id'] ?? 0); ?>
+                <?php foreach (($tiposAvaliacao ?? []) as $tipo): ?>
+                    <option value="<?= (int)$tipo['id'] ?>"
+                            data-chave-quadro="<?= htmlspecialchars((string) ($tipo['chave_quadro'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                            <?= $tipoAvaliacaoSel === (int)$tipo['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($tipo['nome']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <?php include __DIR__ . '/_campo_semana_quadro.php'; ?>
+
+        <div class="flex justify-end pt-2">
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Próximo
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="3">
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Turmas <span class="text-red-500">*</span>
@@ -191,7 +215,19 @@
             </div>
         </div>
 
-        <!-- Professores e Matérias (Múltiplos) -->
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="2">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Próximo
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="4">
         <div class="mb-6">
             <div class="flex items-center justify-between mb-4">
                 <label class="block text-sm font-medium text-gray-700">
@@ -208,6 +244,34 @@
             <div id="professoresContainer" class="space-y-4">
                 <!-- Professores serão adicionados aqui via JavaScript -->
             </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="3">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Revisar
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="2">
+        <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <label class="flex items-start cursor-pointer">
+                <input type="checkbox"
+                       id="visivel_no_portal_aluno"
+                       name="visivel_no_portal_aluno"
+                       value="1"
+                       <?= $visAluno ? 'checked' : '' ?>
+                       class="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                <span class="ml-3">
+                    <span class="block text-sm font-medium text-gray-900">Mostrar este evento no portal do aluno</span>
+                    <span class="block text-xs text-gray-600 mt-1">Desmarcado: o aluno não vê em &quot;Minhas provas&quot; nem acessa por link. Útil para avaliações bimestrais só para coordenação/professor.</span>
+                </span>
+            </label>
         </div>
 
         <!-- Tipo de Prova -->
@@ -236,7 +300,6 @@
             </div>
         </div>
 
-        <?php $fmtEv = $bloco['formato_evento'] ?? 'online_questoes'; ?>
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Tipo de Evento <span class="text-red-500">*</span>
@@ -257,10 +320,6 @@
         </div>
 
         <!-- Responsável -->
-        <?php
-        $cfgNota = (string) ($bloco['configuracao_nota'] ?? 'professor_por_questao');
-        $isFmtLanc = $fmtEv === 'lancamento_nota';
-        ?>
         <div id="responsavelEventoBox" class="mb-6">
             <label id="labelResponsavelEvento" class="block text-sm font-medium text-gray-700 mb-2">
                 <?= $isFmtLanc ? 'Quem lança a nota' : 'Quem elabora a prova' ?> <span class="text-red-500">*</span>
@@ -270,12 +329,6 @@
                     ? 'Atribua ao professor ou deixe a coordenação lançar a nota cheia.'
                     : 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.' ?>
             </p>
-            <?php
-            $chkOnlineProf = !$isFmtLanc && ($cfgNota === 'professor_por_questao' || !in_array($cfgNota, ['professor_por_questao', 'coordenacao_calcula'], true));
-            $chkOnlineCoord = !$isFmtLanc && $cfgNota === 'coordenacao_calcula';
-            $chkLancCoord = $isFmtLanc && ($cfgNota === 'coordenacao_calcula' || !in_array($cfgNota, ['coordenacao_calcula', 'professor_por_questao'], true));
-            $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
-            ?>
             <div id="cfgOnlineOptions" class="flex flex-wrap gap-6 <?= $isFmtLanc ? 'hidden' : '' ?>">
                 <label class="flex items-center">
                     <input type="radio"
@@ -314,7 +367,6 @@
             </div>
         </div>
 
-        <?php $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']); ?>
         <div id="notaUnicaTodasMateriasBox" class="mb-6 p-4 bg-violet-50 border border-violet-200 rounded-lg <?= $isFmtLanc ? '' : 'hidden' ?>">
             <label class="flex items-start cursor-pointer">
                 <input type="checkbox"
@@ -331,24 +383,6 @@
             <p id="msgCoordenacaoLanca" class="text-xs text-violet-900 mt-2 hidden">
                 Coordenação lança notas: você pode usar nota única para aplicar a mesma nota do aluno em todas as matérias.
             </p>
-        </div>
-
-        <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <?php
-            $visAluno = isset($bloco['visivel_no_portal_aluno']) ? (int)$bloco['visivel_no_portal_aluno'] === 1 : true;
-            ?>
-            <label class="flex items-start cursor-pointer">
-                <input type="checkbox"
-                       id="visivel_no_portal_aluno"
-                       name="visivel_no_portal_aluno"
-                       value="1"
-                       <?= $visAluno ? 'checked' : '' ?>
-                       class="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
-                <span class="ml-3">
-                    <span class="block text-sm font-medium text-gray-900">Mostrar este evento no portal do aluno</span>
-                    <span class="block text-xs text-gray-600 mt-1">Desmarcado: o aluno não vê em &quot;Minhas provas&quot; nem acessa por link. Útil para avaliações bimestrais só para coordenação/professor.</span>
-                </span>
-            </label>
         </div>
 
         <!-- Agenda de Prova (somente para prova online) -->
@@ -400,8 +434,31 @@
             <p class="text-xs text-gray-500 mt-1">Após este prazo, provas não enviadas serão automaticamente marcadas como "Não Enviadas" e travadas</p>
         </div>
 
-        <!-- Botões -->
-        <div class="flex justify-end space-x-4">
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="1">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <button type="button"
+                    class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+                Próximo
+                <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+        </section>
+
+        <section class="step-panel hidden" data-step-panel="5">
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Revisão do evento</h3>
+            <p class="text-sm text-gray-500">Confira os dados principais antes de salvar.</p>
+        </div>
+
+        <div id="wizardResumoEvento" class="rounded-lg border border-gray-200 bg-gray-50/50 p-5 text-sm text-gray-700 mb-6"></div>
+
+        <div class="flex items-center justify-between pt-2">
+            <button type="button" class="wizard-step-back px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium" data-go-step="4">
+                <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
+            </button>
+            <div class="flex justify-end space-x-4">
             <a href="<?= URL ?>/admin/provas" 
                class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                 Cancelar
@@ -411,8 +468,11 @@
                     class="btn-primary-custom px-6 py-2 rounded-lg hover:opacity-90">
                 Salvar Alterações
             </button>
+            </div>
         </div>
+        </section>
     </form>
+</div>
 </div>
 
 <script>
@@ -425,16 +485,251 @@ const turmas = <?= json_encode($turmas ?? [], $jsonJsBloco) ?: '[]' ?>;
 const blocoProfessores = <?= json_encode($bloco['professores'] ?? [], $jsonJsBloco) ?: '[]' ?>;
 const BLOCO_ID = <?= (int) ($bloco['id'] ?? 0) ?>;
 let professorCounter = 0;
+let wizardCurrentStep = 1;
+const wizardTotalSteps = 5;
+const wizardCompletedSteps = {};
+const wizardErrorSteps = {};
+const wizardClassMap = {
+    ativo: ['border-accent', 'bg-primary', 'text-primary', 'shadow-md'],
+    completo: ['border-green-500', 'bg-green-50', 'text-green-700'],
+    erro: ['border-red-400', 'bg-red-50', 'text-red-700'],
+    pendente: ['border-gray-200', 'bg-white', 'text-gray-600', 'hover:border-gray-300', 'hover:bg-gray-50']
+};
+const wizardAllStateClasses = Object.keys(wizardClassMap).reduce((acc, key) => acc.concat(wizardClassMap[key]), []);
 
-function mostrarErroBloco(msg) {
+function wizardStepState(step) {
+    if (wizardErrorSteps[step]) return 'erro';
+    if (step === wizardCurrentStep) return 'ativo';
+    if (wizardCompletedSteps[step]) return 'completo';
+    return 'pendente';
+}
+
+function renderWizardBadge(btn, state) {
+    const circle = btn.querySelector('.wizard-step-circle');
+    if (!circle) return;
+    const oldBadge = circle.querySelector('.wizard-step-corner');
+    if (oldBadge) oldBadge.remove();
+    const badge = state === 'completo'
+        ? ['bg-green-500', 'fa-solid fa-check']
+        : (state === 'erro' ? ['bg-red-500', 'fa-solid fa-exclamation'] : null);
+    if (!badge) return;
+    const span = document.createElement('span');
+    span.className = `wizard-step-corner absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-white text-[9px] ${badge[0]}`;
+    span.innerHTML = `<i class="${badge[1]}"></i>`;
+    circle.appendChild(span);
+}
+
+function renderWizardSteps() {
+    document.querySelectorAll('#wizardStepsNav .step-nav-btn').forEach(btn => {
+        const step = parseInt(btn.dataset.stepTarget || '0', 10);
+        const state = wizardStepState(step);
+        btn.classList.remove(...wizardAllStateClasses);
+        btn.classList.add(...wizardClassMap[state]);
+        btn.dataset.stepState = state;
+        btn.dataset.active = state === 'ativo' ? 'true' : 'false';
+        renderWizardBadge(btn, state);
+    });
+    document.querySelectorAll('#wizardStepsNav [data-connector-after]').forEach(el => {
+        const step = parseInt(el.dataset.connectorAfter || '0', 10);
+        const ok = !!wizardCompletedSteps[step] && !wizardErrorSteps[step];
+        el.classList.toggle('bg-green-400', ok);
+        el.classList.toggle('bg-gray-200', !ok);
+    });
+}
+
+function showWizardAlert(message) {
+    const box = document.getElementById('wizardAlert');
+    document.getElementById('blocoEditAlert')?.classList.add('hidden');
+    if (!box) return;
+    box.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i>${escHtml(message)}`;
+    box.classList.remove('hidden');
+}
+
+function clearWizardAlert() {
+    const box = document.getElementById('wizardAlert');
+    if (box) box.classList.add('hidden');
+    document.getElementById('blocoEditAlert')?.classList.add('hidden');
+}
+
+function setWizardStep(step) {
+    wizardCurrentStep = Math.max(1, Math.min(wizardTotalSteps, step));
+    document.querySelectorAll('.step-panel').forEach(panel => {
+        panel.classList.toggle('hidden', parseInt(panel.dataset.stepPanel || '0', 10) !== wizardCurrentStep);
+    });
+    if (wizardCurrentStep === 5) {
+        atualizarResumoWizard();
+    }
+    clearWizardAlert();
+    renderWizardSteps();
+    const wizard = document.getElementById('provaEventoWizard');
+    if (wizard) {
+        window.scrollTo({ top: wizard.offsetTop - 16, behavior: 'smooth' });
+    }
+}
+
+function destinoQuadroOk() {
+    const wrap = document.getElementById('campo-semana-evento');
+    if (!wrap || wrap.classList.contains('hidden')) return true;
+    const rows = Array.from(document.querySelectorAll('.vinculo-grupo-row'));
+    if (rows.length === 0) return true;
+    let completo = false;
+    for (const row of rows) {
+        const g = parseInt(row.querySelector('.sel-grupo')?.value || '0', 10) || 0;
+        if (!g) continue;
+        const wrapT = row.querySelector('.wrap-tipo');
+        const tipoVisivel = wrapT && !wrapT.classList.contains('hidden');
+        if (tipoVisivel) {
+            const t = parseInt(row.querySelector('.sel-tipo')?.value || '0', 10) || 0;
+            const m = parseInt(row.querySelector('.sel-marca')?.value || '0', 10) || 0;
+            if (!t || !m) return false;
+        }
+        completo = true;
+    }
+    return completo;
+}
+
+function validateWizardStep(step) {
+    let ok = true;
+    let message = '';
+
+    if (step === 1) {
+        const required = ['titulo', 'ano_letivo', 'bimestre', 'tipo_avaliacao_id'];
+        ok = required.every(id => {
+            const el = document.getElementById(id);
+            return el && String(el.value || '').trim() !== '';
+        });
+        if (ok && !destinoQuadroOk()) {
+            ok = false;
+            message = 'Escolha o quadro e o bloco de disciplinas para definir a semana (S1, S2…).';
+        } else {
+            message = 'Preencha os dados obrigatórios do evento antes de avançar.';
+        }
+    } else if (step === 2) {
+        const formato = document.querySelector('input[name="formato_evento"]:checked')?.value || '';
+        const configuracao = inputConfiguracaoNotaNoFormatoAtual()?.value || '';
+        const dataHoraVisible = !document.getElementById('agendamentoDataHoraContainer')?.classList.contains('hidden');
+        const prazoVisible = !document.getElementById('prazoProfessorContainer')?.classList.contains('hidden');
+        ok = !!formato && !!configuracao;
+        if (ok && dataHoraVisible) {
+            ok = ['data_prova', 'hora_inicio', 'hora_fim'].every(id => String(document.getElementById(id)?.value || '').trim() !== '');
+        }
+        if (ok && prazoVisible) {
+            ok = String(document.getElementById('prazo_entrega_professor')?.value || '').trim() !== '';
+        }
+        message = 'Complete o tipo de evento, o responsável e os prazos necessários.';
+    } else if (step === 3) {
+        ok = getTurmasBlocoSelecionadas().length > 0;
+        message = 'Selecione pelo menos uma turma para o evento.';
+    } else if (step === 4) {
+        const needQtd = exigeNumeroQuestoes();
+        const professorDivs = Array.from(document.querySelectorAll('#professoresContainer [id^="professor_"]'));
+        ok = professorDivs.length > 0 && professorDivs.every(div => {
+            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
+            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
+            const turmasProfessor = div.querySelectorAll('.turma-professor-checkbox:checked').length;
+            if (!professorId || !materiaId || turmasProfessor === 0) return false;
+            if (needQtd) {
+                const numeroQuestoes = parseInt(div.querySelector('input[name*="[quantidade_questoes]"]')?.value || '0', 10);
+                return numeroQuestoes > 0;
+            }
+            return true;
+        });
+        message = needQtd
+            ? 'Informe professor, matéria, quantidade de questões e turmas para cada professor.'
+            : 'Informe professor, matéria e turmas para cada item.';
+    }
+
+    wizardErrorSteps[step] = !ok;
+    if (ok) {
+        wizardCompletedSteps[step] = true;
+        clearWizardAlert();
+    } else {
+        showWizardAlert(message);
+    }
+    renderWizardSteps();
+    return ok;
+}
+
+function goWizardStep(targetStep) {
+    const target = Math.max(1, Math.min(wizardTotalSteps, parseInt(targetStep, 10) || 1));
+    if (target <= wizardCurrentStep) {
+        setWizardStep(target);
+        return;
+    }
+
+    while (wizardCurrentStep < target) {
+        if (!validateWizardStep(wizardCurrentStep)) {
+            return;
+        }
+        setWizardStep(wizardCurrentStep + 1);
+    }
+}
+
+function selectedText(selector) {
+    const el = document.querySelector(selector);
+    if (!el || el.selectedIndex < 0) return '';
+    return el.options[el.selectedIndex]?.textContent?.trim() || '';
+}
+
+function atualizarResumoWizard() {
+    const out = document.getElementById('wizardResumoEvento');
+    if (!out) return;
+
+    const professoresResumo = Array.from(document.querySelectorAll('#professoresContainer [id^="professor_"]')).map(div => {
+        const professor = div.querySelector('select[name*="[professor_id]"] option:checked')?.textContent?.trim() || 'Professor não selecionado';
+        const materia = div.querySelector('select[name*="[materia_id]"] option:checked')?.textContent?.trim() || 'Matéria não selecionada';
+        const qtd = div.querySelector('input[name*="[quantidade_questoes]"]')?.value || '0';
+        const turmasQtd = div.querySelectorAll('.turma-professor-checkbox:checked').length;
+        const qtdTxt = exigeNumeroQuestoes() ? ` · ${escHtml(qtd)} questão(ões)` : '';
+        return `<li>${escHtml(professor)} · ${escHtml(materia)}${qtdTxt} · ${turmasQtd} turma(s)</li>`;
+    }).join('');
+
+    const formatoTxt = document.querySelector('input[name="formato_evento"]:checked')?.parentElement?.textContent?.trim() || '';
+    const respTxt = inputConfiguracaoNotaNoFormatoAtual()?.parentElement?.textContent?.trim() || '';
+
+    out.innerHTML = `
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Título</dt><dd class="font-semibold text-gray-900">${escHtml(document.getElementById('titulo')?.value)}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Ano/Bimestre</dt><dd>${escHtml(document.getElementById('ano_letivo')?.value)} · ${escHtml(selectedText('#bimestre'))}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de avaliação</dt><dd>${escHtml(selectedText('#tipo_avaliacao_id'))}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Destino no quadro</dt><dd>${escHtml(typeof resumoDestinosQuadro === 'function' ? resumoDestinosQuadro() : (selectedText('#semana') || '—'))}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Tipo de evento</dt><dd>${escHtml(formatoTxt)}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Responsável</dt><dd>${escHtml(respTxt)}</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Turmas do evento</dt><dd>${getTurmasBlocoSelecionadas().length} turma(s)</dd></div>
+            <div><dt class="text-xs font-medium text-gray-500 uppercase">Portal do aluno</dt><dd>${document.getElementById('visivel_no_portal_aluno')?.checked ? 'Visível' : 'Oculto'}</dd></div>
+        </dl>
+        <div class="mt-5">
+            <p class="text-xs font-medium text-gray-500 uppercase mb-2">Professores</p>
+            <ul class="list-disc pl-5 space-y-1">${professoresResumo || '<li>Nenhum professor configurado</li>'}</ul>
+        </div>
+    `;
+}
+
+function inicializarWizardEventoProva() {
+    document.querySelectorAll('#wizardStepsNav .step-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => goWizardStep(btn.dataset.stepTarget));
+    });
+    document.querySelectorAll('.wizard-step-next').forEach(btn => {
+        btn.addEventListener('click', () => goWizardStep(wizardCurrentStep + 1));
+    });
+    document.querySelectorAll('.wizard-step-back').forEach(btn => {
+        btn.addEventListener('click', () => goWizardStep(btn.dataset.goStep || (wizardCurrentStep - 1)));
+    });
+    renderWizardSteps();
+}
+
+function mostrarErroBloco(msg, step) {
     const texto = String(msg || 'Não foi possível salvar o bloco.');
-    const el = document.getElementById('blocoEditAlert');
+    if (step) {
+        setWizardStep(step);
+    }
+    document.getElementById('wizardAlert')?.classList.add('hidden');
+    const el = document.getElementById('blocoEditAlert') || document.getElementById('wizardAlert');
     if (el) {
         el.textContent = texto;
         el.classList.remove('hidden');
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    alert(texto);
 }
 
 function escHtml(s) {
@@ -764,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', function() {
             adicionarProfessor();
         }
     }
-    manterAgendaNoFinalDoFormulario();
+    inicializarWizardEventoProva();
     ajustarOpcoesConfiguracaoNotaPorFormato();
     document.querySelectorAll('input[name="turmas[]"]').forEach(el => {
         el.addEventListener('change', sincronizarTurmasProfessoresComBloco);
@@ -856,17 +1151,6 @@ function sincronizarTurmasProfessoresComBloco() {
     });
 }
 
-function manterAgendaNoFinalDoFormulario() {
-    const form = document.getElementById('formBloco');
-    if (!form) return;
-    const botoes = form.querySelector('.flex.justify-end.space-x-4');
-    const dataHoraBox = document.getElementById('agendamentoDataHoraContainer');
-    const prazoBox = document.getElementById('prazoProfessorContainer');
-    if (!botoes || !dataHoraBox || !prazoBox) return;
-    form.insertBefore(dataHoraBox, botoes);
-    form.insertBefore(prazoBox, botoes);
-}
-
 function garantirPrazoProfessorPreenchido() {
     const prazoInput = document.getElementById('prazo_entrega_professor');
     if (!prazoInput || (prazoInput.value && prazoInput.value.trim() !== '')) {
@@ -898,7 +1182,7 @@ function atualizarBloco(event, blocoId) {
             turmasIds.push(parseInt(checkbox.value, 10));
         });
         if (turmasIds.length === 0) {
-            mostrarErroBloco('Selecione pelo menos uma turma para o bloco');
+            mostrarErroBloco('Selecione pelo menos uma turma para o bloco', 3);
             return;
         }
         const turmasBlocoSet = new Set(turmasIds);
@@ -909,7 +1193,7 @@ function atualizarBloco(event, blocoId) {
         let turmasProfessorInvalidas = false;
 
         if (professorDivs.length === 0) {
-            mostrarErroBloco('Adicione pelo menos um professor');
+            mostrarErroBloco('Adicione pelo menos um professor', 4);
             return;
         }
 
@@ -946,15 +1230,15 @@ function atualizarBloco(event, blocoId) {
         if (professoresInvalidos) {
             mostrarErroBloco(exigeNumeroQuestoes()
                 ? 'Preencha professor, matéria e quantidade de questões para todos os professores adicionados'
-                : 'Preencha professor e matéria para todos os professores adicionados');
+                : 'Preencha professor e matéria para todos os professores adicionados', 4);
             return;
         }
         if (turmasProfessorInvalidas) {
-            mostrarErroBloco('Selecione pelo menos uma turma para cada professor');
+            mostrarErroBloco('Selecione pelo menos uma turma para cada professor', 4);
             return;
         }
         if (professoresPayload.some(prof => prof.turmas.some(turmaId => !turmasBlocoSet.has(turmaId)))) {
-            mostrarErroBloco('As turmas de cada professor precisam estar dentro das turmas selecionadas para o evento');
+            mostrarErroBloco('As turmas de cada professor precisam estar dentro das turmas selecionadas para o evento', 4);
             return;
         }
 
@@ -967,27 +1251,27 @@ function atualizarBloco(event, blocoId) {
         const configNota = configNotaInput ? configNotaInput.value : formData.get('configuracao_nota');
 
         if (!formData.get('titulo')) {
-            mostrarErroBloco('Título é obrigatório');
+            mostrarErroBloco('Título é obrigatório', 1);
             return;
         }
         if (!formData.get('tipo_avaliacao_id')) {
-            mostrarErroBloco('Tipo de avaliação é obrigatório');
+            mostrarErroBloco('Tipo de avaliação é obrigatório', 1);
             return;
         }
         if (!formData.get('ano_letivo')) {
-            mostrarErroBloco('Ano letivo é obrigatório');
+            mostrarErroBloco('Ano letivo é obrigatório', 1);
             return;
         }
         if (!bimestreVal) {
-            mostrarErroBloco('Período letivo é obrigatório');
+            mostrarErroBloco('Período letivo é obrigatório', 1);
             return;
         }
         if (formatoEvento === 'online_questoes' && (!formData.get('data_prova') || !formData.get('hora_inicio') || !formData.get('hora_fim'))) {
-            mostrarErroBloco('Data e horário da prova são obrigatórios para prova online');
+            mostrarErroBloco('Data e horário da prova são obrigatórios para prova online', 2);
             return;
         }
         if (configNota === 'professor_por_questao' && !formData.get('prazo_entrega_professor')) {
-            mostrarErroBloco('Informe o prazo para o professor');
+            mostrarErroBloco('Informe o prazo para o professor', 2);
             return;
         }
 
