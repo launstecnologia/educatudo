@@ -348,6 +348,32 @@ class SchoolSettingsAdminController extends AdminBaseController
                     unset($configs[$chaveTamanho]);
                 }
             }
+
+            $chavesCor = [
+                'primary_color',
+                'primary_text_color',
+                'secondary_color',
+                'secondary_text_color',
+                'page_background_color',
+                'navbar_bg_color',
+                'sidebar_text_color',
+                'button_primary_color',
+            ];
+            foreach ($chavesCor as $chaveCor) {
+                if (!array_key_exists($chaveCor, $configs)) {
+                    continue;
+                }
+                $valor = trim((string) $configs[$chaveCor]);
+                if ($valor === '') {
+                    continue;
+                }
+                $normalizado = LayoutHelper::sanitizarCorHex($valor);
+                if ($normalizado === null) {
+                    unset($configs[$chaveCor]);
+                    continue;
+                }
+                $configs[$chaveCor] = $normalizado;
+            }
             
             foreach ($configs as $key => $value) {
                 if (is_array($value)) {

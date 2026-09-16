@@ -85,19 +85,59 @@ $navbar_links_aluno = [
     <div class="bg-white rounded-xl shadow border border-slate-200 p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Cores e Identidade Visual</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <?php
+            $corPrimariaMaster = (string) ($layout_config['primary_color'] ?? '#6366f1');
+            $navbarBgMaster = (string) ($layout_config['navbar_bg_color'] ?? $corPrimariaMaster);
+            if (!class_exists('LayoutHelper', false)) {
+                require_once dirname(__DIR__, 4) . '/Core/LayoutHelper.php';
+            }
+            $sidebarTextMaster = trim((string) ($layout_config['sidebar_text_color'] ?? ''));
+            if ($sidebarTextMaster === '') {
+                $sidebarTextMaster = LayoutHelper::resolveSidebarTextColor($navbarBgMaster, '#ffffff');
+            }
+            $botaoPrimarioMaster = (string) ($layout_config['button_primary_color'] ?? $corPrimariaMaster);
+            ?>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Cor primária</label>
                 <div class="flex gap-2 items-center">
-                    <input type="color" id="lc_color_picker" value="<?= htmlspecialchars($layout_config['primary_color'] ?? '#6366f1') ?>"
+                    <input type="color" id="lc_color_picker" value="<?= htmlspecialchars($corPrimariaMaster) ?>"
                            class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
-                    <input type="text" name="layout_primary_color" id="lc_color_text" value="<?= htmlspecialchars($layout_config['primary_color'] ?? '#6366f1') ?>"
+                    <input type="text" name="layout_primary_color" id="lc_color_text" value="<?= htmlspecialchars($corPrimariaMaster) ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Destaque geral. Navbar e botões têm campos próprios.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto (sobre botões/primária)</label>
+                <input type="text" name="layout_primary_text_color" value="<?= htmlspecialchars($layout_config['primary_text_color'] ?? '#ffffff') ?>"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Cor dos botões primários</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_button_picker" value="<?= htmlspecialchars($botaoPrimarioMaster) ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_button_primary_color" id="lc_button_text" value="<?= htmlspecialchars($botaoPrimarioMaster) ?>"
                            class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto (sobre primária)</label>
-                <input type="text" name="layout_primary_text_color" value="<?= htmlspecialchars($layout_config['primary_text_color'] ?? '#ffffff') ?>"
-                       class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Background do navbar</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_navbar_picker" value="<?= htmlspecialchars($navbarBgMaster) ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_navbar_bg_color" id="lc_navbar_text" value="<?= htmlspecialchars($navbarBgMaster) ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto do menu e submenu</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_sidebar_text_picker" value="<?= htmlspecialchars($sidebarTextMaster) ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_sidebar_text_color" id="lc_sidebar_text" value="<?= htmlspecialchars($sidebarTextMaster) ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
             </div>
         </div>
     </div>
@@ -360,10 +400,17 @@ function updatePreviewFromUrl(input) {
 
 <script>
 (function() {
-    var picker = document.getElementById('lc_color_picker');
-    var text = document.getElementById('lc_color_text');
-    picker.oninput = function() { text.value = this.value; };
-    text.oninput = function() { if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) picker.value = this.value; };
+    function bindColorPair(pickerId, textId) {
+        var picker = document.getElementById(pickerId);
+        var text = document.getElementById(textId);
+        if (!picker || !text) return;
+        picker.oninput = function() { text.value = this.value; };
+        text.oninput = function() { if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) picker.value = this.value; };
+    }
+    bindColorPair('lc_color_picker', 'lc_color_text');
+    bindColorPair('lc_button_picker', 'lc_button_text');
+    bindColorPair('lc_navbar_picker', 'lc_navbar_text');
+    bindColorPair('lc_sidebar_text_picker', 'lc_sidebar_text');
 })();
 
 (function() {

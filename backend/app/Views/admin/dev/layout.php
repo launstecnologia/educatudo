@@ -107,7 +107,7 @@
                         </div>
                         <div class="flex-1">
                             <input type="file" id="cover-input" accept="image/*" class="hidden">
-                            <button onclick="document.getElementById('cover-input').click()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                            <button type="button" onclick="document.getElementById('cover-input').click()" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 transition-colors">
                                 Escolher Capa
                             </button>
                             <p class="text-sm text-gray-500 mt-1">Formatos: JPG, PNG, GIF, SVG</p>
@@ -193,21 +193,31 @@
                         <p class="text-sm text-gray-500 mt-1">Nome do menu que aparece na navbar do aluno (ex: nome da escola). Padrão: "Colag"</p>
                     </div>
                     
+                    <?php
+                    $corPrimariaAtual = (string) ($config_layout['primary_color'] ?? '#a855f7');
+                    $navbarBgAtual = (string) ($config_layout['navbar_bg_color'] ?? $corPrimariaAtual);
+                    $sidebarTextAtual = (string) ($config_layout['sidebar_text_color'] ?? '');
+                    if ($sidebarTextAtual === '') {
+                        $sidebarTextAtual = LayoutHelper::getSidebarColors()['text'];
+                    }
+                    $botaoPrimarioAtual = (string) ($config_layout['button_primary_color'] ?? $corPrimariaAtual);
+                    ?>
+
                     <!-- Cor Primária -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Cor Primária</label>
                         <div class="flex items-center space-x-3">
                             <input type="color" 
                                    name="config[primary_color]" 
-                                   value="<?= htmlspecialchars($config_layout['primary_color'] ?? '#a855f7') ?>"
+                                   value="<?= htmlspecialchars($corPrimariaAtual) ?>"
                                    class="w-12 h-10 rounded border border-gray-300">
                             <input type="text" 
                                    name="config[primary_color]" 
-                                   value="<?= htmlspecialchars($config_layout['primary_color'] ?? '#a855f7') ?>"
+                                   value="<?= htmlspecialchars($corPrimariaAtual) ?>"
                                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                    placeholder="#a855f7">
                         </div>
-                        <p class="text-sm text-gray-500 mt-1">Usada em botões principais e elementos destacados</p>
+                        <p class="text-sm text-gray-500 mt-1">Destaque geral (links, ícones e acentos). Navbar e botões têm cores próprias abaixo.</p>
                     </div>
                     
                     <!-- Cor do Texto Primário -->
@@ -224,7 +234,58 @@
                                    class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                    placeholder="#ffffff">
                         </div>
-                        <p class="text-sm text-gray-500 mt-1">Cor do texto sobre fundo primário</p>
+                        <p class="text-sm text-gray-500 mt-1">Cor do texto sobre botões primários e fundos de destaque</p>
+                    </div>
+
+                    <!-- Cor dos botões primários -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cor dos Botões Primários</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="color"
+                                   name="config[button_primary_color]"
+                                   value="<?= htmlspecialchars($botaoPrimarioAtual) ?>"
+                                   class="w-12 h-10 rounded border border-gray-300">
+                            <input type="text"
+                                   name="config[button_primary_color]"
+                                   value="<?= htmlspecialchars($botaoPrimarioAtual) ?>"
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="#a855f7">
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">Fundo dos botões de ação principal (Salvar, Criar, CTAs). Padrão: cor primária.</p>
+                    </div>
+
+                    <!-- Background do Navbar -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Background do Navbar</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="color"
+                                   name="config[navbar_bg_color]"
+                                   value="<?= htmlspecialchars($navbarBgAtual) ?>"
+                                   class="w-12 h-10 rounded border border-gray-300">
+                            <input type="text"
+                                   name="config[navbar_bg_color]"
+                                   value="<?= htmlspecialchars($navbarBgAtual) ?>"
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="#a855f7">
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">Fundo do menu lateral (admin, professor, aluno e pais). Padrão: cor primária.</p>
+                    </div>
+
+                    <!-- Cor do texto do menu e submenu -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cor do Texto do Menu e Submenu</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="color"
+                                   name="config[sidebar_text_color]"
+                                   value="<?= htmlspecialchars($sidebarTextAtual) ?>"
+                                   class="w-12 h-10 rounded border border-gray-300">
+                            <input type="text"
+                                   name="config[sidebar_text_color]"
+                                   value="<?= htmlspecialchars($sidebarTextAtual) ?>"
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="#ffffff">
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">Texto dos itens do menu e dos submenus (ex.: Estrutura, Ano Letivo). Padrão: contraste automático no fundo do navbar.</p>
                     </div>
                     
                     <!-- Cor Secundária -->
@@ -330,9 +391,10 @@
             
             <!-- Navbar -->
             <div class="text-center">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Navbar</h4>
-                <div id="preview-navbar" class="px-4 py-2 rounded-lg text-white font-medium">
-                    Navbar
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Navbar / Submenu</h4>
+                <div id="preview-navbar" class="px-4 py-3 rounded-lg text-left">
+                    <div id="preview-navbar-title" class="font-medium">Menu</div>
+                    <div id="preview-navbar-sub" class="text-sm mt-1 pl-3 border-l border-current/30">Submenu</div>
                 </div>
             </div>
             
@@ -426,40 +488,52 @@ document.getElementById('layout-form').addEventListener('submit', function(e) {
 });
 
 // Atualizar preview
+function valorCorCampo(nome) {
+    const inputs = document.querySelectorAll('input[name="' + nome + '"]');
+    if (!inputs.length) {
+        return '';
+    }
+    return inputs[inputs.length - 1].value;
+}
+
 function updatePreview() {
-    const primaryColor = document.querySelector('input[name="config[primary_color]"]').value;
-    const primaryTextColor = document.querySelector('input[name="config[primary_text_color]"]').value;
-    const secondaryColor = document.querySelector('input[name="config[secondary_color]"]').value;
-    const secondaryTextColor = document.querySelector('input[name="config[secondary_text_color]"]').value;
+    const primaryTextColor = valorCorCampo('config[primary_text_color]');
+    const secondaryColor = valorCorCampo('config[secondary_color]');
+    const secondaryTextColor = valorCorCampo('config[secondary_text_color]');
+    const buttonPrimaryColor = valorCorCampo('config[button_primary_color]');
+    const navbarBgColor = valorCorCampo('config[navbar_bg_color]');
+    const sidebarTextColor = valorCorCampo('config[sidebar_text_color]');
     
-    // Botão primário
     const primaryBtn = document.getElementById('preview-primary-btn');
-    primaryBtn.style.backgroundColor = primaryColor;
+    primaryBtn.style.backgroundColor = buttonPrimaryColor;
     primaryBtn.style.color = primaryTextColor;
     
-    // Botão secundário
     const secondaryBtn = document.getElementById('preview-secondary-btn');
     secondaryBtn.style.backgroundColor = secondaryColor;
     secondaryBtn.style.color = secondaryTextColor;
     
-    // Navbar
     const navbar = document.getElementById('preview-navbar');
-    navbar.style.backgroundColor = primaryColor;
-    navbar.style.color = primaryTextColor;
+    navbar.style.backgroundColor = navbarBgColor;
+    navbar.style.color = sidebarTextColor;
 }
 
 // Restaurar cores padrão
 function resetColors() {
     if (confirm('Restaurar cores padrão?')) {
-        document.querySelector('input[name="config[primary_color]"]').value = '#a855f7';
-        document.querySelector('input[name="config[primary_text_color]"]').value = '#ffffff';
-        document.querySelector('input[name="config[secondary_color]"]').value = '#0ea5e9';
-        document.querySelector('input[name="config[secondary_text_color]"]').value = '#ffffff';
-        
-        // Atualizar inputs de cor
-        document.querySelectorAll('input[type="color"]').forEach(input => {
-            const textInput = input.parentElement.querySelector('input[type="text"]');
-            input.value = textInput.value;
+        const padroes = {
+            'config[primary_color]': '#a855f7',
+            'config[primary_text_color]': '#ffffff',
+            'config[button_primary_color]': '#a855f7',
+            'config[navbar_bg_color]': '#a855f7',
+            'config[sidebar_text_color]': '#ffffff',
+            'config[secondary_color]': '#0ea5e9',
+            'config[secondary_text_color]': '#ffffff',
+            'config[page_background_color]': '#f8fafc'
+        };
+        Object.keys(padroes).forEach(function (nome) {
+            document.querySelectorAll('input[name="' + nome + '"]').forEach(function (input) {
+                input.value = padroes[nome];
+            });
         });
         
         updatePreview();

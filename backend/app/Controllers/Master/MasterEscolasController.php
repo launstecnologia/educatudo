@@ -859,6 +859,10 @@ class MasterEscolasController extends BaseController
     {
         $config = [];
 
+        if (!class_exists('LayoutHelper', false)) {
+            require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        }
+
         // Upload de imagens de layout (logo, logo 1x1, capa, ícone da IA) — sobrescrevem o campo de URL se enviados
         foreach (['layout_logo_upload', 'layout_logo_1x1_upload', 'layout_login_cover_upload', 'layout_ia_avatar_upload'] as $field) {
             $url = $this->uploadLayoutImage($escolaId, $field);
@@ -879,12 +883,21 @@ class MasterEscolasController extends BaseController
         }
 
         // Layout (cor, logo, título, nome/ícone da IA, config primeiro acesso) — URLs por texto só entram se não tiveram upload
-        $layoutKeys = ['primary_color', 'primary_text_color', 'logo_url', 'logo_1x1_url', 'login_cover_url', 'system_title', 'system_subtitle', 'ia_name', 'ia_avatar_url', 'primeiro_acesso_turma_obrigatoria'];
+        $layoutKeys = ['primary_color', 'primary_text_color', 'button_primary_color', 'navbar_bg_color', 'sidebar_text_color', 'logo_url', 'logo_1x1_url', 'login_cover_url', 'system_title', 'system_subtitle', 'ia_name', 'ia_avatar_url', 'primeiro_acesso_turma_obrigatoria'];
+        $chavesCor = ['primary_color', 'primary_text_color', 'button_primary_color', 'navbar_bg_color', 'sidebar_text_color'];
         foreach ($layoutKeys as $key) {
             $v = trim((string) ($_POST['layout_' . $key] ?? ''));
-            if ($v !== '' && !isset($config[$key])) {
-                $config[$key] = $v;
+            if ($v === '' || isset($config[$key])) {
+                continue;
             }
+            if (in_array($key, $chavesCor, true)) {
+                $normalizado = LayoutHelper::sanitizarCorHex($v);
+                if ($normalizado === null) {
+                    continue;
+                }
+                $v = $normalizado;
+            }
+            $config[$key] = $v;
         }
 
         $modules = $_POST['modules'] ?? [];

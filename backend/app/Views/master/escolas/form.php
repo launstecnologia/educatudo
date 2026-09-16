@@ -159,12 +159,55 @@
                         <input type="text" name="layout_primary_color" id="layout_primary_color" value="<?= htmlspecialchars($layout['primary_color'] ?? '#6366f1') ?>"
                                class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
+                    <p class="text-xs text-slate-500 mt-1">Destaque geral. Navbar e botões têm campos próprios.</p>
                     <script>document.getElementById('layout_primary_color_picker').oninput=function(){document.getElementById('layout_primary_color').value=this.value};document.getElementById('layout_primary_color').oninput=function(){var v=this.value;if(/^#[0-9A-Fa-f]{6}$/.test(v))document.getElementById('layout_primary_color_picker').value=v;};</script>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto (sobre primária)</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto (sobre botões/primária)</label>
                     <input type="text" name="layout_primary_text_color" value="<?= htmlspecialchars($layout['primary_text_color'] ?? '#ffffff') ?>"
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <?php
+                if (!class_exists('LayoutHelper', false)) {
+                    require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
+                }
+                $corPrimariaForm = (string) ($layout['primary_color'] ?? '#6366f1');
+                $botaoPrimarioForm = (string) ($layout['button_primary_color'] ?? $corPrimariaForm);
+                $navbarBgForm = (string) ($layout['navbar_bg_color'] ?? $corPrimariaForm);
+                $sidebarTextForm = trim((string) ($layout['sidebar_text_color'] ?? ''));
+                if ($sidebarTextForm === '') {
+                    $sidebarTextForm = LayoutHelper::resolveSidebarTextColor($navbarBgForm, '#ffffff');
+                }
+                ?>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Cor dos botões primários</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="color" id="layout_button_primary_color_picker" value="<?= htmlspecialchars($botaoPrimarioForm) ?>"
+                               class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                        <input type="text" name="layout_button_primary_color" id="layout_button_primary_color" value="<?= htmlspecialchars($botaoPrimarioForm) ?>"
+                               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <script>document.getElementById('layout_button_primary_color_picker').oninput=function(){document.getElementById('layout_button_primary_color').value=this.value};document.getElementById('layout_button_primary_color').oninput=function(){var v=this.value;if(/^#[0-9A-Fa-f]{6}$/.test(v))document.getElementById('layout_button_primary_color_picker').value=v;};</script>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Background do navbar</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="color" id="layout_navbar_bg_color_picker" value="<?= htmlspecialchars($navbarBgForm) ?>"
+                               class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                        <input type="text" name="layout_navbar_bg_color" id="layout_navbar_bg_color" value="<?= htmlspecialchars($navbarBgForm) ?>"
+                               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <script>document.getElementById('layout_navbar_bg_color_picker').oninput=function(){document.getElementById('layout_navbar_bg_color').value=this.value};document.getElementById('layout_navbar_bg_color').oninput=function(){var v=this.value;if(/^#[0-9A-Fa-f]{6}$/.test(v))document.getElementById('layout_navbar_bg_color_picker').value=v;};</script>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto do menu e submenu</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="color" id="layout_sidebar_text_color_picker" value="<?= htmlspecialchars($sidebarTextForm) ?>"
+                               class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                        <input type="text" name="layout_sidebar_text_color" id="layout_sidebar_text_color" value="<?= htmlspecialchars($sidebarTextForm) ?>"
+                               class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <script>document.getElementById('layout_sidebar_text_color_picker').oninput=function(){document.getElementById('layout_sidebar_text_color').value=this.value};document.getElementById('layout_sidebar_text_color').oninput=function(){var v=this.value;if(/^#[0-9A-Fa-f]{6}$/.test(v))document.getElementById('layout_sidebar_text_color_picker').value=v;};</script>
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-slate-700 mb-1">URL do logo</label>

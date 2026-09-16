@@ -1688,6 +1688,10 @@ class MasterEscolaDetailController extends BaseController
         }
         $this->getEscolaOrFail($id);
 
+        if (!class_exists('LayoutHelper', false)) {
+            require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        }
+
         $config = [];
         $uploadFailures = [];
 
@@ -1724,6 +1728,9 @@ class MasterEscolaDetailController extends BaseController
         $layoutKeys = [
             'layout_primary_color'      => 'primary_color',
             'layout_primary_text_color' => 'primary_text_color',
+            'layout_button_primary_color' => 'button_primary_color',
+            'layout_navbar_bg_color'    => 'navbar_bg_color',
+            'layout_sidebar_text_color' => 'sidebar_text_color',
             'layout_logo_url'           => 'logo_url',
             'layout_logo_1x1_url'       => 'logo_1x1_url',
             'layout_logo_white_url'     => 'logo_white_url',
@@ -1739,11 +1746,26 @@ class MasterEscolaDetailController extends BaseController
             'layout_jornadas_ativas'    => 'jornadas_ativas_layout',
         ];
 
+        $chavesCor = [
+            'primary_color',
+            'primary_text_color',
+            'button_primary_color',
+            'navbar_bg_color',
+            'sidebar_text_color',
+        ];
         foreach ($layoutKeys as $postKey => $cfgKey) {
             $v = trim((string) ($_POST[$postKey] ?? ''));
-            if ($v !== '' && !isset($config[$cfgKey])) {
-                $config[$cfgKey] = $v;
+            if ($v === '' || isset($config[$cfgKey])) {
+                continue;
             }
+            if (in_array($cfgKey, $chavesCor, true)) {
+                $normalizado = LayoutHelper::sanitizarCorHex($v);
+                if ($normalizado === null) {
+                    continue;
+                }
+                $v = $normalizado;
+            }
+            $config[$cfgKey] = $v;
         }
         // Permitir limpar "qual logo usar" (Automático) salvando string vazia
         if (array_key_exists('layout_logo_use_login', $_POST)) {

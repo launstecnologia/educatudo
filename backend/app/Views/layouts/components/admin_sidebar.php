@@ -357,7 +357,7 @@
 }
 .admin-sidebar-nav .sidebar-subcab-toggle:hover span,
 .admin-sidebar-nav .sidebar-subcab-toggle:focus-visible span {
-    color: #fff;
+    color: var(--sidebar-submenu-text-color, var(--sidebar-text-color, #fff));
 }
 .admin-sidebar-nav .sidebar-ordem-btn {
     flex-shrink: 0;
@@ -366,7 +366,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.72);
+    color: var(--sidebar-submenu-text-color, var(--sidebar-text-color, #fff));
+    opacity: 0.72;
     border-radius: 0.375rem;
     background: transparent;
     border: 0;
@@ -375,7 +376,8 @@
 }
 .admin-sidebar-nav .sidebar-ordem-btn:hover,
 .admin-sidebar-nav .sidebar-ordem-btn:focus-visible {
-    color: #fff;
+    color: var(--sidebar-submenu-text-color, var(--sidebar-text-color, #fff));
+    opacity: 1;
     background: rgba(255, 255, 255, 0.16);
     outline: none;
 }

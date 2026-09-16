@@ -260,6 +260,41 @@ class LayoutHelper
     }
 
     /**
+     * Normaliza cor hex (#RGB / #RRGGBB). Vazio ou inválido → fallback.
+     */
+    public static function corHex(?string $hex, string $fallback): string
+    {
+        $hex = trim((string) $hex);
+        if ($hex === '' || !self::parseHexColor($hex)) {
+            $fallback = trim($fallback);
+            if ($fallback !== '' && $fallback[0] !== '#') {
+                $fallback = '#' . $fallback;
+            }
+            return $fallback !== '' ? $fallback : '#a855f7';
+        }
+        if ($hex[0] !== '#') {
+            $hex = '#' . $hex;
+        }
+        $raw = substr($hex, 1);
+        if (strlen($raw) === 3) {
+            $hex = '#' . $raw[0] . $raw[0] . $raw[1] . $raw[1] . $raw[2] . $raw[2];
+        }
+        return $hex;
+    }
+
+    /**
+     * Hex válido normalizado, ou null se vazio/inválido (não grava lixo no layout).
+     */
+    public static function sanitizarCorHex(?string $hex): ?string
+    {
+        $hex = trim((string) $hex);
+        if ($hex === '' || !self::parseHexColor($hex)) {
+            return null;
+        }
+        return self::corHex($hex, '#000000');
+    }
+
+    /**
      * Cor de texto legível sobre o fundo da sidebar.
      * Se primary_text_color contrastar bem com a primária, mantém;
      * senão força branco (sidebar colorida escura) ou preto (primária clara).
@@ -278,17 +313,32 @@ class LayoutHelper
     }
 
     /**
-     * Cores efetivas da sidebar (bg + texto com contraste garantido).
-     * Em fundos coloridos escuros/médios (padrão Colag/GOLAG) o texto é SEMPRE branco,
-     * ignorando primary_text_color quebrada no banco (ex.: preto).
+     * Cor dos botões primários (CTA). Cai na primária se a escola ainda não separou.
+     */
+    public static function getButtonPrimaryColor(): string
+    {
+        $primary = self::corHex(self::get('primary_color', '#a855f7'), '#a855f7');
+        return self::corHex(self::get('button_primary_color', ''), $primary);
+    }
+
+    /**
+     * Cores efetivas da sidebar/navbar (bg + texto).
+     * Fundo: navbar_bg_color, senão primária.
+     * Texto: sidebar_text_color se configurada; senão contraste automático no fundo.
      */
     public static function getSidebarColors(): array
     {
-        $bg = (string) self::get('primary_color', '#a855f7');
-        $rgb = self::parseHexColor($bg);
-        $lum = $rgb ? self::relativeLuminance($rgb) : 0.3;
-        // Primária típica de escola (azul/roxo) → texto branco, como no print de referência
-        $text = $lum > 0.62 ? '#111827' : '#ffffff';
+        $primary = self::corHex(self::get('primary_color', '#a855f7'), '#a855f7');
+        $bg = self::corHex(self::get('navbar_bg_color', ''), $primary);
+
+        $configuredText = trim((string) self::get('sidebar_text_color', ''));
+        if ($configuredText !== '' && self::parseHexColor($configuredText)) {
+            $text = self::corHex($configuredText, '#ffffff');
+        } else {
+            $rgb = self::parseHexColor($bg);
+            $lum = $rgb ? self::relativeLuminance($rgb) : 0.3;
+            $text = $lum > 0.62 ? '#111827' : '#ffffff';
+        }
         return [
             'bg' => $bg,
             'text' => $text,
@@ -302,24 +352,27 @@ class LayoutHelper
     {
         $config = self::getConfig();
 
-        $sidebarBg = (string) ($config['primary_color'] ?? '#a855f7');
-        $preferredText = (string) ($config['primary_text_color'] ?? '#ffffff');
-        // Sidebar: mesma regra do getSidebarColors (branco em fundo escuro/médio)
+        $primary = self::corHex($config['primary_color'] ?? '#a855f7', '#a855f7');
+        $preferredText = self::corHex($config['primary_text_color'] ?? '#ffffff', '#ffffff');
+        $secondary = self::corHex($config['secondary_color'] ?? '#0ea5e9', '#0ea5e9');
+        $secondaryText = self::corHex($config['secondary_text_color'] ?? '#ffffff', '#ffffff');
+        $buttonPrimary = self::corHex($config['button_primary_color'] ?? '', $primary);
         $sidebarColors = self::getSidebarColors();
         $sidebarText = $sidebarColors['text'];
         $sidebarBg = $sidebarColors['bg'];
 
         $css = "
         :root {
-            --primary-color: " . $sidebarBg . ";
+            --primary-color: " . $primary . ";
             --primary-text-color: " . $preferredText . ";
-            --secondary-color: " . (string) ($config['secondary_color'] ?? '#0ea5e9') . ";
-            --secondary-text-color: " . (string) ($config['secondary_text_color'] ?? '#ffffff') . ";
+            --secondary-color: " . $secondary . ";
+            --secondary-text-color: " . $secondaryText . ";
             --navbar-bg-color: " . $sidebarBg . ";
-            --button-primary-color: " . $sidebarBg . ";
-            --button-secondary-color: " . (string) ($config['secondary_color'] ?? '#0ea5e9') . ";
+            --button-primary-color: " . $buttonPrimary . ";
+            --button-secondary-color: " . $secondary . ";
             --sidebar-bg-color: " . $sidebarBg . ";
             --sidebar-text-color: " . $sidebarText . ";
+            --sidebar-submenu-text-color: " . $sidebarText . ";
             --card-bg-color: " . (string) ($config['card_bg_color'] ?? '#ffffff') . ";
             --card-border-color: " . (string) ($config['card_border_color'] ?? '#e5e7eb') . ";
             --text-primary-color: " . (string) ($config['text_primary_color'] ?? '#111827') . ";
@@ -337,8 +390,8 @@ class LayoutHelper
         .logo-navbar-wrap { max-width: 100%; min-width: 0; }
         .logo-navbar-wrap img { max-height: var(--logo-navbar-size) !important; height: var(--logo-navbar-size) !important; width: auto !important; max-width: 100% !important; object-fit: contain; }
         
-        /* Aplicar cores customizadas */
-        .bg-primary { background-color: var(--primary-color) !important; }
+        /* Aplicar cores customizadas — CTA usa a cor de botão, não o fundo do navbar */
+        .bg-primary { background-color: var(--button-primary-color) !important; }
         .text-primary { color: var(--primary-text-color) !important; }
         .text-accent { color: var(--primary-color) !important; }
         .border-accent { border-color: var(--primary-color) !important; }
@@ -350,7 +403,7 @@ class LayoutHelper
         
         /* Navbar */
         .navbar-custom { background-color: var(--navbar-bg-color) !important; }
-        .navbar-custom .text-white { color: var(--primary-text-color) !important; }
+        .navbar-custom .text-white { color: var(--sidebar-text-color) !important; }
         
         /* Botões */
         .btn-primary-custom { 
@@ -481,6 +534,29 @@ class LayoutHelper
         .sidebar-custom nav a svg,
         .sidebar-custom .menu-group > button svg {
             color: inherit !important;
+        }
+
+        /* Texto do submenu (itens aninhados: Estrutura, Acadêmico, etc.) */
+        .sidebar-custom nav [id\$='-submenu'] a,
+        .sidebar-custom nav [id\$='-submenu'] a .sidebar-text,
+        .sidebar-custom nav [id\$='-submenu'] button,
+        .sidebar-custom nav [id\$='-submenu'] button .sidebar-text,
+        .sidebar-custom nav [id\$='-submenu'] .sidebar-subcab,
+        .sidebar-custom nav [id\$='-submenu'] .sidebar-subcab span,
+        .sidebar-custom nav [id\$='-submenu'] .sidebar-subcab p,
+        .sidebar-custom nav [id\$='-submenu'] .sidebar-subcab-toggle,
+        .sidebar-custom nav [id\$='-submenu'] .sidebar-subcab-toggle span,
+        .sidebar-custom .sidebar-subcab,
+        .sidebar-custom .sidebar-subcab span,
+        .sidebar-custom .sidebar-subcab p {
+            color: var(--sidebar-submenu-text-color) !important;
+        }
+        .sidebar-custom nav [id\$='-submenu'] a i,
+        .sidebar-custom nav [id\$='-submenu'] a svg,
+        .sidebar-custom nav [id\$='-submenu'] button i,
+        .sidebar-custom nav [id\$='-submenu'] button svg {
+            color: var(--sidebar-submenu-text-color) !important;
+            stroke: currentColor;
         }
         
         /* Sidebar Header */
@@ -722,7 +798,7 @@ class LayoutHelper
                 return $url;
             }
         }
-        $primaryColor = (string) self::get('primary_color', '#a855f7');
+        $primaryColor = self::getSidebarColors()['bg'];
         $order = self::isColorDark($primaryColor)
             ? ['logo_horizontal_white', 'logo_white', 'logo_horizontal', 'logo', 'logo_1x1']
             : ['logo_horizontal', 'logo', 'logo_1x1', 'logo_horizontal_white', 'logo_white'];

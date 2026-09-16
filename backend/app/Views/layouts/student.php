@@ -1600,7 +1600,7 @@
             </div>
         </main>
         <?php if (empty($preview)): ?>
-        <?php $navPrimary = LayoutHelper::get('primary_color', '#6366f1'); ?>
+        <?php $navPrimary = LayoutHelper::getButtonPrimaryColor(); ?>
         <nav class="mobile-bottom-nav hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 flex justify-center items-stretch gap-0 z-40 safe-area-pb">
             <?php foreach ($mobileBottomNavItems as $idx => $item): ?>
                 <?php
