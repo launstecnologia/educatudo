@@ -99,6 +99,7 @@
                 height: 100vh;
                 overflow-y: auto;
                 overscroll-behavior: contain;
+                overflow-anchor: none;
             }
 
             main {

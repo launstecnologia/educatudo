@@ -163,6 +163,18 @@
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
         $zConfigOpen = in_array($cp, ['z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos'], true);
         $boletimNestedOpen = in_array($cp, ['boletim_config', 'boletim_guia'], true);
+        $estruturaNestedOpen = in_array($cp, [
+            'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
+            'curso', 'cursos-series', 'matriz-curricular', 'serie',
+        ], true);
+        $pessoasNestedOpen = in_array($cp, [
+            'teachers', 'students', 'turmas', 'grade_horaria', 'salas',
+        ], true);
+        $avaliaNestedOpen = in_array($cp, [
+            'grupos-regras-notas', 'quadros-notas', 'regras-academicas',
+            'tipos_avaliacao', 'boletins', 'boletim_guia',
+            'provas', 'provas_blocos',
+        ], true);
         $forumNestedOpen = $forumDenunciasAtivo;
         $notificacoesNestedOpen = in_array($cp, ['notifications', 'notificacoes-push'], true);
         $diarioNestedOpen = in_array($cp, ['diario_classe', 'faltas', 'presenca'], true);
@@ -321,6 +333,31 @@
 .admin-sidebar-nav .sidebar-subcab-com-ordem > p {
     min-width: 0;
     flex: 1 1 auto;
+}
+.admin-sidebar-nav .sidebar-subcab-toggle {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    background: transparent;
+    border: 0;
+    padding: 0.15rem 0.1rem;
+    margin: -0.15rem -0.1rem;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 0.375rem;
+}
+.admin-sidebar-nav .sidebar-subcab-toggle:hover,
+.admin-sidebar-nav .sidebar-subcab-toggle:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    outline: none;
+}
+.admin-sidebar-nav .sidebar-subcab-toggle:hover span,
+.admin-sidebar-nav .sidebar-subcab-toggle:focus-visible span {
+    color: #fff;
 }
 .admin-sidebar-nav .sidebar-ordem-btn {
     flex-shrink: 0;
@@ -642,6 +679,49 @@ nav a {
 </style>
 
 <script>
+(function persistirScrollSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) {
+        return;
+    }
+    const chave = 'admin-sidebar-scroll';
+    function salvar() {
+        try {
+            sessionStorage.setItem(chave, String(sidebar.scrollTop));
+        } catch (e) {}
+    }
+    function podeRestaurar() {
+        if (sidebar.classList.contains('collapsed')) {
+            return false;
+        }
+        return true;
+    }
+    function restaurar() {
+        if (!podeRestaurar()) {
+            return;
+        }
+        try {
+            const salvo = sessionStorage.getItem(chave);
+            if (salvo === null) {
+                return;
+            }
+            const top = parseInt(salvo, 10);
+            if (isNaN(top)) {
+                return;
+            }
+            sidebar.scrollTop = top;
+        } catch (e) {}
+    }
+    window.restaurarScrollSidebar = restaurar;
+    sidebar.addEventListener('scroll', salvar, { passive: true });
+    sidebar.addEventListener('click', function (e) {
+        if (e.target.closest('a[href]')) {
+            salvar();
+        }
+    });
+    window.addEventListener('pagehide', salvar);
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('sidebar');
     const toggleButton = document.getElementById('sidebarToggle');
@@ -840,6 +920,32 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem(`menu-${finGroup}-expanded`, 'true');
     }
 
+    const nestedAutoOpenMap = {
+        'ano_letivo': 'estrutura',
+        'calendario_letivo': 'estrutura',
+        'componentes-curriculares': 'estrutura',
+        'curso': 'estrutura',
+        'cursos-series': 'estrutura',
+        'matriz-curricular': 'estrutura',
+        'serie': 'estrutura',
+        'teachers': 'pessoas-turmas',
+        'students': 'pessoas-turmas',
+        'turmas': 'pessoas-turmas',
+        'grade_horaria': 'pessoas-turmas',
+        'salas': 'pessoas-turmas',
+        'grupos-regras-notas': 'como-avalia',
+        'quadros-notas': 'como-avalia',
+        'regras-academicas': 'como-avalia',
+        'tipos_avaliacao': 'como-avalia',
+        'boletins': 'como-avalia',
+        'boletim_guia': 'como-avalia',
+        'provas': 'como-avalia',
+        'provas_blocos': 'como-avalia',
+    };
+    if (nestedAutoOpenMap[currentPage]) {
+        localStorage.setItem(`menu-${nestedAutoOpenMap[currentPage]}-expanded`, 'true');
+    }
+
     // Restore expanded state from localStorage
     menuGroups.forEach(group => {
         const isExpanded = localStorage.getItem(`menu-${group}-expanded`) === 'true';
@@ -867,13 +973,23 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[id$="-nested"]').forEach(el => {
         const nestedId = el.id.replace(/-nested$/, '');
         const arrow = document.getElementById(`${nestedId}-arrow`);
+        const toggleBtn = document.querySelector('[onclick="toggleNestedMenu(\'' + nestedId + '\')"]');
         if (localStorage.getItem(`menu-${nestedId}-expanded`) === 'true') {
             el.classList.remove('hidden');
         }
-        if (!el.classList.contains('hidden') && arrow) {
+        const aberto = !el.classList.contains('hidden');
+        if (aberto && arrow) {
             arrow.style.transform = 'rotate(180deg)';
         }
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+        }
     });
+
+    if (typeof restaurarScrollSidebar === 'function') {
+        restaurarScrollSidebar();
+        requestAnimationFrame(restaurarScrollSidebar);
+    }
 });
 
 // Toggle menu group function
@@ -920,18 +1036,21 @@ function toggleNestedMenu(groupId) {
         return;
     }
     const isHidden = submenu.classList.contains('hidden');
+    const toggleBtn = document.querySelector('[onclick="toggleNestedMenu(\'' + groupId + '\')"]');
     if (isHidden) {
         submenu.classList.remove('hidden');
         if (arrow) {
             arrow.style.transform = 'rotate(180deg)';
         }
         localStorage.setItem(`menu-${groupId}-expanded`, 'true');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
     } else {
         submenu.classList.add('hidden');
         if (arrow) {
             arrow.style.transform = 'rotate(0deg)';
         }
         localStorage.setItem(`menu-${groupId}-expanded`, 'false');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
     }
 }
 

@@ -59,7 +59,8 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Implantar acadêmico</span>
         </a>
         <?php endif; ?>
-        <?php $menu_subcab_titulo = 'Estrutura'; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
+        <?php $menu_subcab_titulo = 'Estrutura'; $menu_subcab_ordenar = true; $menu_subcab_id = 'estrutura'; $menu_subcab_aberto = !empty($estruturaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
+        <div id="estrutura-nested" class="<?= !empty($estruturaNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
         <a href="<?= URL ?>/admin/ano-letivo" class="<?= $linkCls($cp === 'ano_letivo') ?>">
             <i class="fa-regular fa-calendar w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -88,7 +89,9 @@ if ($nomeMenuEscola === '') {
         </a>
         <?php endif; ?>
         </div>
-        <?php $menu_subcab_titulo = 'Pessoas e turmas'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
+        </div>
+        <?php $menu_subcab_titulo = 'Pessoas e turmas'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; $menu_subcab_id = 'pessoas-turmas'; $menu_subcab_aberto = !empty($pessoasNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
+        <div id="pessoas-turmas-nested" class="<?= !empty($pessoasNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
         <?php if ($canViewSidebar(['professores'])): ?>
         <a href="<?= URL ?>/admin/teachers" class="<?= $linkCls($cp === 'teachers') ?>">
@@ -119,7 +122,9 @@ if ($nomeMenuEscola === '') {
         </a>
         <?php endif; ?>
         </div>
-        <?php $menu_subcab_titulo = 'Como a escola avalia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
+        </div>
+        <?php $menu_subcab_titulo = 'Como a escola avalia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; $menu_subcab_id = 'como-avalia'; $menu_subcab_aberto = !empty($avaliaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
+        <div id="como-avalia-nested" class="<?= !empty($avaliaNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
         <?php if ($modOn('regras_academicas') && $canViewSidebar(['regras_academicas'])): ?>
         <a href="<?= URL ?>/admin/regras-academicas" class="<?= $linkCls($cp === 'regras-academicas') ?>">
@@ -151,6 +156,7 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Modelo de Boletim</span>
         </a>
         <?php endif; ?>
+        </div>
         </div>
     </div>
 </div>
