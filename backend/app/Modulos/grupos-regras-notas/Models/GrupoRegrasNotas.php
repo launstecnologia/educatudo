@@ -344,6 +344,55 @@ class GrupoRegrasNotas
         return is_array($row) ? $row : null;
     }
 
+    /**
+     * Colunas já usadas em provas deste quadro/bloco no ano e período.
+     *
+     * @return list<int>
+     */
+    public function marcasIdsUsadasNoPeriodo(
+        int $grupoId,
+        int $tipoId,
+        int $ano,
+        int $bimestre,
+        int $excetoBlocoId = 0
+    ): array {
+        if ($grupoId <= 0 || $ano <= 0 || $bimestre <= 0) {
+            return [];
+        }
+        if (!$this->provasBlocosTemColuna('grupo_regras_notas_id') || !$this->provasBlocosTemColuna('grupo_regras_marca_id')) {
+            return [];
+        }
+        if (!$this->provasBlocosTemColuna('ano_letivo') || !$this->provasBlocosTemColuna('bimestre')) {
+            return [];
+        }
+        $sql = 'SELECT DISTINCT grupo_regras_marca_id AS id
+                FROM provas_blocos
+                WHERE deleted_at IS NULL
+                  AND grupo_regras_notas_id = :g
+                  AND grupo_regras_marca_id IS NOT NULL
+                  AND ano_letivo = :ano
+                  AND bimestre = :bim';
+        $params = ['g' => $grupoId, 'ano' => $ano, 'bim' => $bimestre];
+        if ($tipoId > 0 && $this->provasBlocosTemColuna('grupo_regras_tipo_id')) {
+            $sql .= ' AND grupo_regras_tipo_id = :t';
+            $params['t'] = $tipoId;
+        }
+        if ($excetoBlocoId > 0) {
+            $sql .= ' AND id <> :ex';
+            $params['ex'] = $excetoBlocoId;
+        }
+        $rows = $this->db->fetchAll($sql, $params);
+        $out = [];
+        foreach ($rows ?: [] as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
     public function marcaVinculadaAoTipo(int $tipoId, int $marcaId): bool
     {
         if ($tipoId <= 0 || $marcaId <= 0) {
@@ -845,6 +894,8 @@ class GrupoRegrasNotas
             'grupo_regras_notas_id' => true,
             'grupo_regras_tipo_id' => true,
             'grupo_regras_marca_id' => true,
+            'ano_letivo' => true,
+            'bimestre' => true,
         ];
         if (!isset($permitidas[$coluna])) {
             return false;

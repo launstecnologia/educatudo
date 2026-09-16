@@ -486,10 +486,12 @@ class GrupoRegrasNotasService
 
     /**
      * Garante que tipo e marca pertencem ao mesmo grupo. Semana sai do número da marca.
+     * Sem marca, resolve a próxima S do bloco naquele ano/período.
      *
+     * @param array{ano_letivo?:int,bimestre?:int,exceto_bloco_id?:int} $periodo
      * @return array{ok:bool,error?:string,grupo_id:?int,tipo_id:?int,marca_id:?int,semana:?int}
      */
-    public function validarVinculoProva(?int $grupoId, ?int $tipoId, ?int $marcaId): array
+    public function validarVinculoProva(?int $grupoId, ?int $tipoId, ?int $marcaId, array $periodo = []): array
     {
         $grupoId = (int) $grupoId;
         $tipoId = (int) $tipoId;
@@ -536,9 +538,23 @@ class GrupoRegrasNotasService
             $tipoId = 0;
         }
 
+        if ($temMarcas && $marcaId <= 0 && $tipoId > 0) {
+            $prox = $this->proximaColunaDoBloco(
+                $grupoId,
+                $tipoId,
+                (int) ($periodo['ano_letivo'] ?? 0),
+                (int) ($periodo['bimestre'] ?? 0),
+                (int) ($periodo['exceto_bloco_id'] ?? 0)
+            );
+            if (empty($prox['ok'])) {
+                return ['ok' => false, 'error' => (string) ($prox['error'] ?? 'Não foi possível definir a semana deste bloco.')];
+            }
+            $marcaId = (int) ($prox['marca_id'] ?? 0);
+        }
+
         if ($temMarcas) {
             if ($marcaId <= 0) {
-                return ['ok' => false, 'error' => 'Selecione a coluna deste quadro.'];
+                return ['ok' => false, 'error' => 'Selecione o bloco de disciplinas para definir a semana (S) automaticamente.'];
             }
             if (!$this->model->existeMarcaNoGrupo($marcaId, $grupoId)) {
                 return ['ok' => false, 'error' => 'A coluna não pertence ao quadro selecionado.'];
@@ -568,6 +584,100 @@ class GrupoRegrasNotasService
             'tipo_id' => $tipoId > 0 ? $tipoId : null,
             'marca_id' => $marcaId > 0 ? $marcaId : null,
             'semana' => $semana,
+        ];
+    }
+
+    /**
+     * Próxima coluna S do bloco neste ano/período (S1, S3… para A; S2, S4… para B).
+     *
+     * @return array{ok:bool,error?:string,marca_id:?int,semana:?int,nome:?string,dica:?string}
+     */
+    public function proximaColunaDoBloco(
+        int $grupoId,
+        int $tipoId,
+        int $ano,
+        int $bimestre,
+        int $excetoBlocoId = 0
+    ): array {
+        $grupoId = (int) $grupoId;
+        $tipoId = (int) $tipoId;
+        if ($grupoId <= 0 || $tipoId <= 0) {
+            return ['ok' => false, 'error' => 'Informe o quadro e o bloco de disciplinas.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
+        }
+        if ($ano <= 0 || $bimestre <= 0) {
+            return ['ok' => false, 'error' => 'Informe o ano letivo e o período para definir a semana.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
+        }
+        $completo = $this->carregarCompleto($grupoId);
+        if ($completo === null) {
+            return ['ok' => false, 'error' => 'Quadro de Notas inválido.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
+        }
+        $tipo = null;
+        foreach ($completo['tipos'] ?? [] as $t) {
+            if ((int) ($t['id'] ?? 0) === $tipoId) {
+                $tipo = $t;
+                break;
+            }
+        }
+        if ($tipo === null) {
+            return ['ok' => false, 'error' => 'O bloco de disciplinas não pertence a este quadro.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
+        }
+        $idsDoBloco = array_values(array_filter(array_map('intval', $tipo['marcas_ids'] ?? [])));
+        $candidatas = [];
+        foreach ($completo['marcas'] ?? [] as $m) {
+            if (!is_array($m) || GrupoRegrasNotas::papelDaColuna($m) === 'calculada') {
+                continue;
+            }
+            $mid = (int) ($m['id'] ?? 0);
+            $n = (int) ($m['numero'] ?? 0);
+            if ($mid <= 0 || $n < 1) {
+                continue;
+            }
+            if ($idsDoBloco !== [] && !in_array($mid, $idsDoBloco, true)) {
+                continue;
+            }
+            $candidatas[] = $m;
+        }
+        usort($candidatas, static function ($a, $b) {
+            return ((int) ($a['numero'] ?? 0)) <=> ((int) ($b['numero'] ?? 0));
+        });
+        if ($candidatas === []) {
+            return ['ok' => false, 'error' => 'Este bloco não tem coluna de semana no quadro. Gere S1…SN e intercale A/B.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
+        }
+        $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId);
+        $usadasMap = [];
+        foreach ($usadas as $uid) {
+            $usadasMap[(int) $uid] = true;
+        }
+        $escolhida = null;
+        $ordemNoBloco = 0;
+        foreach ($candidatas as $m) {
+            $ordemNoBloco++;
+            if (!isset($usadasMap[(int) $m['id']])) {
+                $escolhida = $m;
+                break;
+            }
+        }
+        if ($escolhida === null) {
+            $nomeBloco = trim((string) ($tipo['nome'] ?? 'bloco'));
+            return [
+                'ok' => false,
+                'error' => 'Todas as semanas deste bloco já têm prova neste período. Gere mais colunas no quadro ou use o outro bloco.',
+                'marca_id' => null,
+                'semana' => null,
+                'nome' => null,
+                'dica' => $nomeBloco,
+            ];
+        }
+        $semana = (int) ($escolhida['numero'] ?? 0);
+        $nome = trim((string) ($escolhida['nome'] ?? ('S' . $semana)));
+        $nomeBloco = trim((string) ($tipo['nome'] ?? 'Bloco'));
+
+        return [
+            'ok' => true,
+            'marca_id' => (int) ($escolhida['id'] ?? 0),
+            'semana' => $semana,
+            'nome' => $nome,
+            'dica' => $nome . ' · ' . $nomeBloco . ' · ' . $ordemNoBloco . 'ª semana deste bloco neste período',
         ];
     }
 

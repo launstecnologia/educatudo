@@ -143,6 +143,30 @@ class GrupoRegrasNotasAdminController extends AdminBaseController
         $this->json(['ok' => true, 'grupo' => $payload]);
     }
 
+    public function proximaColunaJson($id): void
+    {
+        $user = $this->auth->getUser();
+        if (!class_exists('AdminPermissionMatrix')) {
+            require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
+        }
+        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        $pode = AdminPermissionMatrix::can($permissions, 'grupos_regras_notas', 'visualizar')
+            || AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar')
+            || AdminPermissionMatrix::can($permissions, 'provas_online', 'visualizar');
+        if (!$pode) {
+            $this->json(['ok' => false, 'error' => 'Sem permissão para esta ação.'], 403);
+            return;
+        }
+        $prox = $this->service->proximaColunaDoBloco(
+            (int) $id,
+            (int) ($_GET['tipo_id'] ?? 0),
+            (int) ($_GET['ano'] ?? 0),
+            (int) ($_GET['bimestre'] ?? 0),
+            (int) ($_GET['exceto_bloco_id'] ?? 0)
+        );
+        $this->json($prox, !empty($prox['ok']) ? 200 : 422);
+    }
+
     /**
      * @return list<array{id:int,nome:string}>
      */

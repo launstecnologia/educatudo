@@ -468,6 +468,7 @@ class ExamBlockController extends BaseController
             if (!$postData) {
                 $postData = $_POST;
             }
+            $postData['id'] = (int) $id;
             $postData['prazo_entrega_professor'] = $this->normalizarDataHoraParaDb($postData['prazo_entrega_professor'] ?? null);
             if (empty($postData['prazo_entrega_professor'])) {
                 $postData['prazo_entrega_professor'] = $this->montarPrazoFallback($postData);
@@ -1311,12 +1312,18 @@ class ExamBlockController extends BaseController
         } else {
             return $vazio;
         }
+        $periodo = [
+            'ano_letivo' => (int) ($postData['ano_letivo'] ?? 0),
+            'bimestre' => (int) ($postData['bimestre'] ?? 0),
+            'exceto_bloco_id' => (int) ($postData['id'] ?? $postData['bloco_id'] ?? 0),
+        ];
         $itens = [];
         foreach ($linhas as $row) {
             $r = $svc->validarVinculoProva(
                 $this->idPositivoOuNulo($row['grupo_id'] ?? $row['grupo_regras_notas_id'] ?? null),
                 $this->idPositivoOuNulo($row['tipo_id'] ?? $row['grupo_regras_tipo_id'] ?? null),
-                $this->idPositivoOuNulo($row['marca_id'] ?? $row['grupo_regras_marca_id'] ?? null)
+                $this->idPositivoOuNulo($row['marca_id'] ?? $row['grupo_regras_marca_id'] ?? null),
+                $periodo
             );
             if (empty($r['ok'])) {
                 return $r + ['aplicar' => false, 'itens' => []];

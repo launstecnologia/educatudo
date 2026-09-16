@@ -11,7 +11,7 @@ $ui = dirname(__DIR__, 4) . '/Views/admin/_partials/ui';
 
 $page_header_back_url = URL . '/admin/quadros-notas';
 $page_header_title = $ehEdicao ? 'Editar quadro de notas' : 'Novo quadro de notas';
-$page_header_subtitle = 'Defina quantas semanas o molde tem e, se a escola alterna matérias, intercale Bloco A e B (A na S1, B na S2, e segue).';
+$page_header_subtitle = 'Molde anual: gere S1…SN do bimestre mais longo e intercale A/B. Em Lançamento de Notas você escolhe o bloco e a semana daquele período entra sozinha.';
 include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_form.php';
 include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
 
@@ -88,7 +88,7 @@ $steps = [
             <?php ob_start(); ?>
             <div class="space-y-6">
                 <?php $ui_form_secao_titulo = 'Colunas'; include $ui . '/form_secao.php'; ?>
-                <p class="text-sm text-gray-500 -mt-2">Informe quantas semanas este molde cobre (4, 6…) e gere S1 até SN. Bimestre mais curto na avaliação usa só as primeiras. Coluna extra (AV1, Trabalho) continua no + Coluna. Escala e fechamento ficam no tipo de nota.</p>
+                <p class="text-sm text-gray-500 -mt-2">Informe quantas semanas o molde cobre no bimestre mais longo (4, 6…) e gere S1 até SN. O quadro é anual: em Lançamento de Notas você escolhe o bloco e a semana daquele bimestre entra sozinha. Coluna extra (AV1, Trabalho) continua no + Coluna.</p>
                 <div id="wizardStep2Erro" class="hidden rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-3">
                     <i class="fa-solid fa-circle-info mr-2"></i>
                     Sem colunas, o lançamento de notas não tem destino no quadro. Você pode avançar e cadastrar só blocos de disciplinas, se for o caso.
@@ -110,7 +110,7 @@ $steps = [
                     <button type="button" id="btn-add-coluna" class="btn-primary-custom h-10 px-3 rounded-lg text-sm font-medium">+ Coluna</button>
                 </div>
                 <div id="lista-colunas" class="space-y-3"></div>
-                <p id="vazio-colunas" class="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">Nenhuma coluna. Use “Sugerir S1 a S8” ou cadastre AV1, Simulado 1…</p>
+                <p id="vazio-colunas" class="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">Nenhuma coluna. Gere S1 até SN ou cadastre AV1, Simulado 1…</p>
                 <?php
                 $ui_wizard_actions_back_step = 1;
                 $ui_wizard_actions_next_label = 'Próximo';
