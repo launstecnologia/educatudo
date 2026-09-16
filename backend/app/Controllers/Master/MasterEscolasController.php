@@ -1039,6 +1039,29 @@ class MasterEscolasController extends BaseController
     }
 
     /**
+     * Recoloca na fila uma clonagem que falhou (usa o cadastro já criado da escola destino).
+     */
+    public function clonarRetry(): void
+    {
+        $this->requireMaster();
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Recarregue a página e tente novamente.', 'error');
+            header('Location: ' . URL . '/master/escolas');
+            exit;
+        }
+
+        require_once __DIR__ . '/../../Services/MasterFilaService.php';
+        $result = MasterFilaService::reenfileirarClonagem((int) ($_POST['job_id'] ?? 0));
+        if (!empty($result['success'])) {
+            $this->setFlashMessage('Clonagem reenfileirada. Acompanhe o status nesta página.', 'success');
+        } else {
+            $this->setFlashMessage((string) ($result['error'] ?? 'Não foi possível tentar de novo.'), 'error');
+        }
+        header('Location: ' . URL . '/master/escolas');
+        exit;
+    }
+
+    /**
      * JSON com os jobs recentes de clonagem (polling da listagem).
      */
     public function clonarJobs(): void

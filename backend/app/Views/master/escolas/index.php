@@ -42,20 +42,32 @@
                 $st = (string) ($job['status'] ?? '');
                 [$label, $cls] = $rotuloStatusJob($st);
                 $res = is_array($job['resultado_decoded'] ?? null) ? $job['resultado_decoded'] : [];
-                $msg = (string) ($res['mensagem'] ?? $job['mensagem_erro'] ?? '');
+                $erro = trim((string) ($job['mensagem_erro'] ?? ''));
+                $msg = $st === 'failed'
+                    ? ($erro !== '' ? $erro : (string) ($res['mensagem'] ?? ''))
+                    : (string) ($res['mensagem'] ?? $erro);
             ?>
-            <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span class="text-slate-700">
-                    <?= htmlspecialchars((string) ($job['origem_nome'] ?? 'Escola')) ?>
-                    →
-                    <?= htmlspecialchars((string) ($job['destino_nome'] ?? 'nova escola')) ?>
-                </span>
-                <span class="inline-flex items-center gap-2">
+            <li class="flex flex-col gap-1 text-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-slate-700">
+                        <?= htmlspecialchars((string) ($job['origem_nome'] ?? 'Escola')) ?>
+                        →
+                        <?= htmlspecialchars((string) ($job['destino_nome'] ?? 'nova escola')) ?>
+                    </span>
                     <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <?= $cls ?>"><?= htmlspecialchars($label) ?></span>
-                    <?php if ($msg !== ''): ?>
-                    <span class="text-xs text-slate-500"><?= htmlspecialchars($msg) ?></span>
-                    <?php endif; ?>
-                </span>
+                </div>
+                <?php if ($msg !== ''): ?>
+                <p class="text-xs <?= $st === 'failed' ? 'text-red-700' : 'text-slate-500' ?> break-words"><?= htmlspecialchars($msg) ?></p>
+                <?php endif; ?>
+                <?php if ($st === 'failed'): ?>
+                <form method="POST" action="<?= URL ?>/master/escolas/clonar-retry" class="mt-1">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+                    <input type="hidden" name="job_id" value="<?= (int) ($job['id'] ?? 0) ?>">
+                    <button type="submit" class="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                        Tentar de novo
+                    </button>
+                </form>
+                <?php endif; ?>
             </li>
             <?php endforeach; ?>
         </ul>

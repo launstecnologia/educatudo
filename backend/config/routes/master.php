@@ -12,6 +12,7 @@ $router->get('/master/escolas/editar', 'Master/MasterEscolasController@edit');
 $router->post('/master/escolas/atualizar', 'Master/MasterEscolasController@update');
 $router->post('/master/escolas/manutencao', 'Master/MasterEscolasController@toggleManutencao');
 $router->post('/master/escolas/clonar', 'Master/MasterEscolasController@clonar');
+$router->post('/master/escolas/clonar-retry', 'Master/MasterEscolasController@clonarRetry');
 $router->get('/master/escolas/clonar-jobs', 'Master/MasterEscolasController@clonarJobs');
 $router->post('/master/escolas/verificar-dominio', 'Master/MasterEscolasController@verificarDominio');
 $router->get('/master/escolas/verificar-dominios-cron', 'Master/MasterEscolasController@verificarDominiosCron');

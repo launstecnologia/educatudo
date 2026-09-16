@@ -83,6 +83,96 @@ class MasterFilaService
     }
 
     /**
+     * Recoloca um job de clonagem falho na fila, restaurando a senha do cadastro da escola destino.
+     *
+     * @return array{success:bool,error?:string}
+     */
+    public static function reenfileirarClonagem(int $jobId): array
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof PDO) {
+            return ['success' => false, 'error' => 'Não foi possível conectar ao banco master.'];
+        }
+        if (!self::tabelaExiste($pdo) || $jobId < 1) {
+            return ['success' => false, 'error' => 'Job inválido.'];
+        }
+
+        $st = $pdo->prepare('SELECT * FROM fila_jobs_master WHERE id = :id LIMIT 1');
+        $st->execute(['id' => $jobId]);
+        $job = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$job) {
+            return ['success' => false, 'error' => 'Job não encontrado.'];
+        }
+        if ((string) ($job['tipo'] ?? '') !== self::TIPO_CLONAR_ESCOLA) {
+            return ['success' => false, 'error' => 'Só é possível reenfileirar clonagem de escola.'];
+        }
+        $status = (string) ($job['status'] ?? '');
+        if (!in_array($status, ['failed', 'pending'], true)) {
+            return ['success' => false, 'error' => 'Este job ainda está em andamento.'];
+        }
+
+        $payload = json_decode((string) ($job['payload'] ?? ''), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $destinoId = (int) ($job['escola_destino_id'] ?? $payload['escola_destino_id'] ?? 0);
+        if ($destinoId > 0) {
+            require_once __DIR__ . '/../Core/MasterSecretVault.php';
+            $cfg = $pdo->prepare(
+                'SELECT host, porta, nome_banco, usuario, senha_criptografada
+                   FROM config_escolas_banco WHERE escola_id = :id LIMIT 1'
+            );
+            $cfg->execute(['id' => $destinoId]);
+            $banco = $cfg->fetch(PDO::FETCH_ASSOC) ?: [];
+            if ($banco) {
+                $payload['db_host'] = (string) ($banco['host'] ?? $payload['db_host'] ?? '');
+                $payload['db_porta'] = (int) ($banco['porta'] ?? $payload['db_porta'] ?? 3306);
+                $payload['db_nome_banco'] = (string) ($banco['nome_banco'] ?? $payload['db_nome_banco'] ?? '');
+                $payload['db_usuario'] = (string) ($banco['usuario'] ?? $payload['db_usuario'] ?? '');
+                $payload['db_senha_criptografada'] = (string) ($banco['senha_criptografada'] ?? '');
+            }
+            $esc = $pdo->prepare('SELECT nome, slug, dominio FROM escolas WHERE id = :id LIMIT 1');
+            $esc->execute(['id' => $destinoId]);
+            $escola = $esc->fetch(PDO::FETCH_ASSOC) ?: [];
+            if ($escola) {
+                $payload['nome'] = (string) ($escola['nome'] ?? $payload['nome'] ?? '');
+                $payload['slug'] = (string) ($escola['slug'] ?? $payload['slug'] ?? '');
+                $payload['dominio'] = (string) ($escola['dominio'] ?? $payload['dominio'] ?? '');
+            }
+        }
+
+        require_once __DIR__ . '/../Core/MasterSecretVault.php';
+        $senha = MasterSecretVault::decryptDbPassword((string) ($payload['db_senha_criptografada'] ?? ''));
+        if ($senha === '' || trim((string) ($payload['db_nome_banco'] ?? '')) === '') {
+            return ['success' => false, 'error' => 'Não há credenciais do banco destino para repetir a clonagem. Edite a escola e clone de novo.'];
+        }
+
+        $up = $pdo->prepare(
+            "UPDATE fila_jobs_master
+                SET status = 'pending',
+                    payload = :payload,
+                    mensagem_erro = NULL,
+                    resultado = :resultado,
+                    tentativas = 0,
+                    started_at = NULL,
+                    completed_at = NULL
+              WHERE id = :id"
+        );
+        $up->execute([
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'resultado' => json_encode([
+                'mensagem' => 'Reenfileirado. Aguardando o worker…',
+                'percentual' => 0,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'id' => $jobId,
+        ]);
+
+        self::tryProcessImmediately();
+        return ['success' => true];
+    }
+
+    /**
      * @param array<string,mixed> $resultado
      */
     public static function atualizarProgresso(int $jobId, string $mensagem, int $percentual = 0, array $extra = []): void
@@ -193,12 +283,18 @@ class MasterFilaService
                 "UPDATE fila_jobs_master
                     SET status = :status,
                         mensagem_erro = :erro,
+                        resultado = :resultado,
                         completed_at = IF(:final = 1, NOW(), completed_at)
                   WHERE id = :id"
             );
             $fail->execute([
                 'status' => $final ? 'failed' : 'pending',
                 'erro' => substr($e->getMessage(), 0, 4000),
+                'resultado' => json_encode([
+                    'ok' => false,
+                    'mensagem' => $e->getMessage(),
+                    'percentual' => 0,
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 'final' => $final ? 1 : 0,
                 'id' => $jobId,
             ]);

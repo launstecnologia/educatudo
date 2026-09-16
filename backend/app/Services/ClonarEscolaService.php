@@ -200,22 +200,39 @@ class ClonarEscolaService
         $ativo = !empty($payload['ativo']) ? 1 : 0;
         $criarBanco = !empty($payload['criar_banco']);
 
+        $masterPdo = MasterFilaService::masterPdo();
+        if (!$masterPdo instanceof PDO) {
+            throw new RuntimeException('Não foi possível conectar ao banco master.');
+        }
+
         $host = trim((string) ($payload['db_host'] ?? ''));
         $porta = (int) ($payload['db_porta'] ?? 3306);
         $nomeBanco = trim((string) ($payload['db_nome_banco'] ?? ''));
         $usuario = trim((string) ($payload['db_usuario'] ?? ''));
         $senha = MasterSecretVault::decryptDbPassword((string) ($payload['db_senha_criptografada'] ?? ''));
+        if ($destinoId > 0 && ($senha === '' || $nomeBanco === '')) {
+            $cfg = $masterPdo->prepare(
+                'SELECT host, porta, nome_banco, usuario, senha_criptografada
+                   FROM config_escolas_banco WHERE escola_id = :id LIMIT 1'
+            );
+            $cfg->execute(['id' => $destinoId]);
+            $banco = $cfg->fetch(PDO::FETCH_ASSOC) ?: [];
+            if ($banco) {
+                $host = $host !== '' ? $host : trim((string) ($banco['host'] ?? ''));
+                $porta = $porta > 0 ? $porta : (int) ($banco['porta'] ?? 3306);
+                $nomeBanco = $nomeBanco !== '' ? $nomeBanco : trim((string) ($banco['nome_banco'] ?? ''));
+                $usuario = $usuario !== '' ? $usuario : trim((string) ($banco['usuario'] ?? ''));
+                if ($senha === '') {
+                    $senha = MasterSecretVault::decryptDbPassword((string) ($banco['senha_criptografada'] ?? ''));
+                }
+            }
+        }
 
         if ($origemId < 1 || $destinoId < 1 || $nome === '' || $slug === '') {
             throw new RuntimeException('Payload de clonagem incompleto.');
         }
         if ($host === '' || $nomeBanco === '' || $usuario === '' || $senha === '') {
             throw new RuntimeException('Credenciais do banco destino incompletas.');
-        }
-
-        $masterPdo = MasterFilaService::masterPdo();
-        if (!$masterPdo instanceof PDO) {
-            throw new RuntimeException('Não foi possível conectar ao banco master.');
         }
 
         $origem = self::buscarEscolaComBanco($masterPdo, $origemId);
@@ -242,7 +259,10 @@ class ClonarEscolaService
         }
 
         if ($criarBanco) {
-            self::criarBancoDestino($host, $porta, $nomeBanco, $usuario, $senha);
+            $criado = self::criarBancoDestino($host, $porta, $nomeBanco, $usuario, $senha);
+            $host = $criado['host'];
+            $porta = $criado['porta'];
+            self::gravarConfigBanco($masterPdo, $destinoId, $host, $porta, $nomeBanco, $usuario, $senha);
         }
 
         self::garantirBancoDestinoPronto($host, $porta, $nomeBanco, $usuario, $senha, $destinoId, $masterPdo, $tentativas > 1);
@@ -329,7 +349,10 @@ class ClonarEscolaService
         return $row ?: null;
     }
 
-    private static function criarBancoDestino(string $host, int $porta, string $nomeBanco, string $usuario, string $senha): void
+    /**
+     * @return array{host:string,porta:int}
+     */
+    private static function criarBancoDestino(string $host, int $porta, string $nomeBanco, string $usuario, string $senha): array
     {
         if (!MysqlProvisioningService::isAvailable()) {
             throw new RuntimeException('Criação automática de banco indisponível (defina DB_ADMIN_USER e DB_ADMIN_PASS).');
@@ -351,9 +374,15 @@ class ClonarEscolaService
             );
         } catch (Throwable $e) {
             throw new RuntimeException(
-                MysqlProvisioningService::formatarErroAdminMysql($e, $adminUser, $adminHost)
+                'Falha ao criar o banco destino: '
+                . MysqlProvisioningService::formatarErroAdminMysql($e, $adminUser, $adminHost)
             );
         }
+
+        return [
+            'host' => $adminHost !== '' ? $adminHost : $host,
+            'porta' => $adminPorta > 0 ? $adminPorta : $porta,
+        ];
     }
 
     private static function garantirBancoDestinoPronto(
@@ -366,7 +395,15 @@ class ClonarEscolaService
         PDO $masterPdo,
         bool $permitirEsvaziar = false
     ): void {
-        $pdo = self::conectarMysql($host, $porta, $usuario, $senha, $nomeBanco, false);
+        try {
+            $pdo = self::conectarMysql($host, $porta, $usuario, $senha, $nomeBanco, false);
+        } catch (Throwable $e) {
+            throw new RuntimeException(
+                'Não foi possível conectar no MySQL destino (' . $host . ':' . $porta
+                . ') com o usuário "' . $usuario . '". Confira host/usuário/senha'
+                . ' ou marque criar banco automaticamente. Detalhe: ' . $e->getMessage()
+            );
+        }
         $dbQ = self::quoteIdent($nomeBanco);
         try {
             $pdo->exec('USE ' . $dbQ);
