@@ -26,6 +26,9 @@ $periodoFiltro = PeriodoLetivo::doAno((int) date('Y'));
 if (!empty($filterStatus)) {
     $filtrosAtivosCount++;
 }
+$qsListaAtual = http_build_query($_GET ?? []);
+$voltarListaPath = '/admin/provas' . ($qsListaAtual !== '' ? ('?' . $qsListaAtual) : '');
+$editarVoltarQs = $qsListaAtual !== '' ? ('?voltar=' . rawurlencode($voltarListaPath)) : '';
 ?>
 <!-- Header Section -->
 <div class="mb-8">
@@ -57,7 +60,7 @@ if (!empty($filterStatus)) {
                 <i class="fa-solid fa-table-cells mr-2 text-gray-500"></i>
                 Bloco Professor
             </a>
-            <a href="<?= URL ?>/admin/provas/blocos/criar"
+            <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo Evento
@@ -162,7 +165,7 @@ if (!empty($filterStatus)) {
         <div class="ml-3">
             <p class="text-sm text-yellow-700">
                 <strong><?= count($provas_pendentes) ?> prova(s) pendente(s)</strong> aguardando agrupamento em blocos.
-                <a href="<?= URL ?>/admin/provas/blocos/criar" class="font-medium underline ml-1">Criar novo bloco</a>
+                <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>" class="font-medium underline ml-1">Criar novo bloco</a>
             </p>
         </div>
     </div>
@@ -277,8 +280,18 @@ function closeFilterDrawer() {
 }
 
 function clearFilters() {
+    try { sessionStorage.removeItem('educatudo:admin-provas-filtros'); } catch (e) {}
     window.location.href = <?= json_encode(URL . '/admin/provas') ?>;
 }
+
+(function () {
+    var qs = window.location.search || '';
+    try {
+        if (qs && qs !== '?') {
+            sessionStorage.setItem('educatudo:admin-provas-filtros', qs);
+        }
+    } catch (e) {}
+})();
 
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
@@ -331,7 +344,7 @@ document.addEventListener('keydown', function(e) {
                             </svg>
                             <p class="text-gray-500 text-lg mb-2">Nenhum bloco criado ainda</p>
                             <p class="text-sm text-gray-400 mb-4">Comece criando um novo bloco de provas</p>
-                            <a href="<?= URL ?>/admin/provas/blocos/criar" 
+                            <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>"
                                class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg hover:opacity-90">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -420,7 +433,7 @@ document.addEventListener('keydown', function(e) {
                                         data-bloco-id="<?= (int)$bloco['id'] ?>"
                                         data-status="<?= htmlspecialchars($st) ?>"
                                         data-gerenciar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/gerenciar') ?>"
-                                        data-editar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/editar') ?>"
+                                        data-editar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/editar' . $editarVoltarQs) ?>"
                                         data-duplicar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/duplicar') ?>"
                                         onclick="abrirDropdownAcoes(this)">
                                     <span>Ações</span>

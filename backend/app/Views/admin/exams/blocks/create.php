@@ -30,6 +30,11 @@ $ui_wizard_steps = [
     ['label' => 'Revisão', 'sub' => 'Confirmar'],
 ];
 $ui_wizard_current = 1;
+$urlVoltarListaProvas = rtrim((string) URL, '/') . '/admin/provas';
+$voltarRaw = (string) ($_GET['voltar'] ?? '');
+if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$#', $voltarRaw)) {
+    $urlVoltarListaProvas = rtrim((string) URL, '/') . $voltarRaw;
+}
 ?>
 <div class="mb-8">
     <div class="flex justify-between items-center">
@@ -42,8 +47,9 @@ $ui_wizard_current = 1;
             </p>
         </div>
 
-        <a href="<?= URL ?>/admin/provas" 
-           class="text-gray-600 hover:text-gray-900">
+        <a href="<?= htmlspecialchars($urlVoltarListaProvas, ENT_QUOTES, 'UTF-8') ?>"
+           class="text-gray-600 hover:text-gray-900"
+           onclick="this.href=typeof urlListaProvas==='function'?urlListaProvas():this.href">
             ← Voltar
         </a>
     </div>
@@ -449,8 +455,9 @@ $ui_wizard_current = 1;
                 <i class="fa-solid fa-arrow-left mr-2"></i>Voltar
             </button>
             <div class="flex justify-end space-x-4">
-            <a href="<?= URL ?>/admin/provas" 
-               class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+            <a href="<?= htmlspecialchars($urlVoltarListaProvas, ENT_QUOTES, 'UTF-8') ?>"
+               class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+               onclick="this.href=typeof urlListaProvas==='function'?urlListaProvas():this.href">
                 Cancelar
             </a>
             <button type="submit" 
@@ -469,6 +476,28 @@ const professores = <?= json_encode($professores ?? []) ?>;
 const materias = <?= json_encode($materias ?? []) ?>;
 const turmas = <?= json_encode($turmas ?? []) ?>;
 let professorCounter = 0;
+
+function urlListaProvas() {
+    const padrao = <?= json_encode($urlVoltarListaProvas, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    if (String(padrao).indexOf('?') !== -1) {
+        return padrao;
+    }
+    try {
+        let q = sessionStorage.getItem('educatudo:admin-provas-filtros') || '';
+        if (!q) {
+            return padrao;
+        }
+        if (q.charAt(0) !== '?') {
+            q = '?' + q;
+        }
+        if (!/^\?[A-Za-z0-9_\-.&=%+]*$/.test(q)) {
+            return padrao;
+        }
+        return <?= json_encode(rtrim((string) URL, '/') . '/admin/provas', JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> + q;
+    } catch (e) {
+        return padrao;
+    }
+}
 const draftStorageKey = `educatudo:prova-evento:create:v2:${window.location.host}:${window.location.pathname}`;
 let draftSaveTimer = null;
 let restoringDraft = false;
@@ -1541,7 +1570,7 @@ function salvarBloco(event) {
     .then(data => {
         if (data.success) {
             limparRascunhoEvento(false);
-            window.location.href = '<?= URL ?>/admin/provas';
+            window.location.href = urlListaProvas();
         } else {
             let msg = data.error || 'Erro desconhecido';
             if (data.missing_columns && data.missing_columns.length) {
