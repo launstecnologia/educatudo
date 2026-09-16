@@ -108,6 +108,22 @@ Processa a fila `ai_jobs` de cada escola (até 5 jobs por tenant por execução)
 * * * * * /usr/bin/php /caminho/projeto/backend/cron/process_ai_jobs.php >> /caminho/projeto/backend/storage/logs/ai_jobs_cron.log 2>&1
 ```
 
+### 2d-2. `process_master_jobs.php`
+
+Processa a fila `fila_jobs_master` (jobs longos do painel Master, hoje: clonar escola + dump/restore do banco).
+
+**Frequência recomendada:** a cada minuto
+
+```
+* * * * * /usr/bin/php /caminho/projeto/backend/cron/process_master_jobs.php >> /caminho/projeto/backend/storage/logs/master_jobs_cron.log 2>&1
+```
+
+**Pré-requisito:** migration master `2026_09_16_fila_jobs_master.sql`
+
+O painel também tenta disparar o worker em background ao enfileirar. O cron é a garantia se o `exec()` estiver desabilitado.
+
+**Logs:** `storage/logs/master_jobs_cron.log`
+
 ### 2e. `presenca_corte.php`
 
 Gestão de Presença: após o horário de corte da 1ª aula da turma, marca falta nos alunos sem entrada no dia e recalcula `faltas_lancamentos` dos eventos de origem Diário (se a escola ligou a consolidação).

@@ -68,6 +68,27 @@ class MasterEscolasController extends BaseController
         return $this->getDominioEscolaService()->configuracaoParaView();
     }
 
+    private function invalidarCacheResolucaoTenant(array $escola): void
+    {
+        $id = (int) ($escola['id'] ?? 0);
+        $slug = strtolower(trim((string) ($escola['slug'] ?? '')));
+        $dominio = strtolower(trim((string) ($escola['dominio'] ?? '')));
+        if ($dominio !== '' && strpos($dominio, ':') !== false) {
+            $dominio = explode(':', $dominio, 2)[0];
+        }
+
+        require_once __DIR__ . '/../../Core/RedisCache.php';
+        if ($id > 0) {
+            RedisCache::delete('tenant_config_' . $id);
+        }
+        if ($dominio !== '') {
+            RedisCache::delete('tenant_' . $dominio);
+            if ($slug !== '') {
+                RedisCache::delete('tenant_' . $dominio . '_' . $slug);
+            }
+        }
+    }
+
     private function getLayoutConfig(int $escolaId): array
     {
         $db = Database::getInstance();
@@ -278,8 +299,12 @@ class MasterEscolasController extends BaseController
         $stmt = $tenant['pdo']->prepare(
             "SELECT config_value FROM config_layout WHERE config_key = 'maintenance_mode' LIMIT 1"
         );
-        $stmt->execute();
-        $value = $stmt->fetchColumn();
+        try {
+            $stmt->execute();
+            $value = $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return null;
+        }
 
         return $value === false ? '0' : (string) $value;
     }
@@ -356,14 +381,19 @@ class MasterEscolasController extends BaseController
             "SELECT e.id, e.nome, e.slug, e.dominio, e.ativo, e.created_at,
                     e.dns_status, e.ssl_status, e.ssl_expira_em,
                     COALESCE(ml.config_value, '0') AS maintenance_mode,
+                    b.host AS db_host, b.porta AS db_porta, b.nome_banco AS db_nome_banco, b.usuario AS db_usuario,
                     (SELECT COUNT(*) FROM config_escolas_banco c WHERE c.escola_id = e.id) AS tem_banco
              FROM escolas e
              LEFT JOIN config_escolas_layout ml
                ON ml.escola_id = e.id AND ml.config_key = 'maintenance_mode'
+             LEFT JOIN config_escolas_banco b ON b.escola_id = e.id
              ORDER BY e.nome
              LIMIT {$perPage} OFFSET {$offset}"
         )->fetchAll(PDO::FETCH_ASSOC);
         $escolas = $this->syncMaintenanceStatusFromTenants($escolas);
+
+        require_once __DIR__ . '/../../Services/MasterFilaService.php';
+        require_once __DIR__ . '/../../Core/MysqlProvisioningService.php';
 
         $this->viewWithLayout('master', 'master/escolas/index', [
             'title' => 'Escolas - Painel Master',
@@ -373,6 +403,9 @@ class MasterEscolasController extends BaseController
             'escolas' => $escolas,
             'csrf_token' => $this->generateCsrfToken(),
             'dominio_config' => $this->getDominioViewConfig(),
+            'criar_banco_disponivel' => MysqlProvisioningService::isAvailable(),
+            'jobs_clonagem' => MasterFilaService::listarRecentes(MasterFilaService::TIPO_CLONAR_ESCOLA, 10),
+            'tem_jobs_clonagem_pendentes' => MasterFilaService::temPendentes(MasterFilaService::TIPO_CLONAR_ESCOLA),
             'pagination' => [
                 'page' => $page,
                 'per_page' => $perPage,
@@ -456,6 +489,7 @@ class MasterEscolasController extends BaseController
             "INSERT INTO escolas (nome, slug, dominio, ativo, dns_status, ssl_status) VALUES (?, ?, ?, ?, ?, ?)",
             [$nome, $slug, $dominio, $ativo, $dnsStatus, DominioEscolaService::SSL_NAO_VERIFICADO]
         );
+        $this->invalidarCacheResolucaoTenant(['id' => $escolaId, 'slug' => $slug, 'dominio' => $dominio]);
 
         $host = trim($_POST['db_host'] ?? 'localhost');
         $porta = (int) ($_POST['db_porta'] ?? 3306);
@@ -595,7 +629,7 @@ class MasterEscolasController extends BaseController
             exit;
         }
         $db = Database::getInstance();
-        $escola = $db->query("SELECT id FROM escolas WHERE id = ?", [$id])->fetch(PDO::FETCH_ASSOC);
+        $escola = $db->query("SELECT id, slug, dominio FROM escolas WHERE id = ?", [$id])->fetch(PDO::FETCH_ASSOC);
         if (!$escola) {
             $this->setFlashMessage('Escola não encontrada.', 'error');
             header('Location: ' . URL . '/master/escolas');
@@ -638,6 +672,8 @@ class MasterEscolasController extends BaseController
             "UPDATE escolas SET nome = ?, slug = ?, dominio = ?, ativo = ?, dns_status = ? WHERE id = ?",
             [$nome, $slug, $dominio, $ativo, $dnsStatus, $id]
         );
+        $this->invalidarCacheResolucaoTenant($escola);
+        $this->invalidarCacheResolucaoTenant(['id' => $id, 'slug' => $slug, 'dominio' => $dominio]);
 
         $host = trim($_POST['db_host'] ?? 'localhost');
         $porta = (int) ($_POST['db_porta'] ?? 3306);
@@ -714,6 +750,8 @@ class MasterEscolasController extends BaseController
                 );
             }
             if ($erroAdmin !== '') {
+                $this->invalidarCacheResolucaoTenant($escola);
+                $this->invalidarCacheResolucaoTenant(['id' => $id, 'slug' => $slug, 'dominio' => $dominio]);
                 $this->setFlashMessage($erroAdmin, 'error');
                 header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
                 exit;
@@ -730,6 +768,8 @@ class MasterEscolasController extends BaseController
         if ($nomeBanco !== '' && $usuario !== '' && !isset($_POST['nao_sincronizar'])) {
             $this->syncLayoutToTenant($id);
         }
+        $this->invalidarCacheResolucaoTenant($escola);
+        $this->invalidarCacheResolucaoTenant(['id' => $id, 'slug' => $slug, 'dominio' => $dominio]);
 
         $this->setFlashMessage('Escola atualizada com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas');
@@ -957,6 +997,60 @@ class MasterEscolasController extends BaseController
         }
         header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
         exit;
+    }
+
+    /**
+     * Enfileira clonagem completa da escola (cadastro + banco) para processamento em background.
+     */
+    public function clonar(): void
+    {
+        $this->requireMaster();
+        $ajax = !empty($_POST['ajax'])
+            || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            if ($ajax) {
+                $this->json(['success' => false, 'error' => 'Sessão expirada. Recarregue a página e tente novamente.'], 400);
+            }
+            $this->setFlashMessage('Sessão expirada. Recarregue a página e tente novamente.', 'error');
+            header('Location: ' . URL . '/master/escolas');
+            exit;
+        }
+
+        require_once __DIR__ . '/../../Services/ClonarEscolaService.php';
+        $result = ClonarEscolaService::enfileirar(
+            $_POST,
+            (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)
+        );
+
+        if ($ajax) {
+            $this->json($result, !empty($result['success']) ? 200 : 400);
+        }
+
+        if (!empty($result['success'])) {
+            $this->setFlashMessage(
+                'Clonagem enfileirada. O banco é copiado em segundo plano — acompanhe o status nesta página.',
+                'success'
+            );
+        } else {
+            $this->setFlashMessage((string) ($result['error'] ?? 'Não foi possível enfileirar a clonagem.'), 'error');
+        }
+        header('Location: ' . URL . '/master/escolas');
+        exit;
+    }
+
+    /**
+     * JSON com os jobs recentes de clonagem (polling da listagem).
+     */
+    public function clonarJobs(): void
+    {
+        $this->requireMaster();
+        require_once __DIR__ . '/../../Services/MasterFilaService.php';
+        $jobs = MasterFilaService::listarRecentes(MasterFilaService::TIPO_CLONAR_ESCOLA, 10);
+        $this->json([
+            'success' => true,
+            'pendentes' => MasterFilaService::temPendentes(MasterFilaService::TIPO_CLONAR_ESCOLA),
+            'jobs' => $jobs,
+        ]);
     }
 
     /**
