@@ -15,6 +15,7 @@ $gruposRegrasNotas = is_array($grupos_regras_notas ?? null) ? $grupos_regras_not
 $agrupamentosComponentes = is_array($agrupamentos_componentes ?? null) ? $agrupamentos_componentes : [];
 $boletinsCadastro = is_array($boletins_cadastro ?? null) ? $boletins_cadastro : [];
 $grupoRegrasNotasId = (int) ($grupo_regras_notas_id ?? 0);
+$semanasPeriodo = (int) ($semanas_periodo ?? 0);
 $destinosQuadro = is_array($destinos_quadro ?? null) ? $destinos_quadro : [];
 $selectedRegraId = (int) ($selected_regra_id ?? 0);
 $materiasSelecionadasRegra = array_map('intval', (array) ($regra['materias_ids_array'] ?? []));
@@ -661,6 +662,14 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         <p class="text-xs text-amber-800 mt-1">Cadastre o molde em <a href="<?= URL ?>/admin/quadros-notas" class="underline">Acadêmico → Quadro de Notas</a> antes de salvar a avaliação.</p>
                         <?php endif; ?>
                         <p class="text-xs text-gray-500 mt-1">Ao escolher, as colunas S1/S2… e os blocos (A/B, Humanas…) nascem do quadro. <a href="<?= URL ?>/admin/quadros-notas" class="text-indigo-600 underline">Cadastrar quadros</a>.</p>
+                        <div id="wrap-semanas-periodo" class="hidden mt-3">
+                            <label for="semanas-periodo" class="block text-xs font-medium text-gray-700 mb-1">Semanas deste período</label>
+                            <input type="number" id="semanas-periodo" name="semanas_periodo" min="1" max="20"
+                                   value="<?= $semanasPeriodo > 0 ? $semanasPeriodo : '' ?>"
+                                   class="w-28 h-10 px-3 border border-gray-300 rounded-lg text-sm"
+                                   placeholder="Todas">
+                            <p class="text-xs text-gray-500 mt-1">Deixe em branco para usar todas as colunas do quadro. Ex.: molde com 6 semanas, este bimestre só tem 4.</p>
+                        </div>
                         <div id="grupo-regras-notas-preview" class="hidden mt-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-950"></div>
                         <div class="mt-4">
                             <div class="flex items-center justify-between gap-3 mb-2">
@@ -2996,6 +3005,43 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 
     var selGrupoRegras = document.getElementById('grupo-regras-notas-id');
     var previewGrupoRegras = document.getElementById('grupo-regras-notas-preview');
+    var wrapSemanasPeriodo = document.getElementById('wrap-semanas-periodo');
+    var inputSemanasPeriodo = document.getElementById('semanas-periodo');
+    var ultimoGrupoQuadro = null;
+
+    function recortarComponentesQuadro(comps, semanas) {
+        semanas = parseInt(semanas, 10) || 0;
+        if (!Array.isArray(comps) || semanas <= 0) return comps || [];
+        var out = [];
+        comps.forEach(function (c) {
+            var copy = Object.assign({}, c);
+            var cfg = (c && c.config && typeof c.config === 'object') ? Object.assign({}, c.config) : {};
+            copy.config = cfg;
+            var sem = parseInt(cfg.semana, 10) || 0;
+            if (sem > semanas) return;
+            if (Array.isArray(cfg.agregar_nq)) {
+                cfg.agregar_nq = cfg.agregar_nq.filter(function (cod) {
+                    var m = String(cod || '').toLowerCase().match(/^s([1-9]|1\d|20)$/);
+                    if (!m) return true;
+                    return parseInt(m[1], 10) <= semanas;
+                });
+            }
+            out.push(copy);
+        });
+        return out;
+    }
+
+    function ajustarWrapSemanasPeriodo(grupo) {
+        if (!wrapSemanasPeriodo || !inputSemanasPeriodo) return;
+        var max = grupo ? (parseInt(grupo.quantidade_semanas, 10) || 0) : 0;
+        if (max > 0) {
+            wrapSemanasPeriodo.classList.remove('hidden');
+            inputSemanasPeriodo.max = String(max);
+            inputSemanasPeriodo.placeholder = 'Até ' + max;
+        } else {
+            wrapSemanasPeriodo.classList.add('hidden');
+        }
+    }
     function renderPreviewGrupoRegras(grupo) {
         if (!previewGrupoRegras) return;
         if (!grupo) {
@@ -3147,6 +3193,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             var id = parseInt(selGrupoRegras.value, 10) || 0;
             if (id <= 0) {
                 renderPreviewGrupoRegras(null);
+                ajustarWrapSemanasPeriodo(null);
+                ultimoGrupoQuadro = null;
                 return;
             }
             fetch(<?= json_encode(URL . '/admin/grupos-regras-notas/', JSON_UNESCAPED_SLASHES) ?> + id + '/dados', {
@@ -3158,11 +3206,17 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     return;
                 }
                 renderPreviewGrupoRegras(data.grupo);
+                ajustarWrapSemanasPeriodo(data.grupo);
+                ultimoGrupoQuadro = data.grupo;
                 if (aplicar) {
                     if (!confirm('Substituir as colunas semanais pelas colunas e blocos deste quadro?')) {
                         return;
                     }
-                    aplicarComponentesDoGrupo(data.grupo.componentes_sugeridos || []);
+                    var comps = recortarComponentesQuadro(
+                        data.grupo.componentes_sugeridos || [],
+                        inputSemanasPeriodo ? inputSemanasPeriodo.value : 0
+                    );
+                    aplicarComponentesDoGrupo(comps);
                 }
                 var lg = document.getElementById('bloco-layout-group');
                 if (lg && Array.isArray(data.grupo.tipos)) {
@@ -3188,8 +3242,28 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         selGrupoRegras.addEventListener('change', function () {
             carregarGrupoRegras(true);
         });
+        if (inputSemanasPeriodo) {
+            inputSemanasPeriodo.addEventListener('change', function () {
+                if (!ultimoGrupoQuadro) return;
+                var comps = recortarComponentesQuadro(
+                    ultimoGrupoQuadro.componentes_sugeridos || [],
+                    inputSemanasPeriodo.value
+                );
+                aplicarComponentesDoGrupo(comps);
+            });
+        }
         if (parseInt(selGrupoRegras.value, 10) > 0) {
             carregarGrupoRegras(false);
+        }
+        var formRegraQuadro = document.getElementById('form-regra-boletim');
+        if (formRegraQuadro) {
+            formRegraQuadro.addEventListener('submit', function () {
+                if (!inputSemanasPeriodo) return;
+                var n = parseInt(inputSemanasPeriodo.value, 10) || 0;
+                if (n <= 0) return;
+                componentes = recortarComponentesQuadro(componentes, n);
+                if (typeof syncJson === 'function') syncJson();
+            });
         }
     }
 

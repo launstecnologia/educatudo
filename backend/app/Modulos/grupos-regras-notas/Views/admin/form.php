@@ -11,7 +11,7 @@ $ui = dirname(__DIR__, 4) . '/Views/admin/_partials/ui';
 
 $page_header_back_url = URL . '/admin/quadros-notas';
 $page_header_title = $ehEdicao ? 'Editar quadro de notas' : 'Novo quadro de notas';
-$page_header_subtitle = 'Molde das colunas (S1, S2…) para vincular cada semana ao lançamento de notas. Escala e fechamento ficam no tipo de nota.';
+$page_header_subtitle = 'Defina quantas semanas o molde tem e, se a escola alterna matérias, intercale Bloco A e B (A na S1, B na S2, e segue).';
 include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_form.php';
 include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
 
@@ -39,6 +39,7 @@ $steps = [
           action="<?= URL ?>/admin/grupos-regras-notas<?= $ehEdicao ? '/' . (int) $item['id'] . '/update' : '' ?>"
           id="form-grupo-regras">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="ritmo_intervalo_semanas" id="ritmo-intervalo-semanas" value="<?= (int) (is_array($item) ? ($item['ritmo_intervalo_semanas'] ?? 2) : 2) ?>">
 
         <div class="step-panel" data-step-panel="1">
             <?php ob_start(); ?>
@@ -87,15 +88,20 @@ $steps = [
             <?php ob_start(); ?>
             <div class="space-y-6">
                 <?php $ui_form_secao_titulo = 'Colunas'; include $ui . '/form_secao.php'; ?>
-                <p class="text-sm text-gray-500 -mt-2">Cada coluna é uma semana (ou AV1, Trabalho…). Vincule o tipo de nota do lançamento. Só coluna de lançamento entra no Lançamento de Notas. Coluna calculada é opcional (média / nota final).</p>
+                <p class="text-sm text-gray-500 -mt-2">Informe quantas semanas este molde cobre (4, 6…) e gere S1 até SN. Bimestre mais curto na avaliação usa só as primeiras. Coluna extra (AV1, Trabalho) continua no + Coluna. Escala e fechamento ficam no tipo de nota.</p>
                 <div id="wizardStep2Erro" class="hidden rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-3">
                     <i class="fa-solid fa-circle-info mr-2"></i>
                     Sem colunas, o lançamento de notas não tem destino no quadro. Você pode avançar e cadastrar só blocos de disciplinas, se for o caso.
                 </div>
-                <div class="flex flex-wrap justify-between items-center gap-3">
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" id="btn-sugerir-s1s8" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
-                            Sugerir S1 a S8
+                <div class="flex flex-wrap justify-between items-end gap-3">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div>
+                            <label for="quadro-qtd-semanas" class="block text-xs font-medium text-gray-500 mb-1">Quantas semanas neste molde</label>
+                            <input type="number" id="quadro-qtd-semanas" min="1" max="<?= (int) $numeroMax ?>" value="6"
+                                   class="w-28 px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <button type="button" id="btn-gerar-semanas" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
+                            Gerar S1 até SN
                         </button>
                         <button type="button" id="btn-add-calculada" class="px-4 py-2 border border-violet-200 text-violet-800 rounded-lg text-sm bg-white hover:bg-violet-50">
                             + Nota final (calculada)
@@ -123,14 +129,21 @@ $steps = [
             <?php ob_start(); ?>
             <div class="space-y-6">
                 <?php $ui_form_secao_titulo = 'Blocos de disciplinas'; include $ui . '/form_secao.php'; ?>
-                <p class="text-sm text-gray-500 -mt-2">Opcional. Agrupa matérias (Bloco A nas semanas ímpares, Bloco B nas pares, Humanas…). Isto <strong>não</strong> é a prova — a prova é criada em Lançamento de Notas.</p>
+                <p class="text-sm text-gray-500 -mt-2">Opcional. Intercale os blocos na ordem: o 1º pega S1, o 2º pega S2, e volta a repetir (A, B, A, B…). Isto <strong>não</strong> é a prova — a prova é criada em Lançamento de Notas.</p>
                 <div class="flex flex-wrap justify-between items-center gap-3">
-                    <button type="button" id="btn-sugerir-ab" title="Preenche só se ainda não houver blocos"
-                            class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
-                        Sugerir Bloco A e Bloco B
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="btn-sugerir-ab" title="Cria Bloco A e B se ainda não houver blocos e intercalação as colunas"
+                                class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
+                            Criar A e B e intercalar
+                        </button>
+                        <button type="button" id="btn-intercalar-blocos"
+                                class="px-4 py-2 border border-violet-200 text-violet-800 rounded-lg text-sm bg-white hover:bg-violet-50">
+                            Intercalar colunas nos blocos
+                        </button>
+                    </div>
                     <button type="button" id="btn-add-tipo" class="btn-primary-custom h-10 px-3 rounded-lg text-sm font-medium">+ Bloco de disciplinas</button>
                 </div>
+                <div id="preview-intercalacao" class="hidden rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-950"></div>
                 <div id="lista-tipos" class="space-y-4"></div>
                 <p id="vazio-tipos" class="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">Nenhum bloco. Pule esta etapa se todas as matérias usam as mesmas colunas.</p>
                 <?php
@@ -442,7 +455,7 @@ $steps = [
             '<p class="text-xs text-gray-400 mb-2">Se não marcar nenhuma, o bloco usa todas as colunas.</p>' +
             '<div class="wrap-marcas-tipo"></div></div>' +
             '<div><p class="text-xs font-medium text-gray-500 mb-2">Matérias (opcional)</p>' + htmlMaterias(data.materias_ids || []) + '</div>';
-        wrap.querySelector('.btn-rm-tipo').addEventListener('click', function () { wrap.remove(); syncVazios(); });
+        wrap.querySelector('.btn-rm-tipo').addEventListener('click', function () { wrap.remove(); syncVazios(); atualizarPreviewIntercalacao(); });
         wrap.querySelector('.tipo-nome').addEventListener('input', function () {
             var codEl = wrap.querySelector('.tipo-codigo');
             if (codEl && !data.id && !data.codigo) {
@@ -454,6 +467,110 @@ $steps = [
         syncVazios();
     }
 
+    function ehColunaSemanaAuto(row) {
+        var nome = String((row.querySelector('.marca-nome') || {}).value || '').trim().toUpperCase();
+        var codigo = String((row.querySelector('.marca-codigo') || {}).value || '').trim().toLowerCase();
+        var papel = (row.querySelector('.marca-papel') || {}).value || 'lancamento';
+        if (papel === 'calculada') return false;
+        return /^S([1-9]|1\d|20)$/.test(nome) || /^s([1-9]|1\d|20)$/.test(codigo);
+    }
+
+    function tipoNotaPadraoLancamento() {
+        var sel = '';
+        listaMarcas.querySelectorAll('.marca-row').forEach(function (row) {
+            if (sel) return;
+            if ((row.querySelector('.marca-papel') || {}).value === 'calculada') return;
+            sel = (row.querySelector('.marca-tipo-nota') || {}).value || '';
+        });
+        return sel;
+    }
+
+    function gerarSemanas(qtd) {
+        qtd = parseInt(qtd, 10) || 0;
+        if (qtd < 1) qtd = 1;
+        if (qtd > NUMERO_MAX) qtd = NUMERO_MAX;
+        var tipoPadrao = tipoNotaPadraoLancamento();
+        var porNumero = {};
+        listaMarcas.querySelectorAll('.marca-row').forEach(function (row) {
+            if (!ehColunaSemanaAuto(row)) return;
+            var n = parseInt((row.querySelector('.marca-numero') || {}).value, 10) || 0;
+            if (n >= 1) porNumero[n] = row;
+        });
+        for (var n = 1; n <= qtd; n++) {
+            if (porNumero[n]) {
+                var row = porNumero[n];
+                row.querySelector('.marca-nome').value = 'S' + n;
+                var codEl = row.querySelector('.marca-codigo');
+                if (codEl) codEl.value = 's' + n;
+                var numEl = row.querySelector('.marca-numero');
+                if (numEl) numEl.value = String(n);
+            } else {
+                addMarca({ nome: 'S' + n, codigo: 's' + n, numero: n, tipo_nota_id: tipoPadrao });
+            }
+        }
+        listaMarcas.querySelectorAll('.marca-row').forEach(function (row) {
+            if (!ehColunaSemanaAuto(row)) return;
+            var n = parseInt((row.querySelector('.marca-numero') || {}).value, 10) || 0;
+            if (n > qtd) row.remove();
+        });
+        renderCheckboxesMarcas();
+        refreshFormulas();
+        syncVazios();
+        atualizarPreviewIntercalacao();
+    }
+
+    function blocosAtuais() {
+        var out = [];
+        listaTipos.querySelectorAll('.tipo-row').forEach(function (row) {
+            out.push({
+                row: row,
+                nome: (row.querySelector('.tipo-nome') || {}).value || 'Bloco'
+            });
+        });
+        return out;
+    }
+
+    function garantirBlocosAB() {
+        if (listaTipos.querySelectorAll('.tipo-row').length > 0) return;
+        addTipo({ nome: 'Bloco A', codigo: 'a' });
+        addTipo({ nome: 'Bloco B', codigo: 'b' });
+    }
+
+    function intercalarBlocos() {
+        garantirBlocosAB();
+        var blocos = blocosAtuais();
+        if (!blocos.length) return;
+        var lanc = marcasAtuais().filter(function (m) { return m.papel !== 'calculada'; });
+        lanc.sort(function (a, b) { return (a.numero || 0) - (b.numero || 0); });
+        var assigned = blocos.map(function () { return []; });
+        lanc.forEach(function (m, i) {
+            assigned[i % blocos.length].push(m.chave);
+        });
+        blocos.forEach(function (b, i) {
+            htmlMarcasChecks(assigned[i], b.row.querySelector('.wrap-marcas-tipo'));
+        });
+        atualizarPreviewIntercalacao();
+    }
+
+    function atualizarPreviewIntercalacao() {
+        var box = document.getElementById('preview-intercalacao');
+        if (!box) return;
+        var blocos = blocosAtuais();
+        var lanc = marcasAtuais().filter(function (m) { return m.papel !== 'calculada'; });
+        lanc.sort(function (a, b) { return (a.numero || 0) - (b.numero || 0); });
+        if (!blocos.length || !lanc.length) {
+            box.classList.add('hidden');
+            box.innerHTML = '';
+            return;
+        }
+        var partes = lanc.map(function (m, i) {
+            var bloco = blocos[i % blocos.length];
+            return esc(m.nome || ('S' + m.numero)) + ' → ' + esc(bloco.nome);
+        });
+        box.classList.remove('hidden');
+        box.innerHTML = '<strong>Intercalação (ordem dos blocos):</strong> ' + partes.join(' · ');
+    }
+
     document.getElementById('btn-add-coluna').addEventListener('click', function () { addMarca({}); });
     var btnCalc = document.getElementById('btn-add-calculada');
     if (btnCalc) {
@@ -461,44 +578,39 @@ $steps = [
             addMarca({ nome: 'Nota final', codigo: 'nota_final', papel: 'calculada', vai_para_boletim: 1 });
         });
     }
-    document.getElementById('btn-add-tipo').addEventListener('click', function () { addTipo({}); });
-
-    document.getElementById('btn-sugerir-s1s8').addEventListener('click', function () {
-        var usados = {};
-        listaMarcas.querySelectorAll('.marca-row').forEach(function (row) {
-            if ((row.querySelector('.marca-papel') || {}).value === 'calculada') return;
-            var el = row.querySelector('.marca-numero');
-            usados[parseInt(el && el.value, 10) || 0] = true;
-        });
-        for (var n = 1; n <= 8; n++) {
-            if (usados[n]) continue;
-            addMarca({ nome: 'S' + n, codigo: 's' + n, numero: n });
-        }
+    document.getElementById('btn-add-tipo').addEventListener('click', function () {
+        addTipo({});
+        atualizarPreviewIntercalacao();
     });
 
-    document.getElementById('btn-sugerir-ab').addEventListener('click', function () {
-        if (listaTipos.querySelectorAll('.tipo-row').length > 0) {
-            return;
-        }
-        var marcas = marcasAtuais();
-        if (!marcas.length) {
-            for (var n = 1; n <= 8; n++) {
-                addMarca({ nome: 'S' + n, codigo: 's' + n, numero: n });
-            }
-            marcas = marcasAtuais();
-        }
-        var impares = [];
-        var pares = [];
-        marcas.forEach(function (m) {
-            if (m.papel === 'calculada') return;
-            if (m.numero % 2 === 1) impares.push(m.chave);
-            else pares.push(m.chave);
+    var btnGerar = document.getElementById('btn-gerar-semanas');
+    if (btnGerar) {
+        btnGerar.addEventListener('click', function () {
+            var qtdEl = document.getElementById('quadro-qtd-semanas');
+            gerarSemanas(qtdEl ? qtdEl.value : 6);
         });
-        addTipo({ nome: 'Bloco A', codigo: 'a', marcas: impares });
-        addTipo({ nome: 'Bloco B', codigo: 'b', marcas: pares });
-    });
+    }
+
+    var btnSugerirAb = document.getElementById('btn-sugerir-ab');
+    if (btnSugerirAb) {
+        btnSugerirAb.addEventListener('click', function () {
+            garantirBlocosAB();
+            intercalarBlocos();
+        });
+    }
+    var btnIntercalar = document.getElementById('btn-intercalar-blocos');
+    if (btnIntercalar) {
+        btnIntercalar.addEventListener('click', function () {
+            intercalarBlocos();
+        });
+    }
 
     document.getElementById('form-grupo-regras').addEventListener('submit', function () {
+        var ritmoEl = document.getElementById('ritmo-intervalo-semanas');
+        if (ritmoEl) {
+            var nBlocos = listaTipos.querySelectorAll('.tipo-row').length;
+            ritmoEl.value = String(nBlocos > 1 ? nBlocos : 2);
+        }
         listaMarcas.querySelectorAll('.marca-row').forEach(function (row, i) {
             function hid(name, val) {
                 var el = document.createElement('input');
@@ -597,7 +709,10 @@ $steps = [
             el.classList.toggle('hidden', sn !== n);
         });
         setActiveNav();
-        if (n === 3) renderCheckboxesMarcas();
+        if (n === 3) {
+            renderCheckboxesMarcas();
+            atualizarPreviewIntercalacao();
+        }
         if (n === 4) buildWizardResumo();
         var wiz = document.getElementById('quadroWizard');
         if (wiz) window.scrollTo({ top: wiz.offsetTop - 16, behavior: 'smooth' });
@@ -689,6 +804,13 @@ $steps = [
             return c.nome + (c.papel === 'calculada' ? ' (calculada)' : '');
         }).join(', ') : 'Nenhuma');
         addRow(dl, 'Blocos de disciplinas', blocos.length ? blocos.join(', ') : 'Nenhum (todas as matérias nas mesmas colunas)');
+        if (blocos.length && cols.filter(function (c) { return c.papel !== 'calculada'; }).length) {
+            var lanc = cols.filter(function (c) { return c.papel !== 'calculada'; });
+            lanc.sort(function (a, b) { return (a.numero || 0) - (b.numero || 0); });
+            addRow(dl, 'Intercalação', lanc.map(function (m, i) {
+                return (m.nome || ('S' + m.numero)) + ' → ' + (blocos[i % blocos.length] || '');
+            }).join(' · '));
+        }
         addRow(dl, 'Próximo passo', 'Criar as provas em Lançamento de Notas, vinculadas a cada coluna');
         out.appendChild(dl);
     }
@@ -712,7 +834,18 @@ $steps = [
     if (tiposIni.length) {
         tiposIni.forEach(function (t) { addTipo(t); });
     }
+    var qtdEl = document.getElementById('quadro-qtd-semanas');
+    if (qtdEl) {
+        var maxNum = 0;
+        marcasIni.forEach(function (m) {
+            if (String(m.papel || '') === 'calculada') return;
+            var n = parseInt(m.numero, 10) || 0;
+            if (n > maxNum) maxNum = n;
+        });
+        if (maxNum > 0) qtdEl.value = String(maxNum);
+    }
     syncVazios();
+    atualizarPreviewIntercalacao();
     window.setWizardStep(1);
 })();
 </script>

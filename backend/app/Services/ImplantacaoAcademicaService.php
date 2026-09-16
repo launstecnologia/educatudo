@@ -179,7 +179,7 @@ class ImplantacaoAcademicaService
                 $n('quadros') > 0,
                 '/admin/quadros-notas',
                 $n('quadros') . ' quadro(s) ativo(s)',
-                'Cadastre as colunas (S1, AV1…) e, se precisar, os blocos de disciplinas. As provas são criadas em Lançamento de Notas.',
+                'Cadastre as colunas (quantas semanas o molde tiver) e, se precisar, intercale os blocos A/B. As provas são criadas em Lançamento de Notas.',
                 'Existe pelo menos um quadro ativo com colunas (AV1/S1…) ou blocos de disciplinas A/B.',
                 'Avaliação sem quadro: a prévia de colunas fica vazia.'
             ),
@@ -563,13 +563,13 @@ class ImplantacaoAcademicaService
             'quadro' => [
                 'como_fazer' => [
                     'Dê um nome ao quadro (ex.: “Provas semanais 2026”).',
-                    'Crie as colunas — onde cada nota vai cair (S1, S2, AV1…).',
-                    'Se a escola divide as disciplinas em blocos, crie os blocos e vincule as disciplinas.',
-                    'Vincule cada bloco às suas colunas.',
+                    'Informe quantas semanas o molde cobre (4, 6…) e gere S1 até SN — não precisa ser S1 a S8.',
+                    'Se a escola alterna matérias, crie Bloco A e B e intercale: A na S1, B na S2, e segue.',
+                    'Na avaliação do bimestre, escolha quantas semanas daquele período valem (bimestre curto usa as primeiras).',
                 ],
                 'erros_comuns' => [
                     'Criar bloco sem vincular disciplina — o quadro fica montado e não recebe nota.',
-                    'Montar colunas que não correspondem ao que a escola aplica de verdade.',
+                    'Gerar 8 semanas quando a escola só usa 4 ou 6 — o lançamento fica com coluna vazia.',
                 ],
                 'usado_depois_em' => 'Lançamento de notas e geração automática das colunas do boletim. Se todas as disciplinas usam as mesmas colunas, você não precisa criar bloco nenhum.',
                 'prints' => [

@@ -4,7 +4,7 @@ $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
 
 $page_header_title = 'Quadro de Notas';
-$page_header_subtitle = 'Molde das notas: colunas (S1, AV1…) e, se a escola separar matérias, blocos de disciplinas. As provas são criadas em Lançamento de Notas.';
+$page_header_subtitle = 'Molde das notas: quantas semanas (4, 6…), colunas S1…SN e, se a escola separar matérias, blocos intercalados (A na S1, B na S2). As provas são criadas em Lançamento de Notas.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/grupos-regras-notas/novo"

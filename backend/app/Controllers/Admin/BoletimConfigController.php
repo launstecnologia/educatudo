@@ -485,6 +485,7 @@ class BoletimConfigController extends BaseController
                 : [],
             'grupos_regras_notas' => $this->listarGruposRegrasNotasCatalogo(),
             'grupo_regras_notas_id' => $this->grupoRegrasNotasIdDaRegra($regra),
+            'semanas_periodo' => $this->semanasPeriodoDaRegra($regra),
             'destinos_quadro' => $this->destinosQuadroDaRegra($regra),
             'agrupamentos_componentes' => $this->listarAgrupamentosComponentesCatalogo(),
             'boletins_cadastro' => $this->listarBoletinsCadastro(),
@@ -1435,6 +1436,20 @@ class BoletimConfigController extends BaseController
         if ($grupoRegrasId > 0) {
             $decodedExtras['grupo_regras_notas_id'] = $grupoRegrasId;
             $decodedExtras['quadro_notas_id'] = $grupoRegrasId;
+            $semanasPeriodo = (int) ($_POST['semanas_periodo'] ?? 0);
+            if ($semanasPeriodo > 0) {
+                $maxQuadro = (int) ($payloadQuadro['quantidade_semanas'] ?? 0);
+                if ($maxQuadro > 0 && $semanasPeriodo > $maxQuadro) {
+                    $semanasPeriodo = $maxQuadro;
+                }
+                $decodedExtras['semanas_periodo'] = $semanasPeriodo;
+                $componentesNormalizados = (new GrupoRegrasNotasService())->recortarComponentesPorSemanas(
+                    $componentesNormalizados,
+                    $semanasPeriodo
+                );
+            } else {
+                unset($decodedExtras['semanas_periodo']);
+            }
             $destinos = $this->normalizarDestinosQuadroPost($_POST['destinos_json'] ?? $decodedExtras['destinos'] ?? []);
             if ($destinos !== []) {
                 $decodedExtras['destinos'] = $destinos;
@@ -1442,7 +1457,7 @@ class BoletimConfigController extends BaseController
                 unset($decodedExtras['destinos']);
             }
         } else {
-            unset($decodedExtras['grupo_regras_notas_id'], $decodedExtras['quadro_notas_id'], $decodedExtras['destinos']);
+            unset($decodedExtras['grupo_regras_notas_id'], $decodedExtras['quadro_notas_id'], $decodedExtras['destinos'], $decodedExtras['semanas_periodo']);
         }
 
         if ($decodedExtras !== []) {
@@ -8898,6 +8913,23 @@ class BoletimConfigController extends BaseController
             return 0;
         }
         return (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     */
+    private function semanasPeriodoDaRegra(array $regra): int
+    {
+        $raw = $regra['extras_json'] ?? '';
+        if (!is_string($raw) || trim($raw) === '') {
+            return 0;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return 0;
+        }
+
+        return max(0, (int) ($decoded['semanas_periodo'] ?? 0));
     }
 
     /**

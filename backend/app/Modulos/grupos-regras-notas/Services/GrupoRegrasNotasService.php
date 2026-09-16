@@ -97,6 +97,8 @@ class GrupoRegrasNotasService
             'coluna_consolidada_codigo' => (string) ($grupo['coluna_consolidada_codigo'] ?? 'media_sem'),
             'coluna_consolidada_nome' => (string) ($grupo['coluna_consolidada_nome'] ?? 'Média'),
             'modo' => $this->modoDoGrupo($grupo),
+            'quantidade_semanas' => $this->quantidadeSemanasLancamento($grupo),
+            'ritmo_intervalo_semanas' => (int) ($grupo['ritmo_intervalo_semanas'] ?? 2),
             'marcas' => $marcas,
             'colunas' => $marcas,
             'tipos' => $tipos,
@@ -106,8 +108,72 @@ class GrupoRegrasNotasService
     }
 
     /**
+     * Maior número de semana das colunas de lançamento do quadro.
+     *
      * @param array<string,mixed> $grupo
      */
+    public function quantidadeSemanasLancamento(array $grupo): int
+    {
+        $max = 0;
+        foreach ($grupo['marcas'] ?? [] as $m) {
+            if (!is_array($m) || GrupoRegrasNotas::papelDaColuna($m) === 'calculada') {
+                continue;
+            }
+            if (!$this->marcaEhColunaSemanal($m)) {
+                continue;
+            }
+            $n = (int) ($m['numero'] ?? 0);
+            if ($n > $max) {
+                $max = $n;
+            }
+        }
+
+        return $max;
+    }
+
+    /**
+     * Recorta as colunas sugeridas para as N primeiras semanas do período.
+     *
+     * @param list<array<string,mixed>> $componentes
+     * @return list<array<string,mixed>>
+     */
+    public function recortarComponentesPorSemanas(array $componentes, int $semanas): array
+    {
+        $semanas = max(0, $semanas);
+        if ($semanas <= 0) {
+            return $componentes;
+        }
+        $out = [];
+        foreach ($componentes as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cfg = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+            $semana = (int) ($cfg['semana'] ?? 0);
+            if ($semana > $semanas) {
+                continue;
+            }
+            $agregar = $cfg['agregar_nq'] ?? null;
+            if (is_array($agregar)) {
+                $filtrado = [];
+                foreach ($agregar as $cod) {
+                    $cod = strtolower(trim((string) $cod));
+                    if ($cod === '') {
+                        continue;
+                    }
+                    if (preg_match('/^s([1-9]|1\d|20)$/', $cod, $m) && (int) $m[1] > $semanas) {
+                        continue;
+                    }
+                    $filtrado[] = $cod;
+                }
+                $comp['config']['agregar_nq'] = $filtrado;
+            }
+            $out[] = $comp;
+        }
+
+        return $out;
+    }
+
     public function modoDoGrupo(array $grupo): string
     {
         $modo = strtolower(trim((string) ($grupo['modo'] ?? '')));
@@ -341,10 +407,8 @@ class GrupoRegrasNotasService
         $atual = ($id !== null && $id > 0) ? $this->model->findById($id) : null;
         $meta = $this->metaFechamentoDoPost($post, is_array($atual) ? $atual : null);
         $meta['modo'] = $tiposNorm['itens'] !== [] ? 'blocos' : 'simples';
-        if (array_key_exists('ritmo_intervalo_semanas', $post) || array_key_exists('ritmo_data_inicio', $post)) {
-            $meta['ritmo_intervalo_semanas'] = $post['ritmo_intervalo_semanas'] ?? 2;
-            $meta['ritmo_data_inicio'] = $post['ritmo_data_inicio'] ?? null;
-        }
+        $meta['ritmo_intervalo_semanas'] = $post['ritmo_intervalo_semanas'] ?? max(2, count($tiposNorm['itens']));
+        $meta['ritmo_data_inicio'] = $post['ritmo_data_inicio'] ?? (is_array($atual) ? ($atual['ritmo_data_inicio'] ?? null) : null);
 
         try {
             $ehNovo = ($id === null || $id <= 0);
