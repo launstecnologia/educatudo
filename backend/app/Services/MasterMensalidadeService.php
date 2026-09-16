@@ -89,7 +89,6 @@ class MasterMensalidadeService
         $professores = $this->contarUsuarios($pdo, 'professores');
         $totalPagantes = $alunos['pagantes'] + $professores['pagantes'];
         $valorTotal = round($totalPagantes * $valorPorUsuario, 2);
-        $ultimaFatura = $this->lerUltimaFatura($pdo);
 
         return [
             'escola_id' => (int) ($escola['id'] ?? 0),
@@ -103,7 +102,6 @@ class MasterMensalidadeService
             'professores_pagantes' => $professores['pagantes'],
             'total_pagantes' => $totalPagantes,
             'valor_total' => $valorTotal,
-            'ultima_fatura' => $ultimaFatura,
         ];
     }
 
@@ -118,7 +116,7 @@ class MasterMensalidadeService
 
         $stmt = $pdo->query(
             "SELECT mes_referencia, total_alunos_pagantes, total_professores_pagantes,
-                    total_usuarios_pagantes, valor_por_usuario, valor_total, status,
+                    total_usuarios_pagantes, valor_por_usuario, valor_total,
                     data_vencimento, data_pagamento
              FROM financeiro_valores_mensais
              ORDER BY mes_referencia DESC
@@ -185,28 +183,6 @@ class MasterMensalidadeService
     }
 
     /**
-     * @return array<string, mixed>|null
-     */
-    private function lerUltimaFatura(PDO $pdo): ?array
-    {
-        if (!$this->tabelaExiste($pdo, 'financeiro_valores_mensais')) {
-            return null;
-        }
-
-        $stmt = $pdo->query(
-            "SELECT mes_referencia, total_alunos_pagantes, total_professores_pagantes,
-                    total_usuarios_pagantes, valor_por_usuario, valor_total, status,
-                    data_vencimento, data_pagamento
-             FROM financeiro_valores_mensais
-             ORDER BY mes_referencia DESC
-             LIMIT 1"
-        );
-        $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
-
-        return $row ?: null;
-    }
-
-    /**
      * @param array<string, mixed> $escola
      * @return array<string, mixed>
      */
@@ -224,7 +200,6 @@ class MasterMensalidadeService
             'professores_pagantes' => 0,
             'total_pagantes' => 0,
             'valor_total' => 0.0,
-            'ultima_fatura' => null,
         ];
     }
 

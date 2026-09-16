@@ -84,12 +84,10 @@ $fmtMoeda = static function ($valor): string {
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Valor / usuário</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Total</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Vencimento</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
             <?php foreach ($historico as $fatura): ?>
-            <?php $status = (string) ($fatura['status'] ?? ''); ?>
             <tr class="hover:bg-slate-50">
                 <td class="px-6 py-4 text-sm text-slate-900"><?= !empty($fatura['mes_referencia']) ? htmlspecialchars(date('m/Y', strtotime((string) $fatura['mes_referencia']))) : '—' ?></td>
                 <td class="px-6 py-4 text-sm text-slate-700"><?= number_format((int) ($fatura['total_alunos_pagantes'] ?? 0), 0, ',', '.') ?></td>
@@ -97,11 +95,6 @@ $fmtMoeda = static function ($valor): string {
                 <td class="px-6 py-4 text-sm text-slate-700"><?= htmlspecialchars($fmtMoeda($fatura['valor_por_usuario'] ?? 0)) ?></td>
                 <td class="px-6 py-4 text-sm font-semibold text-green-700"><?= htmlspecialchars($fmtMoeda($fatura['valor_total'] ?? 0)) ?></td>
                 <td class="px-6 py-4 text-sm text-slate-600"><?= !empty($fatura['data_vencimento']) ? htmlspecialchars(date('d/m/Y', strtotime((string) $fatura['data_vencimento']))) : '—' ?></td>
-                <td class="px-6 py-4 text-sm">
-                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold <?= $status === 'pago' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' ?>">
-                        <?= $status === 'pago' ? 'Pago' : 'Em aberto' ?>
-                    </span>
-                </td>
             </tr>
             <?php endforeach; ?>
         </tbody>

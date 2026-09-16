@@ -87,7 +87,6 @@ $fmtMoeda = static function ($valor): string {
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Alunos pagantes</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Valor / usuário</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Total estimado</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Última fatura</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase">Ações</th>
             </tr>
         </thead>
@@ -96,8 +95,6 @@ $fmtMoeda = static function ($valor): string {
             <?php
                 $escolaId = (int) ($linha['escola_id'] ?? 0);
                 $valor = (float) ($linha['valor_por_usuario'] ?? 0);
-                $ultima = is_array($linha['ultima_fatura'] ?? null) ? $linha['ultima_fatura'] : null;
-                $statusFatura = (string) ($ultima['status'] ?? '');
             ?>
             <tr class="hover:bg-slate-50">
                 <td class="px-6 py-4 text-sm">
@@ -116,17 +113,6 @@ $fmtMoeda = static function ($valor): string {
                 </td>
                 <td class="px-6 py-4 text-sm font-medium text-slate-900"><?= htmlspecialchars($fmtMoeda($valor)) ?></td>
                 <td class="px-6 py-4 text-sm font-semibold text-green-700"><?= htmlspecialchars($fmtMoeda($linha['valor_total'] ?? 0)) ?></td>
-                <td class="px-6 py-4 text-sm text-slate-600">
-                    <?php if ($ultima): ?>
-                    <span class="block"><?= !empty($ultima['mes_referencia']) ? htmlspecialchars(date('m/Y', strtotime((string) $ultima['mes_referencia']))) : '—' ?></span>
-                    <span class="block text-xs mt-0.5 <?= $statusFatura === 'pago' ? 'text-green-600' : 'text-amber-600' ?>">
-                        <?= $statusFatura === 'pago' ? 'Pago' : 'Em aberto' ?>
-                        · <?= htmlspecialchars($fmtMoeda($ultima['valor_total'] ?? 0)) ?>
-                    </span>
-                    <?php else: ?>
-                    <span class="text-slate-400">—</span>
-                    <?php endif; ?>
-                </td>
                 <td class="px-6 py-4 text-sm text-right">
                     <?php if (empty($linha['erro'])): ?>
                     <button type="button"
