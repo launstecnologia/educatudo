@@ -57,8 +57,14 @@ class DocumentoOficialService
         $payload = $this->enriquecerAluno($payload, $alunoId);
         $payload = $this->enriquecerCabecalhoAcademico($payload, $alunoId, $turmaId, $anoLetivo);
         $payload['componentes_ficha'] = $this->montarComponentesFicha($alunoId, $turmaId, $anoLetivo, $payload);
+        $cargas = $this->cargaDaMatriz((int) ($payload['turma']['matriz_curricular_id'] ?? 0));
+        $payload['dias_letivos'] = (string) ((int) ($cargas['_dias'] ?? 200));
         $payload['quadro_notas_html'] = $this->quadroFichaHtml($payload['componentes_ficha']);
         $payload['observacoes'] = $this->observacoesFicha($alunoId, $turmaId, $anoLetivo, $payload);
+        $payload['proxima_serie'] = $this->proximaSerieRotulo($payload);
+        $payload['conselho_label'] = !empty($payload['_homologado'])
+            ? ('Homologado em ' . date('d/m/Y'))
+            : 'Em andamento';
         return $payload;
     }
 
@@ -68,13 +74,32 @@ class DocumentoOficialService
     public function emitirAta(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null): array
     {
         $preview = $this->homologacao->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $linhas = $preview['linhas'] ?? [];
+        $totais = $this->totaisAta($linhas);
+        $turma = is_array($preview['turma'] ?? null) ? $preview['turma'] : [];
+        $detalhe = $this->db->fetch(
+            'SELECT t.*, c.nome AS curso_nome, s.nome AS serie_nome
+             FROM turmas t
+             LEFT JOIN curso c ON c.id = t.curso_novo_id
+             LEFT JOIN serie s ON s.id = t.serie_id
+             WHERE t.id = :id LIMIT 1',
+            ['id' => $turmaId]
+        ) ?: [];
+        $turma = array_merge($turma, $detalhe);
+        $turma['turno_label'] = $this->rotuloTurno((string) ($turma['turno'] ?? ''));
         $payload = [
-            'turma' => $preview['turma'],
+            'turma' => $turma,
             'periodo' => $preview['periodo'],
-            'linhas' => $preview['linhas'],
+            'linhas' => $linhas,
             'resumo' => $preview['resumo'],
-            'tabela_html' => $this->tabelaAtaHtml($preview['linhas']),
+            'tabela_html' => $this->tabelaAtaHtml($linhas),
+            'ata_totais' => $totais['texto'],
+            'total_aprovados' => $totais['aprovados'],
+            'total_retidos' => $totais['retidos'],
+            'total_transferidos' => $totais['transferidos'],
+            'unidade' => $this->unidadeDaTurma($turmaId),
         ];
+        $payload['conselho_label'] = $this->ehEmissaoOficial('ata_resultados', $payload) ? 'Homologado' : 'Prévia';
         return $this->emitirDocumento('ata_resultados', $payload, $usuarioId, $configApp, null, $turmaId);
     }
 
@@ -83,11 +108,11 @@ class DocumentoOficialService
      */
     public function emitirBoletim(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null): array
     {
-        $payload = $this->homologacao->payloadAluno($alunoId, $turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $payload = $this->montarFicha($alunoId, $turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if ($payload === null) {
             throw new RuntimeException('Não foi possível montar o boletim deste aluno.');
         }
-        $payload = $this->enriquecerAluno($payload, $alunoId);
+        $payload['quadro_notas_html'] = $this->quadroBoletimFinalHtml($payload['componentes_ficha'] ?? []);
         return $this->emitirDocumento('boletim', $payload, $usuarioId, $configApp, $alunoId, $turmaId);
     }
 
@@ -191,8 +216,14 @@ class DocumentoOficialService
             ]);
         }
 
+        $html = (string) ($render['html'] ?? '');
+        if (!$oficial) {
+            $html = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:16px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">Rascunho — sem valor oficial</div>'
+                . $html;
+        }
+
         return [
-            'html' => $render['html'],
+            'html' => $html,
             'orientacao' => $render['orientacao'],
             'papel' => $render['papel'] ?? 'A4',
             'numero' => $numero,
@@ -290,25 +321,52 @@ class DocumentoOficialService
 
         $quadro = $payload['quadro_notas_html'] ?? $this->quadroNotasHtml($payload['componentes'] ?? []);
         $tabela = $payload['tabela_html'] ?? '';
+        $historicoHtml = $payload['historico_html'] ?? $payload['trajetoria_html'] ?? '';
+        $alunoId = (int) ($aluno['id'] ?? 0);
+        if ($historicoHtml === '' && $alunoId > 0) {
+            $historicoHtml = $this->trajetoriaHtml($alunoId);
+        }
+
+        $mae = trim((string) ($aluno['nome_mae'] ?? ''));
+        $pai = trim((string) ($aluno['nome_pai'] ?? ''));
+        $filiacao = trim(implode(' / ', array_filter([$mae, $pai], static fn ($v) => $v !== '')));
+        $etapa = (string) ($turma['curso_nome'] ?? $turma['serie_nome'] ?? $turma['serie'] ?? '');
+        $cargaTotal = $this->somarCargaHoraria($payload);
+        $slugEscola = strtoupper((string) preg_replace('/[^A-Z0-9]+/i', '-', (string) ($unidade['nome_fantasia'] ?? $unidade['nome'] ?? 'EDUCA')));
+        if ($slugEscola === '') {
+            $slugEscola = 'EDUCA';
+        }
+        $codigoValidacao = $slugEscola . '-' . $anoLetivo . '-' . ($aluno['ra'] ?? $aluno['codigo_aluno'] ?? $numero);
+
+        $cidade = trim((string) ($unidade['cidade'] ?? $unidade['cidade_nome'] ?? ''));
+        $cidadeData = trim((string) ($payload['cidade_data'] ?? ''));
+        if ($cidadeData === '') {
+            $cidadeData = ($cidade !== '' ? $cidade . ', ' : '') . $this->dataPorExtenso(date('Y-m-d'));
+        }
 
         return [
             'escola_nome' => $esc($unidade['razao_social'] ?? $unidade['nome'] ?? (class_exists('LayoutHelper') ? LayoutHelper::getSystemTitle() : 'Escola')),
-            'escola_cnpj' => !empty($unidade['cnpj']) ? $esc('CNPJ: ' . $unidade['cnpj']) : '',
-            'escola_inep' => !empty($unidade['inep']) ? $esc('INEP: ' . $unidade['inep']) : '',
+            'escola_cnpj' => !empty($unidade['cnpj']) ? $esc('CNPJ ' . $unidade['cnpj']) : '',
+            'escola_inep' => !empty($unidade['inep']) ? $esc('Código INEP ' . $unidade['inep']) : '',
             'escola_unidade' => $esc($unidade['nome'] ?? $unidade['nome_fantasia'] ?? ''),
             'escola_endereco' => $esc($unidade['endereco_completo'] ?? $unidade['endereco'] ?? ''),
-            'escola_docs' => $esc(trim(implode(' · ', array_filter([
+            'escola_docs' => $esc(trim(implode(' | ', array_filter([
                 !empty($unidade['cnpj']) ? 'CNPJ ' . $unidade['cnpj'] : '',
-                !empty($unidade['inep']) ? 'INEP ' . $unidade['inep'] : '',
+                !empty($unidade['inep']) ? 'Código INEP ' . $unidade['inep'] : '',
             ])))),
             'aluno_nome' => $esc($aluno['nome'] ?? ''),
             'aluno_codigo' => $esc($aluno['codigo_aluno'] ?? $aluno['ra'] ?? '—'),
             'aluno_cpf' => $esc($aluno['cpf'] ?? '—'),
             'aluno_data_nasc' => $this->fmtData($aluno['data_nasc'] ?? null),
+            'aluno_filiacao' => $esc($filiacao !== '' ? $filiacao : '—'),
+            'aluno_naturalidade' => $esc($aluno['naturalidade'] ?? '—'),
+            'aluno_nacionalidade' => $esc($aluno['nacionalidade'] ?? 'Brasileira'),
+            'aluno_nasc_frase' => !empty($aluno['data_nasc']) ? $esc(', nascido(a) em ' . $this->fmtData($aluno['data_nasc'])) : '',
             'turma_nome' => $esc($turma['nome'] ?? ''),
             'serie' => $esc($turma['serie_nome'] ?? $turma['serie'] ?? $turma['turma_serie'] ?? ''),
             'curso_nome' => $esc($turma['curso_nome'] ?? ''),
-            'turno' => $esc($turma['turno_label'] ?? $turma['turno'] ?? '—'),
+            'etapa' => $esc($etapa !== '' ? $etapa : ($turma['serie_nome'] ?? $turma['serie'] ?? '—')),
+            'turno' => $esc($turma['turno_label'] ?? $this->rotuloTurno((string) ($turma['turno'] ?? ''))),
             'situacao_matricula' => $esc($payload['situacao_matricula_label'] ?? '—'),
             'ano_letivo' => (string) $anoLetivo,
             'periodo_label' => $esc($periodo['label'] ?? 'Ano letivo'),
@@ -316,19 +374,28 @@ class DocumentoOficialService
             'frequencia_percentual' => $esc($freqTxt),
             'quadro_notas_html' => is_string($quadro) ? $quadro : '',
             'tabela_html' => is_string($tabela) ? $tabela : '',
+            'historico_html' => is_string($historicoHtml) ? $historicoHtml : '',
+            'trajetoria_html' => is_string($historicoHtml) ? $historicoHtml : '',
             'titulo_relatorio' => $esc($payload['titulo_relatorio'] ?? ResultadoAcademico::DOCUMENTO_TIPOS[$tipo] ?? 'Relatório'),
             'observacoes' => $esc($payload['observacoes'] ?? ''),
             'data_hoje' => date('d/m/Y'),
+            'data_extenso' => $esc($this->dataPorExtenso(date('Y-m-d'))),
             'numero' => $numero > 0 ? (string) $numero : 'prévia',
             'ano' => (string) $anoLetivo,
-            'cidade_data' => $esc($payload['cidade_data'] ?? ''),
-            'diretor_nome' => $esc($unidade['diretor_nome'] ?? ''),
-            'secretario_nome' => $esc($unidade['secretario_nome'] ?? ''),
+            'cidade_data' => $esc($cidadeData),
+            'diretor_nome' => $esc($unidade['diretor_nome'] ?? 'Diretor(a) Escolar'),
+            'secretario_nome' => $esc($unidade['secretario_nome'] ?? 'Secretário(a) Escolar'),
             'assinante_nome' => $esc($unidade['diretor_nome'] ?? ''),
             'assinante_cargo' => 'Direção',
             'total_alunos' => (string) (int) ($resumo['total'] ?? 0),
             'total_homologados' => (string) (int) ($resumo['homologados'] ?? 0),
             'total_pendencias' => (string) (int) ($resumo['pendencias'] ?? 0),
+            'ata_totais' => $esc((string) ($payload['ata_totais'] ?? '')),
+            'carga_horaria_total' => $esc($cargaTotal),
+            'proxima_serie' => $esc((string) ($payload['proxima_serie'] ?? '—')),
+            'dias_letivos' => $esc((string) ($payload['dias_letivos'] ?? '—')),
+            'conselho_label' => $esc((string) ($payload['conselho_label'] ?? (!empty($payload['_homologado']) ? 'Homologado' : '—'))),
+            'codigo_validacao' => $esc($codigoValidacao),
             'logo_html' => '',
         ];
     }
@@ -429,12 +496,15 @@ class DocumentoOficialService
         $cargas = $this->cargaDaMatriz((int) ($payload['turma']['matriz_curricular_id'] ?? 0));
         $diasLetivos = (int) ($cargas['_dias'] ?? 200);
         unset($cargas['_duracao'], $cargas['_dias']);
+        $mapaPai = $this->mapaPaiPorFilho();
+        $notas = $this->agruparNotasNoOficial($notas, $cargas, $mapaPai);
+        $freqs = $this->agruparFrequenciaNoOficial($freqs, $cargas, $mapaPai);
 
         $nomes = [];
         foreach ($payload['componentes'] ?? [] as $c) {
-            $mid = (int) ($c['materia_id'] ?? 0);
+            $mid = $this->idOficialNaCarga((int) ($c['materia_id'] ?? 0), $cargas, $mapaPai);
             if ($mid > 0) {
-                $nomes[$mid] = (string) ($c['materia_nome'] ?? 'Componente');
+                $nomes[$mid] = (string) ($cargas[$mid]['nome'] ?? $c['materia_nome'] ?? 'Componente');
             }
         }
         foreach ($notas as $mid => $info) {
@@ -466,6 +536,7 @@ class DocumentoOficialService
                 }
             }
             $mediaAnual = $mediasBim !== [] ? round(array_sum($mediasBim) / count($mediasBim), 2) : null;
+            $recAno = ($mediaAnual !== null && $mediaAnual < 6.0) ? $rec : null;
             $freq = $freqs[$mid] ?? null;
             $aulasSemana = (int) ($cargas[$mid]['aulas_semana'] ?? 0);
             $semanas = $diasLetivos > 0 ? (int) max(1, round($diasLetivos / 5)) : 40;
@@ -473,11 +544,16 @@ class DocumentoOficialService
             $chCumprida = is_array($freq) ? (int) $freq['total_aulas'] : null;
             $snap = null;
             foreach ($payload['componentes'] ?? [] as $c) {
-                if ((int) ($c['materia_id'] ?? 0) === $mid) {
+                $cid = $this->idOficialNaCarga((int) ($c['materia_id'] ?? 0), $cargas, $mapaPai);
+                if ($cid === (int) $mid) {
                     $snap = $c;
                     break;
                 }
             }
+            $freqGeral = is_array($payload['frequencia'] ?? null) && is_numeric($payload['frequencia']['percentual'] ?? null)
+                ? (float) $payload['frequencia']['percentual']
+                : (is_array($freq) && is_numeric($freq['percentual'] ?? null) ? (float) $freq['percentual'] : null);
+            $avaliadoComp = $this->avaliarComponenteFicha($payload, $alunoId, $turmaId, $anoLetivo, $mediaAnual, $recAno, $freqGeral);
             $linhas[] = [
                 'materia_id' => $mid,
                 'materia_nome' => $nome,
@@ -489,13 +565,13 @@ class DocumentoOficialService
                 'b2' => $bims[2]['media'] ?? null,
                 'b3' => $bims[3]['media'] ?? null,
                 'b4' => $bims[4]['media'] ?? null,
-                'recuperacao' => $rec,
+                'recuperacao' => $recAno,
                 'media' => $mediaAnual,
-                'media_final' => $mediaAnual,
+                'media_final' => $avaliadoComp['media_final'] ?? $mediaAnual,
                 'faltas' => is_array($freq) ? (int) $freq['faltas'] : ($snap['faltas'] ?? null),
                 'frequencia_percentual' => is_array($freq) ? $freq['percentual'] : ($snap['frequencia_percentual'] ?? null),
-                'situacao' => $snap['situacao'] ?? null,
-                'rotulo' => $snap['rotulo'] ?? '—',
+                'situacao' => $avaliadoComp['situacao'] ?? ($snap['situacao'] ?? null),
+                'rotulo' => $avaliadoComp['rotulo'] ?? ($snap['rotulo'] ?? '—'),
             ];
         }
         usort($linhas, static fn ($a, $b) => strcasecmp((string) $a['materia_nome'], (string) $b['materia_nome']));
@@ -538,7 +614,10 @@ class DocumentoOficialService
         foreach ($rows as $row) {
             $mid = (int) ($row['materia_id'] ?? 0);
             $bim = (int) ($row['bimestre'] ?? 0);
-            if ($mid <= 0 || $bim < 1 || $bim > 4) {
+            if ($bim < 1 || $bim > 4) {
+                continue;
+            }
+            if ($mid === 0) {
                 continue;
             }
             if (!isset($out[$mid])) {
@@ -550,10 +629,69 @@ class DocumentoOficialService
             $notas = json_decode((string) ($row['notas_json'] ?? ''), true);
             $notas = is_array($notas) ? $notas : [];
             $media = $this->mediaDeLinhaBoletim($row['media_final'] ?? null, $notas);
-            $rec = isset($notas['REC']) && is_numeric($notas['REC']) ? (float) $notas['REC'] : null;
+            $rec = $this->recDeNotasJson($notas);
             $out[$mid]['bimestres'][$bim] = ['media' => $media, 'recuperacao' => $rec];
         }
         return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $notas
+     */
+    private function recDeNotasJson(array $notas): ?float
+    {
+        foreach ($notas as $codigo => $val) {
+            if (!is_numeric($val)) {
+                continue;
+            }
+            $c = strtolower((string) $codigo);
+            if ($c === 'rec' || $c === 'rec_final' || str_contains($c, 'recup')) {
+                return (float) $val;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array{situacao:?string,rotulo:?string,media_final:?float}
+     */
+    private function avaliarComponenteFicha(
+        array $payload,
+        int $alunoId,
+        int $turmaId,
+        int $anoLetivo,
+        ?float $mediaAnual,
+        ?float $rec,
+        ?float $freqGeral
+    ): array {
+        $turma = is_array($payload['turma'] ?? null) ? $payload['turma'] : [];
+        $regra = $this->homologacao->motor()->resolverRegra([
+            'ano_letivo' => $anoLetivo,
+            'curso_id' => (int) ($turma['curso_novo_id'] ?? $turma['curso_id'] ?? 0) ?: null,
+            'serie_id' => (int) ($turma['serie_id'] ?? 0) ?: null,
+            'matriz_curricular_id' => (int) ($turma['matriz_curricular_id'] ?? 0) ?: null,
+            'periodo_tipo' => 'bimestre',
+            'aluno_id' => $alunoId,
+            'turma_id' => $turmaId,
+        ]);
+        if ($regra === null) {
+            $regra = $this->homologacao->motor()->regraFallbackDoBoletim(['nota_minima_aprovacao' => 6]);
+        }
+        $avaliado = $this->homologacao->motor()->avaliar([
+            'media' => $mediaAnual,
+            'media_antes_rec' => $rec !== null ? $mediaAnual : null,
+            'recuperacao' => $rec,
+            'tem_nota' => $mediaAnual !== null,
+            'frequencia_percentual' => $freqGeral,
+            'aluno_id' => $alunoId,
+            'turma_id' => $turmaId,
+        ], $regra);
+        return [
+            'situacao' => $avaliado['situacao'] ?? null,
+            'rotulo' => $avaliado['rotulo'] ?? null,
+            'media_final' => $avaliado['media_final'] ?? $mediaAnual,
+        ];
     }
 
     /**
@@ -590,14 +728,30 @@ class DocumentoOficialService
                 $out['_duracao'] = (int) ($matriz['duracao_padrao_aula_minutos'] ?? 50) ?: 50;
                 $out['_dias'] = (int) ($matriz['dias_letivos_previstos'] ?? 200) ?: 200;
             }
-            $rows = $this->db->fetchAll(
-                'SELECT c.materia_id, c.aulas_semana, m.nome
-                 FROM matrizes_curriculares_componentes c
-                 INNER JOIN materias m ON m.id = c.materia_id
-                 WHERE c.matriz_id = :id
-                 ORDER BY c.ordem_boletim ASC, m.nome ASC',
-                ['id' => $matrizId]
-            ) ?: [];
+            $rows = [];
+            try {
+                require_once __DIR__ . '/../Models/Education/MatrizCurricular.php';
+                foreach ((new \MatrizCurricular())->getComponentesOficiais($matrizId) as $linha) {
+                    $mid = (int) ($linha['materia_id'] ?? 0);
+                    if ($mid <= 0) {
+                        continue;
+                    }
+                    $rows[] = [
+                        'materia_id' => $mid,
+                        'aulas_semana' => (int) ($linha['aulas_semana'] ?? 0),
+                        'nome' => (string) ($linha['materia_nome'] ?? ''),
+                    ];
+                }
+            } catch (Throwable $e) {
+                $rows = $this->db->fetchAll(
+                    'SELECT c.materia_id, c.aulas_semana, m.nome
+                     FROM matrizes_curriculares_componentes c
+                     INNER JOIN materias m ON m.id = c.materia_id
+                     WHERE c.matriz_id = :id
+                     ORDER BY c.ordem_boletim ASC, m.nome ASC',
+                    ['id' => $matrizId]
+                ) ?: [];
+            }
             foreach ($rows as $row) {
                 $mid = (int) $row['materia_id'];
                 $out[$mid] = [
@@ -607,6 +761,143 @@ class DocumentoOficialService
             }
         } catch (Throwable $e) {
             return $out;
+        }
+        return $out;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function mapaPaiPorFilho(): array
+    {
+        try {
+            require_once __DIR__ . '/../Models/Education/ComponenteCurricular.php';
+            return (new \ComponenteCurricular())->mapaPaiPorFilho();
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param array<int|string, mixed> $cargas
+     * @param array<int, int> $mapaPai
+     */
+    private function idOficialNaCarga(int $mid, array $cargas, array $mapaPai): int
+    {
+        if ($mid <= 0) {
+            return 0;
+        }
+        if (isset($cargas[$mid])) {
+            return $mid;
+        }
+        $pai = (int) ($mapaPai[$mid] ?? 0);
+        if ($pai > 0 && isset($cargas[$pai])) {
+            return $pai;
+        }
+        return $mid;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $notas
+     * @param array<int|string, mixed> $cargas
+     * @param array<int, int> $mapaPai
+     * @return array<int, array<string,mixed>>
+     */
+    private function agruparNotasNoOficial(array $notas, array $cargas, array $mapaPai): array
+    {
+        $out = [];
+        $filhosPorPai = [];
+        foreach ($notas as $mid => $info) {
+            $mid = (int) $mid;
+            if ($mid < 0) {
+                $nome = mb_strtolower(trim((string) ($info['nome'] ?? '')));
+                foreach ($cargas as $cid => $carga) {
+                    if (!is_int($cid) && !ctype_digit((string) $cid)) {
+                        continue;
+                    }
+                    $cid = (int) $cid;
+                    if ($nome !== '' && $nome === mb_strtolower(trim((string) ($carga['nome'] ?? '')))) {
+                        if (!isset($out[$cid])) {
+                            $out[$cid] = $info;
+                        }
+                        break;
+                    }
+                }
+                continue;
+            }
+            $oficial = $this->idOficialNaCarga($mid, $cargas, $mapaPai);
+            if ($oficial > 0 && $oficial !== $mid && isset($cargas[$oficial])) {
+                if (isset($notas[$oficial])) {
+                    continue;
+                }
+                $filhosPorPai[$oficial][] = is_array($info) ? $info : [];
+                continue;
+            }
+            $out[$mid] = $info;
+        }
+        foreach ($filhosPorPai as $pai => $infos) {
+            if (!isset($out[$pai])) {
+                $out[$pai] = $this->mediaNotasComponentes($infos, (string) ($cargas[$pai]['nome'] ?? 'Componente'));
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $infos
+     * @return array{nome:string,bimestres:array<int,array{media:?float,recuperacao:?float}>}
+     */
+    private function mediaNotasComponentes(array $infos, string $nome): array
+    {
+        $bims = [];
+        for ($b = 1; $b <= 4; $b++) {
+            $vals = [];
+            $recs = [];
+            foreach ($infos as $info) {
+                $cel = $info['bimestres'][$b] ?? null;
+                if (!is_array($cel)) {
+                    continue;
+                }
+                if (isset($cel['media']) && is_numeric($cel['media'])) {
+                    $vals[] = (float) $cel['media'];
+                }
+                if (isset($cel['recuperacao']) && is_numeric($cel['recuperacao'])) {
+                    $recs[] = (float) $cel['recuperacao'];
+                }
+            }
+            $bims[$b] = [
+                'media' => $vals !== [] ? round(array_sum($vals) / count($vals), 2) : null,
+                'recuperacao' => $recs !== [] ? round(array_sum($recs) / count($recs), 2) : null,
+            ];
+        }
+        return ['nome' => $nome, 'bimestres' => $bims];
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $freqs
+     * @param array<int|string, mixed> $cargas
+     * @param array<int, int> $mapaPai
+     * @return array<int, array<string,mixed>>
+     */
+    private function agruparFrequenciaNoOficial(array $freqs, array $cargas, array $mapaPai): array
+    {
+        $out = [];
+        foreach ($freqs as $mid => $info) {
+            $mid = (int) $mid;
+            $oficial = $this->idOficialNaCarga($mid, $cargas, $mapaPai);
+            $dest = $oficial > 0 ? $oficial : $mid;
+            if (!isset($out[$dest])) {
+                $out[$dest] = ['faltas' => 0, 'total_aulas' => 0, 'percentual' => null];
+            }
+            $out[$dest]['faltas'] += (int) ($info['faltas'] ?? 0);
+            $out[$dest]['total_aulas'] += (int) ($info['total_aulas'] ?? 0);
+        }
+        foreach ($out as $mid => $info) {
+            $aulas = (int) ($info['total_aulas'] ?? 0);
+            $faltas = (int) ($info['faltas'] ?? 0);
+            $out[$mid]['percentual'] = $aulas > 0
+                ? round((($aulas - $faltas) / $aulas) * 100, 1)
+                : null;
         }
         return $out;
     }
@@ -652,28 +943,16 @@ class DocumentoOficialService
             return is_numeric($v) ? number_format((float) $v, 1, ',', '.') : '—';
         };
         $html = '<table class="dados"><tr>'
-            . '<td class="label">Componente</td>'
-            . '<td class="label">CH prev.</td><td class="label">CH cump.</td>'
-            . '<td class="label">1º Bim</td><td class="label">2º Bim</td>'
-            . '<td class="label">3º Bim</td><td class="label">4º Bim</td>'
-            . '<td class="label">Rec.</td><td class="label">Média</td>'
-            . '<td class="label">Faltas</td><td class="label">Freq.</td>'
-            . '<td class="label">Resultado</td></tr>';
+            . '<td class="label">Componente Curricular</td>'
+            . '<td class="label">CH</td>'
+            . '<td class="label">Nota Final</td>'
+            . '<td class="label">Faltas</td>'
+            . '<td class="label">Situação</td></tr>';
         foreach ($linhas as $c) {
-            $freq = isset($c['frequencia_percentual']) && is_numeric($c['frequencia_percentual'])
-                ? number_format((float) $c['frequencia_percentual'], 1, ',', '.') . '%'
-                : '—';
             $html .= '<tr><td>' . $esc($c['materia_nome'] ?? '') . '</td>'
-                . '<td>' . $esc($c['carga_prevista'] ?? '—') . '</td>'
-                . '<td>' . $esc($c['carga_cumprida'] ?? '—') . '</td>'
-                . '<td>' . $esc($fmt($c['b1'] ?? null)) . '</td>'
-                . '<td>' . $esc($fmt($c['b2'] ?? null)) . '</td>'
-                . '<td>' . $esc($fmt($c['b3'] ?? null)) . '</td>'
-                . '<td>' . $esc($fmt($c['b4'] ?? null)) . '</td>'
-                . '<td>' . $esc($fmt($c['recuperacao'] ?? null)) . '</td>'
+                . '<td>' . $esc(($c['carga_prevista'] ?? $c['carga_horaria'] ?? '—')) . '</td>'
                 . '<td>' . $esc($fmt($c['media_final'] ?? $c['media'] ?? null)) . '</td>'
                 . '<td>' . $esc($c['faltas'] ?? '—') . '</td>'
-                . '<td>' . $esc($freq) . '</td>'
                 . '<td>' . $esc($c['rotulo'] ?? '—') . '</td></tr>';
         }
         return $html . '</table>';
@@ -730,24 +1009,60 @@ class DocumentoOficialService
     }
 
     /**
+     * @param list<array<string,mixed>> $componentes
+     */
+    public function quadroBoletimFinalHtml(array $componentes): string
+    {
+        if ($componentes === []) {
+            return '<p>Nenhum componente lançado neste período.</p>';
+        }
+        $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+        $fmt = static function ($v): string {
+            return is_numeric($v) ? number_format((float) $v, 1, ',', '.') : '—';
+        };
+        $html = '<table class="dados"><tr>'
+            . '<td class="label">Componente</td>'
+            . '<td class="label">B1</td><td class="label">B2</td>'
+            . '<td class="label">B3</td><td class="label">B4</td>'
+            . '<td class="label">Média Final</td>'
+            . '<td class="label">Faltas</td>'
+            . '<td class="label">Resultado</td></tr>';
+        foreach ($componentes as $c) {
+            $html .= '<tr><td>' . $esc($c['materia_nome'] ?? '') . '</td>'
+                . '<td>' . $esc($fmt($c['b1'] ?? null)) . '</td>'
+                . '<td>' . $esc($fmt($c['b2'] ?? null)) . '</td>'
+                . '<td>' . $esc($fmt($c['b3'] ?? null)) . '</td>'
+                . '<td>' . $esc($fmt($c['b4'] ?? null)) . '</td>'
+                . '<td>' . $esc($fmt($c['media_final'] ?? $c['media'] ?? null)) . '</td>'
+                . '<td>' . $esc($c['faltas'] ?? '—') . '</td>'
+                . '<td>' . $esc($c['rotulo'] ?? '—') . '</td></tr>';
+        }
+        return $html . '</table>';
+    }
+
+    /**
      * @param list<array<string,mixed>> $linhas
      */
     public function tabelaAtaHtml(array $linhas): string
     {
         $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         $html = '<table class="dados"><tr>'
-            . '<td class="label">Aluno</td><td class="label">Notas</td>'
-            . '<td class="label">Frequência</td><td class="label">Conselho</td>'
-            . '<td class="label">Resultado</td><td class="label">Status</td></tr>';
+            . '<td class="label">Nº</td><td class="label">Aluno</td>'
+            . '<td class="label">Frequência</td><td class="label">Resultado Final</td>'
+            . '<td class="label">Destino/Observação</td></tr>';
+        $i = 0;
         foreach ($linhas as $linha) {
+            $i++;
             $freq = $linha['frequencia']['percentual'] ?? null;
             $freqTxt = is_numeric($freq) ? number_format((float) $freq, 1, ',', '.') . '%' : '—';
-            $html .= '<tr><td>' . $esc($linha['aluno']['nome'] ?? '') . '</td>'
-                . '<td>' . $esc(!empty($linha['notas_completas']) ? 'OK' : 'Pendente') . '</td>'
+            $html .= '<tr><td>' . str_pad((string) $i, 2, '0', STR_PAD_LEFT) . '</td>'
+                . '<td>' . $esc($linha['aluno']['nome'] ?? '') . '</td>'
                 . '<td>' . $esc($freqTxt) . '</td>'
-                . '<td>' . $esc($linha['conselho']['resultado'] ?? '—') . '</td>'
                 . '<td>' . $esc($linha['rotulo'] ?? '—') . '</td>'
-                . '<td>' . $esc($linha['status'] === 'homologado' ? 'Homologado' : (implode(', ', $linha['pendencias'] ?? []) ?: 'Prévia')) . '</td></tr>';
+                . '<td>' . $esc($this->destinoAta($linha)) . '</td></tr>';
+        }
+        if ($i === 0) {
+            $html .= '<tr><td colspan="5">Nenhum aluno neste recorte.</td></tr>';
         }
         return $html . '</table>';
     }
@@ -774,7 +1089,7 @@ class DocumentoOficialService
                 . '<td>' . $esc($mediaTxt) . '</td>'
                 . '<td>' . $esc($freqTxt) . '</td>'
                 . '<td>' . $esc($linha['rotulo'] ?? '—') . '</td>'
-                . '<td>' . $esc($linha['status'] === 'homologado' ? 'Homologado' : 'Prévia') . '</td></tr>';
+                . '<td>' . $esc(($linha['status'] ?? '') === 'homologado' ? 'Homologado' : 'Prévia') . '</td></tr>';
         }
         if ($i === 0) {
             $html .= '<tr><td colspan="6">Nenhum aluno neste recorte.</td></tr>';
@@ -790,14 +1105,14 @@ class DocumentoOficialService
     private function ehEmissaoOficial(string $tipo, array $payload): bool
     {
         if (in_array($tipo, ['ficha_individual', 'boletim', 'historico'], true)) {
-            return !empty($payload['_homologado']) || (($payload['status'] ?? '') === 'homologado');
+            return !empty($payload['_homologado']);
         }
         $linhas = is_array($payload['linhas'] ?? null) ? $payload['linhas'] : [];
         if ($linhas === []) {
             return false;
         }
         foreach ($linhas as $linha) {
-            if (($linha['status'] ?? '') !== 'homologado') {
+            if (empty($linha['_homologado'])) {
                 return false;
             }
         }
@@ -827,6 +1142,164 @@ class DocumentoOficialService
         }
         $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
         return $dt ? $dt->format('d/m/Y') : '—';
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @return array{texto:string,aprovados:int,retidos:int,transferidos:int}
+     */
+    private function totaisAta(array $linhas): array
+    {
+        $aprovados = 0;
+        $retidos = 0;
+        $transferidos = 0;
+        foreach ($linhas as $linha) {
+            $sit = (string) ($linha['situacao'] ?? '');
+            if (!empty($linha['aluno']['transferido']) || $sit === 'transferencia') {
+                $transferidos++;
+            } elseif (in_array($sit, ['reprovado_rendimento', 'reprovado_frequencia'], true)) {
+                $retidos++;
+            } else {
+                $aprovados++;
+            }
+        }
+        $total = count($linhas);
+        return [
+            'aprovados' => $aprovados,
+            'retidos' => $retidos,
+            'transferidos' => $transferidos,
+            'texto' => 'Total de alunos: ' . $total
+                . ' | Aprovados: ' . $aprovados
+                . ' | Retidos: ' . $retidos
+                . ' | Transferidos: ' . $transferidos,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $linha
+     */
+    private function destinoAta(array $linha): string
+    {
+        if (!empty($linha['aluno']['transferido']) || ($linha['situacao'] ?? '') === 'transferencia') {
+            return 'Transferido';
+        }
+        $sit = (string) ($linha['situacao'] ?? '');
+        if (in_array($sit, ['reprovado_rendimento', 'reprovado_frequencia'], true)) {
+            return 'Retido';
+        }
+        return (string) ($linha['proxima_serie'] ?? $linha['rotulo'] ?? '—');
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function somarCargaHoraria(array $payload): string
+    {
+        $linhas = $payload['componentes_ficha'] ?? $payload['componentes'] ?? [];
+        $soma = 0.0;
+        $tem = false;
+        foreach (is_array($linhas) ? $linhas : [] as $c) {
+            $ch = $c['carga_prevista'] ?? $c['carga_horaria'] ?? null;
+            if (is_numeric($ch)) {
+                $soma += (float) $ch;
+                $tem = true;
+            }
+        }
+        if (!$tem) {
+            return '—';
+        }
+        $txt = (fmod($soma, 1.0) < 0.05) ? (string) (int) round($soma) : number_format($soma, 1, ',', '.');
+        return $txt . ' h';
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function proximaSerieRotulo(array $payload): string
+    {
+        $sit = (string) ($payload['situacao'] ?? $payload['avaliado']['situacao'] ?? '');
+        if (in_array($sit, ['reprovado_rendimento', 'reprovado_frequencia'], true)) {
+            return (string) ($payload['turma']['serie_nome'] ?? $payload['turma']['serie'] ?? 'Retido');
+        }
+        return (string) ($payload['proxima_serie'] ?? '—');
+    }
+
+    private function trajetoriaHtml(int $alunoId): string
+    {
+        if ($alunoId <= 0) {
+            return '';
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT r.ano_letivo, t.nome AS turma_nome, t.serie, r.situacao, r.status
+                   FROM resultado_academico r
+                   LEFT JOIN turmas t ON t.id = r.turma_id
+                  WHERE r.aluno_id = :a AND r.periodo_tipo = 'ano' AND r.status = 'homologado'
+                  ORDER BY r.ano_letivo ASC",
+                ['a' => $alunoId]
+            ) ?: [];
+        } catch (Throwable $e) {
+            return '';
+        }
+        if ($rows === []) {
+            return '';
+        }
+        $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+        $html = '<table class="dados"><tr>'
+            . '<td class="label">Ano</td><td class="label">Ano/Série</td>'
+            . '<td class="label">Estabelecimento</td><td class="label">Resultado</td></tr>';
+        foreach ($rows as $r) {
+            $html .= '<tr><td>' . $esc($r['ano_letivo'] ?? '') . '</td>'
+                . '<td>' . $esc($r['serie'] ?? $r['turma_nome'] ?? '') . '</td>'
+                . '<td>' . $esc($r['turma_nome'] ?? '') . '</td>'
+                . '<td>' . $esc($r['situacao'] ?? '') . '</td></tr>';
+        }
+        return $html . '</table>';
+    }
+
+    private function dataPorExtenso(string $iso): string
+    {
+        $dt = DateTime::createFromFormat('Y-m-d', substr($iso, 0, 10));
+        if (!$dt) {
+            return date('d/m/Y');
+        }
+        $meses = [
+            1 => 'janeiro', 2 => 'fevereiro', 3 => 'março', 4 => 'abril',
+            5 => 'maio', 6 => 'junho', 7 => 'julho', 8 => 'agosto',
+            9 => 'setembro', 10 => 'outubro', 11 => 'novembro', 12 => 'dezembro',
+        ];
+        $dia = (int) $dt->format('j');
+        $mes = $meses[(int) $dt->format('n')] ?? $dt->format('m');
+        return $dia . ' de ' . $mes . ' de ' . $dt->format('Y');
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function unidadeDaTurma(int $turmaId): array
+    {
+        try {
+            $aluno = $this->db->fetch(
+                'SELECT a.* FROM alunos a
+                  INNER JOIN matricula m ON m.aluno_id = a.id AND m.turma_id = :t
+                 ORDER BY m.id DESC LIMIT 1',
+                ['t' => $turmaId]
+            );
+            if ($aluno) {
+                $u = $this->declarations->getUnidadeForAluno($aluno);
+                if (is_array($u)) {
+                    return $u;
+                }
+            }
+        } catch (Throwable $e) {
+            // segue fallback
+        }
+        try {
+            $u = $this->declarations->getUnidadeForAluno([]);
+            return is_array($u) ? $u : [];
+        } catch (Throwable $e) {
+            return [];
+        }
     }
 
     /**

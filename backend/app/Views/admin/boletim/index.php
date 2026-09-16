@@ -1,5 +1,8 @@
 <?php
 $regra = $regra ?? [];
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+}
 $componentes = $regra['componentes'] ?? [];
 $alunos = $alunos ?? [];
 $blocosProvas = $blocos_provas ?? [];
@@ -8,6 +11,11 @@ $series = $series ?? [];
 $turmas = $turmas ?? [];
 $regrasCatalogo = $regras_catalogo ?? [];
 $faltasEventosCatalogo = $faltas_eventos_catalogo ?? [];
+$gruposRegrasNotas = is_array($grupos_regras_notas ?? null) ? $grupos_regras_notas : [];
+$agrupamentosComponentes = is_array($agrupamentos_componentes ?? null) ? $agrupamentos_componentes : [];
+$boletinsCadastro = is_array($boletins_cadastro ?? null) ? $boletins_cadastro : [];
+$grupoRegrasNotasId = (int) ($grupo_regras_notas_id ?? 0);
+$destinosQuadro = is_array($destinos_quadro ?? null) ? $destinos_quadro : [];
 $selectedRegraId = (int) ($selected_regra_id ?? 0);
 $materiasSelecionadasRegra = array_map('intval', (array) ($regra['materias_ids_array'] ?? []));
 $seriesSelecionadasRegra = array_map('intval', (array) ($regra['series_ids_array'] ?? []));
@@ -31,10 +39,12 @@ $roundModeSelected = strtolower(trim((string) ($regra['round_mode'] ?? 'none')))
 if (!in_array($roundModeSelected, ['none', 'half'], true)) {
     $roundModeSelected = 'none';
 }
-$exibirEm = strtolower(trim((string) ($regra['exibir_em'] ?? 'boletim')));
-if (!in_array($exibirEm, ['notas', 'boletim'], true)) {
-    $exibirEm = 'boletim';
+$exibirEm = 'notas';
+$finalidade = strtolower(trim((string) ($regra['finalidade'] ?? 'oficial')));
+if (!in_array($finalidade, ['oficial', 'complementar'], true)) {
+    $finalidade = 'oficial';
 }
+$boletimIdSelecionado = (int) ($regra['boletim_id'] ?? 0);
 $decimalPlacesSelected = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
 $formatNotaBoletim = static function ($valor) use ($decimalPlacesSelected): string {
     return number_format((float) $valor, $decimalPlacesSelected, ',', '.');
@@ -141,17 +151,47 @@ foreach ($materias as $materiaItem) {
     }
 }
 
-foreach ($componentes as $comp) {
-    $rawBlocos = trim((string) ($comp['blocos_ids'] ?? ''));
-    $blocosArr = [];
-    if ($rawBlocos !== '') {
-        foreach (explode(',', $rawBlocos) as $part) {
-            $bid = (int) trim($part);
-            if ($bid > 0) {
-                $blocosArr[] = $bid;
+if (!function_exists('boletim_comp_ids_lista')) {
+    /**
+     * @param mixed $raw
+     * @return list<int>
+     */
+    function boletim_comp_ids_lista($raw): array
+    {
+        if (is_array($raw)) {
+            $out = [];
+            foreach ($raw as $v) {
+                if (is_array($v)) {
+                    continue;
+                }
+                $n = (int) $v;
+                if ($n > 0) {
+                    $out[] = $n;
+                }
+            }
+            return array_values(array_unique($out));
+        }
+        $s = trim((string) ($raw ?? ''));
+        if ($s === '') {
+            return [];
+        }
+        $dec = json_decode($s, true);
+        if (is_array($dec)) {
+            return boletim_comp_ids_lista($dec);
+        }
+        $out = [];
+        foreach (explode(',', $s) as $part) {
+            $n = (int) trim($part);
+            if ($n > 0) {
+                $out[] = $n;
             }
         }
+        return array_values(array_unique($out));
     }
+}
+
+foreach ($componentes as $comp) {
+    $blocosArr = boletim_comp_ids_lista($comp['blocos_ids'] ?? []);
     $cfgJ = [
         'jornada_ids' => [],
         'data_ini' => '',
@@ -170,6 +210,8 @@ foreach ($componentes as $comp) {
             'mode' => 'media',
             'divisor' => 0,
             'materias_ids' => [],
+            'aplicar_em' => 'boletim',
+            'agrupamento_id' => 0,
         ],
         'layout_group' => '',
         'layout_type' => '',
@@ -183,24 +225,22 @@ foreach ($componentes as $comp) {
         'nota_unica_fonte_por_materia' => [],
         'nota_unica_fonte_por_grupo' => [],
     ];
-    $materiasIdsComp = [];
-    $rawMateriasComp = trim((string) ($comp['materias_ids'] ?? ''));
-    if ($rawMateriasComp !== '') {
-        $decMat = json_decode($rawMateriasComp, true);
-        if (is_array($decMat)) {
-            foreach ($decMat as $midComp) {
-                $midComp = (int) $midComp;
-                if ($midComp > 0) {
-                    $materiasIdsComp[] = $midComp;
-                }
+    $materiasIdsComp = boletim_comp_ids_lista($comp['materias_ids'] ?? []);
+    $dec = null;
+    if (isset($comp['config']) && is_array($comp['config'])) {
+        $dec = $comp['config'];
+    } elseif (isset($comp['config_json']) && is_array($comp['config_json'])) {
+        $dec = $comp['config_json'];
+    } else {
+        $rawCj = is_string($comp['config_json'] ?? null) ? trim((string) $comp['config_json']) : '';
+        if ($rawCj !== '') {
+            $tmpCfg = json_decode($rawCj, true);
+            if (is_array($tmpCfg)) {
+                $dec = $tmpCfg;
             }
-            $materiasIdsComp = array_values(array_unique($materiasIdsComp));
         }
     }
-    $rawCj = trim((string) ($comp['config_json'] ?? ''));
-    if ($rawCj !== '') {
-        $dec = json_decode($rawCj, true);
-        if (is_array($dec)) {
+    if (is_array($dec)) {
             $jids = [];
             foreach ((array) ($dec['jornada_ids'] ?? []) as $jid) {
                 $jid = (int) $jid;
@@ -273,11 +313,14 @@ foreach ($componentes as $comp) {
                     'mode' => (string) ($g['mode'] ?? 'media'),
                     'divisor' => (float) ($g['divisor'] ?? 0),
                     'materias_ids' => array_values(array_unique($gm)),
+                    'aplicar_em' => (strtolower(trim((string) ($g['aplicar_em'] ?? 'ambos'))) === 'boletim') ? 'boletim' : 'ambos',
+                    'agrupamento_id' => (int) ($g['agrupamento_id'] ?? 0),
                 ];
             }
             if (isset($dec['layout']) && is_array($dec['layout'])) {
                 $cfgJ['layout_group'] = strtolower(trim((string) ($dec['layout']['group'] ?? '')));
                 $cfgJ['layout_type'] = strtolower(trim((string) ($dec['layout']['type'] ?? '')));
+                $cfgJ['layout_group_label'] = trim((string) ($dec['layout']['label'] ?? ''));
             }
             $cfgJ['semana'] = (int) ($dec['semana'] ?? 0);
             $agNq = [];
@@ -338,7 +381,6 @@ foreach ($componentes as $comp) {
                 }
             }
             $cfgJ['nota_unica_fonte_por_grupo'] = $fpGrp;
-        }
     }
 
     $componentesInicial[] = [
@@ -516,14 +558,17 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 <div class="space-y-6">
     <div class="flex items-start justify-between gap-3 flex-wrap">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Configuração de Boletim</h1>
-            <p class="text-sm text-gray-500 mt-1">Monte a regra da escola por blocos e simule a nota final com dados reais do aluno.</p>
+            <h1 class="text-2xl font-bold text-gray-900">Evento de Notas</h1>
+            <?php if (trim((string) ($regra['nome'] ?? '')) !== ''): ?>
+            <p class="text-sm text-gray-700 mt-1"><?= htmlspecialchars((string) $regra['nome']) ?></p>
+            <?php endif; ?>
+            <p class="text-sm text-gray-500 mt-1">As fórmulas ficam em Configurar Notas. Depois gere o período em lote.</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="<?= URL ?>/admin/boletim-configuracao/assistente<?= $selectedRegraId > 0 ? '?regra_id=' . $selectedRegraId : '' ?>"
                class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                Assistente guiado
+                Configurar Notas
             </a>
             <a href="<?= URL ?>/admin/boletim"
                class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium shrink-0">
@@ -545,16 +590,42 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     <?php endif; ?>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="xl:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200">
-            <div class="px-5 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Configuração por blocos</h2>
-                <p class="text-sm text-gray-500 mt-1">Monte e edite manualmente os blocos que compõem este boletim.</p>
-            </div>
-
+        <div class="xl:col-span-3 hidden" aria-hidden="true">
             <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/salvar" class="p-5 space-y-5" id="form-regra-boletim">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
-                <input type="hidden" name="exibir_em" id="regra-exibir-em" value="<?= htmlspecialchars($exibirEm) ?>">
+                <input type="hidden" name="exibir_em" id="regra-exibir-em" value="notas">
+                <input type="hidden" name="finalidade" id="regra-finalidade" value="<?= htmlspecialchars($finalidade) ?>">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Boletim</label>
+                    <select name="boletim_id" id="regra-boletim-id" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm">
+                        <option value="">Selecione um Boletim</option>
+                        <?php foreach ($boletinsCadastro as $bolOpt): ?>
+                            <?php
+                            $bolOptId = (int) ($bolOpt['id'] ?? 0);
+                            $bolLabel = (string) ($bolOpt['nome'] ?? '');
+                            $bolLabel .= (($bolOpt['finalidade'] ?? '') === 'complementar') ? ' · Extra' : ' · Oficial';
+                            if (!empty($bolOpt['ano_letivo'])) {
+                                $bolLabel .= ' · ' . (int) $bolOpt['ano_letivo'];
+                            }
+                            ?>
+                            <option
+                                value="<?= $bolOptId ?>"
+                                data-finalidade="<?= htmlspecialchars((string) ($bolOpt['finalidade'] ?? 'oficial')) ?>"
+                                data-materias="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($bolOpt['materias_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>"
+                                data-series="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($bolOpt['series_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>"
+                                data-turmas="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($bolOpt['turmas_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>"
+                                data-nota-min="<?= htmlspecialchars((string) ($bolOpt['nota_minima_aprovacao'] ?? '')) ?>"
+                                data-round="<?= htmlspecialchars((string) ($bolOpt['round_mode'] ?? '')) ?>"
+                                data-decimal="<?= htmlspecialchars((string) ($bolOpt['decimal_places'] ?? '')) ?>"
+                                <?= $boletimIdSelecionado === $bolOptId ? 'selected' : '' ?>
+                            ><?= htmlspecialchars($bolLabel) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php if ($boletinsCadastro === []): ?>
+                        <p class="text-xs text-amber-800 mt-1">Cadastre o modelo em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a> antes de criar a avaliação.</p>
+                    <?php endif; ?>
+                </div>
                 <input type="hidden" name="componentes_json" id="componentes-json" value="<?= htmlspecialchars(json_encode($componentesInicial, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>">
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -576,10 +647,38 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         <label class="block text-sm font-medium text-gray-700 mb-1">Descrição curta (opcional)</label>
                         <input type="text" id="regra-descricao-curta" name="regra_descricao_curta" maxlength="255" value="<?= htmlspecialchars((string) ($regra['descricao_curta'] ?? '')) ?>" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex.: Evento do 1º bimestre para composição da média">
                     </div>
-                    <div id="wrap-exibicao-filtros" class="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 md:items-start">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quadro de Notas</label>
+                        <select id="grupo-regras-notas-id" name="grupo_regras_notas_id" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm">
+                            <option value="">Selecione o quadro</option>
+                            <?php foreach ($gruposRegrasNotas as $grn): ?>
+                                <option value="<?= (int) ($grn['id'] ?? 0) ?>" <?= $grupoRegrasNotasId === (int) ($grn['id'] ?? 0) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string) ($grn['nome'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($gruposRegrasNotas === []): ?>
+                        <p class="text-xs text-amber-800 mt-1">Cadastre o molde em <a href="<?= URL ?>/admin/quadros-notas" class="underline">Acadêmico → Quadro de Notas</a> antes de salvar a avaliação.</p>
+                        <?php endif; ?>
+                        <p class="text-xs text-gray-500 mt-1">Ao escolher, as colunas S1/S2… e os blocos (A/B, Humanas…) nascem do quadro. <a href="<?= URL ?>/admin/quadros-notas" class="text-indigo-600 underline">Cadastrar quadros</a>.</p>
+                        <div id="grupo-regras-notas-preview" class="hidden mt-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-950"></div>
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <span class="block text-sm font-medium text-gray-700">Esta avaliação também conta para…</span>
+                                <button type="button" id="btn-add-destino-quadro" class="btn-primary-custom px-3 py-1.5 text-xs font-semibold rounded-lg hover:opacity-90">+ Destino</button>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-2">Além do quadro principal, esta avaliação também conta para outras colunas (ex.: AV1 de outro quadro).</p>
+                            <div id="lista-destinos-quadro" class="space-y-3"></div>
+                            <input type="hidden" name="destinos_json" id="destinos-json" value="<?= htmlspecialchars(json_encode($destinosQuadro, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="campos-herdados-do-boletim" class="hidden" aria-hidden="true">
+                    <div id="wrap-exibicao-filtros" class="grid grid-cols-1 md:grid-cols-3 gap-4 md:items-start">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Ano letivo</label>
-                            <select name="ano_letivo" id="regra-ano-letivo" class="w-full h-10 px-3 border border-gray-300 rounded-lg">
+                            <select name="ano_letivo" id="regra-ano-letivo" data-periodo-ano class="w-full h-10 px-3 border border-gray-300 rounded-lg">
                                 <?php $anoRegra = (int) ($regra['ano_letivo'] ?? (int) date('Y')); ?>
                                 <?php foreach (($anos_letivos_catalogo ?? []) as $anoOpt): ?>
                                     <?php $anoOpt = (int) $anoOpt; if ($anoOpt <= 0) { continue; } ?>
@@ -587,29 +686,30 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nota mínima para passar</label>
-                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap sm:gap-x-3">
-                                <input type="number" name="nota_minima_aprovacao" min="0" max="10" step="0.01" value="<?= htmlspecialchars(number_format((float) (($regra['nota_minima_aprovacao'] ?? 6)), 2, '.', '')) ?>" class="w-full sm:w-32 sm:shrink-0 h-10 px-3 border border-gray-300 rounded-lg box-border">
-                                <label class="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap shrink-0">
-                                    <input type="checkbox" name="usar_resultado_aprovacao" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['usar_resultado_aprovacao']) || (int) $regra['usar_resultado_aprovacao'] === 1 ? 'checked' : '' ?>>
-                                    <span>Mostrar aprovado/reprovado</span>
-                                </label>
-                            </div>
-                        </div>
                         <div id="wrap-exibicao-bimestre">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Bimestre</label>
                             <?php $bimRegra = (int) ($regra['bimestre'] ?? 0); ?>
-                            <select name="bimestre" id="regra-bimestre" class="w-full h-10 px-3 border border-gray-300 rounded-lg">
-                                <option value="">Selecione</option>
-                                <option value="1" <?= $bimRegra === 1 ? 'selected' : '' ?>>1º Bimestre</option>
-                                <option value="2" <?= $bimRegra === 2 ? 'selected' : '' ?>>2º Bimestre</option>
-                                <option value="3" <?= $bimRegra === 3 ? 'selected' : '' ?>>3º Bimestre</option>
-                                <option value="4" <?= $bimRegra === 4 ? 'selected' : '' ?>>4º Bimestre</option>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label>Bimestre</label>
+                            <select name="bimestre" id="regra-bimestre" class="w-full h-10 px-3 border border-gray-300 rounded-lg" data-periodo-letivo-select data-periodo-vazio="1">
+                                <?php
+                                if (!class_exists('PeriodoLetivo')) {
+                                    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                                }
+                                echo PeriodoLetivo::optionsHtml($anoRegra, $bimRegra, ['vazio' => true]);
+                                ?>
                             </select>
                         </div>
+                        <div class="flex items-end pb-1">
+                            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="usar_resultado_aprovacao" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['usar_resultado_aprovacao']) || (int) $regra['usar_resultado_aprovacao'] === 1 ? 'checked' : '' ?>>
+                                <span>Mostrar aprovado/reprovado</span>
+                            </label>
+                        </div>
                     </div>
-                    <div>
+                    <div data-herda-boletim>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nota mínima para passar</label>
+                        <input type="number" name="nota_minima_aprovacao" min="0" max="10" step="0.01" value="<?= htmlspecialchars(number_format((float) (($regra['nota_minima_aprovacao'] ?? 6)), 2, '.', '')) ?>" class="w-full sm:w-32 h-10 px-3 border border-gray-300 rounded-lg box-border">
+                    </div>
+                    <div data-herda-boletim>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Arredondamento final</label>
                         <select name="round_mode" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="none" <?= $roundModeSelected === 'none' ? 'selected' : '' ?>>Sem arredondamento especial (2 casas)</option>
@@ -617,7 +717,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         </select>
                         <p class="text-xs text-gray-500 mt-1 min-h-[2.75rem] leading-snug">Regra: decimal &lt; 0,25 = .00, de 0,25 a &lt; 0,75 = .50, e ≥ 0,75 sobe para o próximo inteiro.</p>
                     </div>
-                    <div>
+                    <div data-herda-boletim>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Casas decimais no boletim</label>
                         <select name="decimal_places" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="2" <?= $decimalPlacesSelected === 2 ? 'selected' : '' ?>>2 casas (ex.: 9,00)</option>
@@ -625,9 +725,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         </select>
                         <p class="text-xs text-gray-500 mt-1 min-h-[2.75rem] leading-snug">Define a exibição das notas geradas para alunos, pais e coordenação.</p>
                     </div>
-                </div>
 
-                <div>
+                <div data-herda-boletim>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Matérias que entram no boletim (opcional)</label>
                     <div class="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto bg-white">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -652,7 +751,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     </p>
                 </div>
 
-                <div>
+                <div data-herda-boletim>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Séries que podem usar este evento (opcional)</label>
                     <div class="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto bg-white">
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -679,7 +778,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <p class="text-xs text-gray-500 mt-1">Se não selecionar nenhuma, o evento fica disponível para todas as séries.</p>
                 </div>
 
-                <div>
+                <div data-herda-boletim>
                     <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-2">
                         <label class="block text-sm font-medium text-gray-700">Turmas que podem usar este evento (opcional)</label>
                         <input type="search" id="filtro-turmas-regra" placeholder="Buscar turma"
@@ -721,6 +820,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         </div>
                     </div>
                     <p class="text-xs text-gray-500 mt-1">Turmas sem série continuam disponíveis para seleção. Quando selecionar uma ou mais turmas, elas terão prioridade sobre o filtro de séries.</p>
+                </div>
                 </div>
 
                 <script>
@@ -779,10 +879,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 <div id="wrap-semanas-quadro" class="hidden rounded-lg border border-indigo-100 bg-indigo-50 p-4">
                     <div class="flex flex-col gap-1 mb-3">
                         <h4 class="text-sm font-semibold text-indigo-950">Semanas do quadro semanal</h4>
-                        <p class="text-xs text-indigo-800">Marque quais colunas S1–S8 aparecem no boletim e entram na Média Sem.</p>
+                        <p class="text-xs text-indigo-800">Marque quais colunas S1–S20 aparecem no boletim e entram na Média Sem.</p>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-                        <?php for ($semanaQuadro = 1; $semanaQuadro <= 8; $semanaQuadro++): ?>
+                        <?php for ($semanaQuadro = 1; $semanaQuadro <= 20; $semanaQuadro++): ?>
                             <label class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-indigo-950">
                                 <input type="checkbox" class="semana-quadro-toggle rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="s<?= $semanaQuadro ?>" data-semana="<?= $semanaQuadro ?>">
                                 <span>S<?= $semanaQuadro ?></span>
@@ -800,36 +900,44 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         </div>
 
         <div class="xl:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200">
-            <div class="px-5 py-4 border-b border-gray-200">
-                <h2 class="text-lg font-semibold text-gray-900">Geração em lote</h2>
-                <p class="text-sm text-gray-500 mt-1">Simule um aluno e depois gere o período. Alunos travados não entram.</p>
+            <div class="px-5 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Geração em lote</h2>
+                    <p class="text-sm text-gray-500 mt-1">Simule um aluno e depois gere o período. Alunos travados não entram.</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" id="btn-abrir-conferir-boletim"
+                            class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                        <i class="fa-solid fa-flask mr-2"></i>Simular boletim
+                    </button>
+                    <?php if ($geracaoEmAndamento): ?>
+                    <a href="<?= URL ?>/admin/boletim"
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Ver status
+                    </a>
+                    <?php else: ?>
+                    <button type="submit" form="form-gerar-lote-boletim"
+                            class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                        Gerar boletins
+                    </button>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <div class="p-5 space-y-4">
-                <button type="button" id="btn-abrir-conferir-boletim" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <i class="fa-solid fa-magnifying-glass mr-2"></i>Conferir
-                </button>
-
-                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" id="form-gerar-lote-boletim" class="space-y-4">
+                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" id="form-gerar-lote-boletim" class="space-y-3">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                     <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
                     <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
                     <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
                     <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
                     <label class="flex items-start gap-2.5 text-sm text-gray-800 cursor-pointer">
-                        <input type="checkbox" id="incluir-novos-boletim" name="incluir_novos" value="1" class="mt-1 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" checked>
+                        <input type="checkbox" id="incluir-novos-boletim" name="incluir_novos" value="1" class="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
                         <span>Incluir alunos que ainda não têm boletim neste período</span>
                     </label>
                     <p class="text-xs text-gray-500">Nova versão vigente; o histórico fica guardado. Roda em segundo plano.</p>
                     <?php if ($geracaoEmAndamento): ?>
                     <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
-                    <a href="<?= URL ?>/admin/boletim" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg hover:opacity-90 font-semibold text-center inline-block">
-                        Ver status na listagem
-                    </a>
-                    <?php else: ?>
-                    <button type="submit" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg hover:opacity-90 font-semibold">
-                        Gerar boletins
-                    </button>
                     <?php endif; ?>
                 </form>
 
@@ -880,7 +988,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
            class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
            aria-hidden="true">
         <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
-            <h2 class="text-xl font-bold text-gray-900">Conferir boletim</h2>
+            <h2 class="text-xl font-bold text-gray-900">Simular boletim</h2>
             <button type="button" onclick="fecharConferirBoletim()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
                 <i class="fa-solid fa-xmark text-xl"></i>
             </button>
@@ -905,7 +1013,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 </form>
             </section>
             <section>
-                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Conferir lote</h3>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Simular lote</h3>
                 <p class="text-sm text-gray-500 mb-4">Valida até 60 alunos sem gravar. A turma é opcional.</p>
                 <div class="space-y-4">
                     <div>
@@ -1468,13 +1576,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         </select>
                     </div>
                     <div class="min-w-[140px]">
-                        <label for="jornada-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1">Bimestre</label>
+                        <label for="jornada-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
                         <select id="jornada-tabela-filtro-bimestre" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
-                            <option value="">Todos</option>
-                            <option value="1">1º Bimestre</option>
-                            <option value="2">2º Bimestre</option>
-                            <option value="3">3º Bimestre</option>
-                            <option value="4">4º Bimestre</option>
+                            <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
                         </select>
                     </div>
                     <div class="min-w-[120px]">
@@ -1530,10 +1634,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 <p id="hint-filtro-blocos" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-1 hidden">Com <strong>blocos de prova</strong> selecionados, este filtro <strong>não é aplicado</strong> na busca (o título da prova costuma ser diferente do nome do bloco). Use só blocos para bimestrais por bloco, ou só o filtro quando não marcar blocos.</p>
             </div>
             <div id="wrap-semana-quadro">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Semana no quadro (S1–S8)</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Semana no quadro (S1–S20)</label>
                 <select id="bloco-semana" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     <option value="">Nenhuma</option>
-                    <?php for ($si = 1; $si <= 8; $si++): ?>
+                    <?php for ($si = 1; $si <= 20; $si++): ?>
                         <option value="<?= $si ?>">S<?= $si ?></option>
                     <?php endfor; ?>
                 </select>
@@ -1577,13 +1681,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         </select>
                     </div>
                     <div class="min-w-[140px]">
-                        <label for="bloco-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1">Bimestre</label>
+                        <label for="bloco-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
                         <select id="bloco-tabela-filtro-bimestre" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
-                            <option value="">Todos</option>
-                            <option value="1">1º Bimestre</option>
-                            <option value="2">2º Bimestre</option>
-                            <option value="3">3º Bimestre</option>
-                            <option value="4">4º Bimestre</option>
+                            <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
                         </select>
                     </div>
                     <div class="min-w-[120px]">
@@ -1670,6 +1770,23 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     Agrupar em linha única (ex.: Língua Portuguesa)
                 </label>
                 <div id="bloco-group-fields" class="hidden mt-3 space-y-3">
+                    <div class="hidden">
+                        <select id="bloco-group-agrupamento">
+                            <option value="0">Montar na hora</option>
+                            <?php foreach ($agrupamentosComponentes as $agOpt): ?>
+                                <?php $agOptId = (int) ($agOpt['id'] ?? 0); ?>
+                                <?php if ($agOptId <= 0) { continue; } ?>
+                                <option value="<?= $agOptId ?>"
+                                        data-nome="<?= htmlspecialchars((string) ($agOpt['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-modo="<?= htmlspecialchars((string) ($agOpt['modo'] ?? 'media'), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-aplicar="<?= htmlspecialchars((string) ($agOpt['aplicar_em'] ?? 'boletim'), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-divisor="<?= htmlspecialchars((string) ($agOpt['divisor'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-materias="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($agOpt['materias_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars((string) ($agOpt['nome'] ?? ('Agrupamento #' . $agOptId))) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-medium text-indigo-900 mb-1">Código do grupo</label>
@@ -1709,6 +1826,13 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         </div>
                     </div>
                     <p class="text-xs text-indigo-800">Use para montar linha única por área. Cada bloco pode usar cálculo diferente para o mesmo grupo.</p>
+                    <div>
+                        <label class="block text-xs font-medium text-indigo-900 mb-1">Onde agrupar</label>
+                        <select id="bloco-group-aplicar-em" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm">
+                            <option value="ambos">No boletim e nas notas</option>
+                            <option value="boletim">Só no boletim (nas notas as matérias ficam separadas)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1913,11 +2037,22 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 if (descWizardEl && rascunhoWizard.descricao_curta != null) descWizardEl.value = rascunhoWizard.descricao_curta;
                 if (formulaWizardEl && rascunhoWizard.formula_final != null) formulaWizardEl.value = rascunhoWizard.formula_final;
                 if (rascunhoWizard.exibir_em) {
-                    var exibirValorWizard = String(rascunhoWizard.exibir_em).replace(/"/g, '');
-                    var exibirWizardEl = document.querySelector('input[name="exibir_em"][value="' + exibirValorWizard + '"]') || document.getElementById('regra-exibir-em');
-                    if (exibirWizardEl) {
-                        if (exibirWizardEl.type === 'radio') exibirWizardEl.checked = true;
-                        else exibirWizardEl.value = exibirValorWizard;
+                    var exibirValorWizard = 'notas';
+                    var exibirWizardEl = document.getElementById('regra-exibir-em');
+                    if (exibirWizardEl) exibirWizardEl.value = exibirValorWizard;
+                }
+                if (rascunhoWizard.boletim_id) {
+                    var bolWizardEl = document.getElementById('regra-boletim-id');
+                    if (bolWizardEl) bolWizardEl.value = String(rascunhoWizard.boletim_id);
+                }
+                if (rascunhoWizard.grupo_regras_notas_id) {
+                    var quadroWizardEl = document.getElementById('grupo-regras-notas-id');
+                    if (quadroWizardEl) quadroWizardEl.value = String(rascunhoWizard.grupo_regras_notas_id);
+                }
+                if (rascunhoWizard.finalidade) {
+                    var finWizardEl = document.getElementById('regra-finalidade');
+                    if (finWizardEl) {
+                        finWizardEl.value = rascunhoWizard.finalidade === 'complementar' ? 'complementar' : 'oficial';
                     }
                 }
                 if (anoWizardEl && rascunhoWizard.ano_letivo) anoWizardEl.value = rascunhoWizard.ano_letivo;
@@ -2002,10 +2137,12 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         ,materiasHint: document.getElementById('bloco-materias-hint')
         ,groupEnabled: document.getElementById('bloco-group-enabled')
         ,groupFields: document.getElementById('bloco-group-fields')
+        ,groupAgrupamento: document.getElementById('bloco-group-agrupamento')
         ,groupKey: document.getElementById('bloco-group-key')
         ,groupLabel: document.getElementById('bloco-group-label')
         ,groupMode: document.getElementById('bloco-group-mode')
         ,groupDivisor: document.getElementById('bloco-group-divisor')
+        ,groupAplicarEm: document.getElementById('bloco-group-aplicar-em')
         ,wrapJornadaNotaUnicaExtras: document.getElementById('wrap-jornada-nota-unica-extras')
         ,listaJornadaFontePorMateria: document.getElementById('lista-jornada-fonte-por-materia')
         ,btnJornadaFonteMateriaAdd: document.getElementById('btn-jornada-fonte-materia-add')
@@ -2738,6 +2875,68 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     });
     syncExibicaoCampos();
 
+    function parseJsonIds(raw) {
+        try {
+            var arr = JSON.parse(raw || '[]');
+            return Array.isArray(arr) ? arr.map(Number).filter(function (n) { return n > 0; }) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    function marcarChecksSeVazio(name, ids, forcar) {
+        var checks = Array.from(document.querySelectorAll('input[name="' + name + '"]'));
+        if (!checks.length) return;
+        var algum = checks.some(function (c) { return c.checked; });
+        if (!forcar && algum) return;
+        var set = {};
+        (ids || []).forEach(function (id) { set[Number(id)] = true; });
+        checks.forEach(function (c) { c.checked = !!set[Number(c.value)]; });
+    }
+    function sincronizarCamposHerdadosDoBoletim() {
+        var wrap = document.getElementById('campos-herdados-do-boletim');
+        if (wrap) wrap.classList.add('hidden');
+        document.querySelectorAll('[data-herda-boletim]').forEach(function (el) {
+            el.classList.add('hidden');
+        });
+    }
+    function aplicarBoletimNoFormulario(forcarEscopo, forcarCriterios) {
+        var sel = document.getElementById('regra-boletim-id');
+        if (!sel || !sel.value) return;
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt) return;
+        var finEl = document.getElementById('regra-finalidade');
+        if (finEl) {
+            finEl.value = opt.getAttribute('data-finalidade') === 'complementar' ? 'complementar' : 'oficial';
+        }
+        marcarChecksSeVazio('materias_ids[]', parseJsonIds(opt.getAttribute('data-materias')), !!forcarEscopo);
+        marcarChecksSeVazio('series_ids[]', parseJsonIds(opt.getAttribute('data-series')), !!forcarEscopo);
+        marcarChecksSeVazio('turmas_ids[]', parseJsonIds(opt.getAttribute('data-turmas')), !!forcarEscopo);
+        var notaEl = document.querySelector('[name="nota_minima_aprovacao"]');
+        var roundEl = document.querySelector('[name="round_mode"]');
+        var decEl = document.querySelector('[name="decimal_places"]');
+        var notaCad = opt.getAttribute('data-nota-min');
+        var roundCad = opt.getAttribute('data-round');
+        var decCad = opt.getAttribute('data-decimal');
+        if (notaEl && notaCad && (forcarCriterios || String(notaEl.value || '').trim() === '')) {
+            notaEl.value = notaCad;
+        }
+        if (roundEl && roundCad && (forcarCriterios || String(roundEl.value || '').trim() === '')) {
+            roundEl.value = roundCad;
+        }
+        if (decEl && decCad && (forcarCriterios || String(decEl.value || '').trim() === '')) {
+            decEl.value = decCad;
+        }
+    }
+    var boletimSelEl = document.getElementById('regra-boletim-id');
+    if (boletimSelEl) {
+        boletimSelEl.addEventListener('change', function () {
+            aplicarBoletimNoFormulario(true, true);
+            sincronizarCamposHerdadosDoBoletim();
+        });
+        if (boletimSelEl.value) aplicarBoletimNoFormulario(true, true);
+        sincronizarCamposHerdadosDoBoletim();
+    }
+
     function syncJson() {
         inputJson.value = JSON.stringify(componentes);
     }
@@ -2748,7 +2947,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 
     function codigoSemanaQuadro(semana) {
         var n = Number(semana || 0);
-        return n >= 1 && n <= 8 ? ('s' + n) : '';
+        return n >= 1 && n <= 20 ? ('s' + n) : '';
     }
 
     function criarComponenteSemanaQuadro(semana) {
@@ -2783,16 +2982,215 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     function isComponenteSemanaQuadro(comp) {
         var cod = String((comp && comp.codigo) || '').toLowerCase().trim();
         var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
-        return /^s[1-8]$/.test(cod) || String(cfg.layout_type || '').toLowerCase() === 'semana_nq';
+        return /^s([1-9]|[1-9]\d)$/.test(cod) || String(cfg.layout_type || '').toLowerCase() === 'semana_nq';
     }
 
     function isMediaSemQuadro(comp) {
         var cod = String((comp && comp.codigo) || '').toLowerCase().trim();
         var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
         var agregacaoSemanas = Array.isArray(cfg.agregar_nq) && cfg.agregar_nq.some(function (x) {
-            return /^s[1-8]$/.test(String(x || '').toLowerCase().trim());
+            return /^s([1-9]|[1-9]\d)$/.test(String(x || '').toLowerCase().trim());
         });
         return cod === 'media_sem' || String(cfg.layout_type || '').toLowerCase() === 'media_sem' || agregacaoSemanas;
+    }
+
+    var selGrupoRegras = document.getElementById('grupo-regras-notas-id');
+    var previewGrupoRegras = document.getElementById('grupo-regras-notas-preview');
+    function renderPreviewGrupoRegras(grupo) {
+        if (!previewGrupoRegras) return;
+        if (!grupo) {
+            previewGrupoRegras.classList.add('hidden');
+            previewGrupoRegras.innerHTML = '';
+            return;
+        }
+        var comps = Array.isArray(grupo.componentes_sugeridos) ? grupo.componentes_sugeridos : [];
+        var nomes = comps.map(function (c) {
+            return String((c && (c.nome || c.codigo)) || '').trim();
+        }).filter(Boolean);
+        previewGrupoRegras.classList.remove('hidden');
+        if (!nomes.length) {
+            previewGrupoRegras.innerHTML = '<strong>Este quadro ainda não gera colunas.</strong> Revise o cadastro antes de usar neste modelo.';
+            return;
+        }
+        previewGrupoRegras.innerHTML = '<strong>Ao usar este quadro, seu boletim terá as colunas:</strong><br>' + nomes.map(escHtml).join(' · ');
+    }
+
+    function escHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function aplicarComponentesDoGrupo(compsSugeridos) {
+        if (!Array.isArray(compsSugeridos)) return;
+        var outros = componentes.filter(function (c) {
+            return !isComponenteSemanaQuadro(c) && !isMediaSemQuadro(c);
+        });
+        componentes = compsSugeridos.concat(outros);
+        syncJson();
+        if (typeof renderLista === 'function') renderLista();
+        else if (typeof renderBlocos === 'function') renderBlocos();
+        if (typeof syncSemanasQuadroPanel === 'function') syncSemanasQuadroPanel();
+    }
+
+    (function initDestinosQuadro() {
+        var catalogo = <?= json_encode($gruposRegrasNotas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
+        var destinosIni = <?= json_encode($destinosQuadro, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
+        var lista = document.getElementById('lista-destinos-quadro');
+        var hid = document.getElementById('destinos-json');
+        var btnAdd = document.getElementById('btn-add-destino-quadro');
+        if (!lista || !hid) return;
+
+        function quadroPorId(id) {
+            id = Number(id) || 0;
+            for (var i = 0; i < catalogo.length; i++) {
+                if (Number(catalogo[i].id) === id) return catalogo[i];
+            }
+            return null;
+        }
+        function fillSelect(sel, placeholder, itens, selectedId, labelKey) {
+            sel.innerHTML = '<option value="">' + placeholder + '</option>';
+            (itens || []).forEach(function (item) {
+                var opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = item[labelKey] || item.nome || item.codigo || ('#' + item.id);
+                if (Number(item.id) === Number(selectedId)) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+        function syncLinha(row) {
+            var selG = row.querySelector('.sel-destino-quadro');
+            var selT = row.querySelector('.sel-destino-bloco');
+            var selM = row.querySelector('.sel-destino-coluna');
+            var wrapT = row.querySelector('.wrap-destino-bloco');
+            var wrapM = row.querySelector('.wrap-destino-coluna');
+            var g = quadroPorId(selG.value);
+            var tipos = (g && Array.isArray(g.tipos)) ? g.tipos : ((g && Array.isArray(g.blocos)) ? g.blocos : []);
+            var marcas = (g && Array.isArray(g.marcas)) ? g.marcas : ((g && Array.isArray(g.colunas)) ? g.colunas : []);
+            if (wrapT) wrapT.classList.toggle('hidden', tipos.length === 0);
+            if (wrapM) wrapM.classList.toggle('hidden', marcas.length === 0);
+            var tipoSel = parseInt(selT.getAttribute('data-keep') || selT.value, 10) || 0;
+            fillSelect(selT, 'Bloco', tipos, tipoSel, 'nome');
+            selT.removeAttribute('data-keep');
+            var tipo = null;
+            tipos.forEach(function (t) { if (Number(t.id) === (parseInt(selT.value, 10) || 0)) tipo = t; });
+            var idsOk = tipo && Array.isArray(tipo.marcas_ids) && tipo.marcas_ids.length
+                ? tipo.marcas_ids.map(Number)
+                : marcas.map(function (m) { return Number(m.id); });
+            var marcasOk = marcas.filter(function (m) {
+                return idsOk.indexOf(Number(m.id)) >= 0 && m.papel !== 'calculada';
+            });
+            fillSelect(selM, 'Coluna', marcasOk, parseInt(selM.getAttribute('data-keep') || selM.value, 10) || 0, 'nome');
+            selM.removeAttribute('data-keep');
+            syncHid();
+        }
+        function syncHid() {
+            var out = [];
+            lista.querySelectorAll('.destino-quadro-row').forEach(function (row) {
+                var g = parseInt(row.querySelector('.sel-destino-quadro').value, 10) || 0;
+                if (!g) return;
+                var t = parseInt(row.querySelector('.sel-destino-bloco').value, 10) || 0;
+                var m = parseInt(row.querySelector('.sel-destino-coluna').value, 10) || 0;
+                out.push({
+                    grupo_id: g,
+                    tipo_id: t > 0 ? t : null,
+                    marca_id: m > 0 ? m : null
+                });
+            });
+            hid.value = JSON.stringify(out);
+        }
+        function addLinha(data) {
+            data = data || {};
+            var wrap = document.createElement('div');
+            wrap.className = 'destino-quadro-row grid grid-cols-1 md:grid-cols-12 gap-3 items-end border border-gray-200 rounded-lg p-3';
+            wrap.innerHTML =
+                '<div class="md:col-span-4"><label class="block text-xs font-medium text-gray-500 mb-1">Quadro</label>' +
+                '<select class="sel-destino-quadro w-full h-10 px-3 border border-gray-300 rounded-lg text-sm"></select></div>' +
+                '<div class="md:col-span-3 wrap-destino-bloco hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Bloco</label>' +
+                '<select class="sel-destino-bloco w-full h-10 px-3 border border-gray-300 rounded-lg text-sm"><option value="">Bloco</option></select></div>' +
+                '<div class="md:col-span-3 wrap-destino-coluna hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Coluna</label>' +
+                '<select class="sel-destino-coluna w-full h-10 px-3 border border-gray-300 rounded-lg text-sm"><option value="">Coluna</option></select></div>' +
+                '<div class="md:col-span-2"><button type="button" class="btn-rm-destino w-full px-3 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">Remover</button></div>';
+            var selG = wrap.querySelector('.sel-destino-quadro');
+            fillSelect(selG, 'Nenhum', catalogo, data.grupo_id || '', 'nome');
+            wrap.querySelector('.sel-destino-bloco').setAttribute('data-keep', data.tipo_id || '');
+            wrap.querySelector('.sel-destino-coluna').setAttribute('data-keep', data.marca_id || '');
+            selG.addEventListener('change', function () {
+                wrap.querySelector('.sel-destino-bloco').value = '';
+                wrap.querySelector('.sel-destino-bloco').removeAttribute('data-keep');
+                wrap.querySelector('.sel-destino-coluna').setAttribute('data-keep', '');
+                syncLinha(wrap);
+            });
+            wrap.querySelector('.sel-destino-bloco').addEventListener('change', function () { syncLinha(wrap); });
+            wrap.querySelector('.sel-destino-coluna').addEventListener('change', syncHid);
+            wrap.querySelector('.btn-rm-destino').addEventListener('click', function () {
+                wrap.remove();
+                syncHid();
+            });
+            lista.appendChild(wrap);
+            syncLinha(wrap);
+        }
+        if (btnAdd) btnAdd.addEventListener('click', function () { addLinha({}); });
+        if (destinosIni.length) {
+            destinosIni.forEach(function (v) { addLinha(v); });
+        }
+        syncHid();
+        var formRegra = document.getElementById('form-regra-boletim');
+        if (formRegra) formRegra.addEventListener('submit', syncHid);
+    })();
+
+    if (selGrupoRegras) {
+        function carregarGrupoRegras(aplicar) {
+            var id = parseInt(selGrupoRegras.value, 10) || 0;
+            if (id <= 0) {
+                renderPreviewGrupoRegras(null);
+                return;
+            }
+            fetch(<?= json_encode(URL . '/admin/grupos-regras-notas/', JSON_UNESCAPED_SLASHES) ?> + id + '/dados', {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                if (!data || !data.ok || !data.grupo) {
+                    alert((data && data.error) ? data.error : 'Não foi possível carregar o grupo.');
+                    return;
+                }
+                renderPreviewGrupoRegras(data.grupo);
+                if (aplicar) {
+                    if (!confirm('Substituir as colunas semanais pelas colunas e blocos deste quadro?')) {
+                        return;
+                    }
+                    aplicarComponentesDoGrupo(data.grupo.componentes_sugeridos || []);
+                }
+                var lg = document.getElementById('bloco-layout-group');
+                if (lg && Array.isArray(data.grupo.tipos)) {
+                    data.grupo.tipos.forEach(function (t) {
+                        var val = String(t.layout_group || '');
+                        if (!val) return;
+                        var exists = false;
+                        for (var i = 0; i < lg.options.length; i++) {
+                            if (lg.options[i].value === val) { exists = true; break; }
+                        }
+                        if (!exists) {
+                            var opt = document.createElement('option');
+                            opt.value = val;
+                            opt.textContent = 'Quadro — ' + (t.layout_group_label || t.nome || val);
+                            lg.appendChild(opt);
+                        }
+                    });
+                }
+            }).catch(function () {
+                alert('Falha ao carregar o Quadro de Notas.');
+            });
+        }
+        selGrupoRegras.addEventListener('change', function () {
+            carregarGrupoRegras(true);
+        });
+        if (parseInt(selGrupoRegras.value, 10) > 0) {
+            carregarGrupoRegras(false);
+        }
     }
 
     function ordenarComponentesQuadroSemanal() {
@@ -2818,7 +3216,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             if (isComponenteSemanaQuadro(comp)) {
                 var cfg = (comp.config && typeof comp.config === 'object') ? comp.config : {};
                 var cod = String(comp.codigo || '').toLowerCase().trim();
-                if (!/^s[1-8]$/.test(cod)) {
+                if (!/^s([1-9]|[1-9]\d)$/.test(cod)) {
                     cod = codigoSemanaQuadro(cfg.semana || 0);
                 }
                 if (cod !== '') {
@@ -2927,6 +3325,47 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         }
         var ativo = !!fields.groupEnabled.checked;
         fields.groupFields.classList.toggle('hidden', !ativo);
+    }
+
+    function aplicarAgrupamentoCadastroNoModal() {
+        if (!fields.groupAgrupamento) {
+            return;
+        }
+        var opt = fields.groupAgrupamento.options[fields.groupAgrupamento.selectedIndex];
+        var id = Number(fields.groupAgrupamento.value || 0);
+        if (!opt || id <= 0) {
+            return;
+        }
+        var nome = String(opt.getAttribute('data-nome') || '').trim();
+        var modo = String(opt.getAttribute('data-modo') || 'media').trim();
+        var aplicar = String(opt.getAttribute('data-aplicar') || 'boletim').trim();
+        var divisor = String(opt.getAttribute('data-divisor') || '').trim();
+        var mats = [];
+        try {
+            mats = JSON.parse(opt.getAttribute('data-materias') || '[]') || [];
+        } catch (eAg) {
+            mats = [];
+        }
+        if (fields.groupEnabled) {
+            fields.groupEnabled.checked = true;
+        }
+        if (fields.groupLabel && nome) {
+            fields.groupLabel.value = nome;
+        }
+        if (fields.groupKey && nome) {
+            fields.groupKey.value = slugify(nome).replace(/-/g, '_') || fields.groupKey.value;
+        }
+        if (fields.groupMode) {
+            fields.groupMode.value = modo === 'soma' ? 'soma' : 'media';
+        }
+        if (fields.groupAplicarEm) {
+            fields.groupAplicarEm.value = aplicar === 'ambos' ? 'ambos' : 'boletim';
+        }
+        if (fields.groupDivisor) {
+            fields.groupDivisor.value = divisor !== '' && Number(divisor) > 0 ? String(Number(divisor)) : '';
+        }
+        setSelectedGroupMateriasOnModal(Array.isArray(mats) ? mats : []);
+        toggleGroupLineFields();
     }
 
     function syncFormulaMateriasJson() {
@@ -3457,6 +3896,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         if (fields.groupEnabled) {
             fields.groupEnabled.checked = false;
         }
+        if (fields.groupAgrupamento) {
+            fields.groupAgrupamento.value = '0';
+        }
         if (fields.groupKey) {
             fields.groupKey.value = '';
         }
@@ -3468,6 +3910,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         }
         if (fields.groupDivisor) {
             fields.groupDivisor.value = '';
+        }
+        if (fields.groupAplicarEm) {
+            fields.groupAplicarEm.value = 'boletim';
         }
         setSelectedGroupMateriasOnModal([]);
         toggleGroupLineFields();
@@ -3553,6 +3998,12 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             if (fields.groupDivisor) {
                 fields.groupDivisor.value = (grp.divisor && Number(grp.divisor) > 0) ? String(Number(grp.divisor)) : '';
             }
+            if (fields.groupAplicarEm) {
+                fields.groupAplicarEm.value = (String(grp.aplicar_em || 'ambos') === 'boletim') ? 'boletim' : 'ambos';
+            }
+            if (fields.groupAgrupamento) {
+                fields.groupAgrupamento.value = String(Number(grp.agrupamento_id || 0) || 0);
+            }
             setSelectedGroupMateriasOnModal(Array.isArray(grp.materias_ids) ? grp.materias_ids : []);
             toggleGroupLineFields();
             fields.calc.value = item.calc_type || 'media';
@@ -3566,7 +4017,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             }
             if (fields.semana) {
                 var semV = Number(cfg.semana || 0);
-                fields.semana.value = (semV >= 1 && semV <= 8) ? String(semV) : '';
+                fields.semana.value = (semV >= 1 && semV <= 20) ? String(semV) : '';
             }
             if (fields.agregarNq) {
                 var ag = Array.isArray(cfg.agregar_nq) ? cfg.agregar_nq : [];
@@ -3826,6 +4277,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     if (fields.groupEnabled) {
         fields.groupEnabled.addEventListener('change', toggleGroupLineFields);
     }
+    if (fields.groupAgrupamento) {
+        fields.groupAgrupamento.addEventListener('change', aplicarAgrupamentoCadastroNoModal);
+    }
     if (fields.blocoIds) {
         fields.blocoIds.addEventListener('change', function () {
             if (getSelectedBlocoIdsFromModal().length > 0 && fields.source.value === 'provas_sistema') {
@@ -4034,6 +4488,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             var gLabel = fields.groupLabel ? String(fields.groupLabel.value || '').trim() : '';
             var gMode = fields.groupMode ? String(fields.groupMode.value || 'media').trim() : 'media';
             var gDiv = fields.groupDivisor ? Number(fields.groupDivisor.value || 0) : 0;
+            var gAplicar = fields.groupAplicarEm ? String(fields.groupAplicarEm.value || 'boletim').trim() : 'boletim';
+            if (gAplicar !== 'boletim') {
+                gAplicar = 'ambos';
+            }
             if (!gKey) {
                 gKey = slugify(gLabel);
             }
@@ -4047,14 +4505,19 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             if (gMode !== 'soma') {
                 gMode = 'media';
             }
+            var gAgrupamentoId = fields.groupAgrupamento ? Number(fields.groupAgrupamento.value || 0) : 0;
             groupLinePayload = {
                 enabled: true,
                 key: gKey,
                 label: gLabel,
                 mode: gMode,
                 divisor: gDiv > 0 ? gDiv : 0,
-                materias_ids: gMats
+                materias_ids: gMats,
+                aplicar_em: gAplicar
             };
+            if (gAgrupamentoId > 0) {
+                groupLinePayload.agrupamento_id = gAgrupamentoId;
+            }
         }
         if (payload.source_type === 'jornadas') {
             var distJn = (fields.jornadaDistribuicaoNotas && fields.jornadaDistribuicaoNotas.value)
@@ -4195,7 +4658,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 payload.config = {};
             }
             var semVal = fields.semana ? Number(fields.semana.value || 0) : 0;
-            if (semVal >= 1 && semVal <= 8) {
+            if (semVal >= 1 && semVal <= 20) {
                 payload.config.semana = semVal;
             } else if (payload.config.semana) {
                 delete payload.config.semana;
@@ -4213,7 +4676,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 if (!merged.config || typeof merged.config !== 'object') {
                     merged.config = {};
                 }
-                if (semMerged >= 1 && semMerged <= 8) {
+                if (semMerged >= 1 && semMerged <= 20) {
                     merged.config.semana = semMerged;
                     if (!merged.config.layout_group) {
                         merged.config.layout_group = (semMerged % 2 === 1) ? 'quadro_a' : 'quadro_b';
@@ -4393,6 +4856,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         btnAbrirConferir.addEventListener('click', function () {
             window.abrirConferirBoletim();
         });
+    }
+    if (new URLSearchParams(window.location.search).get('simular') === '1') {
+        window.abrirConferirBoletim();
     }
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;

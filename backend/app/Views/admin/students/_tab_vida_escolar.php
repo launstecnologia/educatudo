@@ -172,6 +172,7 @@ $mostrarCapa = $podeVidaEscolar && $prontuario !== [];
 <script>
 function selecionarVeAba(nome) {
     if (typeof veFecharLancarEscola === 'function') veFecharLancarEscola();
+    if (typeof fecharModalNotasAluno === 'function') fecharModalNotasAluno();
     if (!nome) nome = 'boletim';
     document.querySelectorAll('.ve-painel').forEach(function (painel) {
         var ativa = painel.getAttribute('data-ve-aba') === nome;

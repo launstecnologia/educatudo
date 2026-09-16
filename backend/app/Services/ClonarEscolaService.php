@@ -258,8 +258,8 @@ class ClonarEscolaService
             $tentativas = max(1, (int) $stTent->fetchColumn());
         }
 
-        if ($criarBanco) {
-            $criado = self::criarBancoDestino($host, $porta, $nomeBanco, $usuario, $senha);
+        if ($criarBanco && !self::bancoDestinoAcessivel($host, $porta, $usuario, $senha, $nomeBanco)) {
+            $criado = self::criarBancoDestino($host, $porta, $nomeBanco, $usuario, $senha, $origem);
             $host = $criado['host'];
             $porta = $criado['porta'];
             self::gravarConfigBanco($masterPdo, $destinoId, $host, $porta, $nomeBanco, $usuario, $senha);
@@ -349,40 +349,123 @@ class ClonarEscolaService
         return $row ?: null;
     }
 
+    private static function bancoDestinoAcessivel(
+        string $host,
+        int $porta,
+        string $usuario,
+        string $senha,
+        string $nomeBanco
+    ): bool {
+        try {
+            $pdo = self::conectarMysql($host, $porta, $usuario, $senha, $nomeBanco, false);
+            $pdo->exec('USE ' . self::quoteIdent($nomeBanco));
+            return true;
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
     /**
+     * Tenta DB_ADMIN, depois o usuário do Master (DB_USER) e o da escola de origem.
+     * Na VPS o root@localhost não funciona a partir do PHP.
+     *
+     * @param array<string,mixed> $origem
      * @return array{host:string,porta:int}
      */
-    private static function criarBancoDestino(string $host, int $porta, string $nomeBanco, string $usuario, string $senha): array
-    {
-        if (!MysqlProvisioningService::isAvailable()) {
-            throw new RuntimeException('Criação automática de banco indisponível (defina DB_ADMIN_USER e DB_ADMIN_PASS).');
-        }
-        $admin = MysqlProvisioningService::getAdminConnectionParams();
-        $adminUser = (string) (function_exists('env') ? env('DB_ADMIN_USER', '') : '');
-        $adminPass = (string) (function_exists('env') ? env('DB_ADMIN_PASS', '') : '');
-        $adminHost = (string) ($admin['host'] ?? $host);
-        $adminPorta = (int) ($admin['port'] ?? $porta);
-        try {
-            MysqlProvisioningService::createDatabaseAndUser(
-                $adminHost,
-                $adminPorta,
-                $adminUser,
-                $adminPass,
-                $nomeBanco,
-                $usuario,
-                $senha
+    private static function criarBancoDestino(
+        string $host,
+        int $porta,
+        string $nomeBanco,
+        string $usuario,
+        string $senha,
+        array $origem
+    ): array {
+        $candidatos = [];
+        $visto = [];
+
+        $adicionar = static function (string $h, int $p, string $u, string $s) use (&$candidatos, &$visto): void {
+            $u = trim($u);
+            $h = trim($h);
+            if ($u === '' || $s === '' || $h === '') {
+                return;
+            }
+            $chave = strtolower($h) . '|' . $p . '|' . strtolower($u);
+            if (isset($visto[$chave])) {
+                return;
+            }
+            $visto[$chave] = true;
+            $candidatos[] = ['host' => $h, 'porta' => $p, 'usuario' => $u, 'senha' => $s];
+        };
+
+        if (MysqlProvisioningService::isAvailable()) {
+            $admin = MysqlProvisioningService::getAdminConnectionParams();
+            $adicionar(
+                (string) ($admin['host'] ?? $host),
+                (int) ($admin['port'] ?? $porta),
+                (string) (function_exists('env') ? env('DB_ADMIN_USER', '') : ''),
+                (string) (function_exists('env') ? env('DB_ADMIN_PASS', '') : '')
             );
-        } catch (Throwable $e) {
-            throw new RuntimeException(
-                'Falha ao criar o banco destino: '
-                . MysqlProvisioningService::formatarErroAdminMysql($e, $adminUser, $adminHost)
+        }
+        $masterHost = strtolower(trim((string) (function_exists('env') ? env('DB_HOST', '') : '')));
+        $adminHostCmp = strtolower(trim((string) (function_exists('env') ? env('DB_ADMIN_HOST', '') : '')));
+        $destHostCmp = strtolower($host);
+        if ($destHostCmp !== '' && ($destHostCmp === $masterHost || $destHostCmp === $adminHostCmp)) {
+            $adicionar(
+                $host,
+                $porta,
+                (string) (function_exists('env') ? env('DB_USER', '') : ''),
+                (string) (function_exists('env') ? env('DB_PASS', '') : '')
+            );
+        }
+        $origemHost = trim((string) ($origem['host'] ?? ''));
+        $origemPorta = (int) ($origem['porta'] ?? $porta);
+        if ($origemHost !== '' && strtolower($origemHost) === strtolower($host) && $origemPorta === $porta) {
+            $adicionar(
+                $origemHost,
+                $origemPorta,
+                (string) ($origem['usuario'] ?? ''),
+                MasterSecretVault::decryptDbPassword((string) ($origem['senha_criptografada'] ?? ''))
             );
         }
 
-        return [
-            'host' => $adminHost !== '' ? $adminHost : $host,
-            'porta' => $adminPorta > 0 ? $adminPorta : $porta,
-        ];
+        if ($candidatos === []) {
+            throw new RuntimeException(
+                'Criação automática de banco indisponível. Defina DB_ADMIN_USER/DB_ADMIN_PASS '
+                . 'ou use um usuário MySQL com CREATE DATABASE (o mesmo da escola de origem).'
+            );
+        }
+
+        $ultimoErro = null;
+        $ultimoCandidato = $candidatos[0];
+        foreach ($candidatos as $c) {
+            try {
+                MysqlProvisioningService::createDatabaseAndUser(
+                    $c['host'],
+                    $c['porta'],
+                    $c['usuario'],
+                    $c['senha'],
+                    $nomeBanco,
+                    $usuario,
+                    $senha
+                );
+                return [
+                    'host' => $c['host'] !== '' ? $c['host'] : $host,
+                    'porta' => $c['porta'] > 0 ? $c['porta'] : $porta,
+                ];
+            } catch (Throwable $e) {
+                $ultimoErro = $e;
+                $ultimoCandidato = $c;
+            }
+        }
+
+        throw new RuntimeException(
+            'Falha ao criar o banco destino (tentamos ' . count($candidatos) . ' usuário(s) MySQL). '
+            . MysqlProvisioningService::formatarErroAdminMysql(
+                $ultimoErro ?? new RuntimeException('sem detalhe'),
+                (string) ($ultimoCandidato['usuario'] ?? 'root'),
+                (string) ($ultimoCandidato['host'] ?? $host)
+            )
+        );
     }
 
     private static function garantirBancoDestinoPronto(

@@ -37,11 +37,21 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
             </select>
         </div>
         <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Bimestre</label>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1" data-periodo-label>Bimestre</label>
             <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
-                <?php for ($b = 1; $b <= 4; $b++): ?>
-                    <option value="<?= $b ?>" <?= ((int) ($filtro['bimestre'] ?? 0) === $b) ? 'selected' : '' ?>><?= $b ?>º</option>
-                <?php endfor; ?>
+                <?php
+                if (!class_exists('PeriodoLetivo')) {
+                    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
+                }
+                $anoDash = (int) date('Y');
+                foreach ($anos as $anoRow) {
+                    if ((int) ($filtro['ano_letivo_id'] ?? 0) === (int) ($anoRow['id'] ?? 0)) {
+                        $anoDash = (int) ($anoRow['ano'] ?? $anoDash);
+                        break;
+                    }
+                }
+                echo PeriodoLetivo::optionsHtml($anoDash, (int) ($filtro['bimestre'] ?? 0));
+                ?>
             </select>
         </div>
         <div>

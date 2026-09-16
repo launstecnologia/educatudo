@@ -46,6 +46,9 @@ class BoletimAssistenteWizard
                     'bimestre' => isset($r['bimestre']) ? (int) $r['bimestre'] : null,
                     'ano_letivo' => isset($r['ano_letivo']) ? (int) $r['ano_letivo'] : null,
                     'exibir_em' => isset($r['exibir_em']) ? (string) $r['exibir_em'] : null,
+                    'finalidade' => strtolower(trim((string) ($r['finalidade'] ?? 'oficial'))) === 'complementar'
+                        ? 'complementar'
+                        : 'oficial',
                     'formula_final' => isset($r['formula_final']) ? (string) $r['formula_final'] : null,
                 ];
             }
@@ -141,9 +144,236 @@ class BoletimAssistenteWizard
             'tipos_avaliacao' => $tipos,
             'eventos_prova' => $eventosProva,
             'faltas_eventos' => $faltasEventos,
+            'agrupamentos' => $this->catalogoAgrupamentos(),
+            'familias_componentes' => $this->catalogoFamiliasComponentes(),
+            'boletins' => $this->catalogoBoletins(),
+            'quadros_notas' => $this->catalogoQuadrosNotas(),
             'pecas' => $this->pecasMeta($tipos),
             'papeis' => self::papeisMeta(),
+            'ano_letivo_ativo' => $this->ferramentas->anoLetivoAtivo(),
         ];
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int}>
+     */
+    private function catalogoBoletins(): array
+    {
+        $path = dirname(__DIR__) . '/Modulos/boletins/Services/BoletimCadastroService.php';
+        if (!is_file($path)) {
+            return [];
+        }
+        require_once $path;
+        try {
+            return (new \App\Modulos\Boletins\Services\BoletimCadastroService())->listarParaEventoNotas();
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard catalogo boletins: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array{id:int,nome:string}>
+     */
+    private function catalogoQuadrosNotas(): array
+    {
+        $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!is_file($path)) {
+            return [];
+        }
+        require_once $path;
+        try {
+            $svc = new GrupoRegrasNotasService();
+            if (!$svc->moduloAtivo() || !$svc->model()->tabelasProntas()) {
+                return [];
+            }
+            $out = [];
+            foreach ($svc->model()->listar(true) as $g) {
+                $id = (int) ($g['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $out[] = [
+                    'id' => $id,
+                    'nome' => trim((string) ($g['nome'] ?? ('Quadro #' . $id))),
+                ];
+            }
+            return $out;
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard catalogo quadros: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function aplicarEscopoDoBoletimCadastro(array &$estado): void
+    {
+        $id = (int) ($estado['boletim_id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+        $bol = null;
+        foreach ($this->catalogoBoletins() as $b) {
+            if ((int) ($b['id'] ?? 0) === $id) {
+                $bol = $b;
+                break;
+            }
+        }
+        if (!is_array($bol)) {
+            return;
+        }
+        if (($estado['finalidade'] ?? '') !== 'complementar') {
+            $estado['finalidade'] = (($bol['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial';
+        }
+        foreach (['materias_ids', 'series_ids', 'turmas_ids'] as $campo) {
+            if (!empty($estado[$campo]) && is_array($estado[$campo])) {
+                continue;
+            }
+            $estado[$campo] = array_values(array_filter(
+                array_map('intval', (array) ($bol[$campo] ?? [])),
+                static fn ($n) => $n > 0
+            ));
+        }
+        if (!isset($estado['nota_minima_aprovacao']) || $estado['nota_minima_aprovacao'] === '' || $estado['nota_minima_aprovacao'] === null) {
+            $estado['nota_minima_aprovacao'] = $bol['nota_minima_aprovacao'] ?? 7;
+        }
+        if (($estado['round_mode'] ?? '') === '') {
+            $estado['round_mode'] = (string) ($bol['round_mode'] ?? 'half');
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function inferirPecasDoQuadro(int $grupoId): array
+    {
+        if ($grupoId <= 0) {
+            return [];
+        }
+        $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('GrupoRegrasNotasService', false)) {
+            return [];
+        }
+        try {
+            $payload = (new \GrupoRegrasNotasService())->payloadPublico($grupoId);
+        } catch (Throwable $e) {
+            return [];
+        }
+        if (!is_array($payload)) {
+            return [];
+        }
+        $pecas = [];
+        foreach ((array) ($payload['marcas'] ?? []) as $m) {
+            if (!is_array($m) || (string) ($m['papel'] ?? '') === 'calculada') {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($m['codigo'] ?? $m['chave'] ?? '')));
+            $tipoId = (int) ($m['tipo_nota_id'] ?? 0);
+            $key = $tipoId > 0 ? $this->chavePecaPorTipoId($tipoId) : '';
+            if ($key === '') {
+                $key = (string) ($this->chavePecaDeComponente([
+                    'codigo' => $cod,
+                    'nome' => (string) ($m['nome'] ?? ''),
+                    'source_type' => 'provas_sistema',
+                    'config' => ['tipo_avaliacao_id' => $tipoId],
+                ]) ?? '');
+            }
+            if ($key !== '') {
+                $pecas[] = $key;
+            }
+        }
+
+        return array_values(array_unique($pecas));
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,modo:string,aplicar_em:string,divisor:?float,materias_ids:list<int>}>
+     */
+    private function catalogoAgrupamentos(): array
+    {
+        $path = dirname(__DIR__) . '/Modulos/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
+        if (!is_file($path)) {
+            return [];
+        }
+        require_once $path;
+        try {
+            return (new \App\Modulos\AgrupamentosComponentes\Services\AgrupamentoComponenteService())->listarParaBoletim();
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard catalogo agrupamentos: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Pai (rótulo) + desdobramentos já cadastrados em Componentes Curriculares.
+     *
+     * @return list<array{pai_id:int,nome:string,filhos:list<array{id:int,nome:string}>,materias_ids:list<int>}>
+     */
+    private function catalogoFamiliasComponentes(): array
+    {
+        $path = dirname(__DIR__) . '/Models/Education/ComponenteCurricular.php';
+        if (!class_exists('ComponenteCurricular', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('ComponenteCurricular', false)) {
+            return [];
+        }
+        try {
+            $model = new ComponenteCurricular();
+            $mapa = $model->mapaFilhosPorPai();
+            if ($mapa === []) {
+                return [];
+            }
+            $byId = [];
+            foreach ($model->getAll(true) ?: [] as $c) {
+                $id = (int) ($c['id'] ?? 0);
+                if ($id > 0) {
+                    $byId[$id] = $c;
+                }
+            }
+            $out = [];
+            foreach ($mapa as $paiId => $filhos) {
+                $paiId = (int) $paiId;
+                if ($paiId <= 0 || count($filhos) < 2) {
+                    continue;
+                }
+                $nome = trim((string) (($byId[$paiId] ?? [])['nome'] ?? ''));
+                if ($nome === '') {
+                    continue;
+                }
+                $filhosOut = [];
+                $ids = [];
+                foreach ($filhos as $f) {
+                    $fid = (int) ($f['id'] ?? 0);
+                    if ($fid <= 0) {
+                        continue;
+                    }
+                    $filhosOut[] = [
+                        'id' => $fid,
+                        'nome' => trim((string) ($f['nome'] ?? '')),
+                    ];
+                    $ids[] = $fid;
+                }
+                if (count($ids) < 2) {
+                    continue;
+                }
+                $out[] = [
+                    'pai_id' => $paiId,
+                    'nome' => $nome,
+                    'filhos' => $filhosOut,
+                    'materias_ids' => $ids,
+                ];
+            }
+            return $out;
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteWizard catalogo familias: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /**
@@ -154,7 +384,14 @@ class BoletimAssistenteWizard
      */
     public function estadoPadrao(?array $estadoFormulario = null, ?int $regraIdAtual = null): array
     {
-        $ano = (int) date('Y');
+        $regraIdAtual = (int) $regraIdAtual;
+        $boletimSeed = is_array($estadoFormulario) ? (int) ($estadoFormulario['boletim_id'] ?? 0) : 0;
+        $anoPreferido = is_array($estadoFormulario) ? (int) ($estadoFormulario['ano_letivo'] ?? 0) : 0;
+        $ano = $this->ferramentas->anoLetivoPadrao($anoPreferido > 0 ? $anoPreferido : null);
+        $bimSeed = is_array($estadoFormulario) ? (int) ($estadoFormulario['bimestre'] ?? 0) : 0;
+        if ($regraIdAtual <= 0 && $boletimSeed > 0) {
+            $regraIdAtual = $this->ferramentas->sugerirRegraIdDoBoletim($boletimSeed, $ano, $bimSeed);
+        }
         $estado = [
             'passo' => 'inicio',
             'origem' => 'zero',
@@ -167,6 +404,9 @@ class BoletimAssistenteWizard
             'ano_letivo' => $ano,
             'bimestre' => 1,
             'exibir_em' => 'notas',
+            'finalidade' => 'oficial',
+            'boletim_id' => 0,
+            'grupo_regras_notas_id' => 0,
             'nota_minima_aprovacao' => 7.0,
             'round_mode' => 'half',
             'pecas' => [],
@@ -219,13 +459,27 @@ class BoletimAssistenteWizard
                 $estado['codigo'] = trim((string) $estadoFormulario['codigo']);
             }
             if (!empty($estadoFormulario['ano_letivo'])) {
-                $estado['ano_letivo'] = (int) $estadoFormulario['ano_letivo'];
+                $anoForm = (int) $estadoFormulario['ano_letivo'];
+                $editando = ($regraIdAtual !== null && $regraIdAtual > 0)
+                    || (int) ($estadoFormulario['id'] ?? 0) > 0;
+                $estado['ano_letivo'] = $editando
+                    ? $anoForm
+                    : $this->ferramentas->anoLetivoPadrao($anoForm);
             }
             if (isset($estadoFormulario['bimestre']) && $estadoFormulario['bimestre'] !== '') {
                 $estado['bimestre'] = (int) $estadoFormulario['bimestre'];
             }
             if (!empty($estadoFormulario['exibir_em'])) {
                 $estado['exibir_em'] = (string) $estadoFormulario['exibir_em'];
+            }
+            if (!empty($estadoFormulario['finalidade'])) {
+                $estado['finalidade'] = $this->normalizarFinalidade($estadoFormulario['finalidade']);
+            }
+            if (!empty($estadoFormulario['boletim_id'])) {
+                $estado['boletim_id'] = (int) $estadoFormulario['boletim_id'];
+            }
+            if (!empty($estadoFormulario['grupo_regras_notas_id'])) {
+                $estado['grupo_regras_notas_id'] = (int) $estadoFormulario['grupo_regras_notas_id'];
             }
             if (isset($estadoFormulario['nota_minima_aprovacao']) && $estadoFormulario['nota_minima_aprovacao'] !== '') {
                 $estado['nota_minima_aprovacao'] = (float) $estadoFormulario['nota_minima_aprovacao'];
@@ -264,6 +518,9 @@ class BoletimAssistenteWizard
                     'codigo' => $estado['codigo'],
                     'formula_final' => (string) ($estadoFormulario['formula_final'] ?? ''),
                     'exibir_em' => $estado['exibir_em'],
+                    'finalidade' => $estado['finalidade'] ?? 'oficial',
+                    'boletim_id' => (int) ($estado['boletim_id'] ?? 0),
+                    'grupo_regras_notas_id' => (int) ($estado['grupo_regras_notas_id'] ?? 0),
                     'ano_letivo' => $estado['ano_letivo'],
                     'bimestre' => $estado['bimestre'] > 0 ? $estado['bimestre'] : null,
                     'turmas_ids' => $estado['turmas_ids'],
@@ -285,6 +542,31 @@ class BoletimAssistenteWizard
                 : sprintf('Notas — %d', (int) $estado['ano_letivo']);
         }
 
+        if ((int) ($estado['boletim_id'] ?? 0) <= 0) {
+            $boletins = $this->catalogoBoletins();
+            if (count($boletins) === 1) {
+                $estado['boletim_id'] = (int) ($boletins[0]['id'] ?? 0);
+            }
+        }
+        if ((int) ($estado['grupo_regras_notas_id'] ?? 0) <= 0) {
+            $quadros = $this->catalogoQuadrosNotas();
+            if (count($quadros) === 1) {
+                $estado['grupo_regras_notas_id'] = (int) ($quadros[0]['id'] ?? 0);
+            }
+        }
+        $this->aplicarEscopoDoBoletimCadastro($estado);
+        if (($estado['pecas'] ?? []) === []) {
+            $doQuadro = $this->inferirPecasDoQuadro((int) ($estado['grupo_regras_notas_id'] ?? 0));
+            if ($doQuadro !== []) {
+                $estado['pecas'] = $doQuadro;
+                $estado['pecas_opcoes'] = $this->mesclarPecasOpcoes(
+                    $this->pecasOpcoesPadrao($doQuadro, (int) ($estado['bimestre'] ?? 0)),
+                    is_array($estado['pecas_opcoes'] ?? null) ? $estado['pecas_opcoes'] : []
+                );
+                $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
+            }
+        }
+
         return $estado;
     }
 
@@ -293,7 +575,7 @@ class BoletimAssistenteWizard
      */
     private function estadoFormularioEstaVazio(array $estadoFormulario): bool
     {
-        $camposTexto = ['nome', 'codigo', 'formula_final', 'exibir_em', 'ano_letivo', 'bimestre'];
+        $camposTexto = ['nome', 'codigo', 'formula_final', 'exibir_em', 'finalidade', 'ano_letivo', 'bimestre'];
         foreach ($camposTexto as $campo) {
             if (trim((string) ($estadoFormulario[$campo] ?? '')) !== '') {
                 return false;
@@ -382,6 +664,11 @@ class BoletimAssistenteWizard
             $rascunho['ano_letivo'] = (int) ($estado['ano_letivo'] ?? $rascunho['ano_letivo'] ?? date('Y'));
             $rascunho['bimestre'] = (int) ($estado['bimestre'] ?? $rascunho['bimestre'] ?? 0) ?: null;
             $rascunho['exibir_em'] = (string) ($estado['exibir_em'] ?? $rascunho['exibir_em'] ?? 'notas');
+            $rascunho['finalidade'] = $this->normalizarFinalidade(
+                $estado['finalidade'] ?? $rascunho['finalidade'] ?? 'oficial'
+            );
+            $rascunho['boletim_id'] = (int) ($estado['boletim_id'] ?? $rascunho['boletim_id'] ?? 0);
+            $rascunho['grupo_regras_notas_id'] = (int) ($estado['grupo_regras_notas_id'] ?? $rascunho['grupo_regras_notas_id'] ?? 0);
             $rascunho['round_mode'] = (string) ($estado['round_mode'] ?? $rascunho['round_mode'] ?? 'half');
             $rascunho['nota_minima_aprovacao'] = $estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 7;
             $rascunho['series_ids'] = $estado['series_ids'] !== []
@@ -483,6 +770,18 @@ class BoletimAssistenteWizard
             $erros[] = 'Escolha ao menos uma peça da média (ex.: Bimestral, Jornada, ENAC).';
         } elseif (!$this->temFormulaMontada($estado) && !$this->temPecaComPapelMedia($estado)) {
             $erros[] = 'Marque ao menos uma peça para entrar na média, ou clique numa coluna amarela em Exibir e monte o cálculo.';
+        }
+        if ((int) ($estado['boletim_id'] ?? 0) <= 0) {
+            if (!class_exists('FechamentoGates', false)) {
+                require_once dirname(__DIR__) . '/Modulos/fechamento/Services/FechamentoGates.php';
+            }
+            $erros[] = FechamentoGates::mensagemAvaliacaoSemModelo();
+        }
+        if ((int) ($estado['grupo_regras_notas_id'] ?? 0) <= 0) {
+            if (!class_exists('FechamentoGates', false)) {
+                require_once dirname(__DIR__) . '/Modulos/fechamento/Services/FechamentoGates.php';
+            }
+            $erros[] = FechamentoGates::mensagemAvaliacaoSemQuadro();
         }
 
         if ($this->querLayoutQuadro($estado)) {
@@ -640,7 +939,14 @@ class BoletimAssistenteWizard
 
         $linhas = [];
         $linhas[] = $nome;
-        $linhas[] = sprintf('Período: %s · %s · Exibir em: %s', $ano, $bimTxt, $exibir);
+        $exibirTxt = $exibir;
+        $fin = strtolower(trim((string) ($rascunho['finalidade'] ?? 'oficial')));
+        if ($fin === 'complementar') {
+            $exibirTxt .= $exibir === 'notas' ? ' (extra — curso complementar)' : ' (complementar — cursos extras)';
+        } else {
+            $exibirTxt .= ' (oficial)';
+        }
+        $linhas[] = sprintf('Período: %s · %s · Exibir em: %s', $ano, $bimTxt, $exibirTxt);
         $di = trim((string) ($rascunho['default_data_inicio'] ?? ''));
         $df = trim((string) ($rascunho['default_data_fim'] ?? ''));
         if ($di !== '' || $df !== '') {
@@ -782,8 +1088,8 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * @param list<array{id:int,nome:string,chave_quadro:?string,descricao:?string}> $tipos
-     * @return list<array{key:string,label:string,hint:string,tipo_avaliacao_id:int,chave_quadro:?string}>
+     * @param list<array{id:int,nome:string,chave_quadro:?string,descricao:?string,criterio_fechamento?:?string,registro_evento?:?string}> $tipos
+     * @return list<array{key:string,label:string,hint:string,tipo_avaliacao_id:int,chave_quadro:?string,calc_type:string,usar_percentual:int,fechamento_rotulo:string}>
      */
     public function pecasMeta(array $tipos = []): array
     {
@@ -806,12 +1112,18 @@ class BoletimAssistenteWizard
             }
             $key = $this->chavePecaDoTipo($t, $usadas);
             $usadas[$key] = true;
+            $herdado = $this->fechamentoHerdadoDoTipo($t);
             $out[] = [
                 'key' => $key,
                 'label' => trim((string) ($t['nome'] ?? ('Tipo #' . $id))),
                 'hint' => $this->hintPecaDoTipo($key, $t),
                 'tipo_avaliacao_id' => $id,
                 'chave_quadro' => isset($t['chave_quadro']) ? (string) $t['chave_quadro'] : null,
+                'criterio_fechamento' => isset($t['criterio_fechamento']) ? (string) $t['criterio_fechamento'] : null,
+                'registro_evento' => isset($t['registro_evento']) ? (string) $t['registro_evento'] : null,
+                'calc_type' => $herdado['calc_type'],
+                'usar_percentual' => $herdado['usar_percentual'],
+                'fechamento_rotulo' => $herdado['rotulo'],
             ];
         }
         $out[] = [
@@ -820,6 +1132,11 @@ class BoletimAssistenteWizard
             'hint' => 'Nota pela quantidade de jornadas concluídas (quantitativo) ou tabela por faixa. Pode entrar na média ou só melhorar.',
             'tipo_avaliacao_id' => 0,
             'chave_quadro' => null,
+            'criterio_fechamento' => null,
+            'registro_evento' => null,
+            'calc_type' => 'media',
+            'usar_percentual' => 1,
+            'fechamento_rotulo' => '',
         ];
         return $out;
     }
@@ -844,7 +1161,10 @@ class BoletimAssistenteWizard
     {
         $canon = $this->chaveCanonicaQuadro($tipo['chave_quadro'] ?? null);
         if ($canon === '') {
-            $canon = $this->chaveCanonicaPorTexto((string) ($tipo['nome'] ?? '') . ' ' . (string) ($tipo['descricao'] ?? ''));
+            $canon = $this->chaveCanonicaPorTexto((string) ($tipo['nome'] ?? ''));
+        }
+        if ($canon === '') {
+            $canon = $this->chaveCanonicaPorTexto((string) ($tipo['descricao'] ?? ''));
         }
         if ($canon !== '' && empty($usadas[$canon])) {
             return $canon;
@@ -878,11 +1198,11 @@ class BoletimAssistenteWizard
         if (str_contains($txt, 'semanal')) {
             return 'semanal';
         }
-        if (str_contains($txt, 'bimestral') || str_contains($txt, 'bimestr')) {
-            return 'bimestral';
-        }
-        if (str_contains($txt, 'trabalho') || str_contains($txt, 'atividade')) {
+        if (str_contains($txt, 'trabalho')) {
             return 'trabalho';
+        }
+        if (str_contains($txt, 'bimestral')) {
+            return 'bimestral';
         }
         if (str_contains($txt, 'participa')) {
             return 'participacao';
@@ -915,6 +1235,10 @@ class BoletimAssistenteWizard
     /** Peças de evento único (prova lançada) começam em "nota do evento", não em média. */
     private function calcTypePadrao(string $peca): string
     {
+        $herdado = $this->fechamentoParaPeca($peca);
+        if ($herdado !== null) {
+            return $herdado['calc_type'];
+        }
         return match ($peca) {
             'bimestral', 'enac', 'trabalho', 'participacao', 'recuperacao' => 'ultima',
             default => 'media',
@@ -923,7 +1247,86 @@ class BoletimAssistenteWizard
 
     private function usarPercentualPadrao(string $peca): int
     {
+        $herdado = $this->fechamentoParaPeca($peca);
+        if ($herdado !== null) {
+            return $herdado['usar_percentual'];
+        }
         return $peca === 'semanal' ? 1 : 0;
+    }
+
+    /**
+     * Média / somatória / acertos vêm do Tipo de Nota, não da peça do boletim.
+     *
+     * @param array<string,mixed> $tipo
+     * @return array{calc_type:string,usar_percentual:int,rotulo:string}
+     */
+    private function fechamentoHerdadoDoTipo(array $tipo): array
+    {
+        $registro = strtolower(trim((string) ($tipo['registro_evento'] ?? 'nota')));
+        $criterio = strtolower(trim((string) ($tipo['criterio_fechamento'] ?? 'ultima')));
+        $usarPerc = ($registro === 'acertos_questoes' || $criterio === 'aproveitamento_nq') ? 1 : 0;
+        $calc = match ($criterio) {
+            'media', 'soma', 'maior', 'ultima' => $criterio,
+            'aproveitamento_nq' => 'media',
+            default => 'ultima',
+        };
+        $rotuloCalc = match ($calc) {
+            'media' => 'média',
+            'soma' => 'somatória',
+            'maior' => 'maior nota',
+            default => 'nota do evento',
+        };
+        $rotulo = $usarPerc
+            ? $rotuloCalc . ' · acertos/questões'
+            : $rotuloCalc . ' · nota lançada';
+        return [
+            'calc_type' => $calc,
+            'usar_percentual' => $usarPerc,
+            'rotulo' => $rotulo,
+        ];
+    }
+
+    /**
+     * @return array{calc_type:string,usar_percentual:int,rotulo:string}|null
+     */
+    private function fechamentoParaPeca(string $peca, int $tipoId = 0): ?array
+    {
+        if ($peca === 'jornada') {
+            return null;
+        }
+        if ($tipoId <= 0) {
+            foreach ($this->pecasMeta($this->tiposAvaliacaoCatalogo()) as $meta) {
+                if ((string) ($meta['key'] ?? '') !== $peca) {
+                    continue;
+                }
+                $tipoId = (int) ($meta['tipo_avaliacao_id'] ?? 0);
+                break;
+            }
+        }
+        if ($tipoId <= 0) {
+            return null;
+        }
+        foreach ($this->tiposAvaliacaoCatalogo() as $tipo) {
+            if ((int) ($tipo['id'] ?? 0) === $tipoId) {
+                return $this->fechamentoHerdadoDoTipo($tipo);
+            }
+        }
+        return null;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function tiposAvaliacaoCatalogo(): array
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $cache = $this->ferramentas->listarTiposAvaliacao();
+        } catch (Throwable $e) {
+            $cache = [];
+        }
+        return $cache;
     }
 
     private function pecaPermiteAcertosQuestoes(string $peca): bool
@@ -1072,6 +1475,9 @@ class BoletimAssistenteWizard
         $merged['exibir_em'] = in_array((string) ($merged['exibir_em'] ?? ''), ['notas', 'boletim'], true)
             ? (string) $merged['exibir_em']
             : 'notas';
+        $merged['finalidade'] = $this->normalizarFinalidade($merged['finalidade'] ?? 'oficial');
+        $merged['boletim_id'] = (int) ($merged['boletim_id'] ?? 0);
+        $merged['grupo_regras_notas_id'] = (int) ($merged['grupo_regras_notas_id'] ?? 0);
         $merged['nota_minima_aprovacao'] = isset($merged['nota_minima_aprovacao'])
             ? (float) $merged['nota_minima_aprovacao']
             : 7.0;
@@ -1443,7 +1849,8 @@ class BoletimAssistenteWizard
         $filtro = mb_strtolower(trim((string) ($c['filtro_titulo'] ?? '')));
         $blob = $cod . ' ' . $nome . ' ' . $filtro;
         $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
-        $layoutG = strtolower(trim((string) ($cfg['layout_group'] ?? $c['layout_group'] ?? '')));
+        $layout = is_array($cfg['layout'] ?? null) ? $cfg['layout'] : [];
+        $layoutG = strtolower(trim((string) ($cfg['layout_group'] ?? $layout['group'] ?? $c['layout_group'] ?? '')));
         $chaveTipo = $this->chaveCanonicaQuadro($cfg['chave_quadro'] ?? ($c['chave_quadro'] ?? ''));
         if ($src === 'jornadas' || str_contains($blob, 'jornada')) {
             return 'jornada';
@@ -1461,11 +1868,11 @@ class BoletimAssistenteWizard
         ) {
             return 'semanal';
         }
-        if (str_contains($blob, 'bimestral') || str_contains($blob, 'bimestr') || $cod === 'prova_bim') {
-            return 'bimestral';
-        }
         if (str_contains($blob, 'trabalho') || $cod === 'trab') {
             return 'trabalho';
+        }
+        if (str_contains($blob, 'bimestral') || $cod === 'prova_bim') {
+            return 'bimestral';
         }
         if (str_contains($blob, 'participa') || $cod === 'part') {
             return 'participacao';
@@ -1566,6 +1973,9 @@ class BoletimAssistenteWizard
             'descricao_curta' => (string) ($regra['descricao_curta'] ?? ''),
             'formula_final' => (string) ($regra['formula_final'] ?? ''),
             'exibir_em' => (string) ($estado['exibir_em'] ?? $regra['exibir_em'] ?? 'notas'),
+            'finalidade' => $this->normalizarFinalidade($estado['finalidade'] ?? $regra['finalidade'] ?? 'oficial'),
+            'boletim_id' => (int) ($estado['boletim_id'] ?? $regra['boletim_id'] ?? 0),
+            'grupo_regras_notas_id' => (int) ($estado['grupo_regras_notas_id'] ?? $regra['grupo_regras_notas_id'] ?? 0),
             'ano_letivo' => $ano,
             'bimestre' => $bim > 0 ? $bim : ($regra['bimestre'] ?? null),
             'default_data_inicio' => (string) ($estado['data_inicio'] ?? ''),
@@ -1631,6 +2041,9 @@ class BoletimAssistenteWizard
             'descricao_curta' => '',
             'formula_final' => $formulaFinal,
             'exibir_em' => (string) ($estado['exibir_em'] ?? 'notas'),
+            'finalidade' => $this->normalizarFinalidade($estado['finalidade'] ?? 'oficial'),
+            'boletim_id' => (int) ($estado['boletim_id'] ?? 0),
+            'grupo_regras_notas_id' => (int) ($estado['grupo_regras_notas_id'] ?? 0),
             'ano_letivo' => $ano,
             'bimestre' => $bim > 0 ? $bim : null,
             'default_data_inicio' => (string) ($estado['data_inicio'] ?? ''),
@@ -1831,6 +2244,13 @@ class BoletimAssistenteWizard
                         $erros[] = 'Não encontrei o evento de Notas do ' . $rotulos[$bim] . '.';
                     } elseif (strtolower(trim((string) ($ref['exibir_em'] ?? ''))) !== 'notas') {
                         $erros[] = 'O evento “' . trim((string) ($ref['nome'] ?? '')) . '” não é de Notas. No boletim só entram médias finais de eventos com Exibir em: Notas.';
+                    } elseif ($this->normalizarFinalidade($ref['finalidade'] ?? 'oficial')
+                        !== $this->normalizarFinalidade($estado['finalidade'] ?? 'oficial')
+                    ) {
+                        $tipoEsperado = $this->normalizarFinalidade($estado['finalidade'] ?? 'oficial') === 'complementar'
+                            ? 'Notas extra (curso complementar)'
+                            : 'Notas da série';
+                        $erros[] = 'O evento “' . trim((string) ($ref['nome'] ?? '')) . '” não é ' . $tipoEsperado . '. O boletim extra só puxa Notas extra, e o oficial só puxa Notas da série.';
                     } else {
                         $slug = trim((string) ($ref['codigo'] ?? ''));
                         if ($slug === '') {
@@ -1917,6 +2337,7 @@ class BoletimAssistenteWizard
             'descricao_curta' => '',
             'formula_final' => $codigosMedia === [] ? '' : 'media_final',
             'exibir_em' => 'boletim',
+            'finalidade' => $this->normalizarFinalidade($estado['finalidade'] ?? 'oficial'),
             'ano_letivo' => $ano,
             'bimestre' => null,
             'usar_resultado_aprovacao' => 1,
@@ -2634,6 +3055,11 @@ class BoletimAssistenteWizard
             if ($blocosIds !== []) {
                 $filtroTitulo = '';
             }
+            $herdado = $this->fechamentoParaPeca($peca, $tipoId);
+            if ($herdado !== null) {
+                $calc = $herdado['calc_type'];
+                $usarPerc = $herdado['usar_percentual'];
+            }
         }
 
         return [
@@ -2892,7 +3318,7 @@ class BoletimAssistenteWizard
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-            if (preg_match('/^s[1-8]$/', $cod)) {
+            if (preg_match('/^s[1-9]\d?$/', $cod)) {
                 return true;
             }
             $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
@@ -2910,7 +3336,7 @@ class BoletimAssistenteWizard
      */
     private function montarQuadroDoEstado(array $estado): array
     {
-        $semanas = $this->semanasQuadroConfig();
+        $semanas = $this->semanasQuadroConfig((int) ($estado['grupo_regras_notas_id'] ?? 0) ?: null);
         $rascunho = $this->ferramentas->montarRascunhoQuadroSemanal([
             'ano_letivo' => (int) ($estado['ano_letivo'] ?? date('Y')),
             'bimestre' => (int) ($estado['bimestre'] ?? 1),
@@ -2931,73 +3357,121 @@ class BoletimAssistenteWizard
             'so_semanas_com_evento' => false,
             'pecas' => $estado['pecas'] ?? [],
         ]);
-        $rascunho = $this->mesclarJornadaNoQuadro($rascunho, $estado);
+        $rascunho = $this->mesclarPecasFaltantesNoQuadro($rascunho, $estado);
+        $rascunho['boletim_id'] = (int) ($estado['boletim_id'] ?? 0);
+        $rascunho['grupo_regras_notas_id'] = (int) ($estado['grupo_regras_notas_id'] ?? 0);
+        $rascunho['finalidade'] = $this->normalizarFinalidade($estado['finalidade'] ?? 'oficial');
+        $rascunho['exibir_em'] = (string) ($estado['exibir_em'] ?? 'notas');
         return $this->aplicarPapeisNoQuadro($rascunho, $estado);
     }
 
     /**
      * @return array{a:list<int>,b:list<int>}
      */
-    private function semanasQuadroConfig(): array
+    private function semanasQuadroConfig(?int $grupoId = null): array
     {
-        $a = [1, 3, 5, 7];
-        $b = [2, 4, 6, 8];
-        $path = dirname(__DIR__) . '/Modulos/notas-semanais/Models/NotasSemanaisConfig.php';
-        if (!class_exists('NotasSemanaisConfig', false) && is_file($path)) {
+        $vazio = ['a' => [], 'b' => []];
+        $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }
-        if (!class_exists('NotasSemanaisConfig', false)) {
-            return ['a' => $a, 'b' => $b];
+        if (!class_exists('GrupoRegrasNotasService', false)) {
+            return $vazio;
         }
         try {
-            $cfg = (new NotasSemanaisConfig())->obter();
-            $sa = is_array($cfg['semanas_grupo_a'] ?? null) ? $cfg['semanas_grupo_a'] : $a;
-            $sb = is_array($cfg['semanas_grupo_b'] ?? null) ? $cfg['semanas_grupo_b'] : $b;
-            if ($sa !== []) {
-                $a = array_values(array_map('intval', $sa));
-            }
-            if ($sb !== []) {
-                $b = array_values(array_map('intval', $sb));
-            }
+            $sem = (new GrupoRegrasNotasService())->semanasQuadroPadrao($grupoId);
+            $sa = is_array($sem['a'] ?? null) ? array_values(array_map('intval', $sem['a'])) : [];
+            $sb = is_array($sem['b'] ?? null) ? array_values(array_map('intval', $sem['b'])) : [];
+
+            return ['a' => $sa, 'b' => $sb];
         } catch (Throwable $e) {
             error_log('BoletimAssistenteWizard semanas quadro: ' . $e->getMessage());
+            return $vazio;
         }
-        return ['a' => $a, 'b' => $b];
     }
 
     /**
+     * Inclui no quadro S1–S8 as peças marcadas que o molde semanal não gerou
+     * (Trabalho, tipo avulso, jornada…).
+     *
      * @param array<string,mixed> $rascunho
      * @param array<string,mixed> $estado
      * @return array<string,mixed>
      */
-    private function mesclarJornadaNoQuadro(array $rascunho, array $estado): array
+    private function mesclarPecasFaltantesNoQuadro(array $rascunho, array $estado): array
     {
-        if (!in_array('jornada', (array) ($estado['pecas'] ?? []), true)) {
-            return $rascunho;
-        }
-        $opts = is_array($estado['pecas_opcoes']['jornada'] ?? null) ? $estado['pecas_opcoes']['jornada'] : [];
-        $def = $this->definirComponentePeca('jornada', $opts, $estado);
-        if ($def === null) {
-            return $rascunho;
-        }
-        $def['config'] = is_array($def['config'] ?? null) ? $def['config'] : [];
-        $def['config']['layout_group'] = 'quadro_comum';
-        $def['config']['layout_type'] = 'media';
+        $mapaCodigos = [
+            'bimestral' => 'prova_bim',
+            'enac' => 'enac',
+            'trabalho' => 'trab',
+            'participacao' => 'part',
+            'recuperacao' => 'rec',
+            'jornada' => 'jornada',
+        ];
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
-        $out = [];
-        $inserido = false;
+        $presentes = [];
         foreach ($comps as $c) {
             if (!is_array($c)) {
                 continue;
             }
-            if (!$inserido && (string) ($c['codigo'] ?? '') === 'media_bim') {
-                $out[] = $def;
-                $inserido = true;
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod !== '') {
+                $presentes[$cod] = true;
+            }
+        }
+
+        $inserir = [];
+        foreach ((array) ($estado['pecas'] ?? []) as $p) {
+            $p = strtolower(trim((string) $p));
+            if ($p === '' || $p === 'semanal') {
+                continue;
+            }
+            $cod = $mapaCodigos[$p] ?? $p;
+            if ($cod === '' || !empty($presentes[$cod])) {
+                continue;
+            }
+            $opts = is_array($estado['pecas_opcoes'][$p] ?? null) ? $estado['pecas_opcoes'][$p] : [];
+            $def = $this->definirComponentePeca($p, $opts, $estado);
+            if ($def === null) {
+                continue;
+            }
+            $codDef = strtolower(trim((string) ($def['codigo'] ?? $cod)));
+            if ($codDef === '' || !empty($presentes[$codDef])) {
+                continue;
+            }
+            $def['config'] = is_array($def['config'] ?? null) ? $def['config'] : [];
+            $def['config']['layout_group'] = 'quadro_comum';
+            if ($p === 'recuperacao' || $codDef === 'rec') {
+                $def['config']['layout_type'] = 'rec';
+            } else {
+                $def['config']['layout_type'] = $def['config']['layout_type'] ?? 'media';
+            }
+            $inserir[] = $def;
+            $presentes[$codDef] = true;
+        }
+
+        if ($inserir === []) {
+            return $rascunho;
+        }
+
+        $out = [];
+        $colocados = false;
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $codC = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if (!$colocados && in_array($codC, ['media_bim', 'media_final'], true)) {
+                foreach ($inserir as $def) {
+                    $out[] = $def;
+                }
+                $colocados = true;
             }
             $out[] = $c;
         }
-        if (!$inserido) {
-            $out[] = $def;
+        if (!$colocados) {
+            $rascunho['componentes'] = array_merge($comps, $inserir);
+            return $rascunho;
         }
         $rascunho['componentes'] = $out;
         return $rascunho;
@@ -3064,19 +3538,13 @@ class BoletimAssistenteWizard
             if ($pecaKey !== false) {
                 $opts = is_array($estado['pecas_opcoes'][$pecaKey] ?? null) ? $estado['pecas_opcoes'][$pecaKey] : [];
                 $c['config']['papel_wizard'] = $this->normalizarPapel($opts['papel'] ?? '', (string) $pecaKey);
-                $calc = strtolower(trim((string) ($opts['calc_type'] ?? $this->calcTypePadrao((string) $pecaKey))));
-                if (in_array($calc, ['media', 'soma', 'maior', 'ultima'], true)) {
-                    $c['calc_type'] = $calc;
-                }
-                if (array_key_exists('usar_percentual', $opts)) {
-                    $c['usar_percentual'] = !empty($opts['usar_percentual']) ? 1 : 0;
-                } else {
-                    $c['usar_percentual'] = $this->usarPercentualPadrao((string) $pecaKey);
-                }
-                if (!$this->pecaPermiteAcertosQuestoes((string) $pecaKey)) {
-                    $c['usar_percentual'] = 0;
-                }
                 if ($pecaKey !== 'jornada') {
+                    $tipoPeca = (int) ($opts['tipo_avaliacao_id'] ?? $c['config']['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
+                    $herdado = $this->fechamentoParaPeca((string) $pecaKey, $tipoPeca);
+                    if ($herdado !== null) {
+                        $c['calc_type'] = $herdado['calc_type'];
+                        $c['usar_percentual'] = $herdado['usar_percentual'];
+                    }
                     $bimsPeca = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
                     if ($bimsPeca !== []) {
                         $c['config']['prova_bimestres'] = $bimsPeca;
@@ -3114,10 +3582,10 @@ class BoletimAssistenteWizard
         $pecasFormula = [];
         foreach ((array) ($estado['pecas'] ?? []) as $p) {
             $p = strtolower(trim((string) $p));
-            if ($p === '' || !isset($mapaCodigos[$p])) {
+            if ($p === '') {
                 continue;
             }
-            $cod = $mapaCodigos[$p];
+            $cod = $mapaCodigos[$p] ?? $p;
             if (empty($presentes[$cod])) {
                 continue;
             }
@@ -3481,16 +3949,19 @@ class BoletimAssistenteWizard
      */
     private function errosGrupoLinha(array $estado): array
     {
-        $g = $this->normalizarGrupoLinha($estado['grupo_linha'] ?? null);
+        $g = $this->completarGrupoLinhaComFamilia(
+            $this->normalizarGrupoLinha($estado['grupo_linha'] ?? null),
+            $estado
+        );
         if (!$g['ativo']) {
             return [];
         }
         $erros = [];
         if ($g['nome'] === '') {
-            $erros[] = 'Dê um nome à linha agrupada (ex.: Linguagem Português).';
+            $erros[] = 'Dê um nome à linha agrupada (ex.: Língua Portuguesa).';
         }
         if (count($g['materias_ids']) < 2) {
-            $erros[] = 'Marque ao menos duas matérias para juntar na linha única.';
+            $erros[] = 'Escolha a área já cadastrada em Componentes Curriculares (pai com pelo menos dois desdobramentos).';
         }
         return $erros;
     }
@@ -3505,7 +3976,7 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>}
+     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int}
      */
     public static function grupoLinhaPadrao(): array
     {
@@ -3514,12 +3985,127 @@ class BoletimAssistenteWizard
             'nome' => '',
             'modo' => 'media',
             'materias_ids' => [],
+            'aplicar_em' => 'boletim',
+            'agrupamento_id' => 0,
         ];
     }
 
     /**
+     * Se a linha única está ligada e ainda não tem matérias, usa a única
+     * família pai/filhos do escopo (Componentes Curriculares).
+     *
+     * @param array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int} $g
+     * @param array<string,mixed> $estado
+     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int}
+     */
+    private function completarGrupoLinhaComFamilia(array $g, array $estado): array
+    {
+        if (!$g['ativo'] || count($g['materias_ids']) >= 2 || $g['agrupamento_id'] > 0) {
+            return $g;
+        }
+        $familias = $this->familiasNoEscopo($estado);
+        if (count($familias) !== 1) {
+            return $g;
+        }
+        $f = $familias[0];
+        if ($g['nome'] === '') {
+            $g['nome'] = (string) ($f['nome'] ?? '');
+        }
+        $g['materias_ids'] = array_values(array_map('intval', (array) ($f['materias_ids'] ?? [])));
+
+        return $g;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @return list<array{pai_id:int,nome:string,filhos:list<array{id:int,nome:string}>,materias_ids:list<int>}>
+     */
+    private function familiasNoEscopo(array $estado): array
+    {
+        $idsEscopo = array_values(array_filter(
+            array_map('intval', (array) ($estado['materias_ids'] ?? [])),
+            static fn ($id) => $id > 0
+        ));
+        $bolId = (int) ($estado['boletim_id'] ?? 0);
+        if ($idsEscopo === [] && $bolId > 0) {
+            foreach ($this->catalogoBoletins() as $b) {
+                if ((int) ($b['id'] ?? 0) !== $bolId) {
+                    continue;
+                }
+                $idsEscopo = array_values(array_filter(
+                    array_map('intval', (array) ($b['materias_ids'] ?? [])),
+                    static fn ($id) => $id > 0
+                ));
+                break;
+            }
+        }
+        $set = $idsEscopo === [] ? null : array_fill_keys($idsEscopo, true);
+        $out = [];
+        foreach ($this->catalogoFamiliasComponentes() as $f) {
+            $paiId = (int) ($f['pai_id'] ?? 0);
+            $filhos = [];
+            foreach ((array) ($f['filhos'] ?? []) as $ch) {
+                $cid = (int) ($ch['id'] ?? 0);
+                if ($cid <= 0) {
+                    continue;
+                }
+                if ($set !== null && empty($set[$cid])) {
+                    continue;
+                }
+                $filhos[] = [
+                    'id' => $cid,
+                    'nome' => trim((string) ($ch['nome'] ?? '')),
+                ];
+            }
+            if (count($filhos) < 2 && $set !== null && $paiId > 0 && !empty($set[$paiId])) {
+                $filhos = [];
+                foreach ((array) ($f['filhos'] ?? []) as $ch) {
+                    $cid = (int) ($ch['id'] ?? 0);
+                    if ($cid <= 0) {
+                        continue;
+                    }
+                    $filhos[] = [
+                        'id' => $cid,
+                        'nome' => trim((string) ($ch['nome'] ?? '')),
+                    ];
+                }
+            }
+            if (count($filhos) < 2) {
+                continue;
+            }
+            $out[] = [
+                'pai_id' => $paiId,
+                'nome' => (string) ($f['nome'] ?? ''),
+                'filhos' => $filhos,
+                'materias_ids' => array_map(static fn ($ch) => (int) $ch['id'], $filhos),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * @param mixed $raw
-     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>}
+     */
+    private function normalizarAplicarEmGrupoLinha($raw, string $padraoAusente = 'boletim'): string
+    {
+        $v = strtolower(trim((string) $raw));
+        if ($v === 'boletim' || $v === 'ambos') {
+            return $v;
+        }
+        return $padraoAusente === 'ambos' ? 'ambos' : 'boletim';
+    }
+
+    /**
+     * @param mixed $raw
+     */
+    private function normalizarFinalidade($raw): string
+    {
+        return strtolower(trim((string) $raw)) === 'complementar' ? 'complementar' : 'oficial';
+    }
+
+    /**
+     * @param mixed $raw
+     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int}
      */
     private function normalizarGrupoLinha($raw): array
     {
@@ -3532,37 +4118,70 @@ class BoletimAssistenteWizard
             static fn ($id) => $id > 0
         )));
         $modo = strtolower(trim((string) ($raw['modo'] ?? 'media')));
+        $aplicarEm = array_key_exists('aplicar_em', $raw)
+            ? $this->normalizarAplicarEmGrupoLinha($raw['aplicar_em'], 'ambos')
+            : 'boletim';
         return [
             'ativo' => !empty($raw['ativo']),
             'nome' => trim((string) ($raw['nome'] ?? '')),
             'modo' => $modo === 'soma' ? 'soma' : 'media',
             'materias_ids' => $ids,
+            'aplicar_em' => $aplicarEm,
+            'agrupamento_id' => max(0, (int) ($raw['agrupamento_id'] ?? 0)),
         ];
     }
 
     /**
      * @param array<string,mixed> $estado
-     * @return array{enabled:bool,key:string,label:string,mode:string,divisor:float,materias_ids:list<int>}|null
+     * @return array{enabled:bool,key:string,label:string,mode:string,divisor:float,materias_ids:list<int>,aplicar_em:string,agrupamento_id?:int}|null
      */
     private function configGrupoLinha(array $estado): ?array
     {
-        $g = $this->normalizarGrupoLinha($estado['grupo_linha'] ?? null);
+        $g = $this->completarGrupoLinhaComFamilia(
+            $this->normalizarGrupoLinha($estado['grupo_linha'] ?? null),
+            $estado
+        );
         if (!$g['ativo']) {
             return null;
         }
         $ids = $g['materias_ids'];
         $label = $g['nome'];
+        $modo = $g['modo'];
+        $aplicarEm = $g['aplicar_em'];
+        if ($g['agrupamento_id'] > 0) {
+            $encontrado = null;
+            foreach ($this->catalogoAgrupamentos() as $ag) {
+                if ((int) ($ag['id'] ?? 0) === $g['agrupamento_id']) {
+                    $encontrado = $ag;
+                    break;
+                }
+            }
+            if ($encontrado === null) {
+                return null;
+            }
+            if ($label === '') {
+                $label = (string) ($encontrado['nome'] ?? '');
+            }
+            $ids = array_values(array_map('intval', (array) ($encontrado['materias_ids'] ?? [])));
+            $modo = (($encontrado['modo'] ?? 'media') === 'soma') ? 'soma' : 'media';
+            $aplicarEm = (($encontrado['aplicar_em'] ?? 'boletim') === 'ambos') ? 'ambos' : 'boletim';
+        }
         if ($label === '' || count($ids) < 2) {
             return null;
         }
-        return [
+        $out = [
             'enabled' => true,
             'key' => $this->slugGrupo($label),
             'label' => $label,
-            'mode' => $g['modo'],
+            'mode' => $modo,
             'divisor' => 1.0,
             'materias_ids' => $ids,
+            'aplicar_em' => $aplicarEm,
         ];
+        if ($g['agrupamento_id'] > 0) {
+            $out['agrupamento_id'] = $g['agrupamento_id'];
+        }
+        return $out;
     }
 
     /**
@@ -3688,6 +4307,8 @@ class BoletimAssistenteWizard
                 'nome' => $label,
                 'modo' => (strtolower((string) ($gl['mode'] ?? 'media')) === 'soma') ? 'soma' : 'media',
                 'materias_ids' => $ids,
+                'aplicar_em' => $this->normalizarAplicarEmGrupoLinha($gl['aplicar_em'] ?? 'ambos', 'ambos'),
+                'agrupamento_id' => max(0, (int) ($gl['agrupamento_id'] ?? 0)),
             ];
             return;
         }
@@ -3729,7 +4350,10 @@ class BoletimAssistenteWizard
             if ($label === '' || $n < 2) {
                 continue;
             }
-            return 'Linha única: “' . $label . '” (' . $n . ' matérias, ' . $modo . ').';
+            $onde = $this->normalizarAplicarEmGrupoLinha($gl['aplicar_em'] ?? 'ambos', 'ambos') === 'boletim'
+                ? 'só no boletim'
+                : 'no boletim e nas notas';
+            return 'Linha única: “' . $label . '” (' . $n . ' matérias, ' . $modo . ', ' . $onde . ').';
         }
         return '';
     }

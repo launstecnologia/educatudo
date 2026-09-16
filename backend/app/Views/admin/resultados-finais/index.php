@@ -11,6 +11,20 @@ $page_header_title = 'Resultados finais';
 $page_header_subtitle = 'Fechamento por turma, homologação imutável e documentos oficiais (boletim, ficha, ata, relatórios).';
 ob_start();
 ?>
+<button type="button"
+        data-fechamento-consulta="homologacoes"
+        data-turma-id="<?= (int) ($turma_id ?? 0) ?>"
+        data-turma-nome=""
+        class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+    <i class="fa-solid fa-book mr-2"></i> Homologações
+</button>
+<button type="button"
+        data-fechamento-consulta="documentos"
+        data-turma-id="<?= (int) ($turma_id ?? 0) ?>"
+        data-turma-nome=""
+        class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+    <i class="fa-solid fa-file-lines mr-2"></i> Documentos
+</button>
 <a href="<?= URL ?>/admin/resultados-finais/layouts" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
     <i class="fa-solid fa-palette mr-2"></i> Layouts
 </a>
@@ -88,6 +102,20 @@ include __DIR__ . '/_filtros.php';
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center"></i> Ata
                         </a>
+                        <button type="button"
+                                data-fechamento-consulta="homologacoes"
+                                data-turma-id="<?= $tid ?>"
+                                data-turma-nome="<?= htmlspecialchars((string) ($turma['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-book text-gray-400 w-4 text-center"></i> Homologações
+                        </button>
+                        <button type="button"
+                                data-fechamento-consulta="documentos"
+                                data-turma-id="<?= $tid ?>"
+                                data-turma-nome="<?= htmlspecialchars((string) ($turma['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-folder-open text-gray-400 w-4 text-center"></i> Documentos
+                        </button>
                         <?php
                         $row_actions_dropdown_items = ob_get_clean();
                         $row_actions_dropdown_id = 'row-rf-' . $tid;
@@ -100,3 +128,4 @@ include __DIR__ . '/_filtros.php';
         </table>
     </div>
 </div>
+<?php include dirname(__DIR__, 3) . '/Modulos/fechamento/Views/admin/_drawer_consulta.php'; ?>

@@ -216,7 +216,7 @@ class TeacherAdminController extends AdminBaseController
             }
             
             // Buscar todas as matérias do banco para validação
-            $todasMateriasBanco = $subjectModel->getAll();
+            $todasMateriasBanco = $subjectModel->getAvaliaveis(false);
             $materiasPorId = [];
             foreach ($todasMateriasBanco as $materia) {
                 $materiasPorId[$materia['id']] = $materia['nome'];

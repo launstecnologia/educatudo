@@ -13,6 +13,14 @@ if (!class_exists('BoletimQuadroLayoutHelper', false)) {
 }
 
 $colsQuadro = is_array($cols ?? null) ? $cols : [];
+$grupoIdQuadro = (int) (($ev['grupo_regras_notas_id'] ?? 0));
+if ($grupoIdQuadro <= 0) {
+    $grupoIdQuadro = BoletimQuadroLayoutHelper::grupoIdDasColunas($colsQuadro);
+}
+$colsQuadro = BoletimQuadroLayoutHelper::alinharColunasAoQuadroCadastro(
+    $colsQuadro,
+    $grupoIdQuadro > 0 ? $grupoIdQuadro : null
+);
 $linhasQuadro = is_array($linhas ?? null) ? $linhas : [];
 $decQuadro = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
 $tabelasQuadro = BoletimQuadroLayoutHelper::partirTabelas($colsQuadro);

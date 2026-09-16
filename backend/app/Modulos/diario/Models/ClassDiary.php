@@ -472,6 +472,7 @@ class ClassDiary
         if ($fechamento && (string) $fechamento['status'] === 'fechado') {
             throw new RuntimeException('Este período já foi fechado pela coordenação. Peça a reabertura antes de editar.');
         }
+        $this->assertFechamentoOficialAberto((int) $aula['turma_id'], (string) $aula['data_aula']);
     }
 
     /**
@@ -487,6 +488,35 @@ class ClassDiary
         );
         if ($fechamento && (string) $fechamento['status'] === 'fechado') {
             throw new RuntimeException('Este período já foi fechado pela coordenação. Peça a reabertura antes de editar.');
+        }
+        $this->assertFechamentoOficialAberto((int) ($grade['turma_id'] ?? 0), $data);
+    }
+
+    private function assertFechamentoOficialAberto(int $turmaId, string $data): void
+    {
+        if ($turmaId <= 0 || $data === '') {
+            return;
+        }
+        $path = __DIR__ . '/../../fechamento/Models/FechamentoPeriodo.php';
+        if (!is_file($path)) {
+            return;
+        }
+        require_once $path;
+        try {
+            $model = new \FechamentoPeriodo();
+            if (!$model->schemaPronto()) {
+                return;
+            }
+            $anoRow = $this->db->fetch('SELECT ano_letivo FROM turmas WHERE id = :id LIMIT 1', ['id' => $turmaId]);
+            $ano = (int) ($anoRow['ano_letivo'] ?? date('Y', strtotime($data)));
+            $bim = $this->bimestreDaData($data);
+            if ($model->estaTravadoNaData($turmaId, $ano, $data, $bim)) {
+                throw new RuntimeException($model->mensagemBloqueioOficial());
+            }
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            return;
         }
     }
 
@@ -553,6 +583,119 @@ class ClassDiary
         }
         usort($out, static fn($a, $b) => strcmp($b['data_aula'] . $b['horario_de'], $a['data_aula'] . $a['horario_de']));
         return $out;
+    }
+
+    /**
+     * Slots da grade ainda sem diário. Com $somenteVencidas, corta em min($fim, hoje).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function slotsSemDiario(int $turmaId, string $inicio, string $fim, bool $somenteVencidas = true): array
+    {
+        if ($turmaId <= 0 || $inicio === '' || $fim === '') {
+            return [];
+        }
+        if ($somenteVencidas) {
+            $hoje = date('Y-m-d');
+            if ($fim > $hoje) {
+                $fim = $hoje;
+            }
+        }
+        if ($inicio > $fim) {
+            return [];
+        }
+        $grades = $this->db->fetchAll(
+            'SELECT id, professor_id, turma_id, materia_id, dia_semana, horario_de, horario_ate
+             FROM grade_horaria
+             WHERE turma_id = :turma',
+            ['turma' => $turmaId]
+        ) ?: [];
+        if ($grades === []) {
+            return [];
+        }
+        $porDia = [];
+        foreach ($grades as $grade) {
+            $porDia[(int) ($grade['dia_semana'] ?? 0)][] = $grade;
+        }
+        $existentes = $this->db->fetchAll(
+            'SELECT grade_horaria_id, data_aula
+             FROM diario_aulas
+             WHERE turma_id = :turma AND data_aula BETWEEN :inicio AND :fim',
+            ['turma' => $turmaId, 'inicio' => $inicio, 'fim' => $fim]
+        ) ?: [];
+        $tem = [];
+        foreach ($existentes as $row) {
+            $tem[(int) ($row['grade_horaria_id'] ?? 0) . '|' . (string) ($row['data_aula'] ?? '')] = true;
+        }
+        $naoLetivos = $this->datasNaoLetivas($inicio, $fim);
+        $out = [];
+        $start = new DateTime($inicio);
+        $end = new DateTime($fim);
+        for ($dia = clone $start; $dia <= $end; $dia->modify('+1 day')) {
+            $data = $dia->format('Y-m-d');
+            if (isset($naoLetivos[$data])) {
+                continue;
+            }
+            $n = (int) $dia->format('N');
+            foreach ($porDia[$n] ?? [] as $grade) {
+                $chave = (int) $grade['id'] . '|' . $data;
+                if (isset($tem[$chave])) {
+                    continue;
+                }
+                $slot = $grade;
+                $slot['data_aula'] = $data;
+                $out[] = $slot;
+            }
+        }
+        return $out;
+    }
+
+    public function contarChamadasVencidas(int $turmaId, string $inicio, string $fim): int
+    {
+        return count($this->slotsSemDiario($turmaId, $inicio, $fim, true));
+    }
+
+    /**
+     * Carga histórica (CLI/seed): materializa aulas finalizadas nos slots vencidos sem diário.
+     * Não aplica gate de período — a coordenação já encerrou o ano na base de demonstração.
+     */
+    public function completarSlotsVencidos(int $turmaId, string $inicio, string $fim): int
+    {
+        $slots = $this->slotsSemDiario($turmaId, $inicio, $fim, true);
+        if ($slots === []) {
+            return 0;
+        }
+        $criadas = 0;
+        $this->db->beginTransaction();
+        try {
+            foreach ($slots as $slot) {
+                $this->db->query(
+                    "INSERT INTO diario_aulas
+                        (grade_horaria_id, professor_id, turma_id, materia_id, data_aula, horario_de, horario_ate,
+                         execucao, conteudo_realizado, status, finalizada_at)
+                     VALUES
+                        (:grade_id, :professor_id, :turma_id, :materia_id, :data_aula, :horario_de, :horario_ate,
+                         'conforme_planejado', :conteudo, 'finalizada', NOW())
+                     ON DUPLICATE KEY UPDATE id = id",
+                    [
+                        'grade_id' => (int) $slot['id'],
+                        'professor_id' => (int) $slot['professor_id'],
+                        'turma_id' => (int) $slot['turma_id'],
+                        'materia_id' => (int) $slot['materia_id'],
+                        'data_aula' => (string) $slot['data_aula'],
+                        'horario_de' => (string) $slot['horario_de'],
+                        'horario_ate' => (string) $slot['horario_ate'],
+                        'conteudo' => 'Aula registrada no fechamento oficial (carga histórica).',
+                    ]
+                );
+                $criadas++;
+            }
+            $this->db->commit();
+        } catch (Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+        return $criadas;
     }
 
     /**

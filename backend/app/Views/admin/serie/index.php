@@ -5,7 +5,9 @@ $status = (string)($status ?? '');
 $message = (string)($message ?? '');
 $csrf_token = $csrf_token ?? '';
 $cursos = $cursos ?? [];
+$somente_drawers = !empty($somente_drawers);
 
+if (!$somente_drawers):
 $page_header_title = 'Séries';
 $page_header_subtitle = 'Cadastre as séries por curso (ex.: 1º Ano, 2º Ano) para vincular às turmas';
 if ($schema_ready) {
@@ -143,6 +145,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     <?php endif; ?>
 </div>
 <?php endif; ?>
+<?php endif; ?>
 
 <?php if ($schema_ready): ?>
 <!-- Offcanvas: Cadastrar/Editar Série -->
@@ -211,11 +214,14 @@ include __DIR__ . '/../_partials/flash_message.php';
 </aside>
 
 <script>
-function openSerieDrawer(id) {
+function openSerieDrawer(id, cursoId) {
     var form = document.getElementById('serie-form');
     form.reset();
     document.getElementById('se_id').value = '';
     document.getElementById('se_ativo').checked = true;
+    if (cursoId) {
+        document.getElementById('se_curso_id').value = String(cursoId);
+    }
 
     if (!id) {
         form.dataset.mode = 'create';

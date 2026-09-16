@@ -5,6 +5,10 @@ foreach ([$filtro_professor ?? '', $filtro_turma ?? '', $filtro_materia ?? '', $
         $filtrosAtivosCount++;
     }
 }
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+}
+$periodoFiltro = PeriodoLetivo::doAno((int) date('Y'));
 ?>
 <!-- Header Section -->
 <div class="mb-8">
@@ -103,13 +107,9 @@ foreach ([$filtro_professor ?? '', $filtro_turma ?? '', $filtro_materia ?? '', $
                 </select>
             </div>
             <div>
-                <label for="bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Bimestre</label>
+                <label for="bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></label>
                 <select id="bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Todos</option>
-                    <option value="1" <?= ($filtro_bimestre ?? '') == '1' ? 'selected' : '' ?>>1º Bimestre</option>
-                    <option value="2" <?= ($filtro_bimestre ?? '') == '2' ? 'selected' : '' ?>>2º Bimestre</option>
-                    <option value="3" <?= ($filtro_bimestre ?? '') == '3' ? 'selected' : '' ?>>3º Bimestre</option>
-                    <option value="4" <?= ($filtro_bimestre ?? '') == '4' ? 'selected' : '' ?>>4º Bimestre</option>
+                    <?= PeriodoLetivo::optionsHtml((int) date('Y'), (int) ($filtro_bimestre ?? 0), ['todos' => true, 'todos_label' => 'Todos']) ?>
                 </select>
             </div>
             <div>

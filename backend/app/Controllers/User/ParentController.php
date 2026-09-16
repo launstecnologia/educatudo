@@ -29,6 +29,23 @@ class ParentController extends BaseController
         return (int)($user['id'] ?? 0);
     }
 
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function paineisNotasDoAluno(int $alunoId, ?int $anoLetivo = null, ?int $bimestre = null): array
+    {
+        try {
+            require_once __DIR__ . '/../../Modulos/grupos-regras-notas/Services/PainelNotasService.php';
+            return PainelNotasService::paraAluno($alunoId, [
+                'portal' => true,
+                'ano_letivo' => $anoLetivo,
+                'bimestre' => $bimestre,
+            ]);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     private function getFilhoById(int $filhoId): ?array
     {
         $paiId = $this->getPaiId();
@@ -878,8 +895,7 @@ class ParentController extends BaseController
             $boletinsGerados = [];
         }
 
-        $boletinsNotas = [];
-        $boletinsBoletim = [];
+        $boletinsFiltrados = [];
         foreach ((array) $boletinsGerados as $ev) {
             $exibirEm = strtolower((string) ($ev['exibir_em'] ?? 'boletim'));
             if (!in_array($exibirEm, ['boletim', 'notas'], true)) {
@@ -917,12 +933,13 @@ class ParentController extends BaseController
                 }
             }
 
-            if ($exibirEm === 'notas') {
-                $boletinsNotas[] = $ev;
-            } else {
-                $boletinsBoletim[] = $ev;
-            }
+            $boletinsFiltrados[] = $ev;
         }
+        $classificados = BoletimConfig::classificarEventosGerados($boletinsFiltrados);
+        $boletinsNotas = $classificados['notas'];
+        $boletinsNotasExtra = $classificados['notas_extra'] ?? [];
+        $boletinsBoletim = $classificados['boletim'];
+        $boletinsComplementar = $classificados['complementar'];
 
         $anosDisponiveis = [];
         foreach ((array) $provasRealizadasBase as $pr) {
@@ -965,9 +982,12 @@ class ParentController extends BaseController
             'notas_lancamento_eventos' => $notasLancamentoEventos,
             'boletins_gerados' => $boletinsGerados,
             'boletins_gerados_notas' => $boletinsNotas,
+            'boletins_gerados_notas_extra' => $boletinsNotasExtra,
             'boletins_gerados_boletim' => $boletinsBoletim,
+            'boletins_gerados_complementar' => $boletinsComplementar,
             'boletim_observacao' => $boletimObservacao,
             'quadro_oficial' => $quadroOficial,
+            'paineis_notas' => $this->paineisNotasDoAluno((int) $filho['id'], $anoLetivo, $bimestre),
         ];
 
         $this->viewWithLayout('parent', 'parents/notas-filho', $data);

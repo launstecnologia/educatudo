@@ -74,7 +74,7 @@ include __DIR__ . '/../_partials/flash_message.php';
             </select>
             </span>
             <?php if (empty($eventos)): ?>
-                <span class="block text-xs text-gray-500 mt-1">Nenhum evento gerado. Em Eventos de Notas, gere o lote para ver provas, trabalhos e médias.</span>
+                <span class="block text-xs text-gray-500 mt-1">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</span>
             <?php endif; ?>
         </label>
         <label class="block xl:col-span-2">

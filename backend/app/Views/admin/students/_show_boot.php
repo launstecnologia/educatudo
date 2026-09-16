@@ -14,6 +14,7 @@ $provas_realizadas = is_array($provas_realizadas ?? null) ? $provas_realizadas :
 $provas_matriz_blocos = is_array($provas_matriz_blocos ?? null) ? $provas_matriz_blocos : [];
 $historico_acesso = is_array($historico_acesso ?? null) ? $historico_acesso : [];
 $boletim_eventos_notas = is_array($boletim_eventos_notas ?? null) ? $boletim_eventos_notas : [];
+$paineis_notas = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 $boletim_eventos_boletim = is_array($boletim_eventos_boletim ?? null) ? $boletim_eventos_boletim : [];
 $boletins_gerados = is_array($boletins_gerados ?? null) ? $boletins_gerados : [];
 $boletins_gerados_notas_por_regra = is_array($boletins_gerados_notas_por_regra ?? null) ? $boletins_gerados_notas_por_regra : [];

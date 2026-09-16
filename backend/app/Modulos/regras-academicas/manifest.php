@@ -1,12 +1,12 @@
 <?php
 /**
- * Manifest do módulo Regras Acadêmicas (CRUD admin).
+ * Manifest do módulo Regras de Aprovação (CRUD admin).
  * O motor (ResultadoAcademicoService) fica no core e o boletim/histórico
  * não dependem deste gate — só a tela de cadastro some se desligado no Master.
  */
 return [
     'chave' => 'regras-academicas',
-    'label' => 'Regras Acadêmicas',
+    'label' => 'Regras de Aprovação',
     'grupo' => 'academico',
     'feature_keys' => [
         'admin' => 'regras_academicas',
@@ -23,7 +23,7 @@ return [
     'menu' => [
         'admin' => [
             [
-                'label' => 'Regras acadêmicas',
+                'label' => 'Regras de Aprovação',
                 'path' => '/admin/regras-academicas',
                 'feature_key' => 'regras_academicas',
             ],

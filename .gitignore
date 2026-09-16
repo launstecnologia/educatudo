@@ -62,6 +62,8 @@ playwright.config.ts
 
 # Conteúdo de uploads (layout, avatars) em storage/files - manter apenas .gitkeep
 backend/storage/files/*/*
+backend/storage/guia-onboarding/
+backend/public/assets/guia-onboarding/
 # Claude Code — overrides pessoais e worktrees não versionam
 .claude/settings.local.json
 .claude/worktrees/

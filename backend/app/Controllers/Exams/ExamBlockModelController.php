@@ -17,6 +17,7 @@ if (!class_exists('Database')) {
     require_once __DIR__ . '/../../Core/Database.php';
 }
 require_once __DIR__ . '/../../Models/Exams/ExamBlockModel.php';
+require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
 
 if (!class_exists('ExamBlockModelController')) {
 class ExamBlockModelController extends BaseController
@@ -90,10 +91,8 @@ class ExamBlockModelController extends BaseController
             "SELECT * FROM professores WHERE ativo = 1 ORDER BY nome ASC"
         );
         
-        // Busca matérias (SEM filtro ativo, pois a tabela não tem essa coluna)
-        $materias = $this->db->fetchAll(
-            "SELECT * FROM materias ORDER BY nome ASC"
-        );
+        // Componentes com nota (rótulo de área não entra no evento)
+        $materias = (new ComponenteCurricular())->getAvaliaveis(true);
         
         // Processa professores para incluir matérias como array de nomes (igual ao criar prova)
         // O campo materias do professor contém nomes (strings) em JSON, não IDs
@@ -173,9 +172,7 @@ class ExamBlockModelController extends BaseController
         );
         
         // Busca matérias (SEM filtro ativo)
-        $materias = $this->db->fetchAll(
-            "SELECT * FROM materias ORDER BY nome ASC"
-        );
+        $materias = (new ComponenteCurricular())->getAvaliaveis(true);
         
         // Processa professores para incluir matérias como array de nomes (igual ao criar prova)
         // O campo materias do professor contém nomes (strings) em JSON, não IDs

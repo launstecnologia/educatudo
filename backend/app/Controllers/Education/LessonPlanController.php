@@ -769,7 +769,7 @@ class LessonPlanController extends BaseController
                 );
             }
         } else {
-            $materias = $this->subjectModel->getAll();
+            $materias = $this->subjectModel->getAvaliaveis(true);
             $turmas = $this->turmaModel->getActive();
         }
         
@@ -1154,7 +1154,7 @@ class LessonPlanController extends BaseController
         // Busca professores e turmas para filtros
         $professores = $this->teacherModel->getActive();
         $turmas = $this->turmaModel->getActive();
-        $materias = $this->subjectModel->getAll();
+        $materias = $this->subjectModel->getAvaliaveis(true);
         $tiposEnsino = $this->db->fetchAll(
             "SELECT DISTINCT tipo_ensino FROM turmas WHERE tipo_ensino IS NOT NULL AND tipo_ensino != '' ORDER BY tipo_ensino ASC"
         );

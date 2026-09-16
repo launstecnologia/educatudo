@@ -95,6 +95,113 @@ class ExamEvaluationType
         return array_key_exists($c, self::chavesQuadro()) ? $c : null;
     }
 
+    public function temColunasRegras(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'provas_tipos_avaliacao'
+                   AND COLUMN_NAME = 'origem'
+                 LIMIT 1"
+            );
+            $cache = !empty($row);
+        } catch (Exception $e) {
+            $cache = false;
+        }
+        return $cache;
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function paramsRegras(array $data): array
+    {
+        $qtd = isset($data['quantidade_eventos_esperada']) ? (int) $data['quantidade_eventos_esperada'] : 0;
+        $params = [
+            'origem' => $this->sanitizarOrigem($data['origem'] ?? 'lancamento_direto'),
+            'registro_evento' => $this->sanitizarRegistro($data['registro_evento'] ?? 'nota'),
+            'criterio_fechamento' => $this->sanitizarCriterio($data['criterio_fechamento'] ?? 'ultima'),
+            'escala_max' => $this->sanitizarEscala($data['escala_max'] ?? 10),
+            'quantidade_eventos_esperada' => $qtd > 0 ? $qtd : null,
+            'media_professores_mesmo_componente' => !empty($data['media_professores_mesmo_componente']) ? 1 : 0,
+        ];
+        if ($this->temColunaCriterioProfessores()) {
+            $params['criterio_professores_mesmo_componente'] = $this->sanitizarCriterioProfessores(
+                $data['criterio_professores_mesmo_componente'] ?? $params['media_professores_mesmo_componente']
+            );
+            $params['media_professores_mesmo_componente'] = in_array($params['criterio_professores_mesmo_componente'], ['media', 'soma'], true) ? 1 : 0;
+        }
+        return $params;
+    }
+
+    private function sanitizarOrigem($valor): string
+    {
+        $v = strtolower(trim((string) $valor));
+        return in_array($v, ['lancamento_direto', 'eventos', 'prova_online'], true) ? $v : 'lancamento_direto';
+    }
+
+    private function sanitizarRegistro($valor): string
+    {
+        $v = strtolower(trim((string) $valor));
+        return in_array($v, ['nota', 'acertos_questoes'], true) ? $v : 'nota';
+    }
+
+    private function sanitizarCriterio($valor): string
+    {
+        $v = strtolower(trim((string) $valor));
+        return in_array($v, ['ultima', 'maior', 'media', 'soma', 'aproveitamento_nq'], true) ? $v : 'ultima';
+    }
+
+    public function temColunaCriterioProfessores(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'provas_tipos_avaliacao'
+                   AND COLUMN_NAME = 'criterio_professores_mesmo_componente'
+                 LIMIT 1"
+            );
+            $cache = !empty($row);
+        } catch (Exception $e) {
+            $cache = false;
+        }
+        return $cache;
+    }
+
+    private function sanitizarCriterioProfessores($valor): string
+    {
+        if ($valor === 1 || $valor === '1' || $valor === true) {
+            return 'media';
+        }
+        $v = strtolower(trim((string) $valor));
+        return in_array($v, ['nenhum', 'media', 'soma'], true) ? $v : 'nenhum';
+    }
+
+    private function sanitizarEscala($valor): float
+    {
+        $n = is_numeric($valor) ? (float) $valor : 10.0;
+        if ($n <= 0) {
+            $n = 10.0;
+        }
+        if ($n > 100) {
+            $n = 100.0;
+        }
+        return round($n, 2);
+    }
+
     public function create(array $data): int
     {
         $params = [
@@ -103,17 +210,24 @@ class ExamEvaluationType
             'ativo' => !empty($data['ativo']) ? 1 : 0,
             'ordem' => isset($data['ordem']) ? (int) $data['ordem'] : 0,
         ];
+        $cols = 'nome, descricao, ativo, ordem';
+        $vals = ':nome, :descricao, :ativo, :ordem';
         if ($this->temColunaChaveQuadro()) {
             $params['chave_quadro'] = $this->sanitizarChaveQuadro($data['chave_quadro'] ?? null);
-            return (int) $this->db->insert(
-                "INSERT INTO provas_tipos_avaliacao (nome, descricao, ativo, ordem, chave_quadro)
-                 VALUES (:nome, :descricao, :ativo, :ordem, :chave_quadro)",
-                $params
-            );
+            $cols .= ', chave_quadro';
+            $vals .= ', :chave_quadro';
+        }
+        if ($this->temColunasRegras()) {
+            $params = array_merge($params, $this->paramsRegras($data));
+            $cols .= ', origem, registro_evento, criterio_fechamento, escala_max, quantidade_eventos_esperada, media_professores_mesmo_componente';
+            $vals .= ', :origem, :registro_evento, :criterio_fechamento, :escala_max, :quantidade_eventos_esperada, :media_professores_mesmo_componente';
+            if ($this->temColunaCriterioProfessores()) {
+                $cols .= ', criterio_professores_mesmo_componente';
+                $vals .= ', :criterio_professores_mesmo_componente';
+            }
         }
         return (int) $this->db->insert(
-            "INSERT INTO provas_tipos_avaliacao (nome, descricao, ativo, ordem)
-             VALUES (:nome, :descricao, :ativo, :ordem)",
+            "INSERT INTO provas_tipos_avaliacao ({$cols}) VALUES ({$vals})",
             $params
         );
     }
@@ -125,20 +239,28 @@ class ExamEvaluationType
             'nome' => trim((string) ($data['nome'] ?? '')),
             'descricao' => !empty($data['descricao']) ? trim((string) $data['descricao']) : null,
             'ativo' => !empty($data['ativo']) ? 1 : 0,
-            'ordem' => isset($data['ordem']) ? (int) $data['ordem'] : 0,
         ];
-        $setChave = '';
-        if ($this->temColunaChaveQuadro()) {
-            $setChave = ', chave_quadro = :chave_quadro';
+        $set = 'nome = :nome, descricao = :descricao, ativo = :ativo';
+        if (array_key_exists('ordem', $data)) {
+            $set .= ', ordem = :ordem';
+            $params['ordem'] = (int) $data['ordem'];
+        }
+        if ($this->temColunaChaveQuadro() && array_key_exists('chave_quadro', $data)) {
+            $set .= ', chave_quadro = :chave_quadro';
             $params['chave_quadro'] = $this->sanitizarChaveQuadro($data['chave_quadro'] ?? null);
+        }
+        if ($this->temColunasRegras()) {
+            $params = array_merge($params, $this->paramsRegras($data));
+            $set .= ', origem = :origem, registro_evento = :registro_evento, criterio_fechamento = :criterio_fechamento,
+                      escala_max = :escala_max, quantidade_eventos_esperada = :quantidade_eventos_esperada,
+                      media_professores_mesmo_componente = :media_professores_mesmo_componente';
+            if ($this->temColunaCriterioProfessores()) {
+                $set .= ', criterio_professores_mesmo_componente = :criterio_professores_mesmo_componente';
+            }
         }
         return (bool) $this->db->query(
             "UPDATE provas_tipos_avaliacao
-             SET nome = :nome,
-                 descricao = :descricao,
-                 ativo = :ativo,
-                 ordem = :ordem
-                 {$setChave}
+             SET {$set}
              WHERE id = :id AND deleted_at IS NULL",
             $params
         );

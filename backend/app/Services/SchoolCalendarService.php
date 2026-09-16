@@ -13,6 +13,9 @@ class SchoolCalendarService
     /** @var Database */
     private $db;
 
+    /** @var array<int,array{nao_letivos:array<string,true>,reposicoes:array<string,true>}> */
+    private $mapaEfeitosCache = [];
+
     public const TIPOS_SISTEMA = [
         'feriado' => [
             'slug' => 'feriado', 'nome' => 'Feriado',
@@ -561,6 +564,94 @@ class SchoolCalendarService
 
         $total = $uteis - count($naoLetivos) + count($reposicoes);
         return max(0, $total);
+    }
+
+    /**
+     * @return array{nao_letivos:array<string,true>,reposicoes:array<string,true>}
+     */
+    public function mapaEfeitosDoAno(int $ano): array
+    {
+        if (isset($this->mapaEfeitosCache[$ano])) {
+            return $this->mapaEfeitosCache[$ano];
+        }
+        $cal = $this->getAno($ano);
+        $eventos = is_array($cal) ? $this->eventos((int) ($cal['id'] ?? 0)) : [];
+        $mapa = $this->tipos();
+        $naoLetivos = [];
+        $reposicoes = [];
+        foreach ($eventos as $ev) {
+            $tipo = (string) ($ev['tipo'] ?? '');
+            $efeito = (string) ($mapa[$tipo]['efeito'] ?? '');
+            if ($efeito === '' && in_array($tipo, ['feriado', 'recesso', 'suspensao'], true)) {
+                $efeito = 'nao_letivo';
+            } elseif ($efeito === '' && $tipo === 'reposicao') {
+                $efeito = 'reposicao';
+            }
+            try {
+                $ini = new DateTime((string) $ev['data_inicio']);
+                $f = new DateTime((string) $ev['data_fim']);
+            } catch (Throwable $e) {
+                continue;
+            }
+            if ($f < $ini) {
+                continue;
+            }
+            for ($d = clone $ini; $d <= $f; $d->modify('+1 day')) {
+                if ((int) $d->format('Y') !== $ano) {
+                    continue;
+                }
+                $key = $d->format('Y-m-d');
+                if ($efeito === 'nao_letivo') {
+                    $naoLetivos[$key] = true;
+                } elseif ($efeito === 'reposicao') {
+                    $reposicoes[$key] = true;
+                }
+            }
+        }
+        $this->mapaEfeitosCache[$ano] = ['nao_letivos' => $naoLetivos, 'reposicoes' => $reposicoes];
+        return $this->mapaEfeitosCache[$ano];
+    }
+
+    public function ehDiaLetivo(string $ymd, int $ano): bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+            return false;
+        }
+        try {
+            $d = new DateTime($ymd);
+        } catch (Throwable $e) {
+            return false;
+        }
+        $mapa = $this->mapaEfeitosDoAno($ano);
+        $n = (int) $d->format('N');
+        if ($n <= 5) {
+            return empty($mapa['nao_letivos'][$ymd]);
+        }
+        return !empty($mapa['reposicoes'][$ymd]);
+    }
+
+    public function proximoDiaLetivo(string $ymd, int $ano, int $maxDias = 45): string
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
+            return $ymd;
+        }
+        try {
+            $d = new DateTime($ymd);
+        } catch (Throwable $e) {
+            return $ymd;
+        }
+        $maxDias = max(1, min(90, $maxDias));
+        for ($i = 0; $i < $maxDias; $i++) {
+            $key = $d->format('Y-m-d');
+            if ($this->ehDiaLetivo($key, $ano)) {
+                return $key;
+            }
+            $d->modify('+1 day');
+        }
+        while ((int) $d->format('N') > 5) {
+            $d->modify('+1 day');
+        }
+        return $d->format('Y-m-d');
     }
 
     private function slugificar(string $nome): string

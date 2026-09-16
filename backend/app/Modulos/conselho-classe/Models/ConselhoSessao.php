@@ -128,9 +128,18 @@ class ConselhoSessao
             $params['turma_id'] = $turmaId;
         }
 
+        $countAlunos = '(SELECT COUNT(*) FROM alunos a WHERE a.turma_id = t.id AND a.ativo = 1)';
+        if ($this->tabelaExiste('matricula') && $this->tabelaExiste('ano_letivo')) {
+            $countAlunos = "(SELECT COUNT(DISTINCT m.aluno_id)
+                             FROM matricula m
+                             INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                             WHERE m.turma_id = t.id AND al.ano = t.ano_letivo
+                               AND m.status IN ('ativa', 'concluido', 'transferido'))";
+        }
+
         return $this->db->fetchAll(
             "SELECT t.id AS turma_id, t.nome AS turma_nome, t.serie AS turma_serie, t.ano_letivo,
-                    (SELECT COUNT(*) FROM alunos a WHERE a.turma_id = t.id AND a.ativo = 1) AS total_alunos,
+                    {$countAlunos} AS total_alunos,
                     cs.id AS sessao_id, cs.status, cs.data_reuniao
              FROM turmas t
              LEFT JOIN conselho_sessoes cs
@@ -211,6 +220,19 @@ class ConselhoSessao
             ['turma_id' => $turmaId]
         ) ?: [];
 
+        $matriculados = [];
+        if ($this->tabelaExiste('matricula')) {
+            $matriculados = $this->db->fetchAll(
+                "SELECT a.id, a.nome, a.ra, a.ativo,
+                        IF(m.status = 'transferido', 1, 0) AS transferido
+                 FROM matricula m
+                 INNER JOIN alunos a ON a.id = m.aluno_id
+                 WHERE m.turma_id = :turma_id AND m.status IN ('ativa', 'concluido', 'transferido')
+                 ORDER BY a.nome ASC",
+                ['turma_id' => $turmaId]
+            ) ?: [];
+        }
+
         $saidos = [];
         if ($this->tabelaExiste('alunos_turmas_historico')) {
             $saidos = $this->db->fetchAll(
@@ -226,7 +248,7 @@ class ConselhoSessao
 
         $vistos = [];
         $out = [];
-        foreach (array_merge($atuais, $saidos) as $aluno) {
+        foreach (array_merge($matriculados, $atuais, $saidos) as $aluno) {
             $id = (int) $aluno['id'];
             if (isset($vistos[$id])) {
                 continue;
@@ -234,6 +256,7 @@ class ConselhoSessao
             $vistos[$id] = true;
             $out[] = $aluno;
         }
+        usort($out, static fn ($a, $b) => strcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? '')));
         return $out;
     }
 
@@ -594,6 +617,19 @@ class ConselhoSessao
         if ((int) $row['turma_id'] === $turmaId) {
             $row['transferido'] = 0;
             return $row;
+        }
+        if ($this->tabelaExiste('matricula')) {
+            $mat = $this->db->fetch(
+                "SELECT m.status FROM matricula m
+                 WHERE m.aluno_id = :aluno_id AND m.turma_id = :turma_id
+                   AND m.status IN ('ativa', 'concluido', 'transferido')
+                 ORDER BY m.id DESC LIMIT 1",
+                ['aluno_id' => $alunoId, 'turma_id' => $turmaId]
+            );
+            if ($mat) {
+                $row['transferido'] = ((string) ($mat['status'] ?? '')) === 'transferido' ? 1 : 0;
+                return $row;
+            }
         }
         if ($this->tabelaExiste('alunos_turmas_historico')) {
             $hist = $this->db->fetch(

@@ -4,6 +4,8 @@
  * Gerencia jornadas do lado do professor
  */
 
+require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
+
 if (!class_exists('TeacherJourneyController')) {
 class TeacherJourneyController extends BaseController
 {
@@ -717,8 +719,8 @@ class TeacherJourneyController extends BaseController
             if ($anoLetivo < 2000 || $anoLetivo > 2100) {
                 throw new Exception('Ano letivo inválido');
             }
-            if ($bimestre < 1 || $bimestre > 4) {
-                throw new Exception('Bimestre inválido');
+            if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+                throw new Exception(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             
             if ($dataFim < $dataInicio) {
@@ -2241,8 +2243,8 @@ class TeacherJourneyController extends BaseController
             if ($anoLetivo < 2000 || $anoLetivo > 2100) {
                 throw new Exception('Ano letivo inválido');
             }
-            if ($bimestre < 1 || $bimestre > 4) {
-                throw new Exception('Bimestre inválido');
+            if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+                throw new Exception(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             
             if ($dataFim < $dataInicio) {
@@ -9073,7 +9075,7 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
             'materias' => array_map(static function ($m) {
                 return ['id' => (int)$m['id'], 'nome' => (string)$m['nome']];
             }, $materias),
-            'bimestres_disponiveis' => [1, 2, 3, 4]
+            'bimestres_disponiveis' => range(1, (int) PeriodoLetivo::doAno((int) date('Y'))['quantidade']),
         ];
     }
 
@@ -9122,7 +9124,9 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
 
         $anoLetivo = (int)($j['ano_letivo'] ?? date('Y'));
         $bimestre = (int)($j['bimestre'] ?? 1);
-        if ($bimestre < 1 || $bimestre > 4) throw new Exception('jornada.bimestre deve ser de 1 a 4');
+        if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+            throw new Exception(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
+        }
 
         $avaliativo = !empty($j['avaliativo']);
         $dataInicio = (string)($j['data_inicio'] ?? date('Y-m-d'));

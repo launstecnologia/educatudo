@@ -59,7 +59,7 @@
         <div class="mb-6">
             <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-medium text-gray-700">
-                    Tipo de Avaliação <span class="text-red-500">*</span>
+                    Tipo de Nota <span class="text-red-500">*</span>
                 </label>
                 <a href="<?= URL ?>/admin/provas/tipos-avaliacao" target="_blank" class="text-xs text-purple-700 hover:text-purple-900">Gerenciar tipos</a>
             </div>
@@ -79,36 +79,7 @@
             </select>
         </div>
 
-        <div class="mb-6" id="campo-semana-evento">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Semana no quadro
-            </label>
-            <?php $semanaSel = (int) ($bloco['semana'] ?? 0); ?>
-            <select id="semana" name="semana" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Não se aplica</option>
-                <?php for ($s = 1; $s <= 8; $s++): ?>
-                    <option value="<?= $s ?>" <?= $semanaSel === $s ? 'selected' : '' ?>>S<?= $s ?></option>
-                <?php endfor; ?>
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Para prova semanal, escolha S1 a S8. Bloco A costuma ser S1/S3/S5/S7; Bloco B, S2/S4/S6/S8.</p>
-        </div>
-        <script>
-        (function () {
-            var sel = document.getElementById('tipo_avaliacao_id');
-            var wrap = document.getElementById('campo-semana-evento');
-            var semana = document.getElementById('semana');
-            if (!sel || !wrap) return;
-            function syncSemana() {
-                var opt = sel.options[sel.selectedIndex];
-                var chave = (opt && opt.getAttribute('data-chave-quadro')) || '';
-                var hide = chave !== '' && chave !== 'semanal';
-                wrap.classList.toggle('hidden', hide);
-                if (hide && semana) semana.value = '';
-            }
-            sel.addEventListener('change', syncSemana);
-            syncSemana();
-        })();
-        </script>
+        <?php include __DIR__ . '/_campo_semana_quadro.php'; ?>
 
         <!-- Descrição -->
         <div class="mb-6">
@@ -122,7 +93,14 @@
                       placeholder="Descrição opcional do bloco"><?= htmlspecialchars($bloco['descricao'] ?? '') ?></textarea>
         </div>
 
-        <!-- Ano Letivo e Bimestre -->
+        <?php
+        if (!class_exists('PeriodoLetivo')) {
+            require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
+        }
+        $anoEvento = (int) ($bloco['ano_letivo'] ?? date('Y'));
+        $bimSel = (int) ($bloco['bimestre'] ?? 0);
+        $periodoEvento = PeriodoLetivo::doAno($anoEvento);
+        ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -134,24 +112,23 @@
                        min="2000"
                        max="2100"
                        required
-                       value="<?= htmlspecialchars((string)($bloco['ano_letivo'] ?? date('Y'))) ?>"
+                       data-periodo-ano
+                       value="<?= htmlspecialchars((string) $anoEvento) ?>"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                        placeholder="Ex: <?= date('Y') ?>">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Bimestre <span class="text-red-500">*</span>
+                <label for="bimestre" class="block text-sm font-medium text-gray-700 mb-2" data-periodo-label>
+                    <?= htmlspecialchars($periodoEvento['rotulo_campo']) ?> <span class="text-red-500">*</span>
                 </label>
-                <?php $bimSel = (int) ($bloco['bimestre'] ?? 0); ?>
                 <select id="bimestre"
                         name="bimestre"
                         required
+                        data-periodo-letivo-select
+                        data-periodo-vazio="1"
+                        data-periodo-selecionado="<?= $bimSel ?>"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option value="">Selecione</option>
-                    <option value="1" <?= $bimSel === 1 ? 'selected' : '' ?>>1º Bimestre</option>
-                    <option value="2" <?= $bimSel === 2 ? 'selected' : '' ?>>2º Bimestre</option>
-                    <option value="3" <?= $bimSel === 3 ? 'selected' : '' ?>>3º Bimestre</option>
-                    <option value="4" <?= $bimSel === 4 ? 'selected' : '' ?>>4º Bimestre</option>
+                    <?= PeriodoLetivo::optionsHtml($anoEvento, $bimSel, ['vazio' => true]) ?>
                 </select>
             </div>
         </div>
@@ -1036,6 +1013,12 @@ function atualizarBloco(event, blocoId) {
             nota_unica_todas_materias: document.getElementById('nota_unica_todas_materias')?.checked ? 1 : 0,
             _token: csrfToken
         };
+        if (typeof coletarVinculosGrupoRegras === 'function') {
+            const vinculosGrupo = coletarVinculosGrupoRegras();
+            if (Array.isArray(vinculosGrupo)) {
+                data.grupos_regras = vinculosGrupo;
+            }
+        }
 
         const btn = document.getElementById('btnSalvarBloco');
         if (btn) {

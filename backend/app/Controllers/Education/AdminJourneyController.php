@@ -4,6 +4,8 @@
  * Gerencia jornadas do lado do admin
  */
 
+require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
+
 if (!class_exists('AdminJourneyController')) {
 class AdminJourneyController extends BaseController
 {
@@ -1672,8 +1674,8 @@ class AdminJourneyController extends BaseController
                 throw new Exception('Ano letivo inválido');
             }
 
-            if ($bimestre < 1 || $bimestre > 4) {
-                throw new Exception('Bimestre inválido');
+            if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+                throw new Exception(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             
             if ($dataFim < $dataInicio) {
@@ -1777,8 +1779,8 @@ class AdminJourneyController extends BaseController
             if ($anoLetivo < 2000 || $anoLetivo > 2100) {
                 throw new Exception('Ano letivo inválido');
             }
-            if ($bimestre < 1 || $bimestre > 4) {
-                throw new Exception('Bimestre inválido');
+            if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+                throw new Exception(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             if ($dataFim < $dataInicio) {
                 throw new Exception('Data de fim deve ser igual ou posterior à data de início');

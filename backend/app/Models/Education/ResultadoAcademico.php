@@ -265,6 +265,41 @@ class ResultadoAcademico
     }
 
     /**
+     * Retificação do período: o snapshot permanece; o aluno volta a 'reaberto'
+     * para receber nova homologação (versão seguinte).
+     */
+    public function marcarReabertoDoPeriodo(
+        int $turmaId,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $usuarioId,
+        string $motivo
+    ): int {
+        if (!$this->schemaPronto() || $turmaId <= 0 || $anoLetivo <= 0) {
+            return 0;
+        }
+        $motivo = trim($motivo);
+        return (int) $this->db->update(
+            'UPDATE resultado_academico
+             SET status = :novo, reaberto_em = NOW(), reaberto_por = :por, reaberto_motivo = :motivo
+             WHERE turma_id = :turma AND ano_letivo = :ano
+               AND periodo_tipo = :tipo AND periodo_numero = :num
+               AND status = :atual',
+            [
+                'novo' => 'reaberto',
+                'por' => $usuarioId > 0 ? $usuarioId : null,
+                'motivo' => $motivo !== '' ? $motivo : 'Retificação do período',
+                'turma' => $turmaId,
+                'ano' => $anoLetivo,
+                'tipo' => $periodoTipo,
+                'num' => $periodoNumero,
+                'atual' => 'homologado',
+            ]
+        );
+    }
+
+    /**
      * @return list<array<string,mixed>>
      */
     public function listarPorAluno(int $alunoId): array
@@ -710,6 +745,36 @@ class ResultadoAcademico
     /**
      * @return list<array<string,mixed>>
      */
+    public function listarEmissoes(int $anoLetivo = 0, int $turmaId = 0, string $tipo = ''): array
+    {
+        if (!$this->tabelaExiste('resultado_documento_emissoes')) {
+            return [];
+        }
+        $sql = 'SELECT e.*, t.nome AS turma_nome, a.nome AS aluno_nome
+                FROM resultado_documento_emissoes e
+                LEFT JOIN turmas t ON t.id = e.turma_id
+                LEFT JOIN alunos a ON a.id = e.aluno_id
+                WHERE 1=1';
+        $params = [];
+        if ($anoLetivo > 0) {
+            $sql .= ' AND e.ano_letivo = :ano';
+            $params['ano'] = $anoLetivo;
+        }
+        if ($turmaId > 0) {
+            $sql .= ' AND e.turma_id = :turma';
+            $params['turma'] = $turmaId;
+        }
+        if ($tipo !== '') {
+            $sql .= ' AND e.tipo = :tipo';
+            $params['tipo'] = $tipo;
+        }
+        $sql .= ' ORDER BY e.emitido_em DESC, e.id DESC LIMIT 200';
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
     public function turmasAtivas(int $anoLetivo = 0): array
     {
         $sql = 'SELECT id, nome, serie, ano_letivo, turno FROM turmas WHERE ativo = 1';
@@ -770,6 +835,10 @@ class ResultadoAcademico
                 }
                 return $out;
             }
+            $anoTurma = $this->anoDaTurma($turmaId);
+            if ($anoTurma > 0 && $anoTurma !== $anoLetivo) {
+                return [];
+            }
         }
 
         $atuais = $this->db->fetchAll(
@@ -804,6 +873,83 @@ class ResultadoAcademico
             $out[] = $aluno;
         }
         return $out;
+    }
+
+    public function anoDaTurma(int $turmaId): int
+    {
+        if ($turmaId <= 0) {
+            return 0;
+        }
+        $row = $this->db->fetch(
+            'SELECT ano_letivo FROM turmas WHERE id = :id LIMIT 1',
+            ['id' => $turmaId]
+        );
+        return (int) ($row['ano_letivo'] ?? 0);
+    }
+
+    /**
+     * Turma equivalente (mesma série / nome-base) no ano pedido.
+     */
+    public function turmaIrmaNoAno(int $turmaId, int $anoLetivo): ?int
+    {
+        if ($turmaId <= 0 || $anoLetivo <= 0) {
+            return null;
+        }
+        $origem = $this->db->fetch(
+            'SELECT id, nome, serie_id, ano_letivo FROM turmas WHERE id = :id LIMIT 1',
+            ['id' => $turmaId]
+        );
+        if (!$origem) {
+            return null;
+        }
+        if ((int) ($origem['ano_letivo'] ?? 0) === $anoLetivo) {
+            return $turmaId;
+        }
+        $nomeBase = trim((string) preg_replace('/\s*20\d{2}\s*$/u', '', (string) ($origem['nome'] ?? '')));
+        if ($nomeBase === '') {
+            return null;
+        }
+        $params = [
+            'ano' => $anoLetivo,
+            'exato' => $nomeBase,
+            'comAno' => $nomeBase . ' ' . $anoLetivo,
+        ];
+        $sql = 'SELECT id FROM turmas
+                 WHERE ano_letivo = :ano AND ativo = 1
+                   AND (nome = :exato OR nome = :comAno)';
+        $serieId = (int) ($origem['serie_id'] ?? 0);
+        if ($serieId > 0) {
+            $sql .= ' AND serie_id = :serie';
+            $params['serie'] = $serieId;
+        }
+        $sql .= ' ORDER BY id ASC LIMIT 1';
+        $irma = $this->db->fetch($sql, $params);
+        $id = (int) ($irma['id'] ?? 0);
+        return $id > 0 ? $id : null;
+    }
+
+    /**
+     * Resolve turma + ano quando o filtro não coincide com o ano da turma aberta.
+     *
+     * @return array{turma_id:int,ano_letivo:int}
+     */
+    public function alinharTurmaAoAnoLetivo(int $turmaId, int $anoLetivo): array
+    {
+        $anoTurma = $this->anoDaTurma($turmaId);
+        if ($anoTurma <= 0) {
+            return ['turma_id' => $turmaId, 'ano_letivo' => $anoLetivo];
+        }
+        if ($anoLetivo <= 0) {
+            return ['turma_id' => $turmaId, 'ano_letivo' => $anoTurma];
+        }
+        if ($anoTurma === $anoLetivo) {
+            return ['turma_id' => $turmaId, 'ano_letivo' => $anoLetivo];
+        }
+        $irmaId = $this->turmaIrmaNoAno($turmaId, $anoLetivo);
+        if ($irmaId !== null && $irmaId !== $turmaId) {
+            return ['turma_id' => $irmaId, 'ano_letivo' => $anoLetivo];
+        }
+        return ['turma_id' => $turmaId, 'ano_letivo' => $anoTurma];
     }
 
     public function tabelaExiste(string $tabela): bool

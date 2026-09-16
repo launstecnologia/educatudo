@@ -20,7 +20,7 @@ class BoletimAssistenteFerramentas
     }
 
     /**
-     * @return list<array{id:int,nome:string,descricao:?string}>
+     * @return list<array{id:int,nome:string,descricao:?string,chave_quadro:?string,origem:?string,registro_evento:?string,criterio_fechamento:?string,escala_max:?float,criterio_professores_mesmo_componente:?string,media_professores_mesmo_componente:bool}>
      */
     public function listarTiposAvaliacao(): array
     {
@@ -40,6 +40,14 @@ class BoletimAssistenteFerramentas
                 'nome' => trim((string) ($row['nome'] ?? '')),
                 'descricao' => isset($row['descricao']) ? trim((string) $row['descricao']) : null,
                 'chave_quadro' => $chave !== '' ? $chave : null,
+                'origem' => isset($row['origem']) ? (string) $row['origem'] : null,
+                'registro_evento' => isset($row['registro_evento']) ? (string) $row['registro_evento'] : null,
+                'criterio_fechamento' => isset($row['criterio_fechamento']) ? (string) $row['criterio_fechamento'] : null,
+                'escala_max' => isset($row['escala_max']) ? (float) $row['escala_max'] : null,
+                'criterio_professores_mesmo_componente' => isset($row['criterio_professores_mesmo_componente'])
+                    ? (string) $row['criterio_professores_mesmo_componente']
+                    : null,
+                'media_professores_mesmo_componente' => !empty($row['media_professores_mesmo_componente']),
             ];
         }
         return $out;
@@ -209,7 +217,7 @@ class BoletimAssistenteFerramentas
     }
 
     /**
-     * @return list<array{id:int,nome:string,codigo:?string,ano_letivo:?int,bimestre:?int,exibir_em:?string,formula_final:?string}>
+     * @return list<array{id:int,nome:string,codigo:?string,ano_letivo:?int,bimestre:?int,exibir_em:?string,finalidade:string,formula_final:?string}>
      */
     public function listarRegras(int $limit = 100): array
     {
@@ -226,6 +234,9 @@ class BoletimAssistenteFerramentas
                 'ano_letivo' => isset($regra['ano_letivo']) ? (int) $regra['ano_letivo'] : null,
                 'bimestre' => isset($regra['bimestre']) ? (int) $regra['bimestre'] : null,
                 'exibir_em' => isset($regra['exibir_em']) ? (string) $regra['exibir_em'] : null,
+                'finalidade' => strtolower(trim((string) ($regra['finalidade'] ?? 'oficial'))) === 'complementar'
+                    ? 'complementar'
+                    : 'oficial',
                 'formula_final' => isset($regra['formula_final']) ? trim((string) $regra['formula_final']) : null,
             ];
         }
@@ -242,6 +253,51 @@ class BoletimAssistenteFerramentas
             return null;
         }
         return $this->normalizarRegraParaAssistente($regra);
+    }
+
+    /**
+     * Evento de notas já ligado ao modelo (mesmo ano/bimestre, ou o único).
+     */
+    public function sugerirRegraIdDoBoletim(int $boletimId, int $anoLetivo = 0, int $bimestre = 0): int
+    {
+        if ($boletimId <= 0) {
+            return 0;
+        }
+        $eventos = $this->boletimConfig->listarEventosNotasDoBoletim($boletimId);
+        if ($eventos === []) {
+            return 0;
+        }
+        $anoLetivo = (int) $anoLetivo;
+        $bimestre = (int) $bimestre;
+        $melhor = 0;
+        $melhorPts = -1;
+        foreach ($eventos as $ev) {
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $pts = 1;
+            $anoEv = (int) ($ev['ano_letivo'] ?? 0);
+            $bimEv = (int) ($ev['bimestre'] ?? 0);
+            if ($anoLetivo > 0 && $anoEv === $anoLetivo) {
+                $pts += 10;
+            }
+            if ($bimestre > 0 && $bimEv === $bimestre) {
+                $pts += 20;
+            }
+            if ($pts > $melhorPts) {
+                $melhorPts = $pts;
+                $melhor = $id;
+            }
+        }
+        if (count($eventos) === 1) {
+            return (int) ($eventos[0]['id'] ?? 0);
+        }
+        if ($melhorPts >= 11) {
+            return $melhor;
+        }
+
+        return 0;
     }
 
     public function obterRegraPorCodigo(string $codigo): ?array
@@ -368,6 +424,89 @@ class BoletimAssistenteFerramentas
                 'ano_letivo' => isset($row['ano_letivo']) ? (int) $row['ano_letivo'] : null,
                 'bimestre' => isset($row['bimestre']) ? (int) $row['bimestre'] : null,
             ];
+        }
+        return $out;
+    }
+
+    /**
+     * Ano letivo marcado como ativo na escola; se não houver, o calendário atual.
+     */
+    public function anoLetivoAtivo(): int
+    {
+        $atual = (int) date('Y');
+        if (!$this->temTabela('ano_letivo')) {
+            return $atual;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT ano FROM ano_letivo WHERE ativo = 1 AND ano IS NOT NULL ORDER BY ano DESC LIMIT 1'
+            );
+            $ano = (int) ($row['ano'] ?? 0);
+            if ($ano >= 2000 && $ano <= 2100) {
+                return $ano;
+            }
+        } catch (Throwable $e) {
+            // fallback silencioso
+        }
+        return $atual;
+    }
+
+    /**
+     * Ano padrão do assistente: prefere o ano com provas (e o ativo da escola),
+     * para não filtrar eventos de 2025 quando o calendário já está em 2026.
+     */
+    public function anoLetivoPadrao(?int $preferido = null): int
+    {
+        $preferido = ($preferido !== null && $preferido >= 2000 && $preferido <= 2100)
+            ? $preferido
+            : 0;
+        $porAno = $this->contagemEventosProvaPorAno();
+        if ($preferido > 0 && ($porAno[$preferido] ?? 0) > 0) {
+            return $preferido;
+        }
+        $ativo = $this->anoLetivoAtivo();
+        if ($ativo > 0 && ($porAno[$ativo] ?? 0) > 0) {
+            return $ativo;
+        }
+        if ($porAno !== []) {
+            $melhor = (int) max(array_keys($porAno));
+            if ($melhor >= 2000) {
+                return $melhor;
+            }
+        }
+        if ($preferido > 0) {
+            return $preferido;
+        }
+        return $ativo > 0 ? $ativo : (int) date('Y');
+    }
+
+    /**
+     * @return array<int,int> ano_letivo => quantidade de blocos
+     */
+    public function contagemEventosProvaPorAno(): array
+    {
+        if (!$this->temColuna('provas_blocos', 'ano_letivo')) {
+            return [];
+        }
+        try {
+            $sql = 'SELECT ano_letivo, COUNT(*) AS total
+                    FROM provas_blocos
+                    WHERE ano_letivo IS NOT NULL AND ano_letivo > 0';
+            if ($this->temColuna('provas_blocos', 'deleted_at')) {
+                $sql .= ' AND deleted_at IS NULL';
+            }
+            $sql .= ' GROUP BY ano_letivo';
+            $rows = $this->db->fetchAll($sql) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $ano = (int) ($row['ano_letivo'] ?? 0);
+            $n = (int) ($row['total'] ?? 0);
+            if ($ano >= 2000 && $ano <= 2100 && $n > 0) {
+                $out[$ano] = $n;
+            }
         }
         return $out;
     }
@@ -537,7 +676,14 @@ class BoletimAssistenteFerramentas
                     : 'media',
                 'divisor' => max(1, (int) ($groupLine['divisor'] ?? 1)),
                 'materias_ids' => $this->normalizarIds($groupLine['materias_ids'] ?? []),
+                'aplicar_em' => strtolower(trim((string) ($groupLine['aplicar_em'] ?? 'ambos'))) === 'boletim'
+                    ? 'boletim'
+                    : 'ambos',
             ];
+            $agIdGl = (int) ($groupLine['agrupamento_id'] ?? 0);
+            if ($agIdGl > 0) {
+                $config['group_line']['agrupamento_id'] = $agIdGl;
+            }
             $layoutGroup = strtolower(trim((string) ($config['layout_group'] ?? $comp['layout_group'] ?? '')));
             $layoutType = strtolower(trim((string) ($config['layout_type'] ?? $comp['layout_type'] ?? '')));
             if (in_array($layoutGroup, BoletimQuadroLayoutHelper::gruposPermitidos(), true)) {
@@ -602,8 +748,22 @@ class BoletimAssistenteFerramentas
                 $config['componente_codigo'] = trim((string) ($config['componente_codigo'] ?? $comp['componente_codigo'] ?? ''));
                 if ($slugEv === '') {
                     $erros[] = "Bloco \"{$codigo}\" precisa do código do evento de Notas (média final já criada).";
-                } elseif ($this->obterRegraPorCodigo($slugEv) === null) {
-                    $erros[] = "Bloco \"{$codigo}\" aponta para evento inexistente ({$slugEv}).";
+                } else {
+                    $refEv = $this->obterRegraPorCodigo($slugEv);
+                    if ($refEv === null) {
+                        $erros[] = "Bloco \"{$codigo}\" aponta para evento inexistente ({$slugEv}).";
+                    } else {
+                        $finRascunho = strtolower(trim((string) ($rascunho['finalidade'] ?? 'oficial'))) === 'complementar'
+                            ? 'complementar'
+                            : 'oficial';
+                        $finFonte = strtolower(trim((string) ($refEv['finalidade'] ?? 'oficial'))) === 'complementar'
+                            ? 'complementar'
+                            : 'oficial';
+                        if ($finRascunho !== $finFonte) {
+                            $tipoEsperado = $finRascunho === 'complementar' ? 'Notas extra' : 'Notas da série';
+                            $erros[] = "Bloco \"{$codigo}\" aponta para um evento que não é {$tipoEsperado}. O boletim extra só puxa Notas extra, e o oficial só puxa Notas da série.";
+                        }
+                    }
                 }
             }
 
@@ -720,6 +880,8 @@ class BoletimAssistenteFerramentas
 
         $exibir = (string) ($rascunho['exibir_em'] ?? 'boletim');
         $rascunho['exibir_em'] = in_array($exibir, ['notas', 'boletim'], true) ? $exibir : 'boletim';
+        $finalidade = strtolower(trim((string) ($rascunho['finalidade'] ?? 'oficial')));
+        $rascunho['finalidade'] = $finalidade === 'complementar' ? 'complementar' : 'oficial';
         $rascunho['round_mode'] = (($rascunho['round_mode'] ?? '') === 'half') ? 'half' : 'none';
 
         return [
@@ -824,6 +986,7 @@ class BoletimAssistenteFerramentas
         $lines[] = 'ano_letivo: ' . (isset($e['ano_letivo']) && $e['ano_letivo'] !== '' && $e['ano_letivo'] !== null ? (int) $e['ano_letivo'] : '');
         $lines[] = 'bimestre: ' . (isset($e['bimestre']) && $e['bimestre'] !== '' && $e['bimestre'] !== null ? (int) $e['bimestre'] : '');
         $lines[] = 'exibir_em: ' . $this->escaparReceitaValor($e['exibir_em'] ?? 'boletim');
+        $lines[] = 'finalidade: ' . $this->escaparReceitaValor($e['finalidade'] ?? 'oficial');
         $lines[] = 'turmas_ids: ' . $this->formatarListaIdsReceita($e['turmas_ids'] ?? []);
         $lines[] = 'materias_ids: ' . $this->formatarListaIdsReceita($e['materias_ids'] ?? []);
         $lines[] = 'series_ids: ' . $this->formatarListaIdsReceita($e['series_ids'] ?? []);
@@ -901,6 +1064,11 @@ class BoletimAssistenteFerramentas
                 $lines[] = 'group_line_label: ' . $this->escaparReceitaValor($gl['label'] ?? '');
                 $lines[] = 'group_line_mode: ' . $this->escaparReceitaValor($gl['mode'] ?? 'media');
                 $lines[] = 'group_line_materias_ids: ' . $this->formatarListaIdsReceita($gl['materias_ids'] ?? []);
+                $lines[] = 'group_line_aplicar_em: ' . $this->escaparReceitaValor($gl['aplicar_em'] ?? 'ambos');
+                $agIdRec = (int) ($gl['agrupamento_id'] ?? 0);
+                if ($agIdRec > 0) {
+                    $lines[] = 'group_line_agrupamento_id: ' . $agIdRec;
+                }
             }
             $lines[] = '';
         }
@@ -998,7 +1166,14 @@ class BoletimAssistenteFerramentas
                     'mode' => trim((string) ($kv['group_line_mode'] ?? 'media')) ?: 'media',
                     'divisor' => 1,
                     'materias_ids' => $this->parseListaIdsReceita($kv['group_line_materias_ids'] ?? '[]'),
+                    'aplicar_em' => strtolower(trim((string) ($kv['group_line_aplicar_em'] ?? 'ambos'))) === 'boletim'
+                        ? 'boletim'
+                        : 'ambos',
                 ];
+                $agIdKv = (int) ($kv['group_line_agrupamento_id'] ?? 0);
+                if ($agIdKv > 0) {
+                    $config['group_line']['agrupamento_id'] = $agIdKv;
+                }
             }
             $componentes[] = [
                 'nome' => trim((string) ($kv['nome'] ?? '')),
@@ -1027,6 +1202,9 @@ class BoletimAssistenteFerramentas
             'ano_letivo' => isset($meta['ano_letivo']) && $meta['ano_letivo'] !== '' ? (int) $meta['ano_letivo'] : null,
             'bimestre' => isset($meta['bimestre']) && $meta['bimestre'] !== '' ? (int) $meta['bimestre'] : null,
             'exibir_em' => trim((string) ($meta['exibir_em'] ?? 'boletim')) ?: 'boletim',
+            'finalidade' => strtolower(trim((string) ($meta['finalidade'] ?? 'oficial'))) === 'complementar'
+                ? 'complementar'
+                : 'oficial',
             'turmas_ids' => $this->parseListaIdsReceita($meta['turmas_ids'] ?? '[]'),
             'materias_ids' => $this->parseListaIdsReceita($meta['materias_ids'] ?? '[]'),
             'series_ids' => $this->parseListaIdsReceita($meta['series_ids'] ?? '[]'),
@@ -1079,6 +1257,9 @@ class BoletimAssistenteFerramentas
         }
         if (preg_match('/-\s*Exibir em\s*:\s*(\w+)/mi', $texto, $m)) {
             $meta['exibir_em'] = strtolower(trim($m[1]));
+        }
+        if (preg_match('/-\s*Finalidade\s*:\s*(\w+)/mi', $texto, $m)) {
+            $meta['finalidade'] = strtolower(trim($m[1]));
         }
         if (preg_match('/-\s*Turmas IDs\s*:\s*(\[[^\]]*\])/mi', $texto, $m)) {
             $meta['turmas_ids'] = $m[1];
@@ -1153,6 +1334,7 @@ class BoletimAssistenteFerramentas
             'ano_letivo' => $meta['ano_letivo'] ?? null,
             'bimestre' => $meta['bimestre'] ?? null,
             'exibir_em' => $meta['exibir_em'] ?? 'boletim',
+            'finalidade' => $meta['finalidade'] ?? 'oficial',
             'turmas_ids' => $this->parseListaIdsReceita($meta['turmas_ids'] ?? '[]'),
             'materias_ids' => $this->parseListaIdsReceita($meta['materias_ids'] ?? '[]'),
             'series_ids' => $this->parseListaIdsReceita($meta['series_ids'] ?? '[]'),
@@ -1358,6 +1540,11 @@ class BoletimAssistenteFerramentas
             'codigo' => (string) ($regra['codigo'] ?? ''),
             'formula_final' => (string) ($regra['formula_final'] ?? ''),
             'exibir_em' => (string) ($regra['exibir_em'] ?? 'boletim'),
+            'finalidade' => strtolower(trim((string) ($regra['finalidade'] ?? 'oficial'))) === 'complementar'
+                ? 'complementar'
+                : 'oficial',
+            'boletim_id' => isset($regra['boletim_id']) ? (int) $regra['boletim_id'] : 0,
+            'grupo_regras_notas_id' => $this->grupoRegrasNotasIdDaRegra($regra),
             'ano_letivo' => isset($regra['ano_letivo']) ? (int) $regra['ano_letivo'] : null,
             'bimestre' => isset($regra['bimestre']) ? (int) $regra['bimestre'] : null,
             'default_data_inicio' => (string) ($regra['default_data_inicio'] ?? ''),
@@ -1369,6 +1556,29 @@ class BoletimAssistenteFerramentas
             'nota_minima_aprovacao' => isset($regra['nota_minima_aprovacao']) ? (float) $regra['nota_minima_aprovacao'] : null,
             'componentes' => $componentes,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     */
+    private function grupoRegrasNotasIdDaRegra(array $regra): int
+    {
+        $direto = (int) ($regra['grupo_regras_notas_id'] ?? $regra['quadro_notas_id'] ?? 0);
+        if ($direto > 0) {
+            return $direto;
+        }
+        $raw = $regra['extras_json'] ?? $regra['extras'] ?? null;
+        if (is_array($raw)) {
+            return (int) ($raw['grupo_regras_notas_id'] ?? $raw['quadro_notas_id'] ?? 0);
+        }
+        if (!is_string($raw) || trim($raw) === '') {
+            return 0;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return 0;
+        }
+        return (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
     }
 
     /** @return list<int> */
@@ -1503,8 +1713,8 @@ class BoletimAssistenteFerramentas
         if ($bim < 1 || $bim > 4) {
             $bim = 1;
         }
-        $semanasA = $this->normalizarListaSemanas($opcoes['semanas_a'] ?? [1, 3, 5, 7], [1, 3, 5, 7]);
-        $semanasB = $this->normalizarListaSemanas($opcoes['semanas_b'] ?? [2, 4, 6, 8], [2, 4, 6, 8]);
+        $semanasA = $this->normalizarListaSemanas($opcoes['semanas_a'] ?? [], []);
+        $semanasB = $this->normalizarListaSemanas($opcoes['semanas_b'] ?? [], []);
         $tipos = $this->indexarTiposQuadro();
         $tipoSemanal = $tipos['semanal'] ?? null;
 
@@ -1513,7 +1723,7 @@ class BoletimAssistenteFerramentas
         if ($soComEvento) {
             foreach ($this->listarEventosProva($tipoSemanal['id'] ?? null, 200) as $ev) {
                 $s = (int) ($ev['semana'] ?? 0);
-                if ($s >= 1 && $s <= 8) {
+                if ($s >= 1 && $s <= BoletimQuadroLayoutHelper::SEMANA_MAX) {
                     $semanasEvento[$s] = true;
                 }
             }
@@ -1552,7 +1762,7 @@ class BoletimAssistenteFerramentas
             'config' => [
                 'expressao' => '',
                 'formula_mode' => 'single',
-                'agregar_nq' => $codigosSemana !== [] ? $codigosSemana : ['s1', 's3', 's5', 's7'],
+                'agregar_nq' => $codigosSemana,
                 'layout_group' => 'quadro_comum',
                 'layout_type' => 'media_sem',
             ],
@@ -1750,7 +1960,7 @@ class BoletimAssistenteFerramentas
         $out = [];
         foreach ($raw as $v) {
             $s = (int) $v;
-            if ($s >= 1 && $s <= 8) {
+            if ($s >= 1 && $s <= BoletimQuadroLayoutHelper::SEMANA_MAX) {
                 $out[] = $s;
             }
         }
@@ -1777,8 +1987,20 @@ class BoletimAssistenteFerramentas
                 'chave_quadro' => $t['chave_quadro'] ?? null,
             ];
             $chave = strtolower(trim((string) ($t['chave_quadro'] ?? '')));
+            if ($chave === 'prova_bim') {
+                $chave = 'bimestral';
+            } elseif ($chave === 'trab') {
+                $chave = 'trabalho';
+            } elseif ($chave === 'part' || $chave === 'participa') {
+                $chave = 'participacao';
+            } elseif ($chave === 'rec' || $chave === 'recupera') {
+                $chave = 'recuperacao';
+            }
             if ($chave !== '' && !isset($out[$chave])) {
                 $out[$chave] = $item;
+            }
+            if ($chave === 'bimestral' && !isset($out['prova_bim'])) {
+                $out['prova_bim'] = $item;
             }
             $nome = mb_strtolower((string) ($t['nome'] ?? ''));
             if ($chave !== '') {
@@ -1885,34 +2107,18 @@ class BoletimAssistenteFerramentas
     private function listarGruposMateriasQuadro(): array
     {
         $out = ['A' => [], 'B' => []];
-        $path = __DIR__ . '/../Modulos/notas-semanais/Models/NotasSemanaisConfig.php';
-        if (!class_exists('NotasSemanaisConfig', false) && is_file($path)) {
+        $path = __DIR__ . '/../Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }
-        if (!class_exists('NotasSemanaisConfig', false)) {
+        if (!class_exists('GrupoRegrasNotasService', false)) {
             return $out;
         }
         try {
-            $cfg = new NotasSemanaisConfig();
-            if (!method_exists($cfg, 'listarMateriasComGrupo')) {
-                return $out;
-            }
-            foreach ($cfg->listarMateriasComGrupo() as $m) {
-                $id = (int) ($m['id'] ?? 0);
-                $g = strtoupper((string) ($m['grupo'] ?? ''));
-                if ($id <= 0 || ($g !== 'A' && $g !== 'B')) {
-                    continue;
-                }
-                $out[$g][] = [
-                    'id' => $id,
-                    'nome' => trim((string) ($m['nome'] ?? '')),
-                ];
-            }
+            return (new GrupoRegrasNotasService())->materiasQuadroPadrao();
         } catch (Throwable $e) {
             return $out;
         }
-
-        return $out;
     }
 
     private function temColuna(string $table, string $column): bool

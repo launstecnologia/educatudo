@@ -86,15 +86,16 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Bimestre
+                    <label class="block text-sm font-medium text-gray-700 mb-2" data-periodo-label>
+                        <?= htmlspecialchars(class_exists('PeriodoLetivo') ? PeriodoLetivo::doAno((int) date('Y'))['rotulo_campo'] : 'Bimestre') ?>
                     </label>
                     <select id="filtroBimestre" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer">
-                        <option value="">Todos os bimestres</option>
-                        <option value="1">1º Bimestre</option>
-                        <option value="2">2º Bimestre</option>
-                        <option value="3">3º Bimestre</option>
-                        <option value="4">4º Bimestre</option>
+                        <?php
+                        if (!class_exists('PeriodoLetivo')) {
+                            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                        }
+                        ?>
+                        <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true, 'todos_label' => 'Todos']) ?>
                     </select>
                 </div>
 

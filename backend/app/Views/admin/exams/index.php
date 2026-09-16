@@ -18,6 +18,10 @@ foreach (['titulo', 'data_prova', 'bloco_modelo_id', 'turma_id', 'materia_id', '
         $filtrosAtivosCount++;
     }
 }
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
+}
+$periodoFiltro = PeriodoLetivo::doAno((int) date('Y'));
 // Conta status só quando o usuário escolheu um filtro explícito (não o padrão "exceto concluídos")
 if (!empty($filterStatus)) {
     $filtrosAtivosCount++;
@@ -46,7 +50,7 @@ if (!empty($filterStatus)) {
             <a href="<?= URL ?>/admin/provas/tipos-avaliacao"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-layer-group mr-2 text-gray-500"></i>
-                Tipo de Avaliação
+                Tipo de Nota
             </a>
             <a href="<?= URL ?>/admin/blocos-modelo"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -209,13 +213,9 @@ if (!empty($filterStatus)) {
                 </select>
             </div>
             <div>
-                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Bimestre</label>
+                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></label>
                 <select id="filtro_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Todos</option>
-                    <option value="1" <?= $filterBimestre === 1 ? 'selected' : '' ?>>1º Bimestre</option>
-                    <option value="2" <?= $filterBimestre === 2 ? 'selected' : '' ?>>2º Bimestre</option>
-                    <option value="3" <?= $filterBimestre === 3 ? 'selected' : '' ?>>3º Bimestre</option>
-                    <option value="4" <?= $filterBimestre === 4 ? 'selected' : '' ?>>4º Bimestre</option>
+                    <?= PeriodoLetivo::optionsHtml((int) date('Y'), $filterBimestre, ['todos' => true]) ?>
                 </select>
             </div>
             <div>
@@ -315,8 +315,8 @@ document.addEventListener('keydown', function(e) {
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Horário</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Avaliação</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Nota</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
@@ -360,7 +360,8 @@ document.addEventListener('keydown', function(e) {
                                 }
                                 $nomeBloco = trim((string)($bloco['bloco_modelo_nome'] ?? ''));
                                 $bimestreNumero = (int)($bloco['bimestre'] ?? 0);
-                                $bimestreTexto = $bimestreNumero >= 1 && $bimestreNumero <= 4 ? ($bimestreNumero . 'º') : '';
+                                $anoBloco = (int)($bloco['ano_letivo'] ?? 0);
+                                $bimestreTexto = $bimestreNumero > 0 ? PeriodoLetivo::rotulo($anoBloco, $bimestreNumero) : '';
                                 $linhaSecundaria = trim(($nomeBloco !== '' ? $nomeBloco : 'Bloco') . ($bimestreTexto !== '' ? (' ' . $bimestreTexto) : '') . ' - ' . $turmasTexto);
                                 ?>
                                 <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($bloco['titulo']) ?></div>
@@ -377,7 +378,7 @@ document.addEventListener('keydown', function(e) {
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">
-                                    <?= !empty($bloco['created_at']) ? date('d/m/Y', strtotime($bloco['created_at'])) : date('d/m/Y', strtotime($bloco['data_prova'])) ?>
+                                    <?= !empty($bloco['data_prova']) ? date('d/m/Y', strtotime($bloco['data_prova'])) : (!empty($bloco['created_at']) ? date('d/m/Y', strtotime($bloco['created_at'])) : '—') ?>
                                 </div>
                                 <div class="text-sm text-gray-500">
                                     <?= date('H:i', strtotime($bloco['hora_inicio'])) ?> - <?= date('H:i', strtotime($bloco['hora_fim'])) ?>
@@ -385,14 +386,9 @@ document.addEventListener('keydown', function(e) {
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-700">
                                 <?php
-                                $bimestreLabel = [
-                                    1 => '1º Bimestre',
-                                    2 => '2º Bimestre',
-                                    3 => '3º Bimestre',
-                                    4 => '4º Bimestre',
-                                ];
                                 $bim = (int)($bloco['bimestre'] ?? 0);
-                                echo isset($bimestreLabel[$bim]) ? htmlspecialchars($bimestreLabel[$bim]) : '<span class="text-gray-400">—</span>';
+                                $labBim = $bim > 0 ? PeriodoLetivo::rotulo((int)($bloco['ano_letivo'] ?? 0), $bim) : '';
+                                echo $labBim !== '' ? htmlspecialchars($labBim) : '<span class="text-gray-400">—</span>';
                                 ?>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-700">

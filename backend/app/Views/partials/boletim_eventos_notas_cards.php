@@ -5,9 +5,10 @@
  * de eventos já gerados, no mesmo formato usado por partials/boletins_gerados.php).
  */
 $boletinsGeradosNotasCards = is_array($boletins_gerados_notas ?? null) ? $boletins_gerados_notas : [];
+$bnPrefix = preg_replace('/[^a-z0-9_-]/i', '', (string) ($boletim_notas_cards_prefix ?? 'bn')) ?: 'bn';
 ?>
 <?php if (!empty($boletinsGeradosNotasCards)): ?>
-<div class="space-y-3">
+    <div class="space-y-3">
     <?php $bnIdx = 0; ?>
     <?php foreach ($boletinsGeradosNotasCards as $evNota): ?>
         <?php
@@ -15,6 +16,7 @@ $boletinsGeradosNotasCards = is_array($boletins_gerados_notas ?? null) ? $boleti
             continue;
         }
         $bnIdx++;
+        $bnDomId = 'content-' . $bnPrefix . '-evento-' . $bnIdx;
         $evNotaNome = (string) ($evNota['regra_nome'] ?? 'Evento de notas');
         $evNotaAtualizado = !empty($evNota['updated_at']) ? date('d/m/Y H:i', strtotime((string) $evNota['updated_at'])) : '-';
         $evNotaBimestre = isset($evNota['bimestre']) && $evNota['bimestre'] !== null ? (int) $evNota['bimestre'] : 0;
@@ -31,11 +33,11 @@ $boletinsGeradosNotasCards = is_array($boletins_gerados_notas ?? null) ? $boleti
             </div>
             <button type="button"
                     class="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 shrink-0"
-                    onclick="<?= htmlspecialchars("abrirModalConteudoVisualizar('content-bn-evento-{$bnIdx}', " . json_encode($evNotaNome, JSON_UNESCAPED_UNICODE) . ')', ENT_QUOTES, 'UTF-8') ?>">
+                    onclick="<?= htmlspecialchars("abrirModalConteudoVisualizar(" . json_encode($bnDomId, JSON_UNESCAPED_UNICODE) . ", " . json_encode($evNotaNome, JSON_UNESCAPED_UNICODE) . ')', ENT_QUOTES, 'UTF-8') ?>">
                 Abrir
             </button>
         </div>
-        <div id="content-bn-evento-<?= $bnIdx ?>" class="hidden">
+        <div id="<?= htmlspecialchars($bnDomId, ENT_QUOTES, 'UTF-8') ?>" class="hidden">
             <?php
             $boletinsGeradosBackup = $boletins_gerados ?? [];
             $boletins_gerados = [$evNota];
@@ -47,4 +49,9 @@ $boletinsGeradosNotasCards = is_array($boletins_gerados_notas ?? null) ? $boleti
 </div>
 <?php endif; ?>
 
-<?php require __DIR__ . '/modal_abrir_conteudo_visualizar.php'; ?>
+<?php
+if (empty($boletim_notas_cards_modal_incluido)) {
+    $boletim_notas_cards_modal_incluido = true;
+    require __DIR__ . '/modal_abrir_conteudo_visualizar.php';
+}
+?>

@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
 require_once __DIR__ . '/../../Core/BaseController.php';
 require_once __DIR__ . '/../../Core/AuthManager.php';
 require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
@@ -8,12 +9,24 @@ require_once __DIR__ . '/../../Models/Education/SchoolAbsence.php';
 require_once __DIR__ . '/../../Helpers/BoletimQuadroLayoutHelper.php';
 require_once __DIR__ . '/../../Services/BoletimAssistenteWizard.php';
 require_once __DIR__ . '/../../Services/ResultadoAcademicoService.php';
+require_once __DIR__ . '/../../Modulos/boletins/Services/BoletimCadastroService.php';
+require_once __DIR__ . '/../../Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+require_once __DIR__ . '/../../Modulos/fechamento/Services/FechamentoGates.php';
+
+use App\Modulos\Boletins\Services\BoletimCadastroService;
 
 class BoletimConfigController extends BaseController
 {
     private $auth;
     private $boletimConfig;
+    /** @var array<int, array<string, mixed>|null> */
+    private array $agrupamentoCadastroCache = [];
+    /** @var list<array<string,mixed>>|null */
     private $materiasDisponiveisCache = null;
+    /** @var \ComponenteCurricular|null */
+    private $componentesCurricularesCache = null;
+    /** @var array<string, list<int>> */
+    private array $materiasExpandidasCache = [];
     private ?ResultadoAcademicoService $resultadoAcademicoSvc = null;
     /** @var array<int, ?int> */
     private array $cursoPorTurmaCache = [];
@@ -44,8 +57,8 @@ class BoletimConfigController extends BaseController
     private array $seriesEscopoGeracao = [];
     /** @var array<string, list<int>> */
     private array $blocosFiltradosPorTurmaCache = [];
-    /** @var array{a: list<int>, b: list<int>}|null */
-    private ?array $semanasQuadroCache = null;
+    /** @var array<int, array{a: list<int>, b: list<int>}> */
+    private array $semanasQuadroCache = [];
     private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 200;
     private const INTERVALO_HEARTBEAT_SEGUNDOS = 2.0;
 
@@ -101,6 +114,21 @@ class BoletimConfigController extends BaseController
         $filtroBimestre = trim((string) ($_GET['bimestre'] ?? ''));
 
         $eventos = $this->boletimConfig->listAllRules(300);
+        $eventos = array_values(array_filter($eventos, static function ($ev) {
+            return strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim'))) === 'notas';
+        }));
+
+        $nomesBoletim = [];
+        try {
+            $cadastro = new BoletimCadastroService();
+            if ($cadastro->model()->tabelasProntas()) {
+                foreach ($cadastro->model()->listar() as $bol) {
+                    $nomesBoletim[(int) $bol['id']] = (string) $bol['nome'];
+                }
+            }
+        } catch (Throwable $e) {
+            $nomesBoletim = [];
+        }
 
         if ($filtroNome !== '') {
             $eventos = array_values(array_filter($eventos, static function ($ev) use ($filtroNome) {
@@ -135,6 +163,8 @@ class BoletimConfigController extends BaseController
                 return $seriesNomesPorId[(int) $sid] ?? null;
             }, $seriesIds));
             $ev['series_nomes'] = $nomes;
+            $bid = (int) ($ev['boletim_id'] ?? 0);
+            $ev['boletim_cadastro_nome'] = $bid > 0 ? ($nomesBoletim[$bid] ?? '') : '';
 
             $regraIdEv = (int) ($ev['id'] ?? 0);
             $ultimaGeracao = $ultimaGeracaoPorRegra[$regraIdEv] ?? null;
@@ -175,8 +205,8 @@ class BoletimConfigController extends BaseController
         $eventosPagina = array_slice($eventos, ($page - 1) * $perPage, $perPage);
 
         $data = [
-            'title' => 'Eventos de Notas - EducaTudo',
-            'page_title' => 'Eventos de Notas',
+            'title' => 'Avaliações - EducaTudo',
+            'page_title' => 'Avaliações',
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
@@ -250,14 +280,39 @@ class BoletimConfigController extends BaseController
         $somenteTabela = isset($_GET['somente_tabela']) && in_array(strtolower(trim((string) $_GET['somente_tabela'])), ['1', 'true', 'sim', 'yes'], true);
         $isNewMode = isset($_GET['novo']) && in_array(strtolower(trim((string) $_GET['novo'])), ['1', 'true', 'sim', 'yes'], true);
         $selectedRegraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
+        $boletimIdGet = isset($_GET['boletim_id']) ? (int) $_GET['boletim_id'] : 0;
         $regra = null;
         if (!$isNewMode) {
-            $regra = $selectedRegraId > 0
-                ? $this->boletimConfig->getRuleById($selectedRegraId)
-                : $this->boletimConfig->getActiveRule();
+            if ($selectedRegraId > 0) {
+                $regra = $this->boletimConfig->getRuleById($selectedRegraId);
+            } elseif ($boletimIdGet > 0) {
+                $eventosDoBoletim = $this->boletimConfig->listarEventosNotasDoBoletim($boletimIdGet);
+                $eventoId = $this->boletimConfig->primeiroEventoNotasSemGeracao($eventosDoBoletim);
+                if ($eventoId > 0) {
+                    $regra = $this->boletimConfig->getRuleById($eventoId);
+                }
+            } else {
+                $regra = $this->boletimConfig->getUltimaRegraNotas();
+            }
+            if ($regra && strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'boletim') {
+                $cadastro = new BoletimCadastroService();
+                $bol = $cadastro->model()->findByRegraId((int) ($regra['id'] ?? 0));
+                if ($bol) {
+                    $this->redirect('/admin/boletins/' . (int) $bol['id'] . '/editar');
+                    return;
+                }
+                $this->redirect('/admin/boletins');
+                return;
+            }
         }
 
         if (!$regra) {
+            $anoPadrao = (int) date('Y');
+            try {
+                $anoPadrao = (new BoletimAssistenteWizard())->ferramentas()->anoLetivoPadrao();
+            } catch (Throwable $e) {
+                // calendário atual se o catálogo da escola falhar
+            }
             $regra = [
                 'id' => null,
                 'nome' => 'Evento padrão da escola',
@@ -267,8 +322,10 @@ class BoletimConfigController extends BaseController
                 'materias_ids' => null,
                 'series_ids' => null,
                 'turmas_ids' => null,
-                'exibir_em' => 'boletim',
-                'ano_letivo' => (int) date('Y'),
+                'exibir_em' => 'notas',
+                'finalidade' => 'oficial',
+                'boletim_id' => $boletimIdGet > 0 ? $boletimIdGet : null,
+                'ano_letivo' => $anoPadrao,
                 'bimestre' => null,
                 'nota_minima_aprovacao' => 6.0,
                 'usar_resultado_aprovacao' => 1,
@@ -392,8 +449,8 @@ class BoletimConfigController extends BaseController
         }
 
         $data = [
-            'title' => 'Configuração de Boletim - EducaTudo',
-            'page_title' => 'Configuração de Boletim',
+            'title' => 'Evento de Notas - EducaTudo',
+            'page_title' => 'Evento de Notas',
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
@@ -426,6 +483,11 @@ class BoletimConfigController extends BaseController
             'versoes_aluno' => ($selectedAlunoId > 0 && (int) ($regra['id'] ?? 0) > 0)
                 ? $this->boletimConfig->listarVersoesAluno((int) $regra['id'], $selectedAlunoId, $periodoRef)
                 : [],
+            'grupos_regras_notas' => $this->listarGruposRegrasNotasCatalogo(),
+            'grupo_regras_notas_id' => $this->grupoRegrasNotasIdDaRegra($regra),
+            'destinos_quadro' => $this->destinosQuadroDaRegra($regra),
+            'agrupamentos_componentes' => $this->listarAgrupamentosComponentesCatalogo(),
+            'boletins_cadastro' => $this->listarBoletinsCadastro(),
         ];
 
         if ($somenteTabela) {
@@ -441,6 +503,9 @@ class BoletimConfigController extends BaseController
     {
         $user = $this->auth->getUser();
         $selectedRegraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
+        $boletimId = isset($_GET['boletim_id']) ? (int) $_GET['boletim_id'] : 0;
+        $voltarBoletins = $boletimId > 0
+            || strtolower(trim((string) ($_GET['voltar'] ?? ''))) === 'boletins';
         $estadoInicial = null;
         $catalogoInicial = null;
         $rascunhoInicial = null;
@@ -450,11 +515,15 @@ class BoletimConfigController extends BaseController
         $previewInicial = null;
         $avisoInicial = null;
 
-        if ($selectedRegraId > 0) {
-            try {
-                $wizard = new BoletimAssistenteWizard();
-                $estadoInicial = $wizard->estadoPadrao(null, $selectedRegraId);
-                $catalogoInicial = $wizard->catalogo();
+        try {
+            $wizard = new BoletimAssistenteWizard();
+            $formSeed = $boletimId > 0 ? ['boletim_id' => $boletimId] : null;
+            $estadoInicial = $wizard->estadoPadrao($formSeed, $selectedRegraId > 0 ? $selectedRegraId : null);
+            if ($selectedRegraId <= 0 && is_array($estadoInicial)) {
+                $selectedRegraId = (int) ($estadoInicial['regra_id'] ?? 0);
+            }
+            $catalogoInicial = $wizard->catalogo();
+            if ($selectedRegraId > 0) {
                 $montado = $wizard->enriquecerSaida($wizard->montar($estadoInicial));
                 $estadoInicial = $montado['estado'] ?? $estadoInicial;
                 $rascunhoInicial = $montado['rascunho'] ?? null;
@@ -465,19 +534,23 @@ class BoletimConfigController extends BaseController
                 if (!is_array($rascunhoInicial) || empty($rascunhoInicial['componentes'])) {
                     $avisoInicial = 'Não consegui carregar a configuração do evento #' . $selectedRegraId . '. Confira se ele existe e está ativo neste ambiente/escola.';
                 }
-            } catch (Throwable $e) {
-                error_log('BoletimConfigController assistente estado inicial: ' . $e->getMessage());
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimConfigController assistente estado inicial: ' . $e->getMessage());
+            if ($selectedRegraId > 0) {
                 $avisoInicial = 'Não consegui carregar a configuração do evento #' . $selectedRegraId . ' neste ambiente.';
             }
         }
 
         $data = [
-            'title' => 'Assistente do Boletim - EducaTudo',
-            'page_title' => 'Assistente do Boletim',
+            'title' => 'Evento de Notas - EducaTudo',
+            'page_title' => 'Evento de Notas',
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
             'selected_regra_id' => $selectedRegraId,
+            'boletim_id' => $boletimId,
+            'voltar_boletins' => $voltarBoletins,
             'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
             'boletim_assistente_estado_inicial' => $estadoInicial,
             'boletim_assistente_catalogo_inicial' => $catalogoInicial,
@@ -955,11 +1028,13 @@ class BoletimConfigController extends BaseController
         }
 
         $auditoria = $this->auditarConsistenciaRegra($regra);
+        $gates = $this->diagnosticarGatesFechamentoRegra($regra);
         $alunos = $this->resolveAlunosVinculadosRegra($regra);
         $cobertura = $this->calcularCoberturaRegra($regra, $alunos, $periodoRef, $dataInicio, $dataFim);
 
         echo json_encode([
             'total_alunos_escopo' => count($alunos),
+            'gates' => $gates,
             'materias_orfas' => $auditoria['materias_orfas'],
             'eventos_incompativeis' => $auditoria['eventos_incompativeis'],
             'cobertura' => $cobertura,
@@ -1180,7 +1255,35 @@ class BoletimConfigController extends BaseController
         $materiasIds = $this->parseMateriasIdsFromPost($_POST['materias_ids'] ?? []);
         $seriesIds = $this->parseSeriesIdsFromPost($_POST['series_ids'] ?? []);
         $turmasIds = $this->parseSeriesIdsFromPost($_POST['turmas_ids'] ?? []);
-        $exibirEm = strtolower(trim((string) ($_POST['exibir_em'] ?? 'boletim')));
+        $exibirEm = 'notas';
+        $boletimIdPost = (int) ($_POST['boletim_id'] ?? 0);
+        $finalidade = $this->boletimConfig->normalizeFinalidade($_POST['finalidade'] ?? 'oficial');
+        $cadastroBoletim = null;
+        $criteriosBol = null;
+        if ($boletimIdPost > 0) {
+            try {
+                $cadastroBoletim = (new BoletimCadastroService())->model()->findById($boletimIdPost);
+            } catch (Throwable $e) {
+                $cadastroBoletim = null;
+            }
+            if (!is_array($cadastroBoletim)) {
+                $_SESSION['boletim_flash'] = 'Modelo de boletim inválido. Cadastre ou selecione um modelo em Acadêmico → Modelo de Boletim.';
+                $_SESSION['boletim_flash_type'] = 'error';
+                $this->redirectFalhaConfiguracao($regraId);
+            }
+        }
+        if (is_array($cadastroBoletim)) {
+            $finalidade = $this->boletimConfig->normalizeFinalidade($cadastroBoletim['finalidade'] ?? 'oficial');
+            $materiasIds = array_map('intval', (array) ($cadastroBoletim['materias_ids'] ?? []));
+            $materiasIds = $this->expandirMateriasComFilhos($materiasIds);
+            $seriesIds = array_map('intval', (array) ($cadastroBoletim['series_ids'] ?? []));
+            $turmasIds = array_map('intval', (array) ($cadastroBoletim['turmas_ids'] ?? []));
+            try {
+                $criteriosBol = (new BoletimCadastroService())->criteriosDoBoletim($cadastroBoletim);
+            } catch (Throwable $e) {
+                $criteriosBol = null;
+            }
+        }
         $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
         $bimestre = (int) ($_POST['bimestre'] ?? 0);
         $visAluno = !empty($_POST['vis_aluno']) ? 1 : 0;
@@ -1191,6 +1294,11 @@ class BoletimConfigController extends BaseController
         $usarResultadoAprovacao = !empty($_POST['usar_resultado_aprovacao']) ? 1 : 0;
         $roundMode = $this->normalizeRoundMode((string) ($_POST['round_mode'] ?? 'none'));
         $decimalPlaces = ((int) ($_POST['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        if (is_array($criteriosBol)) {
+            $notaMinimaAprovacao = (float) ($criteriosBol['nota_minima_aprovacao'] ?? 6);
+            $roundMode = $this->normalizeRoundMode((string) ($criteriosBol['round_mode'] ?? $roundMode));
+            $decimalPlaces = ((int) ($criteriosBol['decimal_places'] ?? $decimalPlaces) === 1) ? 1 : 2;
+        }
         $defaultDataInicio = $this->normalizarDataYmdOpcional((string) ($_POST['default_data_inicio'] ?? ''));
         $defaultDataFim = $this->normalizarDataYmdOpcional((string) ($_POST['default_data_fim'] ?? ''));
         if ($defaultDataInicio !== null && $defaultDataFim !== null && $defaultDataInicio > $defaultDataFim) {
@@ -1212,8 +1320,13 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirectFalhaConfiguracao($regraId);
         }
-        if ($exibirEm === 'notas' && !in_array($bimestre, [1, 2, 3, 4], true)) {
-            $_SESSION['boletim_flash'] = 'Selecione um bimestre válido para exibição em Notas.';
+        if ($exibirEm === 'notas' && !PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+            $_SESSION['boletim_flash'] = PeriodoLetivo::mensagemNumeroInvalido($anoLetivo);
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirectFalhaConfiguracao($regraId);
+        }
+        if ($boletimIdPost <= 0) {
+            $_SESSION['boletim_flash'] = FechamentoGates::mensagemAvaliacaoSemModelo();
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirectFalhaConfiguracao($regraId);
         }
@@ -1303,6 +1416,35 @@ class BoletimConfigController extends BaseController
 
         unset($decodedExtras['jornada_media_condicional']);
 
+        $grupoRegrasId = (int) ($_POST['grupo_regras_notas_id'] ?? 0);
+        if ($grupoRegrasId <= 0) {
+            $_SESSION['boletim_flash'] = FechamentoGates::mensagemAvaliacaoSemQuadro();
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirectFalhaConfiguracao($regraId);
+        }
+        try {
+            $payloadQuadro = (new GrupoRegrasNotasService())->payloadPublico($grupoRegrasId);
+        } catch (Throwable $e) {
+            $payloadQuadro = null;
+        }
+        if (!is_array($payloadQuadro) || empty($payloadQuadro['ativo'])) {
+            $_SESSION['boletim_flash'] = 'Quadro de Notas inválido ou inativo. Revise o cadastro em Acadêmico → Quadro de Notas.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirectFalhaConfiguracao($regraId);
+        }
+        if ($grupoRegrasId > 0) {
+            $decodedExtras['grupo_regras_notas_id'] = $grupoRegrasId;
+            $decodedExtras['quadro_notas_id'] = $grupoRegrasId;
+            $destinos = $this->normalizarDestinosQuadroPost($_POST['destinos_json'] ?? $decodedExtras['destinos'] ?? []);
+            if ($destinos !== []) {
+                $decodedExtras['destinos'] = $destinos;
+            } else {
+                unset($decodedExtras['destinos']);
+            }
+        } else {
+            unset($decodedExtras['grupo_regras_notas_id'], $decodedExtras['quadro_notas_id'], $decodedExtras['destinos']);
+        }
+
         if ($decodedExtras !== []) {
             $extrasJsonNormalized = json_encode($decodedExtras, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
@@ -1331,11 +1473,22 @@ class BoletimConfigController extends BaseController
                 $defaultDataFim,
                 $notaMinimaAprovacao,
                 $usarResultadoAprovacao,
-                $extrasJsonNormalized
+                $extrasJsonNormalized,
+                $finalidade
             );
+            if ($savedId > 0) {
+                $this->boletimConfig->setBoletimId((int) $savedId, $boletimIdPost > 0 ? $boletimIdPost : null);
+                if ($boletimIdPost > 0) {
+                    try {
+                        (new BoletimCadastroService())->sincronizarDocumento($boletimIdPost);
+                    } catch (Throwable $e) {
+                        error_log('salvarRegra sincronizarDocumento: ' . $e->getMessage());
+                    }
+                }
+            }
             $_SESSION['boletim_flash'] = !empty($_POST['origem_assistente'])
                 ? 'Evento salvo pelo assistente. Revise os blocos e clique em Gerar boletins para gravar as notas.'
-                : 'Evento de boletim salvo com sucesso.';
+                : 'Evento de notas salvo com sucesso.';
             $_SESSION['boletim_flash_type'] = 'success';
             if ($savedId > 0) {
                 $regraId = $savedId;
@@ -1472,6 +1625,18 @@ class BoletimConfigController extends BaseController
             exit;
         }
 
+        $regraNotas = $this->boletimConfig->getRuleById($regraId);
+        if (is_array($regraNotas)) {
+            $alunoRow = Database::getInstance()->fetch('SELECT turma_id FROM alunos WHERE id = :id LIMIT 1', ['id' => $alunoId]);
+            $tid = (int) ($alunoRow['turma_id'] ?? 0);
+            $bloqueioNotas = $this->bloquearGeracaoSePeriodoHomologado($regraNotas, $tid > 0 ? [['turma_id' => $tid]] : []);
+            if ($bloqueioNotas !== null) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => $bloqueioNotas], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
         if ($limpar) {
             $resultado = $this->boletimConfig->removerNotaManual($componenteId, $alunoId, $periodoRef, $materiaId);
         } elseif ($vazio) {
@@ -1571,6 +1736,17 @@ class BoletimConfigController extends BaseController
 
         $regraId = (int) ($_POST['regra_id'] ?? 0);
         $alunoId = (int) ($_POST['aluno_id'] ?? 0);
+        $regraNotas = $regraId > 0 ? $this->boletimConfig->getRuleById($regraId) : null;
+        if (is_array($regraNotas)) {
+            $alunoRow = Database::getInstance()->fetch('SELECT turma_id FROM alunos WHERE id = :id LIMIT 1', ['id' => $alunoId]);
+            $tid = (int) ($alunoRow['turma_id'] ?? 0);
+            $bloqueioNotas = $this->bloquearGeracaoSePeriodoHomologado($regraNotas, $tid > 0 ? [['turma_id' => $tid]] : []);
+            if ($bloqueioNotas !== null) {
+                $_SESSION['boletim_flash'] = $bloqueioNotas;
+                $_SESSION['boletim_flash_type'] = 'error';
+                $this->redirect('/admin/boletim-configuracao?regra_id=' . $regraId);
+            }
+        }
         $periodoRef = trim((string) ($_POST['periodo_ref'] ?? ''));
         $dataInicio = $this->normalizarDataYmdOpcional((string) ($_POST['data_inicio'] ?? ''));
         $dataFim = $this->normalizarDataYmdOpcional((string) ($_POST['data_fim'] ?? ''));
@@ -1693,20 +1869,26 @@ class BoletimConfigController extends BaseController
         if (!$regra) {
             $_SESSION['boletim_flash'] = 'Nenhum evento válido encontrado para gerar o boletim.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim-configuracao');
         }
         $regraId = (int) ($regra['id'] ?? 0);
         if ($regraId <= 0) {
             $_SESSION['boletim_flash'] = 'Evento sem ID válido.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao');
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim-configuracao');
+        }
+        $gates = $this->diagnosticarGatesFechamentoRegra($regra);
+        if (!empty($gates['bloqueios'])) {
+            $_SESSION['boletim_flash'] = implode(' ', $gates['bloqueios']);
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? ('/admin/boletim-configuracao?regra_id=' . $regraId));
         }
 
         $alunos = $this->resolveAlunosVinculadosRegra($regra);
         if ($alunos === []) {
             $_SESSION['boletim_flash'] = 'Nenhum aluno ativo encontrado para as séries vinculadas.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao?regra_id=' . $regraId);
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? ('/admin/boletim-configuracao?regra_id=' . $regraId));
         }
 
         if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar')) {
@@ -1724,7 +1906,7 @@ class BoletimConfigController extends BaseController
         );
         $_SESSION['boletim_flash'] = $resultado['mensagem'];
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
-        $this->redirect('/admin/boletim');
+        $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
     }
 
     /**
@@ -1909,7 +2091,7 @@ class BoletimConfigController extends BaseController
                 $qs['data_inicio'] = $dataInicio;
                 $qs['data_fim'] = $dataFim;
             }
-            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? ('/admin/boletim-configuracao?' . http_build_query($qs)));
         }
 
         $alunos = $publicarAPartirDePrevia
@@ -1926,7 +2108,7 @@ class BoletimConfigController extends BaseController
                 $qs['data_inicio'] = $dataInicio;
                 $qs['data_fim'] = $dataFim;
             }
-            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? ('/admin/boletim-configuracao?' . http_build_query($qs)));
         }
 
         if ($this->enfileirarGeracaoBoletim(
@@ -1950,7 +2132,7 @@ class BoletimConfigController extends BaseController
         );
         $_SESSION['boletim_flash'] = $resultado['mensagem'];
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
-        $this->redirect('/admin/boletim');
+        $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
     }
 
     /**
@@ -2022,7 +2204,7 @@ class BoletimConfigController extends BaseController
         if ($this->boletimConfig->temGeracaoEmAndamento($regraId)) {
             $_SESSION['boletim_flash'] = 'Já existe uma geração em andamento para este evento. Aguarde terminar para gerar de novo.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim');
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
         }
 
         $db = Database::getInstance();
@@ -2051,8 +2233,26 @@ class BoletimConfigController extends BaseController
 
         $_SESSION['boletim_flash'] = 'Geração iniciada em segundo plano. Acompanhe o status na listagem — a página atualiza sozinha quando terminar.';
         $_SESSION['boletim_flash_type'] = 'info';
-        $this->redirect('/admin/boletim');
+        $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
         return true;
+    }
+
+    /**
+     * Volta à tela do modelo quando a geração partiu de /admin/boletins/{id}/gerar-boletins.
+     */
+    private function urlRetornoGeracaoModelo(): ?string
+    {
+        $retorno = trim((string) ($_POST['retorno'] ?? ''));
+        if ($retorno === '' || $retorno[0] !== '/') {
+            return null;
+        }
+        if (str_contains($retorno, '//') || str_contains($retorno, '..') || str_contains($retorno, "\n") || str_contains($retorno, "\r")) {
+            return null;
+        }
+        if (!preg_match('#^/admin/boletins/[0-9]+/gerar-boletins(?:\?regra_id=[0-9]+)?$#', $retorno)) {
+            return null;
+        }
+        return $retorno;
     }
 
     private function renovarHeartbeatGeracao(): void
@@ -2216,6 +2416,8 @@ class BoletimConfigController extends BaseController
             $msg .= ' ⚠️ ' . count($alunosComMudancaSignificativa) . ' aluno(s) com nota final mudando 2+ pontos: ' . implode(', ', $exemplosMudanca) . '.';
         }
 
+        $this->atualizarBoletimDestinoAposNotas($regra, $periodoRef, $dataInicio, $dataFim);
+
         return [
             'gerados' => $gerados,
             'linhas' => $linhas,
@@ -2250,6 +2452,17 @@ class BoletimConfigController extends BaseController
         $preservados = 0;
         $idsTravados = [];
         if (!$preview) {
+            $bloqueio = $this->bloquearGeracaoSePeriodoHomologado($regra, $alunos);
+            if ($bloqueio !== null) {
+                return [
+                    'gerados' => 0,
+                    'linhas' => 0,
+                    'erros' => 1,
+                    'errosAmostra' => [$bloqueio],
+                    'preservados' => 0,
+                    'mensagem' => $bloqueio,
+                ];
+            }
             $idsTravados = array_fill_keys($this->boletimConfig->idsAlunosTravados($regraId, $periodoRef), true);
         }
         $usuarioVidaRaw = $this->usuarioGeracaoJob ?? $this->auth->getUser();
@@ -2589,46 +2802,26 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
-            $semanaComp = $this->parseSemanaFromComponente($componente);
-            $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
             $bimestresComp = $this->parseProvaBimestresFromComponente($componente);
             if ($blocoIds !== [] && $bimestresComp !== []) {
                 $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
             }
-            $semanaForcada = $semanaComp >= 1 && $semanaComp <= 8;
-            if ($semanaForcada) {
-                if ($blocoIds !== []) {
-                    $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
-                    if ($filtradosSemana !== []) {
-                        $blocoIds = $filtradosSemana;
-                    } elseif ($tipoAvaliacaoComp > 0) {
-                        $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                            $tipoAvaliacaoComp,
-                            $semanaComp,
-                            $range['inicio'] ?? null,
-                            $range['fim'] ?? null,
-                            $bimestresComp
-                        );
-                    } else {
-                        $blocoIds = [];
-                    }
-                } elseif ($tipoAvaliacaoComp > 0) {
-                    $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                        $tipoAvaliacaoComp,
-                        $semanaComp,
-                        $range['inicio'] ?? null,
-                        $range['fim'] ?? null,
-                        $bimestresComp
-                    );
-                }
-            }
+            $resolvidoQuadro = $this->resolverBlocosQuadroDoComponente(
+                $componente,
+                $blocoIds,
+                $range['inicio'] ?? null,
+                $range['fim'] ?? null,
+                $bimestresComp
+            );
+            $blocoIds = $resolvidoQuadro['bloco_ids'];
+            $quadroForcado = !empty($resolvidoQuadro['forcada']);
             $filtroTitulo = trim((string) ($componente['filtro_titulo'] ?? ''));
             $filtroTitulo = $filtroTitulo !== '' ? $filtroTitulo : null;
             $materiasFiltro = $this->parseMateriasIdsFromComponente($componente);
             $materiaFiltroConsulta = $materiasFiltro !== []
                 ? null
                 : ((int) ($componente['materia_id'] ?? 0) > 0 ? (int) $componente['materia_id'] : null);
-            if ($blocoIds === [] && $semanaForcada) {
+            if ($blocoIds === [] && $quadroForcado) {
                 continue;
             }
             $tinhaBlocos = $blocoIds !== [];
@@ -2772,12 +2965,14 @@ class BoletimConfigController extends BaseController
         string $periodoRef,
         ?string $rangeInicioOverride = null,
         ?string $rangeFimOverride = null,
-        array $visitedRuleCodes = []
+        array $visitedRuleCodes = [],
+        bool $forcarAgrupamentoLinhas = false
     ): array
     {
         $regraIdCache = (int) ($regra['id'] ?? 0);
         $chaveSimulacao = $regraIdCache . ':' . $alunoId . ':' . $periodoRef . ':'
-            . (string) ($rangeInicioOverride ?? '') . ':' . (string) ($rangeFimOverride ?? '');
+            . (string) ($rangeInicioOverride ?? '') . ':' . (string) ($rangeFimOverride ?? '')
+            . ':' . ($forcarAgrupamentoLinhas ? 'agrupar' : 'auto');
         if ($regraIdCache > 0 && isset($this->simulacaoAlunoCache[$chaveSimulacao])) {
             return $this->simulacaoAlunoCache[$chaveSimulacao];
         }
@@ -2990,6 +3185,14 @@ class BoletimConfigController extends BaseController
                         $refRegra = $this->boletimConfig->getRuleByCode($codEvento);
                         if (!$refRegra) {
                             $detalhes['erro'] = 'Evento não encontrado pelo código: ' . $codEvento;
+                        } elseif ($this->boletimConfig->normalizeFinalidade((string) ($refRegra['finalidade'] ?? 'oficial'))
+                            !== $this->boletimConfig->normalizeFinalidade((string) ($regra['finalidade'] ?? 'oficial'))
+                        ) {
+                            $tipoEsperado = $this->boletimConfig->normalizeFinalidade((string) ($regra['finalidade'] ?? 'oficial')) === 'complementar'
+                                ? 'Notas extra (curso complementar)'
+                                : 'Notas da série';
+                            $detalhes['erro'] = 'O evento “' . trim((string) ($refRegra['nome'] ?? $codEvento))
+                                . '” não é ' . $tipoEsperado . '. O boletim extra só puxa Notas extra, e o oficial só puxa Notas da série.';
                         } elseif (!$this->regraNoEscopoGeracao($refRegra)) {
                             $detalhes['aviso_escopo'] = 'Evento de origem fora das turmas/séries desta geração.';
                         } else {
@@ -3004,7 +3207,8 @@ class BoletimConfigController extends BaseController
                                 $periodoRef,
                                 null,
                                 null,
-                                $stack
+                                $stack,
+                                true
                             );
                             $matrizRef = $resRef['matriz_materias'] ?? null;
                             $linhasRef = is_array($matrizRef) ? ($matrizRef['linhas'] ?? []) : [];
@@ -3283,45 +3487,40 @@ class BoletimConfigController extends BaseController
                     }
                 }
             } else {
+                $usouNotaFinalTipo = $this->preencherComponenteComNotaFinalTipo(
+                    $componente,
+                    $alunoId,
+                    $regra,
+                    $periodoRef,
+                    $codigo,
+                    $roundMode,
+                    $valor,
+                    $detalhes,
+                    $matrizPorCodigo,
+                    $materiaNomesPorId
+                );
+                if ($usouNotaFinalTipo) {
+                    // nota_final do tipo — boletim não varre eventos
+                } else {
                 $materiaFiltro = (int) ($componente['materia_id'] ?? 0);
                 $materiasFiltro = $this->parseMateriasIdsFromComponente($componente);
                 $materiaFiltroConsulta = $materiasFiltro !== []
                     ? null
                     : ($materiaFiltro > 0 ? $materiaFiltro : null);
                 $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
-                $semanaComp = $this->parseSemanaFromComponente($componente);
-                $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
                 $bimestresComp = $this->parseProvaBimestresFromComponente($componente);
                 if ($blocoIds !== [] && $bimestresComp !== []) {
                     $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
                 }
-                $semanaForcada = $semanaComp >= 1 && $semanaComp <= 8;
-                if ($semanaForcada) {
-                    if ($blocoIds !== []) {
-                        $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
-                        if ($filtradosSemana !== []) {
-                            $blocoIds = $filtradosSemana;
-                        } elseif ($tipoAvaliacaoComp > 0) {
-                            $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                                $tipoAvaliacaoComp,
-                                $semanaComp,
-                                $range['inicio'] ?? null,
-                                $range['fim'] ?? null,
-                                $bimestresComp
-                            );
-                        } else {
-                            $blocoIds = [];
-                        }
-                    } elseif ($tipoAvaliacaoComp > 0) {
-                        $blocoIds = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                            $tipoAvaliacaoComp,
-                            $semanaComp,
-                            $range['inicio'] ?? null,
-                            $range['fim'] ?? null,
-                            $bimestresComp
-                        );
-                    }
-                }
+                $resolvidoQuadro = $this->resolverBlocosQuadroDoComponente(
+                    $componente,
+                    $blocoIds,
+                    $range['inicio'] ?? null,
+                    $range['fim'] ?? null,
+                    $bimestresComp
+                );
+                $blocoIds = $resolvidoQuadro['bloco_ids'];
+                $quadroForcado = !empty($resolvidoQuadro['forcada']);
                 $filtroTitulo = trim((string) ($componente['filtro_titulo'] ?? ''));
                 $filtroTitulo = $filtroTitulo !== '' ? $filtroTitulo : null;
                 $tinhaBlocos = $blocoIds !== [];
@@ -3337,9 +3536,9 @@ class BoletimConfigController extends BaseController
                         $materiaFiltroConsulta
                     );
                     $detalhes['blocos_ids'] = $blocoIds;
-                } elseif ($semanaForcada) {
+                } elseif ($quadroForcado) {
                     $rows = [];
-                    $detalhes['aviso_semana'] = 'Nenhum evento de prova com a semana S' . $semanaComp . '.';
+                    $detalhes['aviso_semana'] = 'Nenhum evento de prova correspondente a esta coluna do quadro.';
                 } elseif ($tinhaBlocos) {
                     $rows = [];
                 } else {
@@ -3437,6 +3636,7 @@ class BoletimConfigController extends BaseController
                     $valor = $this->applyRoundMode($this->agruparNotas($notas, (string) ($componente['calc_type'] ?? 'media')), $roundModeComp);
                 }
                 $detalhes['qtd_provas'] = count($rows);
+                }
             }
 
             if ($overridesPorMateria !== []) {
@@ -3524,7 +3724,7 @@ class BoletimConfigController extends BaseController
                 $allMidsPreCalc[(int) $midPre] = true;
             }
         }
-        foreach ($this->parseMateriasIdsFromRegra($regra) as $midSelPre) {
+        foreach ($this->expandirMateriasComFilhos($this->parseMateriasIdsFromRegra($regra)) as $midSelPre) {
             $midSelPre = (int) $midSelPre;
             if ($midSelPre > 0) {
                 $allMidsPreCalc[$midSelPre] = true;
@@ -3744,7 +3944,8 @@ class BoletimConfigController extends BaseController
                 'periodo_tipo' => 'bimestre',
                 'data_inicio' => substr((string) ($range['inicio'] ?? ''), 0, 10),
                 'data_fim' => substr((string) ($range['fim'] ?? ''), 0, 10),
-            ]
+            ],
+            $forcarAgrupamentoLinhas
         );
 
         $resultado = [
@@ -3872,6 +4073,7 @@ class BoletimConfigController extends BaseController
         $ids = array_values(array_unique(array_filter(array_map('intval', $materiasSelecionadas), static function (int $id): bool {
             return $id > 0;
         })));
+        $ids = $this->expandirMateriasComFilhos($ids);
         if ($ids === []) {
             return $rows;
         }
@@ -4005,6 +4207,7 @@ class BoletimConfigController extends BaseController
         $ids = array_values(array_unique(array_filter(array_map('intval', $materiasSelecionadas), static function (int $id): bool {
             return $id > 0;
         })));
+        $ids = $this->expandirMateriasComFilhos($ids);
         if ($ids === [] || $rows === []) {
             return $rows;
         }
@@ -4074,10 +4277,18 @@ class BoletimConfigController extends BaseController
         array $materiaNomesPorId,
         array $matrizPercentStatsPorCodigo = [],
         array $materiasAgrupadasHerdadas = [],
-        array $contextoAluno = []
+        array $contextoAluno = [],
+        bool $forcarAgrupamentoLinhas = false
     ): ?array {
         $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
-        $grp = $this->aplicarAgrupamentoLinhasPorComponente($componentesRegra, $matrizPorCodigo, $materiaNomesPorId, $matrizPercentStatsPorCodigo);
+        $grp = $this->aplicarAgrupamentoLinhasPorComponente(
+            $componentesRegra,
+            $matrizPorCodigo,
+            $materiaNomesPorId,
+            $matrizPercentStatsPorCodigo,
+            (string) ($regra['exibir_em'] ?? 'boletim'),
+            $forcarAgrupamentoLinhas
+        );
         $matrizPorCodigo = $grp['matriz_por_codigo'];
         $materiaNomesPorId = $grp['materia_nomes_por_id'];
         $materiasAgrupadas = $grp['materias_agrupadas'];
@@ -4097,6 +4308,9 @@ class BoletimConfigController extends BaseController
             $componentesRegra
         );
         $gruposVirtualMids = is_array($grp['grupos_virtual_mids'] ?? null) ? $grp['grupos_virtual_mids'] : [];
+        $agrupamentoPorVirtualMid = is_array($grp['agrupamento_por_virtual_mid'] ?? null)
+            ? $grp['agrupamento_por_virtual_mid']
+            : [];
 
         $colunas = [];
         foreach ($componentesRegra as $c) {
@@ -4190,6 +4404,20 @@ class BoletimConfigController extends BaseController
                 $midCat = (int) ($mCat['id'] ?? 0);
                 if ($midCat > 0) {
                     $nomesCatalogoById[$midCat] = trim((string) ($mCat['nome'] ?? ('Matéria #' . $midCat)));
+                }
+            }
+            $pathComp = dirname(__DIR__, 2) . '/Models/Education/ComponenteCurricular.php';
+            if (is_file($pathComp)) {
+                require_once $pathComp;
+                try {
+                    foreach ((new \ComponenteCurricular())->getOficiaisParaMatriz(true) as $of) {
+                        $oid = (int) ($of['id'] ?? 0);
+                        if ($oid > 0 && !isset($nomesCatalogoById[$oid])) {
+                            $nomesCatalogoById[$oid] = trim((string) ($of['nome'] ?? ('Matéria #' . $oid)));
+                        }
+                    }
+                } catch (Throwable $e) {
+                    // catálogo operacional já preenchido
                 }
             }
             $nomesGruposVirtuais = [];
@@ -4367,6 +4595,9 @@ class BoletimConfigController extends BaseController
                 }
                 $resultadoTxt = '-';
                 if ($usarResultadoAprovacao && $mediaRef !== null) {
+                    $agrupamentoLinha = ((int) $mid < 0)
+                        ? (int) ($agrupamentoPorVirtualMid[(int) $mid] ?? 0)
+                        : 0;
                     $resultadoTxt = $this->rotuloResultadoAcademico(
                         $regra,
                         $contextoAluno,
@@ -4374,7 +4605,8 @@ class BoletimConfigController extends BaseController
                         $notasLinha,
                         $colunas,
                         $mediaRef,
-                        $notaMinimaAprovacao
+                        $notaMinimaAprovacao,
+                        $agrupamentoLinha > 0 ? $agrupamentoLinha : null
                     );
                 }
                 foreach ($resultadoCodigos as $codRes) {
@@ -4417,10 +4649,18 @@ class BoletimConfigController extends BaseController
      *   matriz_por_codigo: array<string, array<int, float>>,
      *   materia_nomes_por_id: array<int, string>,
      *   materias_agrupadas: array<int, bool>,
-     *   grupos_virtual_mids: array<int, bool>
+     *   grupos_virtual_mids: array<int, bool>,
+     *   agrupamento_por_virtual_mid: array<int, int>
      * }
      */
-    private function aplicarAgrupamentoLinhasPorComponente(array $componentesRegra, array $matrizPorCodigo, array $materiaNomesPorId, array $matrizPercentStatsPorCodigo = []): array
+    private function aplicarAgrupamentoLinhasPorComponente(
+        array $componentesRegra,
+        array $matrizPorCodigo,
+        array $materiaNomesPorId,
+        array $matrizPercentStatsPorCodigo = [],
+        string $exibirEm = 'boletim',
+        bool $forcarAgrupamento = false
+    ): array
     {
         $groupMetaByKey = [];
         $groupMidByKey = [];
@@ -4448,6 +4688,14 @@ class BoletimConfigController extends BaseController
             if ($grp === null) {
                 continue;
             }
+            $exibirEmNorm = strtolower(trim($exibirEm)) === 'notas' ? 'notas' : 'boletim';
+            if (
+                !$forcarAgrupamento
+                && $exibirEmNorm === 'notas'
+                && (($grp['aplicar_em'] ?? 'ambos') === 'boletim')
+            ) {
+                continue;
+            }
             $gk = $grp['key'];
             if (!isset($groupMidByKey[$gk])) {
                 $groupMidByKey[$gk] = $nextVirtualMid;
@@ -4457,6 +4705,7 @@ class BoletimConfigController extends BaseController
                     'materias_ids' => $grp['materias_ids'],
                     'mode' => $grp['mode'],
                     'divisor' => $grp['divisor'],
+                    'agrupamento_id' => (int) ($grp['agrupamento_id'] ?? 0),
                 ];
             }
             // Mantém o grupo ativo sempre que foi configurado, mesmo com notas faltantes.
@@ -4504,6 +4753,7 @@ class BoletimConfigController extends BaseController
                 'materia_nomes_por_id' => $materiaNomesPorId,
                 'materias_agrupadas' => [],
                 'grupos_virtual_mids' => [],
+                'agrupamento_por_virtual_mid' => [],
             ];
         }
 
@@ -4769,6 +5019,7 @@ class BoletimConfigController extends BaseController
         }
 
         $gruposVirtualMids = [];
+        $agrupamentoPorVirtualMid = [];
         foreach ($groupMetaByKey as $gk => $meta) {
             if (empty($groupKeysAtivos[(string) $gk])) {
                 continue;
@@ -4776,6 +5027,10 @@ class BoletimConfigController extends BaseController
             $vmid = (int) ($groupMidByKey[$gk] ?? 0);
             if ($vmid < 0) {
                 $gruposVirtualMids[$vmid] = true;
+                $aid = (int) ($meta['agrupamento_id'] ?? 0);
+                if ($aid > 0) {
+                    $agrupamentoPorVirtualMid[$vmid] = $aid;
+                }
             }
         }
 
@@ -4786,6 +5041,7 @@ class BoletimConfigController extends BaseController
             // daquele grupo e mantém apenas a linha consolidada.
             'materias_agrupadas' => $materiasAgrupadasAtivas,
             'grupos_virtual_mids' => $gruposVirtualMids,
+            'agrupamento_por_virtual_mid' => $agrupamentoPorVirtualMid,
         ];
     }
 
@@ -5380,11 +5636,15 @@ class BoletimConfigController extends BaseController
         array $notasLinha,
         array $colunas,
         float $mediaRef,
-        float $notaMinimaFallback
+        float $notaMinimaFallback,
+        ?int $agrupamentoId = null
     ): string {
         $motor = $this->resultadoAcademico();
         $contexto = $contextoAluno;
         $contexto['materia_id'] = $materiaId > 0 ? $materiaId : null;
+        if ($agrupamentoId !== null && $agrupamentoId > 0) {
+            $contexto['agrupamento_id'] = $agrupamentoId;
+        }
         $regraAcad = $motor->resolverRegra($contexto);
         if ($regraAcad === null) {
             $regraAcad = $motor->regraFallbackDoBoletim($regra + ['nota_minima_aprovacao' => $notaMinimaFallback]);
@@ -6682,7 +6942,7 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * @return array{key:string,label:string,mode:string,divisor:float,materias_ids:list<int>,usar_percentual:bool,source_type:string}|null
+     * @return array{key:string,label:string,mode:string,divisor:float,materias_ids:list<int>,aplicar_em:string,usar_percentual:bool,source_type:string,agrupamento_id:int}|null
      */
     private function parseGroupLineConfigFromComponente(array $componente): ?array
     {
@@ -6707,14 +6967,14 @@ class BoletimConfigController extends BaseController
         if (!$enabled) {
             return null;
         }
-        $key = $this->slug((string) ($grp['key'] ?? ''));
-        if ($key === '') {
+        $agrupamentoId = (int) ($grp['agrupamento_id'] ?? 0);
+        $cadastro = $agrupamentoId > 0 ? $this->carregarAgrupamentoCadastro($agrupamentoId) : null;
+        if ($agrupamentoId > 0 && $cadastro === null) {
             return null;
         }
+
+        $key = $this->slug((string) ($grp['key'] ?? ''));
         $label = trim((string) ($grp['label'] ?? ''));
-        if ($label === '') {
-            $label = $key;
-        }
         $mode = strtolower(trim((string) ($grp['mode'] ?? 'media')));
         if (!in_array($mode, ['media', 'soma'], true)) {
             $mode = 'media';
@@ -6727,12 +6987,36 @@ class BoletimConfigController extends BaseController
             }
         }
         $ids = array_values(array_unique($ids));
-        if ($ids === []) {
-            return null;
-        }
         $divisor = (float) ($grp['divisor'] ?? 0);
         if ($divisor < 0) {
             $divisor = 0;
+        }
+        $aplicarEm = $this->normalizarGroupLineAplicarEm($grp['aplicar_em'] ?? 'ambos');
+        if (is_array($cadastro) && count((array) ($cadastro['materias_ids'] ?? [])) >= 2) {
+            $labelCad = trim((string) ($cadastro['nome'] ?? ''));
+            if ($labelCad !== '') {
+                $label = $labelCad;
+            }
+            $modeCad = strtolower(trim((string) ($cadastro['modo'] ?? 'media')));
+            $mode = $modeCad === 'soma' ? 'soma' : 'media';
+            $ids = array_values(array_map('intval', (array) $cadastro['materias_ids']));
+            $divCad = $cadastro['divisor'] ?? null;
+            $divisor = ($divCad !== null && $divCad !== '' && (float) $divCad > 0)
+                ? (float) $divCad
+                : 0.0;
+            $aplicarEm = $this->normalizarGroupLineAplicarEm($cadastro['aplicar_em'] ?? $aplicarEm);
+            if ($key === '' && $labelCad !== '') {
+                $key = $this->slug($labelCad);
+            }
+        }
+        if ($key === '') {
+            return null;
+        }
+        if ($label === '') {
+            $label = $key;
+        }
+        if ($ids === []) {
+            return null;
         }
 
         return [
@@ -6741,9 +7025,19 @@ class BoletimConfigController extends BaseController
             'mode' => $mode,
             'divisor' => $divisor,
             'materias_ids' => $ids,
+            'aplicar_em' => $aplicarEm,
             'usar_percentual' => !empty($componente['usar_percentual']),
             'source_type' => strtolower(trim((string) ($componente['source_type'] ?? 'provas_sistema'))),
+            'agrupamento_id' => $agrupamentoId > 0 ? $agrupamentoId : 0,
         ];
+    }
+
+    /**
+     * @param mixed $raw
+     */
+    private function normalizarGroupLineAplicarEm($raw): string
+    {
+        return strtolower(trim((string) $raw)) === 'boletim' ? 'boletim' : 'ambos';
     }
 
     private function normalizarDataYmdOpcional(string $s): ?string
@@ -7103,9 +7397,8 @@ class BoletimConfigController extends BaseController
         if ($type === '') {
             $type = strtolower(trim((string) ($componente['layout_type'] ?? '')));
         }
-        $allowedGroups = BoletimQuadroLayoutHelper::gruposPermitidos();
         $allowedTypes = BoletimQuadroLayoutHelper::tiposPermitidos();
-        if (!in_array($group, $allowedGroups, true)) {
+        if (!BoletimQuadroLayoutHelper::grupoLayoutEhValido($group)) {
             $group = '';
         }
         if (!in_array($type, $allowedTypes, true)) {
@@ -7114,8 +7407,19 @@ class BoletimConfigController extends BaseController
         if ($group === '' && $type === '') {
             return null;
         }
+        $label = '';
+        if (isset($componente['config']) && is_array($componente['config'])) {
+            $label = trim((string) ($componente['config']['layout_group_label'] ?? ''));
+        }
+        if ($label === '') {
+            $label = trim((string) ($componente['layout_group_label'] ?? ''));
+        }
+        $out = ['group' => $group, 'type' => ($type !== '' ? $type : 'other')];
+        if ($label !== '') {
+            $out['label'] = $label;
+        }
 
-        return ['group' => $group, 'type' => ($type !== '' ? $type : 'other')];
+        return $out;
     }
 
     /**
@@ -7139,9 +7443,8 @@ class BoletimConfigController extends BaseController
         $layout = is_array($decoded['layout'] ?? null) ? $decoded['layout'] : [];
         $group = strtolower(trim((string) ($layout['group'] ?? $decoded['layout_group'] ?? '')));
         $type = strtolower(trim((string) ($layout['type'] ?? $decoded['layout_type'] ?? '')));
-        $allowedGroups = BoletimQuadroLayoutHelper::gruposPermitidos();
         $allowedTypes = BoletimQuadroLayoutHelper::tiposPermitidos();
-        if (!in_array($group, $allowedGroups, true)) {
+        if (!BoletimQuadroLayoutHelper::grupoLayoutEhValido($group)) {
             $group = '';
         }
         if (!in_array($type, $allowedTypes, true)) {
@@ -7283,13 +7586,13 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-            if ($cod !== '' && !preg_match('/^s[1-8]$/', $cod)) {
+            if ($cod !== '' && !BoletimQuadroLayoutHelper::codigoEhSemana($cod)) {
                 $codigoSemanal = $cod;
                 break;
             }
         }
 
-        $semanas = $this->semanasQuadroNaSimulacao();
+        $semanas = $this->semanasQuadroNaSimulacao($this->grupoRegrasNotasIdDaRegra($regra));
         $novos = BoletimQuadroLayoutHelper::expandirComponentesParaQuadroSemanal(
             $componentes,
             $semanas['a'],
@@ -7322,35 +7625,31 @@ class BoletimConfigController extends BaseController
     /**
      * @return array{a:list<int>,b:list<int>}
      */
-    private function semanasQuadroNaSimulacao(): array
+    private function semanasQuadroNaSimulacao(int $grupoId = 0): array
     {
-        if ($this->semanasQuadroCache !== null) {
-            return $this->semanasQuadroCache;
+        if (isset($this->semanasQuadroCache[$grupoId])) {
+            return $this->semanasQuadroCache[$grupoId];
         }
-        $a = [1, 3, 5, 7];
-        $b = [2, 4, 6, 8];
-        $path = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Models/NotasSemanaisConfig.php';
-        if (!class_exists('NotasSemanaisConfig', false) && is_file($path)) {
+        $a = [];
+        $b = [];
+        $path = dirname(__DIR__, 2) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }
-        if (!class_exists('NotasSemanaisConfig', false)) {
-            return $this->semanasQuadroCache = ['a' => $a, 'b' => $b];
+        if (!class_exists('GrupoRegrasNotasService', false)) {
+            return $this->semanasQuadroCache[$grupoId] = ['a' => $a, 'b' => $b];
         }
         try {
-            $cfg = (new NotasSemanaisConfig())->obter();
-            $sa = is_array($cfg['semanas_grupo_a'] ?? null) ? $cfg['semanas_grupo_a'] : $a;
-            $sb = is_array($cfg['semanas_grupo_b'] ?? null) ? $cfg['semanas_grupo_b'] : $b;
-            if ($sa !== []) {
-                $a = array_values(array_map('intval', $sa));
-            }
-            if ($sb !== []) {
-                $b = array_values(array_map('intval', $sb));
-            }
+            $sem = (new GrupoRegrasNotasService())->semanasQuadroPadrao($grupoId > 0 ? $grupoId : null);
+            $sa = is_array($sem['a'] ?? null) ? $sem['a'] : $a;
+            $sb = is_array($sem['b'] ?? null) ? $sem['b'] : $b;
+            $a = array_values(array_map('intval', $sa));
+            $b = array_values(array_map('intval', $sb));
         } catch (Throwable $e) {
             error_log('BoletimConfig semanas quadro: ' . $e->getMessage());
         }
 
-        return $this->semanasQuadroCache = ['a' => $a, 'b' => $b];
+        return $this->semanasQuadroCache[$grupoId] = ['a' => $a, 'b' => $b];
     }
 
     private function parseSemanaFromComponente(array $componente): int
@@ -7358,7 +7657,195 @@ class BoletimConfigController extends BaseController
         $cfg = $this->decodeComponenteConfig($componente);
         $s = (int) ($cfg['semana'] ?? $componente['semana'] ?? 0);
 
-        return ($s >= 1 && $s <= 8) ? $s : 0;
+        return ($s >= 1 && $s <= BoletimQuadroLayoutHelper::SEMANA_MAX) ? $s : 0;
+    }
+
+    private function parseGrupoRegrasIdFromComponente(array $componente, string $chave): int
+    {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $id = (int) ($cfg[$chave] ?? $componente[$chave] ?? 0);
+
+        return $id > 0 ? $id : 0;
+    }
+
+    /**
+     * Resolve eventos de prova da coluna: IDs do grupo (tipo+marca) têm prioridade sobre semana.
+     *
+     * @param list<int> $blocoIds
+     * @param list<int> $bimestresComp
+     * @return array{bloco_ids: list<int>, forcada: bool}
+     */
+    private function resolverBlocosQuadroDoComponente(
+        array $componente,
+        array $blocoIds,
+        ?string $inicio,
+        ?string $fim,
+        array $bimestresComp
+    ): array {
+        $tipoGr = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_tipo_id');
+        $marcaGr = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_marca_id');
+        if ($tipoGr > 0 || $marcaGr > 0) {
+            if ($blocoIds !== []) {
+                $filtrados = $this->boletimConfig->filtrarBlocoIdsPorGrupoRegras($blocoIds, $tipoGr, $marcaGr);
+                if ($filtrados !== []) {
+                    return ['bloco_ids' => $filtrados, 'forcada' => true];
+                }
+            }
+            $buscados = $this->boletimConfig->buscarBlocoIdsPorGrupoRegras(
+                $tipoGr,
+                $marcaGr,
+                $inicio,
+                $fim,
+                $bimestresComp
+            );
+
+            return ['bloco_ids' => $buscados, 'forcada' => true];
+        }
+
+        $semanaComp = $this->parseSemanaFromComponente($componente);
+        $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
+        $semanaForcada = $semanaComp >= 1 && $semanaComp <= BoletimQuadroLayoutHelper::SEMANA_MAX;
+        if (!$semanaForcada) {
+            if ($blocoIds !== [] && $bimestresComp !== []) {
+                $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
+            }
+            if ($blocoIds === [] && $tipoAvaliacaoComp > 0) {
+                return [
+                    'bloco_ids' => $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                        $tipoAvaliacaoComp,
+                        0,
+                        $inicio,
+                        $fim,
+                        $bimestresComp
+                    ),
+                    'forcada' => true,
+                ];
+            }
+
+            return ['bloco_ids' => $blocoIds, 'forcada' => $blocoIds !== []];
+        }
+        if ($blocoIds !== []) {
+            $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
+            if ($bimestresComp !== [] && $filtradosSemana !== []) {
+                $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorBimestres($filtradosSemana, $bimestresComp);
+            }
+            if ($filtradosSemana !== []) {
+                return ['bloco_ids' => $filtradosSemana, 'forcada' => true];
+            }
+            if ($tipoAvaliacaoComp > 0) {
+                return [
+                    'bloco_ids' => $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                        $tipoAvaliacaoComp,
+                        $semanaComp,
+                        $inicio,
+                        $fim,
+                        $bimestresComp
+                    ),
+                    'forcada' => true,
+                ];
+            }
+
+            return ['bloco_ids' => [], 'forcada' => true];
+        }
+        if ($tipoAvaliacaoComp > 0) {
+            return [
+                'bloco_ids' => $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                    $tipoAvaliacaoComp,
+                    $semanaComp,
+                    $inicio,
+                    $fim,
+                    $bimestresComp
+                ),
+                'forcada' => true,
+            ];
+        }
+
+        return ['bloco_ids' => $blocoIds, 'forcada' => true];
+    }
+
+    /**
+     * Peça sem semana: usa a nota_final já fechada no Tipo de Nota.
+     *
+     * @param array<string,mixed> $componente
+     * @param array<string,mixed> $regra
+     * @param array<string,mixed> $detalhes
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     * @param array<int, string> $materiaNomesPorId
+     */
+    private function preencherComponenteComNotaFinalTipo(
+        array $componente,
+        int $alunoId,
+        array $regra,
+        string $periodoRef,
+        string $codigo,
+        string $roundMode,
+        &$valor,
+        array &$detalhes,
+        array &$matrizPorCodigo,
+        array &$materiaNomesPorId
+    ): bool {
+        if ($this->parseSemanaFromComponente($componente) > 0) {
+            return false;
+        }
+        $tipoId = $this->parseTipoAvaliacaoIdFromComponente($componente);
+        if ($tipoId <= 0) {
+            return false;
+        }
+        $svcPath = __DIR__ . '/../../Services/TipoNotaRegraService.php';
+        if (!is_file($svcPath)) {
+            return false;
+        }
+        require_once $svcPath;
+        $svc = new TipoNotaRegraService();
+        $tipo = $svc->tipos()->findById($tipoId);
+        if (!$svc->tipoFechaNotaFinal($tipo) || !$svc->finais()->tabelaPronta()) {
+            return false;
+        }
+        $aluno = $this->buscarAluno($alunoId);
+        $turmaId = (int) ($aluno['turma_id'] ?? 0);
+        $ano = (int) ($regra['ano_letivo'] ?? 0);
+        $periodo = (int) ($regra['bimestre'] ?? 0);
+        if ($ano <= 0 && preg_match('/^(\d{4})-B([1-4])$/', $periodoRef, $m)) {
+            $ano = (int) $m[1];
+            $periodo = (int) $m[2];
+        }
+        $map = $svc->notasFinaisDoAluno($tipoId, $alunoId, $turmaId, $ano, $periodo);
+        if ($map === []) {
+            return false;
+        }
+        $materiasFiltro = $this->parseMateriasIdsFromComponente($componente);
+        $materiaFiltro = (int) ($componente['materia_id'] ?? 0);
+        if ($materiasFiltro !== []) {
+            $permitidos = array_fill_keys($materiasFiltro, true);
+            $map = array_filter($map, static function ($nota, $mid) use ($permitidos) {
+                return isset($permitidos[(int) $mid]);
+            }, ARRAY_FILTER_USE_BOTH);
+        } elseif ($materiaFiltro > 0) {
+            $map = array_filter($map, static function ($nota, $mid) use ($materiaFiltro) {
+                return (int) $mid === $materiaFiltro;
+            }, ARRAY_FILTER_USE_BOTH);
+        }
+        if ($map === []) {
+            return false;
+        }
+        $roundModeComp = $this->resolveRoundModeComponente($componente, $roundMode);
+        $matrizPorCodigo[$codigo] = $this->applyRoundModeToMateriaMap($map, $roundModeComp);
+        $lista = [];
+        foreach ($matrizPorCodigo[$codigo] as $mid => $v) {
+            if (!is_numeric($v)) {
+                continue;
+            }
+            $lista[] = [
+                'valor' => (float) $v,
+                'materia_id' => (int) $mid,
+                'materia_nome' => (string) ($materiaNomesPorId[(int) $mid] ?? ''),
+            ];
+        }
+        $valor = $this->applyRoundMode($this->agruparNotas($lista, 'media'), $roundModeComp);
+        $detalhes['nota_final_tipo'] = $tipoId;
+        $detalhes['qtd_materias'] = count($map);
+
+        return true;
     }
 
     private function parseTipoAvaliacaoIdFromComponente(array $componente): int
@@ -7431,6 +7918,18 @@ class BoletimConfigController extends BaseController
         if ($bimsProva !== []) {
             $payload['prova_bimestres'] = $bimsProva;
         }
+        $grupoRegrasId = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_notas_id');
+        if ($grupoRegrasId > 0) {
+            $payload['grupo_regras_notas_id'] = $grupoRegrasId;
+        }
+        $tipoRegrasId = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_tipo_id');
+        if ($tipoRegrasId > 0) {
+            $payload['grupo_regras_tipo_id'] = $tipoRegrasId;
+        }
+        $marcaRegrasId = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_marca_id');
+        if ($marcaRegrasId > 0) {
+            $payload['grupo_regras_marca_id'] = $marcaRegrasId;
+        }
         $cfgManual = $this->decodeComponenteConfig($componente);
         if (!empty($cfgManual['blocos_ids_manual'])) {
             $payload['blocos_ids_manual'] = 1;
@@ -7475,7 +7974,7 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * @return array{enabled:bool,key:string,label:string,mode:string,divisor:float,materias_ids:list<int>}|null
+     * @return array{enabled:bool,key:string,label:string,mode:string,divisor:float,materias_ids:list<int>,aplicar_em:string,agrupamento_id?:int}|null
      */
     private function normalizeGroupLineConfigForSave(array $componente): ?array
     {
@@ -7486,6 +7985,25 @@ class BoletimConfigController extends BaseController
         $grp = $cfg['group_line'] ?? ($componente['group_line'] ?? null);
         if (!is_array($grp) || empty($grp['enabled'])) {
             return null;
+        }
+        $agrupamentoId = (int) ($grp['agrupamento_id'] ?? 0);
+        $cadastro = $agrupamentoId > 0 ? $this->carregarAgrupamentoCadastro($agrupamentoId) : null;
+        if ($agrupamentoId > 0 && $cadastro === null) {
+            return null;
+        }
+        if (is_array($cadastro) && count((array) ($cadastro['materias_ids'] ?? [])) >= 2) {
+            if (trim((string) ($grp['key'] ?? '')) === '') {
+                $grp['key'] = (string) ($cadastro['nome'] ?? '');
+            }
+            if (trim((string) ($grp['label'] ?? '')) === '') {
+                $grp['label'] = (string) ($cadastro['nome'] ?? '');
+            }
+            $grp['materias_ids'] = $cadastro['materias_ids'];
+            $grp['mode'] = $cadastro['modo'];
+            $grp['aplicar_em'] = $cadastro['aplicar_em'];
+            if (($cadastro['divisor'] ?? null) !== null) {
+                $grp['divisor'] = $cadastro['divisor'];
+            }
         }
         $key = $this->slug((string) ($grp['key'] ?? ''));
         if ($key === '') {
@@ -7515,14 +8033,20 @@ class BoletimConfigController extends BaseController
             $divisor = 0;
         }
 
-        return [
+        $out = [
             'enabled' => true,
             'key' => $key,
             'label' => $label,
             'mode' => $mode,
             'divisor' => $divisor,
             'materias_ids' => $ids,
+            'aplicar_em' => $this->normalizarGroupLineAplicarEm($grp['aplicar_em'] ?? 'ambos'),
         ];
+        $agrupamentoId = (int) ($grp['agrupamento_id'] ?? 0);
+        if ($agrupamentoId > 0) {
+            $out['agrupamento_id'] = $agrupamentoId;
+        }
+        return $out;
     }
 
     /**
@@ -7647,7 +8171,7 @@ class BoletimConfigController extends BaseController
             return $regra;
         }
         unset($_SESSION['boletim_assistente_rascunho']);
-        foreach (['nome', 'codigo', 'formula_final', 'exibir_em', 'ano_letivo', 'bimestre', 'round_mode', 'nota_minima_aprovacao'] as $k) {
+        foreach (['nome', 'codigo', 'formula_final', 'exibir_em', 'finalidade', 'ano_letivo', 'bimestre', 'round_mode', 'nota_minima_aprovacao'] as $k) {
             if (isset($raw[$k]) && $raw[$k] !== '' && $raw[$k] !== null) {
                 $regra[$k] = $raw[$k];
             }
@@ -7685,6 +8209,92 @@ class BoletimConfigController extends BaseController
             $this->redirect('/admin/boletim-configuracao?novo=1');
         }
         $this->redirect('/admin/boletim-configuracao' . ($id > 0 ? ('?regra_id=' . $id) : ''));
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @return array{ok:bool,bloqueios:list<string>,avisos:list<string>}
+     */
+    private function diagnosticarGatesFechamentoRegra(array $regra): array
+    {
+        $avisos = [];
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        $modeloEncontrado = true;
+        $regraAprovacaoId = 0;
+        if ($boletimId > 0) {
+            try {
+                $boletim = (new BoletimCadastroService())->model()->findById($boletimId);
+            } catch (Throwable $e) {
+                $boletim = null;
+            }
+            $modeloEncontrado = is_array($boletim);
+            $regraAprovacaoId = is_array($boletim) ? (int) ($boletim['regra_academica_id'] ?? 0) : 0;
+        }
+
+        $quadroId = $this->grupoRegrasNotasIdDaRegra($regra);
+        $quadroAtivo = true;
+        if ($quadroId > 0) {
+            try {
+                $quadro = (new GrupoRegrasNotasService())->payloadPublico($quadroId);
+            } catch (Throwable $e) {
+                $quadro = null;
+            }
+            $quadroAtivo = is_array($quadro) && !empty($quadro['ativo']);
+            if ($quadroAtivo && (empty($quadro['componentes_sugeridos']) || !is_array($quadro['componentes_sugeridos']))) {
+                $avisos[] = 'O Quadro de Notas não possui colunas sugeridas; revise o cadastro antes do fechamento oficial.';
+            }
+        }
+
+        $diag = FechamentoGates::diagnosticarGeracao(
+            $boletimId,
+            $quadroId,
+            $regraAprovacaoId,
+            $modeloEncontrado,
+            $quadroAtivo
+        );
+        $diag['avisos'] = $avisos;
+
+        return $diag;
+    }
+
+    /**
+     * Geração oficial (preview=0) não reescreve boletim de período homologado.
+     *
+     * @param array<string,mixed> $regra
+     * @param list<array<string,mixed>> $alunos
+     */
+    private function bloquearGeracaoSePeriodoHomologado(array $regra, array $alunos): ?string
+    {
+        $path = __DIR__ . '/../../Modulos/fechamento/Models/FechamentoPeriodo.php';
+        if (!is_file($path)) {
+            return null;
+        }
+        require_once $path;
+        try {
+            $model = new FechamentoPeriodo();
+            if (!$model->schemaPronto()) {
+                return null;
+            }
+        } catch (Throwable $e) {
+            return null;
+        }
+        $ano = (int) ($regra['ano_letivo'] ?? date('Y'));
+        $bim = (int) ($regra['bimestre'] ?? 0);
+        $tipo = ($bim >= 1 && $bim <= 4) ? 'bimestre' : 'ano';
+        $num = $tipo === 'bimestre' ? $bim : 0;
+        $vistos = [];
+        foreach ($alunos as $aluno) {
+            $tid = (int) ($aluno['turma_id'] ?? 0);
+            if ($tid <= 0 || isset($vistos[$tid])) {
+                continue;
+            }
+            $vistos[$tid] = true;
+            $res = $model->assertEditavel($tid, $ano, $tipo, $num);
+            if (empty($res['ok'])) {
+                return (string) ($res['error'] ?? 'Período homologado: geração oficial bloqueada.');
+            }
+        }
+        return null;
     }
 
     private function assertCsrfOrRedirect(): void
@@ -7744,6 +8354,51 @@ class BoletimConfigController extends BaseController
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * Inclui desdobramentos quando o filtro traz o componente pai.
+     *
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    private function expandirMateriasComFilhos(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn ($id) => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $cacheKey = implode(',', $ids);
+        if (isset($this->materiasExpandidasCache[$cacheKey])) {
+            return $this->materiasExpandidasCache[$cacheKey];
+        }
+        $comp = $this->componentesCurriculares();
+        if ($comp === null) {
+            return $this->materiasExpandidasCache[$cacheKey] = $ids;
+        }
+        try {
+            return $this->materiasExpandidasCache[$cacheKey] = $comp->expandirIdsComFilhos($ids);
+        } catch (Throwable $e) {
+            return $this->materiasExpandidasCache[$cacheKey] = $ids;
+        }
+    }
+
+    private function componentesCurriculares(): ?\ComponenteCurricular
+    {
+        if ($this->componentesCurricularesCache instanceof \ComponenteCurricular) {
+            return $this->componentesCurricularesCache;
+        }
+        $path = dirname(__DIR__, 2) . '/Models/Education/ComponenteCurricular.php';
+        if (!is_file($path)) {
+            return null;
+        }
+        require_once $path;
+        try {
+            $this->componentesCurricularesCache = new \ComponenteCurricular();
+            return $this->componentesCurricularesCache;
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     /**
@@ -7925,6 +8580,13 @@ class BoletimConfigController extends BaseController
             $bimestreRef = (int) ($refRegra['bimestre'] ?? 0);
             $seriesRef = $this->parseSeriesIdsFromRegra($refRegra);
             $motivos = [];
+            $finRegra = $this->boletimConfig->normalizeFinalidade((string) ($regra['finalidade'] ?? 'oficial'));
+            $finRef = $this->boletimConfig->normalizeFinalidade((string) ($refRegra['finalidade'] ?? 'oficial'));
+            if ($finRegra !== $finRef) {
+                $motivos[] = $finRegra === 'complementar'
+                    ? 'é de Notas da série (este evento é extra)'
+                    : 'é de Notas extra (este evento é da série)';
+            }
             if ($bimestreRegra > 0 && $bimestreRef > 0 && $bimestreRef !== $bimestreRegra) {
                 $motivos[] = "é do {$bimestreRef}º bimestre (este evento é {$bimestreRegra}º)";
             }
@@ -8054,5 +8716,243 @@ class BoletimConfigController extends BaseController
             require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
         }
         return \CreditosModuleRegistry::acaoIaDisponivel('boletim_assistente_mensagem');
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,modo:string,aplicar_em:string,divisor:?float,materias_ids:list<int>}>
+     */
+    private function listarAgrupamentosComponentesCatalogo(): array
+    {
+        $path = dirname(__DIR__, 2) . '/Modulos/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
+        if (!is_file($path)) {
+            return [];
+        }
+        require_once $path;
+        try {
+            return (new \App\Modulos\AgrupamentosComponentes\Services\AgrupamentoComponenteService())->listarParaBoletim();
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int}>
+     */
+    private function listarBoletinsCadastro(): array
+    {
+        try {
+            return (new BoletimCadastroService())->listarParaEventoNotas();
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Depois de gerar as notas do bimestre, atualiza o documento 1º–4º do boletim escolhido.
+     */
+    private function atualizarBoletimDestinoAposNotas(
+        array $regra,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim
+    ): void {
+        if (strtolower(trim((string) ($regra['exibir_em'] ?? ''))) !== 'notas') {
+            return;
+        }
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId <= 0) {
+            return;
+        }
+        try {
+            $sync = (new BoletimCadastroService())->sincronizarDocumento($boletimId);
+            $regraDocId = (int) ($sync['regra_id'] ?? 0);
+            if ($regraDocId <= 0) {
+                return;
+            }
+            if ($this->boletimConfig->temGeracaoEmAndamento($regraDocId)) {
+                error_log('atualizarBoletimDestinoAposNotas: documento já em geração #' . $regraDocId);
+                return;
+            }
+            $db = Database::getInstance();
+            if ($db->tableExists('ai_jobs')) {
+                $user = $this->usuarioGeracaoJob ?? $this->auth->getUser();
+                require_once __DIR__ . '/../../Services/AIJobService.php';
+                \App\Services\AIJobService::enqueue('boletim_gerar', [
+                    'regra_id' => $regraDocId,
+                    'periodo_ref' => $periodoRef,
+                    'data_inicio' => $dataInicio,
+                    'data_fim' => $dataFim,
+                    'modo' => 'gerar',
+                    'user_id' => (int) ($user['id'] ?? 0),
+                    'user_nome' => (string) ($user['nome'] ?? ''),
+                    'user_tipo' => (string) ($user['tipo'] ?? 'admin'),
+                ], (int) ($user['id'] ?? 0), 'admin', false);
+                \App\Services\AIJobService::tentarDispararWorker();
+                return;
+            }
+            $doc = $this->boletimConfig->getRuleById($regraDocId);
+            if (!is_array($doc)) {
+                return;
+            }
+            $alunos = $this->resolverAlunosGeracaoPorModo($doc, $regraDocId, $periodoRef, 'gerar');
+            if ($alunos === []) {
+                return;
+            }
+            $this->executarGeracaoMassaInterna(
+                $doc,
+                $regraDocId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                $alunos,
+                'gerar'
+            );
+        } catch (Throwable $e) {
+            error_log('atualizarBoletimDestinoAposNotas: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @return array{id:int,nome:string,modo:string,aplicar_em:string,divisor:?float,materias_ids:list<int>}|null
+     */
+    private function carregarAgrupamentoCadastro(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        if (array_key_exists($id, $this->agrupamentoCadastroCache)) {
+            return $this->agrupamentoCadastroCache[$id];
+        }
+        $this->agrupamentoCadastroCache[$id] = null;
+        $path = dirname(__DIR__, 2) . '/Modulos/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
+        if (!is_file($path)) {
+            return null;
+        }
+        require_once $path;
+        try {
+            $row = (new \App\Modulos\AgrupamentosComponentes\Services\AgrupamentoComponenteService())->carregarParaBoletim($id);
+            if (!is_array($row) || count((array) ($row['materias_ids'] ?? [])) < 2) {
+                return null;
+            }
+            $this->agrupamentoCadastroCache[$id] = [
+                'id' => $id,
+                'nome' => (string) ($row['nome'] ?? ''),
+                'modo' => ((string) ($row['modo'] ?? 'media')) === 'soma' ? 'soma' : 'media',
+                'aplicar_em' => ((string) ($row['aplicar_em'] ?? 'boletim')) === 'ambos' ? 'ambos' : 'boletim',
+                'divisor' => isset($row['divisor']) && $row['divisor'] !== null && (float) $row['divisor'] > 0
+                    ? (float) $row['divisor']
+                    : null,
+                'materias_ids' => array_values(array_map('intval', $row['materias_ids'])),
+            ];
+        } catch (Throwable $e) {
+            return null;
+        }
+        return $this->agrupamentoCadastroCache[$id];
+    }
+
+    private function listarGruposRegrasNotasCatalogo(): array
+    {
+        $path = dirname(__DIR__, 2) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!is_file($path)) {
+            return [];
+        }
+        require_once $path;
+        try {
+            $svc = new GrupoRegrasNotasService();
+            if (!$svc->moduloAtivo() || !$svc->model()->tabelasProntas()) {
+                return [];
+            }
+            $out = [];
+            foreach ($svc->model()->listar(true) as $g) {
+                $id = (int) ($g['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $row = ['id' => $id, 'nome' => (string) ($g['nome'] ?? '')];
+                $payload = $svc->payloadPublico($id);
+                if (is_array($payload)) {
+                    $row['tipos'] = $payload['tipos'] ?? [];
+                    $row['marcas'] = $payload['marcas'] ?? [];
+                    $row['blocos'] = $payload['blocos'] ?? [];
+                    $row['colunas'] = $payload['colunas'] ?? [];
+                }
+                $out[] = $row;
+            }
+            return $out;
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     */
+    private function grupoRegrasNotasIdDaRegra(array $regra): int
+    {
+        $raw = $regra['extras_json'] ?? '';
+        if (!is_string($raw) || trim($raw) === '') {
+            return 0;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return 0;
+        }
+        return (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @return list<array{grupo_id:int,tipo_id:?int,marca_id:?int}>
+     */
+    private function destinosQuadroDaRegra(array $regra): array
+    {
+        $raw = $regra['extras_json'] ?? '';
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        return $this->normalizarDestinosQuadroPost($decoded['destinos'] ?? []);
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<array{grupo_id:int,tipo_id:?int,marca_id:?int}>
+     */
+    private function normalizarDestinosQuadroPost($raw): array
+    {
+        if (is_string($raw) && trim($raw) !== '') {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        $vistos = [];
+        foreach ($raw as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $gid = (int) ($row['grupo_id'] ?? $row['quadro_id'] ?? $row['grupo_regras_notas_id'] ?? 0);
+            if ($gid <= 0) {
+                continue;
+            }
+            $tid = (int) ($row['tipo_id'] ?? $row['bloco_id'] ?? 0);
+            $mid = (int) ($row['marca_id'] ?? $row['coluna_id'] ?? 0);
+            $chave = $gid . ':' . $tid . ':' . $mid;
+            if (isset($vistos[$chave])) {
+                continue;
+            }
+            $vistos[$chave] = true;
+            $out[] = [
+                'grupo_id' => $gid,
+                'tipo_id' => $tid > 0 ? $tid : null,
+                'marca_id' => $mid > 0 ? $mid : null,
+            ];
+        }
+        return $out;
     }
 }

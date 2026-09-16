@@ -151,18 +151,26 @@
                     Ano Letivo <span class="text-red-500">*</span>
                 </label>
                 <input type="number" id="ano_letivo" name="ano_letivo" required min="2000" max="2100"
+                       data-periodo-ano
                        value="<?= htmlspecialchars((string)($jornada['ano_letivo'] ?? date('Y'))) ?>"
                        class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
             </div>
             <div>
-                <label for="bimestre" class="block text-sm font-semibold text-gray-700 mb-2">
-                    Bimestre <span class="text-red-500">*</span>
+                <?php
+                if (!class_exists('PeriodoLetivo')) {
+                    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                }
+                $anoJornada = (int) ($jornada['ano_letivo'] ?? date('Y'));
+                $bimJornada = (int) ($jornada['bimestre'] ?? 0);
+                $periodoJornada = PeriodoLetivo::doAno($anoJornada);
+                ?>
+                <label for="bimestre" class="block text-sm font-semibold text-gray-700 mb-2" data-periodo-label>
+                    <?= htmlspecialchars($periodoJornada['rotulo_campo']) ?> <span class="text-red-500">*</span>
                 </label>
                 <select id="bimestre" name="bimestre" required
+                        data-periodo-letivo-select data-periodo-vazio="1" data-periodo-selecionado="<?= $bimJornada ?>"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors">
-                    <option value="">Selecione</option>
-                    <option value="2" <?= (int)($jornada['bimestre'] ?? 0) === 2 ? 'selected' : '' ?>>2º Bimestre</option>
-                    <option value="3" <?= (int)($jornada['bimestre'] ?? 0) === 3 ? 'selected' : '' ?>>3º Bimestre</option>
+                    <?= PeriodoLetivo::optionsHtml($anoJornada, $bimJornada, ['vazio' => true]) ?>
                 </select>
             </div>
             <div>

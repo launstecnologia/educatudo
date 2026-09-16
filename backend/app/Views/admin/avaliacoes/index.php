@@ -19,9 +19,15 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao')) 
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_provas') || LayoutHelper::isModuleEnabled('aluno_provas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/provas',
-        'title' => 'Avaliações / Notas',
+        'title' => 'Lançamento de Notas',
         'description' => 'Crie provas, aplique e registre notas dos alunos.',
         'icon' => 'fa-regular fa-clipboard',
+    ];
+    $hub_cards[] = [
+        'href' => URL . '/admin/provas/tipos-avaliacao',
+        'title' => 'Tipos de Nota',
+        'description' => 'Cadastre os tipos usados nos eventos (prova bimestral, trabalho, recuperação…).',
+        'icon' => 'fa-solid fa-tags',
     ];
 }
 
@@ -46,15 +52,9 @@ if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('jornadas')) {
 if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('boletim')) {
     $hub_cards[] = [
         'href' => URL . '/admin/boletim',
-        'title' => 'Eventos de Notas',
-        'description' => 'Eventos do bimestre. A média gerada alimenta o boletim da Vida Escolar.',
+        'title' => 'Avaliações',
+        'description' => 'Fórmulas do bimestre. Escolha em qual modelo de boletim a média entra (cadastro em Acadêmico → Modelo de Boletim).',
         'icon' => 'fa-regular fa-file-lines',
-    ];
-    $hub_cards[] = [
-        'href' => URL . '/admin/boletim-guia',
-        'title' => 'Guia do Boletim',
-        'description' => 'Documentação de como o boletim é calculado e exibido.',
-        'icon' => 'fa-solid fa-book-open',
     ];
 }
 

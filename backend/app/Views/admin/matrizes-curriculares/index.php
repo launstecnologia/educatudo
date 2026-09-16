@@ -10,7 +10,7 @@ $series_por_curso = $series_por_curso ?? [];
 $componentes_disponiveis = $componentes_disponiveis ?? [];
 
 $page_header_title = 'Matriz Curricular';
-$page_header_subtitle = 'Defina o que cada série de um curso deve cursar: Componentes Curriculares, aulas por semana e carga horária.';
+$page_header_subtitle = 'Defina o componente oficial de cada série. Desdobramentos somam a carga da área.';
 ob_start();
 ?>
 <button type="button" onclick="openMatrizDrawer()"
@@ -218,7 +218,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                         <i class="fa-solid fa-plus mr-1.5"></i> Adicionar componente
                     </button>
                 </div>
-                <p class="text-sm text-gray-500 mb-4">A carga horária é calculada automaticamente (aulas por semana × duração da aula).</p>
+                <p class="text-sm text-gray-500 mb-4">Inclua o componente oficial (ex.: Língua Portuguesa). Se ele tiver desdobramentos, as aulas são lançadas em cada filho e a carga da área é a soma.</p>
 
                 <div class="overflow-x-auto mb-2">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -262,10 +262,12 @@ include __DIR__ . '/../_partials/flash_message.php';
 <template id="matriz-componente-row-template">
     <tr class="matriz-componente-row">
         <td class="px-3 py-2 align-top">
-            <select class="matriz-materia-select w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm" onchange="matrizRecalcularCargaHoraria()" required>
+            <select class="matriz-materia-select w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm" onchange="matrizAoTrocarComponente(this)" required>
                 <option value="">Selecione…</option>
                 <?php foreach ($componentes_disponiveis as $comp): ?>
-                <option value="<?= (int) $comp['id'] ?>"><?= htmlspecialchars($comp['nome']) ?><?= !empty($comp['codigo']) ? ' (' . htmlspecialchars($comp['codigo']) . ')' : '' ?></option>
+                <option value="<?= (int) $comp['id'] ?>" data-rotulo="<?= !empty($comp['eh_rotulo']) ? '1' : '0' ?>">
+                    <?= htmlspecialchars($comp['nome']) ?><?= !empty($comp['codigo']) ? ' (' . htmlspecialchars($comp['codigo']) . ')' : '' ?><?= !empty($comp['eh_rotulo']) ? ' — área oficial' : '' ?>
+                </option>
                 <?php endforeach; ?>
             </select>
         </td>
@@ -287,8 +289,55 @@ include __DIR__ . '/../_partials/flash_message.php';
     </tr>
 </template>
 
+<template id="matriz-grupo-header-template">
+    <tr class="matriz-grupo-header bg-slate-50">
+        <td class="px-3 py-2 align-top">
+            <div class="text-sm font-semibold text-gray-900 matriz-grupo-nome"></div>
+            <p class="text-xs text-gray-500 mt-0.5">Carga oficial = soma dos desdobramentos</p>
+        </td>
+        <td class="px-3 py-2 align-top text-sm text-gray-700 matriz-grupo-aulas">0</td>
+        <td class="px-3 py-2 align-top text-sm text-gray-600 matriz-grupo-ch">—</td>
+        <td class="px-3 py-2 align-top">
+            <input type="checkbox" class="matriz-grupo-obrigatorio rounded border-gray-300 text-green-600" checked>
+        </td>
+        <td class="px-3 py-2 align-top">
+            <input type="number" class="matriz-grupo-ordem w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm" min="0" value="0">
+        </td>
+        <td class="px-3 py-2 align-top">
+            <button type="button" onclick="matrizRemoverGrupo(this)" class="text-red-500 hover:text-red-700" aria-label="Remover área">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        </td>
+    </tr>
+</template>
+
+<template id="matriz-filho-row-template">
+    <tr class="matriz-componente-row matriz-filho-row">
+        <td class="px-3 py-2 align-top pl-8">
+            <input type="hidden" class="matriz-materia-select" value="">
+            <span class="text-sm text-gray-800 matriz-filho-nome"></span>
+        </td>
+        <td class="px-3 py-2 align-top">
+            <input type="number" class="matriz-aulas-semana w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm" min="1" value="1" oninput="matrizRecalcularCargaHoraria()" required>
+        </td>
+        <td class="px-3 py-2 align-top text-sm text-gray-600 matriz-ch-semanal">—</td>
+        <td class="px-3 py-2 align-top">
+            <input type="hidden" class="matriz-obrigatorio" value="1">
+        </td>
+        <td class="px-3 py-2 align-top">
+            <input type="hidden" class="matriz-ordem" value="0">
+        </td>
+        <td class="px-3 py-2 align-top"></td>
+    </tr>
+</template>
+
 <script>
 var MATRIZ_SERIES_POR_CURSO = <?= json_encode($series_por_curso, JSON_UNESCAPED_UNICODE) ?>;
+var MATRIZ_FILHOS_POR_PAI = <?= json_encode($filhos_por_pai ?? [], JSON_UNESCAPED_UNICODE) ?>;
+var MATRIZ_NOMES_OFICIAIS = <?= json_encode(
+    array_column($componentes_disponiveis ?? [], 'nome', 'id'),
+    JSON_UNESCAPED_UNICODE
+) ?>;
 var matrizSerieAlvo = 0;
 
 function matrizAtualizarSeries() {
@@ -306,7 +355,16 @@ function matrizAtualizarSeries() {
     });
 }
 
+function matrizFilhosDoPai(paiId) {
+    return MATRIZ_FILHOS_POR_PAI[paiId] || MATRIZ_FILHOS_POR_PAI[String(paiId)] || [];
+}
+
 function matrizAdicionarComponente(dados) {
+    if (dados && (dados.eh_rotulo || (dados.filhos && dados.filhos.length))) {
+        matrizAdicionarGrupo(dados);
+        return;
+    }
+
     var template = document.getElementById('matriz-componente-row-template');
     var clone = template.content.cloneNode(true);
     var row = clone.querySelector('.matriz-componente-row');
@@ -316,15 +374,101 @@ function matrizAdicionarComponente(dados) {
         row.querySelector('.matriz-aulas-semana').value = dados.aulas_semana;
         row.querySelector('.matriz-obrigatorio').checked = !!dados.obrigatorio;
         row.querySelector('.matriz-ordem').value = dados.ordem_boletim ?? 0;
+        document.getElementById('matriz-componentes-body').appendChild(row);
+        if (matrizFilhosDoPai(dados.materia_id).length) {
+            matrizAoTrocarComponente(row.querySelector('.matriz-materia-select'), dados);
+            return;
+        }
+        matrizRecalcularCargaHoraria();
+        return;
     }
 
     document.getElementById('matriz-componentes-body').appendChild(row);
     matrizRecalcularCargaHoraria();
 }
 
+function matrizAdicionarGrupo(dados) {
+    var paiId = parseInt(dados.materia_id, 10) || 0;
+    var catalogo = matrizFilhosDoPai(paiId);
+    var filhosSalvos = Array.isArray(dados.filhos) ? dados.filhos : [];
+    var filhos = catalogo.length ? catalogo : filhosSalvos;
+    if (!paiId || !filhos.length) {
+        alert('Essa área ainda não tem desdobramentos cadastrados.');
+        return;
+    }
+
+    var headerTpl = document.getElementById('matriz-grupo-header-template');
+    var header = headerTpl.content.cloneNode(true).querySelector('.matriz-grupo-header');
+    header.setAttribute('data-pai-id', String(paiId));
+    header.querySelector('.matriz-grupo-nome').textContent = MATRIZ_NOMES_OFICIAIS[paiId] || MATRIZ_NOMES_OFICIAIS[String(paiId)] || dados.nome || 'Área';
+    header.querySelector('.matriz-grupo-obrigatorio').checked = dados.obrigatorio === undefined ? true : !!dados.obrigatorio && dados.obrigatorio !== '0';
+    header.querySelector('.matriz-grupo-ordem').value = dados.ordem_boletim ?? 0;
+
+    var body = document.getElementById('matriz-componentes-body');
+    body.appendChild(header);
+
+    var aulasPorFilho = {};
+    (dados.filhos || []).forEach(function (f) {
+        aulasPorFilho[String(f.materia_id)] = f.aulas_semana;
+    });
+
+    filhos.forEach(function (filho) {
+        var fid = parseInt(filho.materia_id || filho.id, 10) || 0;
+        if (!fid) return;
+        var filhoTpl = document.getElementById('matriz-filho-row-template');
+        var row = filhoTpl.content.cloneNode(true).querySelector('.matriz-filho-row');
+        row.setAttribute('data-pai-id', String(paiId));
+        row.querySelector('.matriz-materia-select').value = String(fid);
+        row.querySelector('.matriz-filho-nome').textContent = filho.nome || filho.materia_nome || ('#' + fid);
+        row.querySelector('.matriz-aulas-semana').value = aulasPorFilho[String(fid)] || filho.aulas_semana || 1;
+        body.appendChild(row);
+    });
+
+    matrizRecalcularCargaHoraria();
+}
+
+function matrizAoTrocarComponente(select, dadosOriginais) {
+    var id = parseInt(select.value, 10) || 0;
+    var filhos = matrizFilhosDoPai(id);
+    if (!filhos.length) {
+        matrizRecalcularCargaHoraria();
+        return;
+    }
+    var row = select.closest('tr');
+    var dados = dadosOriginais || {
+        materia_id: id,
+        obrigatorio: row.querySelector('.matriz-obrigatorio') ? row.querySelector('.matriz-obrigatorio').checked : true,
+        ordem_boletim: row.querySelector('.matriz-ordem') ? row.querySelector('.matriz-ordem').value : 0,
+        filhos: []
+    };
+    dados.materia_id = id;
+    dados.eh_rotulo = true;
+    if (!dados.filhos || !dados.filhos.length) {
+        dados.filhos = filhos;
+    }
+    row.remove();
+    matrizAdicionarGrupo(dados);
+}
+
 function matrizRemoverComponente(botao) {
     botao.closest('.matriz-componente-row').remove();
     matrizRecalcularCargaHoraria();
+}
+
+function matrizRemoverGrupo(botao) {
+    var header = botao.closest('.matriz-grupo-header');
+    var paiId = header.getAttribute('data-pai-id');
+    header.remove();
+    document.querySelectorAll('.matriz-filho-row[data-pai-id="' + paiId + '"]').forEach(function (row) {
+        row.remove();
+    });
+    matrizRecalcularCargaHoraria();
+}
+
+function matrizFormatarHoras(minutos) {
+    var horas = Math.floor(minutos / 60);
+    var mins = minutos % 60;
+    return horas + 'h' + String(mins).padStart(2, '0');
 }
 
 function matrizRecalcularCargaHoraria() {
@@ -335,17 +479,25 @@ function matrizRecalcularCargaHoraria() {
         var aulas = parseInt(row.querySelector('.matriz-aulas-semana').value, 10) || 0;
         var minutos = aulas * duracaoAula;
         totalMinutos += minutos;
-        var horas = Math.floor(minutos / 60);
-        var mins = minutos % 60;
-        row.querySelector('.matriz-ch-semanal').textContent = horas + 'h' + String(mins).padStart(2, '0');
+        var cel = row.querySelector('.matriz-ch-semanal');
+        if (cel) cel.textContent = matrizFormatarHoras(minutos);
     });
 
-    var totalHoras = Math.floor(totalMinutos / 60);
-    var totalMins = totalMinutos % 60;
-    document.getElementById('matriz-total-semanal').textContent = totalHoras + 'h' + String(totalMins).padStart(2, '0');
+    document.querySelectorAll('.matriz-grupo-header').forEach(function (header) {
+        var paiId = header.getAttribute('data-pai-id');
+        var aulas = 0;
+        document.querySelectorAll('.matriz-filho-row[data-pai-id="' + paiId + '"]').forEach(function (row) {
+            aulas += parseInt(row.querySelector('.matriz-aulas-semana').value, 10) || 0;
+        });
+        header.querySelector('.matriz-grupo-aulas').textContent = String(aulas);
+        header.querySelector('.matriz-grupo-ch').textContent = matrizFormatarHoras(aulas * duracaoAula);
+    });
+
+    document.getElementById('matriz-total-semanal').textContent = matrizFormatarHoras(totalMinutos);
 
     var vazio = document.getElementById('matriz-componentes-vazio');
-    vazio.style.display = document.querySelectorAll('.matriz-componente-row').length === 0 ? '' : 'none';
+    var qtd = document.querySelectorAll('.matriz-componente-row, .matriz-grupo-header').length;
+    vazio.style.display = qtd === 0 ? '' : 'none';
 }
 
 function matrizLimparComponentes() {
@@ -419,6 +571,18 @@ function closeMatrizDrawer() {
 
 document.getElementById('matriz-form').addEventListener('submit', function (e) {
     e.preventDefault();
+
+    document.querySelectorAll('.matriz-grupo-header').forEach(function (header) {
+        var paiId = header.getAttribute('data-pai-id');
+        var obrig = header.querySelector('.matriz-grupo-obrigatorio').checked ? '1' : '';
+        var ordem = header.querySelector('.matriz-grupo-ordem').value || '0';
+        document.querySelectorAll('.matriz-filho-row[data-pai-id="' + paiId + '"]').forEach(function (row) {
+            var obr = row.querySelector('.matriz-obrigatorio');
+            var ord = row.querySelector('.matriz-ordem');
+            if (obr) obr.value = obrig;
+            if (ord) ord.value = ordem;
+        });
+    });
 
     // Atribui os names dinâmicos das linhas de componente só na hora de enviar.
     document.querySelectorAll('.matriz-componente-row').forEach(function (row, index) {

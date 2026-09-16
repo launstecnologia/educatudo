@@ -364,6 +364,7 @@ class AssistenteConsultaAmpliadaService
         }
 
         $boletim = new BoletimConfig();
+        $boletim->ensureSchema();
         $eventos = $boletim->getGeneratedBoletinsByAluno(
             $alunoId,
             'coordenacao',
@@ -385,6 +386,7 @@ class AssistenteConsultaAmpliadaService
                 'bimestre' => $ev['bimestre'] ?? null,
                 'ano_letivo' => $ev['ano_letivo'] ?? null,
                 'exibir_em' => $ev['exibir_em'] ?? null,
+                'finalidade' => $ev['finalidade'] ?? 'oficial',
                 'colunas' => $ev['colunas'] ?? [],
                 'linhas' => $linhas,
             ];

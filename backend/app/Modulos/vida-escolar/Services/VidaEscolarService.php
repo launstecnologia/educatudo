@@ -4,7 +4,10 @@ namespace App\Modulos\VidaEscolar\Services;
 
 require_once __DIR__ . '/../Models/VidaEscolar.php';
 require_once __DIR__ . '/../../../Services/ResultadoAcademicoService.php';
+require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
+require_once __DIR__ . '/../../boletins/Services/BoletimCadastroService.php';
 
+use App\Modulos\Boletins\Services\BoletimCadastroService;
 use App\Modulos\VidaEscolar\Models\VidaEscolar;
 use Database;
 use ResultadoAcademicoService;
@@ -24,8 +27,17 @@ class VidaEscolarService
     private array $regraAcadCache = [];
     /** @var array<string, array<string, int>> alunoId_materiaId => faltas, chave ano:bimestre */
     private array $faltasLancadasCache = [];
+    /** @var array<string, bool> chave ano:bimestre — evento de faltas cadastrado */
+    private array $faltasEventoExisteCache = [];
+    /** @var array<string, array<string, int>|false> false = sem tabela diário; chave ano:bimestre */
+    private array $faltasDiarioCache = [];
     /** @var array<string, list<array{label:string,materias_ids:list<int>}>> */
     private array $gruposLinhaCache = [];
+    /** @var array<int, int>|null */
+    private ?array $paiPorFilhoCache = null;
+    private ?BoletimCadastroService $boletimCadastro = null;
+    /** @var array<string, array<string,mixed>|null> */
+    private array $modeloBoletimCache = [];
 
     public function __construct(?VidaEscolar $model = null)
     {
@@ -95,11 +107,12 @@ class VidaEscolarService
 
         $existente = $this->model->findFichaAlunoAno($alunoId, $anoLetivo, $turmaId);
         if ($existente) {
+            $this->alinharFichaAoModelo($existente);
             return ['success' => true, 'id' => (int) $existente['id'], 'criada' => false];
         }
 
         $turma = $this->model->turmaPorId($turmaId);
-        $matricula = $this->model->findMatriculaAtiva($alunoId, $turmaId);
+        $matricula = $this->model->findMatriculaDaTurma($alunoId, $turmaId);
         $fichaId = $this->model->criarFicha([
             'aluno_id' => $alunoId,
             'turma_id' => $turmaId,
@@ -109,17 +122,31 @@ class VidaEscolarService
             'status' => 'em_curso',
         ]);
 
-        $componentes = $this->model->componentesDaTurma($turmaId);
+        $componentes = $this->componentesParaNovaFicha($turmaId, $anoLetivo, $alunoId);
+        $jaTemMateria = [];
+        foreach ($this->model->listarLinhas($fichaId) as $linhaExistente) {
+            $midExistente = (int) ($linhaExistente['materia_id'] ?? 0);
+            if ($midExistente > 0) {
+                $jaTemMateria[$midExistente] = true;
+            }
+        }
         $ordem = 0;
         foreach ($componentes as $comp) {
+            $materiaId = (int) ($comp['materia_id'] ?? 0);
+            if ($materiaId > 0 && isset($jaTemMateria[$materiaId])) {
+                continue;
+            }
             $ordem++;
             $linhaId = $this->model->criarLinha([
                 'ficha_id' => $fichaId,
-                'materia_id' => (int) ($comp['materia_id'] ?? 0) ?: null,
+                'materia_id' => $materiaId > 0 ? $materiaId : null,
                 'componente_nome' => (string) ($comp['componente_nome'] ?? 'Componente'),
                 'carga_horaria' => null,
                 'ordem' => $ordem,
             ]);
+            if ($materiaId > 0) {
+                $jaTemMateria[$materiaId] = true;
+            }
             foreach ([1, 2, 3, 4, 0] as $periodo) {
                 $this->model->criarCelula([
                     'linha_id' => $linhaId,
@@ -141,6 +168,174 @@ class VidaEscolarService
     }
 
     /**
+     * Se o aluno já tem boletim gerado ou resultado homologado e ainda não
+     * tem ficha na Vida escolar, cria, preenche e homologa a ficha do ano.
+     *
+     * @param array<string,mixed>|null $usuario
+     * @return array{success:bool,id?:int,criada?:bool,error?:string}
+     */
+    public function materializarFichaOficialSeFaltar(int $alunoId, ?array $usuario = null): array
+    {
+        if (!$this->model->schemaPronto() || $alunoId <= 0) {
+            return ['success' => false, 'error' => 'Migration da vida escolar ainda não foi aplicada.'];
+        }
+        $aluno = $this->model->alunoPorId($alunoId);
+        if (!$aluno) {
+            return ['success' => false, 'error' => 'Aluno não encontrado.'];
+        }
+        $ctx = $this->resolverContextoFicha($alunoId, $aluno);
+        if ($ctx === null) {
+            return ['success' => false, 'error' => 'Aluno sem turma ou ano letivo.'];
+        }
+
+        $usuario = is_array($usuario) ? $usuario : [];
+        $existente = $this->model->findFichaAlunoAno($alunoId, $ctx['ano_letivo'], $ctx['turma_id']);
+        if ($existente) {
+            $fichaId = (int) $existente['id'];
+            $temHomolog = $this->alunoTemResultadoHomologado($alunoId, $ctx['turma_id'], $ctx['ano_letivo']);
+            if ($this->fichaSemNotas($fichaId) || $this->fichaSemFaltasNasNotas($fichaId)) {
+                $this->sincronizarDeEventosGerados($alunoId, $usuario, null, null, $fichaId, false, false);
+                if ($temHomolog) {
+                    $this->homologarFicha($fichaId, $usuario);
+                }
+            }
+            return ['success' => true, 'id' => $fichaId, 'criada' => false];
+        }
+
+        $temGerados = $this->model->listarResultadosGeradosOficiais($alunoId) !== [];
+        $temHomolog = $this->alunoTemResultadoHomologado($alunoId, $ctx['turma_id'], $ctx['ano_letivo']);
+        if (!$temGerados && !$temHomolog) {
+            return ['success' => true, 'id' => 0, 'criada' => false];
+        }
+
+        $ok = $this->garantirFicha(
+            $alunoId,
+            $ctx['turma_id'],
+            $ctx['ano_letivo'],
+            isset($usuario['id']) ? (int) $usuario['id'] : null
+        );
+        if (empty($ok['success'])) {
+            return $ok;
+        }
+        $fichaId = (int) ($ok['id'] ?? 0);
+        $this->sincronizarDeEventosGerados($alunoId, $usuario, null, null, $fichaId, false, false);
+        if ($temHomolog) {
+            $this->homologarFicha($fichaId, $usuario);
+        }
+
+        return ['success' => true, 'id' => $fichaId, 'criada' => !empty($ok['criada'])];
+    }
+
+    /**
+     * Regrava notas e faltas da ficha a partir dos eventos oficiais (seed/demo).
+     *
+     * @param array<string,mixed> $usuario
+     * @return array{success:bool,id?:int,error?:string}
+     */
+    public function reescreverFichaDeEventos(int $fichaId, array $usuario = []): array
+    {
+        $ficha = $this->model->findFicha($fichaId);
+        if (!$ficha) {
+            return ['success' => false, 'error' => 'Ficha não encontrada.'];
+        }
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        $this->model->atualizarFicha($fichaId, ['status' => 'em_curso']);
+        foreach ($this->model->listarCelulas($fichaId) as $c) {
+            if (($c['origem'] ?? '') === 'externa') {
+                continue;
+            }
+            $this->model->atualizarCelula((int) $c['id'], ['status' => 'aberta']);
+        }
+        $ok = $this->sincronizarDeEventosGerados($alunoId, $usuario, null, null, $fichaId, false, true, true);
+        if (empty($ok['success'])) {
+            return $ok;
+        }
+        $this->homologarFicha($fichaId, $usuario);
+        return ['success' => true, 'id' => $fichaId];
+    }
+
+    /**
+     * @param array<string,mixed> $aluno
+     * @return array{turma_id:int,ano_letivo:int}|null
+     */
+    private function resolverContextoFicha(int $alunoId, array $aluno): ?array
+    {
+        $turmaId = (int) ($aluno['turma_id'] ?? 0);
+        $ano = (int) ($aluno['turma_ano_letivo'] ?? 0);
+        if ($turmaId > 0 && $ano > 0) {
+            return ['turma_id' => $turmaId, 'ano_letivo' => $ano];
+        }
+        try {
+            $mat = $this->db->fetch(
+                "SELECT m.turma_id, al.ano AS ano_letivo
+                 FROM matricula m
+                 INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                 WHERE m.aluno_id = :aid
+                 ORDER BY (m.status = 'ativa') DESC, al.ano DESC, m.id DESC
+                 LIMIT 1",
+                ['aid' => $alunoId]
+            );
+            $tid = (int) ($mat['turma_id'] ?? 0);
+            $anoM = (int) ($mat['ano_letivo'] ?? 0);
+            if ($tid > 0 && $anoM > 0) {
+                return ['turma_id' => $tid, 'ano_letivo' => $anoM];
+            }
+        } catch (\Throwable $e) {
+            // matrícula ainda não migrada
+        }
+        return null;
+    }
+
+    private function alunoTemResultadoHomologado(int $alunoId, int $turmaId, int $anoLetivo): bool
+    {
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'resultado_academico'");
+            if (!$tem) {
+                return false;
+            }
+            $row = $this->db->fetch(
+                "SELECT id FROM resultado_academico
+                  WHERE aluno_id = :aid AND turma_id = :tid AND ano_letivo = :ano
+                    AND periodo_tipo = 'ano' AND status = 'homologado'
+                  LIMIT 1",
+                ['aid' => $alunoId, 'tid' => $turmaId, 'ano' => $anoLetivo]
+            );
+            return is_array($row);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function fichaSemNotas(int $fichaId): bool
+    {
+        foreach ($this->model->listarCelulas($fichaId) as $c) {
+            if (isset($c['nota']) && $c['nota'] !== null && $c['nota'] !== '') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Célula com nota e coluna de falta ainda vazia (ex.: JSON gerado com faltas:null). */
+    private function fichaSemFaltasNasNotas(int $fichaId): bool
+    {
+        foreach ($this->model->listarCelulas($fichaId) as $c) {
+            $periodo = (int) ($c['periodo_numero'] ?? -1);
+            if ($periodo < 1 || $periodo > 4) {
+                continue;
+            }
+            $temNota = isset($c['nota']) && $c['nota'] !== null && $c['nota'] !== '';
+            if (!$temNota) {
+                continue;
+            }
+            if (!isset($c['faltas']) || $c['faltas'] === null || $c['faltas'] === '') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Quadro componente × bimestres para tela/PDF.
      *
      * @return array<string,mixed>|null
@@ -151,6 +346,7 @@ class VidaEscolarService
         if (!$ficha) {
             return null;
         }
+        $this->alinharFichaAoModelo($ficha);
         $linhas = $this->model->listarLinhas($fichaId);
         $celulas = $this->model->listarCelulas($fichaId);
         $porLinha = [];
@@ -164,16 +360,28 @@ class VidaEscolarService
             $linhas,
             $porLinha
         );
+        $linhas = $this->linhasUnicasDoQuadro($ficha, $linhas, $idsOcultos);
+        $modelo = $this->modeloOficialDaFicha($ficha);
+        $bimsGerados = $this->bimestresGeradosPorMateria(
+            (int) ($ficha['aluno_id'] ?? 0),
+            (int) ($ficha['ano_letivo'] ?? 0),
+            (int) ($modelo['id'] ?? 0)
+        );
+        $fichaCriadaTs = strtotime((string) ($ficha['created_at'] ?? '')) ?: 0;
         $grid = [];
         foreach ($linhas as $l) {
             $lid = (int) $l['id'];
             $mid = (int) ($l['materia_id'] ?? 0);
-            if ($mid > 0 && isset($idsOcultos[$mid])) {
-                continue;
-            }
+            $orfao = $fichaCriadaTs > 0 && strtotime((string) ($l['created_at'] ?? '')) > 0
+                && strtotime((string) $l['created_at']) < ($fichaCriadaTs - 5);
             $grid[] = [
                 'linha' => $l,
-                'celulas' => $porLinha[$lid] ?? [],
+                'celulas' => $this->celulasQuadroVisiveis(
+                    $porLinha[$lid] ?? [],
+                    $mid,
+                    $bimsGerados,
+                    $orfao
+                ),
             ];
         }
 
@@ -182,6 +390,7 @@ class VidaEscolarService
             'grid' => $grid,
             'periodos' => self::PERIODOS,
             'auditoria' => $this->model->listarAuditoria($fichaId, 40),
+            'modelo_nome' => is_array($modelo) ? (string) ($modelo['nome'] ?? '') : '',
         ];
     }
 
@@ -345,6 +554,11 @@ class VidaEscolarService
         return ['success' => true];
     }
 
+    public function sincronizarEscolarizacaoDaFicha(int $fichaId): void
+    {
+        $this->sincronizarEscolarizacaoInterna($fichaId);
+    }
+
     /**
      * Reabre célula ou bimestre inteiro. Motivo obrigatório.
      *
@@ -425,7 +639,8 @@ class VidaEscolarService
         ?string $periodoRef = null,
         ?int $fichaId = null,
         bool $registrarAuditoria = true,
-        bool $incluirReabertas = false
+        bool $incluirReabertas = false,
+        bool $forcarEscrita = false
     ): array {
         if (!$this->model->schemaPronto()) {
             return ['success' => false, 'error' => 'Migration da vida escolar ainda não foi aplicada.'];
@@ -458,10 +673,14 @@ class VidaEscolarService
             $ficha = $this->model->findFicha($fichaId);
         }
 
-        if (!is_array($ficha) || ($ficha['status'] ?? '') === 'homologada') {
+        if (!is_array($ficha)) {
+            return ['success' => false, 'error' => 'Ficha não encontrada para este aluno.'];
+        }
+        if (($ficha['status'] ?? '') === 'homologada' && !$forcarEscrita) {
             return ['success' => true, 'atualizadas' => 0];
         }
 
+        $this->alinharFichaAoModelo($ficha);
         $linhas = $this->model->listarLinhas($fichaId);
         $porId = [];
         $porNome = [];
@@ -478,8 +697,12 @@ class VidaEscolarService
 
         $n = 0;
         $linhasTocadas = [];
+        $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
         foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
             if (!$this->eventoPertenceAoAno($row, $ano)) {
+                continue;
+            }
+            if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId)) {
                 continue;
             }
             $mid = (int) ($row['materia_id'] ?? 0);
@@ -496,6 +719,9 @@ class VidaEscolarService
                 (int) ($row['ordem_linha'] ?? 0)
             );
             if (!$linha) {
+                continue;
+            }
+            if ($this->resultadoEhDesdobramentoDaLinha($mid, $nomeExibir, $linha)) {
                 continue;
             }
             if ((int) ($linha['id'] ?? 0) > 0 && !$this->linhaEstaNaLista($linhas, (int) $linha['id'])) {
@@ -523,7 +749,8 @@ class VidaEscolarService
                     $periodo,
                     $vals['nota'] ?? null,
                     $faltas,
-                    $incluirReabertas
+                    $incluirReabertas,
+                    $forcarEscrita
                 )) {
                     $n++;
                     $linhasTocadas[$linhaId] = true;
@@ -531,8 +758,17 @@ class VidaEscolarService
             }
         }
 
+        $linhas = $this->model->listarLinhas((int) $fichaId);
+        $n += $this->limparBimsSemEventoNaFicha(
+            $linhas,
+            $this->bimestresGeradosPorMateria($alunoId, $ano, $modeloBoletimId),
+            $linhasTocadas,
+            $incluirReabertas,
+            $forcarEscrita
+        );
+
         foreach (array_keys($linhasTocadas) as $linhaId) {
-            $this->recalcularFinal((int) $linhaId, is_array($ficha) ? $ficha : null);
+            $this->recalcularFinal((int) $linhaId, is_array($ficha) ? $ficha : null, $forcarEscrita);
         }
 
         if ($n > 0 && $registrarAuditoria) {
@@ -653,8 +889,12 @@ class VidaEscolarService
                         $porNome[$nome] = $linha;
                     }
                 }
+                $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
                 foreach ($resultadosPorAluno[$aid] ?? [] as $row) {
                     if (!$this->eventoPertenceAoAno($row, (int) $ano)) {
+                        continue;
+                    }
+                    if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId)) {
                         continue;
                     }
                     $mid = (int) ($row['materia_id'] ?? 0);
@@ -671,6 +911,9 @@ class VidaEscolarService
                         (int) ($row['ordem_linha'] ?? 0)
                     );
                     if (!$linha) {
+                        continue;
+                    }
+                    if ($this->resultadoEhDesdobramentoDaLinha($mid, $nomeExibir, $linha)) {
                         continue;
                     }
                     $linhaId = (int) ($linha['id'] ?? 0);
@@ -1068,11 +1311,16 @@ class VidaEscolarService
             $escola = '';
         }
         $resultado = $this->resultadoDaFicha($ficha);
+        $observacao = $this->observacaoConselhoDaFicha($ficha);
         if ($existente) {
-            $this->model->atualizarAnoEscolarizacao((int) $existente['id'], [
+            $patch = [
                 'resultado' => $resultado,
                 'ficha_id' => $fichaId,
-            ]);
+            ];
+            if ($observacao !== null) {
+                $patch['observacao'] = $observacao;
+            }
+            $this->model->atualizarAnoEscolarizacao((int) $existente['id'], $patch);
             return;
         }
         $anoId = $this->model->criarAnoEscolarizacao([
@@ -1083,6 +1331,7 @@ class VidaEscolarService
             'escola_nome' => $escola !== '' ? $escola : 'Esta instituição',
             'ficha_id' => $fichaId,
             'resultado' => $resultado,
+            'observacao' => $observacao,
         ]);
         $ordem = 0;
         foreach ($this->quadro($fichaId)['grid'] ?? [] as $row) {
@@ -1101,7 +1350,7 @@ class VidaEscolarService
         }
     }
 
-    private function recalcularFinal(int $linhaId, ?array $ficha = null): void
+    private function recalcularFinal(int $linhaId, ?array $ficha = null, bool $forcarEscrita = false): void
     {
         $porBim = [];
         $faltasTotal = 0;
@@ -1120,7 +1369,11 @@ class VidaEscolarService
         if (!$final) {
             return;
         }
-        if (in_array($final['status'] ?? '', ['homologada'], true)) {
+        if (in_array($final['status'] ?? '', ['homologada'], true) && !$forcarEscrita) {
+            $faltaVazia = ($final['faltas'] ?? null) === null || $final['faltas'] === '';
+            if ($temFaltas && $faltaVazia) {
+                $this->model->atualizarCelula((int) $final['id'], ['faltas' => $faltasTotal]);
+            }
             return;
         }
         if (in_array($final['status'] ?? '', ['fechada'], true) && ($final['origem'] ?? '') === 'externa') {
@@ -1224,6 +1477,29 @@ class VidaEscolarService
      */
     private function resultadoDaFicha(array $ficha): string
     {
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        $turmaId = (int) ($ficha['turma_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        if ($alunoId > 0 && $turmaId > 0 && $ano > 0) {
+            try {
+                $homolog = $this->db->fetch(
+                    "SELECT situacao FROM resultado_academico
+                      WHERE aluno_id = :aid AND turma_id = :tid AND ano_letivo = :ano
+                        AND periodo_tipo = 'ano' AND status = 'homologado'
+                      LIMIT 1",
+                    ['aid' => $alunoId, 'tid' => $turmaId, 'ano' => $ano]
+                );
+                if (is_array($homolog)) {
+                    $rotuloHomolog = $this->rotuloResultadoVida((string) ($homolog['situacao'] ?? ''));
+                    if ($rotuloHomolog !== '') {
+                        return $rotuloHomolog;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // schema ainda não aplicado
+            }
+        }
+
         $notas = [];
         $quadro = $this->quadro((int) $ficha['id']);
         foreach (is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [] as $row) {
@@ -1238,19 +1514,64 @@ class VidaEscolarService
             $avaliado = $this->motor()->avaliar([
                 'media' => $media,
                 'tem_nota' => $media !== null,
-                'aluno_id' => (int) ($ficha['aluno_id'] ?? 0),
-                'turma_id' => (int) ($ficha['turma_id'] ?? 0),
+                'aluno_id' => $alunoId,
+                'turma_id' => $turmaId,
             ], $regra ?? []);
         } catch (\Throwable $e) {
             return $media === null ? 'Em andamento' : 'Aprovado';
         }
         $sit = (string) ($avaliado['situacao'] ?? '');
+        $rotuloMap = $this->rotuloResultadoVida($sit);
+        if ($rotuloMap !== '') {
+            return $rotuloMap;
+        }
+        $rotulo = trim((string) ($avaliado['rotulo'] ?? ''));
+        return $rotulo !== '' ? $rotulo : 'Em andamento';
+    }
+
+    /**
+     * @param array<string,mixed> $ficha
+     */
+    private function observacaoConselhoDaFicha(array $ficha): ?string
+    {
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        $turmaId = (int) ($ficha['turma_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        if ($alunoId <= 0 || $turmaId <= 0 || $ano <= 0) {
+            return null;
+        }
+        try {
+            $del = $this->db->fetch(
+                "SELECT d.justificativa, d.resultado_decisao
+                 FROM conselho_deliberacoes d
+                 INNER JOIN conselho_sessoes s ON s.id = d.sessao_id
+                 WHERE s.turma_id = :turma AND s.ano_letivo = :ano AND d.aluno_id = :aluno
+                 ORDER BY s.bimestre DESC, d.id DESC
+                 LIMIT 1",
+                ['turma' => $turmaId, 'ano' => $ano, 'aluno' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (!is_array($del)) {
+            return null;
+        }
+        $just = trim((string) ($del['justificativa'] ?? ''));
+        if ($just === '') {
+            return null;
+        }
+        return 'Conselho de Classe: ' . $just;
+    }
+
+    private function rotuloResultadoVida(string $sit): string
+    {
         $map = [
             'aprovado' => 'Aprovado',
             'aprovado_recuperacao' => 'Aprovado',
-            'aprovado_conselho' => 'Aprovado',
-            'reprovado_rendimento' => 'Reprovado',
-            'reprovado_frequencia' => 'Reprovado',
+            'aprovado_conselho' => 'Aprovado pelo Conselho',
+            'aproveitamento' => 'Aprovado',
+            'reprovado_rendimento' => 'Retido',
+            'reprovado_frequencia' => 'Retido',
             'recuperacao' => 'Recuperação',
             'exame_final' => 'Exame final',
             'progressao_parcial' => 'Progressão parcial',
@@ -1261,11 +1582,7 @@ class VidaEscolarService
             'resultado_pendente' => 'Resultado pendente',
             'em_andamento' => 'Em andamento',
         ];
-        if (isset($map[$sit])) {
-            return $map[$sit];
-        }
-        $rotulo = trim((string) ($avaliado['rotulo'] ?? ''));
-        return $rotulo !== '' ? $rotulo : 'Em andamento';
+        return $map[$sit] ?? '';
     }
 
     /**
@@ -1418,6 +1735,15 @@ class VidaEscolarService
             return $map[$legado];
         }
 
+        $diario = $this->faltasDoDiarioAlunoMateria($alunoId, $materiaId, $bimestre, $anoLetivo);
+        if ($diario !== null) {
+            return $diario;
+        }
+
+        if (!empty($this->faltasEventoExisteCache[$cacheKey])) {
+            return 0;
+        }
+
         return null;
     }
 
@@ -1426,6 +1752,8 @@ class VidaEscolarService
      */
     private function carregarFaltasLancadas(int $anoLetivo, int $bimestre): array
     {
+        $cacheKey = $anoLetivo . ':' . $bimestre;
+        $this->faltasEventoExisteCache[$cacheKey] = false;
         $path = dirname(__DIR__, 3) . '/Models/Education/SchoolAbsence.php';
         if (!class_exists('SchoolAbsence', false) && is_file($path)) {
             require_once $path;
@@ -1435,6 +1763,7 @@ class VidaEscolarService
         }
         $absence = new \SchoolAbsence();
         $eventoId = $absence->idEventoPorAnoBimestre($anoLetivo, $bimestre);
+        $this->faltasEventoExisteCache[$cacheKey] = $eventoId > 0;
         if ($eventoId <= 0) {
             return [];
         }
@@ -1449,12 +1778,75 @@ class VidaEscolarService
         return $out;
     }
 
+    private function faltasDoDiarioAlunoMateria(int $alunoId, int $materiaId, int $bimestre, int $anoLetivo): ?int
+    {
+        if ($materiaId <= 0) {
+            return null;
+        }
+        $cacheKey = $anoLetivo . ':' . $bimestre;
+        if (!array_key_exists($cacheKey, $this->faltasDiarioCache)) {
+            $this->faltasDiarioCache[$cacheKey] = $this->carregarFaltasDoDiario($anoLetivo, $bimestre);
+        }
+        $map = $this->faltasDiarioCache[$cacheKey];
+        if ($map === false) {
+            return null;
+        }
+        $chave = $alunoId . '_' . $materiaId;
+        if (array_key_exists($chave, $map)) {
+            return $map[$chave];
+        }
+
+        return 0;
+    }
+
+    /**
+     * @return array<string, int>|false false quando o diário não existe neste tenant
+     */
+    private function carregarFaltasDoDiario(int $anoLetivo, int $bimestre)
+    {
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'diario_frequencias'");
+            if (!$tem) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+        $bimestre = max(1, min(4, $bimestre));
+        $mesInicio = ($bimestre - 1) * 3 + 1;
+        $mesFim = $mesInicio + 2;
+        $inicio = sprintf('%04d-%02d-01', $anoLetivo, $mesInicio);
+        $fim = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $anoLetivo, $mesFim)));
+        $rows = $this->db->fetchAll(
+            "SELECT df.aluno_id, da.materia_id, COUNT(*) AS n
+             FROM diario_frequencias df
+             INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
+             WHERE df.situacao = 'falta'
+               AND da.status <> 'cancelada'
+               AND da.data_aula BETWEEN :inicio AND :fim
+             GROUP BY df.aluno_id, da.materia_id",
+            ['inicio' => $inicio, 'fim' => $fim]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $aid = (int) ($r['aluno_id'] ?? 0);
+            $mid = (int) ($r['materia_id'] ?? 0);
+            if ($aid <= 0 || $mid <= 0) {
+                continue;
+            }
+            $out[$aid . '_' . $mid] = (int) ($r['n'] ?? 0);
+        }
+
+        return $out;
+    }
+
     private function aplicarCelulaCalculada(
         int $linhaId,
         int $periodo,
         ?float $nota,
         ?int $faltas,
-        bool $incluirReabertas = false
+        bool $incluirReabertas = false,
+        bool $forcarEscrita = false
     ): bool {
         if ($nota === null && $faltas === null) {
             return false;
@@ -1474,11 +1866,16 @@ class VidaEscolarService
         }
         $status = (string) ($cel['status'] ?? '');
         $permitidos = $incluirReabertas ? ['aberta', 'reaberta'] : ['aberta'];
-        if (!in_array($status, $permitidos, true)) {
-            return false;
-        }
         if (($cel['origem'] ?? '') === 'externa') {
             return false;
+        }
+        if (!$forcarEscrita && !in_array($status, $permitidos, true)) {
+            $faltaVazia = ($cel['faltas'] ?? null) === null || $cel['faltas'] === '';
+            if ($faltas === null || !$faltaVazia) {
+                return false;
+            }
+            $this->model->atualizarCelula((int) $cel['id'], ['faltas' => $faltas]);
+            return true;
         }
         $campos = ['origem' => 'calculada'];
         if ($nota !== null) {
@@ -1489,6 +1886,60 @@ class VidaEscolarService
         }
         $this->model->atualizarCelula((int) $cel['id'], $campos);
         return true;
+    }
+
+    /**
+     * Apaga nota calculada aberta em bimestre que não tem evento gerado.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @param array<int, array<int, true>> $bimsGerados
+     * @param array<int, true> $linhasTocadas
+     */
+    private function limparBimsSemEventoNaFicha(
+        array $linhas,
+        array $bimsGerados,
+        array &$linhasTocadas,
+        bool $incluirReabertas,
+        bool $forcarEscrita
+    ): int {
+        $n = 0;
+        $permitidos = $incluirReabertas ? ['aberta', 'reaberta'] : ['aberta'];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $linhaId = (int) ($linha['id'] ?? 0);
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($linhaId <= 0) {
+                continue;
+            }
+            foreach ([1, 2, 3, 4] as $periodo) {
+                if ($mid > 0 && isset($bimsGerados[$mid][$periodo])) {
+                    continue;
+                }
+                $cel = $this->model->findCelulaLinhaPeriodo($linhaId, $periodo);
+                if (!$cel || (string) ($cel['origem'] ?? '') === 'externa') {
+                    continue;
+                }
+                if ((string) ($cel['origem'] ?? '') !== 'calculada') {
+                    continue;
+                }
+                $status = (string) ($cel['status'] ?? '');
+                if (!$forcarEscrita && !in_array($status, $permitidos, true)) {
+                    continue;
+                }
+                $this->model->atualizarCelula((int) $cel['id'], [
+                    'nota' => null,
+                    'conceito' => null,
+                    'faltas' => null,
+                    'origem' => 'vazia',
+                ]);
+                $n++;
+                $linhasTocadas[$linhaId] = true;
+            }
+        }
+
+        return $n;
     }
 
     /**
@@ -1556,6 +2007,117 @@ class VidaEscolarService
     }
 
     /**
+     * Evento do filho (Literatura) não cria linha nova nem grava em cima da
+     * linha oficial do pai (Língua Portuguesa). A nota oficial vem da linha
+     * agrupada do boletim.
+     */
+    private function resultadoEhDesdobramentoDaLinha(int $materiaIdResultado, string $nomeResultado, array $linha): bool
+    {
+        $linhaMid = (int) ($linha['materia_id'] ?? 0);
+        if ($linhaMid <= 0) {
+            return false;
+        }
+        if ($materiaIdResultado > 0 && $materiaIdResultado === $linhaMid) {
+            return false;
+        }
+        $nomeLinha = mb_strtolower(trim((string) ($linha['componente_nome'] ?? '')));
+        $nomeRes = mb_strtolower(trim($nomeResultado));
+        if ($nomeRes !== '' && $nomeRes === $nomeLinha) {
+            return false;
+        }
+        if ($materiaIdResultado > 0) {
+            $pai = $this->paiIdDaMateria($materiaIdResultado);
+            if ($pai === $linhaMid) {
+                return true;
+            }
+        }
+        foreach ($this->filhosDaMateria($linhaMid) as $fid) {
+            if ($materiaIdResultado === $fid) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $porId
+     */
+    private function linhaOficialDoPaiNaFicha(
+        int $materiaId,
+        string $nomeKey,
+        array $porId,
+        int $alunoId,
+        int $anoLetivo
+    ): ?array {
+        if ($materiaId > 0) {
+            $pai = $this->paiIdDaMateria($materiaId);
+            if ($pai > 0 && isset($porId[$pai])) {
+                return $porId[$pai];
+            }
+        }
+        if ($alunoId <= 0 || $anoLetivo <= 0) {
+            return null;
+        }
+        foreach ($this->gruposLinhaDoAluno($alunoId, $anoLetivo) as $g) {
+            $label = mb_strtolower(trim((string) ($g['label'] ?? '')));
+            $idsGrupo = array_map('intval', (array) ($g['materias_ids'] ?? []));
+            $bateNome = $nomeKey !== '' && $label === $nomeKey;
+            $bateId = $materiaId > 0 && in_array($materiaId, $idsGrupo, true);
+            if (!$bateNome && !$bateId) {
+                continue;
+            }
+            foreach ($idsGrupo as $fid) {
+                $pai = $this->paiIdDaMateria($fid);
+                if ($pai > 0 && isset($porId[$pai])) {
+                    return $porId[$pai];
+                }
+            }
+        }
+        return null;
+    }
+
+    private function paiIdDaMateria(int $materiaId): int
+    {
+        if ($materiaId <= 0) {
+            return 0;
+        }
+        return (int) ($this->mapaPaiPorFilho()[$materiaId] ?? 0);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function filhosDaMateria(int $paiId): array
+    {
+        if ($paiId <= 0) {
+            return [];
+        }
+        $ids = [];
+        foreach ($this->mapaPaiPorFilho() as $filhoId => $pai) {
+            if ($pai === $paiId) {
+                $ids[] = (int) $filhoId;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function mapaPaiPorFilho(): array
+    {
+        if ($this->paiPorFilhoCache !== null) {
+            return $this->paiPorFilhoCache;
+        }
+        try {
+            $this->paiPorFilhoCache = (new \ComponenteCurricular())->mapaPaiPorFilho();
+        } catch (\Throwable $e) {
+            $this->paiPorFilhoCache = [];
+        }
+        return $this->paiPorFilhoCache;
+    }
+
+    /**
      * Encaixa a linha do boletim gerado na ficha. Linha agrupada (group_line,
      * materia_id nulo) é criada com o nome do grupo (ex.: Língua Portuguesa).
      *
@@ -1576,15 +2138,18 @@ class VidaEscolarService
         int $ordemGerada = 0
     ): ?array {
         $nomeKey = mb_strtolower(trim($materiaNome));
-        $linha = ($materiaId > 0 ? ($porId[$materiaId] ?? null) : null);
-        if (!$linha && $nomeKey !== '') {
-            $linha = $porNome[$nomeKey] ?? null;
+        $linha = $this->encontrarLinhaFicha($materiaId, $nomeKey, $porId, $porNome, $linhasExistentes);
+        if (!$linha) {
+            $linha = $this->linhaOficialDoPaiNaFicha($materiaId, $nomeKey, $porId, $alunoId, $anoLetivo);
         }
         if ($linha) {
             return $linha;
         }
         $nomeExibir = trim($materiaNome);
         if ($fichaId <= 0 || $nomeExibir === '') {
+            return null;
+        }
+        if (!$this->podeCriarLinhaComponente($fichaId, $materiaId, $linhasExistentes)) {
             return null;
         }
         $ordemMax = 0;
@@ -1690,6 +2255,468 @@ class VidaEscolarService
     }
 
     /**
+     * Uma linha por matéria do modelo de boletim (ou da matriz, se não houver modelo).
+     *
+     * @param array<string,mixed> $ficha
+     * @param list<array<string,mixed>> $linhas
+     * @param array<int, true> $idsOcultos
+     * @return list<array<string,mixed>>
+     */
+    private function linhasUnicasDoQuadro(array $ficha, array $linhas, array $idsOcultos): array
+    {
+        $idsPermitidos = $this->materiaIdsDoModeloDaFicha($ficha);
+        $ordemModelo = $this->ordemMateriasDoModeloDaFicha($ficha);
+        $porMateria = [];
+        $semMateria = [];
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $mid = (int) ($l['materia_id'] ?? 0);
+            if ($mid > 0 && isset($idsOcultos[$mid])) {
+                continue;
+            }
+            if ($mid > 0 && $idsPermitidos !== [] && !isset($idsPermitidos[$mid])) {
+                continue;
+            }
+            if ($mid > 0) {
+                $prev = $porMateria[$mid] ?? null;
+                if ($prev === null || (int) ($l['id'] ?? 0) > (int) ($prev['id'] ?? 0)) {
+                    $porMateria[$mid] = $l;
+                }
+                continue;
+            }
+            if ($idsPermitidos !== []) {
+                continue;
+            }
+            $semMateria[] = $l;
+        }
+        $nomesUsados = [];
+        foreach ($porMateria as $l) {
+            $n = mb_strtolower(trim((string) ($l['componente_nome'] ?? '')));
+            if ($n !== '') {
+                $nomesUsados[$n] = true;
+            }
+        }
+        $out = array_values($porMateria);
+        foreach ($semMateria as $l) {
+            $n = mb_strtolower(trim((string) ($l['componente_nome'] ?? '')));
+            if ($n !== '' && isset($nomesUsados[$n])) {
+                continue;
+            }
+            $out[] = $l;
+            if ($n !== '') {
+                $nomesUsados[$n] = true;
+            }
+        }
+        usort($out, static function ($a, $b) use ($ordemModelo) {
+            $ma = (int) ($a['materia_id'] ?? 0);
+            $mb = (int) ($b['materia_id'] ?? 0);
+            $oa = $ordemModelo[$ma] ?? 1000 + (int) ($a['ordem'] ?? 0);
+            $ob = $ordemModelo[$mb] ?? 1000 + (int) ($b['ordem'] ?? 0);
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
+            return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+        });
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $ficha
+     * @return array<int, int> materia_id => ordem
+     */
+    private function ordemMateriasDoModeloDaFicha(array $ficha): array
+    {
+        $modelo = $this->modeloOficialDaFicha($ficha);
+        if (!is_array($modelo)) {
+            return [];
+        }
+        $ordem = [];
+        foreach ($this->boletimCadastro()->componentesParaFicha($modelo) as $c) {
+            $id = (int) ($c['materia_id'] ?? 0);
+            if ($id > 0 && !isset($ordem[$id])) {
+                $ordem[$id] = (int) ($c['ordem'] ?? (count($ordem) + 1));
+            }
+        }
+
+        return $ordem;
+    }
+
+    /**
+     * @param array<string,mixed> $ficha
+     * @return array<int, true>
+     */
+    private function materiaIdsDoModeloDaFicha(array $ficha): array
+    {
+        $modelo = $this->modeloOficialDaFicha($ficha);
+        if (is_array($modelo)) {
+            $ids = [];
+            foreach ($this->boletimCadastro()->componentesParaFicha($modelo) as $c) {
+                $id = (int) ($c['materia_id'] ?? 0);
+                if ($id > 0) {
+                    $ids[$id] = true;
+                }
+            }
+            if ($ids !== []) {
+                return $ids;
+            }
+        }
+
+        return $this->materiaIdsMatrizDaTurma((int) ($ficha['turma_id'] ?? 0));
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private function materiaIdsMatrizDaTurma(int $turmaId): array
+    {
+        if ($turmaId <= 0) {
+            return [];
+        }
+        $ids = [];
+        foreach ($this->model->componentesDaTurma($turmaId) as $c) {
+            $id = (int) ($c['materia_id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function boletimCadastro(): BoletimCadastroService
+    {
+        if ($this->boletimCadastro === null) {
+            $this->boletimCadastro = new BoletimCadastroService();
+        }
+
+        return $this->boletimCadastro;
+    }
+
+    /**
+     * @param array<string,mixed> $ficha
+     * @return array<string,mixed>|null
+     */
+    private function modeloOficialDaFicha(array $ficha): ?array
+    {
+        $turmaId = (int) ($ficha['turma_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        $chave = $turmaId . ':' . $ano . ':' . $alunoId;
+        if (array_key_exists($chave, $this->modeloBoletimCache)) {
+            return $this->modeloBoletimCache[$chave];
+        }
+        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $serieId = (int) ($turma['serie_id'] ?? 0);
+        $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $ano) : 0;
+        $this->modeloBoletimCache[$chave] = $this->boletimCadastro()->encontrarOficialParaTurma(
+            $turmaId,
+            $serieId,
+            $ano,
+            $preferido > 0 ? $preferido : null
+        );
+
+        return $this->modeloBoletimCache[$chave];
+    }
+
+    /**
+     * @return list<array{materia_id:int,componente_nome:string,ordem?:int}>
+     */
+    private function componentesParaNovaFicha(int $turmaId, int $anoLetivo, int $alunoId = 0): array
+    {
+        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $serieId = (int) ($turma['serie_id'] ?? 0);
+        $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $anoLetivo) : 0;
+        $modelo = $this->boletimCadastro()->encontrarOficialParaTurma(
+            $turmaId,
+            $serieId,
+            $anoLetivo,
+            $preferido > 0 ? $preferido : null
+        );
+        if (is_array($modelo)) {
+            $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
+            if ($comps !== []) {
+                return $comps;
+            }
+        }
+
+        return $this->model->componentesDaTurma($turmaId);
+    }
+
+    /**
+     * Garante na ficha as matérias do modelo oficial (não apaga linhas extras).
+     *
+     * @param array<string,mixed> $ficha
+     */
+    private function alinharFichaAoModelo(array $ficha): void
+    {
+        $fichaId = (int) ($ficha['id'] ?? 0);
+        if ($fichaId <= 0 || ($ficha['status'] ?? '') === 'homologada') {
+            return;
+        }
+        $modelo = $this->modeloOficialDaFicha($ficha);
+        if (!is_array($modelo)) {
+            return;
+        }
+        $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
+        if ($comps === []) {
+            return;
+        }
+        $linhas = $this->model->listarLinhas($fichaId);
+        $jaTem = [];
+        foreach ($linhas as $ln) {
+            $mid = (int) ($ln['materia_id'] ?? 0);
+            if ($mid > 0) {
+                $jaTem[$mid] = true;
+            }
+        }
+        foreach ($comps as $comp) {
+            $mid = (int) ($comp['materia_id'] ?? 0);
+            if ($mid <= 0 || isset($jaTem[$mid])) {
+                continue;
+            }
+            $nome = (string) ($comp['componente_nome'] ?? 'Componente');
+            $nova = $this->criarLinhaFichaCompleta(
+                $fichaId,
+                $mid,
+                $nome,
+                (int) ($comp['ordem'] ?? 0)
+            );
+            if ($nova) {
+                $jaTem[$mid] = true;
+            }
+        }
+    }
+
+    private function boletimIdDicaDoAluno(int $alunoId, int $anoLetivo): int
+    {
+        if ($alunoId <= 0) {
+            return 0;
+        }
+        $notas = 0;
+        $qualquer = 0;
+        foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
+            $bid = (int) ($row['boletim_id'] ?? 0);
+            if ($bid <= 0 || !$this->eventoPertenceAoAno($row, $anoLetivo)) {
+                continue;
+            }
+            if ($qualquer <= 0) {
+                $qualquer = $bid;
+            }
+            if ((string) ($row['exibir_em'] ?? '') === 'notas') {
+                $notas = $bid;
+                break;
+            }
+        }
+
+        return $notas > 0 ? $notas : $qualquer;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function resultadoPertenceAoModelo(array $row, int $boletimId): bool
+    {
+        if ($boletimId <= 0) {
+            return true;
+        }
+        $rowBoletim = (int) ($row['boletim_id'] ?? 0);
+        if ($rowBoletim <= 0) {
+            return true;
+        }
+
+        return $rowBoletim === $boletimId;
+    }
+
+    /**
+     * @return array<int, array<int, true>> materia_id => bimestre => true
+     */
+    private function bimestresGeradosPorMateria(int $alunoId, int $anoLetivo, int $boletimId = 0): array
+    {
+        if ($alunoId <= 0 || $anoLetivo <= 0) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
+            if (!$this->eventoPertenceAoAno($row, $anoLetivo)) {
+                continue;
+            }
+            if (!$this->resultadoPertenceAoModelo($row, $boletimId)) {
+                continue;
+            }
+            $mid = (int) ($row['materia_id'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
+            foreach (array_keys($this->periodosDaLinhaGerada($row)) as $bim) {
+                $bim = (int) $bim;
+                if ($bim >= 1 && $bim <= 4) {
+                    $out[$mid][$bim] = true;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Esconde nota de demonstração (linha antiga / bimestre sem evento gerado).
+     *
+     * @param array<int, array<string,mixed>> $celulas
+     * @param array<int, array<int, true>> $bimsGerados
+     * @return array<int, array<string,mixed>>
+     */
+    private function celulasQuadroVisiveis(array $celulas, int $materiaId, array $bimsGerados, bool $linhaOrfa): array
+    {
+        $temEventoMateria = $materiaId > 0 && isset($bimsGerados[$materiaId]);
+        $alterou = false;
+        foreach ($celulas as $periodo => $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $p = (int) $periodo;
+            if ($p === 0) {
+                continue;
+            }
+            $origem = (string) ($c['origem'] ?? '');
+            if ($origem === 'externa') {
+                continue;
+            }
+            $temEventoBim = $temEventoMateria && isset($bimsGerados[$materiaId][$p]);
+            if ($temEventoBim) {
+                continue;
+            }
+            $status = (string) ($c['status'] ?? '');
+            $aberta = in_array($status, ['aberta', 'reaberta'], true);
+            $apagarDemo = $origem === 'calculada' && ($linhaOrfa || !$aberta);
+            if (!$apagarDemo) {
+                continue;
+            }
+            $alterou = true;
+            $celulas[$periodo]['nota'] = null;
+            $celulas[$periodo]['conceito'] = null;
+            if ($linhaOrfa || $origem === 'calculada') {
+                $celulas[$periodo]['faltas'] = null;
+            }
+            if ($celulas[$periodo]['nota'] === null && ($celulas[$periodo]['faltas'] ?? null) === null) {
+                $celulas[$periodo]['origem'] = 'vazia';
+            }
+        }
+
+        if ($alterou) {
+            return $this->finalQuadroAPartirDosBims($celulas);
+        }
+
+        return $celulas;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $celulas
+     * @return array<int, array<string,mixed>>
+     */
+    private function finalQuadroAPartirDosBims(array $celulas): array
+    {
+        if (!isset($celulas[0]) || !is_array($celulas[0])) {
+            return $celulas;
+        }
+        $notas = [];
+        $faltas = 0;
+        $temFaltas = false;
+        foreach ([1, 2, 3, 4] as $p) {
+            $c = $celulas[$p] ?? null;
+            if (!is_array($c)) {
+                continue;
+            }
+            if (is_numeric($c['nota'] ?? null)) {
+                $notas[] = (float) $c['nota'];
+            }
+            if (($c['faltas'] ?? null) !== null && $c['faltas'] !== '') {
+                $faltas += (int) $c['faltas'];
+                $temFaltas = true;
+            }
+        }
+        if ($notas === []) {
+            $celulas[0]['nota'] = null;
+            $celulas[0]['origem'] = 'vazia';
+        } else {
+            $celulas[0]['nota'] = array_sum($notas) / count($notas);
+            $celulas[0]['origem'] = 'calculada';
+        }
+        $celulas[0]['faltas'] = $temFaltas ? $faltas : null;
+
+        return $celulas;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $porId
+     * @param array<string, array<string,mixed>> $porNome
+     * @param list<array<string,mixed>> $linhasExistentes
+     * @return array<string,mixed>|null
+     */
+    private function encontrarLinhaFicha(
+        int $materiaId,
+        string $nomeKey,
+        array $porId,
+        array $porNome,
+        array $linhasExistentes
+    ): ?array {
+        $escolhida = null;
+        if ($materiaId > 0) {
+            foreach ($linhasExistentes as $ln) {
+                if (!is_array($ln) || (int) ($ln['materia_id'] ?? 0) !== $materiaId) {
+                    continue;
+                }
+                if ($escolhida === null || (int) ($ln['id'] ?? 0) > (int) ($escolhida['id'] ?? 0)) {
+                    $escolhida = $ln;
+                }
+            }
+            if ($escolhida) {
+                return $escolhida;
+            }
+            if (isset($porId[$materiaId])) {
+                return $porId[$materiaId];
+            }
+
+            return null;
+        }
+        if ($nomeKey !== '' && isset($porNome[$nomeKey])) {
+            return $porNome[$nomeKey];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhasExistentes
+     */
+    private function podeCriarLinhaComponente(int $fichaId, int $materiaId, array $linhasExistentes): bool
+    {
+        foreach ($linhasExistentes as $ln) {
+            if (!is_array($ln)) {
+                continue;
+            }
+            if ($materiaId > 0 && (int) ($ln['materia_id'] ?? 0) === $materiaId) {
+                return false;
+            }
+        }
+        $ficha = $this->model->findFicha($fichaId);
+        if (!is_array($ficha)) {
+            return $materiaId > 0;
+        }
+        $idsPermitidos = $this->materiaIdsDoModeloDaFicha($ficha);
+        if ($idsPermitidos === []) {
+            return $materiaId > 0;
+        }
+        if ($materiaId <= 0) {
+            return false;
+        }
+
+        return isset($idsPermitidos[$materiaId]);
+    }
+
+    /**
      * Filhos do group_line (ex.: Literatura) somem do quadro quando a linha
      * agrupada já existe na ficha e o filho não tem lançamento próprio.
      *
@@ -1731,6 +2758,18 @@ class VidaEscolarService
                 if ($mid > 0) {
                     $ocultar[$mid] = true;
                 }
+            }
+        }
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $paiFicha = (int) ($l['materia_id'] ?? 0);
+            if ($paiFicha <= 0) {
+                continue;
+            }
+            foreach ($this->filhosDaMateria($paiFicha) as $fid) {
+                $ocultar[$fid] = true;
             }
         }
         if ($ocultar === []) {

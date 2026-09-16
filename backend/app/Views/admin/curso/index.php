@@ -5,7 +5,9 @@ $status = (string) ($status ?? '');
 $message = (string) ($message ?? '');
 $csrf_token = $csrf_token ?? '';
 $has_tipo_possui_serie = (bool) ($has_tipo_possui_serie ?? false);
+$somente_drawers = !empty($somente_drawers);
 
+if (!$somente_drawers):
 $page_header_title = 'Cursos';
 $page_header_subtitle = 'Cadastre os cursos (ex.: Ensino Fundamental, Médio) para vincular às séries';
 if ($schema_ready) {
@@ -158,6 +160,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     </div>
     <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($schema_ready): ?>

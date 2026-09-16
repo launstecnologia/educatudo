@@ -1666,7 +1666,10 @@ class TeacherExamController extends BaseController
                     $this->db->rollback();
                 }
                 error_log('importarNotasInternas: ' . $e->getMessage());
-                $this->setFlashMessage('Não foi possível importar as notas. Nenhuma alteração foi concluída.', 'error');
+                $this->setFlashMessage(
+                    str_contains($e->getMessage(), 'homologado') ? $e->getMessage() : 'Não foi possível importar as notas. Nenhuma alteração foi concluída.',
+                    'error'
+                );
                 $this->redirect($redirect);
                 return;
             }
@@ -1967,7 +1970,13 @@ class TeacherExamController extends BaseController
                         'observacao' => $mapBaseAluno[$aid]['observacao'],
                     ];
                 }
-                $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas);
+                try {
+                    $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas);
+                } catch (RuntimeException $e) {
+                    $this->setFlashMessage($e->getMessage(), 'error');
+                    $this->redirect($urlVolta);
+                    return;
+                }
             }
 
             $this->setFlashMessage('Notas salvas e replicadas para todas as matérias do evento.', 'success');
@@ -2019,7 +2028,13 @@ class TeacherExamController extends BaseController
                     'observacao' => substr($obs, 0, 500),
                 ];
             }
-            $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas);
+            try {
+                $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas);
+            } catch (RuntimeException $e) {
+                $this->setFlashMessage($e->getMessage(), 'error');
+                $this->redirect($urlVolta);
+                return;
+            }
         }
 
         $this->setFlashMessage('Notas salvas com sucesso.', 'success');

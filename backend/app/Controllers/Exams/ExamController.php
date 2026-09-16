@@ -1220,7 +1220,13 @@ class ExamController extends BaseController
         }
         $notaUnicaTodasMaterias = !empty($evento['nota_unica_todas_materias']);
         if (!$notaUnicaTodasMaterias) {
-            $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], $materiaId, $linhas);
+            try {
+                $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], $materiaId, $linhas);
+            } catch (RuntimeException $e) {
+                $this->setFlashMessage($e->getMessage(), 'error');
+                $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
+                return;
+            }
             $this->setFlashMessage('Notas salvas com sucesso.', 'success');
             $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
             return;
@@ -1280,7 +1286,13 @@ class ExamController extends BaseController
                 ];
             }
             if (!empty($linhasMid)) {
-                $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], (int) $mid, $linhasMid);
+                try {
+                    $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], (int) $mid, $linhasMid);
+                } catch (RuntimeException $e) {
+                    $this->setFlashMessage($e->getMessage(), 'error');
+                    $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
+                    return;
+                }
             }
         }
 

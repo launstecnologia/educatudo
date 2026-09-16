@@ -12,6 +12,7 @@
     <meta name="description" content="Plataforma educacional para professores">
     <title><?= htmlspecialchars($title ?? 'EducaTudo Professor') ?></title>
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>
+    <?php require_once __DIR__ . '/../../Core/PeriodoLetivo.php'; ?>
     <?php $logo1x1 = LayoutHelper::getLogo1x1Url(); ?>
     <link rel="manifest" href="<?= URL ?>/manifest-professor.json">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars($logo1x1 ?: (URL . '/public/uploads/layout/logo-1x1_1761250311.png')) ?>">
@@ -808,5 +809,6 @@
     ?>
     <?php include __DIR__ . '/components/websocket-presence.php'; ?>
     <?php include __DIR__ . '/components/row_actions_dropdown_js.php'; ?>
+    <?php include __DIR__ . '/components/periodo_letivo_js.php'; ?>
 </body>
 </html>

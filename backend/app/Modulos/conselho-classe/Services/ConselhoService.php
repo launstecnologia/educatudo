@@ -5,11 +5,13 @@ namespace App\Modulos\ConselhoClasse\Services;
 require_once __DIR__ . '/../Models/ConselhoSessao.php';
 require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
 require_once __DIR__ . '/../../../Services/FrequencyService.php';
+require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use ClassDiary;
 use Database;
 use FrequencyService;
+use PeriodoLetivo;
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
 use App\Modulos\Ocorrencias\Services\OcorrenciaService;
 use LayoutHelper;
@@ -48,8 +50,8 @@ class ConselhoService
         $turmaId = (int) ($input['turma_id'] ?? 0);
         $anoLetivo = (int) ($input['ano_letivo'] ?? 0);
         $bimestre = (int) ($input['bimestre'] ?? 0);
-        if ($turmaId <= 0 || $anoLetivo <= 0 || $bimestre < 1 || $bimestre > 4) {
-            return ['success' => false, 'error' => 'Informe turma, ano letivo e bimestre'];
+        if ($turmaId <= 0 || $anoLetivo <= 0 || !PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+            return ['success' => false, 'error' => 'Informe turma, ano letivo e período'];
         }
         if (!$this->model->schemaPronto()) {
             return ['success' => false, 'error' => 'Execute a migration do Conselho de Classe antes de usar o módulo.'];
@@ -463,10 +465,10 @@ class ConselhoService
         return ['success' => true];
     }
 
-    public function periodoLabel(int $bimestre): string
+    public function periodoLabel(int $bimestre, int $anoLetivo = 0): string
     {
-        $bimestre = max(1, min(4, $bimestre));
-        return $bimestre . 'º Bimestre';
+        $lab = PeriodoLetivo::rotulo($anoLetivo, $bimestre);
+        return $lab !== '' ? $lab : ($bimestre . 'º período');
     }
 
     public static function statusLabel(string $status): string

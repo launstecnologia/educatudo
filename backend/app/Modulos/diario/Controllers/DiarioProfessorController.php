@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 require_once __DIR__ . '/../../../Core/BaseController.php';
 require_once __DIR__ . '/../../../Core/AuthManager.php';
 require_once __DIR__ . '/../Models/ClassDiary.php';
@@ -222,7 +223,8 @@ class DiarioProfessorController extends BaseController
                     // do filtro da tela, pra não mostrar uma pendência diferente da que
                     // realmente bloqueia (ou libera) o fechamento.
                     $bimestres = [];
-                    for ($b = 1; $b <= 4; $b++) {
+                    $qtdPeriodos = (int) PeriodoLetivo::doAno($anoLetivo)['quantidade'];
+                    for ($b = 1; $b <= $qtdPeriodos; $b++) {
                         $periodo = $this->diary->periodoDoBimestre($anoLetivo, $b);
                         $resumoBimestre = $this->service->resumoDiario($turmaId, $materiaId, $professorId, $periodo['inicio'], $periodo['fim']);
                         $bimestres[$b] = [
@@ -272,8 +274,8 @@ class DiarioProfessorController extends BaseController
             $info = $this->diary->infoDiario($turmaId, $materiaId, $professorId);
             $anoLetivo = (int) ($info['ano_letivo'] ?? 0);
             $bimestre = (int) ($_POST['bimestre'] ?? 0);
-            if ($bimestre < 1 || $bimestre > 4) {
-                throw new RuntimeException('Selecione um bimestre válido (1 a 4).');
+            if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+                throw new RuntimeException(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             $this->service->fechar($turmaId, $materiaId, $professorId, $anoLetivo, $bimestre, (int) ($user['id'] ?? 0));
             $this->setFlashMessage('Bimestre fechado com sucesso.', 'success');

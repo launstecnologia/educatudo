@@ -20,14 +20,16 @@ class MasterAuthController extends BaseController
         parent::__construct();
     }
 
-    private function logMaster(string $message, array $context = []): void
+    private function logMaster(string $message, array $context = [], bool $registrarComoErro = false): void
     {
         $line = date('Y-m-d H:i:s') . ' [master_auth] ' . $message;
         if (!empty($context)) {
             $line .= ' ' . json_encode($context, JSON_UNESCAPED_UNICODE);
         }
         $line .= "\n";
-        error_log(trim($line));
+        if ($registrarComoErro) {
+            error_log(trim($line));
+        }
         $logDir = defined('ENV_FILE_PATH') ? dirname(ENV_FILE_PATH) . '/storage/logs' : (__DIR__ . '/../../../storage/logs');
         if (is_dir($logDir) || @mkdir($logDir, 0755, true)) {
             @file_put_contents($logDir . '/master_auth.log', $line, FILE_APPEND | LOCK_EX);
@@ -94,31 +96,30 @@ class MasterAuthController extends BaseController
     {
         $raw = $_COOKIE[self::COOKIE_MASTER_AUTH] ?? '';
         if ($raw === '') {
-            $this->logMaster('restoreMasterSessionFromCookie: cookie vazio');
             return false;
         }
         $payload = base64_decode($raw, true);
         if ($payload === false) {
-            $this->logMaster('restoreMasterSessionFromCookie: base64_decode falhou');
+            $this->logMaster('restoreMasterSessionFromCookie: base64_decode falhou', [], true);
             return false;
         }
         $parts = explode('.', $payload);
         if (count($parts) !== 2 || !ctype_digit($parts[0])) {
-            $this->logMaster('restoreMasterSessionFromCookie: payload inválido', ['parts_count' => count($parts)]);
+            $this->logMaster('restoreMasterSessionFromCookie: payload inválido', ['parts_count' => count($parts)], true);
             return false;
         }
         $userId = (int) $parts[0];
         $secret = $this->getMasterAuthSecret();
         $expected = hash_hmac('sha256', (string) $userId, $secret);
         if (!hash_equals($expected, $parts[1])) {
-            $this->logMaster('restoreMasterSessionFromCookie: assinatura inválida (cookie de outro ambiente?)');
+            $this->logMaster('restoreMasterSessionFromCookie: assinatura inválida (cookie de outro ambiente?)', [], true);
             return false;
         }
         $db = Database::getInstance();
         $stmt = $db->query("SELECT id, email, nome, avatar_url FROM usuarios_master WHERE id = ? AND ativo = 1", [$userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$user) {
-            $this->logMaster('restoreMasterSessionFromCookie: usuário não encontrado no banco', ['user_id' => $userId]);
+            $this->logMaster('restoreMasterSessionFromCookie: usuário não encontrado no banco', ['user_id' => $userId], true);
             return false;
         }
         $this->setMasterSession((int) $user['id'], $user['email'], $user['nome'], $user['avatar_url'] ?? null);
@@ -131,7 +132,6 @@ class MasterAuthController extends BaseController
      */
     public function index()
     {
-        $this->logMaster('index() GET /master', ['session_id' => session_id(), 'has_master_session' => !empty($_SESSION[self::SESSION_MASTER_USER_ID]), 'has_cookie' => isset($_COOKIE[self::COOKIE_MASTER_AUTH])]);
         $this->ensureMultiTenant();
         $this->redirectIfMasterLoggedIn();
 
@@ -214,12 +214,11 @@ class MasterAuthController extends BaseController
      */
     public function autenticar()
     {
-        $this->logMaster('autenticar() POST /master/login', ['session_id' => session_id(), 'post_email' => trim($_POST['email'] ?? '') ? '(preenchido)' : '(vazio)']);
         $this->ensureMultiTenant();
 
         $token = $_POST['csrf_token'] ?? '';
         if ($token === '' || !$this->verifyCsrfToken($token)) {
-            $this->logMaster('autenticar() CSRF inválido');
+            $this->logMaster('autenticar() CSRF inválido', [], true);
             $this->setFlashMessage('Requisição inválida. Tente novamente.', 'error');
             header('Location: ' . URL . '/master');
             exit;
@@ -229,7 +228,6 @@ class MasterAuthController extends BaseController
         $senha = $_POST['senha'] ?? '';
 
         if ($email === '' || $senha === '') {
-            $this->logMaster('autenticar() email ou senha vazios');
             $this->setFlashMessage('Preencha e-mail e senha.', 'error');
             header('Location: ' . URL . '/master');
             exit;
@@ -240,9 +238,9 @@ class MasterAuthController extends BaseController
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         $pwOk = $user && password_verify($senha, $user['senha_hash']);
-        $this->logMaster('autenticar() user_found=' . ($user ? 'sim' : 'nao') . ' password_verify=' . ($pwOk ? 'ok' : 'falha'));
 
         if (!$user || !$pwOk) {
+            $this->logMaster('autenticar() credenciais inválidas', ['user_found' => $user ? 'sim' : 'nao']);
             $this->setFlashMessage('E-mail ou senha incorretos.', 'error');
             header('Location: ' . URL . '/master');
             exit;
@@ -264,7 +262,6 @@ class MasterAuthController extends BaseController
      */
     public function dashboard()
     {
-        $this->logMaster('dashboard() GET', ['session_id' => session_id(), 'has_master_session' => !empty($_SESSION[self::SESSION_MASTER_USER_ID]), 'has_cookie' => isset($_COOKIE[self::COOKIE_MASTER_AUTH]), 'cookie_length' => isset($_COOKIE[self::COOKIE_MASTER_AUTH]) ? strlen($_COOKIE[self::COOKIE_MASTER_AUTH]) : 0]);
         $this->ensureMultiTenant();
         $this->requireMasterAuth();
         require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
@@ -412,12 +409,10 @@ class MasterAuthController extends BaseController
     private function redirectIfMasterLoggedIn(): void
     {
         if (!empty($_SESSION[self::SESSION_MASTER_USER_ID])) {
-            $this->logMaster('redirectIfMasterLoggedIn: já tem sessão, redirecionando');
             header('Location: ' . URL . '/master/dashboard');
             exit;
         }
         if ($this->restoreMasterSessionFromCookie()) {
-            $this->logMaster('redirectIfMasterLoggedIn: restaurado por cookie, redirecionando');
             header('Location: ' . URL . '/master/dashboard');
             exit;
         }
@@ -426,15 +421,11 @@ class MasterAuthController extends BaseController
     private function requireMasterAuth(): void
     {
         if (!empty($_SESSION[self::SESSION_MASTER_USER_ID])) {
-            $this->logMaster('requireMasterAuth: ok sessão');
             return;
         }
-        $this->logMaster('requireMasterAuth: sessão vazia, tentando cookie');
         if ($this->restoreMasterSessionFromCookie()) {
-            $this->logMaster('requireMasterAuth: ok restaurado por cookie');
             return;
         }
-        $this->logMaster('requireMasterAuth: falha - redirecionando para login', ['cookie_present' => isset($_COOKIE[self::COOKIE_MASTER_AUTH])]);
         $this->setFlashMessage('Faça login para acessar o painel master.', 'error');
         header('Location: ' . URL . '/master');
         exit;

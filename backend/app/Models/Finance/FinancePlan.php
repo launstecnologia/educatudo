@@ -97,9 +97,56 @@ class FinancePlan
         return (int)$this->db->lastInsertId();
     }
 
-    public function removeItem(int $itemId): void
+    public function findItem(int $planId, int $itemId): ?array
     {
-        $this->db->update("DELETE FROM finance_plan_items WHERE id = ?", [$itemId]);
+        if ($planId <= 0 || $itemId <= 0) {
+            return null;
+        }
+        return $this->db->fetch(
+            'SELECT * FROM finance_plan_items WHERE id = ? AND plan_id = ?',
+            [$itemId, $planId]
+        ) ?: null;
+    }
+
+    public function updateItem(int $planId, int $itemId, array $d): bool
+    {
+        if ($this->findItem($planId, $itemId) === null) {
+            return false;
+        }
+        $this->db->update(
+            'UPDATE finance_plan_items
+             SET categoria = ?, descricao = ?, valor_base = ?, num_parcelas = ?,
+                 mes_inicio = ?, mes_fim = ?, dia_vencimento = ?,
+                 fornecedor_externo = ?, nome_instituicao = ?, unidade_id = ?
+             WHERE id = ? AND plan_id = ?',
+            [
+                $d['categoria'],
+                $d['descricao'],
+                (float) str_replace(',', '.', $d['valor_base'] ?? '0'),
+                (int) ($d['num_parcelas'] ?? 1),
+                (int) ($d['mes_inicio'] ?? 1),
+                (int) ($d['mes_fim'] ?? $d['mes_inicio'] ?? 1) ?: null,
+                (int) ($d['dia_vencimento'] ?? 0) ?: null,
+                !empty($d['fornecedor_externo']) ? 1 : 0,
+                trim($d['nome_instituicao'] ?? '') ?: null,
+                (int) ($d['unidade_id'] ?? 0) ?: null,
+                $itemId,
+                $planId,
+            ]
+        );
+        return true;
+    }
+
+    public function removeItem(int $planId, int $itemId): bool
+    {
+        if ($this->findItem($planId, $itemId) === null) {
+            return false;
+        }
+        $this->db->delete(
+            'DELETE FROM finance_plan_items WHERE id = ? AND plan_id = ?',
+            [$itemId, $planId]
+        );
+        return true;
     }
 
     public function toggle(int $id): void

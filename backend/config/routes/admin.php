@@ -415,6 +415,7 @@ $router->get('/admin/doc-sistema/{pagina}', 'Admin/DocSistemaController@index');
 
 // Faltas (Admin/Coordenação)
 $router->get('/admin/faltas', 'Admin/SchoolAbsenceController@index');
+$router->get('/admin/frequencia', 'Admin/FrequenciaAdminController@index');
 $router->get('/admin/faltas/exportar-excel', 'Admin/SchoolAbsenceController@exportarExcel');
 $router->get('/admin/faltas/lancar', 'Admin/SchoolAbsenceController@lancar');
 $router->get('/admin/faltas/lancar/exportar-excel', 'Admin/SchoolAbsenceController@exportarLancamentoExcel');
@@ -591,6 +592,8 @@ $router->post('/admin/finance/plans',                                'Admin/Fina
 $router->get('/admin/finance/plans/{id}',                            'Admin/FinanceController@planShow');
 $router->post('/admin/finance/plans/{id}/toggle',                    'Admin/FinanceController@planToggle');
 $router->post('/admin/finance/plans/{planId}/items',                 'Admin/FinanceController@planItemStore');
+$router->get('/admin/finance/plans/{planId}/items/{itemId}/dados',   'Admin/FinanceController@planItemDados');
+$router->post('/admin/finance/plans/{planId}/items/{itemId}/update',  'Admin/FinanceController@planItemUpdate');
 $router->post('/admin/finance/plans/{planId}/items/{itemId}/delete', 'Admin/FinanceController@planItemDelete');
 // Extrato / ledger do aluno
 $router->get('/admin/finance/aluno/{alunoId}/extrato',               'Admin/FinanceController@alunoExtrato');
@@ -696,6 +699,8 @@ $router->get('/admin/turmas/{id}/export-alunos-csv', 'Education/ClassController@
 $router->get('/admin/academico',       'Education/AnoLetivoController@academico');
 $router->get('/admin/pedagogico',      'Education/AnoLetivoController@pedagogico');
 $router->get('/admin/avaliacoes',      'Education/AnoLetivoController@avaliacoes');
+$router->get('/admin/rotina',          'Education/AnoLetivoController@rotina');
+$router->get('/admin/paineis',         'Education/AnoLetivoController@paineis');
 $router->get('/admin/gestao-escolar',  'Education/AnoLetivoController@gestaoEscolar');
 $router->get('/admin/comunicacao',     'Education/AnoLetivoController@comunicacao');
 $router->get('/admin/conteudo',            'Education/AnoLetivoController@conteudo');
@@ -714,6 +719,7 @@ $router->post('/admin/ano-letivo/{id}/update', 'Education/AnoLetivoController@up
 $router->post('/admin/ano-letivo/{id}/delete', 'Education/AnoLetivoController@destroy');
 
 // Curso (CRUD - tabela curso, estrutura normalizada, offcanvas em index)
+$router->get('/admin/cursos-series', 'Education/CursoController@cursosSeries');
 $router->get('/admin/curso', 'Education/CursoController@index');
 $router->get('/admin/curso/{id}/dados', 'Education/CursoController@dados');
 $router->post('/admin/curso', 'Education/CursoController@store');

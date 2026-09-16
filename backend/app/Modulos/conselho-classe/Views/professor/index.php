@@ -22,7 +22,7 @@ $bimestre = (int) ($bimestre ?? 1);
     <form method="GET" action="<?= URL ?>/professor/conselhos" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Ano letivo</label>
-            <select name="ano_letivo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <select name="ano_letivo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" data-periodo-ano>
                 <?php foreach ($anos as $ano): ?>
                     <option value="<?= (int) $ano ?>" <?= $anoLetivo === (int) $ano ? 'selected' : '' ?>><?= (int) $ano ?></option>
                 <?php endforeach; ?>
@@ -30,10 +30,13 @@ $bimestre = (int) ($bimestre ?? 1);
         </div>
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Período</label>
-            <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                <?php for ($b = 1; $b <= 4; $b++): ?>
-                    <option value="<?= $b ?>" <?= $bimestre === $b ? 'selected' : '' ?>><?= $b ?>º Bimestre</option>
-                <?php endfor; ?>
+            <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" data-periodo-letivo-select>
+                <?php
+                if (!class_exists('PeriodoLetivo')) {
+                    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
+                }
+                echo PeriodoLetivo::optionsHtml($anoLetivo, $bimestre);
+                ?>
             </select>
         </div>
         <div>

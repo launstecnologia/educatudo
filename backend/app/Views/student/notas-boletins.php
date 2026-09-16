@@ -3,9 +3,12 @@ $aluno = $aluno ?? [];
 $notas_lancamento_eventos = $notas_lancamento_eventos ?? [];
 $boletins_gerados = $boletins_gerados ?? [];
 $boletins_gerados_notas = $boletins_gerados_notas ?? [];
+$boletins_gerados_notas_extra = $boletins_gerados_notas_extra ?? [];
 $boletins_gerados_boletim = $boletins_gerados_boletim ?? [];
+$boletins_gerados_complementar = $boletins_gerados_complementar ?? [];
 $boletim_observacao = is_array($boletim_observacao ?? null) ? $boletim_observacao : ['conteudo' => '', 'updated_at' => null];
 $secaoNotas = $secao_notas ?? 'boletim';
+$paineis_notas = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 
 $baseUrlNotas = URL . '/notas-boletins';
 $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
@@ -33,10 +36,16 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                     <?php $boletins_gerados = $boletins_gerados_boletim; ?>
                     <?php if (!empty($boletins_gerados)): ?>
                         <?php require __DIR__ . '/../partials/boletins_gerados.php'; ?>
-                    <?php else: ?>
+                    <?php elseif (empty($boletins_gerados_complementar)): ?>
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhum boletim gerado ainda.</p>
                         </div>
+                    <?php endif; ?>
+                    <?php if (!empty($boletins_gerados_complementar)): ?>
+                        <h2 class="text-lg font-semibold text-gray-900 mt-8 mb-1">Boletim complementar</h2>
+                        <p class="text-sm text-gray-500 mb-4">Cursos extras e atividades paralelas — não entra no histórico oficial.</p>
+                        <?php $boletins_gerados = $boletins_gerados_complementar; ?>
+                        <?php require __DIR__ . '/../partials/boletins_gerados.php'; ?>
                     <?php endif; ?>
                     <?php if (trim((string) ($boletim_observacao['conteudo'] ?? '')) !== ''): ?>
                         <div class="mt-6 rounded-xl border border-gray-200 bg-white p-5">
@@ -45,15 +54,8 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                         </div>
                     <?php endif; ?>
                 <?php elseif ($secaoNotas === 'notas'): ?>
-                    <?php
-                    $quadro = $quadro_notas_semanais ?? [];
-                    $quadroFile = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Views/aluno/quadro.php';
-                    $usarQuadroSemanal = !empty($quadro['modulo_ativo']) && !empty($quadro['tem_dados']) && is_file($quadroFile);
-                    ?>
-                    <?php if ($usarQuadroSemanal): ?>
-                        <?php require $quadroFile; ?>
-                    <?php endif; ?>
-                    <?php if (!$usarQuadroSemanal && !empty($notas_lancamento_eventos)): ?>
+                    <?php require __DIR__ . '/../partials/resumo_notas_tabelas.php'; ?>
+                    <?php if (!empty($notas_lancamento_eventos)): ?>
                         <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
                             <table class="min-w-full text-sm text-left">
                                 <thead class="bg-gray-100 text-gray-700">
@@ -87,8 +89,33 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                     <?php endif; ?>
 
                     <?php if (!empty($boletins_gerados_notas)): ?>
-                        <?php require __DIR__ . '/../partials/boletim_eventos_notas_cards.php'; ?>
-                    <?php elseif (!$usarQuadroSemanal && empty($notas_lancamento_eventos)): ?>
+                        <?php
+                        $paineis_notas_eventos = $boletins_gerados_notas;
+                        $painel_notas_pode_imprimir = false;
+                        require __DIR__ . '/../partials/painel_notas_eventos.php';
+                        ?>
+                    <?php endif; ?>
+                    <?php
+                    $notasExtraComLinhas = array_values(array_filter(
+                        is_array($boletins_gerados_notas_extra) ? $boletins_gerados_notas_extra : [],
+                        static function ($ev) {
+                            return is_array($ev) && !empty($ev['linhas']);
+                        }
+                    ));
+                    ?>
+                    <?php if ($notasExtraComLinhas !== []): ?>
+                        <h2 class="text-lg font-semibold text-gray-900 mt-8 mb-1">Notas extra</h2>
+                        <p class="text-sm text-gray-500 mb-4">Cursos extras (música, robótica…) — não entra no histórico oficial.</p>
+                        <?php
+                        $boletins_gerados_notas_backup = $boletins_gerados_notas;
+                        $boletins_gerados_notas = $notasExtraComLinhas;
+                        $boletim_notas_cards_prefix = 'bnx';
+                        require __DIR__ . '/../partials/boletim_eventos_notas_cards.php';
+                        $boletins_gerados_notas = $boletins_gerados_notas_backup;
+                        unset($boletim_notas_cards_prefix);
+                        ?>
+                    <?php endif; ?>
+                    <?php if (empty($boletins_gerados_notas) && empty($boletins_gerados_notas_extra) && empty($notas_lancamento_eventos) && empty($paineis_notas) && empty($resumosNotas)): ?>
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhuma nota encontrada.</p>
                         </div>

@@ -890,14 +890,18 @@ class FinanceController extends AdminBaseController
         $unidades = $hasUnidades
             ? ($this->db->fetchAll("SELECT id, nome, razao_social FROM unidades WHERE ativo = 1 ORDER BY tipo DESC, nome ASC") ?: [])
             : [];
+        $flash = $this->getFlashMessage();
+        $flashType = (string) ($flash['type'] ?? '');
         $this->viewWithLayout('admin', 'admin/finance/plans/show', [
-            'title'        => 'Plano: ' . $plan['nome'],
-            'page_title'   => $plan['nome'],
-            'user'         => $this->auth->getUser(),
-            'current_page' => 'finance_plans',
-            'plan'         => $plan,
-            'unidades'     => $unidades,
-            'csrf_token'   => $this->generateCsrfToken(),
+            'title'         => 'Plano: ' . $plan['nome'],
+            'page_title'    => $plan['nome'],
+            'user'          => $this->auth->getUser(),
+            'current_page'  => 'finance_plans',
+            'plan'          => $plan,
+            'unidades'      => $unidades,
+            'csrf_token'    => $this->generateCsrfToken(),
+            'flash_status'  => $flashType === 'success' ? 'success' : (($flash['message'] ?? '') ? 'error' : ''),
+            'flash_message' => (string) ($flash['message'] ?? ''),
         ]);
     }
 
@@ -919,15 +923,53 @@ class FinanceController extends AdminBaseController
     public function planItemStore(int $planId): void
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) { $this->redirect("/admin/finance/plans/{$planId}"); return; }
+        if (!$this->planSvc->findById($planId)) {
+            $this->setFlashMessage('Plano não encontrado.', 'error');
+            $this->redirect('/admin/finance/plans');
+            return;
+        }
         $this->planSvc->addItem($planId, $_POST);
         $this->setFlashMessage('Item adicionado.', 'success');
+        $this->redirect("/admin/finance/plans/{$planId}");
+    }
+
+    public function planItemDados(int $planId, int $itemId): void
+    {
+        if (!$this->contracts->schemaReady()) {
+            $this->json(['success' => false, 'error' => 'Módulo financeiro não está pronto.'], 503);
+            return;
+        }
+        $item = $this->planSvc->findItem($planId, $itemId);
+        if ($item === null) {
+            $this->json(['success' => false, 'error' => 'Item não encontrado.'], 404);
+            return;
+        }
+        $this->json(['success' => true, 'item' => $item]);
+    }
+
+    public function planItemUpdate(int $planId, int $itemId): void
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->redirect("/admin/finance/plans/{$planId}");
+            return;
+        }
+        if (!$this->planSvc->updateItem($planId, $itemId, $_POST)) {
+            $this->setFlashMessage('Item não encontrado.', 'error');
+            $this->redirect("/admin/finance/plans/{$planId}");
+            return;
+        }
+        $this->setFlashMessage('Item atualizado.', 'success');
         $this->redirect("/admin/finance/plans/{$planId}");
     }
 
     public function planItemDelete(int $planId, int $itemId): void
     {
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) { $this->redirect("/admin/finance/plans/{$planId}"); return; }
-        $this->planSvc->removeItem($itemId);
+        if (!$this->planSvc->removeItem($planId, $itemId)) {
+            $this->setFlashMessage('Item não encontrado.', 'error');
+            $this->redirect("/admin/finance/plans/{$planId}");
+            return;
+        }
         $this->setFlashMessage('Item removido.', 'success');
         $this->redirect("/admin/finance/plans/{$planId}");
     }

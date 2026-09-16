@@ -507,13 +507,14 @@ class ModuloCatalogo
             ],
             [
                 'chave' => 'geral_boletim',
-                'nome' => 'Eventos de Notas',
-                'aliases' => ['Boletim', 'Notas e Boletim', 'Guia do Boletim'],
+                'nome' => 'Avaliações',
+                'aliases' => ['Eventos de Notas', 'Boletim', 'Notas e Boletim', 'Guia do Boletim'],
                 'feature_keys' => ['boletim'],
                 'rotas' => [
                     '/admin/boletim' => 'boletim',
                     '/admin/boletim-guia' => 'boletim',
                     '/admin/boletim-configuracao' => 'boletim',
+                    '/admin/boletins' => 'boletim',
                     '/admin/reports/boletim-coordenacao' => 'boletim',
                 ],
             ],
@@ -563,7 +564,8 @@ class ModuloCatalogo
             ],
             [
                 'chave' => 'geral_regras_academicas',
-                'nome' => 'Regras Acadêmicas',
+                'nome' => 'Regras de Aprovação',
+                'aliases' => ['Regras Acadêmicas'],
                 'feature_keys' => ['regras_academicas'],
                 'rotas' => [
                     '/admin/regras-academicas' => 'regras_academicas',
@@ -593,6 +595,9 @@ class ModuloCatalogo
                 'feature_keys' => ['resultados_finais'],
                 'rotas' => [
                     '/admin/resultados-finais' => 'resultados_finais',
+                    '/admin/fechamento' => 'resultados_finais',
+                    '/admin/homologacoes' => 'resultados_finais',
+                    '/admin/documentos-periodo' => 'resultados_finais',
                 ],
             ],
             [

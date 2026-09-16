@@ -3817,6 +3817,9 @@ class StudentAdminController extends AdminBaseController
                 if ($rid <= 0 || isset($seenRegras[$rid])) {
                     continue;
                 }
+                if (strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
+                    continue;
+                }
                 $seenRegras[$rid] = true;
                 $boletinsGerados[] = $ev;
             }

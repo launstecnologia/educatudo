@@ -5,7 +5,13 @@ $token = (string) ($csrf_token ?? $token ?? '');
 $quadro = is_array($quadro ?? null) ? $quadro : null;
 $ficha = is_array($quadro['ficha'] ?? null) ? $quadro['ficha'] : null;
 $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
-$periodos = is_array($periodos ?? null) ? $periodos : [1 => '1º', 2 => '2º', 3 => '3º', 4 => '4º', 0 => 'FINAL'];
+if (!class_exists('PeriodoLetivo')) {
+    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
+}
+$anoFicha = (int) ($ficha['ano_letivo'] ?? date('Y'));
+$infoPeriodo = PeriodoLetivo::doAno($anoFicha);
+$periodos = $infoPeriodo['rotulos'];
+$periodos[0] = 'FINAL';
 $fichas = is_array($fichas ?? null) ? $fichas : [];
 $editavelFicha = $ficha && ($ficha['status'] ?? '') !== 'homologada';
 $fichaHomologada = (bool) $ficha && ($ficha['status'] ?? '') === 'homologada';
@@ -53,7 +59,14 @@ $fmtNota = static function ($c): string {
     <div class="flex justify-between items-center mb-4 gap-3 flex-wrap">
         <div>
             <h3 class="text-lg font-semibold text-gray-900">Boletim oficial</h3>
-            <p class="text-sm text-gray-500">Preenchido pelos eventos de notas. Cada bimestre: nota à esquerda, falta à direita. A FINAL segue a fórmula das regras acadêmicas. <span class="text-violet-700">¹</span> = escola anterior.</p>
+            <p class="text-sm text-gray-500"><?php
+                $modeloNome = trim((string) ($quadro['modelo_nome'] ?? ''));
+                if ($modeloNome !== '') {
+                    echo 'Modelo: <span class="font-medium text-gray-700">' . $esc($modeloNome) . '</span>. ';
+                } else {
+                    echo 'Conforme o modelo de boletim oficial da turma. ';
+                }
+            ?>Cada bimestre: nota à esquerda, falta à direita. A FINAL segue a fórmula das regras acadêmicas. <span class="text-violet-700">¹</span> = escola anterior.</p>
             <?php if ($fichaHomologada): ?>
             <p class="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Boletim homologado — notas travadas. Para corrigir, reabra o período abaixo (motivo obrigatório; fica na auditoria).</p>
             <?php endif; ?>
@@ -157,11 +170,9 @@ $fmtNota = static function ($c): string {
                         <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                         <input type="hidden" name="ficha_id" value="<?= (int) $ficha['id'] ?>">
                         <div class="flex-1 min-w-0">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Bimestre</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1"><?= htmlspecialchars($infoPeriodo['rotulo_campo']) ?></label>
                             <select name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                                <?php for ($i = 1; $i <= 4; $i++): ?>
-                                    <option value="<?= $i ?>"><?= $i ?>º bimestre</option>
-                                <?php endfor; ?>
+                                <?= PeriodoLetivo::optionsHtml($anoFicha, 0) ?>
                             </select>
                         </div>
                         <button class="shrink-0 h-10 px-4 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Fechar</button>
@@ -183,12 +194,10 @@ $fmtNota = static function ($c): string {
                     <input type="hidden" name="ficha_id" value="<?= (int) $ficha['id'] ?>">
                     <div class="sm:col-span-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Período</label>
-                        <select name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                            <option value="-1">Ano inteiro</option>
-                            <?php for ($i = 1; $i <= 4; $i++): ?>
-                                <option value="<?= $i ?>"><?= $i ?>º bimestre</option>
-                            <?php endfor; ?>
-                        </select>
+                            <select name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                                <option value="-1">Ano inteiro</option>
+                                <?= PeriodoLetivo::optionsHtml($anoFicha, 0) ?>
+                            </select>
                     </div>
                     <div class="sm:col-span-5">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Motivo</label>

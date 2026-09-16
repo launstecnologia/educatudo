@@ -20,6 +20,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordem</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Área</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sigla</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Área do Conhecimento</th>
@@ -32,7 +33,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($items)): ?>
                 <tr>
-                    <td colspan="9" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="10" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-book text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum componente curricular cadastrado</p>
                         <button type="button" onclick="openComponenteDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
@@ -41,14 +42,28 @@ include __DIR__ . '/../_partials/page_header_list.php';
                     </td>
                 </tr>
                 <?php else: ?>
+                <?php
+                $idsComFilhos = is_array($ids_com_filhos ?? null) ? $ids_com_filhos : [];
+                $nomePorId = [];
+                foreach ($items as $itMap) {
+                    $nomePorId[(int) ($itMap['id'] ?? 0)] = (string) ($itMap['nome'] ?? '');
+                }
+                ?>
                 <?php foreach ($items as $item): ?>
+                <?php $itemId = (int) ($item['id'] ?? 0); $paiIdItem = (int) ($item['pai_id'] ?? 0); ?>
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= (int) ($item['ordem'] ?? 0) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <span class="inline-flex items-center gap-2">
+                        <span class="inline-flex items-center gap-2 <?= $paiIdItem > 0 ? 'pl-4' : '' ?>">
                             <span class="inline-block w-3 h-3 rounded-full border border-gray-200" style="background-color: <?= htmlspecialchars($item['cor'] ?? '#3B82F6') ?>"></span>
                             <?= htmlspecialchars($item['nome'] ?? '') ?>
+                            <?php if (isset($idsComFilhos[$itemId])): ?>
+                                <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">Rótulo</span>
+                            <?php endif; ?>
                         </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <?= $paiIdItem > 0 ? htmlspecialchars($nomePorId[$paiIdItem] ?? '—') : '—' ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($item['codigo'] ?? '') ?: '—' ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= htmlspecialchars($item['sigla'] ?? '') ?: '—' ?></td>
@@ -145,6 +160,24 @@ include __DIR__ . '/../_partials/page_header_list.php';
                         <label for="cc_sigla" class="block text-sm font-medium text-gray-700 mb-1">Sigla</label>
                         <input type="text" id="cc_sigla" name="sigla" placeholder="Ex: MAT"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 uppercase">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="cc_pai_id" class="block text-sm font-medium text-gray-700 mb-1">Área (rótulo pai)</label>
+                        <div class="relative">
+                            <select id="cc_pai_id" name="pai_id"
+                                    class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                <option value="">Nenhuma — este componente tem nota própria</option>
+                                <?php foreach (($pais_candidatos ?? []) as $paiOpt): ?>
+                                    <?php $pidOpt = (int) ($paiOpt['id'] ?? 0); ?>
+                                    <?php if ($pidOpt <= 0) { continue; } ?>
+                                    <option value="<?= $pidOpt ?>"><?= htmlspecialchars((string) ($paiOpt['nome'] ?? '')) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">O pai é o componente oficial da matriz e do histórico (ex.: Língua Portuguesa). Os filhos (Gramática, Redação…) recebem aula, nota e diário; a carga da área é a soma deles.</p>
                     </div>
                     <div>
                         <label for="cc_area_conhecimento" class="block text-sm font-medium text-gray-700 mb-1">Área do Conhecimento *</label>
@@ -274,7 +307,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
 <script>
 const URL_BASE = <?= json_encode(URL) ?>;
 const componenteCheckboxFields = ['permite_avaliacao', 'permite_frequencia', 'permite_plano_aula', 'permite_diario', 'ativo'];
-const componenteTextFields = ['nome', 'codigo', 'sigla', 'area_conhecimento', 'tipo', 'etapa_infantil', 'etapa_fund_i', 'etapa_fund_ii', 'etapa_medio', 'cor', 'ordem', 'descricao'];
+const componenteTextFields = ['nome', 'codigo', 'sigla', 'area_conhecimento', 'tipo', 'etapa_infantil', 'etapa_fund_i', 'etapa_fund_ii', 'etapa_medio', 'cor', 'ordem', 'descricao', 'pai_id'];
 
 function showComponenteDrawer() {
     document.getElementById('componenteDrawerBackdrop').classList.remove('hidden');
@@ -306,6 +339,8 @@ function openComponenteDrawer(id) {
         componenteCheckboxFields.forEach((field) => {
             document.getElementById('cc_' + field).checked = true;
         });
+        var paiElCreate = document.getElementById('cc_pai_id');
+        if (paiElCreate) paiElCreate.value = '';
         showComponenteDrawer();
         return;
     }
@@ -337,6 +372,10 @@ function openComponenteDrawer(id) {
             componenteCheckboxFields.forEach((field) => {
                 document.getElementById('cc_' + field).checked = !!parseInt(item[field], 10);
             });
+            var paiEl = document.getElementById('cc_pai_id');
+            if (paiEl) {
+                paiEl.value = item.pai_id ? String(item.pai_id) : '';
+            }
         })
         .catch(() => {
             alert('Erro de conexão ao carregar componente curricular.');

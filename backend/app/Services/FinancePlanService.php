@@ -50,9 +50,20 @@ class FinancePlanService
         return $this->planModel->addItem($planId, $data);
     }
 
-    public function removeItem(int $itemId): void
+    public function findItem(int $planId, int $itemId): ?array
     {
-        $this->planModel->removeItem($itemId);
+        return $this->planModel->findItem($planId, $itemId);
+    }
+
+    public function updateItem(int $planId, int $itemId, array $data): bool
+    {
+        $data['unidade_id'] = (int) ($data['unidade_id'] ?? 0) ?: null;
+        return $this->planModel->updateItem($planId, $itemId, $data);
+    }
+
+    public function removeItem(int $planId, int $itemId): bool
+    {
+        return $this->planModel->removeItem($planId, $itemId);
     }
 
     public function toggle(int $planId): void

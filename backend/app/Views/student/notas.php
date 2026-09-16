@@ -3,7 +3,10 @@ $aluno = $aluno ?? [];
 $notas_lancamento_eventos = $notas_lancamento_eventos ?? [];
 $boletins_gerados = $boletins_gerados ?? [];
 $boletins_gerados_notas = $boletins_gerados_notas ?? [];
+$boletins_gerados_notas_extra = $boletins_gerados_notas_extra ?? [];
 $boletins_gerados_boletim = $boletins_gerados_boletim ?? [];
+$boletins_gerados_complementar = $boletins_gerados_complementar ?? [];
+$paineis_notas = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 $isPaginaBoletim = (($current_page ?? '') === 'boletim');
 ?>
 
@@ -17,18 +20,8 @@ $isPaginaBoletim = (($current_page ?? '') === 'boletim');
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <?php if (!$isPaginaBoletim): ?>
-            <?php
-            $quadro = $quadro_notas_semanais ?? [];
-            $quadroFile = dirname(__DIR__, 2) . '/Modulos/notas-semanais/Views/aluno/quadro.php';
-            $usarQuadroSemanal = !empty($quadro['modulo_ativo']) && !empty($quadro['tem_dados']) && is_file($quadroFile);
-            ?>
-            <?php if ($usarQuadroSemanal): ?>
-                <?php
-                $baseUrlNotas = URL . '/notas';
-                $secaoNotas = 'notas';
-                require $quadroFile;
-                ?>
-            <?php elseif (!empty($notas_lancamento_eventos)): ?>
+            <?php require __DIR__ . '/../partials/resumo_notas_tabelas.php'; ?>
+            <?php if (!empty($notas_lancamento_eventos)): ?>
                 <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
                     <table class="min-w-full text-sm text-left">
                         <thead class="bg-gray-100 text-gray-700">
@@ -64,11 +57,27 @@ $isPaginaBoletim = (($current_page ?? '') === 'boletim');
             <?php if (!empty($boletins_gerados_notas)): ?>
                 <div class="mt-6">
                     <?php
+                    $paineis_notas_eventos = $boletins_gerados_notas;
+                    $painel_notas_pode_imprimir = false;
+                    require __DIR__ . '/../partials/painel_notas_eventos.php';
+                    ?>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($boletins_gerados_notas_extra)): ?>
+                <h2 class="text-lg font-semibold text-gray-900 mt-8 mb-1">Notas extra</h2>
+                <p class="text-sm text-gray-500 mb-4">Cursos extras (música, robótica…) — não entra no histórico oficial.</p>
+                <div class="mt-2">
+                    <?php
                     $boletinsGeradosBackup = $boletins_gerados;
-                    $boletins_gerados = $boletins_gerados_notas;
+                    $boletins_gerados = $boletins_gerados_notas_extra;
                     require __DIR__ . '/../partials/boletins_gerados.php';
                     $boletins_gerados = $boletinsGeradosBackup;
                     ?>
+                </div>
+            <?php endif; ?>
+            <?php if (empty($boletins_gerados_notas) && empty($boletins_gerados_notas_extra) && empty($notas_lancamento_eventos) && empty($paineis_notas) && empty($resumosNotas)): ?>
+                <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
+                    <p class="text-gray-500">Nenhuma nota encontrada.</p>
                 </div>
             <?php endif; ?>
         <?php else: ?>
@@ -83,7 +92,17 @@ $isPaginaBoletim = (($current_page ?? '') === 'boletim');
             require __DIR__ . '/../partials/boletins_gerados.php';
             $boletins_gerados = $boletinsGeradosBackup;
             ?>
-            <?php if (empty($boletins_gerados_boletim) && empty($quadro_oficial['grid'])): ?>
+            <?php if (!empty($boletins_gerados_complementar)): ?>
+                <h2 class="text-lg font-semibold text-gray-900 mt-8 mb-1">Boletim complementar</h2>
+                <p class="text-sm text-gray-500 mb-4">Cursos extras e atividades paralelas — não entra no histórico oficial.</p>
+                <?php
+                $boletinsGeradosBackup = $boletins_gerados;
+                $boletins_gerados = $boletins_gerados_complementar;
+                require __DIR__ . '/../partials/boletins_gerados.php';
+                $boletins_gerados = $boletinsGeradosBackup;
+                ?>
+            <?php endif; ?>
+            <?php if (empty($boletins_gerados_boletim) && empty($boletins_gerados_complementar) && empty($quadro_oficial['grid'])): ?>
                 <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                     <p class="text-gray-500">Nenhum boletim gerado ainda.</p>
                 </div>

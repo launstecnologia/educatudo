@@ -95,6 +95,8 @@ class BoletimConfig
         $this->ensureRegraColumn('series_ids', "ALTER TABLE boletim_regras ADD COLUMN series_ids TEXT NULL AFTER materias_ids");
         $this->ensureRegraColumn('turmas_ids', "ALTER TABLE boletim_regras ADD COLUMN turmas_ids TEXT NULL AFTER series_ids");
         $this->ensureRegraColumn('exibir_em', "ALTER TABLE boletim_regras ADD COLUMN exibir_em ENUM('notas','boletim') NOT NULL DEFAULT 'boletim' AFTER series_ids");
+        $this->ensureRegraColumn('finalidade', "ALTER TABLE boletim_regras ADD COLUMN finalidade ENUM('oficial','complementar') NOT NULL DEFAULT 'oficial' AFTER exibir_em");
+        $this->ensureRegraColumn('boletim_id', "ALTER TABLE boletim_regras ADD COLUMN boletim_id INT UNSIGNED NULL DEFAULT NULL AFTER finalidade");
         $this->ensureRegraColumn('vis_aluno', "ALTER TABLE boletim_regras ADD COLUMN vis_aluno TINYINT(1) NOT NULL DEFAULT 1 AFTER exibir_em");
         $this->ensureRegraColumn('vis_pais', "ALTER TABLE boletim_regras ADD COLUMN vis_pais TINYINT(1) NOT NULL DEFAULT 1 AFTER vis_aluno");
         $this->ensureRegraColumn('vis_coordenacao', "ALTER TABLE boletim_regras ADD COLUMN vis_coordenacao TINYINT(1) NOT NULL DEFAULT 1 AFTER vis_pais");
@@ -762,7 +764,8 @@ class BoletimConfig
         ?string $defaultDataFim = null,
         ?float $notaMinimaAprovacao = null,
         int $usarResultadoAprovacao = 1,
-        ?string $extrasJson = null
+        ?string $extrasJson = null,
+        string $finalidade = 'oficial'
     ): int
     {
         $this->db->beginTransaction();
@@ -771,7 +774,7 @@ class BoletimConfig
             if ($regraId !== null && $regraId > 0) {
                 $this->db->update(
                     "UPDATE boletim_regras
-                     SET nome = :nome, codigo = :codigo, descricao_curta = :descricao_curta, formula_final = :formula_final, formula_materias_json = :formula_materias_json, extras_json = :extras_json, materias_ids = :materias_ids, series_ids = :series_ids, turmas_ids = :turmas_ids, exibir_em = :exibir_em, ano_letivo = :ano_letivo, bimestre = :bimestre, nota_minima_aprovacao = :nota_minima_aprovacao, usar_resultado_aprovacao = :usar_resultado_aprovacao, vis_aluno = :vis_aluno, vis_pais = :vis_pais, vis_coordenacao = :vis_coordenacao, round_mode = :round_mode, decimal_places = :decimal_places, default_data_inicio = :default_data_inicio, default_data_fim = :default_data_fim, ativo = 1
+                     SET nome = :nome, codigo = :codigo, descricao_curta = :descricao_curta, formula_final = :formula_final, formula_materias_json = :formula_materias_json, extras_json = :extras_json, materias_ids = :materias_ids, series_ids = :series_ids, turmas_ids = :turmas_ids, exibir_em = :exibir_em, finalidade = :finalidade, ano_letivo = :ano_letivo, bimestre = :bimestre, nota_minima_aprovacao = :nota_minima_aprovacao, usar_resultado_aprovacao = :usar_resultado_aprovacao, vis_aluno = :vis_aluno, vis_pais = :vis_pais, vis_coordenacao = :vis_coordenacao, round_mode = :round_mode, decimal_places = :decimal_places, default_data_inicio = :default_data_inicio, default_data_fim = :default_data_fim, ativo = 1
                      WHERE id = :id",
                     [
                         'nome' => $nome,
@@ -784,6 +787,7 @@ class BoletimConfig
                         'series_ids' => $this->trimConfigJson($seriesIdsJson),
                         'turmas_ids' => $this->trimConfigJson($turmasIdsJson),
                         'exibir_em' => $this->normalizeExibirEm($exibirEm),
+                        'finalidade' => $this->normalizeFinalidade($finalidade),
                         'ano_letivo' => $this->normalizeAnoLetivo($anoLetivo),
                         'bimestre' => $this->normalizeBimestre($bimestre),
                         'nota_minima_aprovacao' => $this->normalizeNotaMinimaAprovacao($notaMinimaAprovacao),
@@ -800,8 +804,8 @@ class BoletimConfig
                 );
             } else {
                 $regraId = (int) $this->db->insert(
-                    "INSERT INTO boletim_regras (nome, codigo, descricao_curta, formula_final, formula_materias_json, extras_json, materias_ids, series_ids, turmas_ids, exibir_em, ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao, vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places, default_data_inicio, default_data_fim, ativo)
-                     VALUES (:nome, :codigo, :descricao_curta, :formula_final, :formula_materias_json, :extras_json, :materias_ids, :series_ids, :turmas_ids, :exibir_em, :ano_letivo, :bimestre, :nota_minima_aprovacao, :usar_resultado_aprovacao, :vis_aluno, :vis_pais, :vis_coordenacao, :round_mode, :decimal_places, :default_data_inicio, :default_data_fim, 1)",
+                    "INSERT INTO boletim_regras (nome, codigo, descricao_curta, formula_final, formula_materias_json, extras_json, materias_ids, series_ids, turmas_ids, exibir_em, finalidade, ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao, vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places, default_data_inicio, default_data_fim, ativo)
+                     VALUES (:nome, :codigo, :descricao_curta, :formula_final, :formula_materias_json, :extras_json, :materias_ids, :series_ids, :turmas_ids, :exibir_em, :finalidade, :ano_letivo, :bimestre, :nota_minima_aprovacao, :usar_resultado_aprovacao, :vis_aluno, :vis_pais, :vis_coordenacao, :round_mode, :decimal_places, :default_data_inicio, :default_data_fim, 1)",
                     [
                         'nome' => $nome,
                         'codigo' => $this->normalizeRuleCode($codigo, $nome),
@@ -813,6 +817,7 @@ class BoletimConfig
                         'series_ids' => $this->trimConfigJson($seriesIdsJson),
                         'turmas_ids' => $this->trimConfigJson($turmasIdsJson),
                         'exibir_em' => $this->normalizeExibirEm($exibirEm),
+                        'finalidade' => $this->normalizeFinalidade($finalidade),
                         'ano_letivo' => $this->normalizeAnoLetivo($anoLetivo),
                         'bimestre' => $this->normalizeBimestre($bimestre),
                         'nota_minima_aprovacao' => $this->normalizeNotaMinimaAprovacao($notaMinimaAprovacao),
@@ -923,8 +928,14 @@ class BoletimConfig
     public function listAllRules(int $limit = 300): array
     {
         $limit = max(1, min($limit, 1000));
+        $selFinalidade = $this->hasColumn('boletim_regras', 'finalidade')
+            ? 'finalidade'
+            : "'oficial' AS finalidade";
+        $selBoletimId = $this->hasColumn('boletim_regras', 'boletim_id')
+            ? 'boletim_id'
+            : 'NULL AS boletim_id';
         return $this->db->fetchAll(
-            "SELECT id, nome, codigo, descricao_curta, exibir_em, ano_letivo, bimestre, series_ids, turmas_ids, vis_aluno, vis_pais, vis_coordenacao, updated_at
+            "SELECT id, nome, codigo, descricao_curta, exibir_em, {$selFinalidade}, {$selBoletimId}, ano_letivo, bimestre, series_ids, turmas_ids, vis_aluno, vis_pais, vis_coordenacao, updated_at
              FROM boletim_regras
              WHERE ativo = 1
              ORDER BY updated_at DESC, id DESC
@@ -1540,11 +1551,18 @@ class BoletimConfig
 
         $this->db->beginTransaction();
         try {
-            $novoId = (int) $this->db->insert(
-                "INSERT INTO boletim_regras
+            $temFinalidade = $this->hasColumn('boletim_regras', 'finalidade');
+            $sqlDup = $temFinalidade
+                ? "INSERT INTO boletim_regras
+                (nome, codigo, descricao_curta, formula_final, formula_materias_json, extras_json, materias_ids, series_ids, turmas_ids, exibir_em, finalidade, ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao, vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places, default_data_inicio, default_data_fim, ativo)
+                SELECT :nome, :codigo, descricao_curta, formula_final, formula_materias_json, extras_json, materias_ids, series_ids, turmas_ids, exibir_em, finalidade, ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao, vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places, default_data_inicio, default_data_fim, 1
+                FROM boletim_regras WHERE id = :id"
+                : "INSERT INTO boletim_regras
                 (nome, codigo, descricao_curta, formula_final, formula_materias_json, extras_json, materias_ids, series_ids, turmas_ids, exibir_em, ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao, vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places, default_data_inicio, default_data_fim, ativo)
                 SELECT :nome, :codigo, descricao_curta, formula_final, formula_materias_json, extras_json, materias_ids, series_ids, turmas_ids, exibir_em, ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao, vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places, default_data_inicio, default_data_fim, 1
-                FROM boletim_regras WHERE id = :id",
+                FROM boletim_regras WHERE id = :id";
+            $novoId = (int) $this->db->insert(
+                $sqlDup,
                 ['nome' => $novoNome, 'codigo' => $novoCodigo, 'id' => $ruleId]
             );
 
@@ -1555,6 +1573,8 @@ class BoletimConfig
                 FROM boletim_componentes WHERE regra_id = :regra_id AND ativo = 1",
                 ['novo_regra_id' => $novoId, 'regra_id' => $ruleId]
             );
+
+            $this->setBoletimId($novoId, isset($regra['boletim_id']) ? (int) $regra['boletim_id'] : null);
 
             $this->db->commit();
             return $novoId;
@@ -1575,6 +1595,126 @@ class BoletimConfig
             $candidato = $base . '-copia-' . $i;
         }
         return $candidato;
+    }
+
+    /**
+     * Atualiza nome, código, bimestre, ano e datas de um evento gerado.
+     *
+     * @param array{nome?:string,codigo?:string,bimestre?:int,ano_letivo?:int,default_data_inicio?:?string,default_data_fim?:?string} $campos
+     */
+    public function atualizarEventoGerado(int $ruleId, array $campos): bool
+    {
+        if ($ruleId <= 0) {
+            return false;
+        }
+        $set = [];
+        $params = ['id' => $ruleId];
+        if (array_key_exists('nome', $campos)) {
+            $set[] = 'nome = :nome';
+            $params['nome'] = trim((string) $campos['nome']);
+        }
+        if (array_key_exists('codigo', $campos)) {
+            $set[] = 'codigo = :codigo';
+            $params['codigo'] = trim((string) $campos['codigo']);
+        }
+        if (array_key_exists('bimestre', $campos)) {
+            $bim = (int) $campos['bimestre'];
+            $set[] = 'bimestre = :bimestre';
+            $params['bimestre'] = ($bim >= 1 && $bim <= 4) ? $bim : null;
+        }
+        if (array_key_exists('default_data_inicio', $campos)) {
+            $set[] = 'default_data_inicio = :default_data_inicio';
+            $params['default_data_inicio'] = $campos['default_data_inicio'] ?: null;
+        }
+        if (array_key_exists('default_data_fim', $campos)) {
+            $set[] = 'default_data_fim = :default_data_fim';
+            $params['default_data_fim'] = $campos['default_data_fim'] ?: null;
+        }
+        if (array_key_exists('ano_letivo', $campos)) {
+            $ano = (int) $campos['ano_letivo'];
+            $set[] = 'ano_letivo = :ano_letivo';
+            $params['ano_letivo'] = $ano >= 2000 ? $ano : null;
+        }
+        if ($set === []) {
+            return false;
+        }
+        $n = (int) $this->db->update(
+            'UPDATE boletim_regras SET ' . implode(', ', $set) . ' WHERE id = :id AND ativo = 1',
+            $params
+        );
+        return $n > 0;
+    }
+
+    public function codigoUnicoPara(string $base): string
+    {
+        $base = trim($base);
+        if ($base === '') {
+            $base = 'avaliacao';
+        }
+        $candidato = $base;
+        $i = 1;
+        while ($this->db->fetch('SELECT id FROM boletim_regras WHERE codigo = :codigo', ['codigo' => $candidato])) {
+            $i++;
+            $candidato = $base . '-' . $i;
+        }
+        return $candidato;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarEventosNotasAtivos(): array
+    {
+        $boletim = $this->hasColumn('boletim_regras', 'boletim_id') ? 'boletim_id,' : '';
+        return $this->db->fetchAll(
+            "SELECT id, nome, codigo, bimestre, {$boletim} extras_json, default_data_inicio, default_data_fim, ano_letivo
+             FROM boletim_regras
+             WHERE ativo = 1 AND exibir_em = 'notas'
+             ORDER BY nome ASC, id ASC"
+        ) ?: [];
+    }
+
+    public function regraTemResultadoOficial(int $regraId): bool
+    {
+        if ($regraId <= 0 || !$this->hasTable('boletim_resultados_gerados')) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS n FROM boletim_resultados_gerados
+              WHERE regra_id = :id AND preview = 0',
+            ['id' => $regraId]
+        );
+        return (int) ($row['n'] ?? 0) > 0;
+    }
+
+    /**
+     * @param array<string,mixed> $patch
+     */
+    public function mesclarExtrasJson(int $regraId, array $patch): bool
+    {
+        if ($regraId <= 0 || $patch === []) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            'SELECT extras_json FROM boletim_regras WHERE id = :id AND ativo = 1',
+            ['id' => $regraId]
+        );
+        if (!is_array($row)) {
+            return false;
+        }
+        $extras = json_decode((string) ($row['extras_json'] ?? ''), true);
+        if (!is_array($extras)) {
+            $extras = [];
+        }
+        foreach ($patch as $k => $v) {
+            $extras[(string) $k] = $v;
+        }
+        $json = json_encode($extras, JSON_UNESCAPED_UNICODE);
+        $n = (int) $this->db->update(
+            'UPDATE boletim_regras SET extras_json = :extras WHERE id = :id AND ativo = 1',
+            ['id' => $regraId, 'extras' => $json]
+        );
+        return $n > 0;
     }
 
     public function getAvailableSeries(int $limit = 200): array
@@ -2163,7 +2303,10 @@ class BoletimConfig
             }
         }
 
-        $sql = "SELECT g.*, r.nome AS regra_nome, r.codigo AS regra_codigo, r.exibir_em, r.decimal_places, r.bimestre AS regra_bimestre, r.ano_letivo AS regra_ano_letivo
+        $selFinalidade = $this->hasColumn('boletim_regras', 'finalidade')
+            ? 'r.finalidade'
+            : "'oficial' AS finalidade";
+        $sql = "SELECT g.*, r.nome AS regra_nome, r.codigo AS regra_codigo, r.exibir_em, {$selFinalidade}, r.decimal_places, r.bimestre AS regra_bimestre, r.ano_letivo AS regra_ano_letivo
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              WHERE g.aluno_id = :aluno_id
@@ -2192,6 +2335,7 @@ class BoletimConfig
                     'regra_nome' => (string) ($r['regra_nome'] ?? 'Evento'),
                     'regra_codigo' => (string) ($r['regra_codigo'] ?? ''),
                     'exibir_em' => (string) ($r['exibir_em'] ?? 'boletim'),
+                    'finalidade' => $this->normalizeFinalidade((string) ($r['finalidade'] ?? 'oficial')),
                     'bimestre' => $r['regra_bimestre'] !== null ? (int) $r['regra_bimestre'] : null,
                     'ano_letivo' => $r['regra_ano_letivo'] !== null ? (int) $r['regra_ano_letivo'] : null,
                     'decimal_places' => $this->normalizeDecimalPlaces((int) ($r['decimal_places'] ?? 2)),
@@ -3277,9 +3421,23 @@ class BoletimConfig
         if (isset($this->materiasDisponiveisCache[$cacheKey])) {
             return $this->materiasDisponiveisCache[$cacheKey];
         }
+        $sqlFiltroRotulo = '';
+        try {
+            $colPai = $this->db->fetch("SHOW COLUMNS FROM materias LIKE 'pai_id'");
+            if ($colPai) {
+                $sqlFiltroRotulo .= " AND m.id NOT IN (SELECT DISTINCT pai_id FROM materias WHERE pai_id IS NOT NULL AND pai_id > 0)";
+            }
+            $colAv = $this->db->fetch("SHOW COLUMNS FROM materias LIKE 'permite_avaliacao'");
+            if ($colAv) {
+                $sqlFiltroRotulo .= " AND m.permite_avaliacao = 1";
+            }
+        } catch (Throwable $e) {
+            $sqlFiltroRotulo = '';
+        }
         $rows = $this->db->fetchAll(
             "SELECT m.id, m.nome
              FROM materias m
+             WHERE 1=1{$sqlFiltroRotulo}
              ORDER BY m.nome ASC
              LIMIT {$limit}"
         ) ?: [];
@@ -3311,6 +3469,7 @@ class BoletimConfig
                 $out[$id] = 100000 + $id;
             }
         }
+        $out = $this->aplicarOrdemOficialNoMapa($out);
         if (!$this->hasTable('matrizes_curriculares_componentes')) {
             $this->mapaOrdemBoletimCache[$cacheKey] = $out;
             return $out;
@@ -3370,7 +3529,45 @@ class BoletimConfig
             $out[$mid] = (int) ($r['ordem'] ?? 0);
         }
 
+        $out = $this->aplicarOrdemOficialNoMapa($out);
         $this->mapaOrdemBoletimCache[$cacheKey] = $out;
+        return $out;
+    }
+
+    /**
+     * Inclui o pai oficial e usa a menor ordem dos filhos.
+     *
+     * @param array<int, int> $out
+     * @return array<int, int>
+     */
+    private function aplicarOrdemOficialNoMapa(array $out): array
+    {
+        $pathComp = dirname(__DIR__) . '/Education/ComponenteCurricular.php';
+        if (!is_file($pathComp)) {
+            return $out;
+        }
+        require_once $pathComp;
+        try {
+            $comp = new \ComponenteCurricular();
+            foreach ($comp->getOficiaisParaMatriz(true) as $of) {
+                $oid = (int) ($of['id'] ?? 0);
+                if ($oid > 0 && !isset($out[$oid])) {
+                    $out[$oid] = 100000 + $oid;
+                }
+            }
+            foreach ($comp->mapaPaiPorFilho() as $filhoId => $paiId) {
+                $filhoId = (int) $filhoId;
+                $paiId = (int) $paiId;
+                if ($filhoId <= 0 || $paiId <= 0 || !isset($out[$filhoId])) {
+                    continue;
+                }
+                if (!isset($out[$paiId]) || $out[$paiId] > $out[$filhoId]) {
+                    $out[$paiId] = $out[$filhoId];
+                }
+            }
+        } catch (Throwable $e) {
+            return $out;
+        }
         return $out;
     }
 
@@ -3715,10 +3912,208 @@ class BoletimConfig
         return substr($raw, 0, 120);
     }
 
+    public function setBoletimId(int $regraId, ?int $boletimId): void
+    {
+        if ($regraId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return;
+        }
+        $this->db->update(
+            "UPDATE boletim_regras SET boletim_id = :boletim_id WHERE id = :id",
+            [
+                'id' => $regraId,
+                'boletim_id' => ($boletimId !== null && $boletimId > 0) ? $boletimId : null,
+            ]
+        );
+    }
+
+    public function desvincularEventosDoBoletim(int $boletimId): void
+    {
+        if ($boletimId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return;
+        }
+        $this->db->update(
+            "UPDATE boletim_regras SET boletim_id = NULL WHERE boletim_id = :boletim_id",
+            ['boletim_id' => $boletimId]
+        );
+    }
+
+    /**
+     * @return array<int,int> bimestre => regra_id
+     */
+    public function fontesBimestresDoBoletim(int $boletimId): array
+    {
+        $out = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+        if ($boletimId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return $out;
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT id, bimestre FROM boletim_regras
+             WHERE ativo = 1 AND exibir_em = 'notas' AND boletim_id = :boletim_id
+             ORDER BY updated_at ASC, id ASC",
+            ['boletim_id' => $boletimId]
+        ) ?: [];
+        foreach ($rows as $row) {
+            $bim = (int) ($row['bimestre'] ?? 0);
+            if ($bim >= 1 && $bim <= 4) {
+                $out[$bim] = (int) ($row['id'] ?? 0);
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @return array<int,int> boletim_id => quantidade
+     */
+    public function contarEventosNotasPorBoletim(): array
+    {
+        if (!$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT boletim_id, COUNT(*) AS qtd
+             FROM boletim_regras
+             WHERE ativo = 1 AND exibir_em = 'notas' AND boletim_id IS NOT NULL
+             GROUP BY boletim_id"
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) ($row['boletim_id'] ?? 0)] = (int) ($row['qtd'] ?? 0);
+        }
+        return $out;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarEventosNotasDoBoletim(int $boletimId): array
+    {
+        if ($boletimId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return [];
+        }
+        return $this->db->fetchAll(
+            "SELECT id, nome, codigo, bimestre, default_data_inicio, default_data_fim, ano_letivo
+             FROM boletim_regras
+             WHERE ativo = 1 AND exibir_em = 'notas' AND boletim_id = :boletim_id
+             ORDER BY bimestre ASC, id ASC",
+            ['boletim_id' => $boletimId]
+        ) ?: [];
+    }
+
+    /**
+     * Primeiro evento (por bimestre) ainda sem boletim oficial gravado.
+     * Evita o "Gerar boletins" cair no último período (ex.: 4º) quando o trabalho atual é o 2º.
+     *
+     * @param list<array<string,mixed>> $eventos
+     */
+    public function primeiroEventoNotasSemGeracao(array $eventos): int
+    {
+        $primeiro = 0;
+        foreach ($eventos as $ev) {
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ($primeiro === 0) {
+                $primeiro = $id;
+            }
+            if (!$this->regraTemResultadoOficial($id)) {
+                return $id;
+            }
+        }
+        return $primeiro;
+    }
+
+    /**
+     * Após duplicar um evento de notas, aponta as peças para o bimestre novo
+     * e solta IDs de bloco do modelo (senão o 2º/4º reaproveita as provas do 1º).
+     */
+    public function alinharComponentesAoBimestre(int $regraId, int $bimestre): void
+    {
+        $bimestre = max(1, min(4, $bimestre));
+        if ($regraId <= 0) {
+            return;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, source_type, config_json FROM boletim_componentes WHERE regra_id = :r AND ativo = 1',
+            ['r' => $regraId]
+        ) ?: [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $cfg = json_decode((string) ($row['config_json'] ?? ''), true);
+            if (!is_array($cfg)) {
+                $cfg = [];
+            }
+            $cfg['prova_bimestres'] = [$bimestre];
+            $this->db->update(
+                'UPDATE boletim_componentes
+                    SET bloco_id = NULL, blocos_ids = NULL, config_json = :c
+                  WHERE id = :id',
+                [
+                    'c' => json_encode($cfg, JSON_UNESCAPED_UNICODE),
+                    'id' => $id,
+                ]
+            );
+        }
+    }
+
+    public function getUltimaRegraNotas(): ?array
+    {
+        $row = $this->db->fetch(
+            "SELECT id FROM boletim_regras WHERE ativo = 1 AND exibir_em = 'notas' ORDER BY updated_at DESC, id DESC LIMIT 1"
+        );
+        if (!$row) {
+            return null;
+        }
+        return $this->getRuleById((int) $row['id']);
+    }
+
     private function normalizeExibirEm(string $value): string
     {
         $v = strtolower(trim($value));
         return $v === 'notas' ? 'notas' : 'boletim';
+    }
+
+    /**
+     * @param mixed $value
+     */
+    public function normalizeFinalidade($value): string
+    {
+        return strtolower(trim((string) $value)) === 'complementar' ? 'complementar' : 'oficial';
+    }
+
+    /**
+     * Separa eventos gerados em notas da série, notas extra, boletim oficial e boletim complementar.
+     *
+     * @param list<array<string,mixed>> $eventos
+     * @return array{notas: list<array<string,mixed>>, notas_extra: list<array<string,mixed>>, boletim: list<array<string,mixed>>, complementar: list<array<string,mixed>>}
+     */
+    public static function classificarEventosGerados(array $eventos): array
+    {
+        $out = ['notas' => [], 'notas_extra' => [], 'boletim' => [], 'complementar' => []];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $exibir = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
+            $fin = strtolower(trim((string) ($ev['finalidade'] ?? 'oficial')));
+            if ($exibir === 'notas') {
+                if ($fin === 'complementar') {
+                    $out['notas_extra'][] = $ev;
+                } else {
+                    $out['notas'][] = $ev;
+                }
+                continue;
+            }
+            if ($fin === 'complementar') {
+                $out['complementar'][] = $ev;
+            } else {
+                $out['boletim'][] = $ev;
+            }
+        }
+        return $out;
     }
 
     private function normalizeAnoLetivo(?int $ano): ?int
@@ -3772,7 +4167,7 @@ class BoletimConfig
         if (isset($this->filtroBlocosCache[$cacheKey])) {
             return $this->filtroBlocosCache[$cacheKey];
         }
-        if ($blocoIds === [] || $semana < 1 || $semana > 8 || !$this->hasColumn('provas_blocos', 'semana')) {
+        if ($blocoIds === [] || $semana < 1 || $semana > 20 || !$this->hasColumn('provas_blocos', 'semana')) {
             return $this->filtroBlocosCache[$cacheKey] = $blocoIds;
         }
         $placeholders = implode(',', array_fill(0, count($blocoIds), '?'));
@@ -3935,7 +4330,7 @@ class BoletimConfig
         ?string $fim = null,
         array $bimestres = []
     ): array {
-        if ($tipoAvaliacaoId <= 0 || $semana < 1 || $semana > 8) {
+        if ($tipoAvaliacaoId <= 0 || $semana < 0 || $semana > 20) {
             return [];
         }
         if (!$this->hasColumn('provas_blocos', 'tipo_avaliacao_id')
@@ -3956,12 +4351,16 @@ class BoletimConfig
         }
         $sql = 'SELECT id FROM provas_blocos
                 WHERE deleted_at IS NULL
-                  AND tipo_avaliacao_id = :tipo
-                  AND semana = :semana';
+                  AND tipo_avaliacao_id = :tipo';
         $params = [
             'tipo' => $tipoAvaliacaoId,
-            'semana' => $semana,
         ];
+        if ($semana >= 1) {
+            $sql .= ' AND semana = :semana';
+            $params['semana'] = $semana;
+        } else {
+            $sql .= ' AND (semana IS NULL OR semana = 0)';
+        }
         if ($inicio !== null && $fim !== null && $inicio !== '' && $fim !== '') {
             $sql .= ' AND (
                 data_prova IS NULL
@@ -3988,6 +4387,177 @@ class BoletimConfig
             $sql .= ' AND (bimestre IS NULL OR bimestre = 0 OR bimestre IN (' . implode(',', $ph) . '))';
         }
         $sql .= ' ORDER BY data_prova DESC, id DESC LIMIT 400';
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return $this->filtroBlocosCache[$cacheKey] = array_values(array_unique($out));
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     * @return list<int>
+     */
+    public function filtrarBlocoIdsPorGrupoRegras(array $blocoIds, int $tipoId, int $marcaId): array
+    {
+        $blocoIds = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $tipoId = $tipoId > 0 ? $tipoId : 0;
+        $marcaId = $marcaId > 0 ? $marcaId : 0;
+        $cacheKey = 'grn:' . $tipoId . ':' . $marcaId . ':' . implode(',', $blocoIds);
+        if (isset($this->filtroBlocosCache[$cacheKey])) {
+            return $this->filtroBlocosCache[$cacheKey];
+        }
+        if ($blocoIds === [] || ($tipoId <= 0 && $marcaId <= 0)) {
+            return $this->filtroBlocosCache[$cacheKey] = $blocoIds;
+        }
+        $out = [];
+        $placeholders = implode(',', array_fill(0, count($blocoIds), '?'));
+        $temColTipo = $tipoId > 0 && $this->hasColumn('provas_blocos', 'grupo_regras_tipo_id');
+        $temColMarca = $marcaId > 0 && $this->hasColumn('provas_blocos', 'grupo_regras_marca_id');
+        $conds = [];
+        $params = $blocoIds;
+        if ($tipoId > 0 && $temColTipo) {
+            $conds[] = 'grupo_regras_tipo_id = ?';
+            $params[] = $tipoId;
+        }
+        if ($marcaId > 0 && $temColMarca) {
+            $conds[] = 'grupo_regras_marca_id = ?';
+            $params[] = $marcaId;
+        }
+        if ($conds !== []) {
+            $sql = 'SELECT id FROM provas_blocos
+                    WHERE deleted_at IS NULL AND id IN (' . $placeholders . ')
+                      AND ' . implode(' AND ', $conds);
+            foreach ($this->db->fetchAll($sql, $params) ?: [] as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                if ($id > 0) {
+                    $out[] = $id;
+                }
+            }
+        }
+        if ($this->hasTable('provas_blocos_grupos_regras')) {
+            $vconds = [];
+            $vparams = $blocoIds;
+            if ($tipoId > 0) {
+                $vconds[] = 'tipo_id = ?';
+                $vparams[] = $tipoId;
+            }
+            if ($marcaId > 0) {
+                $vconds[] = 'marca_id = ?';
+                $vparams[] = $marcaId;
+            }
+            if ($vconds !== []) {
+                $sqlV = 'SELECT bloco_id AS id FROM provas_blocos_grupos_regras
+                         WHERE bloco_id IN (' . $placeholders . ') AND ' . implode(' AND ', $vconds);
+                foreach ($this->db->fetchAll($sqlV, $vparams) ?: [] as $row) {
+                    $id = (int) ($row['id'] ?? 0);
+                    if ($id > 0) {
+                        $out[] = $id;
+                    }
+                }
+            }
+        }
+
+        return $this->filtroBlocosCache[$cacheKey] = array_values(array_unique($out));
+    }
+
+    /**
+     * @param list<int> $bimestres
+     * @return list<int>
+     */
+    public function buscarBlocoIdsPorGrupoRegras(
+        int $tipoId,
+        int $marcaId,
+        ?string $inicio = null,
+        ?string $fim = null,
+        array $bimestres = []
+    ): array {
+        $tipoId = $tipoId > 0 ? $tipoId : 0;
+        $marcaId = $marcaId > 0 ? $marcaId : 0;
+        if ($tipoId <= 0 && $marcaId <= 0) {
+            return [];
+        }
+        $temColTipo = $tipoId > 0 && $this->hasColumn('provas_blocos', 'grupo_regras_tipo_id');
+        $temColMarca = $marcaId > 0 && $this->hasColumn('provas_blocos', 'grupo_regras_marca_id');
+        $temVinc = $this->hasTable('provas_blocos_grupos_regras');
+        if (!$temVinc && (($tipoId > 0 && !$temColTipo) || ($marcaId > 0 && !$temColMarca))) {
+            return [];
+        }
+        $bimsKey = [];
+        foreach ($bimestres as $b) {
+            $n = (int) $b;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $bimsKey, true)) {
+                $bimsKey[] = $n;
+            }
+        }
+        $cacheKey = 'grnbusca:' . $tipoId . ':' . $marcaId . ':' . (string) $inicio . ':' . (string) $fim . ':' . implode(',', $bimsKey);
+        if (isset($this->filtroBlocosCache[$cacheKey])) {
+            return $this->filtroBlocosCache[$cacheKey];
+        }
+        $sql = 'SELECT DISTINCT pb.id FROM provas_blocos pb';
+        if ($temVinc) {
+            $sql .= ' LEFT JOIN provas_blocos_grupos_regras v ON v.bloco_id = pb.id';
+        }
+        $sql .= ' WHERE pb.deleted_at IS NULL';
+        $params = [];
+        $ors = [];
+        $colAnd = [];
+        if ($tipoId > 0 && $temColTipo) {
+            $colAnd[] = 'pb.grupo_regras_tipo_id = :tipo';
+            $params['tipo'] = $tipoId;
+        }
+        if ($marcaId > 0 && $temColMarca) {
+            $colAnd[] = 'pb.grupo_regras_marca_id = :marca';
+            $params['marca'] = $marcaId;
+        }
+        if ($colAnd !== []) {
+            $ors[] = '(' . implode(' AND ', $colAnd) . ')';
+        }
+        if ($temVinc) {
+            $vAnd = [];
+            if ($tipoId > 0) {
+                $vAnd[] = 'v.tipo_id = :tipo_v';
+                $params['tipo_v'] = $tipoId;
+            }
+            if ($marcaId > 0) {
+                $vAnd[] = 'v.marca_id = :marca_v';
+                $params['marca_v'] = $marcaId;
+            }
+            if ($vAnd !== []) {
+                $ors[] = '(' . implode(' AND ', $vAnd) . ')';
+            }
+        }
+        if ($ors === []) {
+            return [];
+        }
+        $sql .= ' AND (' . implode(' OR ', $ors) . ')';
+        if ($inicio !== null && $fim !== null && $inicio !== '' && $fim !== '') {
+            $sql .= ' AND (
+                pb.data_prova IS NULL
+                OR CAST(pb.data_prova AS CHAR) = \'0000-00-00\'
+                OR pb.data_prova BETWEEN DATE(:ini) AND DATE(:fim)
+            )';
+            $params['ini'] = $inicio;
+            $params['fim'] = $fim;
+        }
+        $bims = $bimsKey;
+        if ($bims !== [] && $this->hasColumn('provas_blocos', 'bimestre')) {
+            $ph = [];
+            foreach ($bims as $i => $n) {
+                $key = 'bim' . $i;
+                $ph[] = ':' . $key;
+                $params[$key] = $n;
+            }
+            $sql .= ' AND (pb.bimestre IS NULL OR pb.bimestre = 0 OR pb.bimestre IN (' . implode(',', $ph) . '))';
+        }
+        $sql .= ' ORDER BY pb.data_prova DESC, pb.id DESC LIMIT 400';
         $rows = $this->db->fetchAll($sql, $params) ?: [];
         $out = [];
         foreach ($rows as $row) {

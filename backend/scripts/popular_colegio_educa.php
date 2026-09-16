@@ -45,6 +45,7 @@ require_once $basePath . '/app/Services/HistoricoEscolarService.php';
 require_once $basePath . '/app/Services/DocumentoOficialService.php';
 require_once $basePath . '/app/Services/FrequencyService.php';
 require_once $basePath . '/app/Controllers/Admin/BoletimConfigController.php';
+require_once $basePath . '/scripts/lib/SimulacaoAcademicaEduca.php';
 
 const TENANT_DB = 'educatudo_educa';
 const SENHA = 'Teste@123';
@@ -1138,8 +1139,9 @@ final class PopularColegioEduca
                 $freq = [];
                 foreach ($alunos as $al) {
                     $aid = (int) $al['id'];
+                    $mid = (int) ($grade['materia_id'] ?? 0);
                     $freq[$aid] = [
-                        'situacao' => $this->situacaoFrequencia($aid, $bim, $n, $data),
+                        'situacao' => $this->situacaoFrequencia($aid, $mid, $bim, $data),
                         'observacao' => '',
                     ];
                 }
@@ -1155,16 +1157,10 @@ final class PopularColegioEduca
         }
     }
 
-    private function situacaoFrequencia(int $alunoId, int $bim, int $diaSemana, string $data): string
+    private function situacaoFrequencia(int $alunoId, int $materiaId, int $bim, string $data): string
     {
         $cenario = $this->cenarioPorAluno[$alunoId] ?? 'regular';
-        if ($cenario === 'frequencia') {
-            return $diaSemana >= 3 ? 'falta' : 'presente';
-        }
-        if ($cenario === 'regular' && $bim === 1 && $diaSemana === 1) {
-            return 'atraso';
-        }
-        return 'presente';
+        return SimulacaoAcademicaEduca::situacaoFrequencia($alunoId, $materiaId, $bim, $data, $cenario);
     }
 
     private function alunosAtivosNaTurma(int $turmaId, int $anoLetivoId): array
@@ -1287,12 +1283,13 @@ final class PopularColegioEduca
                         continue;
                     }
                     $linhas = [];
+                    $mid = (int) ($this->materias[$nomeMat]['id'] ?? 0);
                     foreach ($alunos as $al) {
                         $aid = (int) $al['id'];
                         $linhas[] = [
                             'turma_id' => $turmaId,
                             'aluno_id' => $aid,
-                            'nota' => $this->notaDoAluno($aid, $bim, (string) $tipoEv),
+                            'nota' => $this->notaDoAluno($aid, $mid, $bim, (string) $tipoEv),
                         ];
                     }
                     $this->notas->upsertLinhas(
@@ -1306,25 +1303,10 @@ final class PopularColegioEduca
         }
     }
 
-    private function notaDoAluno(int $alunoId, int $bim, string $tipoEv): float
+    private function notaDoAluno(int $alunoId, int $materiaId, int $bim, string $tipoEv): float
     {
         $cenario = $this->cenarioPorAluno[$alunoId] ?? 'regular';
-        $base = [
-            'regular' => [8.0, 8.5, 9.0, 8.5],
-            'recuperacao' => [4.0, 5.0, 7.0, 8.0],
-            'frequencia' => [7.0, 7.0, 7.0, 7.0],
-            'reprovado' => [3.0, 4.0, 4.0, 3.5],
-            'transferencia' => [7.0, 7.5, 7.0, 7.0],
-        ][$cenario] ?? [7.5, 7.5, 7.5, 7.5];
-        $n = $base[$bim - 1] ?? 7.5;
-        if ($tipoEv === 'p2') {
-            $n = min(10, $n + 0.3);
-        } elseif ($tipoEv === 'atv') {
-            $n = max(0, $n - 0.4);
-        } elseif ($tipoEv === 'rec') {
-            $n = $cenario === 'recuperacao' ? 8.0 : $n;
-        }
-        return round($n, 1);
+        return SimulacaoAcademicaEduca::nota($alunoId, $materiaId, $bim, $tipoEv, $cenario);
     }
 
     private function criarRecuperacao(int $ano, string $serie, string $letra, int $turmaId, int $bim, array &$eventos): void

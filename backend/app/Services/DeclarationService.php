@@ -245,6 +245,7 @@ class DeclarationService
             $cfg = new \BoletimConfig();
             $cfg->ensureSchema();
             $todos = $cfg->getGeneratedBoletinsByAluno($alunoId, 'coordenacao', 'boletim');
+            $todos = \BoletimConfig::classificarEventosGerados($todos)['boletim'];
         } catch (\Throwable $e) {
             error_log('DeclarationService getHistorico: ' . $e->getMessage());
             return [];

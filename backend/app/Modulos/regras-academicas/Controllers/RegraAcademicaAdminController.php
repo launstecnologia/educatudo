@@ -1,15 +1,12 @@
 <?php
 /**
- * EducaTudo - Cadastro de Regras Acadêmicas (admin)
+ * EducaTudo - Cadastro de Regras de Aprovação (admin)
  */
 
 require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
 require_once __DIR__ . '/../Models/RegraAcademica.php';
 require_once __DIR__ . '/../../../Models/Education/ClassRoom.php';
-require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
-require_once __DIR__ . '/../../../Models/Education/MatrizCurricular.php';
 require_once __DIR__ . '/../Services/RegraAcademicaService.php';
-require_once __DIR__ . '/../../../Services/ResultadoAcademicoService.php';
 
 use App\Modulos\RegrasAcademicas\Services\RegraAcademicaService;
 
@@ -37,7 +34,7 @@ class RegraAcademicaAdminController extends AdminBaseController
         $catalogos = $this->catalogos();
 
         $this->viewWithLayout('admin', 'admin/regras-academicas/index', [
-            'title' => 'Regras Acadêmicas - EducaTudo',
+            'title' => 'Regras de Aprovação - EducaTudo',
             'user' => $this->auth->getUser(),
             'current_page' => 'regras-academicas',
             'itens' => $model->schemaPronto() ? $model->getAll(array_filter($filtros)) : [],
@@ -67,7 +64,7 @@ class RegraAcademicaAdminController extends AdminBaseController
         }
         $item = $this->service()->model()->findById((int) $id);
         if (!$item) {
-            $this->setFlashMessage('Regra acadêmica não encontrada.', 'error');
+            $this->setFlashMessage('Regra de aprovação não encontrada.', 'error');
             $this->redirect('/admin/regras-academicas');
             return;
         }
@@ -91,7 +88,7 @@ class RegraAcademicaAdminController extends AdminBaseController
             $this->redirect('/admin/regras-academicas/nova');
             return;
         }
-        $this->setFlashMessage('Regra acadêmica cadastrada.', 'success');
+        $this->setFlashMessage('Regra de aprovação cadastrada.', 'success');
         $this->redirect('/admin/regras-academicas');
     }
 
@@ -112,7 +109,7 @@ class RegraAcademicaAdminController extends AdminBaseController
             $this->redirect('/admin/regras-academicas/' . (int) $id . '/editar');
             return;
         }
-        $this->setFlashMessage('Regra acadêmica atualizada (nova versão gravada).', 'success');
+        $this->setFlashMessage('Regra de aprovação atualizada (nova versão gravada).', 'success');
         $this->redirect('/admin/regras-academicas');
     }
 
@@ -132,7 +129,7 @@ class RegraAcademicaAdminController extends AdminBaseController
             $this->redirect('/admin/regras-academicas');
             return;
         }
-        $this->setFlashMessage('Regra acadêmica excluída.', 'success');
+        $this->setFlashMessage('Regra de aprovação excluída.', 'success');
         $this->redirect('/admin/regras-academicas');
     }
 
@@ -148,7 +145,7 @@ class RegraAcademicaAdminController extends AdminBaseController
             $historico = $this->service()->model()->listarHistorico((int) $item['id']);
         }
         $this->viewWithLayout('admin', 'admin/regras-academicas/form', [
-            'title' => ($item ? 'Editar' : 'Nova') . ' regra acadêmica - EducaTudo',
+            'title' => ($item ? 'Editar' : 'Nova') . ' regra de aprovação - EducaTudo',
             'user' => $this->auth->getUser(),
             'current_page' => 'regras-academicas',
             'item' => $item,
@@ -156,9 +153,6 @@ class RegraAcademicaAdminController extends AdminBaseController
             'cursos' => $catalogos['cursos'],
             'series' => $catalogos['series'],
             'anos_letivos' => $catalogos['anos_letivos'],
-            'matrizes' => $catalogos['matrizes'],
-            'componentes' => $catalogos['componentes'],
-            'situacoes' => ResultadoAcademicoService::SITUACOES,
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -166,25 +160,11 @@ class RegraAcademicaAdminController extends AdminBaseController
     }
 
     /**
-     * @return array{cursos:list,series:list,anos_letivos:list,matrizes:list,componentes:list}
+     * @return array{cursos:list,series:list,anos_letivos:list}
      */
     private function catalogos(): array
     {
         $classRoom = new ClassRoom();
-        $componentes = [];
-        try {
-            $componentes = (new ComponenteCurricular())->getAll(false) ?: [];
-        } catch (Throwable $e) {
-            $componentes = [];
-        }
-        $matrizes = [];
-        try {
-            $matrizModel = new MatrizCurricular();
-            $matrizes = $matrizModel->getAll(['ativo' => 1]) ?: [];
-        } catch (Throwable $e) {
-            $matrizes = [];
-        }
-
         $anos = [];
         try {
             foreach ($classRoom->getAnosLetivoNovo() ?: [] as $a) {
@@ -215,8 +195,6 @@ class RegraAcademicaAdminController extends AdminBaseController
             'cursos' => $classRoom->getCursosNovo() ?: [],
             'series' => $classRoom->getSeriesNovo() ?: [],
             'anos_letivos' => array_values($anos),
-            'matrizes' => $matrizes,
-            'componentes' => $componentes,
         ];
     }
 }

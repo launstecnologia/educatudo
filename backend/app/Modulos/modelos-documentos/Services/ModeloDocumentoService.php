@@ -3,6 +3,7 @@
 namespace App\Modulos\ModelosDocumentos\Services;
 
 require_once __DIR__ . '/../../../Core/Database.php';
+require_once __DIR__ . '/EstruturaDocumentosOficiais.php';
 
 use Database;
 
@@ -158,6 +159,18 @@ class ModeloDocumentoService
         'total_alunos' => 'Total de alunos (ata/relatório)',
         'total_homologados' => 'Total homologados',
         'total_pendencias' => 'Total de pendências críticas',
+        'etapa' => 'Curso / etapa de ensino',
+        'turno' => 'Turno da turma',
+        'aluno_filiacao' => 'Filiação (mãe / pai)',
+        'aluno_naturalidade' => 'Naturalidade do aluno',
+        'aluno_nacionalidade' => 'Nacionalidade do aluno',
+        'carga_horaria_total' => 'Carga horária total do ano',
+        'proxima_serie' => 'Próxima série / destino',
+        'dias_letivos' => 'Dias letivos do ano',
+        'conselho_label' => 'Situação do conselho / homologação',
+        'ata_totais' => 'Totais da ata (aprovados, retidos, transferidos)',
+        'data_extenso' => 'Data por extenso (ata)',
+        'codigo_validacao' => 'Código de validação do documento',
         'destinatario' => 'Destinatário do ofício',
         'cargo_destinatario' => 'Cargo do destinatário',
         'instituicao' => 'Instituição do destinatário',
@@ -278,6 +291,8 @@ class ModeloDocumentoService
         'resultado_boletim_padrao',
         'resultado_relatorio_padrao',
         'resultado_historico',
+        'resultado_certificado_conclusao',
+        'resultado_diploma',
         'vida_escolar_boletim',
         'vida_escolar_dossie',
         'vida_escolar_pacote',
@@ -585,6 +600,7 @@ class ModeloDocumentoService
             'tabelas' => [
                 $item('tabela_aluno', 'Tabela do aluno', 'fa-table'),
                 $item('tabela_notas', 'Tabela de notas', 'fa-table-list'),
+                $item('tabela_coletiva', 'Tabela coletiva (ata)', 'fa-table-cells'),
                 $item('tabela_frequencia', 'Tabela de frequência', 'fa-calendar-check'),
                 $item('historico', 'Histórico escolar', 'fa-scroll'),
                 $item('resultado_final', 'Resultado final', 'fa-flag-checkered'),
@@ -648,17 +664,7 @@ class ModeloDocumentoService
      */
     public static function estruturaSugeridaParaCodigo(string $codigo): ?array
     {
-        $codigo = strtolower(trim($codigo));
-        if ($codigo === '') {
-            return null;
-        }
-        if ($codigo === 'resultado_boletim_padrao'
-            || $codigo === 'vida_escolar_boletim'
-            || str_contains($codigo, 'boletim')
-        ) {
-            return self::estruturaSugeridaBoletim();
-        }
-        return null;
+        return EstruturaDocumentosOficiais::paraCodigo($codigo);
     }
 
     /**
@@ -743,7 +749,7 @@ class ModeloDocumentoService
      * @param array<string,mixed> $style
      * @return array<string,mixed>
      */
-    private static function elementoEstrutura(string $tipo, array $props = [], array $style = [], bool $ocultarVazio = false): array
+    public static function elementoEstrutura(string $tipo, array $props = [], array $style = [], bool $ocultarVazio = false): array
     {
         $el = [
             'id' => self::idEstrutura('e'),
@@ -952,7 +958,10 @@ class ModeloDocumentoService
                 'chaves' => [
                     'quadro_notas_html', 'frequencia_html', 'frequencia_percentual', 'historico_html',
                     'tabela_html', 'situacao_final', 'titulo_relatorio', 'total_alunos',
-                    'total_homologados', 'total_pendencias',
+                    'total_homologados', 'total_pendencias', 'etapa', 'turno',
+                    'aluno_filiacao', 'aluno_naturalidade', 'aluno_nacionalidade',
+                    'carga_horaria_total', 'proxima_serie', 'dias_letivos',
+                    'conselho_label', 'ata_totais', 'data_extenso', 'codigo_validacao',
                 ],
             ],
             'contrato' => [
@@ -1372,6 +1381,10 @@ class ModeloDocumentoService
             if (is_array($decoded) && isset($decoded['body'])) {
                 return $this->normalizarEstrutura($decoded, $modelo);
             }
+        }
+        $sugerida = self::estruturaSugeridaParaCodigo((string) ($modelo['codigo'] ?? ''));
+        if (is_array($sugerida)) {
+            return $this->normalizarEstrutura($sugerida, $modelo);
         }
         return $this->estruturaAPartirDeHtml($modelo);
     }
@@ -1918,7 +1931,10 @@ class ModeloDocumentoService
         $htmlBrutoCab = '';
         $htmlBrutoCorpo = '';
         $estruturaVisual = null;
-        if ($this->modeloTemEstruturaVisual($modelo)) {
+        $codigo = (string) ($modelo['codigo'] ?? '');
+        $usarVisual = $this->modeloTemEstruturaVisual($modelo)
+            || self::estruturaSugeridaParaCodigo($codigo) !== null;
+        if ($usarVisual) {
             $estruturaVisual = $this->estruturaDoModelo($modelo);
             $partes = $this->htmlDaEstrutura($estruturaVisual, $vars);
             $htmlBrutoCab = $partes['cabecalho'];
@@ -1934,7 +1950,6 @@ class ModeloDocumentoService
             $rodape = $this->aplicarPlaceholders((string) ($modelo['rodape_html'] ?? ''), $vars);
         }
 
-        $codigo = (string) ($modelo['codigo'] ?? '');
         if ($estilo === 'auto') {
             $estilo = str_starts_with($codigo, 'declaracao_') ? 'declaracao' : 'simples';
         }
@@ -2013,6 +2028,18 @@ HTML;
     /** @return 'portrait'|'landscape' */
     public function orientacaoDompdf(array $modelo): string
     {
+        if ($this->modeloTemEstruturaVisual($modelo)
+            || self::estruturaSugeridaParaCodigo((string) ($modelo['codigo'] ?? '')) !== null
+        ) {
+            $est = $this->estruturaDoModelo($modelo);
+            $o = strtolower((string) ($est['page']['orientation'] ?? ''));
+            if ($o === 'landscape') {
+                return 'landscape';
+            }
+            if ($o === 'portrait') {
+                return 'portrait';
+            }
+        }
         return (($modelo['orientacao'] ?? 'retrato') === 'paisagem') ? 'landscape' : 'portrait';
     }
 
@@ -2837,6 +2864,18 @@ HTML;
             'total_alunos' => '28',
             'total_homologados' => '26',
             'total_pendencias' => '2',
+            'etapa' => 'Ensino Fundamental — Anos Finais',
+            'turno' => 'Matutino',
+            'aluno_filiacao' => 'Maria da Silva / Carlos da Silva',
+            'aluno_naturalidade' => 'Ribeirão Preto/SP',
+            'aluno_nacionalidade' => 'Brasileira',
+            'carga_horaria_total' => '1.000 h',
+            'proxima_serie' => '9º Ano',
+            'dias_letivos' => '200',
+            'conselho_label' => 'Homologado em 18/12/2026',
+            'ata_totais' => 'Total de alunos: 6 | Aprovados: 6 | Retidos: 0 | Transferidos: 0',
+            'data_extenso' => '18 de dezembro de 2026',
+            'codigo_validacao' => 'EDUCA-2026-00125',
         ];
         foreach ($amostra as $k => $v) {
             $htmlKeys = [

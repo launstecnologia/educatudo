@@ -43,12 +43,7 @@ class BoletimGuiaController extends BaseController
 
     public function index()
     {
-        $user = $this->auth->getUser();
-        $this->viewWithLayout('admin', 'admin/boletim_guia/index', [
-            'title' => 'Guia do Boletim (coordenação) - EducaTudo',
-            'user' => $user,
-            'current_page' => 'boletim_guia',
-            'csrf_token' => $this->generateCsrfToken(),
-        ]);
+        $this->redirect(URL . '/admin/boletins');
+        exit;
     }
 }

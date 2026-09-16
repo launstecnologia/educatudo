@@ -91,7 +91,13 @@ $ui_wizard_current = 1;
                       placeholder="Descrição opcional do evento"></textarea>
         </div>
 
-        <!-- Ano Letivo e Bimestre -->
+        <?php
+        if (!class_exists('PeriodoLetivo')) {
+            require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
+        }
+        $anoEvento = (int) date('Y');
+        $periodoEvento = PeriodoLetivo::doAno($anoEvento);
+        ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -103,23 +109,22 @@ $ui_wizard_current = 1;
                        min="2000"
                        max="2100"
                        required
-                       value="<?= date('Y') ?>"
+                       data-periodo-ano
+                       value="<?= $anoEvento ?>"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                        placeholder="Ex: <?= date('Y') ?>">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Bimestre <span class="text-red-500">*</span>
+                <label for="bimestre" class="block text-sm font-medium text-gray-700 mb-2" data-periodo-label>
+                    <?= htmlspecialchars($periodoEvento['rotulo_campo']) ?> <span class="text-red-500">*</span>
                 </label>
                 <select id="bimestre"
                         name="bimestre"
                         required
+                        data-periodo-letivo-select
+                        data-periodo-vazio="1"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option value="">Selecione</option>
-                    <option value="1">1º Bimestre</option>
-                    <option value="2">2º Bimestre</option>
-                    <option value="3">3º Bimestre</option>
-                    <option value="4">4º Bimestre</option>
+                    <?= PeriodoLetivo::optionsHtml($anoEvento, 0, ['vazio' => true]) ?>
                 </select>
             </div>
         </div>
@@ -127,7 +132,7 @@ $ui_wizard_current = 1;
         <div class="mb-6">
             <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-medium text-gray-700">
-                    Tipo de Avaliação <span class="text-red-500">*</span>
+                    Tipo de Nota <span class="text-red-500">*</span>
                 </label>
                 <a href="<?= URL ?>/admin/provas/tipos-avaliacao" target="_blank" class="text-xs text-purple-700 hover:text-purple-900">Gerenciar tipos</a>
             </div>
@@ -144,35 +149,7 @@ $ui_wizard_current = 1;
             </select>
         </div>
 
-        <div class="mb-6" id="campo-semana-evento">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Semana no quadro
-            </label>
-            <select id="semana" name="semana" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Não se aplica</option>
-                <?php for ($s = 1; $s <= 8; $s++): ?>
-                    <option value="<?= $s ?>">S<?= $s ?></option>
-                <?php endfor; ?>
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Para prova semanal, escolha S1 a S8. Bloco A costuma ser S1/S3/S5/S7; Bloco B, S2/S4/S6/S8.</p>
-        </div>
-        <script>
-        (function () {
-            var sel = document.getElementById('tipo_avaliacao_id');
-            var wrap = document.getElementById('campo-semana-evento');
-            var semana = document.getElementById('semana');
-            if (!sel || !wrap) return;
-            function syncSemana() {
-                var opt = sel.options[sel.selectedIndex];
-                var chave = (opt && opt.getAttribute('data-chave-quadro')) || '';
-                var hide = chave !== '' && chave !== 'semanal';
-                wrap.classList.toggle('hidden', hide);
-                if (hide && semana) semana.value = '';
-            }
-            sel.addEventListener('change', syncSemana);
-            syncSemana();
-        })();
-        </script>
+        <?php include __DIR__ . '/_campo_semana_quadro.php'; ?>
 
         <div class="flex justify-end pt-2">
             <button type="button"
@@ -1528,6 +1505,12 @@ function salvarBloco(event) {
         visivel_no_portal_aluno: document.getElementById('visivel_no_portal_aluno')?.checked ? 1 : 0,
         nota_unica_todas_materias: document.getElementById('nota_unica_todas_materias')?.checked ? 1 : 0
     };
+    if (typeof coletarVinculosGrupoRegras === 'function') {
+        const vinculosGrupo = coletarVinculosGrupoRegras();
+        if (Array.isArray(vinculosGrupo)) {
+            data.grupos_regras = vinculosGrupo;
+        }
+    }
     
     fetch('<?= URL ?>/admin/provas/blocos', {
         method: 'POST',

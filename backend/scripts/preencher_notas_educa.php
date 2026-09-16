@@ -32,6 +32,7 @@ require_once $basePath . '/app/Models/Exams/ExamBlockManualGrade.php';
 require_once $basePath . '/app/Models/System/BoletimConfig.php';
 require_once $basePath . '/app/Controllers/Admin/BoletimConfigController.php';
 require_once $basePath . '/app/Services/ResultadoHomologacaoService.php';
+require_once $basePath . '/scripts/lib/SimulacaoAcademicaEduca.php';
 
 const TENANT_DB = 'educatudo_educa';
 
@@ -127,7 +128,7 @@ final class PreencherNotasEduca
                         $linhas[] = [
                             'turma_id' => $turmaId,
                             'aluno_id' => $aid,
-                            'nota' => $this->notaDoAluno($aid, $bim, $tipoEv),
+                            'nota' => $this->notaDoAluno($aid, $mid, $bim, $tipoEv),
                         ];
                     }
                     if ($linhas === []) {
@@ -302,18 +303,9 @@ final class PreencherNotasEduca
         return 'p1';
     }
 
-    private function notaDoAluno(int $alunoId, int $bim, string $tipoEv): float
+    private function notaDoAluno(int $alunoId, int $materiaId, int $bim, string $tipoEv): float
     {
-        $base = [8.0, 8.2, 8.5, 8.3][$bim - 1] ?? 8.0;
-        $base += ($alunoId % 7) * 0.1;
-        if ($tipoEv === 'p2') {
-            $base = min(10, $base + 0.3);
-        } elseif ($tipoEv === 'atv') {
-            $base = max(0, $base - 0.4);
-        } elseif ($tipoEv === 'rec') {
-            $base = 8.0;
-        }
-        return round(min(10, $base), 1);
+        return SimulacaoAcademicaEduca::nota($alunoId, $materiaId, $bim, $tipoEv);
     }
 
     private static function montarBoletimController(): BoletimConfigController

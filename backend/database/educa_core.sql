@@ -5767,7 +5767,7 @@ CREATE TABLE IF NOT EXISTS `modulos_apostilas_turmas` (
 CREATE TABLE IF NOT EXISTS `modulos_arquivos` (
   `id` int NOT NULL AUTO_INCREMENT,
   `turma_id` int NOT NULL,
-  `materia_id` int NOT NULL,
+  `materia_id` int DEFAULT NULL,
   `professor_id` int DEFAULT NULL,
   `aluno_id` int DEFAULT NULL,
   `titulo` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -5946,35 +5946,6 @@ CREATE TABLE IF NOT EXISTS `mural_recados_vistos` (
   KEY `idx_mural_vistos_aluno` (`aluno_id`),
   KEY `idx_mural_recados_vistos_aluno_recado` (`aluno_id`,`mural_recado_id`),
   CONSTRAINT `fk_mural_vistos_recado` FOREIGN KEY (`mural_recado_id`) REFERENCES `mural_recados` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- notas_semanais_config
---
-CREATE TABLE IF NOT EXISTS `notas_semanais_config` (
-  `id` int unsigned NOT NULL AUTO_INCREMENT,
-  `semanas_grupo_a` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '1,3,5,7',
-  `semanas_grupo_b` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '2,4,6,8',
-  `peso_media_sem` decimal(5,2) NOT NULL DEFAULT '4.00',
-  `peso_prova_bim` decimal(5,2) NOT NULL DEFAULT '4.00',
-  `peso_enac` decimal(5,2) NOT NULL DEFAULT '1.00',
-  `peso_participacao` decimal(5,2) NOT NULL DEFAULT '0.50',
-  `peso_trabalho` decimal(5,2) NOT NULL DEFAULT '0.50',
-  `regra_recuperacao` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'maior',
-  `media_minima` decimal(4,2) NOT NULL DEFAULT '6.00',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- notas_semanais_materias
---
-CREATE TABLE IF NOT EXISTS `notas_semanais_materias` (
-  `materia_id` int NOT NULL,
-  `grupo` char(1) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'A ou B',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`materia_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --

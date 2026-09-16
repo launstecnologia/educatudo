@@ -7,7 +7,7 @@ require_once __DIR__ . '/../Models/RegraAcademica.php';
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 
 /**
- * EducaTudo - CRUD de Regras Acadêmicas (validação + versionamento).
+ * EducaTudo - CRUD de Regras de Aprovação (validação + versionamento).
  */
 class RegraAcademicaService
 {
@@ -37,10 +37,6 @@ class RegraAcademicaService
         if ($erro !== null) {
             return ['success' => false, 'error' => $erro];
         }
-        if ($data['codigo'] !== null && $this->model->codigoExists($data['codigo'])) {
-            return ['success' => false, 'error' => 'Código já cadastrado em outra regra.'];
-        }
-
         $data['versao'] = 1;
         $id = $this->model->create($data);
         $this->model->gravarHistorico($id, 1, $data, $usuarioId, $usuarioNome);
@@ -55,7 +51,7 @@ class RegraAcademicaService
     {
         $atual = $this->model->findById($id);
         if (!$atual) {
-            return ['success' => false, 'error' => 'Regra acadêmica não encontrada.'];
+            return ['success' => false, 'error' => 'Regra de aprovação não encontrada.'];
         }
 
         $data = $this->normalizar($input);
@@ -63,11 +59,11 @@ class RegraAcademicaService
         if ($erro !== null) {
             return ['success' => false, 'error' => $erro];
         }
-        if ($data['codigo'] !== null && $this->model->codigoExists($data['codigo'], $id)) {
-            return ['success' => false, 'error' => 'Código já cadastrado em outra regra.'];
-        }
 
         $data['versao'] = ((int) ($atual['versao'] ?? 1)) + 1;
+        $data['codigo'] = trim((string) ($atual['codigo'] ?? '')) !== ''
+            ? (string) $atual['codigo']
+            : null;
         $this->model->update($id, $data);
         $this->model->gravarHistorico($id, $data['versao'], $data, $usuarioId, $usuarioNome);
 
@@ -80,7 +76,7 @@ class RegraAcademicaService
     public function excluir(int $id): array
     {
         if (!$this->model->exists($id)) {
-            return ['success' => false, 'error' => 'Regra acadêmica não encontrada.'];
+            return ['success' => false, 'error' => 'Regra de aprovação não encontrada.'];
         }
         $this->model->delete($id);
         return ['success' => true];
@@ -91,12 +87,6 @@ class RegraAcademicaService
      */
     private function normalizar(array $input): array
     {
-        $codigo = strtolower(trim((string) ($input['codigo'] ?? '')));
-        if ($codigo !== '') {
-            $codigo = preg_replace('/[^a-z0-9_\-]+/', '-', $codigo);
-        }
-        $codigo = ($codigo === '' || $codigo === null) ? null : $codigo;
-
         $intOrNull = static function ($v): ?int {
             if ($v === null || $v === '') {
                 return null;
@@ -105,7 +95,6 @@ class RegraAcademicaService
             return $n > 0 ? $n : null;
         };
 
-        $periodoNumero = $intOrNull($input['periodo_numero'] ?? null);
         $periodoTipo = (string) ($input['periodo_tipo'] ?? 'bimestre');
         if (!isset(RegraAcademica::PERIODO_TIPOS[$periodoTipo])) {
             $periodoTipo = 'bimestre';
@@ -135,14 +124,15 @@ class RegraAcademicaService
 
         return [
             'nome' => trim((string) ($input['nome'] ?? '')),
-            'codigo' => $codigo,
+            'codigo' => null,
             'ano_letivo' => $intOrNull($input['ano_letivo'] ?? null),
             'curso_id' => $intOrNull($input['curso_id'] ?? null),
             'serie_id' => $intOrNull($input['serie_id'] ?? null),
-            'matriz_curricular_id' => $intOrNull($input['matriz_curricular_id'] ?? null),
-            'materia_id' => $intOrNull($input['materia_id'] ?? null),
+            'matriz_curricular_id' => null,
+            'materia_id' => null,
+            'agrupamento_id' => null,
             'periodo_tipo' => $periodoTipo,
-            'periodo_numero' => $periodoNumero,
+            'periodo_numero' => null,
             'media_minima' => is_numeric($input['media_minima'] ?? null)
                 ? (float) str_replace(',', '.', (string) $input['media_minima'])
                 : 6.0,
@@ -156,12 +146,12 @@ class RegraAcademicaService
             'formula_final' => $formulaFinal !== '' ? $formulaFinal : null,
             'recuperacao_tipo' => $recTipo,
             'recuperacao_composicao' => $recComp,
-            'min_avaliacoes' => $intOrNull($input['min_avaliacoes'] ?? null),
-            'max_avaliacoes' => $intOrNull($input['max_avaliacoes'] ?? null),
-            'componentes_sem_nota' => !empty($input['componentes_sem_nota']) ? 1 : 0,
+            'min_avaliacoes' => null,
+            'max_avaliacoes' => null,
+            'componentes_sem_nota' => 0,
             'aprovacao_so_frequencia' => !empty($input['aprovacao_so_frequencia']) ? 1 : 0,
             'situacoes_json' => null,
-            'observacoes' => trim((string) ($input['observacoes'] ?? '')) ?: null,
+            'observacoes' => null,
             'ativo' => array_key_exists('ativo', $input) ? (!empty($input['ativo']) ? 1 : 0) : 1,
         ];
     }
@@ -176,13 +166,6 @@ class RegraAcademicaService
         }
         if ($data['frequencia_minima'] < 0 || $data['frequencia_minima'] > 100) {
             return 'Frequência mínima deve estar entre 0 e 100.';
-        }
-        if ($data['periodo_numero'] !== null && ($data['periodo_numero'] < 1 || $data['periodo_numero'] > 4)) {
-            return 'Número do período deve ser de 1 a 4.';
-        }
-        if ($data['min_avaliacoes'] !== null && $data['max_avaliacoes'] !== null
-            && $data['min_avaliacoes'] > $data['max_avaliacoes']) {
-            return 'Quantidade mínima de avaliações não pode ser maior que a máxima.';
         }
         return null;
     }

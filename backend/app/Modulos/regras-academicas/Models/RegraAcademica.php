@@ -3,9 +3,10 @@
 namespace App\Modulos\RegrasAcademicas\Models;
 
 use Database;
+use Throwable;
 
 /**
- * EducaTudo - Modelo de Regras Acadêmicas
+ * EducaTudo - Modelo de Regras de Aprovação
  * Critérios versionados de aprovação, recuperação e frequência.
  */
 class RegraAcademica
@@ -30,7 +31,7 @@ class RegraAcademica
         'maior_nota' => 'Maior nota (substitui se for maior)',
         'substitui' => 'Substitui a média',
         'composicao' => 'Composição (média + recuperação) / 2',
-        'formula' => 'Fórmula própria (formula_final)',
+        'formula' => 'Fórmula própria',
     ];
 
     public function __construct()
@@ -54,6 +55,9 @@ class RegraAcademica
         } catch (Throwable $e) {
             $ok = false;
         }
+        if ($ok) {
+            $this->ensureAgrupamentoColumn();
+        }
         return $ok;
     }
 
@@ -67,14 +71,21 @@ class RegraAcademica
             return [];
         }
 
+        $joinAg = $this->regrasAgrupamentoPronto()
+            ? ' LEFT JOIN agrupamentos_componentes ag ON ag.id = r.agrupamento_id'
+            : '';
+        $selectAg = $this->regrasAgrupamentoPronto() ? ', ag.nome AS agrupamento_nome' : '';
+
         $sql = "SELECT r.*,
                        c.nome AS curso_nome,
                        s.nome AS serie_nome,
                        m.nome AS materia_nome
+                       {$selectAg}
                 FROM regras_academicas r
                 LEFT JOIN curso c ON c.id = r.curso_id
                 LEFT JOIN serie s ON s.id = r.serie_id
                 LEFT JOIN materias m ON m.id = r.materia_id
+                {$joinAg}
                 WHERE 1=1";
         $params = [];
 
@@ -125,15 +136,21 @@ class RegraAcademica
         if (!$this->schemaPronto() || $id <= 0) {
             return null;
         }
+        $joinAg = $this->regrasAgrupamentoPronto()
+            ? ' LEFT JOIN agrupamentos_componentes ag ON ag.id = r.agrupamento_id'
+            : '';
+        $selectAg = $this->regrasAgrupamentoPronto() ? ', ag.nome AS agrupamento_nome' : '';
         $row = $this->db->fetch(
             "SELECT r.*,
                     c.nome AS curso_nome,
                     s.nome AS serie_nome,
                     m.nome AS materia_nome
+                    {$selectAg}
              FROM regras_academicas r
              LEFT JOIN curso c ON c.id = r.curso_id
              LEFT JOIN serie s ON s.id = r.serie_id
              LEFT JOIN materias m ON m.id = r.materia_id
+             {$joinAg}
              WHERE r.id = :id",
             ['id' => $id]
         );
@@ -164,14 +181,14 @@ class RegraAcademica
     {
         return (int) $this->db->insert(
             "INSERT INTO regras_academicas (
-                nome, codigo, ano_letivo, curso_id, serie_id, matriz_curricular_id, materia_id,
+                nome, codigo, ano_letivo, curso_id, serie_id, matriz_curricular_id, materia_id, agrupamento_id,
                 periodo_tipo, periodo_numero, media_minima, frequencia_minima, usar_frequencia,
                 round_mode, decimal_places, formula_media, formula_final,
                 recuperacao_tipo, recuperacao_composicao, min_avaliacoes, max_avaliacoes,
                 componentes_sem_nota, aprovacao_so_frequencia, situacoes_json, observacoes,
                 versao, ativo
              ) VALUES (
-                :nome, :codigo, :ano_letivo, :curso_id, :serie_id, :matriz_curricular_id, :materia_id,
+                :nome, :codigo, :ano_letivo, :curso_id, :serie_id, :matriz_curricular_id, :materia_id, :agrupamento_id,
                 :periodo_tipo, :periodo_numero, :media_minima, :frequencia_minima, :usar_frequencia,
                 :round_mode, :decimal_places, :formula_media, :formula_final,
                 :recuperacao_tipo, :recuperacao_composicao, :min_avaliacoes, :max_avaliacoes,
@@ -195,6 +212,7 @@ class RegraAcademica
                 serie_id = :serie_id,
                 matriz_curricular_id = :matriz_curricular_id,
                 materia_id = :materia_id,
+                agrupamento_id = :agrupamento_id,
                 periodo_tipo = :periodo_tipo,
                 periodo_numero = :periodo_numero,
                 media_minima = :media_minima,
@@ -277,6 +295,7 @@ class RegraAcademica
             'serie_id' => $data['serie_id'] ?? null,
             'matriz_curricular_id' => $data['matriz_curricular_id'] ?? null,
             'materia_id' => $data['materia_id'] ?? null,
+            'agrupamento_id' => !empty($data['agrupamento_id']) ? (int) $data['agrupamento_id'] : null,
             'periodo_tipo' => (string) ($data['periodo_tipo'] ?? 'bimestre'),
             'periodo_numero' => $data['periodo_numero'] ?? null,
             'media_minima' => (float) ($data['media_minima'] ?? 6),
@@ -297,5 +316,63 @@ class RegraAcademica
             'versao' => (int) ($data['versao'] ?? 1),
             'ativo' => (int) ($data['ativo'] ?? 1),
         ];
+    }
+
+    private function ensureAgrupamentoColumn(): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM regras_academicas LIKE 'agrupamento_id'");
+            if ($col) {
+                return;
+            }
+            $this->db->query(
+                "ALTER TABLE regras_academicas ADD COLUMN agrupamento_id INT UNSIGNED NULL DEFAULT NULL AFTER materia_id"
+            );
+        } catch (Throwable $e) {
+            // migration ainda não rodou / sem permissão ALTER
+        }
+    }
+
+    private function agrupamentosTabelaExiste(): bool
+    {
+        static $ok = null;
+        if ($ok !== null) {
+            return $ok;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name = 'agrupamentos_componentes'
+                 LIMIT 1"
+            );
+            $ok = !empty($row['ok']);
+        } catch (Throwable $e) {
+            $ok = false;
+        }
+        return $ok;
+    }
+
+    private function regrasAgrupamentoPronto(): bool
+    {
+        static $ok = null;
+        if ($ok !== null) {
+            return $ok;
+        }
+        if (!$this->agrupamentosTabelaExiste()) {
+            $ok = false;
+            return false;
+        }
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM regras_academicas LIKE 'agrupamento_id'");
+            $ok = !empty($col);
+        } catch (Throwable $e) {
+            $ok = false;
+        }
+        return $ok;
     }
 }

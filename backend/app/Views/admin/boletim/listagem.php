@@ -16,9 +16,17 @@ foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     }
 }
 
-$bimestreLabel = static function ($bimestre) {
+$bimestreLabel = static function ($bimestre, $ano = 0) {
     $bimestre = (int) $bimestre;
-    return $bimestre > 0 ? $bimestre . 'º Bimestre' : 'N/A';
+    $ano = (int) $ano;
+    if (!class_exists('PeriodoLetivo')) {
+        require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+    }
+    if ($bimestre <= 0) {
+        return 'N/A';
+    }
+    $lab = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
+    return $lab !== '' ? $lab : 'N/A';
 };
 $dataHoraGeracao = static function (?string $valor): ?string {
     $valor = trim((string) $valor);
@@ -54,8 +62,8 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
 <div class="mb-8">
     <div class="flex justify-between items-center flex-wrap gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Eventos de Notas</h2>
-            <p class="text-gray-600">Configure os eventos do bimestre. Ao gerar, as médias entram no boletim da Vida Escolar.</p>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2">Avaliações</h2>
+            <p class="text-gray-600">Configure as fórmulas do bimestre e escolha em qual modelo de boletim a média entra. O cadastro do documento (oficial / extra) fica em <a href="<?= URL ?>/admin/boletins" class="text-indigo-600 underline">Acadêmico → Modelo de Boletim</a>.</p>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
             <button type="button" onclick="openFilterDrawer()"
@@ -66,10 +74,10 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
                 <?php endif; ?>
             </button>
-            <a href="<?= URL ?>/admin/boletim-guia"
+            <a href="<?= URL ?>/admin/boletins"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-book mr-2 text-gray-500"></i>
-                Guia do Boletim
+                <i class="fa-solid fa-clipboard-list mr-2 text-gray-500"></i>
+                Modelo de Boletim
             </a>
             <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -148,12 +156,9 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div>
-                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Bimestre</label>
+                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars(PeriodoLetivo::doAno((int) ($filtroAno !== '' ? $filtroAno : date('Y')))['rotulo_campo']) ?></label>
                 <select id="filtro_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Todos</option>
-                    <?php for ($b = 1; $b <= 4; $b++): ?>
-                        <option value="<?= $b ?>" <?= $filtroBimestre === (string) $b ? 'selected' : '' ?>><?= $b ?>º Bimestre</option>
-                    <?php endfor; ?>
+                    <?= PeriodoLetivo::optionsHtml((int) ($filtroAno !== '' ? $filtroAno : date('Y')), (int) $filtroBimestre, ['todos' => true]) ?>
                 </select>
             </div>
         </div>
@@ -196,7 +201,7 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exibir em</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Boletim</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Séries</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano Letivo</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
@@ -209,7 +214,8 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 <tr>
                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-file-lines text-4xl text-gray-300 mb-4"></i>
-                        <p>Nenhum evento de boletim cadastrado</p>
+                        <p>Nenhum evento de notas cadastrado</p>
+                        <p class="text-sm mt-1">Cadastre o modelo em Acadêmico → Modelo de Boletim e depois crie a avaliação do bimestre.</p>
                         <a href="<?= URL ?>/admin/boletim-configuracao?novo=1"
                            class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
                             <i class="fa-solid fa-plus mr-2"></i>
@@ -243,8 +249,14 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex flex-col items-start gap-1">
-                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= ($evento['exibir_em'] ?? 'boletim') === 'notas' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800' ?>">
-                                <?= ($evento['exibir_em'] ?? 'boletim') === 'notas' ? 'Notas' : 'Boletim' ?>
+                            <?php $nomeBol = trim((string) ($evento['boletim_cadastro_nome'] ?? '')); ?>
+                            <?php if ($nomeBol !== ''): ?>
+                            <span class="text-sm text-gray-900"><?= htmlspecialchars($nomeBol) ?></span>
+                            <?php else: ?>
+                            <span class="text-sm text-gray-400">—</span>
+                            <?php endif; ?>
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= (($evento['finalidade'] ?? 'oficial') === 'complementar') ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' ?>">
+                                <?= (($evento['finalidade'] ?? 'oficial') === 'complementar') ? 'Extra' : 'Oficial' ?>
                             </span>
                             <?php $liberadoAlunoPais = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1); ?>
                             <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full <?= $liberadoAlunoPais ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>">
@@ -268,7 +280,7 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                         <?= !empty($evento['ano_letivo']) ? (int) $evento['ano_letivo'] : 'N/A' ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <?= $bimestreLabel($evento['bimestre'] ?? null) ?>
+                        <?= $bimestreLabel($evento['bimestre'] ?? null, $evento['ano_letivo'] ?? 0) ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <?php

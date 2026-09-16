@@ -4,9 +4,12 @@ $schema_ready = $schema_ready ?? false;
 $status = (string) ($status ?? '');
 $message = (string) ($message ?? '');
 $csrf_token = $csrf_token ?? '';
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+}
 
 $page_header_title = 'Anos Letivos';
-$page_header_subtitle = 'Cadastre os anos letivos para uso em turmas e matrículas';
+        $page_header_subtitle = 'Cadastre os anos letivos e a divisão (bimestre, trimestre ou semestre) usada em toda a escola';
 if ($schema_ready) {
     ob_start();
     ?>
@@ -50,6 +53,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Início</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fim</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Divisão do ano</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -65,6 +69,15 @@ include __DIR__ . '/../_partials/flash_message.php';
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         <?= $row['data_fim'] ? date('d/m/Y', strtotime($row['data_fim'])) : '—' ?>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <?php
+                        if (!class_exists('PeriodoLetivo')) {
+                            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                        }
+                        $tipoAno = PeriodoLetivo::normalizarTipo((string) ($row['periodo_tipo'] ?? 'bimestre'));
+                        echo htmlspecialchars(PeriodoLetivo::TIPOS[$tipoAno] ?? PeriodoLetivo::TIPOS['bimestre']);
+                        ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $row['ativo'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
@@ -173,6 +186,16 @@ include __DIR__ . '/../_partials/flash_message.php';
                         <input type="date" id="al_data_fim" name="data_fim"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
+                    <div class="sm:col-span-2">
+                        <label for="al_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1">Divisão do ano <span class="text-red-500">*</span></label>
+                        <select id="al_periodo_tipo" name="periodo_tipo" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <?php foreach (PeriodoLetivo::TIPOS as $cod => $lab): ?>
+                                <option value="<?= htmlspecialchars($cod) ?>" <?= $cod === 'bimestre' ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Define os períodos em prova, jornada, boletim e conselho. Ex.: semestral mostra 1º e 2º semestre.</p>
+                    </div>
                 </div>
             </section>
         </div>
@@ -219,6 +242,7 @@ function openAnoLetivoDrawer(id) {
             document.getElementById('al_ativo').checked = !!parseInt(data.item.ativo, 10);
             document.getElementById('al_data_inicio').value = data.item.data_inicio || '';
             document.getElementById('al_data_fim').value = data.item.data_fim || '';
+            document.getElementById('al_periodo_tipo').value = data.item.periodo_tipo || 'bimestre';
         })
         .catch(function () { alert('Erro de conexão.'); closeAnoLetivoDrawer(); });
 }

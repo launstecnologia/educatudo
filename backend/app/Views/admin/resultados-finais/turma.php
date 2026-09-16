@@ -95,7 +95,7 @@ include __DIR__ . '/_filtros.php';
                 ?>
                 <tr class="hover:bg-gray-50 <?= !empty($aluno['transferido']) ? 'opacity-70' : '' ?>">
                     <td class="px-3 py-3">
-                        <?php if ($status !== 'homologado' && !$criticas): ?>
+                        <?php if ($status !== 'homologado' && !$criticas && empty($fechamento_travado)): ?>
                         <input type="checkbox" name="aluno_ids[]" value="<?= $aid ?>" class="rf-check rounded border-gray-300">
                         <?php endif; ?>
                     </td>
@@ -140,13 +140,16 @@ include __DIR__ . '/_filtros.php';
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-table text-gray-400 w-4 text-center"></i> Boletim oficial
                         </a>
-                        <?php if ($status === 'homologado' && (int) ($linha['resultado_id'] ?? 0) > 0): ?>
+                        <a href="<?= URL ?>/admin/students/<?= $aid ?>/historico-escolar"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-scroll text-gray-400 w-4 text-center"></i> Histórico escolar
+                        </a>
+                        <?php if ($status === 'homologado'): ?>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button type="button"
-                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-amber-50"
-                                onclick="document.getElementById('rf-reabrir-<?= (int) $linha['resultado_id'] ?>').classList.remove('hidden')">
-                            <i class="fa-solid fa-rotate-left text-amber-500 w-4 text-center"></i> Reabrir
-                        </button>
+                        <a href="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>?<?= htmlspecialchars($qs) ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-amber-700 hover:bg-amber-50">
+                            <i class="fa-solid fa-stamp text-amber-500 w-4 text-center"></i> Retificar período
+                        </a>
                         <?php endif; ?>
                         <?php
                         $row_actions_dropdown_items = ob_get_clean();
@@ -161,6 +164,7 @@ include __DIR__ . '/_filtros.php';
     </div>
     <div class="px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <p class="text-xs text-gray-500">
+            Homologação só fecha aluno aprovado ou reprovado (ou situação especial já resolvida). Recuperação e exame final ficam pendentes até o resultado definitivo.
             Pendências críticas configuradas:
             <?= !empty($config['exigir_notas']) ? 'notas' : 'notas opcionais' ?>
             · <?= !empty($config['exigir_frequencia']) ? 'frequência' : 'frequência opcional' ?>
@@ -168,6 +172,12 @@ include __DIR__ . '/_filtros.php';
             <a href="<?= URL ?>/admin/resultados-finais/layouts" class="text-primary underline">Alterar</a>
         </p>
         <div class="flex flex-wrap items-center gap-2">
+            <?php if (!empty($fechamento_travado)): ?>
+            <a href="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>?<?= htmlspecialchars($qs) ?>"
+               class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100">
+                Período homologado — retificar
+            </a>
+            <?php else: ?>
             <button type="submit" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90">
                 Homologar selecionados
             </button>
@@ -175,24 +185,10 @@ include __DIR__ . '/_filtros.php';
                     class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
                 Homologar todos os elegíveis
             </button>
+            <?php endif; ?>
         </div>
     </div>
 </form>
-
-<?php foreach ($linhas as $linha):
-    $rid = (int) ($linha['resultado_id'] ?? 0);
-    if ($rid <= 0 || ($linha['status'] ?? '') !== 'homologado') {
-        continue;
-    }
-?>
-<form id="rf-reabrir-<?= $rid ?>" method="POST" action="<?= URL ?>/admin/resultados-finais/resultado/<?= $rid ?>/reabrir"
-      class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
-    <p class="text-sm font-medium text-amber-900 mb-2">Reabrir <?= htmlspecialchars((string) ($linha['aluno']['nome'] ?? '')) ?> — a versão homologada será preservada.</p>
-    <textarea name="motivo" required rows="2" class="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm mb-2" placeholder="Motivo da correção"></textarea>
-    <button type="submit" class="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium">Confirmar reabertura</button>
-</form>
-<?php endforeach; ?>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
     <h3 class="text-lg font-semibold text-gray-900 mb-1">Dispensa, aproveitamento e dependência</h3>

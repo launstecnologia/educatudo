@@ -7,6 +7,8 @@
 require_once __DIR__ . '/../../Models/Exams/ExamBlock.php';
 require_once __DIR__ . '/../../Models/Exams/Exam.php';
 require_once __DIR__ . '/../../Models/Exams/ExamEvaluationType.php';
+require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
+require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
 
 if (!class_exists('ExamBlockController')) {
 class ExamBlockController extends BaseController
@@ -188,9 +190,7 @@ class ExamBlockController extends BaseController
         }
         
         // Busca matérias
-        $materias = $this->db->fetchAll(
-            "SELECT * FROM materias ORDER BY nome ASC"
-        );
+        $materias = (new ComponenteCurricular())->getAvaliaveis(true);
         
         // Busca turmas
         $turmas = $this->db->fetchAll(
@@ -211,6 +211,7 @@ class ExamBlockController extends BaseController
             'turmas' => $turmas,
             'blocosModelo' => $blocosModelo,
             'tiposAvaliacao' => $tiposAvaliacao,
+            'grupos_regras_notas' => $this->catalogoGruposRegrasNotas(),
             'current_page' => 'provas_blocos'
         ];
         
@@ -267,8 +268,8 @@ class ExamBlockController extends BaseController
             if (empty($postData['ano_letivo']) || (int)$postData['ano_letivo'] < 2000) {
                 $errors['ano_letivo'] = 'Ano letivo é obrigatório';
             }
-            if (empty($postData['bimestre']) || !in_array((int)$postData['bimestre'], [1, 2, 3, 4], true)) {
-                $errors['bimestre'] = 'Bimestre inválido';
+            if (empty($postData['bimestre']) || !PeriodoLetivo::numeroValido((int) ($postData['ano_letivo'] ?? 0), (int) $postData['bimestre'])) {
+                $errors['bimestre'] = PeriodoLetivo::mensagemNumeroInvalido((int) ($postData['ano_letivo'] ?? 0));
             }
             $tipoAvaliacaoId = isset($postData['tipo_avaliacao_id']) ? (int)$postData['tipo_avaliacao_id'] : 0;
             if ($tipoAvaliacaoId <= 0 || !$this->evaluationTypeModel->findById($tipoAvaliacaoId)) {
@@ -306,6 +307,11 @@ class ExamBlockController extends BaseController
                     }
                 }
             }
+
+            $vinculosGrupo = $this->resolverVinculosGrupoRegrasPost($postData);
+            if (empty($vinculosGrupo['ok'])) {
+                $errors['grupo_regras'] = (string) ($vinculosGrupo['error'] ?? 'Grupo de regras inválido.');
+            }
             
             if (!empty($errors)) {
                 $this->json(['error' => 'Dados inválidos', 'errors' => $errors], 400);
@@ -342,9 +348,7 @@ class ExamBlockController extends BaseController
                 'ano_letivo' => isset($postData['ano_letivo']) ? (int)$postData['ano_letivo'] : null,
                 'bimestre' => isset($postData['bimestre']) ? (int)$postData['bimestre'] : null,
                 'tipo_avaliacao_id' => $tipoAvaliacaoId > 0 ? $tipoAvaliacaoId : null,
-                'semana' => (isset($postData['semana']) && (int) $postData['semana'] >= 1 && (int) $postData['semana'] <= 8)
-                    ? (int) $postData['semana']
-                    : null,
+                'semana' => $vinculosGrupo['semana'] ?? $this->normalizarSemanaPost($postData['semana'] ?? null),
                 'data_prova' => $exigeDataHoraProva ? ($postData['data_prova'] ?? null) : null,
                 'hora_inicio' => $exigeDataHoraProva ? ($postData['hora_inicio'] ?? null) : null,
                 'hora_fim' => $exigeDataHoraProva ? ($postData['hora_fim'] ?? null) : null,
@@ -363,6 +367,7 @@ class ExamBlockController extends BaseController
                 'nota_unica_todas_materias' => !empty($postData['nota_unica_todas_materias']) ? 1 : 0,
                 'prazo_entrega_professor' => $exigePrazoProfessor ? ($postData['prazo_entrega_professor'] ?? null) : null,
             ];
+            $data = $this->aplicarVinculosGrupoRegrasNoPayload($data, $vinculosGrupo);
             
             $blocoId = $this->blocoModel->create($data);
             
@@ -417,9 +422,7 @@ class ExamBlockController extends BaseController
         unset($prof);
         
         // Busca matérias
-        $materias = $this->db->fetchAll(
-            "SELECT * FROM materias ORDER BY nome ASC"
-        );
+        $materias = (new ComponenteCurricular())->getAvaliaveis(true);
         
         // Busca turmas
         $turmas = $this->db->fetchAll(
@@ -437,6 +440,7 @@ class ExamBlockController extends BaseController
             'provas_ids_no_bloco' => $provasIdsNoBloco,
             'turmas' => $turmas,
             'tiposAvaliacao' => $tiposAvaliacao,
+            'grupos_regras_notas' => $this->catalogoGruposRegrasNotas(),
             'current_page' => 'provas_blocos'
         ];
         
@@ -523,8 +527,8 @@ class ExamBlockController extends BaseController
             if (empty($postData['ano_letivo']) || (int)$postData['ano_letivo'] < 2000) {
                 $errors['ano_letivo'] = 'Ano letivo é obrigatório';
             }
-            if (empty($postData['bimestre']) || !in_array((int)$postData['bimestre'], [1, 2, 3, 4], true)) {
-                $errors['bimestre'] = 'Bimestre inválido';
+            if (empty($postData['bimestre']) || !PeriodoLetivo::numeroValido((int) ($postData['ano_letivo'] ?? 0), (int) $postData['bimestre'])) {
+                $errors['bimestre'] = PeriodoLetivo::mensagemNumeroInvalido((int) ($postData['ano_letivo'] ?? 0));
             }
             $tipoAvaliacaoId = isset($postData['tipo_avaliacao_id']) ? (int)$postData['tipo_avaliacao_id'] : 0;
             if ($tipoAvaliacaoId <= 0 || !$this->evaluationTypeModel->findById($tipoAvaliacaoId)) {
@@ -560,6 +564,11 @@ class ExamBlockController extends BaseController
                         $errors["materia_{$index}"] = "Professor #{$index}: Matéria é obrigatória";
                     }
                 }
+            }
+
+            $vinculosGrupo = $this->resolverVinculosGrupoRegrasPost($postData);
+            if (empty($vinculosGrupo['ok'])) {
+                $errors['grupo_regras'] = (string) ($vinculosGrupo['error'] ?? 'Grupo de regras inválido.');
             }
             
             if (!empty($errors)) {
@@ -599,9 +608,7 @@ class ExamBlockController extends BaseController
                 'ano_letivo' => isset($postData['ano_letivo']) ? (int)$postData['ano_letivo'] : null,
                 'bimestre' => isset($postData['bimestre']) ? (int)$postData['bimestre'] : null,
                 'tipo_avaliacao_id' => $tipoAvaliacaoId > 0 ? $tipoAvaliacaoId : null,
-                'semana' => (isset($postData['semana']) && (int) $postData['semana'] >= 1 && (int) $postData['semana'] <= 8)
-                    ? (int) $postData['semana']
-                    : null,
+                'semana' => $vinculosGrupo['semana'] ?? $this->normalizarSemanaPost($postData['semana'] ?? null),
                 'data_prova' => $exigeDataHoraProva ? ($postData['data_prova'] ?? null) : null,
                 'hora_inicio' => $exigeDataHoraProva ? ($postData['hora_inicio'] ?? null) : null,
                 'hora_fim' => $exigeDataHoraProva ? ($postData['hora_fim'] ?? null) : null,
@@ -620,6 +627,7 @@ class ExamBlockController extends BaseController
             if (array_key_exists('provas', $postData) && is_array($postData['provas'])) {
                 $data['provas'] = $postData['provas'];
             }
+            $data = $this->aplicarVinculosGrupoRegrasNoPayload($data, $vinculosGrupo);
             
             $this->blocoModel->update($id, $data);
             
@@ -1232,6 +1240,148 @@ class ExamBlockController extends BaseController
                 $this->redirect('/');
                 break;
         }
+    }
+
+    private function idPositivoOuNulo($valor): ?int
+    {
+        $id = (int) $valor;
+        return $id > 0 ? $id : null;
+    }
+
+    private function normalizarSemanaPost($valor): ?int
+    {
+        $n = (int) $valor;
+        return ($n >= 1 && $n <= 20) ? $n : null;
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     * @param array<string,mixed> $vinculosGrupo
+     * @return array<string,mixed>
+     */
+    private function aplicarVinculosGrupoRegrasNoPayload(array $data, array $vinculosGrupo): array
+    {
+        if (empty($vinculosGrupo['aplicar'])) {
+            return $data;
+        }
+        $data['grupo_regras_notas_id'] = $vinculosGrupo['grupo_id'] ?? null;
+        $data['grupo_regras_tipo_id'] = $vinculosGrupo['tipo_id'] ?? null;
+        $data['grupo_regras_marca_id'] = $vinculosGrupo['marca_id'] ?? null;
+        $data['grupos_regras_vinculos'] = $vinculosGrupo['itens'] ?? [];
+        if (array_key_exists('semana', $vinculosGrupo)) {
+            $data['semana'] = $vinculosGrupo['semana'];
+        }
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $postData
+     * @return array{ok:bool,aplicar:bool,error?:string,grupo_id:?int,tipo_id:?int,marca_id:?int,semana:?int,itens:list<array<string,mixed>>}
+     */
+    private function resolverVinculosGrupoRegrasPost(array $postData): array
+    {
+        $semanaPost = $this->normalizarSemanaPost($postData['semana'] ?? null);
+        $vazio = [
+            'ok' => true,
+            'aplicar' => false,
+            'grupo_id' => null,
+            'tipo_id' => null,
+            'marca_id' => null,
+            'semana' => $semanaPost,
+            'itens' => [],
+        ];
+        $svc = $this->obterServicoGrupoRegrasNotas();
+        if ($svc === null) {
+            return $vazio;
+        }
+        $linhas = [];
+        $temLista = array_key_exists('grupos_regras', $postData) && is_array($postData['grupos_regras']);
+        if ($temLista) {
+            foreach ($postData['grupos_regras'] as $row) {
+                if (is_array($row)) {
+                    $linhas[] = $row;
+                }
+            }
+        } elseif (!empty($postData['grupo_regras_notas_id'])) {
+            $linhas[] = [
+                'grupo_id' => $postData['grupo_regras_notas_id'] ?? null,
+                'tipo_id' => $postData['grupo_regras_tipo_id'] ?? null,
+                'marca_id' => $postData['grupo_regras_marca_id'] ?? null,
+            ];
+        } else {
+            return $vazio;
+        }
+        $itens = [];
+        foreach ($linhas as $row) {
+            $r = $svc->validarVinculoProva(
+                $this->idPositivoOuNulo($row['grupo_id'] ?? $row['grupo_regras_notas_id'] ?? null),
+                $this->idPositivoOuNulo($row['tipo_id'] ?? $row['grupo_regras_tipo_id'] ?? null),
+                $this->idPositivoOuNulo($row['marca_id'] ?? $row['grupo_regras_marca_id'] ?? null)
+            );
+            if (empty($r['ok'])) {
+                return $r + ['aplicar' => false, 'itens' => []];
+            }
+            if (empty($r['grupo_id'])) {
+                continue;
+            }
+            $itens[] = [
+                'grupo_id' => $r['grupo_id'],
+                'tipo_id' => $r['tipo_id'] ?? null,
+                'marca_id' => $r['marca_id'] ?? null,
+            ];
+            if ($semanaPost === null && !empty($r['semana'])) {
+                $vazio['semana'] = $r['semana'];
+            } elseif ($vazio['semana'] === $semanaPost && !empty($r['semana'])) {
+                $vazio['semana'] = $r['semana'];
+            }
+        }
+        $primeiro = $itens[0] ?? null;
+        return [
+            'ok' => true,
+            'aplicar' => true,
+            'grupo_id' => $primeiro['grupo_id'] ?? null,
+            'tipo_id' => $primeiro['tipo_id'] ?? null,
+            'marca_id' => $primeiro['marca_id'] ?? null,
+            'semana' => $vazio['semana'],
+            'itens' => $itens,
+        ];
+    }
+
+    private function obterServicoGrupoRegrasNotas()
+    {
+        $path = dirname(__DIR__, 2) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!is_file($path)) {
+            return null;
+        }
+        require_once $path;
+        try {
+            $svc = new GrupoRegrasNotasService();
+            if (!$svc->moduloAtivo() || !$svc->model()->tabelasProntas()) {
+                return null;
+            }
+            return $svc;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function catalogoGruposRegrasNotas(): array
+    {
+        $svc = $this->obterServicoGrupoRegrasNotas();
+        if ($svc === null) {
+            return [];
+        }
+        $out = [];
+        foreach ($svc->model()->listar(true) as $g) {
+            $payload = $svc->payloadPublico((int) ($g['id'] ?? 0));
+            if (is_array($payload)) {
+                $out[] = $payload;
+            }
+        }
+        return $out;
     }
 }
 }

@@ -185,6 +185,10 @@ class DocumentoRenderer
                 '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>',
                 $css
             ),
+            'tabela_coletiva' => $this->blocoHtmlLivre(
+                '<div class="tabela-coletiva-wrap">{{tabela_html}}</div>',
+                $css
+            ),
             'tabela_frequencia' => $this->blocoHtmlLivre('{{frequencia_html}}', $css),
             'historico' => $this->blocoHtmlLivre('{{historico_html}}', $css),
             'resultado_final' => $this->tabelaChaveValor([

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../Models/Education/MatrizCurricular.php';
+require_once __DIR__ . '/../Models/Education/ComponenteCurricular.php';
 
 /**
  * EducaTudo - Service de Matriz Curricular
@@ -9,11 +10,13 @@ require_once __DIR__ . '/../Models/Education/MatrizCurricular.php';
 class MatrizCurricularService
 {
     private MatrizCurricular $matrizCurricular;
+    private ComponenteCurricular $componenteCurricular;
     private $db;
 
     public function __construct()
     {
         $this->matrizCurricular = new MatrizCurricular();
+        $this->componenteCurricular = new ComponenteCurricular();
         $this->db = Database::getInstance();
     }
 
@@ -25,6 +28,10 @@ class MatrizCurricularService
     {
         $data = $this->normalizar($input);
         $componentes = $this->normalizarComponentes($input['componentes'] ?? []);
+        $erroExpansao = $this->expandirRotulos($componentes);
+        if ($erroExpansao !== null) {
+            return ['success' => false, 'error' => $erroExpansao];
+        }
 
         $erro = $this->validar($data, $componentes);
         if ($erro !== null) {
@@ -57,6 +64,10 @@ class MatrizCurricularService
 
         $data = $this->normalizar($input);
         $componentes = $this->normalizarComponentes($input['componentes'] ?? []);
+        $erroExpansao = $this->expandirRotulos($componentes);
+        if ($erroExpansao !== null) {
+            return ['success' => false, 'error' => $erroExpansao];
+        }
 
         $erro = $this->validar($data, $componentes);
         if ($erro !== null) {
@@ -146,6 +157,81 @@ class MatrizCurricularService
         }
 
         return $componentes;
+    }
+
+    /**
+     * Rótulo de área não persiste na matriz: a carga oficial é a soma dos filhos.
+     * Se o form mandar só o pai, exige os desdobramentos já cadastrados.
+     *
+     * @param list<array{materia_id:int, aulas_semana:int, obrigatorio:int, ordem_boletim:int, ordem_historico:int}> $componentes
+     */
+    private function expandirRotulos(array &$componentes): ?string
+    {
+        $idsComFilhos = $this->componenteCurricular->idsComFilhos();
+        $mapaFilhos = $this->componenteCurricular->mapaFilhosPorPai();
+        $idsPresentes = [];
+        foreach ($componentes as $c) {
+            $idsPresentes[(int) $c['materia_id']] = true;
+        }
+
+        $filtrados = [];
+        foreach ($componentes as $c) {
+            $id = (int) $c['materia_id'];
+            if (!isset($idsComFilhos[$id])) {
+                $filtrados[] = $c;
+                continue;
+            }
+            $filhosCatalogo = $mapaFilhos[$id] ?? [];
+            $temFilhoNaLista = false;
+            foreach ($filhosCatalogo as $filho) {
+                if (isset($idsPresentes[(int) $filho['id']])) {
+                    $temFilhoNaLista = true;
+                    break;
+                }
+            }
+            if ($temFilhoNaLista) {
+                continue;
+            }
+            if ($filhosCatalogo === []) {
+                return 'A área selecionada ainda não tem desdobramentos cadastrados em Componentes Curriculares.';
+            }
+            return 'Informe as aulas de cada desdobramento da área. A carga oficial é a soma deles.';
+        }
+
+        $componentes = $filtrados;
+        return null;
+    }
+
+    /**
+     * Payload do offcanvas: pai oficial com filhos aninhados.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function componentesParaFormulario(int $matrizId): array
+    {
+        $oficiais = $this->matrizCurricular->getComponentesOficiais($matrizId);
+        $out = [];
+        foreach ($oficiais as $linha) {
+            $item = [
+                'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                'aulas_semana' => (int) ($linha['aulas_semana'] ?? 0),
+                'obrigatorio' => (int) ($linha['obrigatorio'] ?? 1),
+                'ordem_boletim' => (int) ($linha['ordem_boletim'] ?? 0),
+                'eh_rotulo' => !empty($linha['eh_oficial_agrupado']),
+                'filhos' => [],
+            ];
+            foreach ((array) ($linha['filhos'] ?? []) as $filho) {
+                $item['filhos'][] = [
+                    'materia_id' => (int) ($filho['materia_id'] ?? 0),
+                    'aulas_semana' => (int) ($filho['aulas_semana'] ?? 0),
+                    'obrigatorio' => (int) ($filho['obrigatorio'] ?? 1),
+                    'ordem_boletim' => (int) ($filho['ordem_boletim'] ?? 0),
+                    'nome' => (string) ($filho['materia_nome'] ?? ''),
+                ];
+            }
+            $out[] = $item;
+        }
+        return $out;
     }
 
     /**

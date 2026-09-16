@@ -1,6 +1,6 @@
 <?php
 /**
- * Rotas admin do módulo Regras Acadêmicas.
+ * Rotas admin do módulo Regras de Aprovação.
  *
  * @var Router $router
  */

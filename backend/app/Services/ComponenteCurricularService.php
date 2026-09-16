@@ -36,6 +36,9 @@ class ComponenteCurricularService
         }
 
         $id = $this->componenteCurricular->create($data);
+        if (!empty($data['pai_id'])) {
+            $this->componenteCurricular->marcarPaiComoRotulo((int) $data['pai_id']);
+        }
 
         return ['success' => true, 'id' => $id];
     }
@@ -52,7 +55,7 @@ class ComponenteCurricularService
 
         $data = $this->normalizar($input);
 
-        $erro = $this->validar($data);
+        $erro = $this->validar($data, $id);
         if ($erro !== null) {
             return ['success' => false, 'error' => $erro];
         }
@@ -66,6 +69,9 @@ class ComponenteCurricularService
         }
 
         $this->componenteCurricular->update($id, $data);
+        if (!empty($data['pai_id'])) {
+            $this->componenteCurricular->marcarPaiComoRotulo((int) $data['pai_id']);
+        }
 
         return ['success' => true];
     }
@@ -93,13 +99,14 @@ class ComponenteCurricularService
             'permite_plano_aula' => !empty($input['permite_plano_aula']) ? 1 : 0,
             'permite_diario' => !empty($input['permite_diario']) ? 1 : 0,
             'ativo' => !empty($input['ativo']) ? 1 : 0,
+            'pai_id' => (int) ($input['pai_id'] ?? 0),
         ];
     }
 
     /**
      * @return string|null Mensagem de erro, ou null se válido.
      */
-    private function validar(array $data): ?string
+    private function validar(array $data, ?int $idAtual = null): ?string
     {
         if ($data['nome'] === '') {
             return 'Nome é obrigatório';
@@ -129,6 +136,25 @@ class ComponenteCurricularService
 
         if ($data['cor'] !== '' && !preg_match('/^#[0-9A-Fa-f]{6}$/', $data['cor'])) {
             return 'Cor inválida — use o formato hexadecimal (#RRGGBB)';
+        }
+
+        $paiId = (int) ($data['pai_id'] ?? 0);
+        if ($paiId > 0) {
+            if (!$this->componenteCurricular->exists($paiId)) {
+                return 'Área (componente pai) inválida';
+            }
+            $pai = $this->componenteCurricular->findById($paiId);
+            if (is_array($pai) && (int) ($pai['pai_id'] ?? 0) > 0) {
+                return 'A área precisa ser um componente raiz (um nível só)';
+            }
+            $filhosDoAtual = $this->componenteCurricular->idsComFilhos();
+            $idAtual = (int) ($idAtual ?? 0);
+            if ($idAtual > 0 && $paiId === $idAtual) {
+                return 'Um componente não pode ser pai de si mesmo';
+            }
+            if ($idAtual > 0 && isset($filhosDoAtual[$idAtual])) {
+                return 'Quem já é área (tem filhos) não pode virar filho de outro';
+            }
         }
 
         return null;

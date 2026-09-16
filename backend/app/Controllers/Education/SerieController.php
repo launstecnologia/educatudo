@@ -47,53 +47,7 @@ class SerieController extends BaseController
 
     public function index()
     {
-        $user = $this->auth->getUser();
-        if (!$this->schemaReady()) {
-            $this->viewWithLayout('admin', 'admin/serie/index', [
-                'title' => 'Séries - EducaTudo',
-                'user' => $user,
-                'current_page' => 'serie',
-                'schema_ready' => false,
-                'list' => [],
-            ]);
-            return;
-        }
-
-        $perPage = 10;
-        $page = max(1, (int)($_GET['page'] ?? 1));
-        $offset = ($page - 1) * $perPage;
-
-        $totalGeral = (int)($this->db->fetch(
-            "SELECT COUNT(*) AS total FROM serie s INNER JOIN curso c ON c.id = s.curso_id"
-        )['total'] ?? 0);
-        $list = $this->db->fetchAll(
-            "SELECT s.*, c.nome AS curso_nome
-             FROM serie s
-             INNER JOIN curso c ON c.id = s.curso_id
-             ORDER BY c.ordem ASC, c.nome ASC, s.ordem ASC, s.nome ASC
-             LIMIT $perPage OFFSET $offset"
-        );
-
-        $pagination = [
-            'total' => $totalGeral,
-            'per_page' => $perPage,
-            'page' => $page,
-            'total_pages' => $perPage > 0 ? (int)ceil($totalGeral / $perPage) : 1,
-        ];
-
-        $cursos = $this->db->fetchAll("SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC");
-        $this->viewWithLayout('admin', 'admin/serie/index', [
-            'title' => 'Séries - EducaTudo',
-            'user' => $user,
-            'current_page' => 'serie',
-            'schema_ready' => true,
-            'list' => $list,
-            'pagination' => $pagination,
-            'csrf_token' => $this->generateCsrfToken(),
-            'status' => $_GET['status'] ?? '',
-            'message' => $_GET['message'] ?? '',
-            'cursos' => $cursos,
-        ]);
+        $this->redirect('/admin/cursos-series', 301);
     }
 
     /**

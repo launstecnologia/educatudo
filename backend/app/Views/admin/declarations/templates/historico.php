@@ -42,6 +42,9 @@ $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
 // Agrupa boletins por ano letivo.
 $porAno = [];
 foreach ($historico as $ev) {
+    if (strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
+        continue;
+    }
     $ano = (int) ($ev['ano_letivo_calc'] ?? $ev['ano_letivo'] ?? 0);
     if ($ano <= 0) {
         $ano = (int) date('Y');
@@ -180,6 +183,9 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
                     $decimalPlaces = ((int) ($ev['decimal_places'] ?? 2) === 1) ? 1 : 2;
                     if ($cols === [] || $linhas === []) { continue; }
                     $exibirEmEv = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
+                    if (strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
+                        continue;
+                    }
                     $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
                         ? $buildGroupedBoletimHeader($cols)
                         : ['enabled' => false, 'groups' => []];

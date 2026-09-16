@@ -144,7 +144,7 @@ class GradeHorariaController extends BaseController
             "SELECT id, nome, serie, tipo_ensino FROM turmas WHERE ativo = 1 ORDER BY nome"
         ) ?: [];
         $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
-        $materias = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome") ?: [];
+        $materias = $this->materiasOperacionais();
 
         $tiposEnsino = [];
         $series = [];
@@ -213,7 +213,7 @@ class GradeHorariaController extends BaseController
             "SELECT id, nome, serie, tipo_ensino FROM turmas WHERE ativo = 1 ORDER BY nome"
         ) ?: [];
         $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
-        $materias = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome") ?: [];
+        $materias = $this->materiasOperacionais();
 
         $html = $this->renderizarHtml('admin/grade-horaria/pdf', [
             'itens' => $this->listarItens($filtros),
@@ -643,6 +643,24 @@ class GradeHorariaController extends BaseController
         } finally {
             ini_set('display_errors', (string) $old);
         }
+    }
+
+    /**
+     * Grade usa só desdobramentos/componentes com aula — rótulo de área não entra no horário.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function materiasOperacionais(): array
+    {
+        require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
+        $out = [];
+        foreach ((new \ComponenteCurricular())->getAvaliaveis(true) as $m) {
+            $out[] = [
+                'id' => (int) ($m['id'] ?? 0),
+                'nome' => (string) ($m['nome'] ?? ''),
+            ];
+        }
+        return $out;
     }
 }
 }

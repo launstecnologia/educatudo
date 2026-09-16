@@ -13,6 +13,7 @@
  *       </button>
  *   <?php $row_actions_dropdown_items = ob_get_clean(); ?>
  *   <?php $row_actions_dropdown_id = 'row-actions-' . $row['id']; ?>
+ *   <?php $row_actions_dropdown_menu_class = 'w-64'; // só se o texto não couber em w-48 ?>
  *   <?php include __DIR__ . '/../_partials/row_actions_dropdown.php'; ?>
  *
  * O JS de toggle/fechar é global, carregado uma vez em layouts/admin.php
@@ -20,6 +21,10 @@
  */
 $row_actions_dropdown_id = $row_actions_dropdown_id ?? ('row-actions-' . uniqid());
 $row_actions_dropdown_items = $row_actions_dropdown_items ?? '';
+$row_actions_dropdown_menu_class = trim((string) ($row_actions_dropdown_menu_class ?? 'w-48'));
+if ($row_actions_dropdown_menu_class === '') {
+    $row_actions_dropdown_menu_class = 'w-48';
+}
 ?>
 <div class="relative inline-block text-left" data-dropdown>
     <button type="button" id="<?= htmlspecialchars($row_actions_dropdown_id) ?>" data-dropdown-toggle
@@ -27,12 +32,12 @@ $row_actions_dropdown_items = $row_actions_dropdown_items ?? '';
         Ações
         <i class="fa-solid fa-chevron-down text-xs text-gray-400"></i>
     </button>
-    <div data-dropdown-menu class="hidden fixed z-50 w-48 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden">
+    <div data-dropdown-menu class="hidden fixed z-50 <?= htmlspecialchars($row_actions_dropdown_menu_class, ENT_QUOTES, 'UTF-8') ?> origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden">
         <div class="py-1">
             <?= $row_actions_dropdown_items ?>
         </div>
     </div>
 </div>
 <?php
-unset($row_actions_dropdown_id, $row_actions_dropdown_items);
+unset($row_actions_dropdown_id, $row_actions_dropdown_items, $row_actions_dropdown_menu_class);
 ?>

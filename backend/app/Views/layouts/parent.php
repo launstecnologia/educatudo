@@ -7,6 +7,7 @@
     <title><?= htmlspecialchars($title ?? 'EducaTudo - Pais') ?></title>
     <link rel="manifest" href="<?= URL ?>/manifest-pais.json">
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>
+    <?php require_once __DIR__ . '/../../Core/PeriodoLetivo.php'; ?>
     <meta name="theme-color" content="<?= htmlspecialchars(LayoutHelper::get('primary_color', '#a855f7')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -145,5 +146,6 @@
     if ($onesignal_app_id === '' && function_exists('env')) { $onesignal_app_id = trim(env('ONESIGNAL_APP_ID', '')); }
     include __DIR__ . '/../components/onesignal-init.php';
     ?>
+    <?php include __DIR__ . '/components/periodo_letivo_js.php'; ?>
 </body>
 </html>

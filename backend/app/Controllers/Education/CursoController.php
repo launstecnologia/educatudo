@@ -46,50 +46,64 @@ class CursoController extends BaseController
 
     public function index()
     {
+        $this->redirect('/admin/cursos-series', 301);
+    }
+
+    public function cursosSeries()
+    {
         $user = $this->auth->getUser();
         if (!$this->tableExists()) {
-            $data = [
-                'title' => 'Cursos - EducaTudo',
+            $this->viewWithLayout('admin', 'admin/cursos-series/index', [
+                'title' => 'Cursos e Séries - EducaTudo',
                 'user' => $user,
-                'current_page' => 'curso',
+                'current_page' => 'cursos-series',
                 'schema_ready' => false,
-                'list' => []
-            ];
-            $this->viewWithLayout('admin', 'admin/curso/index', $data);
+                'list' => [],
+                'series_por_curso' => [],
+                'cursos' => [],
+                'has_tipo_possui_serie' => false,
+            ]);
             return;
         }
 
-        $perPage = 10;
-        $page = max(1, (int)($_GET['page'] ?? 1));
-        $offset = ($page - 1) * $perPage;
-
-        $totalGeral = (int)($this->db->fetch("SELECT COUNT(*) AS total FROM curso")['total'] ?? 0);
         $list = $this->db->fetchAll(
             "SELECT c.*, (SELECT COUNT(*) FROM serie s WHERE s.curso_id = c.id) AS total_series
-             FROM curso c ORDER BY c.ordem ASC, c.nome ASC
-             LIMIT $perPage OFFSET $offset"
-        );
+             FROM curso c ORDER BY c.ordem ASC, c.nome ASC"
+        ) ?: [];
 
-        $pagination = [
-            'total' => $totalGeral,
-            'per_page' => $perPage,
-            'page' => $page,
-            'total_pages' => $perPage > 0 ? (int)ceil($totalGeral / $perPage) : 1,
-        ];
+        $series = [];
+        try {
+            $series = $this->db->fetchAll(
+                "SELECT s.*, c.nome AS curso_nome
+                 FROM serie s
+                 INNER JOIN curso c ON c.id = s.curso_id
+                 ORDER BY c.ordem ASC, c.nome ASC, s.ordem ASC, s.nome ASC"
+            ) ?: [];
+        } catch (Exception $e) {
+            $series = [];
+        }
 
-        $data = [
-            'title' => 'Cursos - EducaTudo',
+        $seriesPorCurso = [];
+        foreach ($series as $serie) {
+            $cid = (int) ($serie['curso_id'] ?? 0);
+            $seriesPorCurso[$cid][] = $serie;
+        }
+
+        $cursosAtivos = $this->db->fetchAll("SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC") ?: [];
+
+        $this->viewWithLayout('admin', 'admin/cursos-series/index', [
+            'title' => 'Cursos e Séries - EducaTudo',
             'user' => $user,
-            'current_page' => 'curso',
+            'current_page' => 'cursos-series',
             'schema_ready' => true,
             'list' => $list,
-            'pagination' => $pagination,
+            'series_por_curso' => $seriesPorCurso,
+            'cursos' => $cursosAtivos,
             'csrf_token' => $this->generateCsrfToken(),
             'status' => $_GET['status'] ?? '',
             'message' => $_GET['message'] ?? '',
             'has_tipo_possui_serie' => $this->hasTipoPossuiSerie(),
-        ];
-        $this->viewWithLayout('admin', 'admin/curso/index', $data);
+        ]);
     }
 
     /**

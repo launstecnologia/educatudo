@@ -12,6 +12,8 @@
 class ComponenteCurricular
 {
     private $db;
+    /** @var array<int, list<array{id:int,nome:string,codigo:string}>>|null */
+    private ?array $mapaFilhosPorPaiCache = null;
 
     /** Catálogo fixo de áreas do conhecimento (valor salvo => rótulo exibido) */
     public const AREAS_CONHECIMENTO = [
@@ -55,6 +57,7 @@ class ComponenteCurricular
      */
     public function getAll(bool $apenasAtivos = false)
     {
+        $this->ensurePaiColumn();
         $sql = "SELECT * FROM materias";
         if ($apenasAtivos) {
             $sql .= " WHERE ativo = 1";
@@ -62,6 +65,225 @@ class ComponenteCurricular
         $sql .= " ORDER BY ordem ASC, nome ASC";
 
         return $this->db->fetchAll($sql);
+    }
+
+    /**
+     * Lista em árvore de 1 nível: pai seguido dos filhos.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getAllArvore(bool $apenasAtivos = false): array
+    {
+        $rows = $this->getAll($apenasAtivos) ?: [];
+        $byPai = [];
+        $roots = [];
+        $ids = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $ids[$id] = true;
+            $pai = (int) ($r['pai_id'] ?? 0);
+            if ($pai > 0) {
+                $byPai[$pai][] = $r;
+            } else {
+                $roots[] = $r;
+            }
+        }
+        $out = [];
+        $visto = [];
+        foreach ($roots as $root) {
+            $rid = (int) $root['id'];
+            $out[] = $root;
+            $visto[$rid] = true;
+            foreach ($byPai[$rid] ?? [] as $child) {
+                $cid = (int) ($child['id'] ?? 0);
+                $out[] = $child;
+                $visto[$cid] = true;
+            }
+        }
+        foreach ($rows as $r) {
+            $id = (int) ($r['id'] ?? 0);
+            if ($id > 0 && empty($visto[$id])) {
+                $out[] = $r;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Componentes oficiais da matriz: raiz sem pai (Matemática) ou rótulo de área
+     * (Língua Portuguesa). Desdobramentos (filhos) não entram neste catálogo —
+     * a carga deles é lançada debaixo do pai.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getOficiaisParaMatriz(bool $apenasAtivos = true): array
+    {
+        $idsComFilhos = $this->idsComFilhos();
+        $out = [];
+        foreach ($this->getAll($apenasAtivos) ?: [] as $c) {
+            $id = (int) ($c['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ((int) ($c['pai_id'] ?? 0) > 0) {
+                continue;
+            }
+            $ehRotulo = isset($idsComFilhos[$id]);
+            $c['eh_rotulo'] = $ehRotulo;
+            $permiteAvaliacao = !isset($c['permite_avaliacao']) || (int) $c['permite_avaliacao'] === 1;
+            if ($ehRotulo || $permiteAvaliacao) {
+                $out[] = $c;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Filhos ativos agrupados pelo id do pai.
+     *
+     * @return array<int, list<array{id:int,nome:string,codigo:string}>>
+     */
+    public function mapaFilhosPorPai(): array
+    {
+        if ($this->mapaFilhosPorPaiCache !== null) {
+            return $this->mapaFilhosPorPaiCache;
+        }
+        if (!$this->temPaiColumn()) {
+            return $this->mapaFilhosPorPaiCache = [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT id, nome, codigo, pai_id FROM materias
+             WHERE pai_id IS NOT NULL AND pai_id > 0 AND ativo = 1
+             ORDER BY ordem ASC, nome ASC"
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $pai = (int) ($r['pai_id'] ?? 0);
+            $id = (int) ($r['id'] ?? 0);
+            if ($pai <= 0 || $id <= 0) {
+                continue;
+            }
+            $out[$pai][] = [
+                'id' => $id,
+                'nome' => (string) ($r['nome'] ?? ''),
+                'codigo' => (string) ($r['codigo'] ?? ''),
+            ];
+        }
+        return $this->mapaFilhosPorPaiCache = $out;
+    }
+
+    /**
+     * Filho → pai (só filhos ativos).
+     *
+     * @return array<int, int>
+     */
+    public function mapaPaiPorFilho(): array
+    {
+        $out = [];
+        foreach ($this->mapaFilhosPorPai() as $paiId => $filhos) {
+            foreach ($filhos as $f) {
+                $fid = (int) ($f['id'] ?? 0);
+                if ($fid > 0) {
+                    $out[$fid] = (int) $paiId;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Componentes que recebem nota (exclui rótulos-pai e permite_avaliacao=0).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getAvaliaveis(bool $apenasAtivos = true): array
+    {
+        $this->ensurePaiColumn();
+        $sql = "SELECT * FROM materias WHERE 1=1";
+        if ($apenasAtivos) {
+            $sql .= " AND ativo = 1";
+        }
+        if ($this->temColuna('permite_avaliacao')) {
+            $sql .= " AND permite_avaliacao = 1";
+        }
+        if ($this->temPaiColumn()) {
+            $sql .= " AND id NOT IN (SELECT DISTINCT pai_id FROM materias WHERE pai_id IS NOT NULL AND pai_id > 0 AND ativo = 1)";
+        }
+        $sql .= " ORDER BY ordem ASC, nome ASC";
+        return $this->db->fetchAll($sql) ?: [];
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    public function idsComFilhos(): array
+    {
+        if (!$this->temPaiColumn()) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT pai_id FROM materias
+             WHERE pai_id IS NOT NULL AND pai_id > 0 AND ativo = 1"
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['pai_id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = true;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * IDs oficiais + desdobramentos (busca de nota/prova).
+     *
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    public function expandirIdsComFilhos(array $ids): array
+    {
+        $out = [];
+        $filhosPorPai = $this->mapaFilhosPorPai();
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if ($id <= 0) {
+                continue;
+            }
+            $out[$id] = $id;
+            foreach ($filhosPorPai[$id] ?? [] as $f) {
+                $fid = (int) ($f['id'] ?? 0);
+                if ($fid > 0) {
+                    $out[$fid] = $fid;
+                }
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function listarFilhosIds(int $paiId): array
+    {
+        if (!$this->temPaiColumn() || $paiId <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT id FROM materias WHERE pai_id = :pai_id AND ativo = 1 ORDER BY ordem ASC, nome ASC",
+            ['pai_id' => $paiId]
+        ) ?: [];
+        $ids = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return $ids;
     }
 
     /**
@@ -80,16 +302,17 @@ class ComponenteCurricular
      */
     public function create(array $data)
     {
+        $this->ensurePaiColumn();
         $sql = "INSERT INTO materias
                     (nome, codigo, sigla, area_conhecimento, tipo,
                      etapa_infantil, etapa_fund_i, etapa_fund_ii, etapa_medio,
                      descricao, cor, ordem,
-                     permite_avaliacao, permite_frequencia, permite_plano_aula, permite_diario, ativo)
+                     permite_avaliacao, permite_frequencia, permite_plano_aula, permite_diario, ativo, pai_id)
                 VALUES
                     (:nome, :codigo, :sigla, :area_conhecimento, :tipo,
                      :etapa_infantil, :etapa_fund_i, :etapa_fund_ii, :etapa_medio,
                      :descricao, :cor, :ordem,
-                     :permite_avaliacao, :permite_frequencia, :permite_plano_aula, :permite_diario, :ativo)";
+                     :permite_avaliacao, :permite_frequencia, :permite_plano_aula, :permite_diario, :ativo, :pai_id)";
 
         return $this->db->insert($sql, $this->paramsFromData($data));
     }
@@ -99,6 +322,7 @@ class ComponenteCurricular
      */
     public function update($id, array $data)
     {
+        $this->ensurePaiColumn();
         $sql = "UPDATE materias SET
                     nome = :nome,
                     codigo = :codigo,
@@ -116,7 +340,8 @@ class ComponenteCurricular
                     permite_frequencia = :permite_frequencia,
                     permite_plano_aula = :permite_plano_aula,
                     permite_diario = :permite_diario,
-                    ativo = :ativo
+                    ativo = :ativo,
+                    pai_id = :pai_id
                 WHERE id = :id";
 
         $params = $this->paramsFromData($data);
@@ -208,6 +433,61 @@ class ComponenteCurricular
             'permite_plano_aula' => (int) $data['permite_plano_aula'],
             'permite_diario' => (int) $data['permite_diario'],
             'ativo' => (int) $data['ativo'],
+            'pai_id' => !empty($data['pai_id']) ? (int) $data['pai_id'] : null,
         ];
     }
+
+    public function marcarPaiComoRotulo(int $paiId): void
+    {
+        if ($paiId <= 0 || !$this->temColuna('permite_avaliacao')) {
+            return;
+        }
+        $this->db->update(
+            "UPDATE materias SET permite_avaliacao = 0 WHERE id = :id",
+            ['id' => $paiId]
+        );
+    }
+
+    private function ensurePaiColumn(): void
+    {
+        if ($this->temPaiColumn()) {
+            return;
+        }
+        try {
+            $this->db->query(
+                "ALTER TABLE materias ADD COLUMN pai_id INT NULL DEFAULT NULL COMMENT 'Área-rótulo (sem nota própria)' AFTER ativo"
+            );
+            $this->colunaExisteCache['materias.pai_id'] = true;
+        } catch (Throwable $e) {
+            $this->colunaExisteCache['materias.pai_id'] = false;
+        }
+    }
+
+    private function temPaiColumn(): bool
+    {
+        return $this->temColuna('pai_id');
+    }
+
+    private function temColuna(string $column): bool
+    {
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+            return false;
+        }
+        $key = 'materias.' . $column;
+        if (array_key_exists($key, $this->colunaExisteCache)) {
+            return $this->colunaExisteCache[$key];
+        }
+        $existe = false;
+        try {
+            $row = $this->db->fetch("SHOW COLUMNS FROM `materias` LIKE '{$column}'");
+            $existe = !empty($row);
+        } catch (Throwable $e) {
+            $existe = false;
+        }
+        $this->colunaExisteCache[$key] = $existe;
+        return $existe;
+    }
+
+    /** @var array<string, bool> */
+    private array $colunaExisteCache = [];
 }

@@ -263,6 +263,38 @@ class VidaEscolar
         return is_array($row) ? $row : null;
     }
 
+    private function sqlSelectBoletimId(): string
+    {
+        static $sql = null;
+        if ($sql !== null) {
+            return $sql;
+        }
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'boletim_id'");
+            $sql = $col ? ', r.boletim_id' : '';
+        } catch (\Throwable $e) {
+            $sql = '';
+        }
+        return $sql;
+    }
+
+    /**
+     * Só boletim oficial da matriz regular — ignora notas e boletim complementar.
+     */
+    private function sqlFiltroBoletimOficial(): string
+    {
+        $sql = " AND (r.exibir_em IS NULL OR r.exibir_em IN ('boletim', 'notas'))";
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'finalidade'");
+            if ($col) {
+                $sql .= " AND (r.finalidade IS NULL OR r.finalidade = 'oficial')";
+            }
+        } catch (\Throwable $e) {
+            // coluna ainda não migrada
+        }
+        return $sql;
+    }
+
     /**
      * Eventos oficiais (preview=0) já gravados para o aluno.
      *
@@ -289,10 +321,10 @@ class VidaEscolar
         }
         $rows = $this->db->fetchAll(
             "SELECT g.id, g.regra_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
-                    g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo
+                    g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo{$this->sqlSelectBoletimId()}
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}
+             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}
              ORDER BY g.id ASC",
             ['aid' => $alunoId]
         );
@@ -323,10 +355,10 @@ class VidaEscolar
             $params[$k] = $id;
         }
         $sql = "SELECT g.id, g.aluno_id, g.regra_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json, g.colunas_json,
-                    g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo
+                    g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo{$this->sqlSelectBoletimId()}
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}";
+             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}";
         $regraId = (int) $regraId;
         if ($regraId > 0) {
             $sql .= ' AND g.regra_id = :regra_id';
@@ -994,28 +1026,36 @@ class VidaEscolar
         if ($matrizId > 0) {
             $ok = $this->db->fetch("SHOW TABLES LIKE 'matrizes_curriculares_componentes'");
             if ($ok) {
-                $rows = $this->db->fetchAll(
-                    "SELECT mcc.materia_id, mat.nome AS componente_nome, mcc.ordem_boletim AS ordem,
-                            mcc.aulas_semana
-                     FROM matrizes_curriculares_componentes mcc
-                     INNER JOIN materias mat ON mat.id = mcc.materia_id
-                     WHERE mcc.matriz_id = :mid
-                     ORDER BY mcc.ordem_boletim ASC, mat.nome ASC",
-                    ['mid' => $matrizId]
-                );
-                if (!empty($rows)) {
+                require_once dirname(__DIR__, 3) . '/Models/Education/MatrizCurricular.php';
+                $matriz = new \MatrizCurricular();
+                $oficiais = $matriz->getComponentesOficiais($matrizId);
+                if (!empty($oficiais)) {
+                    $rows = [];
+                    foreach ($oficiais as $linha) {
+                        $rows[] = [
+                            'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                            'componente_nome' => (string) ($linha['materia_nome'] ?? 'Componente'),
+                            'ordem' => (int) ($linha['ordem_boletim'] ?? 0),
+                            'aulas_semana' => (int) ($linha['aulas_semana'] ?? 0),
+                        ];
+                    }
                     return $rows;
                 }
             }
         }
-        $rows = $this->db->fetchAll(
-            "SELECT DISTINCT gh.materia_id, mat.nome AS componente_nome, 0 AS ordem
+        $sqlGrade = "SELECT DISTINCT gh.materia_id, mat.nome AS componente_nome, 0 AS ordem
              FROM grade_horaria gh
              INNER JOIN materias mat ON mat.id = gh.materia_id
-             WHERE gh.turma_id = :tid
-             ORDER BY mat.nome ASC",
-            ['tid' => $turmaId]
-        );
+             WHERE gh.turma_id = :tid";
+        try {
+            if ($this->db->fetch("SHOW COLUMNS FROM materias LIKE 'pai_id'")) {
+                $sqlGrade .= " AND mat.id NOT IN (SELECT DISTINCT pai_id FROM materias WHERE pai_id IS NOT NULL AND pai_id > 0)";
+            }
+        } catch (\Throwable $e) {
+            // schema antigo
+        }
+        $sqlGrade .= " ORDER BY mat.nome ASC";
+        $rows = $this->db->fetchAll($sqlGrade, ['tid' => $turmaId]);
         return is_array($rows) ? $rows : [];
     }
 
@@ -1028,19 +1068,25 @@ class VidaEscolar
         return is_array($rows) ? $rows : [];
     }
 
-    public function findMatriculaAtiva(int $alunoId, int $turmaId): ?array
+    public function findMatriculaDaTurma(int $alunoId, int $turmaId): ?array
     {
         try {
             $row = $this->db->fetch(
                 "SELECT id FROM matricula
-                 WHERE aluno_id = :aid AND turma_id = :tid AND status = 'ativa'
-                 ORDER BY id DESC LIMIT 1",
+                 WHERE aluno_id = :aid AND turma_id = :tid
+                 ORDER BY (status = 'ativa') DESC, id DESC
+                 LIMIT 1",
                 ['aid' => $alunoId, 'tid' => $turmaId]
             );
             return is_array($row) ? $row : null;
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    public function findMatriculaAtiva(int $alunoId, int $turmaId): ?array
+    {
+        return $this->findMatriculaDaTurma($alunoId, $turmaId);
     }
 
     /**

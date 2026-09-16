@@ -37,6 +37,11 @@ class PresencaAdminController extends AdminBaseController
 
     public function index(): void
     {
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '';
+        if (preg_match('#/admin/presenca/?$#', $path)) {
+            $this->redirect('/admin/frequencia?' . http_build_query(array_merge($_GET, ['modo' => 'presenca'])), 301);
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('presenca', 'visualizar', false)) {
             return;
         }
@@ -46,9 +51,10 @@ class PresencaAdminController extends AdminBaseController
         $flash = $this->getFlashMessage();
         $total = (int) ($lista['total'] ?? 0);
         $this->viewWithLayout('admin', 'admin/presenca/index', [
-            'title' => 'Gestão de Presença — EducaTudo',
+            'title' => 'Frequência — Presença — EducaTudo',
             'user' => $this->auth->getUser(),
-            'current_page' => 'presenca',
+            'current_page' => 'frequencia',
+            'frequencia_modo' => 'presenca',
             'flash_message' => $flash['message'] ?? '',
             'flash_type' => $flash['type'] ?? '',
             'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),

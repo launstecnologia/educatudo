@@ -20,10 +20,11 @@ if ($flash_status === '' && !empty($flash_message)) {
     $flash_status = (($flash_type ?? '') === 'error') ? 'error' : 'success';
 }
 
-$page_header_title = 'Gestão de Presença';
-$page_header_subtitle = 'Entrada e saída na portaria aplicam a chamada nas aulas da grade. O boletim continua no consolidado de faltas.';
+$page_header_title = 'Frequência';
+$page_header_subtitle = 'Presença na portaria. Troque para Faltas para lançar a sala de aula.';
 ob_start();
 ?>
+<?php $frequencia_modo = $frequencia_modo ?? 'presenca'; include dirname(__DIR__, 4) . '/Views/admin/_partials/frequencia_toggle.php'; ?>
 <?php if ($schemaPronto): ?>
 <button type="button" onclick="openFilterDrawer()"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">

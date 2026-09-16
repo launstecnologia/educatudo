@@ -5,12 +5,15 @@ $provas_matriz_blocos = $provas_matriz_blocos ?? [];
 $notas_lancamento_eventos = $notas_lancamento_eventos ?? [];
 $boletins_gerados = $boletins_gerados ?? [];
 $boletins_gerados_notas = $boletins_gerados_notas ?? [];
+$boletins_gerados_notas_extra = $boletins_gerados_notas_extra ?? [];
 $boletins_gerados_boletim = $boletins_gerados_boletim ?? [];
+$boletins_gerados_complementar = $boletins_gerados_complementar ?? [];
 $boletim_observacao = is_array($boletim_observacao ?? null) ? $boletim_observacao : ['conteudo' => '', 'updated_at' => null];
 $secaoNotas = $secao_notas ?? 'boletim';
 $filtroAnoLetivo = isset($filtro_ano_letivo) ? (int) $filtro_ano_letivo : 0;
 $filtroBimestre = isset($filtro_bimestre) ? (int) $filtro_bimestre : 0;
 $anosDisponiveis = is_array($anos_disponiveis ?? null) ? $anos_disponiveis : [];
+$paineis_notas = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 
 $baseUrlNotas = URL . '/pais/filhos/' . (int) ($filho['id'] ?? 0) . '/notas';
 $queryFiltros = [];
@@ -43,7 +46,7 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                         <input type="hidden" name="secao" value="<?= htmlspecialchars($secaoNotas, ENT_QUOTES, 'UTF-8') ?>">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1">Ano letivo</label>
-                            <select name="ano_letivo" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                            <select name="ano_letivo" data-periodo-ano class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                                 <option value="">Todos</option>
                                 <?php foreach ($anosDisponiveis as $anoOpt): ?>
                                     <option value="<?= (int) $anoOpt ?>" <?= $filtroAnoLetivo === (int) $anoOpt ? 'selected' : '' ?>><?= (int) $anoOpt ?></option>
@@ -51,13 +54,15 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-gray-600 mb-1">Bimestre</label>
-                            <select name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                                <option value="">Todos</option>
-                                <option value="1" <?= $filtroBimestre === 1 ? 'selected' : '' ?>>1º bimestre</option>
-                                <option value="2" <?= $filtroBimestre === 2 ? 'selected' : '' ?>>2º bimestre</option>
-                                <option value="3" <?= $filtroBimestre === 3 ? 'selected' : '' ?>>3º bimestre</option>
-                                <option value="4" <?= $filtroBimestre === 4 ? 'selected' : '' ?>>4º bimestre</option>
+                            <label class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
+                            <select name="bimestre" data-periodo-letivo-select data-periodo-todos="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                                <?php
+                                if (!class_exists('PeriodoLetivo')) {
+                                    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                                }
+                                $anoFiltroPais = $filtroAnoLetivo > 0 ? $filtroAnoLetivo : (int) date('Y');
+                                echo PeriodoLetivo::optionsHtml($anoFiltroPais, $filtroBimestre, ['todos' => true]);
+                                ?>
                             </select>
                         </div>
                         <div class="md:col-span-2 flex items-end gap-2">
@@ -77,10 +82,16 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                     <?php $boletins_gerados = $boletins_gerados_boletim; ?>
                     <?php if (!empty($boletins_gerados)): ?>
                         <?php require __DIR__ . '/../partials/boletins_gerados.php'; ?>
-                    <?php elseif (empty($quadro_oficial['grid'])): ?>
+                    <?php elseif (empty($quadro_oficial['grid']) && empty($boletins_gerados_complementar)): ?>
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhum boletim disponível.</p>
                         </div>
+                    <?php endif; ?>
+                    <?php if (!empty($boletins_gerados_complementar)): ?>
+                        <h2 class="text-lg font-semibold text-gray-900 mt-8 mb-1">Boletim complementar</h2>
+                        <p class="text-sm text-gray-500 mb-4">Cursos extras e atividades paralelas — não entra no histórico oficial.</p>
+                        <?php $boletins_gerados = $boletins_gerados_complementar; ?>
+                        <?php require __DIR__ . '/../partials/boletins_gerados.php'; ?>
                     <?php endif; ?>
                     <?php if (trim((string) ($boletim_observacao['conteudo'] ?? '')) !== ''): ?>
                         <div class="mt-6 rounded-xl border border-gray-200 bg-white p-5">
@@ -89,6 +100,7 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                         </div>
                     <?php endif; ?>
                 <?php elseif ($secaoNotas === 'notas'): ?>
+                    <?php require __DIR__ . '/../partials/resumo_notas_tabelas.php'; ?>
                     <?php if (!empty($notas_lancamento_eventos)): ?>
                         <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
                             <table class="min-w-full text-sm text-left">
@@ -116,8 +128,33 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas, $queryFiltr
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($boletins_gerados_notas)): ?>
-                        <?php require __DIR__ . '/../partials/boletim_eventos_notas_cards.php'; ?>
-                    <?php elseif (empty($notas_lancamento_eventos)): ?>
+                        <?php
+                        $paineis_notas_eventos = $boletins_gerados_notas;
+                        $painel_notas_pode_imprimir = false;
+                        require __DIR__ . '/../partials/painel_notas_eventos.php';
+                        ?>
+                    <?php endif; ?>
+                    <?php
+                    $notasExtraComLinhas = array_values(array_filter(
+                        is_array($boletins_gerados_notas_extra) ? $boletins_gerados_notas_extra : [],
+                        static function ($ev) {
+                            return is_array($ev) && !empty($ev['linhas']);
+                        }
+                    ));
+                    ?>
+                    <?php if ($notasExtraComLinhas !== []): ?>
+                        <h2 class="text-lg font-semibold text-gray-900 mt-8 mb-1">Notas extra</h2>
+                        <p class="text-sm text-gray-500 mb-4">Cursos extras (música, robótica…) — não entra no histórico oficial.</p>
+                        <?php
+                        $boletins_gerados_notas_backup = $boletins_gerados_notas;
+                        $boletins_gerados_notas = $notasExtraComLinhas;
+                        $boletim_notas_cards_prefix = 'bnx';
+                        require __DIR__ . '/../partials/boletim_eventos_notas_cards.php';
+                        $boletins_gerados_notas = $boletins_gerados_notas_backup;
+                        unset($boletim_notas_cards_prefix);
+                        ?>
+                    <?php endif; ?>
+                    <?php if (empty($boletins_gerados_notas) && empty($boletins_gerados_notas_extra) && empty($notas_lancamento_eventos) && empty($paineis_notas) && empty($resumosNotas)): ?>
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhuma nota encontrada para o filtro selecionado.</p>
                         </div>

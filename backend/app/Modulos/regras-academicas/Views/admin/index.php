@@ -11,14 +11,14 @@ $anosLetivos = is_array($anos_letivos ?? null) ? $anos_letivos : [];
 $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
 
-$page_header_title = 'Regras Acadêmicas';
+$page_header_title = 'Regras de Aprovação';
 $page_header_subtitle = 'Critérios de aprovação, recuperação e frequência. O boletim consulta este motor — não recodifique média 6 na tela.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/regras-academicas/nova"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
-    Nova regra
+    Nova regra de aprovação
 </a>
 <?php
 $page_header_actions = ob_get_clean();
@@ -86,7 +86,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <tr>
                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-scale-balanced text-4xl text-gray-300 mb-4"></i>
-                        <p>Nenhuma regra acadêmica cadastrada</p>
+                        <p>Nenhuma regra de aprovação cadastrada</p>
                         <p class="text-sm mt-1">Sem regra, o boletim continua usando a nota mínima do próprio evento.</p>
                     </td>
                 </tr>
@@ -95,19 +95,14 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
                             <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) $row['nome']) ?></div>
-                            <?php if (!empty($row['codigo'])): ?>
-                                <div class="text-xs text-gray-500"><?= htmlspecialchars((string) $row['codigo']) ?></div>
-                            <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">
                             <?= !empty($row['ano_letivo']) ? (int) $row['ano_letivo'] : 'Qualquer ano' ?>
-                            <?php if (!empty($row['serie_nome'])): ?>
-                                · <?= htmlspecialchars((string) $row['serie_nome']) ?>
-                            <?php elseif (!empty($row['curso_nome'])): ?>
+                            <?php if (!empty($row['curso_nome'])): ?>
                                 · <?= htmlspecialchars((string) $row['curso_nome']) ?>
                             <?php endif; ?>
-                            <?php if (!empty($row['materia_nome'])): ?>
-                                <div class="text-xs text-gray-500">Exceção: <?= htmlspecialchars((string) $row['materia_nome']) ?></div>
+                            <?php if (!empty($row['serie_nome'])): ?>
+                                · <?= htmlspecialchars((string) $row['serie_nome']) ?>
                             <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">

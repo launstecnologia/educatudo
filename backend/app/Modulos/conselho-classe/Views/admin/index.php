@@ -31,7 +31,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 <form method="GET" action="<?= URL ?>/admin/conselhos" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
     <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Ano letivo</label>
-        <select name="ano_letivo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <select name="ano_letivo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" data-periodo-ano>
             <?php foreach ($anos as $ano): ?>
                 <option value="<?= (int) $ano ?>" <?= $anoLetivo === (int) $ano ? 'selected' : '' ?>><?= (int) $ano ?></option>
             <?php endforeach; ?>
@@ -39,10 +39,13 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     </div>
     <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Período</label>
-        <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <?php for ($b = 1; $b <= 4; $b++): ?>
-                <option value="<?= $b ?>" <?= $bimestre === $b ? 'selected' : '' ?>><?= $b ?>º Bimestre</option>
-            <?php endfor; ?>
+        <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" data-periodo-letivo-select>
+            <?php
+            if (!class_exists('PeriodoLetivo')) {
+                require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
+            }
+            echo PeriodoLetivo::optionsHtml($anoLetivo, $bimestre);
+            ?>
         </select>
     </div>
     <div>
@@ -91,7 +94,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                         <div class="font-medium"><?= htmlspecialchars((string) $linha['turma_nome']) ?></div>
                         <div class="text-xs text-gray-500"><?= htmlspecialchars((string) ($linha['turma_serie'] ?? '')) ?></div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= (int) $bimestre ?>º Bimestre / <?= (int) $anoLetivo ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? PeriodoLetivo::rotulo($anoLetivo, $bimestre) : ($bimestre . 'º Bimestre')) ?> / <?= (int) $anoLetivo ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= (int) ($linha['total_alunos'] ?? 0) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm <?= $pend > 0 ? 'text-amber-700 font-medium' : 'text-gray-700' ?>"><?= $pend ?></td>
                     <td class="px-6 py-4 whitespace-nowrap">

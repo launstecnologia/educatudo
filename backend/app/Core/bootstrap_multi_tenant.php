@@ -107,6 +107,31 @@ if (!function_exists('educatudo_definir_constantes_tenant')) {
     }
 }
 
+if (!function_exists('educatudo_responder_escola_inativa')) {
+    function educatudo_responder_escola_inativa(array $tenant): void
+    {
+        if (!headers_sent()) {
+            http_response_code(403);
+            header('Content-Type: text/html; charset=utf-8');
+            header('X-Robots-Tag: noindex, nofollow', true);
+        }
+
+        $nome = trim((string) ($tenant['nome'] ?? ''));
+        $titulo = $nome !== '' ? $nome : 'Escola indisponivel';
+        $tituloHtml = htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8');
+        echo '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">';
+        echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+        echo '<title>Escola indisponivel - EducaTudo</title>';
+        echo '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;color:#0f172a;font-family:Inter,Arial,sans-serif}.box{max-width:520px;padding:40px 28px;text-align:center}.badge{display:inline-flex;align-items:center;border-radius:999px;background:#fee2e2;color:#991b1b;padding:6px 12px;font-size:13px;font-weight:700}h1{margin:18px 0 10px;font-size:28px;line-height:1.2}p{margin:0;color:#475569;font-size:16px;line-height:1.6}</style>';
+        echo '</head><body><main class="box">';
+        echo '<span class="badge">Acesso indisponivel</span>';
+        echo '<h1>' . $tituloHtml . '</h1>';
+        echo '<p>Esta escola esta temporariamente indisponivel no EducaTudo. Entre em contato com a instituicao para mais informacoes.</p>';
+        echo '</main></body></html>';
+        exit;
+    }
+}
+
 // Rotas /master e domínio MASTER continuam no fluxo original (sempre abrem o MASTER).
 if ($isMasterPath || $isMasterDomain) {
     $masterPdo = Database::createMasterPdo();
@@ -153,6 +178,11 @@ $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
 $resolver = new TenantResolver($masterPdo);
 $tenant = $resolver->resolveTenant();
 if ($tenant === null) {
+    $knownTenant = $resolver->resolveTenantIncludingInactive();
+    if ($knownTenant !== null && (int) ($knownTenant['ativo'] ?? 0) !== 1) {
+        educatudo_responder_escola_inativa($knownTenant);
+    }
+
     $errorHost = $_SERVER['HTTP_HOST'] ?? 'N/A';
     if (defined('MASTER_DOMAIN') && MASTER_DOMAIN !== '' && strtolower(trim((string) MASTER_DOMAIN)) === strtolower(trim((string) $errorHost))) {
         Database::setCurrentInstance(Database::createFromPdo($masterPdo));

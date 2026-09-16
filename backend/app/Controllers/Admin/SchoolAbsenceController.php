@@ -311,6 +311,12 @@ class SchoolAbsenceController extends BaseController
             return;
         }
 
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '';
+        if (preg_match('#/admin/faltas/?$#', $path)) {
+            $this->redirect('/admin/frequencia?' . http_build_query(array_merge($_GET, ['modo' => 'faltas'])), 301);
+            return;
+        }
+
         $user = $this->auth->getUser();
         $eventos = $this->absence->listEventos(300);
         $materiasCatalogo = $this->absence->listMateriasCadastradas(800);
@@ -324,9 +330,10 @@ class SchoolAbsenceController extends BaseController
         }
 
         $this->viewWithLayout('admin', 'admin/faltas/index', [
-            'title' => 'Só Faltas - EducaTudo',
-            'page_title' => 'Só Faltas',
-            'current_page' => 'faltas',
+            'title' => 'Frequência — Faltas - EducaTudo',
+            'page_title' => 'Frequência',
+            'current_page' => 'frequencia',
+            'frequencia_modo' => 'faltas',
             'user' => $user,
             'csrf_token' => $this->generateCsrfToken(),
             'eventos' => $eventos,

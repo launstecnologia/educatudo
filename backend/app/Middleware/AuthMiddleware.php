@@ -187,6 +187,22 @@ class AuthMiddleware
             }
             return true;
         }
+        if (is_string($path) && ($path === '/admin/cursos-series' || str_starts_with($path, '/admin/cursos-series/'))) {
+            if (!empty($permissions['curso']['visualizar']) || !empty($permissions['series']['visualizar'])) {
+                return true;
+            }
+            http_response_code(302);
+            header('Location: ' . URL . '/admin/dashboard');
+            exit;
+        }
+        if (is_string($path) && ($path === '/admin/frequencia' || str_starts_with($path, '/admin/frequencia/'))) {
+            if (!empty($permissions['faltas']['visualizar']) || !empty($permissions['presenca']['visualizar'])) {
+                return true;
+            }
+            http_response_code(302);
+            header('Location: ' . URL . '/admin/dashboard');
+            exit;
+        }
 
         $resolved = AdminPermissionMatrix::resolveModuleAndAction((string) ($_SERVER['REQUEST_URI'] ?? ''), (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
         $moduleKey = $resolved['module_key'] ?? null;

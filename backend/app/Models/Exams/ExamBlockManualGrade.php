@@ -311,6 +311,8 @@ class ExamBlockManualGrade
         if (!$this->tableExists() || empty($linhas)) {
             return;
         }
+        $this->assertPeriodoEditavel($blocoId, $linhas);
+        $alunosFechar = [];
         foreach ($linhas as $linha) {
             $tid = (int) ($linha['turma_id'] ?? 0);
             $aid = (int) ($linha['aluno_id'] ?? 0);
@@ -337,6 +339,71 @@ class ExamBlockManualGrade
                     'observacao' => $obs !== '' ? $obs : null,
                 ]
             );
+            $alunosFechar[$aid] = $tid;
+        }
+        $this->atualizarNotaFinalDoTipo($blocoId, $alunosFechar, $materiaId);
+    }
+
+    /**
+     * @param array<int,int> $alunosFechar aluno_id => turma_id
+     */
+    private function atualizarNotaFinalDoTipo(int $blocoId, array $alunosFechar, int $materiaId): void
+    {
+        if ($alunosFechar === []) {
+            return;
+        }
+        $path = __DIR__ . '/../../Services/TipoNotaRegraService.php';
+        if (!is_file($path)) {
+            return;
+        }
+        require_once $path;
+        try {
+            $svc = new TipoNotaRegraService();
+            foreach ($alunosFechar as $alunoId => $turmaId) {
+                $svc->atualizarAposLancamento($blocoId, (int) $alunoId, (int) $turmaId, $materiaId);
+            }
+        } catch (Throwable $e) {
+            error_log('ExamBlockManualGrade::atualizarNotaFinalDoTipo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     */
+    private function assertPeriodoEditavel(int $blocoId, array $linhas): void
+    {
+        $path = __DIR__ . '/../../Modulos/fechamento/Models/FechamentoPeriodo.php';
+        if (!is_file($path)) {
+            return;
+        }
+        require_once $path;
+        try {
+            $model = new FechamentoPeriodo();
+            if (!$model->schemaPronto()) {
+                return;
+            }
+            $bloco = $this->db->fetch(
+                'SELECT ano_letivo, bimestre FROM provas_blocos WHERE id = :id LIMIT 1',
+                ['id' => $blocoId]
+            );
+        } catch (Throwable $e) {
+            return;
+        }
+        $ano = (int) ($bloco['ano_letivo'] ?? date('Y'));
+        $bim = (int) ($bloco['bimestre'] ?? 0);
+        $tipo = ($bim >= 1 && $bim <= 4) ? 'bimestre' : 'ano';
+        $num = $tipo === 'bimestre' ? $bim : 0;
+        $vistos = [];
+        foreach ($linhas as $linha) {
+            $tid = (int) ($linha['turma_id'] ?? 0);
+            if ($tid <= 0 || isset($vistos[$tid])) {
+                continue;
+            }
+            $vistos[$tid] = true;
+            $res = $model->assertEditavel($tid, $ano, $tipo, $num);
+            if (empty($res['ok'])) {
+                throw new RuntimeException((string) ($res['error'] ?? 'Período homologado.'));
+            }
         }
     }
 }

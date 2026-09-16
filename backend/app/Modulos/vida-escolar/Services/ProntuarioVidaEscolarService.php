@@ -63,6 +63,13 @@ class ProntuarioVidaEscolarService
         $resultados = $this->resultadosHomologados($alunoId);
         $emissoes = $this->emissoesDeclaracao($alunoId);
         $trajetoria = $vida->trajetoria($alunoId);
+        if ($vida->model()->schemaPronto()) {
+            try {
+                $vida->materializarFichaOficialSeFaltar($alunoId);
+            } catch (\Throwable $e) {
+                error_log('Vida escolar materializar ficha aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+        }
         $fichas = $vida->model()->schemaPronto() ? $vida->model()->listarFichasAluno($alunoId) : [];
 
         if ($fichaId > 0) {

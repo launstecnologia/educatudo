@@ -9,8 +9,6 @@ $historico = is_array($historico ?? null) ? $historico : [];
 $cursos = is_array($cursos ?? null) ? $cursos : [];
 $series = is_array($series ?? null) ? $series : [];
 $anosLetivos = is_array($anos_letivos ?? null) ? $anos_letivos : [];
-$matrizes = is_array($matrizes ?? null) ? $matrizes : [];
-$componentes = is_array($componentes ?? null) ? $componentes : [];
 $csrf_token = $csrf_token ?? '';
 $action = $isEdit
     ? URL . '/admin/regras-academicas/' . (int) $item['id'] . '/update'
@@ -25,7 +23,7 @@ $val = static function (?array $item, string $key, $default = '') {
 <div class="mb-8">
     <div class="flex justify-between items-center">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= $isEdit ? 'Editar regra acadêmica' : 'Nova regra acadêmica' ?></h2>
+            <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= $isEdit ? 'Editar regra de aprovação' : 'Nova regra de aprovação' ?></h2>
             <p class="text-gray-600">Define como a escola aprova, recupera e exige frequência. Salvar gera uma nova versão — anos anteriores não mudam.</p>
         </div>
         <a href="<?= URL ?>/admin/regras-academicas" class="text-gray-600 hover:text-gray-900">← Voltar</a>
@@ -34,7 +32,7 @@ $val = static function (?array $item, string $key, $default = '') {
 
 <?php include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php'; ?>
 
-<div class="bg-white rounded-xl shadow-lg p-6">
+<div class="bg-white rounded-xl shadow-lg p-6 w-full">
     <form method="POST" action="<?= htmlspecialchars($action) ?>">
         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
 
@@ -47,14 +45,6 @@ $val = static function (?array $item, string $key, $default = '') {
                        placeholder="Ex.: Ensino Médio 2026">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Código</label>
-                <input type="text" name="codigo" maxlength="120" value="<?= htmlspecialchars((string) $val($item, 'codigo')) ?>"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                       placeholder="em-2026">
-            </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Ano letivo</label>
                 <select name="ano_letivo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <option value="">Qualquer ano</option>
@@ -63,8 +53,10 @@ $val = static function (?array $item, string $key, $default = '') {
                         <option value="<?= $ano ?>" <?= (int) $val($item, 'ano_letivo', 0) === $ano ? 'selected' : '' ?>><?= $ano ?></option>
                     <?php endforeach; ?>
                 </select>
-                <p class="text-xs text-gray-500 mt-1">Deixe em branco para valer em todos os anos (não recomendado).</p>
+                <p class="text-xs text-gray-500 mt-1">Melhor apontar o ano. Em branco vale para todos (não recomendado).</p>
             </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Curso</label>
                 <select name="curso_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
@@ -74,8 +66,6 @@ $val = static function (?array $item, string $key, $default = '') {
                     <?php endforeach; ?>
                 </select>
             </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Série</label>
                 <select name="serie_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
@@ -84,38 +74,18 @@ $val = static function (?array $item, string $key, $default = '') {
                         <option value="<?= (int) $s['id'] ?>" <?= (int) $val($item, 'serie_id', 0) === (int) $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $s['nome']) ?></option>
                     <?php endforeach; ?>
                 </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Matriz curricular</label>
-                <select name="matriz_curricular_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option value="">Qualquer matriz</option>
-                    <?php foreach ($matrizes as $mz): ?>
-                        <option value="<?= (int) $mz['id'] ?>" <?= (int) $val($item, 'matriz_curricular_id', 0) === (int) $mz['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $mz['nome']) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <p class="text-xs text-gray-500 mt-1">Deixe em todas se o critério for o mesmo no curso inteiro.</p>
             </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Componente (exceção)</label>
-                <select name="materia_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option value="">Todos os componentes</option>
-                    <?php foreach ($componentes as $comp): ?>
-                        <option value="<?= (int) $comp['id'] ?>" <?= (int) $val($item, 'materia_id', 0) === (int) $comp['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $comp['nome']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="text-xs text-gray-500 mt-1">Preencha só se esta regra for exceção de um componente.</p>
-            </div>
-            <div class="flex items-end pb-2">
-                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" name="ativo" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !$isEdit || !empty($item['ativo']) ? 'checked' : '' ?>>
-                    Regra ativa
-                </label>
-            </div>
+        <div class="mb-8">
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="ativo" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !$isEdit || !empty($item['ativo']) ? 'checked' : '' ?>>
+                Regra ativa
+            </label>
         </div>
 
         <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-6">Período e fórmulas</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de período</label>
                 <select name="periodo_tipo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
@@ -123,31 +93,14 @@ $val = static function (?array $item, string $key, $default = '') {
                         <option value="<?= htmlspecialchars($k) ?>" <?= (string) $val($item, 'periodo_tipo', 'bimestre') === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <p class="text-xs text-gray-500 mt-1">A quantidade de períodos (4, 3 ou 2) vem de <a href="<?= URL ?>/admin/ano-letivo" class="text-indigo-600 hover:underline">Ano Letivo → Divisão do ano</a>.</p>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Número do período</label>
-                <select name="periodo_numero" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option value="">Ano todo</option>
-                    <?php for ($i = 1; $i <= 4; $i++): ?>
-                        <option value="<?= $i ?>" <?= (int) $val($item, 'periodo_numero', 0) === $i ? 'selected' : '' ?>><?= $i ?>º</option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Fórmula da média do período</label>
                 <input type="text" name="formula_media" value="<?= htmlspecialchars((string) $val($item, 'formula_media')) ?>"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                        placeholder="Ex.: (B1 + B2 + B3 + B4) / 4">
-                <p class="text-xs text-gray-500 mt-1">Usada no boletim da Vida Escolar para calcular a coluna FINAL a partir dos bimestres (B1–B4).</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Fórmula final (com recuperação)</label>
-                <input type="text" name="formula_final" value="<?= htmlspecialchars((string) $val($item, 'formula_final')) ?>"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                       placeholder="Ex.: max(media, rec) ou (media + rec) / 2">
-                <p class="text-xs text-gray-500 mt-1">Usada quando a composição da recuperação for “fórmula própria”.</p>
+                <p class="text-xs text-gray-500 mt-1">Vida Escolar usa na coluna FINAL. Vazio = média simples dos períodos (B1+B2…, T1+T2… ou S1+S2).</p>
             </div>
         </div>
 
@@ -161,11 +114,9 @@ $val = static function (?array $item, string $key, $default = '') {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Frequência mínima (%)</label>
-                <div class="flex items-center gap-3">
-                    <input type="number" name="frequencia_minima" min="0" max="100" step="0.1"
-                           value="<?= htmlspecialchars(number_format((float) $val($item, 'frequencia_minima', 75), 1, '.', '')) ?>"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                </div>
+                <input type="number" name="frequencia_minima" min="0" max="100" step="0.1"
+                       value="<?= htmlspecialchars(number_format((float) $val($item, 'frequencia_minima', 75), 1, '.', '')) ?>"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-700 mt-2">
                     <input type="checkbox" name="usar_frequencia" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !empty($item['usar_frequencia']) ? 'checked' : '' ?>>
                     Exigir frequência mínima na aprovação
@@ -199,38 +150,27 @@ $val = static function (?array $item, string $key, $default = '') {
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Como a recuperação entra na média</label>
-                <select name="recuperacao_composicao" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <select name="recuperacao_composicao" id="regra-recuperacao-composicao"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <?php foreach (RegraAcademica::RECUPERACAO_COMPOSICOES as $k => $lab): ?>
                         <option value="<?= htmlspecialchars($k) ?>" <?= (string) $val($item, 'recuperacao_composicao', 'maior_nota') === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <p class="text-xs text-gray-500 mt-1">Maior nota, substitui ou média das duas. Fórmula própria abre o campo abaixo.</p>
             </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Mín. de avaliações</label>
-                <input type="number" name="min_avaliacoes" min="1" value="<?= htmlspecialchars((string) $val($item, 'min_avaliacoes')) ?>"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Máx. de avaliações</label>
-                <input type="number" name="max_avaliacoes" min="1" value="<?= htmlspecialchars((string) $val($item, 'max_avaliacoes')) ?>"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
+        <div id="campo-formula-final" class="mb-6 <?= (string) $val($item, 'recuperacao_composicao', 'maior_nota') === 'formula' ? '' : 'hidden' ?>">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Fórmula da recuperação</label>
+            <input type="text" name="formula_final" value="<?= htmlspecialchars((string) $val($item, 'formula_final')) ?>"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   placeholder="Ex.: max(media, rec) ou (media + rec) / 2">
+            <p class="text-xs text-gray-500 mt-1">Use <code>media</code> e <code>rec</code>. Ex.: max(media, rec).</p>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" name="componentes_sem_nota" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !empty($item['componentes_sem_nota']) ? 'checked' : '' ?>>
-                Permitir componente sem nota (não avaliado)
-            </label>
+        <div class="mb-8">
             <label class="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input type="checkbox" name="aprovacao_so_frequencia" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !empty($item['aprovacao_so_frequencia']) ? 'checked' : '' ?>>
                 Aprovar somente por frequência (sem nota)
             </label>
-        </div>
-        <div class="mb-8">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Observações</label>
-            <textarea name="observacoes" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"><?= htmlspecialchars((string) $val($item, 'observacoes')) ?></textarea>
         </div>
 
         <?php if ($isEdit && $historico !== []): ?>
@@ -265,3 +205,19 @@ $val = static function (?array $item, string $key, $default = '') {
         </div>
     </form>
 </div>
+<script>
+(function () {
+    var sel = document.getElementById('regra-recuperacao-composicao');
+    var campo = document.getElementById('campo-formula-final');
+    if (!sel || !campo) return;
+    function sync() {
+        if (sel.value === 'formula') {
+            campo.classList.remove('hidden');
+        } else {
+            campo.classList.add('hidden');
+        }
+    }
+    sel.addEventListener('change', sync);
+    sync();
+})();
+</script>

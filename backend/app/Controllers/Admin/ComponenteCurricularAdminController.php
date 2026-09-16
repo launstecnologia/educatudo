@@ -33,7 +33,14 @@ class ComponenteCurricularAdminController extends AdminBaseController
 
         $data = [
             'title' => 'Componentes Curriculares - EducaTudo',
-            'items' => $this->model()->getAll(),
+            'items' => $this->model()->getAllArvore(),
+            'ids_com_filhos' => $this->model()->idsComFilhos(),
+            'pais_candidatos' => array_values(array_filter(
+                $this->model()->getAll(true) ?: [],
+                static function ($c) {
+                    return (int) ($c['pai_id'] ?? 0) <= 0;
+                }
+            )),
             'areas_conhecimento' => ComponenteCurricular::AREAS_CONHECIMENTO,
             'tipos' => ComponenteCurricular::TIPOS,
             'etapas' => ComponenteCurricular::ETAPAS,

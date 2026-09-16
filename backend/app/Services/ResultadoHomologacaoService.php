@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../Models/Education/ResultadoAcademico.php';
 require_once __DIR__ . '/../Models/Education/ClassDiary.php';
+require_once __DIR__ . '/../Modulos/fechamento/Services/FechamentoGates.php';
 require_once __DIR__ . '/FrequencyService.php';
 require_once __DIR__ . '/ResultadoAcademicoService.php';
 
@@ -72,6 +73,7 @@ class ResultadoHomologacaoService
             'total' => 0,
             'homologados' => 0,
             'pendencias' => 0,
+            'elegiveis' => 0,
             'aprovados' => 0,
             'reprovados' => 0,
             'recuperacao' => 0,
@@ -98,6 +100,8 @@ class ResultadoHomologacaoService
             }
             if (!empty($linha['pendencias_criticas'])) {
                 $resumo['pendencias']++;
+            } elseif (($linha['status'] ?? '') !== 'homologado') {
+                $resumo['elegiveis']++;
             }
             $sit = (string) ($linha['situacao'] ?? '');
             if (in_array($sit, ['aprovado', 'aprovado_recuperacao', 'aprovado_conselho', 'aproveitamento'], true)) {
@@ -111,7 +115,12 @@ class ResultadoHomologacaoService
             }
         }
 
-        $pode = $resumo['pendencias'] === 0 && $resumo['total'] > 0;
+        $resumo['chamadas_pendentes'] = $this->contarChamadasPendentes($turmaId, $periodo['inicio'], $periodo['fim']);
+
+        $pode = $resumo['pendencias'] === 0
+            && $resumo['total'] > 0
+            && (int) $resumo['chamadas_pendentes'] === 0
+            && (int) $resumo['recuperacao'] === 0;
 
         return [
             'turma' => $turma,
@@ -149,10 +158,25 @@ class ResultadoHomologacaoService
             return ['success' => false, 'error' => 'Selecione ao menos um aluno, ou use Homologar todos os elegíveis.'];
         }
 
+        if ($this->periodoEstaTravado($turmaId, $anoLetivo, $periodoTipo, $periodoNumero)) {
+            return [
+                'success' => false,
+                'error' => 'Período homologado. Use Retificar no painel de Fechamento, com justificativa, antes de homologar de novo.',
+            ];
+        }
+
         $preview = $this->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $chamadasPendentes = (int) ($preview['resumo']['chamadas_pendentes'] ?? 0);
+        if ($chamadasPendentes > 0) {
+            return [
+                'success' => false,
+                'error' => FechamentoGates::mensagemChamadasPendentes($chamadasPendentes),
+            ];
+        }
 
         $homologados = 0;
         $ignorados = 0;
+        $alunosHomologados = [];
         foreach ($preview['linhas'] as $linha) {
             $alunoId = (int) ($linha['aluno']['id'] ?? 0);
             if ($alunoId <= 0) {
@@ -161,7 +185,7 @@ class ResultadoHomologacaoService
             if ($filtro !== [] && !isset($filtro[$alunoId])) {
                 continue;
             }
-            if (($linha['status'] ?? '') === 'homologado') {
+            if (($linha['status'] ?? '') === 'homologado' && !empty($linha['_homologado'])) {
                 $ignorados++;
                 continue;
             }
@@ -169,17 +193,34 @@ class ResultadoHomologacaoService
                 $ignorados++;
                 continue;
             }
+            if (!FechamentoGates::situacaoPermiteHomologar((string) ($linha['situacao'] ?? ''))) {
+                $ignorados++;
+                continue;
+            }
             $this->gravarHomologacao($linha, $usuarioId);
+            $alunosHomologados[] = $alunoId;
             $homologados++;
         }
 
-        if ($homologados === 0 && $ignorados === 0) {
-            return ['success' => false, 'error' => 'Nenhum aluno elegível para homologar.'];
+        if ($homologados === 0) {
+            $emRec = (int) ($preview['resumo']['recuperacao'] ?? 0);
+            return [
+                'success' => false,
+                'error' => $emRec > 0
+                    ? FechamentoGates::mensagemAlunosEmRecuperacao($emRec)
+                    : 'Nenhum aluno elegível para homologar.',
+            ];
         }
+
+        $this->sincronizarFechamentoPeriodo($turmaId, $anoLetivo, $periodoTipo, $periodoNumero, $usuarioId);
+        $this->sincronizarVidaEscolarAlunos($alunosHomologados, $usuarioId);
+
         return ['success' => true, 'homologados' => $homologados, 'ignorados' => $ignorados];
     }
 
     /**
+     * Reabertura de aluno homologado foi substituída por retificação do período.
+     *
      * @return array{success:bool,error?:string}
      */
     public function reabrir(int $resultadoId, int $usuarioId, string $motivo): array
@@ -188,30 +229,10 @@ class ResultadoHomologacaoService
         if (!$doc) {
             return ['success' => false, 'error' => 'Resultado não encontrado.'];
         }
-        if ((string) $doc['status'] !== 'homologado') {
-            return ['success' => false, 'error' => 'Só é possível reabrir resultado homologado.'];
-        }
-        $motivo = trim($motivo);
-        if ($motivo === '') {
-            return ['success' => false, 'error' => 'Informe o motivo da reabertura.'];
-        }
-
-        $this->model->registrarHistorico($resultadoId, [
-            'versao' => (int) ($doc['versao'] ?? 1),
-            'status' => (string) $doc['status'],
-            'situacao' => (string) $doc['situacao'],
-            'rotulo' => (string) $doc['rotulo'],
-            'snapshot_json' => $doc['snapshot_json'] ?? null,
-            'motivo' => $motivo,
-            'usuario_id' => $usuarioId,
-        ]);
-        $this->model->atualizar($resultadoId, [
-            'status' => 'reaberto',
-            'reaberto_em' => date('Y-m-d H:i:s'),
-            'reaberto_por' => $usuarioId,
-            'reaberto_motivo' => $motivo,
-        ]);
-        return ['success' => true];
+        return [
+            'success' => false,
+            'error' => 'Resultado homologado não pode ser reaberto. Use Retificar no painel de Fechamento da turma, com justificativa e auditoria.',
+        ];
     }
 
     /**
@@ -222,7 +243,8 @@ class ResultadoHomologacaoService
     public function payloadAluno(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo = 'ano', int $periodoNumero = 0): ?array
     {
         $vigente = $this->model->findVigente($alunoId, $turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
-        if ($vigente && (string) $vigente['status'] === 'homologado' && !empty($vigente['snapshot_json'])) {
+        $periodoSnap = $this->periodoUsaSnapshot(['id' => $turmaId], $anoLetivo, ['tipo' => $periodoTipo, 'numero' => $periodoNumero]);
+        if ($periodoSnap && $vigente && (string) $vigente['status'] === 'homologado' && !empty($vigente['snapshot_json'])) {
             $snap = json_decode((string) $vigente['snapshot_json'], true);
             if (is_array($snap)) {
                 $snap['_homologado'] = true;
@@ -300,6 +322,141 @@ class ResultadoHomologacaoService
         return $numero . $suf;
     }
 
+    private function sincronizarFechamentoPeriodo(
+        int $turmaId,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $usuarioId
+    ): void {
+        $path = __DIR__ . '/../Modulos/fechamento/Services/FechamentoService.php';
+        if (!is_file($path)) {
+            return;
+        }
+        require_once $path;
+        try {
+            $preview = $this->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+            (new FechamentoService(null, $this))->sincronizarAposHomologacaoAlunos(
+                $turmaId,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero,
+                $preview,
+                $usuarioId
+            );
+        } catch (Throwable $e) {
+            error_log('ResultadoHomologacaoService::sincronizarFechamentoPeriodo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     */
+    private function sincronizarVidaEscolarAlunos(array $alunoIds, int $usuarioId): void
+    {
+        if ($alunoIds === []) {
+            return;
+        }
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once __DIR__ . '/../Core/LayoutHelper.php';
+            }
+            if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return;
+            }
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $usuario = ['id' => $usuarioId];
+            foreach ($alunoIds as $alunoId) {
+                $aid = (int) $alunoId;
+                if ($aid <= 0) {
+                    continue;
+                }
+                $vida->materializarFichaOficialSeFaltar($aid, $usuario);
+            }
+        } catch (Throwable $e) {
+            error_log('ResultadoHomologacaoService::sincronizarVidaEscolarAlunos: ' . $e->getMessage());
+        }
+    }
+
+    public function marcarAlunosReabertosPorRetificacao(
+        int $turmaId,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $usuarioId,
+        string $motivo
+    ): int {
+        return $this->model->marcarReabertoDoPeriodo(
+            $turmaId,
+            $anoLetivo,
+            $periodoTipo,
+            $periodoNumero,
+            $usuarioId,
+            $motivo
+        );
+    }
+
+    private function periodoEstaTravado(
+        int $turmaId,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero
+    ): bool {
+        $path = __DIR__ . '/../Modulos/fechamento/Models/FechamentoPeriodo.php';
+        if (!is_file($path)) {
+            return false;
+        }
+        require_once $path;
+        try {
+            $model = new FechamentoPeriodo();
+            return $model->schemaPronto()
+                && $model->estaTravado($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Snapshot congelado só enquanto o período vigente está HOMOLOGADO.
+     *
+     * @param array<string,mixed> $turma
+     * @param array<string,mixed> $periodo
+     */
+    private function periodoUsaSnapshot(array $turma, int $anoLetivo, array $periodo): bool
+    {
+        $path = __DIR__ . '/../Modulos/fechamento/Models/FechamentoPeriodo.php';
+        if (!is_file($path)) {
+            return true;
+        }
+        require_once $path;
+        try {
+            $model = new FechamentoPeriodo();
+            if (!$model->schemaPronto()) {
+                return true;
+            }
+            $row = $model->findVigente(
+                (int) ($turma['id'] ?? 0),
+                $anoLetivo,
+                (string) ($periodo['tipo'] ?? 'ano'),
+                (int) ($periodo['numero'] ?? 0)
+            );
+            if (!$row) {
+                return true;
+            }
+            $st = FechamentoMaquinaEstados::normalizar((string) ($row['status'] ?? ''));
+            if ($st === FechamentoMaquinaEstados::HOMOLOGADO) {
+                return true;
+            }
+            if ($st === FechamentoMaquinaEstados::RETIFICADO || !empty($row['retificado_de_id'])) {
+                return false;
+            }
+            return true;
+        } catch (Throwable $e) {
+            return true;
+        }
+    }
+
     /**
      * @param array<string,mixed> $linha
      */
@@ -374,7 +531,8 @@ class ResultadoHomologacaoService
         $alunoId = (int) $aluno['id'];
         $transferido = !empty($aluno['transferido']);
         $homolog = $homologados[$alunoId] ?? null;
-        if (is_array($homolog) && (string) ($homolog['status'] ?? '') === 'homologado' && !empty($homolog['snapshot_json'])) {
+        $usarSnapshot = $this->periodoUsaSnapshot($turma, $anoLetivo, $periodo);
+        if ($usarSnapshot && is_array($homolog) && (string) ($homolog['status'] ?? '') === 'homologado' && !empty($homolog['snapshot_json'])) {
             $snap = json_decode((string) $homolog['snapshot_json'], true);
             if (is_array($snap)) {
                 $snap['status'] = 'homologado';
@@ -428,8 +586,16 @@ class ResultadoHomologacaoService
                 $temNota = true;
                 $medias[] = $media;
             }
+            $recItem = is_array($cel) && isset($cel['recuperacao']) && is_numeric($cel['recuperacao'])
+                ? (float) $cel['recuperacao']
+                : null;
+            $mediaAntesItem = is_array($cel) && isset($cel['media_antes_rec']) && is_numeric($cel['media_antes_rec'])
+                ? (float) $cel['media_antes_rec']
+                : null;
             $entradaItem = [
                 'media' => $media,
+                'media_antes_rec' => $mediaAntesItem,
+                'recuperacao' => $recItem,
                 'tem_nota' => $media !== null,
                 'frequencia_percentual' => $freq['percentual'],
                 'situacao_matricula' => $transferido ? 'transferido' : null,
@@ -448,7 +614,7 @@ class ResultadoHomologacaoService
                 'materia_nome' => (string) ($comp['nome'] ?? 'Componente'),
                 'carga_horaria' => $this->cargaHoraria($mid),
                 'media' => $media,
-                'recuperacao' => null,
+                'recuperacao' => $recItem,
                 'media_final' => $avaliadoItem['media_final'],
                 'faltas' => $freq['faltas'] ?? null,
                 'frequencia_percentual' => $freq['percentual'],
@@ -487,6 +653,36 @@ class ResultadoHomologacaoService
             }
         }
 
+        $conselhoDefinitivo = in_array((string) $conselhoResultado, ['aprovado', 'aprovado_conselho', 'retido', 'transferido'], true);
+        if (!$transferido && $especialGeral !== 'dispensado' && !$conselhoDefinitivo) {
+            $sitReprovado = null;
+            $sitProcessual = null;
+            $temRecPass = false;
+            foreach ($componentes as $comp) {
+                $cs = (string) ($comp['situacao'] ?? '');
+                if ($cs === 'reprovado_rendimento' || $cs === 'reprovado_frequencia') {
+                    $sitReprovado = $cs;
+                    break;
+                }
+                if ($sitProcessual === null && !FechamentoGates::situacaoPermiteHomologar($cs)) {
+                    $sitProcessual = $cs;
+                }
+                if ($cs === 'aprovado_recuperacao') {
+                    $temRecPass = true;
+                }
+            }
+            if ($sitReprovado !== null) {
+                $avaliado['situacao'] = $sitReprovado;
+                $avaliado['rotulo'] = $this->motor->rotuloSituacao($sitReprovado, $regra);
+            } elseif ($sitProcessual !== null) {
+                $avaliado['situacao'] = $sitProcessual;
+                $avaliado['rotulo'] = $this->motor->rotuloSituacao($sitProcessual, $regra);
+            } elseif ($temRecPass && in_array((string) ($avaliado['situacao'] ?? ''), ['aprovado', 'recuperacao', 'exame_final', 'em_andamento'], true)) {
+                $avaliado['situacao'] = 'aprovado_recuperacao';
+                $avaliado['rotulo'] = $this->motor->rotuloSituacao('aprovado_recuperacao', $regra);
+            }
+        }
+
         $pendencias = [];
         $pendenciasCriticas = [];
         if ($config['exigir_notas'] && !$temNota && !$transferido && $especialGeral !== 'dispensado') {
@@ -501,6 +697,10 @@ class ResultadoHomologacaoService
             $pendencias[] = 'Conselho pendente';
             $pendenciasCriticas[] = 'conselho';
         }
+        if (!$transferido && !FechamentoGates::situacaoPermiteHomologar((string) ($avaliado['situacao'] ?? ''))) {
+            $pendencias[] = FechamentoGates::rotuloPendenciaProcessual((string) ($avaliado['situacao'] ?? ''));
+            $pendenciasCriticas[] = 'recuperacao';
+        }
 
         $status = 'em_andamento';
         $versaoProxima = 1;
@@ -510,10 +710,13 @@ class ResultadoHomologacaoService
             if ($status === 'reaberto') {
                 $versaoProxima++;
             }
-            if ($status === 'homologado') {
+            if ($usarSnapshot && $status === 'homologado') {
                 $avaliado['situacao'] = (string) $homolog['situacao'];
                 $avaliado['rotulo'] = (string) $homolog['rotulo'];
                 $avaliado['media_final'] = $homolog['media_final'];
+            } elseif (!$usarSnapshot && $status === 'homologado') {
+                $status = 'reaberto';
+                $versaoProxima++;
             }
         }
 
@@ -535,6 +738,13 @@ class ResultadoHomologacaoService
                 'finalizado' => !empty($conselho['sessao_finalizada']),
             ],
             'avaliado' => $avaliado,
+            'regra' => [
+                'id' => (int) ($regra['id'] ?? ($avaliado['regra_id'] ?? 0)),
+                'nome' => (string) ($regra['nome'] ?? ''),
+                'versao' => (int) ($regra['versao'] ?? ($avaliado['regra_versao'] ?? 0)),
+                'media_minima' => $regra['media_minima'] ?? null,
+                'frequencia_minima' => $regra['frequencia_minima'] ?? null,
+            ],
             'situacao' => $avaliado['situacao'],
             'rotulo' => $avaliado['rotulo'],
             'pendencias' => $pendencias,
@@ -593,6 +803,18 @@ class ResultadoHomologacaoService
         return $row ?: ['id' => $turmaId, 'nome' => 'Turma'];
     }
 
+    private function contarChamadasPendentes(int $turmaId, string $inicio, string $fim): int
+    {
+        if ($turmaId <= 0 || $inicio === '' || $fim === '') {
+            return 0;
+        }
+        try {
+            return $this->diario->contarChamadasVencidas($turmaId, $inicio, $fim);
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
     /**
      * @return array{componentes:list<array{id:?int,nome:string}>,por_aluno:array<int,array<string,array<string,mixed>>>,nota_minima:float}
      */
@@ -633,6 +855,9 @@ class ResultadoHomologacaoService
         $porAluno = [];
         $notaMinima = 6.0;
         $vistoCel = [];
+        $vistoBim = [];
+        $accAno = [];
+        $agregarAno = !($periodoTipo === 'bimestre' && $periodoNumero >= 1 && $periodoNumero <= 4);
         foreach ($rows as $row) {
             $nome = trim((string) ($row['materia_nome'] ?? ''));
             if ($nome === '') {
@@ -651,30 +876,124 @@ class ResultadoHomologacaoService
             }
             $alunoId = (int) $row['aluno_id'];
             $celKey = $alunoId . '|' . $chave;
+            $camposNota = $this->extrairCamposNotaJson((string) ($row['notas_json'] ?? ''));
+            $media = $row['media_final'];
+            if ($media === null || $media === '') {
+                $media = $camposNota['media'];
+            }
+            $cel = [
+                'aluno_id' => $alunoId,
+                'chave' => $chave,
+                'nome' => $nome,
+                'materia_id' => isset($row['materia_id']) && $row['materia_id'] !== null ? (int) $row['materia_id'] : null,
+                'media' => is_numeric($media) ? (float) $media : null,
+                'recuperacao' => $camposNota['recuperacao'],
+                'media_antes_rec' => $camposNota['media_antes_rec'],
+                'bimestre' => (int) ($row['bimestre'] ?? 0),
+            ];
+            if ($agregarAno) {
+                $bimKey = $celKey . '|' . max(0, (int) ($row['bimestre'] ?? 0));
+                if (isset($vistoBim[$bimKey])) {
+                    continue;
+                }
+                $vistoBim[$bimKey] = true;
+                $accAno[$celKey][] = $cel;
+                continue;
+            }
             if (isset($vistoCel[$celKey])) {
                 continue;
             }
             $vistoCel[$celKey] = true;
-            $media = $row['media_final'];
-            if ($media === null || $media === '') {
-                $notasJson = json_decode((string) ($row['notas_json'] ?? ''), true);
-                if (is_array($notasJson)) {
-                    foreach (['media_final', 'media_bim', 'media'] as $codigo) {
-                        if (isset($notasJson[$codigo]) && is_numeric($notasJson[$codigo])) {
-                            $media = $notasJson[$codigo];
-                            break;
-                        }
-                    }
-                }
-            }
             $porAluno[$alunoId][$chave] = [
                 'nome' => $nome,
-                'materia_id' => isset($row['materia_id']) && $row['materia_id'] !== null ? (int) $row['materia_id'] : null,
-                'media' => is_numeric($media) ? (float) $media : null,
+                'materia_id' => $cel['materia_id'],
+                'media' => $cel['media'],
+                'recuperacao' => $cel['recuperacao'],
+                'media_antes_rec' => $cel['media_antes_rec'],
             ];
         }
 
+        if ($agregarAno) {
+            $porAluno = $this->agregarNotasAnuais($accAno);
+        }
+
         return ['componentes' => $componentes, 'por_aluno' => $porAluno, 'nota_minima' => $notaMinima];
+    }
+
+    /**
+     * Ano letivo: média dos bimestres por componente; rec do último bimestre que tiver.
+     *
+     * @param array<string, list<array<string,mixed>>> $accAno
+     * @return array<int, array<string, array<string,mixed>>>
+     */
+    private function agregarNotasAnuais(array $accAno): array
+    {
+        $porAluno = [];
+        foreach ($accAno as $itens) {
+            if ($itens === []) {
+                continue;
+            }
+            usort($itens, static fn ($a, $b) => ((int) ($a['bimestre'] ?? 0)) <=> ((int) ($b['bimestre'] ?? 0)));
+            $medias = [];
+            $rec = null;
+            foreach ($itens as $cel) {
+                if (isset($cel['media']) && is_numeric($cel['media'])) {
+                    $medias[] = (float) $cel['media'];
+                }
+                if (isset($cel['recuperacao']) && is_numeric($cel['recuperacao'])) {
+                    $rec = (float) $cel['recuperacao'];
+                }
+            }
+            $primeiro = $itens[0];
+            $alunoId = (int) ($primeiro['aluno_id'] ?? 0);
+            $chave = (string) ($primeiro['chave'] ?? '');
+            if ($alunoId <= 0 || $chave === '') {
+                continue;
+            }
+            $mediaAnual = $medias !== [] ? round(array_sum($medias) / count($medias), 2) : null;
+            $recAno = ($mediaAnual !== null && $mediaAnual < 6.0) ? $rec : null;
+            $porAluno[$alunoId][$chave] = [
+                'nome' => (string) ($primeiro['nome'] ?? 'Componente'),
+                'materia_id' => $primeiro['materia_id'] ?? null,
+                'media' => $mediaAnual,
+                'recuperacao' => $recAno,
+                'media_antes_rec' => $recAno !== null ? $mediaAnual : null,
+            ];
+        }
+        return $porAluno;
+    }
+
+    /**
+     * @return array{media:?float,recuperacao:?float,media_antes_rec:?float}
+     */
+    private function extrairCamposNotaJson(string $notasJson): array
+    {
+        $out = ['media' => null, 'recuperacao' => null, 'media_antes_rec' => null];
+        $decoded = json_decode($notasJson, true);
+        if (!is_array($decoded)) {
+            return $out;
+        }
+        foreach (['media_final', 'media_bim', 'media'] as $codigo) {
+            if (isset($decoded[$codigo]) && is_numeric($decoded[$codigo])) {
+                $out['media'] = (float) $decoded[$codigo];
+                break;
+            }
+        }
+        foreach ($decoded as $codigo => $val) {
+            if (!is_numeric($val)) {
+                continue;
+            }
+            $c = strtolower((string) $codigo);
+            if ($out['recuperacao'] === null
+                && ($c === 'rec' || $c === 'rec_final' || str_contains($c, 'recup'))) {
+                $out['recuperacao'] = (float) $val;
+            }
+            if ($out['media_antes_rec'] === null
+                && ($c === 'media_antes_rec' || $c === 'media_bim' || str_contains($c, 'media_bim'))) {
+                $out['media_antes_rec'] = (float) $val;
+            }
+        }
+        return $out;
     }
 
     /**

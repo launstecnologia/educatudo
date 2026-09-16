@@ -608,6 +608,9 @@ class AdminStudentProfileService
                     $boletimEventosNotas[] = $item;
                     $boletinsGeradosNotasPorRegra[$rid] = $ev;
                 } else {
+                    if (strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
+                        continue;
+                    }
                     if (isset($seenBoletim[$rid])) {
                         continue;
                     }
@@ -783,6 +786,7 @@ class AdminStudentProfileService
             'boletim_pode_excluir' => $this->controller->coordenacaoPodeEditarBoletim($user),
             'admin_permissions' => $adminPermissions,
             'user' => $user,
+            'paineis_notas' => $this->paineisNotasDoAluno((int) $id),
         ], $this->carregarVidaEscolar($id, (int) ($opts['ficha_id'] ?? 0), $adminPermissions));
     }
 
@@ -1108,6 +1112,19 @@ class AdminStudentProfileService
                 ['exato' => $prefixo, 'prefixo' => $prefixo . '/%']
             );
             return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function paineisNotasDoAluno(int $alunoId): array
+    {
+        try {
+            require_once dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/PainelNotasService.php';
+            return \PainelNotasService::paraAluno($alunoId, ['portal' => false]);
         } catch (\Throwable $e) {
             return [];
         }

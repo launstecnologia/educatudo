@@ -15,7 +15,11 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
 <div class="space-y-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Só Faltas</h1>
+            <h1 class="text-2xl font-bold text-gray-900">Frequência</h1>
+            <p class="text-sm text-gray-500 mt-1">Faltas da sala de aula. Troque para Presença para ver a portaria.</p>
+            <div class="mt-3">
+                <?php $frequencia_modo = $frequencia_modo ?? 'faltas'; include __DIR__ . '/../_partials/frequencia_toggle.php'; ?>
+            </div>
         </div>
         <div class="flex items-center gap-2">
             <a href="<?= htmlspecialchars($urlExportarExcel, ENT_QUOTES, 'UTF-8') ?>" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-sm" title="Exportar os eventos de faltas para Excel" aria-label="Exportar faltas em Excel">
@@ -160,18 +164,19 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
                                 <input type="text" name="nome" id="faltas-modal-nome" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ex.: Faltas 1º Bimestre - Ensino Médio" required>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Bimestre</label>
-                                <select name="bimestre" id="faltas-modal-bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
-                                    <option value="">Selecione</option>
-                                    <option value="1º Bimestre">1º Bimestre</option>
-                                    <option value="2º Bimestre">2º Bimestre</option>
-                                    <option value="3º Bimestre">3º Bimestre</option>
-                                    <option value="4º Bimestre">4º Bimestre</option>
+                                <label class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label>Bimestre</label>
+                                <select name="bimestre" id="faltas-modal-bimestre" data-periodo-letivo-select data-periodo-vazio="1" data-periodo-valor="rotulo" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                                    <?php
+                                    if (!class_exists('PeriodoLetivo')) {
+                                        require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                                    }
+                                    echo PeriodoLetivo::optionsHtml((int) date('Y'), '', ['vazio' => true, 'valor_rotulo' => true]);
+                                    ?>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Ano letivo</label>
-                                <input type="number" name="ano_letivo" id="faltas-modal-ano" min="2000" max="2100" value="<?= (int) date('Y') ?>" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                                <input type="number" name="ano_letivo" id="faltas-modal-ano" min="2000" max="2100" value="<?= (int) date('Y') ?>" data-periodo-ano class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
                             </div>
                         </div>
                         <div>

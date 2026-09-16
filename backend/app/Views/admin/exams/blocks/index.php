@@ -12,7 +12,7 @@
         <div class="flex space-x-3">
             <a href="<?= URL ?>/admin/provas/tipos-avaliacao" 
                class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-3 rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all duration-300 flex items-center shadow-lg hover:shadow-xl">
-                Tipos de Avaliação
+                Tipos de Nota
             </a>
             <a href="<?= URL ?>/admin/blocos-modelo" 
                class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 flex items-center shadow-lg hover:shadow-xl">

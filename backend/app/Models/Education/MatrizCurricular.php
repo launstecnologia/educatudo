@@ -24,8 +24,20 @@ class MatrizCurricular
      */
     public function getAll(array $filtros = [])
     {
+        $countSql = "(SELECT COUNT(*) FROM matrizes_curriculares_componentes mcc WHERE mcc.matriz_id = m.id)";
+        try {
+            if ($this->db->fetch("SHOW COLUMNS FROM materias LIKE 'pai_id'")) {
+                $countSql = "(SELECT COUNT(DISTINCT COALESCE(NULLIF(mat.pai_id, 0), mat.id))
+                        FROM matrizes_curriculares_componentes mcc
+                        INNER JOIN materias mat ON mat.id = mcc.materia_id
+                        WHERE mcc.matriz_id = m.id)";
+            }
+        } catch (\Throwable $e) {
+            // schema antigo sem pai_id — conta as linhas brutas
+        }
+
         $sql = "SELECT m.*, c.nome AS curso_nome, s.nome AS serie_nome,
-                       (SELECT COUNT(*) FROM matrizes_curriculares_componentes mcc WHERE mcc.matriz_id = m.id) AS total_componentes
+                       {$countSql} AS total_componentes
                 FROM matrizes_curriculares m
                 INNER JOIN curso c ON c.id = m.curso_id
                 INNER JOIN serie s ON s.id = m.serie_id
@@ -166,14 +178,26 @@ class MatrizCurricular
             ['id' => $matrizId]
         )['duracao_padrao_aula_minutos'] ?? 50);
 
-        $componentes = $this->db->fetchAll(
-            "SELECT mcc.*, mat.nome AS materia_nome, mat.codigo AS materia_codigo, mat.cor AS materia_cor
+        $sql = "SELECT mcc.*, mat.nome AS materia_nome, mat.codigo AS materia_codigo, mat.cor AS materia_cor
              FROM matrizes_curriculares_componentes mcc
              INNER JOIN materias mat ON mat.id = mcc.materia_id
              WHERE mcc.matriz_id = :matriz_id
-             ORDER BY mcc.ordem_boletim ASC, mat.nome ASC",
-            ['matriz_id' => $matrizId]
-        );
+             ORDER BY mcc.ordem_boletim ASC, mat.nome ASC";
+        try {
+            if ($this->db->fetch("SHOW COLUMNS FROM materias LIKE 'pai_id'")) {
+                $sql = "SELECT mcc.*, mat.nome AS materia_nome, mat.codigo AS materia_codigo, mat.cor AS materia_cor,
+                    mat.pai_id AS pai_id, pai.nome AS pai_nome
+                 FROM matrizes_curriculares_componentes mcc
+                 INNER JOIN materias mat ON mat.id = mcc.materia_id
+                 LEFT JOIN materias pai ON pai.id = mat.pai_id
+                 WHERE mcc.matriz_id = :matriz_id
+                 ORDER BY mcc.ordem_boletim ASC, mat.nome ASC";
+            }
+        } catch (\Throwable $e) {
+            // schema antigo
+        }
+
+        $componentes = $this->db->fetchAll($sql, ['matriz_id' => $matrizId]) ?: [];
 
         foreach ($componentes as &$componente) {
             $minutosSemana = (int) $componente['aulas_semana'] * $duracaoAula;
@@ -183,6 +207,138 @@ class MatrizCurricular
         unset($componente);
 
         return $componentes;
+    }
+
+    /**
+     * Linhas oficiais da matriz: desdobramentos somam no pai (Língua Portuguesa),
+     * componentes sem pai permanecem sozinhos.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function getComponentesOficiais(int $matrizId): array
+    {
+        return $this->agruparOficiais($this->getComponentes($matrizId));
+    }
+
+    /**
+     * @param list<array<string,mixed>> $componentes
+     * @return list<array<string,mixed>>
+     */
+    public function agruparOficiais(array $componentes): array
+    {
+        $filhosPorPai = [];
+        $soltos = [];
+        foreach ($componentes as $c) {
+            $id = (int) ($c['materia_id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $pai = (int) ($c['pai_id'] ?? 0);
+            if ($pai > 0) {
+                $filhosPorPai[$pai][] = $c;
+                continue;
+            }
+            $soltos[] = $c;
+        }
+
+        $out = [];
+        $paisEmitidos = [];
+        foreach ($soltos as $c) {
+            $id = (int) ($c['materia_id'] ?? 0);
+            if (isset($filhosPorPai[$id])) {
+                $out[] = $this->linhaOficialDoPai($id, (string) ($c['materia_nome'] ?? ''), $filhosPorPai[$id], $c);
+                $paisEmitidos[$id] = true;
+                continue;
+            }
+            $c['filhos'] = [];
+            $c['eh_oficial_agrupado'] = false;
+            $out[] = $c;
+        }
+
+        foreach ($filhosPorPai as $paiId => $filhos) {
+            if (isset($paisEmitidos[$paiId])) {
+                continue;
+            }
+            $nomePai = (string) ($filhos[0]['pai_nome'] ?? '');
+            if ($nomePai === '') {
+                $nomePai = 'Área';
+            }
+            $out[] = $this->linhaOficialDoPai($paiId, $nomePai, $filhos, null);
+        }
+
+        usort($out, static function ($a, $b) {
+            $oa = (int) ($a['ordem_boletim'] ?? 0);
+            $ob = (int) ($b['ordem_boletim'] ?? 0);
+            if ($oa !== $ob) {
+                return $oa <=> $ob;
+            }
+            return strcmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
+        });
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $filhos
+     * @param array<string,mixed>|null $linhaPai
+     * @return array<string,mixed>
+     */
+    private function linhaOficialDoPai(int $paiId, string $nomePai, array $filhos, ?array $linhaPai): array
+    {
+        $aulas = 0;
+        $minutos = 0;
+        $obrigatorio = 1;
+        $ordem = $linhaPai !== null ? (int) ($linhaPai['ordem_boletim'] ?? 0) : PHP_INT_MAX;
+        foreach ($filhos as $f) {
+            $aulas += (int) ($f['aulas_semana'] ?? 0);
+            $minutos += (int) ($f['carga_horaria_semanal_minutos'] ?? 0);
+            if (empty($f['obrigatorio'])) {
+                $obrigatorio = 0;
+            }
+            $ordem = min($ordem, (int) ($f['ordem_boletim'] ?? 0));
+        }
+        if ($linhaPai !== null && empty($filhos)) {
+            $aulas = (int) ($linhaPai['aulas_semana'] ?? 0);
+            $minutos = (int) ($linhaPai['carga_horaria_semanal_minutos'] ?? 0);
+            $obrigatorio = !empty($linhaPai['obrigatorio']) ? 1 : 0;
+            $ordem = (int) ($linhaPai['ordem_boletim'] ?? 0);
+        }
+
+        $codigo = (string) ($linhaPai['materia_codigo'] ?? '');
+        $cor = $linhaPai['materia_cor'] ?? null;
+        $nome = $nomePai;
+        if ($codigo === '' || $cor === null || $nome === '' || $nome === 'Área') {
+            $paiRow = $this->db->fetch(
+                "SELECT nome, codigo, cor FROM materias WHERE id = :id",
+                ['id' => $paiId]
+            );
+            if (is_array($paiRow)) {
+                if ($nome === '' || $nome === 'Área') {
+                    $nome = (string) ($paiRow['nome'] ?? $nome);
+                }
+                if ($codigo === '') {
+                    $codigo = (string) ($paiRow['codigo'] ?? '');
+                }
+                if ($cor === null) {
+                    $cor = $paiRow['cor'] ?? null;
+                }
+            }
+        }
+
+        return [
+            'materia_id' => $paiId,
+            'materia_nome' => $nome,
+            'materia_codigo' => $codigo,
+            'materia_cor' => $cor,
+            'aulas_semana' => $aulas,
+            'obrigatorio' => $obrigatorio,
+            'ordem_boletim' => $ordem === PHP_INT_MAX ? 0 : $ordem,
+            'ordem_historico' => $ordem === PHP_INT_MAX ? 0 : $ordem,
+            'carga_horaria_semanal_minutos' => $minutos,
+            'carga_horaria_semanal_horas' => round($minutos / 60, 2),
+            'filhos' => $filhos,
+            'eh_oficial_agrupado' => $filhos !== [],
+        ];
     }
 
     /**

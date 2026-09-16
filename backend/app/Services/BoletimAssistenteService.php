@@ -533,6 +533,7 @@ class BoletimAssistenteService
     "descricao_curta": "string",
     "formula_final": "(semanal + bimestral) / 2",
     "exibir_em": "notas|boletim",
+    "finalidade": "oficial|complementar",
     "ano_letivo": 2026,
     "bimestre": 1,
     "default_data_inicio": "YYYY-MM-DD",
@@ -599,7 +600,8 @@ Regras do produto:
 - calc_type: media|soma|maior|ultima. source_type padrão: provas_sistema.
 - materia_unica=1: junta/soma notas da MESMA matéria quando há mais de um professor (matérias únicas). Use quando o coordenador pedir "juntar matérias", "somar professores da mesma matéria", "matéria única".
 - usar_percentual=1 em provas_sistema: nota por acertos/questões.
-- Para agrupar matérias use config.group_line (enabled, key, label, mode media|soma, materias_ids).
+- Para agrupar matérias use config.group_line. Prefira catalogo.familias_componentes (pai + desdobramentos de Componentes Curriculares): key/label = nome do pai, materias_ids = filhos. Só peça matérias à mão se não houver família. mode media|soma; aplicar_em=boletim junta só no boletim. catalogo.agrupamentos é cadastro extra, não a hierarquia oficial.
+- finalidade do evento: oficial (série / histórico) ou complementar (curso extra). Vale em Notas e em Boletim. Boletim complementar só puxa médias de eventos de Notas extra.
 - turmas_ids / materias_ids / series_ids: só IDs existentes no catálogo.
 - Fórmula final usa os códigos dos componentes com + - * / ( ) max min.
 - modo=editar só se houver regra_id atual; senão criar.
@@ -617,7 +619,7 @@ Regras do produto:
 - PAPEL NO BOLETIM: independente do tipo. pecas_opcoes[chave].papel = media|depois|so_melhora|substitui|exibe.
   media = 1ª média (parcial); depois = entra na média final com o resultado da parcial, ex.: ((bimestral + semanal) / 2 + enac) / 2; so_melhora = max(media, (media+peça)/2); substitui = max(media, peça); exibe = coluna fora da fórmula.
   Grave config.papel_wizard. Preferência: passo Exibir. estado.formulas_blocos[codigo] = tokens gerais; estado.formulas_materias_blocos[codigo][materia_id] = tokens da exceção (matéria sem semanal → só bimestral+ENAC). nomes_blocos[codigo] = nome visível. Tokens viram config.expressao; exceções viram config.formula_materias + formula_mode=per_materia. formula_tokens = bloco aberto (bloco_calc).
-- JUNÇÃO DE MATÉRIAS: "juntar Português dos dois professores", "matérias únicas" → materia_unica=1 em TODOS os componentes de prova/jornada (no wizard isso é um único controle no passo Matérias, estado.materia_unica). "juntar Português + Literatura + Gramática numa linha Linguagem Português" → config.group_line.
+- JUNÇÃO DE MATÉRIAS: "juntar Português dos dois professores", "matérias únicas" → materia_unica=1 em TODOS os componentes de prova/jornada (no wizard isso é um único controle no passo Matérias, estado.materia_unica). "juntar Gramática + Interpretação + Literatura numa linha Língua Portuguesa" → config.group_line a partir de catalogo.familias_componentes (não remarcar matérias).
 - WIZARD: se houver "Estado do wizard" no contexto, respeite peças/pecas_opcoes/formulas_blocos/formulas_materias_blocos/nomes_blocos/formula_tokens/bloco_calc/materia_calc/colunas_ordem/fontes_bimestres/fontes_faltas/formula_preset/matérias/jornadas/grupo_linha/materia_unica/series_ids/turmas_ids. Passos Notas: Começar → Identidade → Peças → Exibir → Matérias → Revisar. Se exibir_em=boletim, NÃO monte peças/quadro: layout oficial 1º–4º bimestre (Média + Faltas) + FINAL (Média, Rec., Faltas, Resultado). Preencha estado.fontes_bimestres[1..4] com IDs dos eventos de Notas e estado.fontes_faltas[1..4] com IDs dos eventos de faltas. Componentes: evento_boletim (layout_type media) + faltas_evento (layout_type faltas) por bimestre, media_final calculada, rec_final nenhuma, faltas_final soma, resultado nenhuma (layout_group final).
 - MATÉRIAS DO EVENTO: se pedir "só Matemática e Português" / "sem Educação Física", preencha materias_ids do rascunho (IDs do catálogo). Vazio = todas.
 - PROVAS: use tipo_avaliacao_id (catálogo) e config.prova_bimestres para o sistema resolver blocos_ids. Não invente IDs de bloco.

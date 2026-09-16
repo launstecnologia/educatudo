@@ -176,7 +176,7 @@ $totalAltErros = (int) ($totaisAlt['erros'] ?? 0);
         <div class="flex-1 overflow-y-auto px-6 py-6 space-y-4">
             <div>
                 <label for="filtro_ano_letivo" class="block text-sm font-medium text-gray-700 mb-1">Ano letivo</label>
-                <select id="filtro_ano_letivo" name="ano_letivo" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <select id="filtro_ano_letivo" name="ano_letivo" data-periodo-ano class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <option value="">Todos</option>
                     <?php foreach ($anosDisponiveis as $anoOpt): ?>
                         <option value="<?= (int) $anoOpt ?>" <?= $filtroAnoLetivo === (int) $anoOpt ? 'selected' : '' ?>><?= (int) $anoOpt ?></option>
@@ -184,13 +184,15 @@ $totalAltErros = (int) ($totaisAlt['erros'] ?? 0);
                 </select>
             </div>
             <div>
-                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1">Bimestre</label>
-                <select id="filtro_bimestre" name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="">Todos</option>
-                    <option value="1" <?= $filtroBimestre === 1 ? 'selected' : '' ?>>1º bimestre</option>
-                    <option value="2" <?= $filtroBimestre === 2 ? 'selected' : '' ?>>2º bimestre</option>
-                    <option value="3" <?= $filtroBimestre === 3 ? 'selected' : '' ?>>3º bimestre</option>
-                    <option value="4" <?= $filtroBimestre === 4 ? 'selected' : '' ?>>4º bimestre</option>
+                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label>Bimestre</label>
+                <select id="filtro_bimestre" name="bimestre" data-periodo-letivo-select data-periodo-todos="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <?php
+                    if (!class_exists('PeriodoLetivo')) {
+                        require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+                    }
+                    $anoFiltroJor = $filtroAnoLetivo > 0 ? $filtroAnoLetivo : (int) date('Y');
+                    echo PeriodoLetivo::optionsHtml($anoFiltroJor, $filtroBimestre, ['todos' => true]);
+                    ?>
                 </select>
             </div>
         </div>

@@ -79,6 +79,27 @@ class TenantResolver
     }
 
     /**
+     * Resolve metadados mesmo quando a escola esta inativa.
+     * Usado para responder uma pagina controlada em vez de excecao no bootstrap.
+     *
+     * @return array{id:int,nome:string,slug:string,dominio:?string,ativo:int}|null
+     */
+    public function resolveTenantIncludingInactive(): ?array
+    {
+        $slug = self::slugFromHeader();
+        if ($slug !== null) {
+            return $this->resolveBySlugIncludingInactive($slug);
+        }
+
+        $host = self::hostFromRequest();
+        if ($host === '') {
+            return null;
+        }
+
+        return $this->resolveByDominioIncludingInactive($host);
+    }
+
+    /**
      * Chave Redis de resolução de tenant para a requisição atual (TTL 60s).
      * Formato: tenant_<host> ou tenant_<host>_<slug> quando X-Tenant está presente.
      */
@@ -162,6 +183,40 @@ class TenantResolver
             'id' => (int) $row['id'],
             'slug' => (string) ($row['slug'] ?? ''),
             'dominio' => isset($row['dominio']) ? (string) $row['dominio'] : null,
+        ];
+    }
+
+    private function resolveBySlugIncludingInactive(string $slug): ?array
+    {
+        $stmt = $this->masterPdo->prepare(
+            "SELECT id, nome, slug, dominio, ativo FROM escolas WHERE slug = :slug LIMIT 1"
+        );
+        $stmt->execute(['slug' => $slug]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->formatTenantWithStatus($row) : null;
+    }
+
+    private function resolveByDominioIncludingInactive(string $dominio): ?array
+    {
+        $stmt = $this->masterPdo->prepare(
+            "SELECT id, nome, slug, dominio, ativo FROM escolas WHERE dominio = :dominio LIMIT 1"
+        );
+        $stmt->execute(['dominio' => $dominio]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->formatTenantWithStatus($row) : null;
+    }
+
+    /**
+     * @return array{id:int,nome:string,slug:string,dominio:?string,ativo:int}
+     */
+    private function formatTenantWithStatus(array $row): array
+    {
+        return [
+            'id' => (int) $row['id'],
+            'nome' => (string) ($row['nome'] ?? ''),
+            'slug' => (string) ($row['slug'] ?? ''),
+            'dominio' => isset($row['dominio']) ? (string) $row['dominio'] : null,
+            'ativo' => (int) ($row['ativo'] ?? 0),
         ];
     }
 

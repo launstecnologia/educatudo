@@ -69,6 +69,119 @@ class ExamBlock
     }
 
     /**
+     * Tabela física dos vínculos prova→quadro. Prefere provas_blocos_quadros_notas
+     * (migration 2026_09_10); a view provas_blocos_grupos_regras só entra se a base não existir.
+     */
+    private function tabelaVinculosQuadro(): ?string
+    {
+        foreach (['provas_blocos_quadros_notas', 'provas_blocos_grupos_regras'] as $nome) {
+            if ($this->hasBaseTable($nome)) {
+                return $nome;
+            }
+        }
+        if ($this->hasTable('provas_blocos_grupos_regras')) {
+            return 'provas_blocos_grupos_regras';
+        }
+        return null;
+    }
+
+    private function hasBaseTable(string $table): bool
+    {
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok
+                 FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = :table
+                   AND TABLE_TYPE = 'BASE TABLE'
+                 LIMIT 1",
+                ['table' => $table]
+            );
+            return !empty($row);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<array{grupo_id:int,tipo_id:?int,marca_id:?int}>
+     */
+    public function listarVinculosGrupoRegras(int $blocoId): array
+    {
+        $tabela = $this->tabelaVinculosQuadro();
+        if ($blocoId <= 0 || $tabela === null) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT grupo_id, tipo_id, marca_id
+               FROM `' . $tabela . '`
+              WHERE bloco_id = :id
+              ORDER BY id ASC',
+            ['id' => $blocoId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $gid = (int) ($row['grupo_id'] ?? 0);
+            if ($gid <= 0) {
+                continue;
+            }
+            $tid = (int) ($row['tipo_id'] ?? 0);
+            $mid = (int) ($row['marca_id'] ?? 0);
+            $out[] = [
+                'grupo_id' => $gid,
+                'tipo_id' => $tid > 0 ? $tid : null,
+                'marca_id' => $mid > 0 ? $mid : null,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $vinculos
+     */
+    public function substituirVinculosGrupoRegras(int $blocoId, array $vinculos): void
+    {
+        $tabela = $this->tabelaVinculosQuadro();
+        if ($blocoId <= 0 || $tabela === null) {
+            return;
+        }
+        $this->db->query(
+            'DELETE FROM `' . $tabela . '` WHERE bloco_id = :id',
+            ['id' => $blocoId]
+        );
+        $vistos = [];
+        foreach ($vinculos as $v) {
+            if (!is_array($v)) {
+                continue;
+            }
+            $gid = (int) ($v['grupo_id'] ?? $v['grupo_regras_notas_id'] ?? 0);
+            if ($gid <= 0) {
+                continue;
+            }
+            $tid = (int) ($v['tipo_id'] ?? $v['grupo_regras_tipo_id'] ?? 0);
+            $mid = (int) ($v['marca_id'] ?? $v['grupo_regras_marca_id'] ?? 0);
+            $chave = $gid . ':' . $tid . ':' . $mid;
+            if (isset($vistos[$chave])) {
+                continue;
+            }
+            $vistos[$chave] = true;
+            $this->db->insert(
+                'INSERT INTO `' . $tabela . '` (bloco_id, grupo_id, tipo_id, marca_id)
+                 VALUES (:bloco_id, :grupo_id, :tipo_id, :marca_id)',
+                [
+                    'bloco_id' => $blocoId,
+                    'grupo_id' => $gid,
+                    'tipo_id' => $tid > 0 ? $tid : null,
+                    'marca_id' => $mid > 0 ? $mid : null,
+                ]
+            );
+        }
+    }
+
+    /**
      * Se o aluno pode ver o evento no portal (lista, iniciar prova, resultados).
      * Sem a coluna no banco: comportamento legado (sempre visível).
      */
@@ -407,6 +520,19 @@ class ExamBlock
                 }
             }
             unset($professor);
+            $bloco['grupos_regras_vinculos'] = $this->listarVinculosGrupoRegras($blocoId);
+            if ($bloco['grupos_regras_vinculos'] === []) {
+                $gid = (int) ($bloco['grupo_regras_notas_id'] ?? 0);
+                if ($gid > 0) {
+                    $tid = (int) ($bloco['grupo_regras_tipo_id'] ?? 0);
+                    $mid = (int) ($bloco['grupo_regras_marca_id'] ?? 0);
+                    $bloco['grupos_regras_vinculos'] = [[
+                        'grupo_id' => $gid,
+                        'tipo_id' => $tid > 0 ? $tid : null,
+                        'marca_id' => $mid > 0 ? $mid : null,
+                    ]];
+                }
+            }
         }
         
         return $bloco;
@@ -700,7 +826,19 @@ class ExamBlock
             if ($this->hasProvasBlocosColumn('semana')) {
                 $columns[] = 'semana';
                 $semana = isset($data['semana']) ? (int) $data['semana'] : 0;
-                $params['semana'] = ($semana >= 1 && $semana <= 8) ? $semana : null;
+                $params['semana'] = ($semana >= 1 && $semana <= 20) ? $semana : null;
+            }
+            if ($this->hasProvasBlocosColumn('grupo_regras_notas_id')) {
+                $columns[] = 'grupo_regras_notas_id';
+                $params['grupo_regras_notas_id'] = !empty($data['grupo_regras_notas_id']) ? (int) $data['grupo_regras_notas_id'] : null;
+            }
+            if ($this->hasProvasBlocosColumn('grupo_regras_tipo_id')) {
+                $columns[] = 'grupo_regras_tipo_id';
+                $params['grupo_regras_tipo_id'] = !empty($data['grupo_regras_tipo_id']) ? (int) $data['grupo_regras_tipo_id'] : null;
+            }
+            if ($this->hasProvasBlocosColumn('grupo_regras_marca_id')) {
+                $columns[] = 'grupo_regras_marca_id';
+                $params['grupo_regras_marca_id'] = !empty($data['grupo_regras_marca_id']) ? (int) $data['grupo_regras_marca_id'] : null;
             }
             if ($this->hasProvasBlocosColumn('formato_evento')) {
                 $columns[] = 'formato_evento';
@@ -772,6 +910,10 @@ class ExamBlock
                 $this->adicionarTurmas($blocoId, $data['turmas']);
             } elseif (!empty($data['turma_id'])) {
                 $this->adicionarTurmas($blocoId, [$data['turma_id']]);
+            }
+
+            if (array_key_exists('grupos_regras_vinculos', $data) && is_array($data['grupos_regras_vinculos'])) {
+                $this->substituirVinculosGrupoRegras((int) $blocoId, $data['grupos_regras_vinculos']);
             }
             
             // Bloco novo fica aguardando; provas ficam agendadas até aprovação
@@ -869,7 +1011,19 @@ class ExamBlock
             if ($this->hasProvasBlocosColumn('semana')) {
                 $setParts[] = 'semana = :semana';
                 $semana = isset($data['semana']) ? (int) $data['semana'] : 0;
-                $params['semana'] = ($semana >= 1 && $semana <= 8) ? $semana : null;
+                $params['semana'] = ($semana >= 1 && $semana <= 20) ? $semana : null;
+            }
+            if ($this->hasProvasBlocosColumn('grupo_regras_notas_id') && array_key_exists('grupo_regras_notas_id', $data)) {
+                $setParts[] = 'grupo_regras_notas_id = :grupo_regras_notas_id';
+                $params['grupo_regras_notas_id'] = !empty($data['grupo_regras_notas_id']) ? (int) $data['grupo_regras_notas_id'] : null;
+            }
+            if ($this->hasProvasBlocosColumn('grupo_regras_tipo_id') && array_key_exists('grupo_regras_tipo_id', $data)) {
+                $setParts[] = 'grupo_regras_tipo_id = :grupo_regras_tipo_id';
+                $params['grupo_regras_tipo_id'] = !empty($data['grupo_regras_tipo_id']) ? (int) $data['grupo_regras_tipo_id'] : null;
+            }
+            if ($this->hasProvasBlocosColumn('grupo_regras_marca_id') && array_key_exists('grupo_regras_marca_id', $data)) {
+                $setParts[] = 'grupo_regras_marca_id = :grupo_regras_marca_id';
+                $params['grupo_regras_marca_id'] = !empty($data['grupo_regras_marca_id']) ? (int) $data['grupo_regras_marca_id'] : null;
             }
             if ($this->hasProvasBlocosColumn('formato_evento')) {
                 $setParts[] = 'formato_evento = :formato_evento';
@@ -1015,6 +1169,10 @@ class ExamBlock
                      AND p.deleted_at IS NULL",
                     ['bloco_id' => $id]
                 );
+            }
+
+            if (array_key_exists('grupos_regras_vinculos', $data) && is_array($data['grupos_regras_vinculos'])) {
+                $this->substituirVinculosGrupoRegras((int) $id, $data['grupos_regras_vinculos']);
             }
             
             $this->db->commit();
@@ -1392,7 +1550,7 @@ class ExamBlock
                     ))
                     OR pr.status = 'finalizado'
                 )
-                ORDER BY pb.data_prova ASC, pb.hora_inicio ASC";
+                ORDER BY pb.data_prova DESC, pb.hora_inicio DESC";
 
         $params = array_merge($turmaList, [$alunoId], $turmaList, $turmaList);
         $result = $this->db->fetchAll($sql, $params);

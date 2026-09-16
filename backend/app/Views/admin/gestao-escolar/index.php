@@ -3,8 +3,8 @@ if (!class_exists('AdminPermissionMatrix')) {
     require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
 
-$hub_title = 'Gestão Escolar';
-$hub_subtitle = 'Acompanhe matrícula, frequência, documentos e a rotina da escola.';
+$hub_title = 'Secretaria';
+$hub_subtitle = 'Matrículas, movimentação, vida escolar, documentos e censo.';
 $hub_cards = [];
 
 $permsHub = [];
@@ -36,15 +36,6 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade
     ];
 }
 
-if ($podeHub('conselho_classe') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/conselhos',
-        'title' => 'Conselho de Classe',
-        'description' => 'Organize sessões, atas e deliberações do conselho.',
-        'icon' => 'fa-solid fa-chalkboard-user',
-    ];
-}
-
 if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/diario',
@@ -54,21 +45,13 @@ if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper:
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas')) {
+if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas'))
+    || ($podeHub('presenca') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca')))) {
     $hub_cards[] = [
-        'href' => URL . '/admin/faltas',
-        'title' => 'Faltas',
-        'description' => 'Registre e acompanhe as faltas dos alunos.',
-        'icon' => 'fa-regular fa-clipboard',
-    ];
-}
-
-if ($podeHub('presenca') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca'))) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/presenca',
-        'title' => 'Presença',
-        'description' => 'Controle de entrada e presença dos alunos na escola.',
-        'icon' => 'fa-solid fa-right-to-bracket',
+        'href' => URL . '/admin/frequencia',
+        'title' => 'Frequência',
+        'description' => 'Faltas da sala de aula e presença na portaria.',
+        'icon' => 'fa-solid fa-user-check',
     ];
 }
 

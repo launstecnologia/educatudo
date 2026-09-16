@@ -44,17 +44,23 @@ class AdminPermissionMatrix
             'alunos' => ['label' => 'Alunos', 'prefixes' => ['/admin/students']],
 
             'ano_letivo' => ['label' => 'Ano Letivo', 'prefixes' => ['/admin/ano-letivo']],
-            'curso' => ['label' => 'Curso', 'prefixes' => ['/admin/curso', '/admin/cursos']],
-            'series' => ['label' => 'Série', 'prefixes' => ['/admin/serie']],
+            'curso' => ['label' => 'Curso', 'prefixes' => ['/admin/curso', '/admin/cursos', '/admin/cursos-series']],
+            'series' => ['label' => 'Série', 'prefixes' => ['/admin/serie', '/admin/cursos-series']],
             'matriz_curricular' => ['label' => 'Matriz Curricular', 'prefixes' => ['/admin/matrizes-curriculares']],
-            'regras_academicas' => ['label' => 'Regras Acadêmicas', 'prefixes' => ['/admin/regras-academicas']],
-            'resultados_finais' => ['label' => 'Resultados Finais', 'prefixes' => ['/admin/resultados-finais']],
+            'regras_academicas' => ['label' => 'Regras de Aprovação', 'prefixes' => ['/admin/regras-academicas']],
+            'resultados_finais' => ['label' => 'Resultados Finais / Fechamento', 'prefixes' => [
+                '/admin/resultados-finais',
+                '/admin/fechamento',
+                '/admin/homologacoes',
+                '/admin/documentos-periodo',
+                '/admin/diagnostico-menu',
+            ]],
             'salas' => ['label' => 'Salas / Ambientes', 'prefixes' => ['/admin/salas']],
             'turmas' => ['label' => 'Turmas', 'prefixes' => ['/admin/turmas']],
 
             'exercicios' => ['label' => 'Exercícios', 'prefixes' => ['/admin/exercises']],
             'jornadas_aluno' => ['label' => 'Jornada do Aluno', 'prefixes' => ['/admin/consulta-jornadas-aluno', '/admin/jornadas']],
-            'provas_online' => ['label' => 'Avaliações/Notas', 'prefixes' => ['/admin/consulta-provas-aluno', '/admin/consulta-provas-professor', '/admin/provas', '/admin/provas-professor', '/admin/blocos-modelo']],
+            'provas_online' => ['label' => 'Lançamento de Notas', 'prefixes' => ['/admin/consulta-provas-aluno', '/admin/consulta-provas-professor', '/admin/provas', '/admin/provas-professor', '/admin/blocos-modelo']],
             'assistente' => ['label' => 'Assistente', 'prefixes' => ['/admin/assistente', '/admin/assistente-provas', '/admin/consulta-assistente', '/admin/doc-sistema']],
             'redacao_professor' => ['label' => 'Jornada da Redação', 'prefixes' => ['/admin/redacao-professor']],
             'inclusao' => ['label' => 'EducaInclui (Acessibilidade)', 'prefixes' => ['/admin/inclusao']],
@@ -69,13 +75,12 @@ class AdminPermissionMatrix
             'notificacoes' => ['label' => 'Notificações', 'prefixes' => ['/admin/notifications']],
             'notificacoes_push' => ['label' => 'Notificações Push', 'prefixes' => ['/admin/push-notifications']],
 
-            'configuracao_boletim' => ['label' => 'Configuração Boletim', 'prefixes' => ['/admin/boletim', '/admin/boletim-configuracao']],
+            'configuracao_boletim' => ['label' => 'Avaliações e Modelo de Boletim', 'prefixes' => ['/admin/boletim', '/admin/boletim-configuracao', '/admin/boletins', '/admin/implantar-academico']],
             'vida_escolar' => ['label' => 'Vida Escolar (documentos e prontuário)', 'prefixes' => [
                 '/admin/vida-escolar',
                 '/admin/students/%id%/vida-escolar',
             ]],
-            'notas_semanais' => ['label' => 'Quadro de Notas Semanais', 'prefixes' => ['/admin/notas-semanais']],
-            'guia_boletim' => ['label' => 'Guia do Boletim', 'prefixes' => ['/admin/boletim-guia', '/admin/boletim_guia']],
+            'grupos_regras_notas' => ['label' => 'Quadro de Notas', 'prefixes' => ['/admin/grupos-regras-notas', '/admin/quadros-notas']],
             'modo_manutencao' => ['label' => 'Modo Manutenção', 'prefixes' => ['/admin/maintenance']],
             'slider_dashboard' => ['label' => 'Slider Dashboard', 'prefixes' => ['/admin/settings']],
             'avatares_alunos' => ['label' => 'Avatares dos Alunos', 'prefixes' => ['/admin/avatares-alunos']],
@@ -94,8 +99,8 @@ class AdminPermissionMatrix
             'financeiro_dashboard' => ['label' => 'Dashboard', 'prefixes' => ['/admin/financeiro']],
             'financeiro_relatorio_pagantes' => ['label' => 'Relatório Pagantes', 'prefixes' => ['/admin/financeiro/relatorio-pagantes']],
 
-            'faltas' => ['label' => 'Faltas', 'prefixes' => ['/admin/faltas', '/admin/faltas/lancar']],
-            'presenca' => ['label' => 'Gestão de Presença', 'prefixes' => ['/admin/presenca']],
+            'faltas' => ['label' => 'Faltas', 'prefixes' => ['/admin/faltas', '/admin/faltas/lancar', '/admin/frequencia']],
+            'presenca' => ['label' => 'Gestão de Presença', 'prefixes' => ['/admin/presenca', '/admin/frequencia']],
             'diario_classe' => ['label' => 'Diário de Classe', 'prefixes' => ['/admin/diario']],
             'conformidade' => ['label' => 'Painel de Conformidade', 'prefixes' => ['/admin/conformidade']],
             'calendario_letivo' => ['label' => 'Calendário Letivo', 'prefixes' => ['/admin/calendario-letivo']],
@@ -178,14 +183,17 @@ class AdminPermissionMatrix
     {
         return [
             'dashboard' => ['label' => 'Dashboard', 'items' => ['dashboard', 'assistente']],
-            'academico' => ['label' => 'Acadêmico', 'items' => [
+            'rotina_academica' => ['label' => 'Rotina Acadêmica', 'items' => [
                 'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
-                'curso', 'grade_horaria', 'matriz_curricular', 'professores', 'notas_semanais',
-                'regras_academicas', 'salas', 'series', 'turmas',
+                'curso', 'grade_horaria', 'matriz_curricular', 'professores',
+                'salas', 'series', 'turmas',
             ]],
-            'avaliacoes' => ['label' => 'Avaliações', 'items' => [
-                'inclusao', 'provas_online', 'redacao_professor', 'jornadas_aluno',
-                'configuracao_boletim', 'guia_boletim', 'exercicios', 'listagem_avaliacoes', 'relatorio_avaliacoes', 'relatorios_gerais',
+            'avaliacoes' => ['label' => 'Avaliações e Lançamentos', 'items' => [
+                'provas_online', 'exercicios', 'listagem_avaliacoes', 'relatorio_avaliacoes',
+            ]],
+            'fechamento' => ['label' => 'Fechamento', 'items' => [
+                'configuracao_boletim', 'grupos_regras_notas', 'regras_academicas',
+                'resultados_finais', 'conselho_classe', 'vida_escolar',
             ]],
             'comunicacao' => ['label' => 'Comunicação', 'items' => [
                 'comunicacao_escolar', 'calendario_escolar', 'forum', 'denuncias_forum', 'mural_recados',
@@ -193,14 +201,20 @@ class AdminPermissionMatrix
             ]],
             'conteudo' => ['label' => 'Conteúdo', 'items' => ['arquivos', 'educahits_portal', 'apostilas_ia', 'apostilas', 'expo_colag']],
             'financeiro' => ['label' => 'Financeiro', 'items' => ['financeiro_dashboard', 'financeiro_relatorio_pagantes']],
-            'gestao_escolar' => ['label' => 'Gestão Escolar', 'items' => [
-                'censo_escolar', 'conformidade', 'conselho_classe', 'diario_classe', 'faltas', 'presenca',
+            'secretaria' => ['label' => 'Secretaria', 'items' => [
+                'censo_escolar', 'diario_classe', 'faltas', 'presenca',
                 'documentos_institucionais', 'modelos_documentos', 'documentos_professor',
                 'processos_matricula', 'transferencia', 'ocorrencias', 'almoxarifado', 'patrimonio',
-                'resultados_finais', 'vida_escolar', 'saude_academica', 'pacotes_creditos',
+                'pacotes_creditos',
+            ]],
+            'paineis' => ['label' => 'Painéis', 'items' => [
+                'relatorios_gerais', 'conformidade', 'saude_academica',
             ]],
             'monitoramento' => ['label' => 'Monitoramento', 'items' => ['alertas_sensiveis', 'alunos_online', 'tentativas_login', 'reconhecimento_facial']],
-            'pedagogico' => ['label' => 'Pedagógico', 'items' => ['planos_aula', 'ava', 'bncc', 'minicursos']],
+            'pedagogico' => ['label' => 'Pedagógico', 'items' => [
+                'planos_aula', 'ava', 'bncc', 'minicursos',
+                'inclusao', 'redacao_professor', 'jornadas_aluno',
+            ]],
             'sistema' => ['label' => 'Sistema', 'items' => ['avatares_alunos', 'configuracao_prompt', 'tickets_dev']],
             'usuarios' => ['label' => 'Usuários', 'items' => ['administradores', 'lista_chamada']],
             'configuracoes' => ['label' => 'Z-Configuração', 'items' => [
@@ -242,7 +256,7 @@ class AdminPermissionMatrix
                     'dashboard', 'alunos', 'assistente', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor', 'inclusao', 'listagem_avaliacoes', 'relatorio_avaliacoes',
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
-                    'configuracao_boletim', 'notas_semanais', 'guia_boletim', 'avatares_alunos',
+                    'configuracao_boletim', 'grupos_regras_notas', 'avatares_alunos',
                     'apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'minicursos', 'planos_aula', 'ava',
                     'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
                     'alertas_sensiveis', 'alunos_online', 'reconhecimento_facial',
@@ -266,6 +280,7 @@ class AdminPermissionMatrix
                 return self::onlyModules($all, [
                     'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor',
+                    'configuracao_boletim', 'grupos_regras_notas', 'relatorios_gerais',
                     'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
                     'professores', 'transferencia', 'lista_chamada', 'reconhecimento_facial',
                     'acao_rapida_ativar_desativar',

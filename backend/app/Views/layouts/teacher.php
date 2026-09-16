@@ -8,6 +8,7 @@
     <?php 
     // Incluir LayoutHelper
     require_once __DIR__ . '/../../Core/LayoutHelper.php';
+    require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
     ?>
     <style>
         <?= LayoutHelper::generateCustomCSS() ?>
@@ -108,5 +109,6 @@
     <?php endif; ?>
 
     <?php include __DIR__ . '/components/plataforma_footer.php'; ?>
+    <?php include __DIR__ . '/components/periodo_letivo_js.php'; ?>
 </body>
 </html>

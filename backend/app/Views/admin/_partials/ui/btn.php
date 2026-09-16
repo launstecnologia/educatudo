@@ -4,7 +4,7 @@
  *
  * Variantes:
  * - primary      — CTA (criar/salvar), bg-primary, sempre o último no cabeçalho
- * - complementar — outline cinza + ícone cinza (Filtros, Tipo de Avaliação, Bloco…)
+ * - complementar — outline cinza + ícone cinza (Filtros, Tipo de Nota, Bloco…)
  * - secondary    — alias de complementar
  * - filtro       — complementar + badge de contagem opcional
  * - detalhes|confirm|destrutivo|link

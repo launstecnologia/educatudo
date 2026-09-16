@@ -71,16 +71,11 @@ class MatrizCurricularAdminController extends AdminBaseController
             return;
         }
 
-        $componentes = array_map(function ($c) {
-            return [
-                'materia_id' => (int) $c['materia_id'],
-                'aulas_semana' => (int) $c['aulas_semana'],
-                'obrigatorio' => (int) $c['obrigatorio'],
-                'ordem_boletim' => (int) $c['ordem_boletim'],
-            ];
-        }, $this->model()->getComponentes((int) $id));
-
-        $this->json(['success' => true, 'item' => $item, 'componentes' => $componentes]);
+        $this->json([
+            'success' => true,
+            'item' => $item,
+            'componentes' => $this->service()->componentesParaFormulario((int) $id),
+        ]);
     }
 
     public function store(): void
@@ -147,6 +142,8 @@ class MatrizCurricularAdminController extends AdminBaseController
     {
         $classRoom = new ClassRoom();
         $componenteCurricular = new ComponenteCurricular();
+        $oficiais = $componenteCurricular->getOficiaisParaMatriz(true);
+        $filhosPorPai = $componenteCurricular->mapaFilhosPorPai();
 
         $series = $classRoom->getSeriesNovo();
         $seriesPorCurso = [];
@@ -161,7 +158,8 @@ class MatrizCurricularAdminController extends AdminBaseController
             'cursos' => $classRoom->getCursosNovo(),
             'series' => $series,
             'series_por_curso' => $seriesPorCurso,
-            'componentes_disponiveis' => $componenteCurricular->getAll(true),
+            'componentes_disponiveis' => $oficiais,
+            'filhos_por_pai' => $filhosPorPai,
             'csrf_token' => $this->generateCsrfToken(),
             'status' => $_GET['status'] ?? '',
             'message' => $_GET['message'] ?? '',

@@ -434,30 +434,6 @@ function garantirBlocoLancamento(PDO $pdo, array $ctx, string $titulo, array $no
     println("→ Evento de lançamento criado: {$titulo} (id={$blocoId})");
 }
 
-function garantirGruposMateriasQuadro(PDO $pdo): void
-{
-    $ok = $pdo->query("SHOW TABLES LIKE 'notas_semanais_materias'");
-    if (!$ok || $ok->fetch() === false) {
-        println('→ Tabela notas_semanais_materias ausente; pulei grupos A/B.');
-        return;
-    }
-    $stmt = $pdo->prepare(
-        'INSERT INTO notas_semanais_materias (materia_id, grupo) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE grupo = VALUES(grupo)'
-    );
-    $mapa = [
-        44 => 'A', // Matemática
-        47 => 'A', // Geografia
-        48 => 'A', // Ciências
-        45 => 'B', // Português
-        46 => 'B', // História
-    ];
-    foreach ($mapa as $materiaId => $grupo) {
-        $stmt->execute([$materiaId, $grupo]);
-    }
-    println('→ Grupos do quadro: A = Matemática/Geografia/Ciências · B = Português/História');
-}
-
 function limparSemanaBlocosAntigos(PDO $pdo): void
 {
     if (!colunaExiste($pdo, 'provas_blocos', 'semana')) {
@@ -713,7 +689,6 @@ try {
     }
 
     limparSemanaBlocosAntigos($pdo);
-    garantirGruposMateriasQuadro($pdo);
     semearQuadroBimestres($pdo, $ctx, $tipoSemanal, $tipoBim);
 
     $pdo->commit();

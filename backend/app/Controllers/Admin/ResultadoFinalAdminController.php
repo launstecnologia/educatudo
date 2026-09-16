@@ -70,11 +70,38 @@ class ResultadoFinalAdminController extends AdminBaseController
         }
         $turmaId = (int) $turmaId;
         $svc = $this->homologacao();
-        $anos = $svc->model()->anosLetivosTurmas();
-        $anoLetivo = (int) ($_GET['ano_letivo'] ?? ($anos[0] ?? date('Y')));
+        $model = $svc->model();
+        $anos = $model->anosLetivosTurmas();
+        $anoTurma = $model->anoDaTurma($turmaId);
+        $anoLetivo = (int) ($_GET['ano_letivo'] ?? 0);
+        if ($anoLetivo <= 0) {
+            $anoLetivo = $anoTurma > 0 ? $anoTurma : (int) ($anos[0] ?? date('Y'));
+        }
         [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
+        $alinhado = $model->alinharTurmaAoAnoLetivo($turmaId, $anoLetivo);
+        if ((int) $alinhado['turma_id'] !== $turmaId || (int) $alinhado['ano_letivo'] !== $anoLetivo) {
+            $this->redirect($this->urlTurma(
+                (int) $alinhado['turma_id'],
+                (int) $alinhado['ano_letivo'],
+                $periodoTipo,
+                $periodoNumero
+            ));
+            return;
+        }
         $preview = $svc->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         $especiais = $svc->model()->listarEspeciaisTurma($turmaId, $anoLetivo);
+        $fechamentoTravado = false;
+        $fechamentoPath = __DIR__ . '/../../Modulos/fechamento/Models/FechamentoPeriodo.php';
+        if (is_file($fechamentoPath)) {
+            require_once $fechamentoPath;
+            try {
+                $fp = new FechamentoPeriodo();
+                $fechamentoTravado = $fp->schemaPronto()
+                    && $fp->estaTravado($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+            } catch (Throwable $e) {
+                $fechamentoTravado = false;
+            }
+        }
 
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/resultados-finais/turma', [
@@ -89,6 +116,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             'especiais' => $especiais,
             'componentes' => $this->componentesCatalogo(),
             'alunos' => $preview['linhas'],
+            'fechamento_travado' => $fechamentoTravado,
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -149,10 +177,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             (int) ($this->auth->getUser()['id'] ?? 0),
             (string) ($_POST['motivo'] ?? '')
         );
-        $this->setFlashMessage(
-            $result['success'] ? 'Resultado reaberto. A versão anterior foi preservada.' : ($result['error'] ?? 'Falha'),
-            $result['success'] ? 'success' : 'error'
-        );
+        $this->setFlashMessage($result['error'] ?? 'Falha', 'error');
         $this->redirect($voltar);
     }
 
@@ -237,6 +262,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             $turmaId = (int) ($aluno['turma_id'] ?? 0);
         }
         try {
+            $this->prepararSaidaPdf();
             $emitido = $this->documentos()->emitirFicha(
                 $alunoId,
                 $turmaId,
@@ -248,6 +274,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             );
             $this->outputPdf($emitido['html'], 'ficha_individual_' . (int) $alunoId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4');
         } catch (Throwable $e) {
+            $this->abortarSaidaPdf();
             $this->setFlashMessage($e->getMessage(), 'error');
             $this->redirect('/admin/students/' . (int) $alunoId);
         }
@@ -283,6 +310,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             return;
         }
         try {
+            $this->prepararSaidaPdf();
             $emitido = $this->documentos()->emitirAta(
                 (int) $turmaId,
                 (int) ($_GET['ano_letivo'] ?? date('Y')),
@@ -293,6 +321,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             );
             $this->outputPdf($emitido['html'], 'ata_resultados_turma_' . (int) $turmaId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4');
         } catch (Throwable $e) {
+            $this->abortarSaidaPdf();
             $this->setFlashMessage($e->getMessage(), 'error');
             $this->redirect($this->urlTurma((int) $turmaId));
         }
@@ -310,6 +339,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             $turmaId = (int) ($aluno['turma_id'] ?? 0);
         }
         try {
+            $this->prepararSaidaPdf();
             $emitido = $this->documentos()->emitirBoletim(
                 $alunoId,
                 $turmaId,
@@ -321,6 +351,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             );
             $this->outputPdf($emitido['html'], 'boletim_oficial_' . (int) $alunoId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4');
         } catch (Throwable $e) {
+            $this->abortarSaidaPdf();
             $this->setFlashMessage($e->getMessage(), 'error');
             $this->redirect('/admin/students/' . (int) $alunoId);
         }
@@ -380,6 +411,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             return;
         }
         try {
+            $this->prepararSaidaPdf();
             $emitido = $this->documentos()->emitirRelatorio(
                 $tipo,
                 $turmaId,
@@ -391,6 +423,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             );
             $this->outputPdf($emitido['html'], $tipo . '_turma_' . $turmaId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4');
         } catch (Throwable $e) {
+            $this->abortarSaidaPdf();
             $this->setFlashMessage($e->getMessage(), 'error');
             $this->redirect('/admin/resultados-finais/relatorios?turma_id=' . $turmaId);
         }
@@ -555,6 +588,21 @@ class ResultadoFinalAdminController extends AdminBaseController
             return (new ComponenteCurricular())->getAll(false) ?: [];
         } catch (Throwable $e) {
             return [];
+        }
+    }
+
+    private function prepararSaidaPdf(): void
+    {
+        ini_set('display_errors', '0');
+        if (ob_get_level() === 0) {
+            ob_start();
+        }
+    }
+
+    private function abortarSaidaPdf(): void
+    {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
         }
     }
 

@@ -10,7 +10,7 @@ $ui_btn_onclick = 'return false;';
 include $ui . '/btn.php';
 
 $ui_btn_variant = 'complementar';
-$ui_btn_label = 'Tipo de Avaliação';
+$ui_btn_label = 'Tipo de Nota';
 $ui_btn_icon = 'fa-solid fa-layer-group';
 $ui_btn_href = '#';
 include $ui . '/btn.php';
@@ -59,7 +59,7 @@ ob_start();
             include $ui . '/btn.php';
 
             $ui_btn_variant = 'complementar';
-            $ui_btn_label = 'Tipo de Avaliação';
+            $ui_btn_label = 'Tipo de Nota';
             $ui_btn_icon = 'fa-solid fa-layer-group';
             $ui_btn_href = '#';
             include $ui . '/btn.php';
@@ -95,7 +95,7 @@ ob_start();
             include $ui . '/btn.php';
 
             $ui_btn_variant = 'complementar';
-            $ui_btn_label = 'Tipo de Avaliação';
+            $ui_btn_label = 'Tipo de Nota';
             $ui_btn_icon = 'fa-solid fa-layer-group';
             $ui_btn_href = '#';
             include $ui . '/btn.php';

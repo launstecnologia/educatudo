@@ -54,6 +54,7 @@ class ResultadoAcademicoService
      *   serie_id?:int|null,
      *   matriz_curricular_id?:int|null,
      *   materia_id?:int|null,
+     *   agrupamento_id?:int|null,
      *   periodo_tipo?:string|null,
      *   periodo_numero?:int|null
      * } $contexto
@@ -123,9 +124,20 @@ class ResultadoAcademicoService
         if ($matriz === null) {
             return -1;
         }
-        $materia = $matchOrNull($regra['materia_id'] ?? null, $contexto['materia_id'] ?? null);
-        if ($materia === null) {
-            return -1;
+        $agrupamentoRegra = (int) ($regra['agrupamento_id'] ?? 0);
+        $agrupamentoCtx = (int) ($contexto['agrupamento_id'] ?? 0);
+        if ($agrupamentoRegra > 0) {
+            if ($agrupamentoCtx !== $agrupamentoRegra) {
+                return -1;
+            }
+            $agrupamento = 10;
+            $materia = 1;
+        } else {
+            $agrupamento = 1;
+            $materia = $matchOrNull($regra['materia_id'] ?? null, $contexto['materia_id'] ?? null);
+            if ($materia === null) {
+                return -1;
+            }
         }
 
         $periodoTipoCtx = strtolower(trim((string) ($contexto['periodo_tipo'] ?? 'bimestre')));
@@ -152,6 +164,7 @@ class ResultadoAcademicoService
         $score += $curso === 10 ? 40 : $curso;
         $score += $serie === 10 ? 80 : $serie;
         $score += $matriz === 10 ? 30 : $matriz;
+        $score += $agrupamento === 10 ? 160 : $agrupamento;
         $score += $materia === 10 ? 160 : $materia;
         $score += $numRegra > 0 ? 20 : 2;
         return $score;
@@ -304,9 +317,17 @@ class ResultadoAcademicoService
             return $this->montarRetorno('resultado_pendente', $entrada, $regra, null, $freq);
         }
 
+        $mediaOrig = $mediaAntes ?? $media;
+        if ($rec !== null) {
+            $aplic = $this->aplicarRecuperacao($mediaOrig, $rec, $regra);
+            if ($aplic['media_final'] !== null) {
+                $media = (float) $aplic['media_final'];
+            }
+        }
+
         $passouRendimento = $media >= $minima;
         if ($passouRendimento) {
-            $usouRec = $rec !== null && $mediaAntes !== null && $mediaAntes < $minima;
+            $usouRec = $rec !== null && $mediaOrig < $minima;
             $sit = $usouRec ? 'aprovado_recuperacao' : 'aprovado';
             return $this->montarRetorno($sit, $entrada, $regra, $media, $freq);
         }

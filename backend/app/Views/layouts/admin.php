@@ -11,6 +11,7 @@
     <?php 
     // Incluir LayoutHelper
     require_once __DIR__ . '/../../Core/LayoutHelper.php';
+    require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
     require_once __DIR__ . '/../../Helpers/AvatarUrlHelper.php';
 
     if (isset($user) && is_array($user) && in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
@@ -565,5 +566,6 @@
     <?php include __DIR__ . '/components/websocket-presence.php'; ?>
 
     <?php include __DIR__ . '/components/row_actions_dropdown_js.php'; ?>
+    <?php include __DIR__ . '/components/periodo_letivo_js.php'; ?>
 </body>
 </html>
