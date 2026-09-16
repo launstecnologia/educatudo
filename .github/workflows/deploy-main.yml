@@ -18,6 +18,4 @@ jobs:
       - name: Deploy no servidor
         run: |
           cd /opt/educatudo
-          git fetch origin main
-          git pull --ff-only origin main
           bash scripts/deploy-main.sh
