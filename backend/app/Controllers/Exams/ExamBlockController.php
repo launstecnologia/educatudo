@@ -410,10 +410,31 @@ class ExamBlockController extends BaseController
             }
         }
         
-        // Busca professores ativos (com matérias para o dropdown)
+        // Professores ativos + quem já está neste bloco (mesmo inativo), senão o select fica vazio na edição
         $professores = $this->db->fetchAll(
             "SELECT * FROM professores WHERE ativo = 1 ORDER BY nome ASC"
-        );
+        ) ?: [];
+        $idsLista = [];
+        foreach ($professores as $p) {
+            $idsLista[(int) ($p['id'] ?? 0)] = true;
+        }
+        foreach ($bloco['professores'] ?? [] as $vinculo) {
+            $pid = (int) ($vinculo['professor_id'] ?? 0);
+            if ($pid <= 0 || !empty($idsLista[$pid])) {
+                continue;
+            }
+            $extra = $this->db->fetch(
+                "SELECT * FROM professores WHERE id = :id LIMIT 1",
+                ['id' => $pid]
+            );
+            if ($extra) {
+                $professores[] = $extra;
+                $idsLista[$pid] = true;
+            }
+        }
+        usort($professores, static function ($a, $b) {
+            return strcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+        });
         foreach ($professores as &$prof) {
             $materiasJson = $prof['materias'] ?? '[]';
             $materiasNomes = json_decode($materiasJson, true) ?: [];

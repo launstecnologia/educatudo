@@ -30,6 +30,7 @@ $ui_wizard_steps = [
     ['label' => 'Revisão', 'sub' => 'Confirmar'],
 ];
 $ui_wizard_current = 1;
+$ui_wizard_completed = [1, 2, 3, 4];
 if (!class_exists('PeriodoLetivo')) {
     require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
 }
@@ -487,7 +488,7 @@ const BLOCO_ID = <?= (int) ($bloco['id'] ?? 0) ?>;
 let professorCounter = 0;
 let wizardCurrentStep = 1;
 const wizardTotalSteps = 5;
-const wizardCompletedSteps = {};
+const wizardCompletedSteps = { 1: true, 2: true, 3: true, 4: true };
 const wizardErrorSteps = {};
 const wizardClassMap = {
     ativo: ['border-accent', 'bg-primary', 'text-primary', 'shadow-md'],
@@ -623,17 +624,33 @@ function validateWizardStep(step) {
     } else if (step === 4) {
         const needQtd = exigeNumeroQuestoes();
         const professorDivs = cartoesProfessor();
-        ok = professorDivs.length > 0 && professorDivs.every(div => {
-            if (!valorProfessor(div, 'professor_id') || !valorProfessor(div, 'materia_id')) return false;
-            if (qtdTurmasProfessor(div) === 0) return false;
-            if (needQtd) {
-                return parseInt(valorProfessor(div, 'quantidade_questoes') || '0', 10) > 0;
+        const faltando = [];
+        professorDivs.forEach((div, i) => {
+            const n = i + 1;
+            if (!valorProfessor(div, 'professor_id')) {
+                faltando.push('Professor ' + n + ': escolha o professor');
+                return;
             }
-            return true;
+            if (!valorProfessor(div, 'materia_id')) {
+                faltando.push('Professor ' + n + ': escolha a matéria');
+                return;
+            }
+            if (qtdTurmasProfessor(div) === 0) {
+                faltando.push('Professor ' + n + ': marque as turmas');
+                return;
+            }
+            if (needQtd && parseInt(valorProfessor(div, 'quantidade_questoes') || '0', 10) < 1) {
+                faltando.push('Professor ' + n + ': informe a quantidade de questões');
+            }
         });
-        message = needQtd
-            ? 'Informe professor, matéria, quantidade de questões e turmas para cada professor.'
-            : 'Informe professor, matéria e turmas para cada item.';
+        ok = professorDivs.length > 0 && faltando.length === 0;
+        if (professorDivs.length === 0) {
+            message = 'Adicione pelo menos um professor.';
+        } else if (faltando.length) {
+            message = faltando.join('. ') + '.';
+        } else {
+            message = '';
+        }
     }
 
     wizardErrorSteps[step] = !ok;
@@ -649,7 +666,7 @@ function validateWizardStep(step) {
 
 function goWizardStep(targetStep) {
     const target = Math.max(1, Math.min(wizardTotalSteps, parseInt(targetStep, 10) || 1));
-    if (target <= wizardCurrentStep) {
+    if (target <= wizardCurrentStep || wizardCompletedSteps[target] || (target === wizardTotalSteps && wizardCompletedSteps[target - 1])) {
         setWizardStep(target);
         return;
     }
@@ -778,7 +795,8 @@ function adicionarProfessor(professorData = null) {
     professorDiv.className = 'js-professor-card border border-gray-300 rounded-lg p-4 bg-gray-50';
     professorDiv.id = `professor_${professorCounter}`;
     
-    const profId = professorData ? (professorData.professor_id ?? '') : '';
+    const profId = professorData ? (professorData.professor_id ?? professorData.id ?? '') : '';
+    const profNome = professorData ? (professorData.professor_nome || professorData.nome || '') : '';
     const matId = professorData ? (professorData.materia_id ?? '') : '';
     const materiaNome = professorData ? (professorData.materia_nome || '') : '';
     const quantidadeQuestoes = professorData
@@ -863,15 +881,28 @@ function adicionarProfessor(professorData = null) {
     container.appendChild(professorDiv);
     atualizarCamposPassoProfessores();
 
+    const professorSelect = campoProfessor(professorDiv, 'professor_id');
+    if (professorSelect && profId) {
+        const idStr = String(profId);
+        const temOpcao = Array.from(professorSelect.options).some(opt => String(opt.value) === idStr);
+        if (!temOpcao) {
+            const opt = document.createElement('option');
+            opt.value = idStr;
+            opt.textContent = profNome || ('Professor #' + idStr);
+            professorSelect.appendChild(opt);
+        }
+        professorSelect.value = idStr;
+    }
+
     // Se há dados do professor do bloco, preenche matéria após o DOM estar pronto
-    if (professorData && profId) {
+    if (professorData && (profId || matId)) {
         const currentCounter = professorCounter;
         const matIdStr = (matId != null && matId !== '' && String(matId) !== 'null') ? String(matId) : '';
         setTimeout(() => {
             carregarMateriasProfessor(currentCounter);
             const materiaSelect = document.getElementById(`materia_${currentCounter}`);
             if (materiaSelect && matIdStr) {
-                const jaTemOpcao = Array.from(materiaSelect.options).some(opt => opt.value === matIdStr);
+                const jaTemOpcao = Array.from(materiaSelect.options).some(opt => String(opt.value) === matIdStr);
                 if (!jaTemOpcao) {
                     const nome = materiaNome || (materias.find(m => Number(m.id) === Number(matId)) || {}).nome || 'Matéria';
                     const opt = document.createElement('option');
@@ -893,7 +924,8 @@ function removerProfessor(id) {
 }
 
 function carregarMateriasProfessor(professorIndex) {
-    const professorSelect = document.querySelector(`select[name="professores[${professorIndex}][professor_id]"]`);
+    const card = document.getElementById(`professor_${professorIndex}`);
+    const professorSelect = card ? campoProfessor(card, 'professor_id') : null;
     const materiaSelect = document.getElementById(`materia_${professorIndex}`);
     
     if (!professorSelect || !materiaSelect) return;
