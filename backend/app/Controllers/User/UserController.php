@@ -39,7 +39,7 @@ class UsuarioController extends BaseController
         if ($filters['tipo'] !== '' && !in_array($filters['tipo'], $typesForQuery, true)) {
             $filters['tipo'] = '';
         }
-        if (!in_array($filters['status'], ['0', '1'], true)) {
+        if (!in_array($filters['status'], ['0', '1', 'all'], true)) {
             $filters['status'] = '';
         }
 
@@ -50,9 +50,12 @@ class UsuarioController extends BaseController
             $where[] = 'u.perfil_admin = ?';
             $params[] = $filters['tipo'];
         }
-        if ($filters['status'] !== '') {
-            $where[] = 'u.ativo = ?';
-            $params[] = (int) $filters['status'];
+        if ($filters['status'] === '0') {
+            $where[] = 'u.ativo = 0';
+        } elseif ($filters['status'] === 'all') {
+            // listagem completa, inclusive ocultos
+        } else {
+            $where[] = 'u.ativo = 1';
         }
         if ($filters['busca'] !== '') {
             $where[] = '(u.nome LIKE ? OR u.email LIKE ?)';
@@ -293,6 +296,93 @@ class UsuarioController extends BaseController
 
             $this->json(['success' => true, 'message' => 'Usuário atualizado com sucesso!']);
 
+        } catch (Exception $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Oculta o usuário da listagem (soft-delete). Não apaga o registro.
+     */
+    public function excluir($id)
+    {
+        $user = $this->auth->getUser();
+        if (!$this->canManageUsers($user)) {
+            $this->json(['error' => 'Acesso negado'], 403);
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido'], 400);
+            return;
+        }
+
+        try {
+            $id = (int) $id;
+            $usuario = $this->db->fetch(
+                'SELECT * FROM usuarios WHERE id = :id LIMIT 1',
+                ['id' => $id]
+            );
+            if (!$usuario) {
+                throw new Exception('Usuário não encontrado');
+            }
+            if (!$this->canEditUser($user, $usuario)) {
+                throw new Exception('Sem permissão para excluir este usuário');
+            }
+            if ((int) ($user['id'] ?? 0) === $id) {
+                throw new Exception('Você não pode excluir o próprio usuário');
+            }
+
+            $this->db->query(
+                'UPDATE usuarios SET ativo = 0, updated_at = NOW() WHERE id = :id',
+                ['id' => $id]
+            );
+
+            $this->json([
+                'success' => true,
+                'message' => 'Usuário excluído da visualização. Os dados foram preservados no banco.',
+            ]);
+        } catch (Exception $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Devolve o usuário à listagem (ativo = 1). Não recria registro.
+     */
+    public function restaurar($id)
+    {
+        $user = $this->auth->getUser();
+        if (!$this->canManageUsers($user)) {
+            $this->json(['error' => 'Acesso negado'], 403);
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido'], 400);
+            return;
+        }
+
+        try {
+            $id = (int) $id;
+            $usuario = $this->db->fetch(
+                'SELECT * FROM usuarios WHERE id = :id LIMIT 1',
+                ['id' => $id]
+            );
+            if (!$usuario) {
+                throw new Exception('Usuário não encontrado');
+            }
+            if (!$this->canEditUser($user, $usuario)) {
+                throw new Exception('Sem permissão para restaurar este usuário');
+            }
+
+            $this->db->query(
+                'UPDATE usuarios SET ativo = 1, updated_at = NOW() WHERE id = :id',
+                ['id' => $id]
+            );
+
+            $this->json([
+                'success' => true,
+                'message' => 'Usuário restaurado na listagem.',
+            ]);
         } catch (Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }

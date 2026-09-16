@@ -151,7 +151,7 @@ class Auth
                 $sql = "SELECT ativo FROM responsaveis WHERE usuario_id = :id";
                 break;
             case 'admin_escola':
-                return true; // Admin sempre ativo
+                return (int) ($user['ativo'] ?? 0) === 1;
             default:
                 return false;
         }

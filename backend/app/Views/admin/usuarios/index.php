@@ -126,6 +126,20 @@ include __DIR__ . '/../_partials/page_header_list.php';
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-camera text-gray-400 w-4 text-center"></i> Alterar Avatar
                         </button>
+                        <?php if ((int) ($user['id'] ?? 0) !== (int) $usuario['id']): ?>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <?php if (!empty($usuario['ativo'])): ?>
+                        <button type="button" onclick="excluirUsuario(<?= (int) $usuario['id'] ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                            <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
+                        </button>
+                        <?php else: ?>
+                        <button type="button" onclick="restaurarUsuario(<?= (int) $usuario['id'] ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-rotate-left text-gray-400 w-4 text-center"></i> Restaurar na listagem
+                        </button>
+                        <?php endif; ?>
+                        <?php endif; ?>
                         <?php
                         $row_actions_dropdown_items = ob_get_clean();
                         $row_actions_dropdown_id = 'row-actions-usuario-' . (int) $usuario['id'];
@@ -205,9 +219,9 @@ include __DIR__ . '/../_partials/page_header_list.php';
                 <div class="relative">
                     <select id="filtro_status" name="status"
                             class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Todos</option>
-                        <option value="1" <?= $filters['status'] === '1' ? 'selected' : '' ?>>Ativo</option>
-                        <option value="0" <?= $filters['status'] === '0' ? 'selected' : '' ?>>Inativo</option>
+                        <option value="">Ativos</option>
+                        <option value="0" <?= $filters['status'] === '0' ? 'selected' : '' ?>>Ocultos da listagem</option>
+                        <option value="all" <?= $filters['status'] === 'all' ? 'selected' : '' ?>>Todos</option>
                     </select>
                     <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -784,6 +798,51 @@ function changePassword(id) {
                 alert('Senha alterada com sucesso!');
             } else {
                 alert('Erro: ' + data.error);
+            }
+        })
+        .catch(() => alert('Erro de conexão'));
+}
+
+function excluirUsuario(id) {
+    if (!confirm('O usuário sairá da listagem, mas os dados permanecem no banco. Continuar?')) {
+        return;
+    }
+    const token = resolveCsrfToken();
+    const formData = new FormData();
+    formData.append('_token', token);
+    fetch(URL_BASE + '/admin/usuarios/' + id + '/excluir', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + (data.error || 'Não foi possível excluir'));
+            }
+        })
+        .catch(() => alert('Erro de conexão'));
+}
+
+function restaurarUsuario(id) {
+    const token = resolveCsrfToken();
+    const formData = new FormData();
+    formData.append('_token', token);
+    fetch(URL_BASE + '/admin/usuarios/' + id + '/restaurar', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + (data.error || 'Não foi possível restaurar'));
             }
         })
         .catch(() => alert('Erro de conexão'));

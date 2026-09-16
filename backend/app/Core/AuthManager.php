@@ -126,7 +126,7 @@ class AuthManager
     private function authenticateAdmin($login, $senha)
     {
         $user = $this->db->fetch(
-            "SELECT * FROM usuarios WHERE email = :login AND tipo = 'admin_escola'",
+            "SELECT * FROM usuarios WHERE email = :login AND tipo = 'admin_escola' AND ativo = 1",
             ['login' => $login]
         );
         

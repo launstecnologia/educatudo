@@ -554,6 +554,8 @@ $router->post('/admin/usuarios', 'User/UserController@store');
 $router->post('/admin/usuarios/{id}', 'User/UserController@update');
 $router->post('/admin/usuarios/{id}/avatar', 'User/UserController@uploadAvatar');
 $router->post('/admin/usuarios/{id}/senha', 'User/UserController@changePassword');
+$router->post('/admin/usuarios/{id}/excluir', 'User/UserController@excluir');
+$router->post('/admin/usuarios/{id}/restaurar', 'User/UserController@restaurar');
 
 // Perfis de Permissão (Admin escola)
 $router->get('/admin/permissoes-perfis', 'User/AdminPermissionProfileController@index');

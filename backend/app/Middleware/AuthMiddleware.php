@@ -53,6 +53,26 @@ class AuthMiddleware
         }
 
         $user = $this->auth->getUser();
+        if ($this->adminFoiOcultadoDaListagem($user)) {
+            try {
+                $this->auth->logout();
+            } catch (Exception $e) {
+                session_unset();
+                session_destroy();
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+            }
+            $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            $acceptsJson = isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+            if ($isAjax || $acceptsJson) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'error' => 'Usuário inativo. Faça login novamente.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $this->redirectToLogin();
+        }
         $appliedCustomPermissions = false;
         if ($user && in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
             $appliedCustomPermissions = $this->applyCustomAdminPermissions($user);
@@ -99,6 +119,32 @@ class AuthMiddleware
         }
 
         // Aceite é tratado no dashboard com modal bloqueante
+    }
+
+    /**
+     * Soft-delete de admin: registro permanece, mas a sessão não pode continuar.
+     */
+    private function adminFoiOcultadoDaListagem($user): bool
+    {
+        if (!is_array($user) || !in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            return false;
+        }
+        $adminId = (int) ($user['id'] ?? 0);
+        if ($adminId <= 0) {
+            return true;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT ativo FROM usuarios WHERE id = :id LIMIT 1',
+                ['id' => $adminId]
+            );
+        } catch (Throwable $e) {
+            return false;
+        }
+        if (!is_array($row)) {
+            return true;
+        }
+        return (int) ($row['ativo'] ?? 0) !== 1;
     }
     
     /**
