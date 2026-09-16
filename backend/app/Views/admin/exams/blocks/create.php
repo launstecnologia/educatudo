@@ -484,6 +484,27 @@ const wizardClassMap = {
 };
 const wizardAllStateClasses = Object.keys(wizardClassMap).reduce((acc, key) => acc.concat(wizardClassMap[key]), []);
 
+function cartoesProfessor() {
+    const container = document.getElementById('professoresContainer');
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(':scope > .js-professor-card, :scope > [id^="professor_"]'))
+        .filter(el => el.classList.contains('js-professor-card') || /^professor_\d+$/.test(el.id || ''));
+}
+
+function campoProfessor(card, chave) {
+    return Array.from(card.querySelectorAll('select, input')).find(el => String(el.name || '').includes(chave)) || null;
+}
+
+function valorProfessor(card, chave) {
+    return String(campoProfessor(card, chave)?.value || '').trim();
+}
+
+function qtdTurmasProfessor(card) {
+    return Array.from(card.querySelectorAll('input[type="checkbox"]')).filter(cb => (
+        cb.checked && (cb.classList.contains('turma-professor-checkbox') || String(cb.name || '').includes('[turmas]'))
+    )).length;
+}
+
 function wizardStepState(step) {
     if (wizardErrorSteps[step]) return 'erro';
     if (step === wizardCurrentStep) return 'ativo';
@@ -581,15 +602,12 @@ function validateWizardStep(step) {
         message = 'Selecione pelo menos uma turma para o evento.';
     } else if (step === 4) {
         const needQtd = exigeNumeroQuestoes();
-        const professorDivs = Array.from(document.querySelectorAll('[id^="professor_"]'));
+        const professorDivs = cartoesProfessor();
         ok = professorDivs.length > 0 && professorDivs.every(div => {
-            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
-            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
-            const turmasProfessor = div.querySelectorAll('.turma-professor-checkbox:checked').length;
-            if (!professorId || !materiaId || turmasProfessor === 0) return false;
+            if (!valorProfessor(div, 'professor_id') || !valorProfessor(div, 'materia_id')) return false;
+            if (qtdTurmasProfessor(div) === 0) return false;
             if (needQtd) {
-                const numeroQuestoes = parseInt(div.querySelector('input[name*="[numero_questoes]"]')?.value || '0', 10);
-                return numeroQuestoes > 0;
+                return parseInt(valorProfessor(div, 'numero_questoes') || valorProfessor(div, 'quantidade_questoes') || '0', 10) > 0;
             }
             return true;
         });
@@ -847,7 +865,7 @@ function adicionarProfessor() {
     const container = document.getElementById('professoresContainer');
     
     const professorDiv = document.createElement('div');
-    professorDiv.className = 'border border-gray-300 rounded-lg p-4 bg-gray-50';
+    professorDiv.className = 'js-professor-card border border-gray-300 rounded-lg p-4 bg-gray-50';
     professorDiv.id = `professor_${professorCounter}`;
     
     professorDiv.innerHTML = `
@@ -1034,7 +1052,7 @@ function adicionarProfessorDoModelo(profModelo) {
     }
     
     const professorDiv = document.createElement('div');
-    professorDiv.className = 'border border-gray-300 rounded-lg p-4 bg-gray-50';
+    professorDiv.className = 'js-professor-card border border-gray-300 rounded-lg p-4 bg-gray-50';
     professorDiv.id = `professor_${professorCounter}`;
     
     professorDiv.innerHTML = `

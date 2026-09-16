@@ -622,15 +622,12 @@ function validateWizardStep(step) {
         message = 'Selecione pelo menos uma turma para o evento.';
     } else if (step === 4) {
         const needQtd = exigeNumeroQuestoes();
-        const professorDivs = Array.from(document.querySelectorAll('#professoresContainer [id^="professor_"]'));
+        const professorDivs = cartoesProfessor();
         ok = professorDivs.length > 0 && professorDivs.every(div => {
-            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
-            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
-            const turmasProfessor = div.querySelectorAll('.turma-professor-checkbox:checked').length;
-            if (!professorId || !materiaId || turmasProfessor === 0) return false;
+            if (!valorProfessor(div, 'professor_id') || !valorProfessor(div, 'materia_id')) return false;
+            if (qtdTurmasProfessor(div) === 0) return false;
             if (needQtd) {
-                const numeroQuestoes = parseInt(div.querySelector('input[name*="[quantidade_questoes]"]')?.value || '0', 10);
-                return numeroQuestoes > 0;
+                return parseInt(valorProfessor(div, 'quantidade_questoes') || '0', 10) > 0;
             }
             return true;
         });
@@ -675,11 +672,13 @@ function atualizarResumoWizard() {
     const out = document.getElementById('wizardResumoEvento');
     if (!out) return;
 
-    const professoresResumo = Array.from(document.querySelectorAll('#professoresContainer [id^="professor_"]')).map(div => {
-        const professor = div.querySelector('select[name*="[professor_id]"] option:checked')?.textContent?.trim() || 'Professor não selecionado';
-        const materia = div.querySelector('select[name*="[materia_id]"] option:checked')?.textContent?.trim() || 'Matéria não selecionada';
-        const qtd = div.querySelector('input[name*="[quantidade_questoes]"]')?.value || '0';
-        const turmasQtd = div.querySelectorAll('.turma-professor-checkbox:checked').length;
+    const professoresResumo = cartoesProfessor().map(div => {
+        const professorSel = campoProfessor(div, 'professor_id');
+        const materiaSel = campoProfessor(div, 'materia_id');
+        const professor = professorSel?.selectedOptions?.[0]?.textContent?.trim() || 'Professor não selecionado';
+        const materia = materiaSel?.selectedOptions?.[0]?.textContent?.trim() || 'Matéria não selecionada';
+        const qtd = valorProfessor(div, 'quantidade_questoes') || '0';
+        const turmasQtd = qtdTurmasProfessor(div);
         const qtdTxt = exigeNumeroQuestoes() ? ` · ${escHtml(qtd)} questão(ões)` : '';
         return `<li>${escHtml(professor)} · ${escHtml(materia)}${qtdTxt} · ${turmasQtd} turma(s)</li>`;
     }).join('');
@@ -741,6 +740,27 @@ function escHtml(s) {
         .replace(/'/g, '&#39;');
 }
 
+function cartoesProfessor() {
+    const container = document.getElementById('professoresContainer');
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(':scope > .js-professor-card, :scope > [id^="professor_"]'))
+        .filter(el => el.classList.contains('js-professor-card') || /^professor_\d+$/.test(el.id || ''));
+}
+
+function campoProfessor(card, chave) {
+    return Array.from(card.querySelectorAll('select, input')).find(el => String(el.name || '').includes(chave)) || null;
+}
+
+function valorProfessor(card, chave) {
+    return String(campoProfessor(card, chave)?.value || '').trim();
+}
+
+function qtdTurmasProfessor(card) {
+    return Array.from(card.querySelectorAll('input[type="checkbox"]')).filter(cb => (
+        cb.checked && (cb.classList.contains('turma-professor-checkbox') || String(cb.name || '').includes('[turmas]'))
+    )).length;
+}
+
 function setCampoAgenda(el, ativo) {
     if (!el) return;
     el.disabled = !ativo;
@@ -755,7 +775,7 @@ function adicionarProfessor(professorData = null) {
     const container = document.getElementById('professoresContainer');
     
     const professorDiv = document.createElement('div');
-    professorDiv.className = 'border border-gray-300 rounded-lg p-4 bg-gray-50';
+    professorDiv.className = 'js-professor-card border border-gray-300 rounded-lg p-4 bg-gray-50';
     professorDiv.id = `professor_${professorCounter}`;
     
     const profId = professorData ? (professorData.professor_id ?? '') : '';
@@ -1129,7 +1149,7 @@ function marcarTurmasProfessor(professorIndex) {
 
 function sincronizarTurmasProfessoresComBloco() {
     const selecionadas = new Set(getTurmasBlocoSelecionadas());
-    document.querySelectorAll('#professoresContainer [id^="professor_"]').forEach(div => {
+    cartoesProfessor().forEach(div => {
         const professorIndex = parseInt(div.id.replace('professor_', ''), 10);
         const checks = Array.from(div.querySelectorAll('.turma-professor-checkbox'));
         const turmasVisiveisAntes = new Set(checks.map(cb => parseInt(cb.dataset.turmaId || cb.value, 10)));
@@ -1188,7 +1208,7 @@ function atualizarBloco(event, blocoId) {
         const turmasBlocoSet = new Set(turmasIds);
 
         const professoresPayload = [];
-        const professorDivs = document.querySelectorAll('#professoresContainer [id^="professor_"]');
+        const professorDivs = cartoesProfessor();
         let professoresInvalidos = false;
         let turmasProfessorInvalidas = false;
 
@@ -1198,21 +1218,21 @@ function atualizarBloco(event, blocoId) {
         }
 
         professorDivs.forEach(div => {
-            const professorId = div.querySelector('select[name*="[professor_id]"]')?.value;
-            const materiaId = div.querySelector('select[name*="[materia_id]"]')?.value;
+            const professorId = valorProfessor(div, 'professor_id');
+            const materiaId = valorProfessor(div, 'materia_id');
             if (!professorId || !materiaId) {
                 professoresInvalidos = true;
                 return;
             }
-            const qtdQuestoesInput = div.querySelector('input[name*="[quantidade_questoes]"]');
             const quantidadeQuestoes = exigeNumeroQuestoes()
-                ? (qtdQuestoesInput ? (parseInt(qtdQuestoesInput.value, 10) || 0) : 0)
+                ? (parseInt(valorProfessor(div, 'quantidade_questoes') || '0', 10) || 0)
                 : 0;
             if (exigeNumeroQuestoes() && quantidadeQuestoes < 1) {
                 professoresInvalidos = true;
                 return;
             }
-            const turmasProfessor = Array.from(div.querySelectorAll('.turma-professor-checkbox:checked'))
+            const turmasProfessor = Array.from(div.querySelectorAll('input[type="checkbox"]'))
+                .filter(cb => cb.checked && (cb.classList.contains('turma-professor-checkbox') || String(cb.name || '').includes('[turmas]')))
                 .map(cb => parseInt(cb.value, 10))
                 .filter(id => id > 0);
             if (turmasProfessor.length === 0) {
