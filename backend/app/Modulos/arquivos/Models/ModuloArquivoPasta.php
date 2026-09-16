@@ -7,10 +7,28 @@ if (!class_exists('ModuloArquivoPasta')) {
 class ModuloArquivoPasta
 {
     private $db;
+    private ?bool $temColunaArquivoAtivo = null;
 
     public function __construct()
     {
         $this->db = Database::getInstance();
+    }
+
+    private function sqlArquivoAtivo(string $alias = 'ma'): string
+    {
+        if ($this->temColunaArquivoAtivo === null) {
+            $this->temColunaArquivoAtivo = (bool) $this->db->fetch(
+                "SELECT 1 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'modulos_arquivos'
+                   AND COLUMN_NAME = 'ativo'"
+            );
+        }
+        if (!$this->temColunaArquivoAtivo) {
+            return '1=1';
+        }
+        $coluna = $alias !== '' ? $alias . '.ativo' : 'ativo';
+        return "({$coluna} = 1 OR {$coluna} IS NULL)";
     }
 
     public function findById(int $id): ?array
@@ -98,7 +116,7 @@ class ModuloArquivoPasta
         return $this->db->fetchAll(
             "SELECT p.*,
                     (SELECT COUNT(*) FROM modulos_arquivos ma
-                     WHERE ma.pasta_id = p.id AND ma.professor_id = :prof_id2) AS total_arquivos
+                     WHERE ma.pasta_id = p.id AND ma.professor_id = :prof_id2 AND {$this->sqlArquivoAtivo('ma')}) AS total_arquivos
              FROM modulos_arquivos_pastas p
              WHERE p.professor_id = :prof_id AND p.criado_por_tipo = 'professor'
              ORDER BY p.ordem ASC, p.nome ASC",
@@ -113,7 +131,7 @@ class ModuloArquivoPasta
             $params = $parentId === null ? [] : ['parent_id' => $parentId];
             $pastas = $this->db->fetchAll(
                 "SELECT p.*,
-                        (SELECT COUNT(*) FROM modulos_arquivos ma WHERE ma.pasta_id = p.id) AS total_arquivos,
+                        (SELECT COUNT(*) FROM modulos_arquivos ma WHERE ma.pasta_id = p.id AND {$this->sqlArquivoAtivo('ma')}) AS total_arquivos,
                         (SELECT COUNT(*) FROM modulos_arquivos_pastas sub WHERE sub.parent_id = p.id) AS total_subpastas
                  FROM modulos_arquivos_pastas p
                  WHERE p.criado_por_tipo = 'admin' AND {$parentSql}
@@ -125,7 +143,7 @@ class ModuloArquivoPasta
 
         return $this->db->fetchAll(
             "SELECT p.*,
-                    (SELECT COUNT(*) FROM modulos_arquivos ma WHERE ma.pasta_id = p.id) AS total_arquivos,
+                    (SELECT COUNT(*) FROM modulos_arquivos ma WHERE ma.pasta_id = p.id AND {$this->sqlArquivoAtivo('ma')}) AS total_arquivos,
                     0 AS total_subpastas
              FROM modulos_arquivos_pastas p
              WHERE p.criado_por_tipo = 'admin'
@@ -161,7 +179,7 @@ class ModuloArquivoPasta
     public function contarArquivosDiretos(): array
     {
         $rows = $this->db->fetchAll(
-            'SELECT pasta_id, COUNT(*) AS c FROM modulos_arquivos WHERE pasta_id IS NOT NULL GROUP BY pasta_id'
+            'SELECT pasta_id, COUNT(*) AS c FROM modulos_arquivos WHERE pasta_id IS NOT NULL AND ' . $this->sqlArquivoAtivo('') . ' GROUP BY pasta_id'
         ) ?: [];
         $mapa = [];
         foreach ($rows as $row) {

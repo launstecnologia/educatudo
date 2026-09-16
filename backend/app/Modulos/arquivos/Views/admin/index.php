@@ -239,11 +239,10 @@ function adminArquivoDescricaoVazia(?string $html): bool {
                     <?php endif; ?>
                     <a href="<?= URL ?>/admin/arquivos/editar?id=<?= (int)$item['id'] ?>"
                        class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100">Editar</a>
-                    <form action="<?= URL ?>/admin/arquivos/excluir" method="POST" onsubmit="return confirm('Deseja remover este arquivo?');">
-                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
-                        <input type="hidden" name="id" value="<?= (int)$item['id'] ?>">
-                        <button type="submit" class="px-2 py-1.5 text-sm font-medium text-red-600 hover:text-red-800">Excluir</button>
-                    </form>
+                    <button type="button"
+                            class="btn-excluir-arquivo-admin px-2 py-1.5 text-sm font-medium text-red-600 hover:text-red-800"
+                            data-id="<?= (int)$item['id'] ?>"
+                            data-titulo="<?= htmlspecialchars((string)($item['titulo'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">Excluir</button>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -315,6 +314,33 @@ function adminArquivoDescricaoVazia(?string $html): bool {
                 <button type="button" id="modal-pasta-admin-cancelar" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
                 <button type="button" id="modal-pasta-admin-salvar" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Salvar</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: inativar arquivo (senha do admin logado) -->
+<div id="modal-excluir-arquivo-admin" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/60 p-4" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col" role="dialog" aria-labelledby="modal-excluir-arquivo-titulo">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 id="modal-excluir-arquivo-titulo" class="text-lg font-bold text-gray-900">Remover arquivo</h2>
+            <button type="button" class="modal-excluir-arquivo-fechar p-2 rounded-lg text-gray-500 hover:bg-gray-100" title="Fechar" aria-label="Fechar">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-sm text-gray-600">Para remover <strong id="modal-excluir-arquivo-nome" class="text-gray-900"></strong> da listagem, digite a <strong>senha da sua conta</strong> de administrador.</p>
+            <p class="text-xs text-gray-500">O arquivo deixa de aparecer para alunos, pais e na lista administrativa. O registro não é apagado do banco.</p>
+            <div id="modal-excluir-arquivo-erro" class="hidden text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2"></div>
+            <div>
+                <label for="input-senha-excluir-arquivo" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                <input type="password" id="input-senha-excluir-arquivo" autocomplete="current-password" class="w-full rounded-lg border-gray-300 focus:ring-red-500 focus:border-red-500" placeholder="Sua senha de login">
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
+            <button type="button" class="modal-excluir-arquivo-fechar px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancelar</button>
+            <button type="button" id="btn-confirmar-excluir-arquivo" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
+                Remover da listagem
+            </button>
         </div>
     </div>
 </div>
@@ -408,6 +434,91 @@ function adminArquivoDescricaoVazia(?string $html): bool {
                 });
         });
     });
+
+    var modalExcluir = document.getElementById('modal-excluir-arquivo-admin');
+    var inputSenhaExcluir = document.getElementById('input-senha-excluir-arquivo');
+    var erroExcluir = document.getElementById('modal-excluir-arquivo-erro');
+    var nomeExcluir = document.getElementById('modal-excluir-arquivo-nome');
+    var btnConfirmarExcluir = document.getElementById('btn-confirmar-excluir-arquivo');
+    var excluirArquivoId = null;
+
+    function fecharModalExcluirArquivo() {
+        if (!modalExcluir) return;
+        modalExcluir.style.display = 'none';
+        modalExcluir.classList.add('hidden');
+        excluirArquivoId = null;
+        if (inputSenhaExcluir) inputSenhaExcluir.value = '';
+        if (erroExcluir) { erroExcluir.textContent = ''; erroExcluir.classList.add('hidden'); }
+        if (btnConfirmarExcluir) btnConfirmarExcluir.disabled = false;
+        document.body.style.overflow = '';
+    }
+
+    function abrirModalExcluirArquivo(id, titulo) {
+        excluirArquivoId = id;
+        if (nomeExcluir) nomeExcluir.textContent = titulo || 'este arquivo';
+        if (inputSenhaExcluir) inputSenhaExcluir.value = '';
+        if (erroExcluir) { erroExcluir.textContent = ''; erroExcluir.classList.add('hidden'); }
+        if (modalExcluir) { modalExcluir.style.display = 'flex'; modalExcluir.classList.remove('hidden'); }
+        document.body.style.overflow = 'hidden';
+        if (inputSenhaExcluir) setTimeout(function() { inputSenhaExcluir.focus(); }, 80);
+    }
+
+    document.querySelectorAll('.btn-excluir-arquivo-admin').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            abrirModalExcluirArquivo(parseInt(this.getAttribute('data-id'), 10), this.getAttribute('data-titulo') || '');
+        });
+    });
+    document.querySelectorAll('.modal-excluir-arquivo-fechar').forEach(function(b) {
+        b.addEventListener('click', fecharModalExcluirArquivo);
+    });
+    if (modalExcluir) {
+        modalExcluir.addEventListener('click', function(e) { if (e.target === modalExcluir) fecharModalExcluirArquivo(); });
+    }
+    function confirmarExcluirArquivo() {
+        if (!excluirArquivoId) return;
+        var senha = inputSenhaExcluir ? inputSenhaExcluir.value : '';
+        if (!senha) {
+            if (erroExcluir) { erroExcluir.textContent = 'Digite sua senha.'; erroExcluir.classList.remove('hidden'); }
+            return;
+        }
+        if (btnConfirmarExcluir) btnConfirmarExcluir.disabled = true;
+        if (erroExcluir) { erroExcluir.textContent = ''; erroExcluir.classList.add('hidden'); }
+        var body = new URLSearchParams();
+        body.set('_token', CSRF);
+        body.set('id', String(excluirArquivoId));
+        body.set('senha', senha);
+        if (PARENT) body.set('pasta_id', String(PARENT));
+        fetch(BASE + '/admin/arquivos/excluir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            body: body.toString(),
+            credentials: 'same-origin'
+        }).then(function(r) {
+            return r.text().then(function(text) {
+                var j = null;
+                try { j = JSON.parse(text); } catch (e) { j = null; }
+                return { ok: r.ok, json: j };
+            });
+        }).then(function(res) {
+            if (res.json && res.json.success) {
+                fecharModalExcluirArquivo();
+                location.reload();
+                return;
+            }
+            var msg = (res.json && res.json.error) ? res.json.error : 'Não foi possível remover o arquivo.';
+            if (erroExcluir) { erroExcluir.textContent = msg; erroExcluir.classList.remove('hidden'); }
+            if (btnConfirmarExcluir) btnConfirmarExcluir.disabled = false;
+        }).catch(function() {
+            if (erroExcluir) { erroExcluir.textContent = 'Erro de rede. Tente novamente.'; erroExcluir.classList.remove('hidden'); }
+            if (btnConfirmarExcluir) btnConfirmarExcluir.disabled = false;
+        });
+    }
+    if (btnConfirmarExcluir) btnConfirmarExcluir.addEventListener('click', confirmarExcluirArquivo);
+    if (inputSenhaExcluir) {
+        inputSenhaExcluir.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmarExcluirArquivo(); }
+        });
+    }
 })();
 
 window.adminMoverArquivo = function(arquivoId, pastaId, selectEl) {

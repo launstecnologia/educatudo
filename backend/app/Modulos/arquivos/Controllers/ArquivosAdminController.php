@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__ . '/../Services/ArquivosService.php';
+require_once __DIR__ . '/../../../Helpers/AdminPasswordHelper.php';
 
 if (!class_exists('ArquivosAdminController')) {
 class ArquivosAdminController extends BaseController
@@ -299,20 +300,62 @@ class ArquivosAdminController extends BaseController
         if (!$this->ensureCanManageOrRedirect()) {
             return;
         }
+        $wantsJson = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest'
+            || str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+        $pastaIdPost = (int) ($_POST['pasta_id'] ?? 0);
+        $qsPasta = $pastaIdPost > 0 ? '?pasta_id=' . $pastaIdPost : '';
+
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            if ($wantsJson) {
+                $this->json(['error' => 'Token inválido. Recarregue a página e tente novamente.'], 403);
+                return;
+            }
             $this->setFlashMessage('Token inválido. Recarregue a página e tente novamente.', 'error');
-            $this->redirect('/admin/arquivos');
+            $this->redirect('/admin/arquivos' . $qsPasta);
             return;
         }
+
+        $senha = trim((string) ($_POST['senha'] ?? ''));
+        if ($senha === '') {
+            if ($wantsJson) {
+                $this->json(['error' => 'Digite a senha da sua conta para confirmar.'], 400);
+                return;
+            }
+            $this->setFlashMessage('Digite a senha da sua conta para confirmar.', 'error');
+            $this->redirect('/admin/arquivos' . $qsPasta);
+            return;
+        }
+
+        $user = $this->auth->getUser() ?? [];
+        if (!AdminPasswordHelper::verifyAdminPassword(Database::getInstance(), $user, $senha)) {
+            if ($wantsJson) {
+                $this->json(['error' => 'Senha incorreta.'], 400);
+                return;
+            }
+            $this->setFlashMessage('Senha incorreta.', 'error');
+            $this->redirect('/admin/arquivos' . $qsPasta);
+            return;
+        }
+
         $id = (int) ($_POST['id'] ?? 0);
-        $result = $this->arquivosService->excluirAdmin($id, $this->config);
+        $result = $this->arquivosService->inativarAdmin($id, (int) ($user['id'] ?? 0));
         if (!$result['ok']) {
+            if ($wantsJson) {
+                $this->json(['error' => $result['error'] ?? 'Não foi possível remover o arquivo.'], 400);
+                return;
+            }
             $this->setFlashMessage($result['error'], 'error');
-            $this->redirect('/admin/arquivos');
+            $this->redirect('/admin/arquivos' . $qsPasta);
             return;
         }
-        $this->setFlashMessage('Arquivo removido com sucesso.', 'success');
-        $this->redirect('/admin/arquivos');
+
+        $mensagem = 'Arquivo removido da listagem.';
+        if ($wantsJson) {
+            $this->json(['success' => true, 'message' => $mensagem]);
+            return;
+        }
+        $this->setFlashMessage($mensagem, 'success');
+        $this->redirect('/admin/arquivos' . $qsPasta);
     }
 
     public function baixarAnexo($id = null)
@@ -330,7 +373,7 @@ class ArquivosAdminController extends BaseController
             exit;
         }
         $anexo = $this->arquivosService->anexos()->findById($id);
-        if (!$anexo) {
+        if (!$anexo || !$this->arquivosService->anexoDeArquivoAtivo($anexo)) {
             http_response_code(404);
             echo 'Anexo não encontrado';
             exit;

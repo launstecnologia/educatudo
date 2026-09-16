@@ -245,7 +245,7 @@ class ArquivosAlunoController extends BaseController
             exit;
         }
         $anexo = $this->arquivosService->anexos()->findById($id);
-        if (!$anexo) {
+        if (!$anexo || !$this->arquivosService->anexoDeArquivoAtivo($anexo)) {
             http_response_code(404);
             echo 'Anexo não encontrado';
             exit;

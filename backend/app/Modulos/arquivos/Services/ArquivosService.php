@@ -85,7 +85,7 @@ class ArquivosService
 
         $visibilityCond = ModuloArquivo::sqlVisibilidadeAluno();
         $paramsList = ['turma_id' => $turmaId, 'turma_id2' => $turmaId, 'aluno_id' => $alunoId];
-        $where = [$visibilityCond];
+        $where = [$visibilityCond, $this->arquivoModel->sqlFiltroAtivo('ma')];
         $params = $paramsList;
 
         $hasRecuperacaoCol = $this->temColunaRecuperacao();
@@ -158,8 +158,9 @@ class ArquivosService
             $params
         ) ?: [];
 
-        $materiasWhere = $visibilityCond;
-        $professoresWhere = $visibilityCond;
+        $filtroAtivoSql = $this->arquivoModel->sqlFiltroAtivo('ma');
+        $materiasWhere = $visibilityCond . ' AND ' . $filtroAtivoSql;
+        $professoresWhere = $visibilityCond . ' AND ' . $filtroAtivoSql;
         $filtroParams = $paramsList;
         if ($hasRecuperacaoCol) {
             if ($somenteRecuperacao) {
@@ -238,6 +239,7 @@ class ArquivosService
             "SELECT ma.pasta_id, COUNT(*) AS c
              FROM modulos_arquivos ma
              WHERE {$visibilityCond}{$recSql} AND ma.pasta_id IS NOT NULL
+               AND {$this->arquivoModel->sqlFiltroAtivo('ma')}
              GROUP BY ma.pasta_id",
             $params
         ) ?: [];
@@ -552,7 +554,8 @@ class ArquivosService
 
     public function moverArquivoParaPastaAdmin(int $arquivoId, ?int $pastaId): ?string
     {
-        if (!$this->arquivoModel->findById($arquivoId)) {
+        $item = $this->arquivoModel->findById($arquivoId);
+        if (!$item || !$this->arquivoModel->estaAtivo($item)) {
             return 'Arquivo não encontrado';
         }
         if ($pastaId !== null && !$this->pastaModel->findByIdAdmin($pastaId)) {
@@ -1054,7 +1057,8 @@ class ArquivosService
      */
     public function atualizarAdmin(int $id, array $post): array
     {
-        if ($id <= 0 || !$this->arquivoModel->findById($id)) {
+        $item = $this->arquivoModel->findById($id);
+        if ($id <= 0 || !$item || !$this->arquivoModel->estaAtivo($item)) {
             return ['ok' => false, 'error' => 'Arquivo não encontrado.'];
         }
 
@@ -1095,16 +1099,37 @@ class ArquivosService
     }
 
     /**
+     * Inativa o arquivo (some da listagem; registro e anexos permanecem).
+     *
      * @return array{ok: bool, error?: string}
      */
-    public function excluirAdmin(int $id, array $config): array
+    public function inativarAdmin(int $id, int $adminId): array
     {
-        if ($id <= 0 || !$this->arquivoModel->findById($id)) {
-            return ['ok' => false, 'error' => 'Arquivo inválido.'];
+        $item = $this->arquivoModel->findById($id);
+        if ($id <= 0 || !$item || !$this->arquivoModel->estaAtivo($item)) {
+            return ['ok' => false, 'error' => 'Arquivo não encontrado.'];
         }
-        $this->removerAnexosFisicos($id, $config);
-        $this->arquivoModel->delete($id);
+        if (!$this->arquivoModel->temColunaAtivo()) {
+            return ['ok' => false, 'error' => 'Atualize o banco (migration de inativação de arquivos) para remover da listagem.'];
+        }
+        try {
+            if (!$this->arquivoModel->inativar($id, $adminId)) {
+                return ['ok' => false, 'error' => 'Não foi possível remover o arquivo da listagem.'];
+            }
+        } catch (\Throwable $e) {
+            error_log('ArquivosService::inativarAdmin: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Atualize o banco (migration de inativação de arquivos) para remover da listagem.'];
+        }
         return ['ok' => true];
+    }
+
+    public function anexoDeArquivoAtivo(?array $anexo): bool
+    {
+        if (!$anexo) {
+            return false;
+        }
+        $item = $this->arquivoModel->findById((int) ($anexo['modulo_arquivo_id'] ?? 0));
+        return $this->arquivoModel->estaAtivo($item);
     }
 
     public function getItemAdmin(int $id): ?array

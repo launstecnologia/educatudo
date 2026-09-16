@@ -7,10 +7,45 @@ if (!class_exists('ModuloArquivo')) {
 class ModuloArquivo
 {
     private $db;
+    private ?bool $temColunaAtivo = null;
 
     public function __construct()
     {
         $this->db = Database::getInstance();
+    }
+
+    public function temColunaAtivo(): bool
+    {
+        if ($this->temColunaAtivo !== null) {
+            return $this->temColunaAtivo;
+        }
+        $this->temColunaAtivo = (bool) $this->db->fetch(
+            "SELECT 1 FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'modulos_arquivos'
+               AND COLUMN_NAME = 'ativo'"
+        );
+        return $this->temColunaAtivo;
+    }
+
+    public function sqlFiltroAtivo(string $alias = 'ma'): string
+    {
+        if (!$this->temColunaAtivo()) {
+            return '1=1';
+        }
+        $coluna = $alias !== '' ? $alias . '.ativo' : 'ativo';
+        return "({$coluna} = 1 OR {$coluna} IS NULL)";
+    }
+
+    public function estaAtivo(?array $row): bool
+    {
+        if (!$row) {
+            return false;
+        }
+        if (!$this->temColunaAtivo()) {
+            return true;
+        }
+        return (int) ($row['ativo'] ?? 1) === 1;
     }
 
     public function findById(int $id): ?array
@@ -29,7 +64,7 @@ class ModuloArquivo
              FROM modulos_arquivos ma
              LEFT JOIN materias m ON ma.materia_id = m.id
              LEFT JOIN professores p ON ma.professor_id = p.id
-             WHERE ma.id = :id',
+             WHERE ma.id = :id AND ' . $this->sqlFiltroAtivo('ma'),
             ['id' => $id]
         );
         return $row ?: null;
@@ -38,7 +73,7 @@ class ModuloArquivo
     public function findByIdDoProfessor(int $id, int $professorId): ?array
     {
         $row = $this->db->fetch(
-            'SELECT * FROM modulos_arquivos WHERE id = :id AND professor_id = :prof_id',
+            'SELECT * FROM modulos_arquivos WHERE id = :id AND professor_id = :prof_id AND ' . $this->sqlFiltroAtivo(''),
             ['id' => $id, 'prof_id' => $professorId]
         );
         return $row ?: null;
@@ -51,7 +86,7 @@ class ModuloArquivo
              FROM modulos_arquivos ma
              LEFT JOIN materias m ON ma.materia_id = m.id
              LEFT JOIN professores p ON ma.professor_id = p.id
-             WHERE ma.id = :id AND ma.professor_id = :prof_id',
+             WHERE ma.id = :id AND ma.professor_id = :prof_id AND ' . $this->sqlFiltroAtivo('ma'),
             ['id' => $id, 'prof_id' => $professorId]
         );
         return $row ?: null;
@@ -68,6 +103,7 @@ class ModuloArquivo
              LEFT JOIN materias m ON ma.materia_id = m.id
              LEFT JOIN professores p ON ma.professor_id = p.id
              WHERE ma.id = :id
+               AND ' . $this->sqlFiltroAtivo('ma') . '
                AND ((ma.aluno_id IS NULL AND (ma.turma_id = :turma_id OR EXISTS (
                     SELECT 1 FROM modulos_arquivos_turmas mat
                     WHERE mat.modulo_arquivo_id = ma.id AND mat.turma_id = :turma_id2
@@ -87,6 +123,7 @@ class ModuloArquivo
         $row = $this->db->fetch(
             'SELECT 1 FROM modulos_arquivos ma
              WHERE ma.id = :id
+               AND ' . $this->sqlFiltroAtivo('ma') . '
                AND ((ma.aluno_id IS NULL AND (ma.turma_id = :tid OR EXISTS (
                     SELECT 1 FROM modulos_arquivos_turmas mat
                     WHERE mat.modulo_arquivo_id = ma.id AND mat.turma_id = :tid2
@@ -104,7 +141,7 @@ class ModuloArquivo
     public function professorPodeVer(int $id, int $professorId): bool
     {
         return (bool) $this->db->fetch(
-            'SELECT 1 FROM modulos_arquivos ma WHERE ma.id = :id AND ma.professor_id = :prof_id',
+            'SELECT 1 FROM modulos_arquivos ma WHERE ma.id = :id AND ma.professor_id = :prof_id AND ' . $this->sqlFiltroAtivo('ma'),
             ['id' => $id, 'prof_id' => $professorId]
         );
     }
@@ -199,7 +236,7 @@ class ModuloArquivo
              FROM modulos_arquivos ma
              LEFT JOIN turmas t ON ma.turma_id = t.id
              LEFT JOIN materias m ON ma.materia_id = m.id
-             WHERE ma.professor_id = :prof_id{$whereExtra}
+             WHERE ma.professor_id = :prof_id AND " . $this->sqlFiltroAtivo('ma') . "{$whereExtra}
              ORDER BY ma.created_at DESC",
             $params
         ) ?: [];
@@ -223,7 +260,7 @@ class ModuloArquivo
      */
     public function listAdmin(array $filtros, int $perPage, int $page): array
     {
-        $where = ['1=1'];
+        $where = [$this->sqlFiltroAtivo('ma')];
         $params = [];
 
         if (($filtros['materia_id'] ?? 0) > 0) {
@@ -329,6 +366,21 @@ class ModuloArquivo
             'UPDATE modulos_arquivos SET pasta_id = NULL WHERE pasta_id = :id',
             ['id' => $pastaId]
         );
+    }
+
+    public function inativar(int $id, int $adminId): bool
+    {
+        if (!$this->temColunaAtivo()) {
+            return false;
+        }
+        $this->db->query(
+            'UPDATE modulos_arquivos
+             SET ativo = 0, inativado_em = NOW(), inativado_por = :admin_id
+             WHERE id = :id AND (ativo = 1 OR ativo IS NULL)',
+            ['id' => $id, 'admin_id' => $adminId > 0 ? $adminId : null]
+        );
+        $row = $this->findById($id);
+        return $row !== null && (int) ($row['ativo'] ?? 1) === 0;
     }
 
     public function delete(int $id): void
