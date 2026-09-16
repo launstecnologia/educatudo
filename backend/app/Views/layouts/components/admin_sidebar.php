@@ -318,10 +318,10 @@
     word-break: break-word;
 }
 
-/* Sub-seções (Estrutura, Como a escola avalia…): escala maior que o caption de 10px */
+/* Sub-seções (Estrutura, Pessoas e turmas…): caption menor que os itens do menu */
 .admin-sidebar-nav .sidebar-subcab {
-    padding: 0.85rem 0.75rem 0.4rem 0.75rem;
-    margin: 0.35rem 0.15rem 0.15rem;
+    padding: 0.5rem 0.75rem 0.2rem 0.75rem;
+    margin: 0.2rem 0.15rem 0.05rem;
     border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
 .admin-sidebar-nav .sidebar-subcab-com-ordem {

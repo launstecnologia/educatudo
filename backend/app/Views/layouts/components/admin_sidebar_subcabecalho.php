@@ -23,13 +23,13 @@ $temAcoes = $menu_subcab_ordenar || $menu_subcab_id !== '';
             onclick="toggleNestedMenu('<?= htmlspecialchars($menu_subcab_id, ENT_QUOTES, 'UTF-8') ?>')"
             title="Expandir <?= htmlspecialchars($menu_subcab_titulo, ENT_QUOTES, 'UTF-8') ?>"
             aria-expanded="<?= $menu_subcab_aberto ? 'true' : 'false' ?>">
-        <span class="text-[13px] font-semibold tracking-wide text-white/90 leading-snug"><?= htmlspecialchars($menu_subcab_titulo, ENT_QUOTES, 'UTF-8') ?></span>
+        <span class="text-[11px] font-medium tracking-wide text-white/80 leading-snug"><?= htmlspecialchars($menu_subcab_titulo, ENT_QUOTES, 'UTF-8') ?></span>
         <svg id="<?= htmlspecialchars($menu_subcab_id, ENT_QUOTES, 'UTF-8') ?>-arrow" class="w-3 h-3 flex-shrink-0 transition-transform duration-200" <?= $menu_subcab_aberto ? 'style="transform: rotate(180deg)"' : '' ?> fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
     </button>
     <?php else: ?>
-    <p class="text-[13px] font-semibold tracking-wide text-white/90 leading-snug"><?= htmlspecialchars($menu_subcab_titulo, ENT_QUOTES, 'UTF-8') ?></p>
+    <p class="text-[11px] font-medium tracking-wide text-white/80 leading-snug"><?= htmlspecialchars($menu_subcab_titulo, ENT_QUOTES, 'UTF-8') ?></p>
     <?php endif; ?>
     <?php if ($menu_subcab_ordenar): ?>
     <button type="button"
