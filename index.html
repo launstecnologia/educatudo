@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Implantar acadêmico — EducaTudo</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#F4F6FA;color:#16181D;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding:30px 20px 60px}
+.hero{background:linear-gradient(135deg,#1E3A8A 0%,#2C4FA8 55%,#3B5BC4 100%);
+ color:#fff;border-radius:16px;padding:34px 34px 30px;margin-bottom:14px}
+.hero .kick{font-size:11.5px;letter-spacing:2px;text-transform:uppercase;color:#A9C0F5;margin-bottom:12px}
+.hero h1{font-size:31px;margin:0 0 10px;letter-spacing:-.6px;line-height:1.15}
+.hero p{font-size:16px;color:#D6E2FB;margin:0;max-width:640px;line-height:1.6}
+.hero p b{color:#fff;font-weight:600}
+.tres{display:flex;gap:12px;margin-bottom:14px}
+.tres .c{flex:1;background:#fff;border:1px solid #E3E7EF;border-radius:12px;padding:16px 18px}
+.tres .n2{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7C8BA8;margin-bottom:6px}
+.tres .t{font-size:15.5px;font-weight:600;margin-bottom:5px}
+.tres .d{font-size:13.5px;color:#5A6170;line-height:1.5}
+.espera{background:#fff;border:1px solid #E3E7EF;border-radius:12px;padding:20px 22px;margin-bottom:14px}
+.espera h2{font-size:15.5px;margin:0 0 12px;font-weight:600}
+.espera ul{margin:0;padding:0;list-style:none}
+.espera li{position:relative;padding-left:26px;margin-bottom:9px;font-size:14.5px;color:#3A4254;line-height:1.55}
+.espera li:before{content:"";position:absolute;left:0;top:7px;width:13px;height:7px;
+ border-left:2.4px solid #1B7A33;border-bottom:2.4px solid #1B7A33;transform:rotate(-45deg)}
+.espera li b{color:#16181D;font-weight:600}
+.fim{background:#F0F6EC;border:1px solid #CBE3BE;border-radius:12px;padding:17px 20px;margin-bottom:26px;
+ font-size:14.5px;color:#2C5220;line-height:1.6}
+.fim b{color:#1B4310}
+.prog{background:#fff;border:1px solid #E3E7EF;border-radius:12px;padding:16px 18px;margin-bottom:8px}
+.prog .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.prog .ano{font-weight:600}.prog .nn{color:#5A6170;font-size:13px}
+.badge{background:#EEF2FA;color:#5A6C90;font-weight:700;font-size:13px;padding:3px 10px;border-radius:99px}
+.bar{height:8px;background:#E8ECF3;border-radius:99px;overflow:hidden}
+.fill{height:100%;background:#1E3A8A;width:0%}
+.prox{margin-top:12px;background:#EEF4FF;border:1px solid #CFDEFA;border-radius:8px;padding:10px 13px;font-size:13.5px;color:#25406F}
+.prox b{color:#152E63}
+.mundo{font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:#8A93A5;margin:24px 0 8px;padding-left:2px}
+.card{background:#fff;border:1px solid #E3E7EF;border-radius:10px;margin-bottom:8px;overflow:hidden}
+.card.first{border-color:#BFD2F5;box-shadow:0 2px 10px rgba(30,58,138,.07)}
+.head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;cursor:pointer}
+.chk{flex:0 0 22px;width:22px;height:22px;border-radius:50%;background:#fff;border:1.6px solid #D7DDE8;margin-top:1px}
+.chk.done{background:#1B7A33;border-color:#1B7A33}
+.tit{flex:1;min-width:0}.tit b{display:block;font-size:15px;font-weight:600}
+.aqui{display:inline-block;margin-left:8px;background:#1E3A8A;color:#fff;font-size:10px;font-weight:700;
+ letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:99px;vertical-align:2px}
+.cont{display:block;color:#98A0B0;font-size:13px;margin-top:1px}
+.ok{display:block;color:#7A8294;font-size:12.5px;margin-top:3px}
+.ok i{font-style:normal;font-weight:600;color:#5A6170}
+.abrir{flex:0 0 auto;border:1px solid #D4DAE6;border-radius:7px;padding:5px 14px;font-size:13px;
+ color:#1E3A8A;text-decoration:none;background:#fff;margin-top:2px}
+.abrir.pri{background:#1E3A8A;color:#fff;border-color:#1E3A8A}
+.chev{flex:0 0 auto;color:#A6AEBE;font-size:12px;margin-top:6px;transition:transform .18s}
+.card.open .chev{transform:rotate(90deg)}
+.body{display:none;padding:0 16px 18px 50px;border-top:1px solid #EEF1F6}
+.card.open .body{display:block}
+.card.num .head{align-items:center}.card.num .body{padding-left:54px}
+.n{flex:0 0 26px;width:26px;height:26px;border-radius:50%;background:#EEF2FA;color:#1E3A8A;
+ font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.card.num.marco{border-color:#E8C4C4}.card.num.marco .n{background:#C62828;color:#fff}
+.card.num.crit{border-color:#F0DFA8}.card.num.crit .n{background:#C98A00;color:#fff}
+.sel{display:inline-block;margin-left:8px;background:#C62828;color:#fff;font-size:10px;font-weight:700;
+ letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:99px;vertical-align:2px}
+.sel.crit{background:#C98A00}.sel.out{background:#7C8BA8}
+.lab{font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#1E3A8A;margin:14px 0 5px}
+ol.como,ul.erros{margin:0;padding-left:20px}
+ol.como li,ul.erros li{margin-bottom:5px;font-size:14px}
+ul.erros li{color:#8A3B3B}
+.usado{margin-top:14px;background:#F3F5FA;border-radius:7px;padding:9px 12px;font-size:13.5px;color:#3A4254}
+.usado b{color:#1E3A8A}
+.nota{margin-top:9px;background:#EEF6FF;border-left:3px solid #1E3A8A;padding:9px 12px;font-size:13.5px;color:#25406F;border-radius:0 6px 6px 0}
+.pend{margin-top:9px;background:#FDF2F2;border-left:3px solid #C62828;padding:9px 12px;font-size:13px;color:#8E1F1F;border-radius:0 6px 6px 0}
+.shots{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.shot{margin:0;width:190px;border:1px solid #E3E7EF;border-radius:8px;overflow:hidden;cursor:zoom-in;background:#fff}
+.shot img{display:block;width:100%;height:auto}
+.semshot{font-size:12.5px;color:#8A93A5;background:#F7F8FB;border:1px dashed #D7DDE8;border-radius:8px;padding:11px 13px}
+.sec{margin-top:36px}
+.sec h2{font-size:21px;margin:0 0 4px;letter-spacing:-.3px}
+.sec .s{color:#5A6170;font-size:14.5px;margin:0 0 16px}
+.sec h3{font-size:18px;margin:26px 0 4px}
+.dois{display:flex;gap:12px;margin-bottom:26px}
+.dois .b{flex:1;border-radius:12px;padding:17px 19px}
+.dois .rot{background:#fff;border:1px solid #E3E7EF}
+.dois .fec{background:#132C6B;color:#fff}
+.dois .q{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px}
+.dois .rot .q{color:#7C8BA8}.dois .fec .q{color:#93AEEC}
+.dois .t{font-size:16px;font-weight:600;margin-bottom:8px}
+.dois .p{font-size:13.5px;line-height:1.6}
+.dois .rot .p{color:#5A6170}.dois .fec .p{color:#CCDAF6}
+.dois .fec b{color:#fff}
+.cadeia{background:#fff;border:1px solid #E3E7EF;border-radius:12px;padding:20px 22px;margin-bottom:14px}
+.cadeia h3{font-size:15.5px;margin:0 0 3px;font-weight:600}
+.cadeia .sub{font-size:13.5px;color:#5A6170;margin:0 0 15px}
+.elo{display:flex;align-items:flex-start;gap:12px;padding:7px 0}
+.elo .dot{flex:0 0 11px;width:11px;height:11px;border-radius:50%;background:#C6D2E8;margin-top:5px}
+.elo.hi .dot{background:#C98A00;box-shadow:0 0 0 4px #FBEFD4}
+.elo .tx{flex:1}
+.elo .tt{font-size:14.5px;font-weight:600}
+.elo .dd{font-size:13px;color:#6B7382}
+.elo.hi .tt{color:#8A6100}
+.seta{color:#C6D2E8;font-size:12px;padding-left:4px;line-height:1}
+.alerta{margin-top:14px;background:#FFFBEF;border:1px solid #F0E2B6;border-radius:8px;padding:12px 14px;font-size:13.5px;color:#7A5B00;line-height:1.6}
+.alerta b{color:#5C4310}
+.papeis{display:flex;gap:10px;margin-bottom:22px}
+.papeis .pp{flex:1;background:#fff;border:1px solid #E3E7EF;border-radius:10px;padding:13px 15px}
+.papeis .who{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#1E3A8A;margin-bottom:4px}
+.papeis .what{font-size:13px;color:#5A6170;line-height:1.5}
+.docs{background:#FFFBEF;border:1px solid #F0E2B6;border-radius:12px;padding:18px 20px;margin-bottom:26px}
+.docs h3{font-size:15px;margin:0 0 10px;color:#7A5B00}
+.docs table{width:100%;border-collapse:collapse;font-size:13.5px}
+.docs td{padding:6px 0;border-bottom:1px solid #F2E8CC;color:#5C4A17;vertical-align:top}
+.docs td:first-child{font-weight:600;color:#3E3208;width:38%}
+.docs tr:last-child td{border-bottom:none}
+.linha{display:flex;align-items:center;gap:12px;margin:18px 0 10px}
+.linha:before,.linha:after{content:"";flex:1;height:1px;background:#E0C4C4}
+.linha span{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#A8574F}
+.maq{background:#fff;border:1px solid #E3E7EF;border-radius:12px;padding:16px 18px;margin-bottom:18px}
+.maq h3{font-size:15px;margin:0 0 12px;font-weight:600}
+.maq .els{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.maq .st{background:#EEF2FA;color:#1E3A8A;font-size:12px;font-weight:700;padding:6px 10px;border-radius:99px}
+.maq .st.ok{background:#E6F4EA;color:#1B7A33}
+.maq .st.lock{background:#FDECEC;color:#C62828}
+.maq .st.warn{background:#FFF4D6;color:#8A6100}
+.maq .ar{color:#C6D2E8;font-size:14px}
+.maq p{margin:12px 0 0;font-size:13.5px;color:#5A6170;line-height:1.55}
+.btnex{display:inline-block;border:1px solid #D4DAE6;border-radius:6px;padding:1px 8px;font-size:12px;color:#1E3A8A;background:#fff;font-weight:600}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#F3F5FA;padding:1px 5px;border-radius:4px;color:#1E3A8A}
+.papel{background:#fff;border:1px solid #D8C9A3;border-radius:4px;box-shadow:0 8px 24px rgba(40,30,10,.08);padding:28px 30px;margin:18px 0 8px;font-family:Georgia,"Times New Roman",serif}
+.papel .bras{text-align:center;border-bottom:2px solid #1E3A8A;padding-bottom:12px;margin-bottom:16px}
+.papel .esc{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#1E3A8A;font-weight:700;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .ht{font-size:20px;margin:6px 0 2px;color:#132C6B}
+.papel .sube{font-size:12px;color:#5A6170}
+.papel .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:13px;margin:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .meta b{color:#3E3208}
+.papel .selo{display:inline-block;background:#1B7A33;color:#fff;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:3px 8px;border-radius:99px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel th{text-align:left;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:#5A6170;border-bottom:1px solid #E3E7EF;padding:6px 8px}
+.papel td{padding:6px 8px;border-bottom:1px solid #F0F2F6}
+.papel .res{background:#F0F6EC;border:1px solid #CBE3BE;border-radius:8px;padding:10px 12px;font-size:13.5px;color:#2C5220;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .ass{display:flex;gap:24px;margin-top:22px;font-size:12px;text-align:center;color:#3A4254;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .ass div{flex:1;border-top:1px solid #C9CDD6;padding-top:8px}
+.papel .qr{margin-top:14px;font-size:11px;color:#7A8294;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .ano-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:16px 0 4px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .ano-h b{font-size:13px;color:#132C6B}
+.papel .ano-h span{font-size:12px;color:#5A6170}
+.papel .ori{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:99px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.papel .ori.in{background:#EEF2FA;color:#1E3A8A}
+.papel .ori.ex{background:#FFF4D6;color:#8A6100}
+.papel .res + .res{margin-top:8px}
+.papel.bol .ht{font-size:18px}
+.papel.bol .scroll{overflow-x:auto}
+.papel.bol table{font-size:11px;min-width:640px}
+.papel.bol th,.papel.bol td{text-align:center}
+.papel.bol th:first-child,.papel.bol td:first-child{text-align:left}
+.papel.bol thead .bim{background:#EEF2FA;font-size:10px;letter-spacing:.4px;border-bottom:1px solid #D4DCEC}
+.papel.bol thead .sub{font-size:9.5px;font-weight:600;color:#5A6170}
+.papel.bol .sit-r{color:#C62828;font-weight:600}
+.papel.bol .sit-a{color:#1B7A33;font-weight:600}
+.traj{display:flex;gap:10px;margin:0 0 16px}
+.traj .c{flex:1;background:#fff;border:1px solid #E3E7EF;border-radius:12px;padding:14px 16px}
+.traj .n2{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#7C8BA8;margin-bottom:4px}
+.traj .t{font-size:16px;font-weight:700;margin-bottom:6px;color:#132C6B}
+.traj .d{font-size:13px;color:#5A6170;line-height:1.5}
+.traj .c.hi{border-color:#BFD2F5;box-shadow:0 2px 10px rgba(30,58,138,.07)}
+.hist-of{background:#fff;border:1px solid #1a1a1a;padding:14px 12px 18px;margin:18px 0 8px;font-family:Arial,Helvetica,sans-serif;color:#111;box-shadow:0 8px 24px rgba(40,30,10,.08)}
+.hist-of .hh{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.hist-of .brasao{flex:0 0 62px;width:62px;height:62px;border-radius:50%;border:3px solid #1E3A8A;background:#EEF4FF;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:800;text-align:center;color:#1E3A8A;line-height:1.15}
+.hist-of .hid{flex:1;text-align:center}
+.hist-of .hid .nm{font-size:14.5px;font-weight:800;letter-spacing:.2px;text-transform:uppercase}
+.hist-of .hid .en{font-size:11px;margin-top:2px}
+.hist-of .hid .dc{font-size:10px;margin-top:2px}
+.hist-of table{width:100%;border-collapse:collapse;font-size:10.5px;margin:0 0 0}
+.hist-of th,.hist-of td{border:1px solid #111;padding:3px 5px;vertical-align:middle}
+.hist-of .bar{background:#8FB56A;color:#111;text-align:center;font-weight:800;font-size:11px;letter-spacing:.35px;padding:4px}
+.hist-of .labc{background:#f2f2f2;font-weight:700;white-space:nowrap;width:1%}
+.hist-of .scroll{overflow-x:auto;margin:0 0 0}
+.hist-of .eq{font-size:9px;min-width:720px}
+.hist-of .eq th,.hist-of .eq td{text-align:center;padding:2px 1px;line-height:1.2}
+.hist-of .eq .comp{text-align:left;font-weight:700;white-space:nowrap;padding:3px 5px;background:#fafafa}
+.hist-of .eq .tot{font-weight:800;background:#f2f2f2}
+.hist-of .na{color:#888}
+.hist-of .obs{font-size:10.5px;padding:7px 8px;line-height:1.45}
+.hist-of .car{text-align:center;font-weight:800;letter-spacing:.7px;padding:16px 8px;background:#f4f4f4}
+.hist-of .ass2{display:flex;gap:20px;margin-top:18px;font-size:10.5px;text-align:center}
+.hist-of .ass2 div{flex:1;border-top:1px solid #111;padding-top:6px}
+.hist-of .hint{margin-top:8px;font-size:10.5px;color:#5A6170;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.lb{position:fixed;inset:0;background:rgba(10,14,25,.9);display:none;align-items:center;justify-content:center;z-index:99;padding:26px}
+.lb.on{display:flex}.lb img{max-width:100%;max-height:88vh;border-radius:8px}
+.lb .x{position:absolute;top:14px;right:22px;color:#fff;font-size:32px;cursor:pointer;line-height:1}
+.lb .cap{position:absolute;bottom:16px;left:0;right:0;text-align:center;color:#fff;font-size:13px;opacity:.85}
+ @media (max-width:700px){.tres,.dois,.papeis,.traj{flex-direction:column}.body{padding-left:18px}
+ .shot{width:100%}.hero{padding:26px 22px}.hero h1{font-size:26px}
+ .papel{padding:18px 16px}.papel .meta,.papel .ass{grid-template-columns:1fr;display:grid}
+ .hist-of .hh{flex-direction:column}.hist-of .ass2{flex-direction:column;gap:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <div class="kick">Acadêmico · Implantação</div>
+  <h1>Vamos montar o ano letivo<br>da sua escola.</h1>
+  <p>Este é o módulo onde a sua escola se descreve: <b>quem estuda, quem ensina, quando acontece
+  cada aula e como as notas viram boletim.</b> Você preenche uma vez — e o sistema usa isso o ano inteiro.</p>
+</div>
+
+<div class="tres">
+  <div class="c"><div class="n2">1 · Estrutura</div><div class="t">O esqueleto do ano</div>
+    <div class="d">O ano letivo, os cursos, as séries, as disciplinas e o calendário.</div></div>
+  <div class="c"><div class="n2">2 · Pessoas e turmas</div><div class="t">Quem está onde</div>
+    <div class="d">Professores, salas, turmas, alunos e a grade de horários.</div></div>
+  <div class="c"><div class="n2">3 · Como a escola avalia</div><div class="t">O boletim do seu jeito</div>
+    <div class="d">Suas regras de aprovação, os tipos de nota e o modelo de boletim.</div></div>
+</div>
+
+<div class="espera">
+  <h2>O que esperar daqui</h2>
+  <ul>
+    <li><b>São 14 passos, e você faz uma vez por ano.</b> Depois disso, só volta aqui no ano que vem.</li>
+    <li><b>A ordem já está pronta.</b> Você não precisa decidir por onde começar — cada passo prepara o próximo.</li>
+    <li><b>Cada passo diz como saber que deu certo.</b> Você nunca vai ficar na dúvida se terminou ou não.</li>
+    <li><b>Dá para parar e voltar quando quiser.</b> No painel, o progresso é lido do que você já cadastrou — não precisa marcar nada.</li>
+    <li><b>Nesta trilha nada é irreversível.</b> Pode explorar sem medo: errar custa só o tempo de corrigir. Homologar o período, depois, é o ponto sem volta.</li>
+  </ul>
+</div>
+
+<div class="fim">
+  <b>No fim dos 14 passos:</b> o boletim sai com a cara da sua escola, o diário funciona, a frequência
+  conta certo e os documentos oficiais saem prontos para assinar. A escola fica pronta para o ano inteiro.
+</div>
+
+<div class="prog">
+  <div class="top">
+    <div><div class="ano">Ano 2026</div><div class="nn">Guia dos 14 passos — comece pelo primeiro</div></div>
+    <span class="badge">trilha</span>
+  </div>
+  <div class="bar"><div class="fill" style="width:8%"></div></div>
+  <div class="prox"><b>Próximo passo:</b> criar o <b>Ano Letivo</b>. É a base de tudo — sem ele, nada mais salva corretamente.</div>
+</div>
+
+<div class="mundo">Estrutura</div>
+<article class="card first" id="p0">
+  <header class="head" onclick="tog('p0')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Ano Letivo<span class="aqui">comece por aqui</span></b>
+      <span class="cont">nenhum ano letivo cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Existe um ano letivo com período definido.</span>
+    </span>
+    <a class="abrir pri" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Clique em Novo Ano Letivo.</li><li>Informe o ano, a data de início e a data de fim.</li><li>Escolha a divisão do ano: bimestre, trimestre, semestre ou etapa única.</li><li>Marque Ano letivo ativo e salve. Os períodos nascem dessa divisão — não há cadastro separado.</li></ol><div class="shots"><figure class="shot" data-src="imagens/003-ano-letivo.jpg" data-cap="Listagem"><img src="imagens/003-ano-letivo.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/004-ano-letivo-novo-novo-ano-letivo.jpg" data-cap="Novo ano letivo"><img src="imagens/004-ano-letivo-novo-novo-ano-letivo.jpg" alt="Novo ano letivo" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Esquecer de marcar “ativo” — o ano existe, mas as outras telas não o assumem como corrente.</li><li>Errar a divisão do ano. Prova, boletim e fechamento usam essa configuração; mudar depois mexe em tudo que já foi lançado.</li></ul><div class="usado"><b>Usado depois em:</b> Turmas, matrículas, notas, boletim e fechamento.</div></div>
+</article>
+<article class="card" id="p1">
+  <header class="head" onclick="tog('p1')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Cursos e Séries</b>
+      <span class="cont">nenhum curso cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há ao menos um curso. Se ele tiver progressão anual, tem série.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Cadastre o curso (ex.: Ensino Fundamental — Anos Finais).</li><li>Dentro dele, cadastre as séries que ele oferece.</li><li>Desmarque “Possui série” só para cursos sem progressão anual (curso extra).</li></ol><div class="shots"><figure class="shot" data-src="imagens/006-cursos-series.jpg" data-cap="Listagem"><img src="imagens/006-cursos-series.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/007-cursos-series-novo-novo-curso.jpg" data-cap="Novo curso"><img src="imagens/007-cursos-series-novo-novo-curso.jpg" alt="Novo curso" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Usar nome diferente do oficial. Esse nome sai no histórico escolar.</li><li>Criar curso regular e esquecer as séries — a matriz não tem onde se apoiar.</li></ul><div class="usado"><b>Usado depois em:</b> Matriz curricular, turmas e regras de aprovação.</div></div>
+</article>
+<article class="card" id="p2">
+  <header class="head" onclick="tog('p2')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Componentes Curriculares</b>
+      <span class="cont">nenhum componente cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há componentes ativos para montar a matriz.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Cadastre cada disciplina com nome e sigla — a sigla é o que aparece na grade e no boletim.</li><li>Informe a área do conhecimento (usada no censo).</li><li>Confira Permite avaliação: marcado para disciplina que recebe nota.</li><li>Se a escola junta disciplinas numa área (ex.: Língua Portuguesa), cadastre a área como componente pai e as disciplinas como filhas.</li></ol><div class="shots"><figure class="shot" data-src="imagens/011-componentes.jpg" data-cap="Listagem"><img src="imagens/011-componentes.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/012-componentes-novo-novo-componente-curricular.jpg" data-cap="Novo componente"><img src="imagens/012-componentes-novo-novo-componente-curricular.jpg" alt="Novo componente" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Cadastrar a disciplina e não incluir na matriz (passo seguinte). Ela existe, mas não entra no boletim.</li><li>Desmarcar “Permite avaliação” sem querer — a disciplina some do boletim.</li><li>Nome diferente do que a escola usa oficialmente. Depois sai errado no documento.</li></ul><div class="usado"><b>Usado depois em:</b> Matriz, grade horária, diário, quadro de notas e boletim.</div></div>
+</article>
+<article class="card" id="p3">
+  <header class="head" onclick="tog('p3')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Matriz Curricular</b>
+      <span class="cont">nenhuma matriz cadastrada</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há ao menos uma matriz com os componentes da série.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Crie a matriz para uma série (a matriz não é por ano letivo — vale até alguém editar).</li><li>Inclua os componentes oficiais daquela série com a carga horária de cada um.</li><li>Confira a carga total — é o número do qual a escola presta contas.</li><li>Na turma, aponte esta matriz. É assim que a turma herda as disciplinas.</li></ol><div class="shots"><figure class="shot" data-src="imagens/013-matrizes.jpg" data-cap="Listagem"><img src="imagens/013-matrizes.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/014-matrizes-novo-nova-matriz.jpg" data-cap="Nova matriz"><img src="imagens/014-matrizes-novo-nova-matriz.jpg" alt="Nova matriz" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Componente cadastrado e não incluído aqui. É a causa nº 1 de “a disciplina não aparece no boletim”.</li><li>Repetir a mesma carga em séries diferentes sem conferir: a carga pertence ao vínculo série + disciplina, não à disciplina.</li></ul><div class="usado"><b>Usado depois em:</b> Turmas, grade horária, diário, boletim e histórico.</div></div>
+</article>
+<article class="card" id="p4">
+  <header class="head" onclick="tog('p4')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Calendário Letivo</b>
+      <span class="cont">calendário não configurado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> O ano letivo tem calendário cadastrado.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Defina a meta de dias letivos do ano.</li><li>Cadastre feriados, recessos e férias — nenhum deles conta como dia letivo.</li><li>Cadastre reposições, que somam dias letivos.</li><li>Confira a contagem final.</li></ol><div class="shots"><figure class="shot" data-src="imagens/016-calendario-letivo.jpg" data-cap="Calendário"><img src="imagens/016-calendario-letivo.jpg" alt="Calendário" loading="lazy"></figure><figure class="shot" data-src="imagens/017-calendario-letivo-novo-configurar.jpg" data-cap="Configurar ano"><img src="imagens/017-calendario-letivo-novo-configurar.jpg" alt="Configurar ano" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Esquecer feriados: a contagem fica maior que a real e a frequência sai errada.</li><li>Cadastrar evento que não é aula sem marcar “Descontar dos dias letivos”.</li></ul><div class="usado"><b>Usado depois em:</b> Frequência, diário e fechamento.</div><div class="nota">No perfil Secretaria este item não aparece no menu lateral. Entre por Acadêmico no painel, ou peça a um administrador para abrir a tela.</div></div>
+</article>
+<div class="mundo">Pessoas e turmas</div>
+<article class="card" id="p5">
+  <header class="head" onclick="tog('p5')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Professores</b>
+      <span class="cont">nenhum professor cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há ao menos um professor ativo.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Cadastre nome completo e e-mail institucional — é o acesso dele.</li><li>Vincule os componentes que ele leciona (ajuda na organização; a grade ainda lista todo professor ativo).</li><li>Confira que está ativo.</li></ol><div class="shots"><figure class="shot" data-src="imagens/021-professores.jpg" data-cap="Listagem"><img src="imagens/021-professores.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/022-professores-novo-novo-professor.jpg" data-cap="Novo professor"><img src="imagens/022-professores-novo-novo-professor.jpg" alt="Novo professor" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>E-mail digitado errado: ninguém descobre até o dia do treinamento.</li><li>Deixar o professor inativo: aí sim ele some da grade.</li></ul><div class="usado"><b>Usado depois em:</b> Grade horária, diário e lançamento de notas.</div></div>
+</article>
+<article class="card" id="p6">
+  <header class="head" onclick="tog('p6')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Salas / Ambientes</b>
+      <span class="cont">nenhuma sala cadastrada</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há salas cadastradas para usar como sala padrão e na grade.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Cadastre as salas com nome, capacidade, bloco e andar.</li><li>Cadastre também ambientes especiais: laboratório, quadra, biblioteca.</li></ol><div class="shots"><figure class="shot" data-src="imagens/032-salas.jpg" data-cap="Listagem"><img src="imagens/032-salas.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/033-salas-novo-nova-sala.jpg" data-cap="Nova sala"><img src="imagens/033-salas-novo-nova-sala.jpg" alt="Nova sala" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Nomes duplicados entre salas — depois ninguém sabe qual é qual na grade.</li></ul><div class="usado"><b>Usado depois em:</b> Sala padrão da turma e montagem da grade horária.</div><div class="nota">A sala vem antes da turma porque o cadastro da turma pede a sala padrão.</div></div>
+</article>
+<article class="card" id="p7">
+  <header class="head" onclick="tog('p7')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Turmas</b>
+      <span class="cont">nenhuma turma criada neste ano</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Existem turmas do ano letivo, com curso, série e matriz.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Crie a turma com ano letivo, curso, série e turno.</li><li>Aponte a matriz curricular da série — é ela que define as disciplinas da turma.</li><li>Defina a sala padrão.</li><li>Professores e horários entram no passo da Grade Horária, não nesta tela.</li></ol><div class="shots"><figure class="shot" data-src="imagens/026-turmas.jpg" data-cap="Listagem"><img src="imagens/026-turmas.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/027-turmas-novo-nova-turma.jpg" data-cap="Nova turma"><img src="imagens/027-turmas-novo-nova-turma.jpg" alt="Nova turma" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Criar turma antes da matriz: ela nasce sem o vínculo das disciplinas.</li><li>Esquecer o ano letivo: a turma fica fora do ano que a trilha está montando.</li></ul><div class="usado"><b>Usado depois em:</b> Matrícula, grade horária, diário, notas e fechamento.</div><div class="nota">A turma vem antes do aluno porque não dá para matricular em turma que não existe.</div></div>
+</article>
+<article class="card" id="p8">
+  <header class="head" onclick="tog('p8')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Alunos</b>
+      <span class="cont">nenhum aluno matriculado nas turmas</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há alunos matriculados nas turmas — não apenas cadastrados.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Cadastre o aluno com nome completo, data de nascimento e código. O login dele é nickname e senha, nesta mesma tela.</li><li>Na listagem, clique em <b>Detalhes</b>. Abre a ficha: é o lugar de tudo o que é deste aluno (abas no topo, Editar e Mais ações).</li><li>Na ficha, vincule o responsável — sem ele não há comunicação nem app da família.</li><li>Matricule o aluno na turma em <b>Mais ações → Nova matrícula</b>. Cadastrar e matricular são dois atos.</li><li>Para volume, use Cursos e Séries → Ações → Importar alunos.</li><li>Se ele veio de outra escola, a matrícula é do tipo Transferência — e a escola anterior se registra na Vida Escolar (seção mais abaixo).</li></ol><div class="shots"><figure class="shot" data-src="imagens/024-alunos.jpg" data-cap="Listagem"><img src="imagens/024-alunos.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/025-alunos-admin-students-create.jpg" data-cap="Cadastrar aluno"><img src="imagens/025-alunos-admin-students-create.jpg" alt="Cadastrar aluno" loading="lazy"></figure><figure class="shot" data-src="imagens/095-aluno-visao-geral.jpg" data-cap="Ficha — Detalhes do aluno"><img src="imagens/095-aluno-visao-geral.jpg" alt="Ficha — Detalhes do aluno" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Cadastrar e não matricular. O aluno existe, mas não aparece em nota, chamada nem boletim.</li><li>Importar com a coluna de turma em branco ou com código que não existe.</li><li>Aluno que entra depois do início do ano sem a data de matrícula correta.</li><li>Achar que cadastrar o aluno já grava a escola anterior. Não grava. Isso é Vida Escolar → Trajetória → Lançar Escola.</li></ul><div class="usado"><b>Usado depois em:</b> Tudo que é por aluno — nota, chamada, boletim e documentos.</div><div class="nota">Este passo só fica pronto quando há matrícula ativa no ano, não só cadastro. Como usar cada aba da ficha: seção “A ficha do aluno”. Transferido: veja “Quando o aluno chega de outra escola”.</div></div>
+</article>
+<article class="card" id="p9">
+  <header class="head" onclick="tog('p9')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Grade Horária</b>
+      <span class="cont">nenhuma grade montada</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há ao menos uma aula cadastrada na grade.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Selecione a turma.</li><li>Para cada aula: dia da semana, horário de início e fim, componente e professor.</li><li>Gere o PDF e confira.</li><li>A lista de disciplinas mostra os componentes avaliáveis; a de professores, todos os ativos. Confira à mão se fecha com a matriz.</li></ol><div class="shots"><figure class="shot" data-src="imagens/030-grade-horaria.jpg" data-cap="Listagem"><img src="imagens/030-grade-horaria.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/031-grade-horaria-novo-nova-aula.jpg" data-cap="Nova aula"><img src="imagens/031-grade-horaria-novo-nova-aula.jpg" alt="Nova aula" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Mesmo professor em duas turmas no mesmo horário — o sistema ainda não bloqueia isso.</li><li>Grade que não fecha com a carga da matriz — confira a soma.</li><li>Disciplina da série que não está na matriz: o problema está no passo da Matriz Curricular.</li></ul><div class="usado"><b>Usado depois em:</b> Diário de classe, frequência e consulta do professor e do aluno.</div></div>
+</article>
+<div class="mundo">Como a escola avalia</div>
+<article class="card" id="p10">
+  <header class="head" onclick="tog('p10')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Regras de Aprovação</b>
+      <span class="cont">nenhuma regra cadastrada</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há uma regra ativa com média mínima e, se usar, frequência.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Defina a média mínima e a frequência mínima.</li><li>Marque se a frequência também reprova.</li><li>Configure o tipo de recuperação e como ela entra na média.</li><li>Defina arredondamento e casas decimais. Vincule ao ano letivo correto.</li></ol><div class="shots"><figure class="shot" data-src="imagens/035-regras.jpg" data-cap="Listagem"><img src="imagens/035-regras.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/036-regras-novo-nova-regra.jpg" data-cap="Nova regra"><img src="imagens/036-regras-novo-nova-regra.jpg" alt="Nova regra" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Assumir que o padrão do sistema é a regra da escola. Confira, não presuma.</li><li>Não vincular ao ano letivo correto. As regras são versionadas por ano — mexer em 2026 não altera 2025, e isso é proposital.</li></ul><div class="usado"><b>Usado depois em:</b> Cálculo da média, resultado final, boletim e fechamento.</div><div class="nota">É este passo que faz o boletim sair certo. Se algo vier errado depois, o problema quase sempre está aqui — não na tela de notas.</div></div>
+</article>
+<article class="card" id="p11">
+  <header class="head" onclick="tog('p11')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Tipos de Nota</b>
+      <span class="cont">nenhum tipo de nota cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Há ao menos um tipo de nota ativo.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Cadastre cada natureza de nota que a escola aplica: prova bimestral, trabalho, simulado.</li><li>Escolha se é online (prova na plataforma) ou offline (a escola informa a nota).</li><li>Escolha evento único (informa uma vez no período) ou múltiplos (várias vezes, consolidadas depois).</li><li>Defina a escala e como fecha a nota final.</li></ol><div class="shots"><figure class="shot" data-src="imagens/040-tipos-nota.jpg" data-cap="Listagem"><img src="imagens/040-tipos-nota.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/041-tipos-nota-novo-novo-tipo.jpg" data-cap="Novo tipo"><img src="imagens/041-tipos-nota-novo-novo-tipo.jpg" alt="Novo tipo" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Escala diferente da que a escola usa: a nota entra fora do padrão do boletim.</li><li>Esquecer de definir o que acontece quando dois professores lançam o mesmo componente.</li></ul><div class="usado"><b>Usado depois em:</b> Quadro de notas, lançamento e boletim.</div></div>
+</article>
+<article class="card" id="p12">
+  <header class="head" onclick="tog('p12')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Quadro de Notas</b>
+      <span class="cont">nenhum quadro cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Existe um quadro de notas com colunas definidas.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Dê um nome ao quadro (ex.: “Provas semanais 2026”).</li><li>Crie as colunas — onde cada nota vai cair: S1, S2, AV1.</li><li>Se a escola divide as disciplinas em blocos, crie os blocos e vincule as disciplinas.</li><li>Na hora de criar o evento em Lançamento de Notas, aponte este quadro e a coluna.</li></ol><div class="shots"><figure class="shot" data-src="imagens/044-quadro-notas.jpg" data-cap="Listagem"><img src="imagens/044-quadro-notas.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/045-quadro-notas-novo-novo-quadro.jpg" data-cap="Novo quadro"><img src="imagens/045-quadro-notas-novo-novo-quadro.jpg" alt="Novo quadro" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Criar bloco sem vincular disciplina: o quadro fica montado e não recebe nota.</li><li>Montar colunas que não correspondem ao que a escola aplica de verdade.</li></ul><div class="usado"><b>Usado depois em:</b> Lançamento de notas. As colunas do boletim nascem daqui, pelo evento — não pelo cadastro do modelo.</div><div class="nota">Se todas as disciplinas usam as mesmas colunas, você não precisa criar bloco nenhum.</div></div>
+</article>
+<article class="card" id="p13">
+  <header class="head" onclick="tog('p13')">
+    <span class="chk"></span>
+    <span class="tit">
+      <b>Modelo de Boletim</b>
+      <span class="cont">nenhum modelo cadastrado</span>
+      <span class="ok"><i>Como saber que deu certo:</i> Existe modelo de boletim oficial vinculado a uma regra.</span>
+    </span>
+    <a class="abrir" href="#" onclick="event.stopPropagation();return false;">Abrir</a>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Crie o modelo e escolha se é oficial (vai para o histórico) ou extra (curso complementar, não entra no histórico).</li><li>Vincule a regra de aprovação que ele usa — média, frequência e arredondamento saem dela.</li><li>Marque as disciplinas (áreas oficiais) e, se quiser, as séries ou turmas.</li><li>Defina quem vê: aluno, família.</li><li>Use Simular boletim e confira contra a conta feita à mão para um aluno.</li></ol><div class="shots"><figure class="shot" data-src="imagens/056-modelo-boletim.jpg" data-cap="Listagem"><img src="imagens/056-modelo-boletim.jpg" alt="Listagem" loading="lazy"></figure><figure class="shot" data-src="imagens/057-modelo-boletim-novo-novo-modelo.jpg" data-cap="Novo modelo"><img src="imagens/057-modelo-boletim-novo-novo-modelo.jpg" alt="Novo modelo" loading="lazy"></figure><figure class="shot" data-src="imagens/060-modelo-boletim-acao-simular-boletim.jpg" data-cap="Simular boletim"><img src="imagens/060-modelo-boletim-acao-simular-boletim.jpg" alt="Simular boletim" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Publicar sem simular. A simulação existe justamente para ver o resultado antes de valer.</li><li>Confundir modelo oficial com extra — o extra não entra no histórico.</li><li>Procurar o campo de quadro nesta tela: ele não existe aqui. O quadro entra no evento de Lançamento de Notas.</li></ul><div class="usado"><b>Usado depois em:</b> Emissão de boletins, fechamento e histórico escolar.</div><div class="nota">O quadro de notas não se escolhe neste cadastro. Sem o quadro apontado no evento, a nota não chega no boletim.</div></div>
+</article>
+
+<div class="sec">
+  <h2>Depois da implantação, o ano roda</h2>
+  <p class="s">Os 14 passos acima acontecem uma vez. A ficha do aluno é o lugar de tudo o que é dele. Os dois ciclos abaixo se repetem o ano inteiro.</p>
+  <div class="dois">
+    <div class="b rot"><div class="q">Toda semana</div><div class="t">Rotina</div>
+      <div class="p"><b>Avaliação → nota lançada → diário e frequência.</b>
+      É o que alimenta todo o resto: sem nota lançada, não há boletim nem ata.</div></div>
+    <div class="b fec"><div class="q">A cada bimestre</div><div class="t">Fechamento</div>
+      <div class="p"><b>Conferir → fechar → conselho → homologar → emitir.</b>
+      É aqui que sai a ata, o boletim e, no fim do ano, o histórico.</div></div>
+  </div>
+</div>
+
+<div class="sec">
+  <h2>A ficha do aluno</h2>
+  <p class="s">Tudo o que é deste aluno mora aqui. Não se lança nota nesta tela — mas é nela que a secretaria
+  vê o cadastro, a matrícula, o responsável, o prontuário e o que falta. Abre na listagem, no botão <b>Detalhes</b>.</p>
+
+  <div class="cadeia">
+    <h3>Como a ficha está organizada</h3>
+    <p class="sub">O topo identifica. As abas separam o assunto. Mais ações faz o que muda o aluno.</p>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Listagem → Detalhes</span>
+      <span class="dd">Acadêmico → Alunos → o aluno</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo hi"><span class="dot"></span><span class="tx"><span class="tt">Topo da ficha</span>
+      <span class="dd">foto, RA, status, Editar aluno e Mais ações</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Abas</span>
+      <span class="dd">Visão geral · Dados · Responsáveis · Matrículas · Saúde · Documentos · Vida escolar · Pedagógico · Histórico</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Mais ações</span>
+      <span class="dd">matricular, senha, declaração, inativar — o que altera o vínculo</span></span></div>
+    <div class="alerta"><b>Cadastrar não é matricular.</b>
+      O cadastro cria a pessoa. A matrícula vincula a uma turma e a um ano letivo. Sem matrícula ativa, o aluno
+      não entra em chamada, prova nem boletim.</div>
+  </div>
+
+<article class="card num" id="a0">
+  <header class="head" onclick="tog('a0')">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Abrir a ficha</b>
+      <span class="ok">/admin/students</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Em Acadêmico → Alunos, ache o aluno (busca por nome, RA ou turma).</li><li>Na linha, clique em <b>Detalhes</b>. Abre <b>Detalhes do aluno</b>.</li><li>O topo mostra nome, foto, RA, status da matrícula (Ativa / Encerrada / Pendente), se é pagante e se já fez o 1º acesso.</li><li><b>Editar aluno</b> muda cadastro (nome, documentos, endereço, login). <b>Mais ações</b> abre o painel da direita — matrícula, senha, declarações, inativar.</li></ol><div class="shots"><figure class="shot" data-src="imagens/024-alunos.jpg" data-cap="Listagem — Detalhes"><img src="imagens/024-alunos.jpg" alt="Listagem — Detalhes" loading="lazy"></figure><figure class="shot" data-src="imagens/095-aluno-visao-geral.jpg" data-cap="Topo da ficha"><img src="imagens/095-aluno-visao-geral.jpg" alt="Topo da ficha" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Procurar “editar matrícula” no botão Editar aluno. Editar aluno muda a pessoa; a turma muda em Mais ações → Nova matrícula ou na aba Matrículas.</li><li>Confundir aluno Ativo na listagem com matrícula Ativa. A listagem pode mostrar Ativo e a ficha, Encerrada — é o status da matrícula daquele ano.</li></ul><div class="usado"><b>Usado depois em:</b> Todas as abas abaixo e nas ações do painel direito.</div></div>
+</article>
+<article class="card num" id="a1">
+  <header class="head" onclick="tog('a1')">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Visão geral</b>
+      <span class="ok">aba Visão geral</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">O que tem aqui</div><p style="margin:0 0 10px;font-size:14px;line-height:1.55;color:#3A4150">É o resumo. Não se cadastra nada nesta aba: ela mostra a situação acadêmica e aponta para o resto da ficha.</p><ol class="como"><li>Abra a ficha. A primeira aba já é a Visão geral.</li><li>Confira turma, série, status da matrícula, período (entrada — em andamento) e tipo de vínculo (Principal, Extra…).</li><li>Os cartões de Frequência, Média e Pendências vêm do boletim oficial. Clique para ir à Vida escolar.</li><li><b>Ver matrícula</b> e <b>Vida escolar</b> saltam para essas abas. Ocorrências no cartão à direita abrem Pedagógico.</li></ol><div class="shots"><figure class="shot" data-src="imagens/095-aluno-visao-geral.jpg" data-cap="Visão geral"><img src="imagens/095-aluno-visao-geral.jpg" alt="Visão geral" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Achar que a média daqui é lançamento. É leitura do boletim — a nota entra no evento de avaliação (Rotina).</li><li>Ignorar o selo Encerrada: o aluno pode estar ativo no cadastro e sem matrícula no ano corrente.</li></ul><div class="usado"><b>Usado depois em:</b> Conferência rápida antes de atender a família ou o conselho.</div></div>
+</article>
+<article class="card num" id="a2">
+  <header class="head" onclick="tog('a2')">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Dados pessoais</b>
+      <span class="ok">aba Dados pessoais</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como usar</div><ol class="como"><li>Nesta aba você <b>consulta</b>: identificação (nome, RA, CPF/CIN, RG, nascimento), acesso (nickname, e-mail, 1º acesso), vínculo escolar e endereço.</li><li>Para alterar, clique em <b>Editar aluno</b> no topo — não há formulário dentro da aba.</li><li>Confira o login: o aluno entra com nickname e senha. Se o 1º acesso está pendente, a senha padrão ainda não foi trocada.</li><li>Endereço e certidão saem em declaração e histórico. Preencha antes de emitir documento oficial.</li></ol><div class="shots"><figure class="shot" data-src="imagens/096-aluno-dados-pessoais.jpg" data-cap="Dados pessoais"><img src="imagens/096-aluno-dados-pessoais.jpg" alt="Dados pessoais" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Corrigir nome só na declaração. O papel lê o cadastro: edite o aluno e emita de novo.</li><li>Nickname duplicado ou e-mail errado: o aluno (ou o responsável) não entra no portal.</li></ul><div class="usado"><b>Usado depois em:</b> Declarações, histórico, portal do aluno e app da família.</div></div>
+</article>
+<article class="card num" id="a3">
+  <header class="head" onclick="tog('a3')">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Responsáveis</b>
+      <span class="ok">aba Responsáveis</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>A aba lista quem está vinculado: nome, CPF, e-mail, telefone, parentesco e selos (Financeiro, Pode retirar, Ativo).</li><li>Para incluir: botão da própria aba ou <b>Mais ações → Cadastrar responsável</b>. Informe nome, documento e o tipo de vínculo.</li><li>Marque o responsável financeiro (boletos) e quem pode retirar o aluno na portaria.</li><li>Sem responsável, <b>Acessar como responsável</b> fica desabilitado e o app da família não tem conta.</li></ol><div class="shots"><figure class="shot" data-src="imagens/097-aluno-responsaveis.jpg" data-cap="Responsáveis vinculados"><img src="imagens/097-aluno-responsaveis.jpg" alt="Responsáveis vinculados" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Deixar o aluno sem responsável. Sem isso não há comunicação oficial nem portal dos pais.</li><li>Marcar dois financeiros sem regra da escola — o financeiro usa o responsável marcado.</li><li>Cadastrar o responsável e não vincular a este aluno: a pessoa existe, a ficha continua vazia.</li></ul><div class="usado"><b>Usado depois em:</b> App da família, autorizações de retirada e boletos.</div></div>
+</article>
+<article class="card num" id="a4">
+  <header class="head" onclick="tog('a4')">
+    <span class="n">5</span>
+    <span class="tit">
+      <b>Matrículas</b>
+      <span class="ok">aba Matrículas</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>A tabela mostra cada vínculo: turma, tipo (Principal / Extra / Paralela), ano letivo, entrada, saída e status (Ativa, Encerrada…).</li><li>Para matricular neste ano: <b>Mais ações → Nova matrícula</b>. Escolha ano letivo, turma e data de entrada. Transferido: tipo Transferência.</li><li><b>Rematricular</b> inicia o processo do ano seguinte (não substitui a matrícula corrente).</li><li>Curso extra (inglês, contra-turno) entra como matrícula Extra — faltas e provas oficiais usam a turma Principal.</li></ol><div class="shots"><figure class="shot" data-src="imagens/098-aluno-matriculas.jpg" data-cap="Histórico de matrículas"><img src="imagens/098-aluno-matriculas.jpg" alt="Histórico de matrículas" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Cadastrar o aluno e parar. Sem linha Ativa nesta aba, ele não aparece na prova nem na chamada.</li><li>Duas matrículas ativas em turmas diferentes do mesmo curso regular: provas e listagens ficam no lugar errado. Use Alinhar matrícula se o sistema avisar.</li><li>Data de entrada depois do início do ano sem conferir — a frequência conta a partir desta data.</li></ul><div class="usado"><b>Usado depois em:</b> Chamada, lançamento de notas, boletim e fechamento.</div><div class="nota">Esta aba é o vínculo com a turma daqui. Anos cursados em outra escola não entram aqui — entram na Vida escolar → Trajetória → Lançar Escola.</div></div>
+</article>
+<article class="card num" id="a5">
+  <header class="head" onclick="tog('a5')">
+    <span class="n">6</span>
+    <span class="tit">
+      <b>Saúde</b>
+      <span class="ok">aba Saúde</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como usar</div><ol class="como"><li>A ficha complementar guarda o que a escola precisa no dia a dia: tipo sanguíneo, plano, hospital de referência, alergias, medicamentos, condições crônicas e acessibilidade.</li><li>Há também contato de emergência, alimentação e transporte (van, público, próprio, a pé).</li><li>Para preencher, use <b>Editar aluno</b> — os campos da ficha complementar ficam no cadastro.</li><li>Laudo e máscara de acessibilidade não ficam só aqui: <b>Mais ações → EducaInclui / Laudo</b>.</li></ol><div class="shots"><figure class="shot" data-src="imagens/099-aluno-saude.jpg" data-cap="Ficha complementar"><img src="imagens/099-aluno-saude.jpg" alt="Ficha complementar" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Alergia só no papel da matrícula e não no sistema. A portaria e o professor leem esta aba.</li><li>Confundir Saúde com EducaInclui: saúde é o cuidado cotidiano; o laudo e a máscara de prova estão em EducaInclui.</li></ul><div class="usado"><b>Usado depois em:</b> Atendimento, passeio, portaria e inclusão.</div></div>
+</article>
+<article class="card num" id="a6">
+  <header class="head" onclick="tog('a6')">
+    <span class="n">7</span>
+    <span class="tit">
+      <b>Documentos</b>
+      <span class="ok">aba Documentos</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>É o checklist de entrega (RG, CPF, certidão, comprovante…). O número na aba é quantos itens a ficha já tem.</li><li>Clique em <b>Documento</b> para anexar o arquivo, marcar Entregue ou Dispensado.</li><li>Status: Pendente (falta), Entregue (com ou sem arquivo), Dispensado (a escola não exige).</li><li>Isto não emite declaração. Declaração, histórico e boletim oficial saem em <b>Mais ações</b> (Gerar declaração / Documentação) ou na Vida escolar.</li></ol><div class="shots"><figure class="shot" data-src="imagens/100-aluno-documentos.jpg" data-cap="Checklist de documentos"><img src="imagens/100-aluno-documentos.jpg" alt="Checklist de documentos" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Marcar Entregue sem guardar o arquivo — na auditoria não há comprovação.</li><li>Procurar o PDF do boletim nesta aba. Boletim e histórico estão em Vida escolar e em Mais ações → Documentação.</li></ul><div class="usado"><b>Usado depois em:</b> Conferência de matrícula e dossiê de transferência.</div></div>
+</article>
+<article class="card num crit" id="a7">
+  <header class="head" onclick="tog('a7')">
+    <span class="n">8</span>
+    <span class="tit">
+      <b>Vida escolar<span class="sel crit">prontuário oficial</span></b>
+      <span class="ok">aba Vida escolar</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body">
+    <div class="lab">O que tem dentro desta aba</div>
+    <p style="margin:0 0 10px;font-size:14px;line-height:1.55;color:#3A4150">É o prontuário. No topo: situação, ficha do ano, documentos e SED/INEP. Embaixo, sub-abas. Daqui saem o boletim deste aluno, o histórico e o registro da escola anterior.</p>
+    <ol class="como">
+      <li><b>Boletim.</b> Quadro oficial do ano, por disciplina e período. Conferir antes de emitir.</li>
+      <li><b>Notas.</b> Notas dos eventos (provas, trabalhos) deste aluno — o detalhe do que alimentou o boletim.</li>
+      <li><b>Trajetória.</b> Anos cursados, aqui e em outra escola. <b>Lançar Escola</b> grava a instituição anterior (nome, município, série, resultado). Sem isso o histórico oficial sai só com o que ele fez aqui.</li>
+      <li><b>Histórico / emissões.</b> Gerar rascunho, conferir, emitir, assinar e baixar o PDF. Lista o que já foi emitido.</li>
+      <li><b>SED / INEP.</b> Códigos e conferência para censo e sistemas da rede.</li>
+      <li><b>Dossiê.</b> Pacote de transferência e PDF único da pasta do aluno.</li>
+    </ol>
+    <div class="shots"><figure class="shot" data-src="imagens/101-aluno-vida-escolar.jpg" data-cap="Vida escolar — prontuário"><img src="imagens/101-aluno-vida-escolar.jpg" alt="Vida escolar — prontuário" loading="lazy"></figure><figure class="shot" data-src="imagens/086-trajetoria-lancar-escola.jpg" data-cap="Trajetória — Lançar Escola"><img src="imagens/086-trajetoria-lancar-escola.jpg" alt="Trajetória — Lançar Escola" loading="lazy"></figure></div>
+    <div class="nota">Passo a passo da transferência e do histórico: seções “Quando o aluno chega de outra escola” e Fechamento. O atalho Mais ações → Vida escolar abre esta mesma aba.</div>
+    <div class="lab">Erros comuns</div>
+    <ul class="erros">
+      <li>Achar que a matrícula tipo Transferência já preenche o histórico. Não preenche. É Trajetória → Lançar Escola.</li>
+      <li>Emitir histórico sem conferir a Trajetória: faltam anos ou a escola anterior.</li>
+      <li>Procurar o ZIP de boletins da turma aqui. ZIP da turma é no fechamento / boletins da coordenação; nesta ficha o recorte é deste aluno.</li>
+    </ul>
+    <div class="usado"><b>Usado depois em:</b> Boletim, histórico escolar, transferência e Educacenso.</div>
+  </div>
+</article>
+<article class="card num" id="a8">
+  <header class="head" onclick="tog('a8')">
+    <span class="n">9</span>
+    <span class="tit">
+      <b>Pedagógico</b>
+      <span class="ok">aba Pedagógico</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como usar</div><p style="margin:0 0 10px;font-size:14px;line-height:1.55;color:#3A4150">Acompanhamento do que o aluno fez na plataforma — não substitui o boletim oficial (esse está na Vida escolar).</p><ol class="como"><li><b>Desempenho.</b> Indicadores (redação, jornadas, provas). Visão rápida para reunião com a família.</li><li><b>Jornada de Redação.</b> Textos enviados e correção.</li><li><b>Ocorrências.</b> O que foi registrado sobre este aluno. Para criar nova, a tela geral é Secretaria → Ocorrências; aqui você lê o histórico dele.</li><li><b>Jornadas</b> e <b>Provas.</b> Participação e resultados na plataforma (prova online, jornada de estudo).</li><li><b>Acessos.</b> Quando o aluno entrou no portal — útil se a família diz que “não consegue logar”.</li></ol><div class="shots"><figure class="shot" data-src="imagens/102-aluno-pedagogico.jpg" data-cap="Pedagógico — desempenho"><img src="imagens/102-aluno-pedagogico.jpg" alt="Pedagógico — desempenho" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Usar a nota da prova online daqui como se fosse a coluna do boletim. A coluna oficial nasce do evento apontado ao Quadro de Notas.</li><li>Registrar ocorrência só no papel. Sem registro nesta ficha, o conselho não tem histórico.</li></ul><div class="usado"><b>Usado depois em:</b> Reunião com responsáveis, conselho de classe e suporte de acesso.</div></div>
+</article>
+<article class="card num" id="a9">
+  <header class="head" onclick="tog('a9')">
+    <span class="n">10</span>
+    <span class="tit">
+      <b>Histórico (auditoria)</b>
+      <span class="ok">aba Histórico</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como usar</div><ol class="como"><li>Esta aba <b>não é o histórico escolar</b>. É o log: quem alterou senha, matrícula, cadastro, visualizou a ficha.</li><li>Use quando a família questiona uma mudança ou quando precisa saber quem inativou o aluno.</li><li>O histórico escolar (quadro de equivalência, PDF assinado) está em Vida escolar → Histórico / emissões.</li></ol><div class="shots"><figure class="shot" data-src="imagens/103-aluno-historico.jpg" data-cap="Auditoria e atividade recente"><img src="imagens/103-aluno-historico.jpg" alt="Auditoria e atividade recente" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Abrir esta aba pedindo o documento oficial. Nome parecido, função diferente.</li></ul><div class="usado"><b>Usado depois em:</b> Auditoria interna e atendimento de dúvida sobre alteração de cadastro.</div></div>
+</article>
+<article class="card num" id="a10">
+  <header class="head" onclick="tog('a10')">
+    <span class="n">11</span>
+    <span class="tit">
+      <b>Mais ações</b>
+      <span class="ok">painel à direita</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body">
+    <div class="lab">Como abrir</div>
+    <ol class="como">
+      <li>No topo da ficha, clique em <b>Mais ações</b>. Abre o painel <b>Ações do aluno</b>. Dá para buscar pelo nome da ação.</li>
+    </ol>
+    <div class="lab">O que cada grupo faz</div>
+    <ol class="como">
+      <li><b>Acesso e segurança.</b> Acessar como aluno (abre o portal na conta dele). Acessar como responsável (precisa ter responsável vinculado). Redefinir senha (gera senha padrão de novo).</li>
+      <li><b>Matrícula e vínculos.</b> Nova matrícula, Rematricular, Cadastrar responsável, Autorizações de retirada, Financeiro (saldo e faturas).</li>
+      <li><b>Documentos e atendimento.</b> Gerar declaração (matrícula, transferência, frequência, comparecimento). Registrar reunião. Documentação (histórico, ficha, boletim oficial). Atalho para Vida escolar. EducaInclui / Laudo.</li>
+      <li><b>Outros.</b> Análise da Tudinha (IA). Entrada e saída facial, se a escola usa.</li>
+      <li><b>Área crítica.</b> Inativar / Transferir (encerra matrículas e pede o motivo). Excluir aluno (oculta da listagem; os dados não são apagados).</li>
+    </ol>
+    <div class="shots"><figure class="shot" data-src="imagens/104-aluno-mais-acoes.jpg" data-cap="Mais ações — painel"><img src="imagens/104-aluno-mais-acoes.jpg" alt="Mais ações — painel" loading="lazy"></figure></div>
+    <div class="nota">Editar aluno (botão azul) e Mais ações são complementares: um muda o cadastro; o outro executa o que envolve matrícula, documento, acesso e saída.</div>
+    <div class="lab">Erros comuns</div>
+    <ul class="erros">
+      <li>Inativar achando que é só “esconder da lista”. Inativar / Transferir encerra as matrículas. Para só corrigir a turma, use Nova matrícula / a aba Matrículas.</li>
+      <li>Redefinir senha e não avisar a família. A senha padrão volta; o 1º acesso fica pendente de novo.</li>
+      <li>Excluir para “limpar teste”. A exclusão oculta; não apaga o histórico acadêmico.</li>
+    </ul>
+    <div class="usado"><b>Usado depois em:</b> Matrícula, portal, declarações e encerramento de vínculo.</div>
+  </div>
+</article>
+</div>
+
+<div class="sec">
+  <h2>Rotina — lançar notas e registrar a aula</h2>
+  <p class="s">A parte mais usada do sistema, e a que envolve mais gente.</p>
+
+  <div class="cadeia">
+    <h3>O caminho que a nota percorre</h3>
+    <p class="sub">Da prova aplicada até o documento oficial.</p>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Evento de avaliação</span>
+      <span class="dd">a coordenação diz o que vai valer nota</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Nota lançada</span>
+      <span class="dd">o professor ou a secretaria digita</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo hi"><span class="dot"></span><span class="tx"><span class="tt">Coluna do Quadro de Notas</span>
+      <span class="dd">a nota cai no lugar que o evento apontou</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Média do boletim</span>
+      <span class="dd">a fórmula do Modelo de Boletim consolida</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Resultado final</span>
+      <span class="dd">as Regras de Aprovação decidem</span></span></div>
+    <div class="seta">&#9662;</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Boletim · Ata · Histórico</span>
+      <span class="dd">documentos oficiais</span></span></div>
+    <div class="alerta"><b>Se a nota não chega no boletim, o problema quase sempre está no terceiro elo.</b>
+      O evento foi criado sem apontar para a coluna certa do Quadro de Notas. A nota existe, está lançada,
+      e não aparece em lugar nenhum.</div>
+  </div>
+
+  <div class="papeis">
+    <div class="pp"><div class="who">Coordenação</div>
+      <div class="what">Cria os eventos de avaliação e define para onde a nota vai.</div></div>
+    <div class="pp"><div class="who">Professor</div>
+      <div class="what">Monta a prova, quando online, e lança as notas da sua turma.</div></div>
+    <div class="pp"><div class="who">Secretaria</div>
+      <div class="what">Lança em nome do professor quando preciso e acompanha o que falta.</div></div>
+  </div>
+
+<article class="card num" id="r0">
+  <header class="head" onclick="tog('r0')">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Criar o evento de avaliação</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Em Avaliações e Notas, clique em <b>Novo Evento</b>. Abre um assistente de 5 passos: Dados → Configuração → Turmas → Professores → Revisão.</li><li>No passo <b>1 · Dados</b>, dê um título que dê para achar depois: tipo + período + turma. Ex.: “Prova Semanal S1 — 1A”.</li><li>Escolha o ano letivo, o bimestre e o Tipo de Nota (Prova Semanal, Prova Bimestral, Trabalho…).</li><li>Não crie um evento por turma se a avaliação vale para várias: o passo 3 aceita várias turmas de uma vez.</li></ol><div class="shots"><figure class="shot" data-src="imagens/051-lancamento.jpg" data-cap="Listagem — Novo Evento"><img src="imagens/051-lancamento.jpg" alt="Listagem — Novo Evento" loading="lazy"></figure><figure class="shot" data-src="imagens/052-lancamento-novo-novo-evento.jpg" data-cap="Passo 1 · Dados"><img src="imagens/052-lancamento-novo-novo-evento.jpg" alt="Passo 1 · Dados" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Título genérico do tipo “Prova”. Com quatro bimestres e várias disciplinas, ninguém distingue depois.</li><li>A listagem esconde os eventos Concluídos por padrão. Se “sumiu”, mude o filtro Status para Todos (inclui concluídos).</li></ul><div class="usado"><b>Usado depois em:</b> Lançamento da nota, quadro de notas e boletim.</div></div>
+</article>
+<article class="card num crit" id="r1">
+  <header class="head" onclick="tog('r1')">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Definir para onde a nota vai<span class="sel crit">onde a nota se perde</span></b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Ainda no passo <b>1 · Dados</b> — não é no passo Configuração. Tipo de Nota e destino do quadro ficam juntos aqui.</li><li>Em prova semanal, preencha Destinos no quadro: o Quadro, o Bloco de disciplinas (A/B) e a coluna (S1, S2…). O cartão roxo confirma: “Vai para S1 · Bloco A”.</li><li>Em prova bimestral, esse bloco some: o próprio Tipo de Nota já aponta a coluna do boletim.</li><li>Original ou Substitutiva e “mostrar no portal” vêm no passo 2. Desmarque o portal para prova interna.</li></ol><div class="shots"><figure class="shot" data-src="imagens/053-lancamento-wizard-2.jpg" data-cap="Destino no quadro — S1 · Bloco A"><img src="imagens/053-lancamento-wizard-2.jpg" alt="Destino no quadro — S1 · Bloco A" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Deixar o Quadro em branco ou apontando para a coluna errada. A nota é lançada normalmente e não aparece no boletim. É a causa mais frequente de “lancei a nota e sumiu”.</li><li>Escolher Tipo de Nota com escala diferente da que a prova usa — a nota entra fora do padrão.</li><li>Marcar “mostrar no portal” numa avaliação interna que a escola não queria divulgar.</li></ul><div class="usado"><b>Usado depois em:</b> Composição do boletim e cálculo da média.</div><div class="nota">Este é o passo que decide se a nota vira documento. Se só der para conferir uma coisa antes de salvar o evento, confira o destino no quadro.</div></div>
+</article>
+<article class="card num" id="r2">
+  <header class="head" onclick="tog('r2')">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Escolher como a prova acontece</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>No passo <b>2 · Configuração</b>, Tipo de Evento: <b>Prova online</b> (questões na plataforma) ou <b>Lançamento de notas</b> (prova no papel; a escola só informa o resultado, sem questões).</li><li>Em lançamento, diga quem lança: <b>Atribuir ao professor</b> ou <b>Coordenação lança a nota</b>. É esta escolha que abre a tela de lançamento no detalhe.</li><li>Passo <b>3 · Turmas</b>: marque quem entra (ex.: 1A). Passo <b>4 · Professores</b>: professor + matéria + as turmas dele.</li><li>Passo <b>5 · Revisão</b>: confira título, destino no quadro, tipo de evento e responsável — só então Criar Evento.</li></ol><div class="shots"><figure class="shot" data-src="imagens/054-lancamento-wizard-3.jpg" data-cap="Passo 2 · Lançamento de notas"><img src="imagens/054-lancamento-wizard-3.jpg" alt="Passo 2 · Lançamento de notas" loading="lazy"></figure><figure class="shot" data-src="imagens/055-lancamento-wizard-4.jpg" data-cap="Passo 3 · Turmas"><img src="imagens/055-lancamento-wizard-4.jpg" alt="Passo 3 · Turmas" loading="lazy"></figure><figure class="shot" data-src="imagens/089-lancamento-wizard-professores.jpg" data-cap="Passo 4 · Professores"><img src="imagens/089-lancamento-wizard-professores.jpg" alt="Passo 4 · Professores" loading="lazy"></figure><figure class="shot" data-src="imagens/090-lancamento-wizard-revisao.jpg" data-cap="Passo 5 · Revisão"><img src="imagens/090-lancamento-wizard-revisao.jpg" alt="Passo 5 · Revisão" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Escolher “prova online” para uma avaliação que será no papel: o sistema fica esperando questões que nunca chegam.</li><li>Atribuir ao professor sem avisá-lo. O evento existe, o prazo corre, e ninguém lança.</li></ul><div class="usado"><b>Usado depois em:</b> Trabalho do professor e lançamento da nota.</div></div>
+</article>
+<article class="card num" id="r3">
+  <header class="head" onclick="tog('r3')">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Lançar as notas</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body">
+    <div class="lab">O evento inteiro, do começo ao fim</div>
+    <p style="margin:0 0 10px;font-size:14px;line-height:1.55;color:#3A4150">Não se lança nota na listagem. Primeiro o assistente cria o evento; depois se entra no <b>detalhe</b> e se digita a nota aluno a aluno. Exemplo real: Prova Semanal S1 — 1A, lançamento pela coordenação, destino S1 · Bloco A.</p>
+    <ol class="como">
+      <li><b>Passo 1 · Dados.</b> Título, ano, bimestre, Tipo de Nota. Em semanal: Quadro + Bloco + coluna (S1).</li>
+      <li><b>Passo 2 · Configuração.</b> Tipo de Evento = Lançamento de notas. Quem lança = Coordenação lança a nota (ou o professor, se for o caso).</li>
+      <li><b>Passo 3 · Turmas.</b> Marque a turma (1A).</li>
+      <li><b>Passo 4 · Professores.</b> Professor + matéria daquela turma. Sem quantidade de questões — a nota é cheia, de 0 a 10.</li>
+      <li><b>Passo 5 · Revisão.</b> Confira destino no quadro e responsável. Clique em Criar Evento.</li>
+    </ol>
+    <div class="shots">
+      <figure class="shot" data-src="imagens/052-lancamento-novo-novo-evento.jpg" data-cap="1 · Dados"><img src="imagens/052-lancamento-novo-novo-evento.jpg" alt="1 · Dados" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/053-lancamento-wizard-2.jpg" data-cap="1 · Destino S1"><img src="imagens/053-lancamento-wizard-2.jpg" alt="1 · Destino S1" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/054-lancamento-wizard-3.jpg" data-cap="2 · Configuração"><img src="imagens/054-lancamento-wizard-3.jpg" alt="2 · Configuração" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/055-lancamento-wizard-4.jpg" data-cap="3 · Turmas"><img src="imagens/055-lancamento-wizard-4.jpg" alt="3 · Turmas" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/089-lancamento-wizard-professores.jpg" data-cap="4 · Professores"><img src="imagens/089-lancamento-wizard-professores.jpg" alt="4 · Professores" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/090-lancamento-wizard-revisao.jpg" data-cap="5 · Revisão"><img src="imagens/090-lancamento-wizard-revisao.jpg" alt="5 · Revisão" loading="lazy"></figure>
+    </div>
+    <div class="lab">Como lançar a nota dentro do detalhe</div>
+    <ol class="como">
+      <li>Na listagem, no evento, abra <b>Ações → Gerenciar</b>. Entra no painel do evento, não na edição do cadastro.</li>
+      <li>O título vira “Lançamento de notas: …”. Clique em <b>Lançar notas (coordenação)</b> no topo — ou, na linha da matéria, em <b>Lançar/editar notas</b>.</li>
+      <li>Abre a tabela da turma. Filtre Matéria e Turma no topo. Cada linha é um aluno: campo <b>Nota</b> (0 a 10) e <b>Observação</b> opcional.</li>
+      <li>Digite as notas. Em branco = sem nota ainda. Confira contra a lista de presença.</li>
+      <li>Clique em <b>Salvar notas</b>. Sair sem salvar perde o que foi digitado.</li>
+    </ol>
+    <div class="shots">
+      <figure class="shot" data-src="imagens/091-lancamento-detalhe.jpg" data-cap="Detalhe — Lançar notas (coordenação)"><img src="imagens/091-lancamento-detalhe.jpg" alt="Detalhe — Lançar notas (coordenação)" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/092-lancamento-materias.jpg" data-cap="Progresso por matéria"><img src="imagens/092-lancamento-materias.jpg" alt="Progresso por matéria" loading="lazy"></figure>
+      <figure class="shot" data-src="imagens/093-lancar-notas-grid.jpg" data-cap="Tabela: aluno, nota, salvar"><img src="imagens/093-lancar-notas-grid.jpg" alt="Tabela: aluno, nota, salvar" loading="lazy"></figure>
+    </div>
+    <div class="nota">Se no wizard ficou “Atribuir ao professor”, quem lança é o professor em /professor — a coordenação acompanha o progresso no mesmo detalhe. “Coordenação lança a nota” abre a tabela acima para a secretaria/coordenação.</div>
+    <div class="lab">Erros comuns</div>
+    <ul class="erros">
+      <li>Procurar a tabela de notas na listagem ou no wizard. Ela só existe depois de Gerenciar → Lançar notas.</li>
+      <li>Lançar no bimestre ou na coluna errada. Isso se decide no wizard (passos 1 e 2), não na tabela. Conferir o filtro do topo antes de digitar.</li>
+      <li>Aluno que não aparece: ele não está matriculado naquela turma. Cadastrado não é o mesmo que matriculado.</li>
+      <li>Sair da tabela sem Salvar notas.</li>
+    </ul>
+    <div class="usado"><b>Usado depois em:</b> Simulação do boletim, painel de fechamento e resultado final.</div>
+  </div>
+</article>
+<article class="card num" id="r4">
+  <header class="head" onclick="tog('r4')">
+    <span class="n">5</span>
+    <span class="tit">
+      <b>Segunda chamada e correções</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Crie outro evento no mesmo assistente, no passo Configuração marcado como <b>Substitutiva</b>, apontando para a mesma coluna do quadro (mesmo S, mesmo bloco).</li><li>Entre no detalhe (Ações → Gerenciar → Lançar notas) e lance só os alunos da segunda chamada.</li><li>Para corrigir uma nota já lançada, abra de novo a mesma tabela e altere — enquanto o período não estiver fechado.</li></ol><div class="shots"><figure class="shot" data-src="imagens/054-lancamento-wizard-3.jpg" data-cap="Original ou Substitutiva"><img src="imagens/054-lancamento-wizard-3.jpg" alt="Original ou Substitutiva" loading="lazy"></figure><figure class="shot" data-src="imagens/093-lancar-notas-grid.jpg" data-cap="Corrigir na mesma tabela"><img src="imagens/093-lancar-notas-grid.jpg" alt="Corrigir na mesma tabela" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Criar a substitutiva apontando para outra coluna: a nota entra, mas em lugar errado do boletim.</li><li>Tentar corrigir depois do período homologado. Aí é preciso retificar, e isso fica registrado.</li></ul><div class="usado"><b>Usado depois em:</b> Resultado final e boletim.</div></div>
+</article>
+<article class="card num" id="r5">
+  <header class="head" onclick="tog('r5')">
+    <span class="n">6</span>
+    <span class="tit">
+      <b>Acompanhar o diário dos professores</b>
+      <span class="ok">/admin/diario</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Filtre por período, turma e professor.</li><li>Veja o que cada professor lançou: conteúdo da aula, frequência e notas.</li><li>Use o status para achar quem ainda está pendente.</li><li>Cobre os pendentes antes do fim do período. Se precisar, a secretaria também consegue lançar em /admin/diario/lancar.</li></ol><div class="shots"><figure class="shot" data-src="imagens/066-diario.jpg" data-cap="Diário"><img src="imagens/066-diario.jpg" alt="Diário" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Descobrir a pendência só na hora de fechar o bimestre. Esta tela existe para ver antes.</li><li>Confundir com o diário do professor: o professor lança no portal dele; aqui você acompanha (e, se preciso, lança).</li></ul><div class="usado"><b>Usado depois em:</b> Frequência, painel de fechamento e conselho de classe.</div><div class="nota">O professor registra a aula no portal dele. A secretaria acompanha — e pode lançar se faltar.</div></div>
+</article>
+<article class="card num" id="r6">
+  <header class="head" onclick="tog('r6')">
+    <span class="n">7</span>
+    <span class="tit">
+      <b>Frequência</b>
+      <span class="ok">/admin/frequencia</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Escolha a turma e o período.</li><li>Confira o percentual de cada aluno — a mesma tela mostra faltas e presença.</li><li>Justifique as faltas que tiverem atestado ou amparo (no diário/presença).</li><li>Acompanhe quem está perto do limite mínimo.</li></ol><div class="shots"><figure class="shot" data-src="imagens/067-frequencia.jpg" data-cap="Frequência"><img src="imagens/067-frequencia.jpg" alt="Frequência" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Esperar o fim do bimestre para olhar. Aluno perto do limite precisa ser identificado enquanto ainda dá para agir.</li><li>Esquecer que a frequência pode nascer do diário ou de um lançamento avulso de faltas — se o número não bate, confira as duas origens.</li></ul><div class="usado"><b>Usado depois em:</b> Resultado final, reprovação por falta e conselho de classe.</div></div>
+</article>
+<article class="card num" id="r7">
+  <header class="head" onclick="tog('r7')">
+    <span class="n">8</span>
+    <span class="tit">
+      <b>Ocorrências</b>
+      <span class="ok">/admin/ocorrencias</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Registre a ocorrência com data, local e o relato do que aconteceu.</li><li>Classifique a categoria e a gravidade.</li><li>Registre testemunhas, quando houver.</li><li>Preencha o que a escola vai fazer — a providência tomada.</li></ol><div class="shots"><figure class="shot" data-src="imagens/068-ocorrencias.jpg" data-cap="Ocorrências"><img src="imagens/068-ocorrencias.jpg" alt="Ocorrências" loading="lazy"></figure><figure class="shot" data-src="imagens/069-ocorrencias-novo-nova-ocorrencia.jpg" data-cap="Nova ocorrência"><img src="imagens/069-ocorrencias-novo-nova-ocorrencia.jpg" alt="Nova ocorrência" loading="lazy"></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Registrar o julgamento em vez do fato. O relato deve descrever o que foi observado.</li><li>Deixar a providência em branco: sem ela, a ocorrência não sustenta medida disciplinar depois.</li></ul><div class="usado"><b>Usado depois em:</b> Conselho de classe, comunicação com a família e histórico disciplinar.</div></div>
+</article>
+</div>
+
+<div class="sec">
+  <h2>Quando o aluno chega de outra escola</h2>
+  <p class="s">Sim, o sistema registra a escola anterior. Cadastrar e matricular só coloca o aluno
+  na turma daqui. Os anos e as notas de fora entram na <b>Vida Escolar</b> da ficha (aba Vida escolar → Trajetória).
+  Sem isso, o papel sai só com o que ele cursar nesta instituição. Como abrir cada aba da ficha: seção “A ficha do aluno”.</p>
+
+  <div class="cadeia">
+    <h3>Dois atos diferentes</h3>
+    <p class="sub">Matricular como transferido não preenche sozinho o quadro de equivalência.</p>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">1 · Entrar na escola</span>
+      <span class="dd">Cadastro + matrícula tipo Transferência (vindo de outra instituição).</span></span></div>
+    <div class="seta">↓</div>
+    <div class="elo hi"><span class="dot"></span><span class="tx"><span class="tt">2 · Registrar a escola anterior</span>
+      <span class="dd">Vida Escolar → Trajetória → Lançar Escola (anos fechados) e, se chegou no meio do ano, os bimestres no boletim.</span></span></div>
+    <div class="seta">↓</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">3 · O histórico oficial puxa daqui</span>
+      <span class="dd">Gerar rascunho junta estes anos externos com os homologados nesta escola.</span></span></div>
+    <div class="alerta"><b>Não confundir com a saída.</b> Secretaria → Movimentação → Saída da escola (TR) é quando o aluno <i>deixa</i> o colégio. Aqui é o contrário: ele está chegando.</div>
+  </div>
+
+<article class="card num" id="t0">
+  <header class="head" onclick="tog('t0')">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Matricular como transferência</b>
+      <span class="ok">Alunos ou Matrículas · tipo Transferência</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Cadastre o aluno (nome, nascimento, documentos) se ele ainda não existe.</li>
+    <li>Na matrícula, escolha o tipo <b>Transferência</b> — “Vindo de outra instituição”. Também em Secretaria → Matrículas (<code>/admin/matricula</code>).</li>
+    <li>Informe ano letivo, turma e a data de entrada. Quem chegou depois do início do ano precisa dessa data certa, senão a frequência e o boletim distorcem.</li>
+    <li>Vincule o responsável. Sem ele não há app da família nem comunicação da secretaria.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Usar Matrícula nova para quem já cursou outra escola. O tipo Transferência marca a origem; o cadastro das notas de fora é o passo seguinte.</li>
+    <li>Parar aqui. O aluno já aparece na turma, mas o histórico ainda não tem o 1º, o 2º, o 5º…</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Vida Escolar, boletim desta escola e histórico oficial.</div></div>
+</article>
+
+<article class="card num" id="t1">
+  <header class="head" onclick="tog('t1')">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Anexar o papel da outra escola</b>
+      <span class="ok">Ficha do aluno → Vida Escolar → Histórico / emissões</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Abra a ficha: Secretaria → Vida Escolar, ou Acadêmico → Alunos → o aluno → aba Vida Escolar.</li>
+    <li>Vá em <b>Histórico / emissões</b>. No bloco <b>Recebidos de outra escola</b>, escolha o tipo (Histórico escolar, Ficha individual ou Declaração de transferência).</li>
+    <li>Informe a escola emissora, anexe o PDF ou a imagem e clique em <span class="btnex">Anexar</span>. Sem arquivo anexado, o botão de IA ainda não existe.</li>
+    <li><b>Onde está Ler com IA:</b> depois do Anexar, o arquivo aparece numa linha acima do formulário. Nessa linha, à direita, ficam <span class="btnex">Abrir</span> e o link roxo <span class="btnex">Ler com IA</span>. Não fica ao lado do botão Anexar.</li>
+    <li>O rascunho vai para a aba Trajetória. Só entra na trajetória oficial depois de <span class="btnex">Validar leitura</span>.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/088-docs-outra-escola.jpg" data-cap="Formulário de anexar — Ler com IA ainda não aparece"><img src="imagens/088-docs-outra-escola.jpg" alt="Recebidos de outra escola — anexar o PDF" loading="lazy"></figure></div>
+  <div class="nota">Neste print o bloco está vazio: só o formulário (Tipo, Escola, Arquivo, Anexar). O texto “Depois use Ler com IA” é instrução. O botão só nasce na <b>linha do PDF já anexado</b>. Tipo tem que ser Histórico, Ficha individual ou Declaração de transferência (Guia/Outro não mostram o botão). Se a escola não tiver crédito de IA para ler histórico, o link também não aparece — aí o caminho é Lançar Escola à mão.</div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Procurar Ler com IA ao lado de Anexar. Ele não está no formulário; está na linha do arquivo, depois de anexar.</li>
+    <li>Achar que anexar o PDF já preenche o histórico oficial. O anexo é o comprovante; as notas entram em Lançar Escola ou na validação da leitura.</li>
+    <li>Validar a leitura da IA sem conferir nota a nota. A IA erra nomes de disciplina e vírgula de nota.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Lançar Escola (documento anexado aparece no seletor) e auditoria da transferência.</div></div>
+</article>
+
+<article class="card num" id="t2">
+  <header class="head" onclick="tog('t2')">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Lançar a escola anterior<span class="sel out">o essencial</span></b>
+      <span class="ok">Vida Escolar → Trajetória → Lançar Escola</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Na mesma ficha, aba <b>Trajetória</b>. Clique em <span class="btnex">Lançar Escola</span>.</li>
+    <li>Preencha a escola de origem: nome, município, UF e INEP (se tiver). Vincule o documento anexado no passo 2.</li>
+    <li>Informe o ano letivo, a série (ex.: 7º Ano) e o resultado (Aprovado, Transferido…).</li>
+    <li>Lance as disciplinas com nota e carga horária. Linhas em branco são ignoradas. Clique em <span class="btnex">Adicionar ano</span>.</li>
+    <li>Repita para cada ano fechado na outra instituição — 5º, 6º, 7º… Cada clique grava um ano na trajetória, com origem “externa”.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/086-trajetoria-lancar-escola.jpg" data-cap="Trajetória — Lançar Escola"><img src="imagens/086-trajetoria-lancar-escola.jpg" alt="Trajetória escolar" loading="lazy"></figure><figure class="shot" data-src="imagens/087-lancar-escola-drawer.jpg" data-cap="Formulário da escola de origem"><img src="imagens/087-lancar-escola-drawer.jpg" alt="Lançar Escola" loading="lazy"></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Lançar o ano em curso da outra escola aqui. Anos já fechados vão em Lançar Escola; bimestres do ano atual, se ele chegou no meio do ano, vão no passo 4.</li>
+    <li>Um único lançamento para vários anos. É um ano por vez, senão a série e o resultado misturam.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Quadro de equivalência do histórico oficial (escola de origem, município, estado, resultado).</div>
+  <div class="nota">É exatamente a tabela de estabelecimento do histórico: série, ano, escola, município, UF e resultado.</div></div>
+</article>
+
+<article class="card num" id="t3">
+  <header class="head" onclick="tog('t3')">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Chegou no meio do ano? Bimestres no boletim</b>
+      <span class="ok">Trajetória → Notas do ano em curso (outra escola)</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Só se ele já tem bimestre lançado na escola de origem neste mesmo ano letivo.</li>
+    <li>No bloco Notas do ano em curso (outra escola), informe a escola, a data da transferência e, se houver, o documento.</li>
+    <li>Preencha nota e faltas só dos bimestres que constam no papel da outra escola.</li>
+    <li>Esses lançamentos entram no <b>boletim desta escola</b> (origem externa). Os anos já fechados continuam em Lançar Escola.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Digitar o 6º e o 7º ano neste bloco. Aqui é só o ano em curso, bimestre a bimestre.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Boletim do ano em que ele chegou e fechamento desta turma.</div>
+  <div class="nota">Se ele chegou no 1º dia de aula, pule este passo. Não há bimestre de fora para importar.</div></div>
+</article>
+</div>
+
+<div class="sec">
+  <h2>Fechar o período e emitir o histórico</h2>
+  <p class="s">Uma turma por vez. Esta trilha reinicia a cada bimestre. No fim do ano, o boletim
+  oficial sai por período; o <b>histórico junta a trajetória inteira</b> num quadro de equivalência —
+  Fundamental do 1º ao 9º, Médio da 1ª à 3ª, inclusive o que ele fez em outra escola.</p>
+
+  <div class="maq">
+    <h3>Os estados da turma no painel</h3>
+    <div class="els">
+      <span class="st">Aberto</span><span class="ar">→</span>
+      <span class="st">Em fechamento</span><span class="ar">→</span>
+      <span class="st warn">Em recuperação</span><span class="ar">→</span>
+      <span class="st lock">Homologado</span><span class="ar">→</span>
+      <span class="st">Retificado</span>
+    </div>
+    <p><b>Aberto</b> ainda lança nota. <b>Em fechamento</b> trava o lançamento, mas dá para
+    <span class="btnex">Voltar para aberto</span>. Quem ficou em recuperação precisa de resultado
+    definitivo (aprovado ou reprovado) antes de homologar. <b>Homologado</b> não reabre:
+    só <span class="btnex">Retificar período</span>, com justificativa.</p>
+  </div>
+
+  <div class="docs">
+    <h3>O que a escola recebe no fim de cada período</h3>
+    <table>
+      <tr><td>Boletim</td><td>Por aluno, com os quatro bimestres (nota e faltas) e a média final. PDF em Documentos do período; ZIP em Painéis → Relatórios</td></tr>
+      <tr><td>Ata de Resultados Finais</td><td>Por turma — o documento oficial do período</td></tr>
+      <tr><td>Ficha Individual</td><td>Por aluno, consolidado do ano</td></tr>
+      <tr><td>Histórico Escolar</td><td>Quadro de equivalência: todas as séries nas colunas. 9º ano traz 1º–9º; 3º do Médio traz 1ª+2ª+3ª — inclusive outra escola</td></tr>
+      <tr><td>Pacote de transferência</td><td>Quando o aluno <b>sai</b> da escola (Vida Escolar). A entrada de transferido é outra: Lançar Escola</td></tr>
+    </table>
+  </div>
+
+  <div class="cadeia">
+    <h3>O histórico não é o boletim do ano em curso</h3>
+    <p class="sub">É a trajetória. O sistema puxa todos os anos homologados nesta escola e aceita os anos cursados em outra instituição.</p>
+    <div class="traj">
+      <div class="c">
+        <div class="n2">Aluno no 1º ano</div>
+        <div class="t">Só o 1º</div>
+        <div class="d">O documento traz o ano em curso. Se ele veio transferido, o fundamental ou o 1º de outra escola entra no mesmo papel.</div>
+      </div>
+      <div class="c">
+        <div class="n2">Aluno no 2º ano</div>
+        <div class="t">1º + 2º</div>
+        <div class="d">O 1º homologado (aqui ou lançado de fora) aparece junto com o 2º. Não se emite um histórico “só do segundo”.</div>
+      </div>
+      <div class="c hi">
+        <div class="n2">Aluno no 3º ano</div>
+        <div class="t">1º + 2º + 3º</div>
+        <div class="d">O Ensino Médio inteiro. Conclusão ou transferência sai com os três anos, cada um com a escola de origem.</div>
+      </div>
+    </div>
+    <div class="alerta"><b>Sim, o sistema faz isso.</b> Ao gerar o rascunho, ele consolida todos os resultados anuais homologados desta escola, os anos da Vida Escolar (incluindo importação de outra instituição) e o que você lançar à mão em “Lançar estudo em outra instituição”. O PDF agrupa por ano/série.</div>
+  </div>
+
+<article class="card num" id="f0">
+  <header class="head" onclick="tog('f0')">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Conferir se a turma está pronta</b>
+      <span class="ok">Fechamento → Painel · /admin/fechamento</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Abra Fechamento. Filtre o ano letivo e o período (bimestre ou ano inteiro).</li>
+    <li>A tabela mostra, por turma: estado, alunos, frequência, recuperação e pendências.</li>
+    <li>Clique na turma. A tela lista cada aluno: média, frequência, resultado e o que falta.</li>
+    <li>Clique na pendência para ir à tela de lançamento. Resolva tudo antes de iniciar o fechamento.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/074-fechamento-hub.jpg" data-cap="Painel de fechamento"><img src="imagens/074-fechamento-hub.jpg" alt="Painel de fechamento" loading="lazy"></figure><figure class="shot" data-src="imagens/076-fechamento-hub-acao-conferir-turma.jpg" data-cap="Conferir turma"><img src="imagens/076-fechamento-hub-acao-conferir-turma.jpg" alt="Conferir turma" loading="lazy"></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Tentar fechar com pendência. O botão <span class="btnex">Iniciar fechamento</span> fica desabilitado e o motivo aparece no próprio botão — leia o que ele diz.</li>
+    <li>Confundir aluno “sem nota” com nota zero. Sem nota bloqueia; nunca vira aprovado nem reprovado sozinho.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Início do fechamento, conselho e homologação.</div></div>
+</article>
+
+<article class="card num" id="f1">
+  <header class="head" onclick="tog('f1')">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Iniciar o fechamento da turma</b>
+      <span class="ok">Na turma · botão Iniciar fechamento</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Com a turma sem pendências, clique em <span class="btnex">Iniciar fechamento</span>.</li>
+    <li>O estado passa de Aberto para Em fechamento. As Regras de Aprovação calculam média, frequência e situação de cada aluno.</li>
+    <li>Os lançamentos da turma ficam travados.</li>
+    <li>Confira o resumo no topo: alunos, pendências e quantos estão em recuperação.</li>
+    <li>Se iniciou cedo demais, use <span class="btnex">Voltar para aberto</span>, corrija e inicie de novo.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/075-fechamento-hub-acoes.jpg" data-cap="Ações do fechamento"><img src="imagens/075-fechamento-hub-acoes.jpg" alt="Ações do fechamento" loading="lazy"></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Fechar sem conferir qual regra de aprovação está vigente. Se a regra estiver errada, o resultado inteiro sai errado.</li>
+    <li>Esquecer turma no meio do caminho: o fechamento é por turma, nunca da escola inteira de uma vez.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Conselho, recuperação e homologação.</div>
+  <div class="nota">Fechar não é homologar. Fechar trava o lançamento e é reversível. Homologar é o ponto sem volta.</div></div>
+</article>
+
+<article class="card num crit" id="f1b">
+  <header class="head" onclick="tog('f1b')">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Resolver a recuperação<span class="sel crit">bloqueia a homologação</span></b>
+      <span class="ok">Painel da turma · coluna Recuperação</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Se o resumo mostrar alunos em recuperação, o estado pode ir para Em recuperação.</li>
+    <li>Lance a nota da recuperação no evento substitutivo (mesmo quadro/coluna combinados no Lançamento de Notas).</li>
+    <li>Cada aluno precisa terminar aprovado ou reprovado. Em recuperação ou exame final não entra no snapshot.</li>
+    <li>Só então o botão Homologar libera.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Homologar com recuperação em aberto. O sistema bloqueia e escreve quantos alunos faltam resolver.</li>
+    <li>Lançar a recuperação em outra coluna do quadro: a nota entra, mas não substitui o resultado do período.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Homologação e boletim oficial.</div>
+  <div class="nota">Se ninguém ficou em recuperação, pule este passo.</div></div>
+</article>
+
+<article class="card num" id="f2">
+  <header class="head" onclick="tog('f2')">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Conselho de Classe</b>
+      <span class="ok">Fechamento → Conselho · /admin/conselhos</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Em Conselho de Classe, clique em <span class="btnex">Iniciar Conselho</span>. Escolha ano, período e turma.</li>
+    <li>Percorra os casos limítrofes: perto da média, perto da frequência mínima, ou em recuperação.</li>
+    <li>Registre cada decisão com justificativa. A deliberação muda o resultado, não a nota lançada.</li>
+    <li>Encerre o conselho. Se a escola exigir conselho no fechamento, homologar fica bloqueado até isso.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Mudar a nota do aluno para forçar o resultado. Nunca faça isso: corrompe o histórico. Use o registro do conselho.</li>
+    <li>Encerrar sem justificar os casos alterados. A justificativa é o que sustenta a decisão se a família questionar.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Resultado final, ata da turma e histórico do aluno.</div></div>
+</article>
+
+<article class="card num" id="f3">
+  <header class="head" onclick="tog('f3')">
+    <span class="n">5</span>
+    <span class="tit">
+      <b>Conferir os resultados</b>
+      <span class="ok">Painel da turma ou /admin/resultados-finais</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Na turma do Fechamento, confira aluno a aluno: média, frequência e situação.</li>
+    <li>Abra a conta de pelo menos um aluno e confira contra o cálculo feito à mão.</li>
+    <li>Resolva os casos sinalizados: sem nota, frequência limítrofe, transferido, matrícula tardia.</li>
+    <li>Aluno transferido não entra na estatística de aprovação da turma.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Homologar sem conferir nenhum aluno à mão. É o único jeito de descobrir regra mal configurada antes do documento sair.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Homologação e todos os documentos do período.</div></div>
+</article>
+
+<div class="linha"><span>daqui para trás, tudo é corrigível</span></div>
+
+<article class="card num marco" id="f4">
+  <header class="head" onclick="tog('f4')">
+    <span class="n">6</span>
+    <span class="tit">
+      <b>Homologar<span class="sel">ponto sem volta</span></b>
+      <span class="ok">Na turma · Homologar selecionados / Homologar todos os elegíveis</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Com tudo conferido e sem recuperação em aberto, marque os alunos (ou use todos os elegíveis).</li>
+    <li>Clique em <span class="btnex">Homologar selecionados</span> ou <span class="btnex">Homologar todos os elegíveis</span>. Confirme.</li>
+    <li>O estado da turma vira Homologado. Notas, faltas e boletim oficial travam.</li>
+    <li>O registro guarda quem homologou, quando, e o resultado. O livro fica em /admin/homologacoes.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/080-fechamento-homologado.jpg" data-cap="Painel 2025 — turma 1A homologada"><img src="imagens/080-fechamento-homologado.jpg" alt="Painel homologado" loading="lazy"></figure><figure class="shot" data-src="imagens/081-fechamento-turma-homologada.jpg" data-cap="Turma 1A travada — só retifica"><img src="imagens/081-fechamento-turma-homologada.jpg" alt="Turma homologada" loading="lazy"></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Tratar homologação como “salvar”. Daqui para frente, corrigir exige <span class="btnex">Retificar período</span>, com justificativa, e gera nova versão.</li>
+    <li>Homologar com chamada pendente ou aluno em recuperação. O botão explica o bloqueio.</li>
+  </ol>
+  <div class="usado"><b>Usado depois em:</b> Boletim, ata, ficha e histórico escolar.</div>
+  <div class="nota">Esta é a única ação irreversível do módulo acadêmico. Homologado não volta para Aberto.</div></div>
+</article>
+
+<article class="card num" id="f5">
+  <header class="head" onclick="tog('f5')">
+    <span class="n">7</span>
+    <span class="tit">
+      <b>Gerar boletim, PDF e ZIP</b>
+      <span class="ok">Documentos do período · Relatórios · Vida Escolar</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body">
+  <div class="lab">1 · Gerar / conferir o boletim</div>
+  <ol class="como">
+    <li>O boletim oficial nasce do fechamento homologado — não se “monta” à mão. Sem homologar, o PDF sai como prévia, sem valor para a família.</li>
+    <li>Abra Fechamento → Documentos do período (<code>/admin/documentos-periodo</code>). Filtre ano letivo, período e turma.</li>
+    <li>Confira a lista: cada aluno tem <span class="btnex">Ficha</span> e <span class="btnex">Boletim PDF</span>. A turma tem <span class="btnex">Ata (prévia)</span> e <span class="btnex">Ata PDF</span>.</li>
+    <li>Outro caminho, um aluno por vez: Secretaria → Vida Escolar → escolha a turma → no menu do aluno, <span class="btnex">Boletim (PDF)</span> (ou a aba Boletim no prontuário).</li>
+  </ol>
+  <div class="lab">2 · Gerar o PDF individual</div>
+  <ol class="como">
+    <li>Em Documentos do período, clique em <span class="btnex">Boletim PDF</span> na linha do aluno. Abre o PDF oficial daquele período (snapshot homologado).</li>
+    <li>Em Vida Escolar, o mesmo PDF sai de <span class="btnex">Boletim (PDF)</span> no menu de ações — usa a ficha daquele ano.</li>
+    <li>Olhe um PDF inteiro antes de mandar o lote: cabeçalho, disciplinas, médias, frequência e resultado.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/082-documentos-periodo.jpg" data-cap="Documentos do período — Ata, Ficha e Boletim PDF por aluno"><img src="imagens/082-documentos-periodo.jpg" alt="Documentos do período" loading="lazy"></figure></div>
+  <div class="lab">3 · Gerar o ZIP da turma (ou da escola)</div>
+  <ol class="como">
+    <li>Abra Painéis → Relatórios → <b>Notas da Coordenação</b> (<code>/admin/reports/boletim-coordenacao</code>).</li>
+    <li>Em Exibir, deixe <b>Boletim da Vida Escolar</b>. Escolha o ano letivo e a turma (ou Todas as turmas).</li>
+    <li>Clique em <span class="btnex">Gerar relatório</span>. A tela lista os alunos com ficha.</li>
+    <li>Clique em <span class="btnex">Baixar boletins (ZIP)</span>. O sistema gera um PDF por aluno em segundo plano e empacota. Com a escola inteira pode levar alguns minutos — deixe a página aberta.</li>
+    <li>Quando o banner ficar verde, clique em <span class="btnex">Baixar ZIP</span>. Quem ainda não tem ficha na Vida Escolar fica de fora do arquivo; a tela avisa quantos.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/084-notas-coordenacao.jpg" data-cap="Notas da Coordenação — Gerar relatório"><img src="imagens/084-notas-coordenacao.jpg" alt="Notas da Coordenação" loading="lazy"></figure><figure class="shot" data-src="imagens/085-boletins-zip.jpg" data-cap="Depois de gerar — Baixar boletins (ZIP)"><img src="imagens/085-boletins-zip.jpg" alt="Baixar boletins ZIP" loading="lazy"></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Emitir o PDF antes de homologar: sai com marca de rascunho e não tem valor oficial. Serve para o conselho, não para a família.</li>
+    <li>Clicar em Baixar ZIP sem ter gerado o relatório, ou com fonte “Notas do evento”: o ZIP dos boletins oficiais só existe na fonte Vida Escolar, com aluno que já tem ficha.</li>
+    <li>Gerar trinta PDFs sem olhar um. Erro de layout descoberto depois da impressão custa o dobro.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Entrega às famílias, reunião de pais e montagem do histórico.</div>
+  <div class="nota">O visual do papel (brasão, margens, rodapé) se ajusta em Secretaria → Documentos Institucionais → Layout de documentos. O boletim é do período; o histórico (passo 8) é da trajetória inteira.</div></div>
+</article>
+
+<article class="card num" id="f6">
+  <header class="head" onclick="tog('f6')">
+    <span class="n">8</span>
+    <span class="tit">
+      <b>Gerar e emitir o histórico escolar<span class="sel out">Ensino Médio inteiro</span></b>
+      <span class="ok">Secretaria → Vida Escolar · /admin/students/ID/historico-escolar</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body">
+  <div class="lab">O que entra no documento</div>
+  <ol class="como">
+    <li><b>Todos os anos desta escola</b> com resultado anual homologado — 1º, 2º e 3º, o que o aluno já tiver. O rascunho não pega só o ano atual.</li>
+    <li><b>Anos de outra instituição</b> já gravados na Vida Escolar (Lançar Escola / importar transferência).</li>
+    <li><b>Itens manuais</b> pelo formulário “Lançar estudo em outra instituição”, no próprio histórico — um componente por vez, com a escola de origem.</li>
+  </ol>
+  <div class="lab">Como gerar o rascunho</div>
+  <ol class="como">
+    <li>Com os anos desta escola homologados, abra Secretaria → Vida Escolar. Escolha o ano e a turma.</li>
+    <li>No aluno, clique em Histórico (também em <code>/admin/students/ID/historico-escolar</code>).</li>
+    <li>Complete o checklist pré-emissão: nome, nascimento, filiação, documento, nacionalidade, INEP da unidade, CNPJ, diretor e secretário.</li>
+    <li>Escolha a finalidade (Solicitação, Transferência ou Conclusão) e clique em <span class="btnex">Gerar rascunho</span>. O sistema reconsolida os internos e anexa os anos da Vida Escolar.</li>
+    <li>Abra a versão. Confira se todos os anos esperados estão lá — aluno do 2º precisa do 1º; aluno do 3º precisa do 1º, do 2º e do 3º.</li>
+  </ol>
+  <div class="lab">Se ele estudou em outra escola</div>
+  <ol class="como">
+    <li>Faça isso na entrada, não na hora de emitir: seção <b>Quando o aluno chega de outra escola</b> — anexar o PDF e <span class="btnex">Lançar Escola</span> na Trajetória.</li>
+    <li>Ajuste pontual no rascunho: bloco <b>Lançar estudo em outra instituição</b> (um componente por vez). Clique em <span class="btnex">Adicionar item externo</span>.</li>
+    <li>Gere o rascunho de novo depois de lançar. Os itens externos não são apagados na reconsolidação.</li>
+  </ol>
+  <div class="lab">Conferir, emitir e assinar</div>
+  <ol class="como">
+    <li>Confira componente a componente, ano a ano. Clique em <span class="btnex">Conferir</span>.</li>
+    <li>Com o checklist verde, clique em <span class="btnex">Emitir (imutável)</span>. O documento ganha hash e QR de validação pública.</li>
+    <li>Assine como Secretário(a) e como Diretor(a). Depois, <span class="btnex">Baixar PDF</span>.</li>
+    <li>Se o aluno <b>sai</b> da escola: na ficha, Pacote de transferência. Ofícios ficam em Vida Escolar → Ofícios. Isso não substitui Lançar Escola na entrada.</li>
+  </ol>
+  <div class="shots"><figure class="shot" data-src="imagens/083-historico-assinado.jpg" data-cap="Histórico emitido e assinado — conferir, emitir, assinar, baixar PDF"><img src="imagens/083-historico-assinado.jpg" alt="Histórico assinado" loading="lazy"></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Achar que o histórico “nasce sozinho” depois de homologar. Homologar trava o resultado do período; emitir o histórico é outro ato, no aluno, e junta a trajetória.</li>
+    <li>Emitir o 3º ano sem lançar o 1º e o 2º de outra escola. O sistema só inclui o que está homologado aqui ou gravado na Vida Escolar / itens externos.</li>
+    <li>Tentar emitir com checklist incompleto. O botão Emitir fica desabilitado até ficar verde.</li>
+    <li>Deixar o layout para a última hora, no dia em que a família pede a transferência.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Transferência, matrícula em outra escola e conclusão de curso.</div>
+  <div class="nota">Rascunho → Conferido → Emitido → Assinado. Emitido congela. Correção vira nova versão; a anterior é cancelada. Itens de outra escola são copiados para a nova versão.</div></div>
+</article>
+
+<article class="card num" id="f7">
+  <header class="head" onclick="tog('f7')">
+    <span class="n">9</span>
+    <span class="tit">
+      <b>Retificar depois de homologado</b>
+      <span class="ok">Na turma · Retificar período</span>
+    </span>
+    <span class="chev">&#9656;</span>
+  </header>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Só aparece quando o período está Homologado. Clique em <span class="btnex">Retificar período</span>.</li>
+    <li>Escreva a justificativa (obrigatória). Confirme.</li>
+    <li>O snapshot homologado permanece no livro. O fluxo reabre com auditoria para corrigir e homologar de novo.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Procurar um “desfazer homologação”. Esse botão não existe. O caminho formal é a retificação.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Nova homologação e nova versão dos documentos.</div></div>
+</article>
+
+  <h3>Exemplo — boletim do período (gerar, PDF, ZIP)</h3>
+  <p class="s">Turma 1A, 2025, ano dividido em <b>quatro bimestres</b>. O boletim oficial mostra
+  nota e faltas de cada bimestre e a média final — não só o resultado do ano.
+  PDF um a um em Documentos do período; lote em Painéis → Relatórios → Notas da Coordenação →
+  <b>Gerar relatório</b> → <b>Baixar boletins (ZIP)</b>.</p>
+
+  <div class="papel bol">
+    <div class="bras">
+      <div class="esc">Colégio Educa</div>
+      <div class="ht">Boletim Escolar</div>
+      <div class="sube">1ª Série EM · Turma 1A · Ano letivo 2025 · 1º, 2º, 3º e 4º bimestres · homologado</div>
+    </div>
+    <div class="meta">
+      <div><b>Aluno:</b> Ana Almeida Rocha</div>
+      <div><b>Nascimento:</b> 01/02/2010</div>
+      <div><b>Turma:</b> 1A · 2025</div>
+      <div><b>Frequência anual:</b> 93,10%</div>
+      <div><b>Origem:</b> snapshot homologado</div>
+      <div><span class="selo">Boletim oficial</span></div>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Componente</th>
+          <th class="bim" colspan="2">1º Bimestre</th>
+          <th class="bim" colspan="2">2º Bimestre</th>
+          <th class="bim" colspan="2">3º Bimestre</th>
+          <th class="bim" colspan="2">4º Bimestre</th>
+          <th class="bim" colspan="3">Final</th>
+        </tr>
+        <tr>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Média</th><th class="sub">Faltas</th><th class="sub">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Língua Portuguesa</td><td>4,80</td><td>2</td><td>5,20</td><td>1</td><td>4,90</td><td>2</td><td>5,10</td><td>1</td><td>5,00</td><td>6</td><td class="sit-r">Reprovado</td></tr>
+        <tr><td>Matemática</td><td>6,00</td><td>2</td><td>6,50</td><td>1</td><td>6,20</td><td>2</td><td>6,26</td><td>1</td><td>6,24</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Língua Inglesa</td><td>6,50</td><td>1</td><td>6,80</td><td>1</td><td>6,40</td><td>2</td><td>6,70</td><td>2</td><td>6,60</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>História</td><td>6,20</td><td>2</td><td>6,80</td><td>1</td><td>6,40</td><td>2</td><td>6,60</td><td>1</td><td>6,50</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Geografia</td><td>6,00</td><td>2</td><td>6,30</td><td>1</td><td>6,10</td><td>2</td><td>6,24</td><td>1</td><td>6,16</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Física</td><td>6,40</td><td>1</td><td>6,70</td><td>2</td><td>6,30</td><td>2</td><td>6,60</td><td>1</td><td>6,50</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Química</td><td>5,20</td><td>2</td><td>5,80</td><td>1</td><td>5,40</td><td>2</td><td>5,60</td><td>1</td><td>5,50</td><td>6</td><td class="sit-r">Reprovado</td></tr>
+        <tr><td>Biologia</td><td>6,00</td><td>2</td><td>6,40</td><td>1</td><td>6,00</td><td>2</td><td>6,32</td><td>1</td><td>6,18</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Arte</td><td>6,20</td><td>1</td><td>6,50</td><td>2</td><td>6,20</td><td>1</td><td>6,46</td><td>2</td><td>6,34</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Educação Física</td><td>6,80</td><td>1</td><td>6,40</td><td>1</td><td>6,50</td><td>2</td><td>6,30</td><td>2</td><td>6,50</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="res"><b>Resultado do período:</b> Reprovado por rendimento (média anual abaixo da mínima em Língua Portuguesa e Química). O PDF traz os quatro bimestres; o ZIP empacota um arquivo desses por aluno.</div>
+    <div class="qr">PDF: Fechamento → Documentos do período → Boletim PDF. ZIP: Painéis → Relatórios → Notas da Coordenação → Gerar relatório → Baixar boletins (ZIP).</div>
+  </div>
+
+  <h3>Exemplo — histórico escolar (quadro de equivalência)</h3>
+  <p class="s">Este é o papel: <b>disciplinas nas linhas, todos os anos nas colunas</b>. No Fundamental,
+  o 9º ano traz do 1º ao 9º. No Médio, o 3º traz 1ª + 2ª + 3ª. Anos feitos em outra escola entram
+  na mesma grade e na tabela de estabelecimento. Células com <b>**</b> são componente que a série não oferecia.</p>
+
+  <div class="hist-of">
+    <div class="hh">
+      <div class="brasao">COLÉGIO<br>EDUCA</div>
+      <div class="hid">
+        <div class="nm">Colégio Educa</div>
+        <div class="en">Rua das Palmeiras, 120 — Centro — Ribeirão Preto — SP</div>
+        <div class="dc">INEP: 35012345 — Autorização do Curso: Resolução CEE · e-mail: secretaria@colegioeduca.local</div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th class="bar" colspan="4">Histórico Escolar do Ensino Fundamental</th></tr>
+      <tr><th class="bar" colspan="4">Dados do aluno</th></tr>
+      <tr>
+        <td class="labc">Nome do Aluno (a)</td>
+        <td colspan="2">Maria Clara Nunes</td>
+        <td><b>Sexo</b> F</td>
+      </tr>
+      <tr>
+        <td class="labc">Data de Nascimento</td>
+        <td>12/04/2011</td>
+        <td><b>Naturalidade</b> Amarante</td>
+        <td><b>UF</b> MA</td>
+      </tr>
+      <tr>
+        <td class="labc">Nome do Pai</td>
+        <td colspan="3">Paulo Henrique Nunes</td>
+      </tr>
+      <tr>
+        <td class="labc">Nome da Mãe</td>
+        <td colspan="3">Ana Lúcia Silva Nunes</td>
+      </tr>
+    </table>
+
+    <div class="scroll">
+    <table class="eq">
+      <tr><th class="bar" colspan="19">Equivalência</th></tr>
+      <tr>
+        <th class="comp" rowspan="2">Componentes<br>Curriculares</th>
+        <th colspan="2">Alfabetização</th>
+        <th colspan="2">1ª Série</th>
+        <th colspan="2">2ª Série</th>
+        <th colspan="2">3ª Série</th>
+        <th colspan="2">4ª Série</th>
+        <th colspan="2">5ª Série</th>
+        <th colspan="2">6ª Série</th>
+        <th colspan="2">7ª Série</th>
+        <th colspan="2">8ª Série</th>
+      </tr>
+      <tr>
+        <th>1º<br>ANO</th><th>CHA</th>
+        <th>2º<br>ANO</th><th>CHA</th>
+        <th>3º<br>ANO</th><th>CHA</th>
+        <th>4º<br>ANO</th><th>CHA</th>
+        <th>5º<br>ANO</th><th>CHA</th>
+        <th>6º<br>ANO</th><th>CHA</th>
+        <th>7º<br>ANO</th><th>CHA</th>
+        <th>8º<br>ANO</th><th>CHA</th>
+        <th>9º<br>ANO</th><th>CHA</th>
+      </tr>
+      <tr>
+        <td class="comp">Português</td>
+        <td>7,0</td><td>240</td><td>7,2</td><td>240</td><td>7,5</td><td>240</td><td>7,8</td><td>240</td><td>8,0</td><td>240</td>
+        <td>7,5</td><td>200</td><td>7,6</td><td>200</td><td>7,8</td><td>200</td><td>8,0</td><td>200</td>
+      </tr>
+      <tr>
+        <td class="comp">Matemática</td>
+        <td>6,8</td><td>240</td><td>7,0</td><td>240</td><td>7,2</td><td>240</td><td>7,4</td><td>240</td><td>7,6</td><td>240</td>
+        <td>7,0</td><td>200</td><td>7,2</td><td>200</td><td>7,4</td><td>200</td><td>7,5</td><td>200</td>
+      </tr>
+      <tr>
+        <td class="comp">Ciências</td>
+        <td>7,5</td><td>160</td><td>7,6</td><td>160</td><td>7,8</td><td>160</td><td>8,0</td><td>160</td><td>8,2</td><td>160</td>
+        <td>7,8</td><td>120</td><td>8,0</td><td>120</td><td>8,1</td><td>120</td><td>8,2</td><td>120</td>
+      </tr>
+      <tr>
+        <td class="comp">História</td>
+        <td>8,0</td><td>80</td><td>8,0</td><td>80</td><td>8,2</td><td>80</td><td>8,3</td><td>80</td><td>8,4</td><td>80</td>
+        <td>8,0</td><td>80</td><td>8,1</td><td>80</td><td>8,2</td><td>80</td><td>8,3</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Geografia</td>
+        <td>7,8</td><td>80</td><td>7,9</td><td>80</td><td>8,0</td><td>80</td><td>8,1</td><td>80</td><td>8,2</td><td>80</td>
+        <td>7,9</td><td>80</td><td>8,0</td><td>80</td><td>8,1</td><td>80</td><td>8,2</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Artes</td>
+        <td>9,0</td><td>80</td><td>9,0</td><td>80</td><td>9,2</td><td>80</td><td>9,0</td><td>80</td><td>9,1</td><td>80</td>
+        <td>8,8</td><td>80</td><td>9,0</td><td>80</td><td>9,0</td><td>80</td><td>9,2</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Religião</td>
+        <td>8,5</td><td>40</td><td>8,5</td><td>40</td><td>8,6</td><td>40</td><td>8,7</td><td>40</td><td>8,8</td><td>40</td>
+        <td>8,5</td><td>40</td><td>8,6</td><td>40</td><td>8,7</td><td>40</td><td>8,8</td><td>40</td>
+      </tr>
+      <tr>
+        <td class="comp">Inglês</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td>8,0</td><td>80</td><td>8,2</td><td>80</td><td>8,4</td><td>80</td><td>8,5</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Ed. Física</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td>9,0</td><td>80</td><td>9,0</td><td>80</td><td>9,2</td><td>80</td><td>9,5</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Ética</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td>8,5</td><td>80</td><td>8,6</td><td>80</td><td>8,7</td><td>80</td><td>8,8</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp tot">CHA TOTAL</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">1040</td>
+        <td class="tot" colspan="2">1040</td>
+        <td class="tot" colspan="2">1040</td>
+        <td class="tot" colspan="2">1040</td>
+      </tr>
+    </table>
+    </div>
+
+    <table>
+      <tr>
+        <th class="bar">Série/Ano</th>
+        <th class="bar">Ano</th>
+        <th class="bar">Estabelecimento de ensino</th>
+        <th class="bar">Município</th>
+        <th class="bar">Estado</th>
+        <th class="bar">Resultado</th>
+      </tr>
+      <tr><td>1º Ano</td><td>2017</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>1ª Série / 2º Ano</td><td>2018</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>2ª Série / 3º Ano</td><td>2019</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>3ª Série / 4º Ano</td><td>2020</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>4ª Série / 5º Ano</td><td>2021</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>5ª Série / 6º Ano</td><td>2022</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+      <tr><td>6ª Série / 7º Ano</td><td>2023</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+      <tr><td>7ª Série / 8º Ano</td><td>2024</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+      <tr><td>8ª Série / 9º Ano</td><td>2025</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+    </table>
+
+    <table>
+      <tr><th class="bar">Observações</th></tr>
+      <tr><td class="obs">Estudos de 2017 a 2021 realizados em outra instituição (E. M. Gen. Eurico Gaspar Dutra — Amarante/MA), lançados na Vida Escolar. De 2022 a 2025, resultados homologados nesta instituição. Escala 0–10. Documento isento de autenticação pela Inspeção Escolar, nos termos da legislação vigente.</td></tr>
+      <tr><td class="car">Área reservada para carimbos</td></tr>
+    </table>
+
+    <div class="ass2">
+      <div>Secretário(a) escolar<br>Admin Colégio Educa · 17/09/2026</div>
+      <div>Diretor(a)<br>Admin Colégio Educa · 17/09/2026</div>
+    </div>
+    <div class="hint">No sistema: Secretaria → Vida Escolar → aluno → Histórico → Gerar rascunho → Conferir → Emitir → Assinar → Baixar PDF. Anos de outra escola: Lançar Escola ou “Lançar estudo em outra instituição”.</div>
+  </div>
+</div>
+
+</div>
+<div class="lb" id="lb" onclick="fechar()"><span class="x">&times;</span><img id="lbi" alt=""><div class="cap" id="lbc"></div></div>
+<script>
+function tog(id){document.getElementById(id).classList.toggle('open');}
+document.querySelectorAll('.shot').forEach(function(f){
+  f.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    document.getElementById('lbi').src=f.dataset.src;
+    document.getElementById('lbc').textContent=f.dataset.cap;
+    document.getElementById('lb').classList.add('on');
+  });
+});
+function fechar(){document.getElementById('lb').classList.remove('on');}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')fechar();});
+</script>
+</body>
+</html>
