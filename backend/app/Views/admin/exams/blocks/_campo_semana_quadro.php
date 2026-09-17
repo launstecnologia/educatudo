@@ -22,7 +22,7 @@ if ($vinculosIni === []) {
     <?php if ($temGruposRegras): ?>
         <div class="mb-2">
             <label class="block text-sm font-medium text-gray-700">Destinos no quadro de notas</label>
-            <p class="text-xs text-gray-500 mt-1">Escolha o quadro e o bloco (A/B). A semana (S1, S2…) entra sozinha neste bimestre.</p>
+            <p class="text-xs text-gray-500 mt-1">Escolha o quadro e o bloco (A/B). Turmas diferentes no mesmo dia compartilham a mesma semana; a próxima S só entra na semana seguinte daquelas turmas.</p>
         </div>
         <div id="lista-vinculos-grupo" class="space-y-3"></div>
         <button type="button" id="btn-add-vinculo-grupo"
@@ -47,6 +47,17 @@ if ($vinculosIni === []) {
                     if (Number(catalogo[i].id) === id) return catalogo[i];
                 }
                 return null;
+            }
+
+            function idsTurmasEvento() {
+                return Array.from(document.querySelectorAll('input[name="turmas[]"]:checked'))
+                    .map(function (el) { return parseInt(el.value, 10) || 0; })
+                    .filter(function (id) { return id > 0; });
+            }
+
+            function dataProvaEvento() {
+                var v = (document.getElementById('data_prova') || {}).value || '';
+                return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : '';
             }
 
             function fillSelect(sel, placeholder, itens, selectedId, labelKey) {
@@ -152,23 +163,17 @@ if ($vinculosIni === []) {
                     setDica(row, 'Informe o ano letivo e o período para definir a semana.');
                     return;
                 }
-                if (!forcar && row.getAttribute('data-marca-ok') === '1') {
-                    var selM = row.querySelector('.sel-marca');
-                    var opt = selM && selM.options[selM.selectedIndex];
-                    var n = opt ? parseInt(opt.getAttribute('data-numero') || '', 10) : 0;
-                    var nome = opt ? opt.textContent : '';
-                    if (n > 0) {
-                        setDica(row, nome + ' neste período (já vinculada a esta prova).');
-                        syncSemana();
-                        return;
-                    }
-                }
                 row.removeAttribute('data-marca-ok');
                 setDica(row, 'Definindo a semana…');
                 var qs = 'tipo_id=' + encodeURIComponent(tipoId)
                     + '&ano=' + encodeURIComponent(p.ano)
                     + '&bimestre=' + encodeURIComponent(p.bim)
                     + '&exceto_bloco_id=' + encodeURIComponent(blocoId || 0);
+                var dataP = dataProvaEvento();
+                if (dataP) qs += '&data_prova=' + encodeURIComponent(dataP);
+                idsTurmasEvento().forEach(function (tid) {
+                    qs += '&turma_ids[]=' + encodeURIComponent(tid);
+                });
                 fetch(urlBase + g.id + '/proxima-coluna?' + qs, {
                     credentials: 'same-origin',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
@@ -176,13 +181,15 @@ if ($vinculosIni === []) {
                     if (!data || !data.ok) {
                         preencherMarca(row, 0, 0, '');
                         setDica(row, (data && data.error) ? data.error : 'Não foi possível definir a semana.', true);
-                        return;
+                    } else {
+                        preencherMarca(row, data.marca_id, data.semana, data.nome);
+                        setDica(row, data.dica || ((data.nome || '') + ' neste período.'));
                     }
-                    preencherMarca(row, data.marca_id, data.semana, data.nome);
-                    setDica(row, data.dica || ((data.nome || '') + ' neste período.'));
+                    if (typeof atualizarResumoWizard === 'function') atualizarResumoWizard();
                 }).catch(function () {
                     preencherMarca(row, 0, 0, '');
                     setDica(row, 'Falha ao definir a semana deste bloco.', true);
+                    if (typeof atualizarResumoWizard === 'function') atualizarResumoWizard();
                 });
             }
 
@@ -202,17 +209,19 @@ if ($vinculosIni === []) {
                 fillSelect(selT, 'Bloco de disciplinas', tipos, tipoSel, 'nome');
                 selT.removeAttribute('data-keep');
                 if (auto) {
-                    var keepM = parseInt(selM.getAttribute('data-keep') || selM.value, 10) || 0;
+                    var keepAttr = selM.getAttribute('data-keep');
+                    var keepM = keepAttr === null
+                        ? (parseInt(selM.value, 10) || 0)
+                        : (parseInt(keepAttr, 10) || 0);
                     selM.removeAttribute('data-keep');
                     if (keepM > 0) {
                         var marcaKeep = null;
                         marcas.forEach(function (m) { if (Number(m.id) === keepM) marcaKeep = m; });
                         if (marcaKeep) {
                             preencherMarca(row, marcaKeep.id, marcaKeep.numero, marcaKeep.nome);
-                            row.setAttribute('data-marca-ok', '1');
                         }
                     }
-                    resolverProxima(row, keepM <= 0);
+                    resolverProxima(row, true);
                     return;
                 }
                 var tipo = null;
@@ -344,10 +353,14 @@ if ($vinculosIni === []) {
                     resolverProxima(row, true);
                 });
             }
-            var anoEl = document.getElementById('ano_letivo');
-            var bimEl = document.getElementById('bimestre');
-            if (anoEl) anoEl.addEventListener('change', reprocessarPeriodo);
-            if (bimEl) bimEl.addEventListener('change', reprocessarPeriodo);
+            window.reprocessarSemanaQuadro = reprocessarPeriodo;
+            document.addEventListener('change', function (e) {
+                var t = e.target;
+                if (!t) return;
+                if (t.name === 'turmas[]' || t.id === 'data_prova' || t.id === 'ano_letivo' || t.id === 'bimestre') {
+                    reprocessarPeriodo();
+                }
+            });
         })();
         </script>
     <?php else: ?>

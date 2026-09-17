@@ -592,6 +592,7 @@ function setWizardStep(step) {
         panel.classList.toggle('hidden', parseInt(panel.dataset.stepPanel || '0', 10) !== wizardCurrentStep);
     });
     if (wizardCurrentStep === 5) {
+        if (typeof reprocessarSemanaQuadro === 'function') reprocessarSemanaQuadro();
         atualizarResumoWizard();
     }
     clearWizardAlert();

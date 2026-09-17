@@ -157,12 +157,31 @@ class GrupoRegrasNotasAdminController extends AdminBaseController
             $this->json(['ok' => false, 'error' => 'Sem permissão para esta ação.'], 403);
             return;
         }
+        $turmaIds = [];
+        $rawTurmas = $_GET['turma_ids'] ?? [];
+        if (!is_array($rawTurmas)) {
+            $rawTurmas = preg_split('/[,\s]+/', (string) $rawTurmas) ?: [];
+        }
+        foreach ($rawTurmas as $tid) {
+            $n = (int) $tid;
+            if ($n > 0) {
+                $turmaIds[$n] = true;
+            }
+        }
+        $dataProva = (string) ($_GET['data_prova'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}/', $dataProva)) {
+            $dataProva = '';
+        } else {
+            $dataProva = substr($dataProva, 0, 10);
+        }
         $prox = $this->service->proximaColunaDoBloco(
             (int) $id,
             (int) ($_GET['tipo_id'] ?? 0),
             (int) ($_GET['ano'] ?? 0),
             (int) ($_GET['bimestre'] ?? 0),
-            (int) ($_GET['exceto_bloco_id'] ?? 0)
+            (int) ($_GET['exceto_bloco_id'] ?? 0),
+            array_map('intval', array_keys($turmaIds)),
+            $dataProva
         );
         $this->json($prox, !empty($prox['ok']) ? 200 : 422);
     }

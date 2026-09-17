@@ -1337,6 +1337,8 @@ class ExamBlockController extends BaseController
             'ano_letivo' => (int) ($postData['ano_letivo'] ?? 0),
             'bimestre' => (int) ($postData['bimestre'] ?? 0),
             'exceto_bloco_id' => (int) ($postData['id'] ?? $postData['bloco_id'] ?? 0),
+            'turma_ids' => $this->turmaIdsDoPost($postData),
+            'data_prova' => (string) ($postData['data_prova'] ?? ''),
         ];
         $itens = [];
         foreach ($linhas as $row) {
@@ -1373,6 +1375,34 @@ class ExamBlockController extends BaseController
             'semana' => $vazio['semana'],
             'itens' => $itens,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $postData
+     * @return list<int>
+     */
+    private function turmaIdsDoPost(array $postData): array
+    {
+        $ids = [];
+        foreach ((array) ($postData['turmas'] ?? []) as $t) {
+            $id = (int) (is_array($t) ? ($t['id'] ?? $t['turma_id'] ?? 0) : $t);
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+        foreach ((array) ($postData['professores'] ?? []) as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            foreach ((array) ($p['turmas'] ?? []) as $t) {
+                $id = (int) (is_array($t) ? ($t['id'] ?? $t['turma_id'] ?? 0) : $t);
+                if ($id > 0) {
+                    $ids[$id] = true;
+                }
+            }
+        }
+
+        return array_map('intval', array_keys($ids));
     }
 
     private function obterServicoGrupoRegrasNotas()

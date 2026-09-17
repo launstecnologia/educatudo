@@ -488,7 +488,7 @@ class GrupoRegrasNotasService
      * Garante que tipo e marca pertencem ao mesmo grupo. Semana sai do número da marca.
      * Sem marca, resolve a próxima S do bloco naquele ano/período.
      *
-     * @param array{ano_letivo?:int,bimestre?:int,exceto_bloco_id?:int} $periodo
+     * @param array{ano_letivo?:int,bimestre?:int,exceto_bloco_id?:int,turma_ids?:list<int>,data_prova?:string} $periodo
      * @return array{ok:bool,error?:string,grupo_id:?int,tipo_id:?int,marca_id:?int,semana:?int}
      */
     public function validarVinculoProva(?int $grupoId, ?int $tipoId, ?int $marcaId, array $periodo = []): array
@@ -538,18 +538,24 @@ class GrupoRegrasNotasService
             $tipoId = 0;
         }
 
-        if ($temMarcas && $marcaId <= 0 && $tipoId > 0) {
+        $turmaIds = $this->idsTurmasPeriodo($periodo);
+        $dataProva = $this->dataIsoPeriodo($periodo);
+
+        if ($temMarcas && $tipoId > 0) {
             $prox = $this->proximaColunaDoBloco(
                 $grupoId,
                 $tipoId,
                 (int) ($periodo['ano_letivo'] ?? 0),
                 (int) ($periodo['bimestre'] ?? 0),
-                (int) ($periodo['exceto_bloco_id'] ?? 0)
+                (int) ($periodo['exceto_bloco_id'] ?? 0),
+                $turmaIds,
+                $dataProva
             );
-            if (empty($prox['ok'])) {
+            if (!empty($prox['ok']) && (int) ($prox['marca_id'] ?? 0) > 0) {
+                $marcaId = (int) $prox['marca_id'];
+            } elseif ($marcaId <= 0) {
                 return ['ok' => false, 'error' => (string) ($prox['error'] ?? 'Não foi possível definir a semana deste bloco.')];
             }
-            $marcaId = (int) ($prox['marca_id'] ?? 0);
         }
 
         if ($temMarcas) {
@@ -560,7 +566,12 @@ class GrupoRegrasNotasService
                 return ['ok' => false, 'error' => 'A coluna não pertence ao quadro selecionado.'];
             }
             if ($tipoId > 0 && !$this->model->marcaVinculadaAoTipo($tipoId, $marcaId)) {
-                return ['ok' => false, 'error' => 'A coluna não pertence ao bloco de disciplinas selecionado neste quadro.'];
+                $tipoDono = $this->model->tipoIdDaMarcaNoGrupo($grupoId, $marcaId);
+                if ($tipoDono > 0) {
+                    $tipoId = $tipoDono;
+                } else {
+                    return ['ok' => false, 'error' => 'A coluna não pertence ao bloco de disciplinas selecionado neste quadro.'];
+                }
             }
             $marca = $this->model->findMarcaById($marcaId);
             if (!is_array($marca)) {
@@ -590,6 +601,7 @@ class GrupoRegrasNotasService
     /**
      * Próxima coluna S do bloco neste ano/período (S1, S3… para A; S2, S4… para B).
      *
+     * @param list<int> $turmaIds
      * @return array{ok:bool,error?:string,marca_id:?int,semana:?int,nome:?string,dica:?string}
      */
     public function proximaColunaDoBloco(
@@ -597,7 +609,9 @@ class GrupoRegrasNotasService
         int $tipoId,
         int $ano,
         int $bimestre,
-        int $excetoBlocoId = 0
+        int $excetoBlocoId = 0,
+        array $turmaIds = [],
+        string $dataProva = ''
     ): array {
         $grupoId = (int) $grupoId;
         $tipoId = (int) $tipoId;
@@ -643,7 +657,36 @@ class GrupoRegrasNotasService
         if ($candidatas === []) {
             return ['ok' => false, 'error' => 'Este bloco não tem coluna de semana no quadro. Gere S1…SN e intercale A/B.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
         }
-        $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId);
+        $dataIso = $this->dataIso($dataProva);
+        if ($dataIso !== '') {
+            $irma = $this->model->marcaIdDaMesmaSemanaLetiva(
+                $grupoId,
+                $tipoId,
+                $ano,
+                $bimestre,
+                $dataIso,
+                $excetoBlocoId,
+                $turmaIds
+            );
+            if ($irma > 0) {
+                foreach ($candidatas as $m) {
+                    if ((int) ($m['id'] ?? 0) !== $irma) {
+                        continue;
+                    }
+                    $semana = (int) ($m['numero'] ?? 0);
+                    $nome = trim((string) ($m['nome'] ?? ('S' . $semana)));
+                    $nomeBloco = trim((string) ($tipo['nome'] ?? 'Bloco'));
+                    return [
+                        'ok' => true,
+                        'marca_id' => $irma,
+                        'semana' => $semana,
+                        'nome' => $nome,
+                        'dica' => $nome . ' · ' . $nomeBloco . ' · mesma semana de outra turma neste bloco',
+                    ];
+                }
+            }
+        }
+        $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId, $turmaIds);
         $usadasMap = [];
         foreach ($usadas as $uid) {
             $usadasMap[(int) $uid] = true;
@@ -679,6 +722,48 @@ class GrupoRegrasNotasService
             'nome' => $nome,
             'dica' => $nome . ' · ' . $nomeBloco . ' · ' . $ordemNoBloco . 'ª semana deste bloco neste período',
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $periodo
+     * @return list<int>
+     */
+    private function idsTurmasPeriodo(array $periodo): array
+    {
+        $raw = $periodo['turma_ids'] ?? $periodo['turmas'] ?? [];
+        if (!is_array($raw)) {
+            $raw = preg_split('/[,\s]+/', (string) $raw) ?: [];
+        }
+        $out = [];
+        foreach ($raw as $id) {
+            if (is_array($id)) {
+                $id = $id['id'] ?? $id['turma_id'] ?? 0;
+            }
+            $n = (int) $id;
+            if ($n > 0) {
+                $out[$n] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($out));
+    }
+
+    /**
+     * @param array<string,mixed> $periodo
+     */
+    private function dataIsoPeriodo(array $periodo): string
+    {
+        return $this->dataIso((string) ($periodo['data_prova'] ?? ''));
+    }
+
+    private function dataIso(string $data): string
+    {
+        $data = trim($data);
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $data, $m)) {
+            return $m[1];
+        }
+
+        return '';
     }
 
     /**

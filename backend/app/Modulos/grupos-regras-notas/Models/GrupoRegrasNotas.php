@@ -345,8 +345,10 @@ class GrupoRegrasNotas
     }
 
     /**
-     * Colunas já usadas em provas deste quadro/bloco no ano e período.
+     * Colunas já usadas neste quadro/bloco/período por eventos que cruzam as turmas informadas.
+     * Sem turmas, ninguém "ocupa" a semana — séries diferentes podem compartilhar a mesma S.
      *
+     * @param list<int> $turmaIds
      * @return list<int>
      */
     public function marcasIdsUsadasNoPeriodo(
@@ -354,9 +356,14 @@ class GrupoRegrasNotas
         int $tipoId,
         int $ano,
         int $bimestre,
-        int $excetoBlocoId = 0
+        int $excetoBlocoId = 0,
+        array $turmaIds = []
     ): array {
         if ($grupoId <= 0 || $ano <= 0 || $bimestre <= 0) {
+            return [];
+        }
+        $turmaIds = $this->idsPositivos($turmaIds);
+        if ($turmaIds === []) {
             return [];
         }
         if (!$this->provasBlocosTemColuna('grupo_regras_notas_id') || !$this->provasBlocosTemColuna('grupo_regras_marca_id')) {
@@ -365,22 +372,25 @@ class GrupoRegrasNotas
         if (!$this->provasBlocosTemColuna('ano_letivo') || !$this->provasBlocosTemColuna('bimestre')) {
             return [];
         }
-        $sql = 'SELECT DISTINCT grupo_regras_marca_id AS id
-                FROM provas_blocos
-                WHERE deleted_at IS NULL
-                  AND grupo_regras_notas_id = :g
-                  AND grupo_regras_marca_id IS NOT NULL
-                  AND ano_letivo = :ano
-                  AND bimestre = :bim';
+        $sql = 'SELECT DISTINCT pb.grupo_regras_marca_id AS id
+                FROM provas_blocos pb
+                WHERE pb.deleted_at IS NULL
+                  AND pb.grupo_regras_notas_id = :g
+                  AND pb.grupo_regras_marca_id IS NOT NULL
+                  AND pb.ano_letivo = :ano
+                  AND pb.bimestre = :bim';
         $params = ['g' => $grupoId, 'ano' => $ano, 'bim' => $bimestre];
         if ($tipoId > 0 && $this->provasBlocosTemColuna('grupo_regras_tipo_id')) {
-            $sql .= ' AND grupo_regras_tipo_id = :t';
+            $sql .= ' AND pb.grupo_regras_tipo_id = :t';
             $params['t'] = $tipoId;
         }
         if ($excetoBlocoId > 0) {
-            $sql .= ' AND id <> :ex';
+            $sql .= ' AND pb.id <> :ex';
             $params['ex'] = $excetoBlocoId;
         }
+        $cruzam = $this->sqlBlocoCruzaTurmas('pb', $turmaIds);
+        $sql .= $cruzam['sql'];
+        $params = array_merge($params, $cruzam['params']);
         $rows = $this->db->fetchAll($sql, $params);
         $out = [];
         foreach ($rows ?: [] as $row) {
@@ -391,6 +401,112 @@ class GrupoRegrasNotas
         }
 
         return array_values(array_unique($out));
+    }
+
+    /**
+     * Semana já usada no mesmo bloco A/B na mesma semana civil, por evento sem cruzar estas turmas.
+     *
+     * @param list<int> $turmaIds
+     */
+    public function marcaIdDaMesmaSemanaLetiva(
+        int $grupoId,
+        int $tipoId,
+        int $ano,
+        int $bimestre,
+        string $dataProva,
+        int $excetoBlocoId = 0,
+        array $turmaIds = []
+    ): int {
+        if ($grupoId <= 0 || $tipoId <= 0 || $ano <= 0 || $bimestre <= 0) {
+            return 0;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataProva)) {
+            return 0;
+        }
+        if (!$this->provasBlocosTemColuna('grupo_regras_notas_id')
+            || !$this->provasBlocosTemColuna('grupo_regras_marca_id')
+            || !$this->provasBlocosTemColuna('grupo_regras_tipo_id')
+            || !$this->provasBlocosTemColuna('ano_letivo')
+            || !$this->provasBlocosTemColuna('bimestre')
+        ) {
+            return 0;
+        }
+        $sql = 'SELECT pb.grupo_regras_marca_id AS id
+                FROM provas_blocos pb
+                WHERE pb.deleted_at IS NULL
+                  AND pb.grupo_regras_notas_id = :g
+                  AND pb.grupo_regras_tipo_id = :t
+                  AND pb.grupo_regras_marca_id IS NOT NULL
+                  AND pb.ano_letivo = :ano
+                  AND pb.bimestre = :bim
+                  AND pb.data_prova IS NOT NULL
+                  AND YEARWEEK(pb.data_prova, 3) = YEARWEEK(:data, 3)';
+        $params = ['g' => $grupoId, 't' => $tipoId, 'ano' => $ano, 'bim' => $bimestre, 'data' => $dataProva];
+        if ($excetoBlocoId > 0) {
+            $sql .= ' AND pb.id <> :ex';
+            $params['ex'] = $excetoBlocoId;
+        }
+        $turmaIds = $this->idsPositivos($turmaIds);
+        if ($turmaIds !== []) {
+            $cruzam = $this->sqlBlocoCruzaTurmas('pb', $turmaIds);
+            $sql .= str_replace(' AND EXISTS', ' AND NOT EXISTS', $cruzam['sql']);
+            $params = array_merge($params, $cruzam['params']);
+        }
+        $sql .= ' ORDER BY pb.id ASC LIMIT 1';
+        $row = $this->db->fetch($sql, $params);
+
+        return (int) ($row['id'] ?? 0);
+    }
+
+    /**
+     * @param list<int> $turmaIds
+     * @return array{sql:string,params:array<string,int>}
+     */
+    private function sqlBlocoCruzaTurmas(string $alias, array $turmaIds): array
+    {
+        $turmaIds = $this->idsPositivos($turmaIds);
+        if ($turmaIds === [] || !preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $alias)) {
+            return ['sql' => '', 'params' => []];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($turmaIds as $i => $tid) {
+            $k = 'tur' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $tid;
+        }
+        $in = implode(',', $ph);
+        $sql = " AND EXISTS (
+            SELECT 1 FROM (
+                SELECT pbt.turma_id AS turma_id
+                  FROM provas_blocos_turmas pbt
+                 WHERE pbt.bloco_id = {$alias}.id
+                UNION
+                SELECT pbx.turma_id
+                  FROM provas_blocos pbx
+                 WHERE pbx.id = {$alias}.id AND pbx.turma_id IS NOT NULL AND pbx.turma_id > 0
+            ) turmas_ev
+            WHERE turmas_ev.turma_id IN ({$in})
+        )";
+
+        return ['sql' => $sql, 'params' => $params];
+    }
+
+    /**
+     * @param list<mixed> $ids
+     * @return list<int>
+     */
+    private function idsPositivos(array $ids): array
+    {
+        $out = [];
+        foreach ($ids as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $out[$n] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($out));
     }
 
     public function marcaVinculadaAoTipo(int $tipoId, int $marcaId): bool
@@ -411,6 +527,27 @@ class GrupoRegrasNotas
             ['tipo_id' => $tipoId, 'marca_id' => $marcaId]
         );
         return !empty($row['tipo_id']);
+    }
+
+    /**
+     * Bloco de disciplinas deste quadro que contém a coluna (S).
+     */
+    public function tipoIdDaMarcaNoGrupo(int $grupoId, int $marcaId): int
+    {
+        if ($grupoId <= 0 || $marcaId <= 0) {
+            return 0;
+        }
+        $row = $this->db->fetch(
+            $this->sql('SELECT tm.tipo_id
+              FROM {bloco_colunas} tm
+              INNER JOIN {blocos} t ON t.id = tm.tipo_id
+              WHERE t.grupo_id = :grupo_id AND tm.marca_id = :marca_id
+              ORDER BY tm.tipo_id ASC
+              LIMIT 1'),
+            ['grupo_id' => $grupoId, 'marca_id' => $marcaId]
+        );
+
+        return (int) ($row['tipo_id'] ?? 0);
     }
 
     public function grupoEmUsoEmProvas(int $grupoId): bool
