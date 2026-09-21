@@ -25,6 +25,7 @@
                 Exportar PDF
             </a>
             <a href="<?= URL ?>/admin/planos-aula"
+               id="voltar-planos-aula"
                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 Voltar
             </a>
@@ -314,3 +315,36 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 <?php endif; ?>
+<script>
+(function () {
+    var link = document.getElementById('voltar-planos-aula');
+    if (!link) {
+        return;
+    }
+    try {
+        var raw = localStorage.getItem('educatudo:admin-planos-aula-filtros');
+        if (!raw) {
+            return;
+        }
+        var data = JSON.parse(raw);
+        if (!data || !data.exp || Date.now() > Number(data.exp)) {
+            localStorage.removeItem('educatudo:admin-planos-aula-filtros');
+            return;
+        }
+        var qs = String(data.qs || '').replace(/^\?/, '');
+        var params = new URLSearchParams(qs);
+        var out = new URLSearchParams();
+        ['status', 'professor_id', 'turma_id', 'materia_id', 'tipo_ensino', 'page', 'per_page'].forEach(function (chave) {
+            var valor = (params.get(chave) || '').trim();
+            if (valor !== '') {
+                out.set(chave, valor);
+            }
+        });
+        var limpo = out.toString();
+        if (!limpo) {
+            return;
+        }
+        link.href = <?= json_encode(URL . '/admin/planos-aula', JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?> + '?' + limpo;
+    } catch (e) {}
+})();
+</script>

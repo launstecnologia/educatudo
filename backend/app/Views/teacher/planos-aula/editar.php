@@ -3,6 +3,7 @@
 $back_url = $back_url ?? URL . '/professor/planos-aula';
 $update_url = $update_url ?? URL . '/professor/planos-aula/atualizar/' . $plano['id'];
 $redirect_url = $redirect_url ?? $back_url;
+$voltarComFiltroAdmin = str_contains((string) $back_url, '/admin/planos-aula');
 ?>
 <div class="mb-8">
     <div class="flex justify-between items-center">
@@ -14,8 +15,8 @@ $redirect_url = $redirect_url ?? $back_url;
                 Edite os dados do seu plano de aula
             </p>
         </div>
-        <a href="<?= $back_url ?>" 
-           class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-all duration-300 flex items-center shadow-lg hover:shadow-xl">
+        <a href="<?= $back_url ?>"
+           class="js-voltar-planos-aula bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-all duration-300 flex items-center shadow-lg hover:shadow-xl">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
             </svg>
@@ -254,8 +255,8 @@ $redirect_url = $redirect_url ?? $back_url;
 
         <!-- Botões -->
         <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-            <a href="<?= $back_url ?>" 
-               class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+            <a href="<?= $back_url ?>"
+               class="js-voltar-planos-aula px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
                 Cancelar
             </a>
             <button type="submit" 
@@ -443,7 +444,9 @@ document.getElementById('planoForm').addEventListener('submit', function(e) {
     .then(data => {
         if (data.success) {
             alert(data.message);
-            window.location.href = '<?= $redirect_url ?>';
+            window.location.href = (typeof urlListaPlanosAulaAdmin === 'function')
+                ? urlListaPlanosAulaAdmin(<?= json_encode($redirect_url, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)
+                : <?= json_encode($redirect_url, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
         } else {
             alert('Erro: ' + (data.error || 'Erro ao atualizar plano'));
             if (data.errors) {
@@ -540,3 +543,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+<?php if (!empty($voltarComFiltroAdmin)): ?>
+<script>
+function urlListaPlanosAulaAdmin(padrao) {
+    padrao = String(padrao || '');
+    try {
+        var raw = localStorage.getItem('educatudo:admin-planos-aula-filtros');
+        if (!raw) {
+            return padrao;
+        }
+        var data = JSON.parse(raw);
+        if (!data || !data.exp || Date.now() > Number(data.exp)) {
+            localStorage.removeItem('educatudo:admin-planos-aula-filtros');
+            return padrao;
+        }
+        var qs = String(data.qs || '').replace(/^\?/, '');
+        var params = new URLSearchParams(qs);
+        var out = new URLSearchParams();
+        ['status', 'professor_id', 'turma_id', 'materia_id', 'tipo_ensino', 'page', 'per_page'].forEach(function (chave) {
+            var valor = (params.get(chave) || '').trim();
+            if (valor !== '') {
+                out.set(chave, valor);
+            }
+        });
+        var limpo = out.toString();
+        if (!limpo) {
+            return padrao;
+        }
+        return padrao.split('?')[0] + '?' + limpo;
+    } catch (e) {
+        return padrao;
+    }
+}
+document.querySelectorAll('.js-voltar-planos-aula').forEach(function (link) {
+    link.href = urlListaPlanosAulaAdmin(link.getAttribute('href') || '');
+});
+</script>
+<?php endif; ?>

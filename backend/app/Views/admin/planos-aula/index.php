@@ -190,10 +190,10 @@ $resumoPlanos = [
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <a href="<?= URL ?>/admin/planos-aula"
-               class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors text-center">
+            <button type="button" onclick="clearPlanosAulaFilters()"
+                    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors text-center">
                 Limpar
-            </a>
+            </button>
             <button type="submit"
                     class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
                 Aplicar filtros
@@ -323,6 +323,55 @@ $resumoPlanos = [
 </div>
 
 <script>
+    var PLANOS_AULA_FILTROS_KEY = 'educatudo:admin-planos-aula-filtros';
+    var PLANOS_AULA_FILTROS_TTL_MS = 8 * 60 * 60 * 1000;
+    var PLANOS_AULA_FILTROS_CHAVES = ['status', 'professor_id', 'turma_id', 'materia_id', 'tipo_ensino', 'page', 'per_page'];
+    var PLANOS_AULA_LISTA_URL = <?= json_encode(URL . '/admin/planos-aula', JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    function qsFiltrosPlanosAula(search) {
+        var params = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+        var out = new URLSearchParams();
+        PLANOS_AULA_FILTROS_CHAVES.forEach(function (chave) {
+            var valor = (params.get(chave) || '').trim();
+            if (valor !== '') {
+                out.set(chave, valor);
+            }
+        });
+        var qs = out.toString();
+        return qs ? ('?' + qs) : '';
+    }
+
+    function salvarFiltrosPlanosAula(qs) {
+        qs = qsFiltrosPlanosAula(qs);
+        try {
+            if (!qs) {
+                localStorage.removeItem(PLANOS_AULA_FILTROS_KEY);
+                return;
+            }
+            localStorage.setItem(PLANOS_AULA_FILTROS_KEY, JSON.stringify({
+                qs: qs,
+                exp: Date.now() + PLANOS_AULA_FILTROS_TTL_MS
+            }));
+        } catch (e) {}
+    }
+
+    function lerFiltrosPlanosAula() {
+        try {
+            var raw = localStorage.getItem(PLANOS_AULA_FILTROS_KEY);
+            if (!raw) {
+                return '';
+            }
+            var data = JSON.parse(raw);
+            if (!data || !data.exp || Date.now() > Number(data.exp)) {
+                localStorage.removeItem(PLANOS_AULA_FILTROS_KEY);
+                return '';
+            }
+            return qsFiltrosPlanosAula(data.qs || '');
+        } catch (e) {
+            return '';
+        }
+    }
+
     function openFilterDrawer() {
         document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
         const drawer = document.getElementById('filterDrawer');
@@ -338,6 +387,23 @@ $resumoPlanos = [
         drawer.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
     }
+
+    function clearPlanosAulaFilters() {
+        try { localStorage.removeItem(PLANOS_AULA_FILTROS_KEY); } catch (e) {}
+        window.location.href = PLANOS_AULA_LISTA_URL;
+    }
+
+    (function () {
+        var atual = qsFiltrosPlanosAula(window.location.search || '');
+        if (atual) {
+            salvarFiltrosPlanosAula(atual);
+            return;
+        }
+        var salvo = lerFiltrosPlanosAula();
+        if (salvo) {
+            window.location.replace(PLANOS_AULA_LISTA_URL + salvo);
+        }
+    })();
 
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
