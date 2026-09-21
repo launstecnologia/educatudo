@@ -747,9 +747,32 @@ class MasterEscolaDetailController extends BaseController
             } catch (PDOException $e) {}
 
             $offset = ($page - 1) * $perPage;
+            $ultimoAcessoSql = 'NULL AS ultimo_acesso';
+            $partesUltimoAcesso = [];
+            try {
+                if ($pdo->query("SHOW TABLES LIKE 'logs_auditoria'")->fetchColumn()) {
+                    $partesUltimoAcesso[] = "(SELECT MAX(a.created_at) FROM logs_auditoria a
+                        WHERE a.user_id = usuarios.id
+                          AND a.action = 'LOGIN'
+                          AND a.user_role IN ('admin', 'admin_escola'))";
+                }
+            } catch (PDOException $e) {
+            }
+            try {
+                if ($pdo->query("SHOW TABLES LIKE 'sessoes'")->fetchColumn()) {
+                    $partesUltimoAcesso[] = '(SELECT MAX(s.created_at) FROM sessoes s WHERE s.usuario_id = usuarios.id)';
+                }
+            } catch (PDOException $e) {
+            }
+            if ($partesUltimoAcesso !== []) {
+                $ultimoAcessoSql = (count($partesUltimoAcesso) === 1
+                    ? $partesUltimoAcesso[0]
+                    : 'COALESCE(' . implode(', ', $partesUltimoAcesso) . ')')
+                    . ' AS ultimo_acesso';
+            }
             try {
                 $stmt = $pdo->prepare(
-                    "SELECT id, nome, email, perfil_admin, ativo, created_at
+                    "SELECT id, nome, email, perfil_admin, ativo, created_at, {$ultimoAcessoSql}
                      FROM usuarios WHERE {$where}
                      ORDER BY nome
                      LIMIT {$perPage} OFFSET {$offset}"

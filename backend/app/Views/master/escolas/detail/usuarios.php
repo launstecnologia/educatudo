@@ -27,12 +27,12 @@ $badge_perfil_class = static function (string $perfil): string {
     };
 };
 
-$formatar_data = static function (?string $data): string {
+$formatar_ultimo_acesso = static function (?string $data): string {
     if ($data === null || $data === '') {
-        return '-';
+        return 'Nunca acessou';
     }
     $ts = strtotime($data);
-    return $ts !== false ? date('d/m/Y', $ts) : '-';
+    return $ts !== false ? date('d/m/Y H:i', $ts) : 'Nunca acessou';
 };
 
 $query_params = [];
@@ -224,7 +224,7 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
                             <?php else: ?>
                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Inativo</span>
                             <?php endif; ?>
-                            <span class="text-xs text-gray-400"><?= htmlspecialchars($formatar_data($u['created_at'] ?? null)) ?></span>
+                            <span class="text-xs text-gray-400">Último acesso: <?= htmlspecialchars($formatar_ultimo_acesso($u['ultimo_acesso'] ?? null)) ?></span>
                         </div>
                     </td>
                     <td class="px-3 py-3 align-top text-right whitespace-nowrap">
@@ -263,7 +263,7 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Inativo</span>
                         <?php endif; ?>
                     </div>
-                    <div class="text-xs text-gray-400 mt-1.5"><?= htmlspecialchars($formatar_data($u['created_at'] ?? null)) ?></div>
+                    <div class="text-xs text-gray-400 mt-1.5">Último acesso: <?= htmlspecialchars($formatar_ultimo_acesso($u['ultimo_acesso'] ?? null)) ?></div>
                 </div>
                 <div class="shrink-0">
                     <?php $render_dropdown_acoes($u, '-mobile'); ?>
