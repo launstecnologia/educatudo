@@ -310,15 +310,26 @@ class MasterAuthController extends BaseController
             'total_logins_sucesso' => 0,
             'total_jornadas' => 0,
             'total_provas' => 0,
+            'total_exercicios_ia' => 0,
+            'total_exercicios' => 0,
             'modulos' => [],
             'gerado_em' => null,
             'disponivel' => false,
         ];
         try {
-            $rowKpi = $db->query(
-                "SELECT total_logins_sucesso, total_jornadas, total_provas, modulos_json, gerado_em
-                 FROM master_dashboard_kpis WHERE id = 1 LIMIT 1"
-            )->fetch(PDO::FETCH_ASSOC);
+            $rowKpi = null;
+            try {
+                $rowKpi = $db->query(
+                    "SELECT total_logins_sucesso, total_jornadas, total_provas,
+                            total_exercicios_ia, total_exercicios, modulos_json, gerado_em
+                     FROM master_dashboard_kpis WHERE id = 1 LIMIT 1"
+                )->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {
+                $rowKpi = $db->query(
+                    "SELECT total_logins_sucesso, total_jornadas, total_provas, modulos_json, gerado_em
+                     FROM master_dashboard_kpis WHERE id = 1 LIMIT 1"
+                )->fetch(PDO::FETCH_ASSOC);
+            }
             if ($rowKpi) {
                 $modulos = json_decode((string) ($rowKpi['modulos_json'] ?? '[]'), true);
                 if (!is_array($modulos)) {
@@ -328,6 +339,8 @@ class MasterAuthController extends BaseController
                     'total_logins_sucesso' => (int) ($rowKpi['total_logins_sucesso'] ?? 0),
                     'total_jornadas' => (int) ($rowKpi['total_jornadas'] ?? 0),
                     'total_provas' => (int) ($rowKpi['total_provas'] ?? 0),
+                    'total_exercicios_ia' => (int) ($rowKpi['total_exercicios_ia'] ?? 0),
+                    'total_exercicios' => (int) ($rowKpi['total_exercicios'] ?? 0),
                     'modulos' => $modulos,
                     'gerado_em' => $rowKpi['gerado_em'] ?? null,
                     'disponivel' => true,

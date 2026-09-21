@@ -4,6 +4,8 @@ $kpis = $kpis ?? [
     'total_logins_sucesso' => 0,
     'total_jornadas' => 0,
     'total_provas' => 0,
+    'total_exercicios_ia' => 0,
+    'total_exercicios' => 0,
     'modulos' => [],
     'gerado_em' => null,
     'disponivel' => false,
@@ -89,7 +91,7 @@ $geradoEmFmt = !empty($kpis['gerado_em']) ? date('d/m/Y H:i', strtotime($kpis['g
     </div>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
         <p class="text-sm text-slate-500">Total de acessos</p>
         <p class="text-3xl font-bold text-slate-900 mt-1"><?= number_format((int) ($kpis['total_logins_sucesso'] ?? 0), 0, ',', '.') ?></p>
@@ -104,6 +106,16 @@ $geradoEmFmt = !empty($kpis['gerado_em']) ? date('d/m/Y H:i', strtotime($kpis['g
         <p class="text-sm text-slate-500">Total de provas</p>
         <p class="text-3xl font-bold text-slate-900 mt-1"><?= number_format((int) ($kpis['total_provas'] ?? 0), 0, ',', '.') ?></p>
         <p class="text-xs text-slate-400 mt-2">Provas cadastradas nas escolas</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+        <p class="text-sm text-slate-500">Exercícios por IA</p>
+        <p class="text-3xl font-bold text-slate-900 mt-1"><?= number_format((int) ($kpis['total_exercicios_ia'] ?? 0), 0, ',', '.') ?></p>
+        <p class="text-xs text-slate-400 mt-2">Questões respondidas pelos alunos</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all duration-200">
+        <p class="text-sm text-slate-500">Total de exercícios feitos</p>
+        <p class="text-3xl font-bold text-slate-900 mt-1"><?= number_format((int) ($kpis['total_exercicios'] ?? 0), 0, ',', '.') ?></p>
+        <p class="text-xs text-slate-400 mt-2">Jornadas, provas, IA e unidades</p>
     </div>
 </div>
 

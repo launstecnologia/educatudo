@@ -1,6 +1,6 @@
 <?php
 /**
- * Cron: agrega KPIs do dashboard Master (logins, jornadas, provas, uso por módulo).
+ * Cron: agrega KPIs do dashboard Master (logins, jornadas, provas, exercícios, uso por módulo).
  * Recomendado: diariamente à meia-noite (America/Sao_Paulo)
  * 0 0 * * * /usr/bin/php /caminho/projeto/src/cron/master_dashboard_kpis.php >> /caminho/projeto/src/storage/logs/cron_master_dashboard_kpis.log 2>&1
  */
@@ -41,7 +41,7 @@ $runner = function (?int $escolaId) use (&$porEscola, $service, $basePath): void
         $dados['escola_id'] = $escolaId;
         $porEscola[] = $dados;
         logMasterKpis(
-            "escola_id={$escolaId} logins={$dados['total_logins_sucesso']} jornadas={$dados['total_jornadas']} provas={$dados['total_provas']}",
+            "escola_id={$escolaId} logins={$dados['total_logins_sucesso']} jornadas={$dados['total_jornadas']} provas={$dados['total_provas']} exercicios_ia={$dados['total_exercicios_ia']} exercicios={$dados['total_exercicios']}",
             $basePath
         );
     } catch (Throwable $e) {
