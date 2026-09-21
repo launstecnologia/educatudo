@@ -308,15 +308,25 @@ class MasterFilaService
     }
 
     /**
+     * @param list<string> $statusPermitidos pending|processing|done|failed. Vazio = todos.
      * @return list<array<string,mixed>>
      */
-    public static function listarRecentes(string $tipo = '', int $limite = 20): array
+    public static function listarRecentes(string $tipo = '', int $limite = 20, array $statusPermitidos = []): array
     {
         $pdo = self::masterPdo();
         if (!$pdo instanceof PDO || !self::tabelaExiste($pdo)) {
             return [];
         }
         $limite = max(1, min(50, $limite));
+        $statusValidos = ['pending', 'processing', 'done', 'failed'];
+        $statusFiltro = [];
+        foreach ($statusPermitidos as $st) {
+            $st = (string) $st;
+            if (in_array($st, $statusValidos, true) && !in_array($st, $statusFiltro, true)) {
+                $statusFiltro[] = $st;
+            }
+        }
+
         $sql = "SELECT j.id, j.tipo, j.status, j.resultado, j.mensagem_erro, j.tentativas,
                        j.escola_origem_id, j.escola_destino_id, j.criado_por,
                        j.created_at, j.started_at, j.completed_at,
@@ -324,13 +334,28 @@ class MasterFilaService
                   FROM fila_jobs_master j
                   LEFT JOIN escolas o ON o.id = j.escola_origem_id
                   LEFT JOIN escolas d ON d.id = j.escola_destino_id";
+        $where = [];
+        $params = [];
         if ($tipo !== '') {
-            $st = $pdo->prepare($sql . " WHERE j.tipo = :tipo ORDER BY j.id DESC LIMIT {$limite}");
-            $st->execute(['tipo' => $tipo]);
-        } else {
-            $st = $pdo->query($sql . " ORDER BY j.id DESC LIMIT {$limite}");
+            $where[] = 'j.tipo = :tipo';
+            $params['tipo'] = $tipo;
         }
-        $rows = $st ? $st->fetchAll(PDO::FETCH_ASSOC) : [];
+        if ($statusFiltro !== []) {
+            $ph = [];
+            foreach ($statusFiltro as $i => $st) {
+                $key = 'st' . $i;
+                $ph[] = ':' . $key;
+                $params[$key] = $st;
+            }
+            $where[] = 'j.status IN (' . implode(', ', $ph) . ')';
+        }
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= " ORDER BY j.id DESC LIMIT {$limite}";
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         foreach ($rows as &$row) {
             $row['resultado_decoded'] = json_decode((string) ($row['resultado'] ?? ''), true) ?: [];
         }

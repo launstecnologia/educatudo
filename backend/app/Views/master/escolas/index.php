@@ -1,7 +1,4 @@
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-    <?php
-    require_once __DIR__ . '/../../../Services/DominioEscolaService.php';
-    ?>
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
             <h2 class="text-xl font-semibold text-slate-900">Escolas (tenants)</h2>
@@ -85,8 +82,6 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Nome</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Slug</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Domínio</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">HTTPS</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Banco</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Ativo</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Ações</th>
                     </tr>
@@ -99,27 +94,6 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900"><?= htmlspecialchars($e['nome']) ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600"><?= htmlspecialchars($e['slug'] ?? '') ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"><?= htmlspecialchars($e['dominio'] ?? '') ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <?php
-                            $sslSt = (string) ($e['ssl_status'] ?? 'nao_verificado');
-                            $sslClass = match ($sslSt) {
-                                'ok' => 'bg-green-100 text-green-800',
-                                'pendente' => 'bg-amber-100 text-amber-800',
-                                'erro' => 'bg-red-100 text-red-800',
-                                default => 'bg-slate-100 text-slate-600',
-                            };
-                            ?>
-                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $sslClass ?>" title="<?= htmlspecialchars(DominioEscolaService::rotuloSslStatus($sslSt)) ?>">
-                                <?= htmlspecialchars(DominioEscolaService::rotuloSslStatus($sslSt)) ?>
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <?php if (!empty($e['tem_banco'])): ?>
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">Sim</span>
-                            <?php else: ?>
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Não</span>
-                            <?php endif; ?>
-                        </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <?php if ($emManutencao): ?>
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Manutenção</span>

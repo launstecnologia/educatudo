@@ -404,7 +404,11 @@ class MasterEscolasController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
             'dominio_config' => $this->getDominioViewConfig(),
             'criar_banco_disponivel' => MysqlProvisioningService::isAvailable(),
-            'jobs_clonagem' => MasterFilaService::listarRecentes(MasterFilaService::TIPO_CLONAR_ESCOLA, 10),
+            'jobs_clonagem' => MasterFilaService::listarRecentes(
+                MasterFilaService::TIPO_CLONAR_ESCOLA,
+                10,
+                ['pending', 'processing']
+            ),
             'tem_jobs_clonagem_pendentes' => MasterFilaService::temPendentes(MasterFilaService::TIPO_CLONAR_ESCOLA),
             'pagination' => [
                 'page' => $page,
@@ -1081,7 +1085,11 @@ class MasterEscolasController extends BaseController
     {
         $this->requireMaster();
         require_once __DIR__ . '/../../Services/MasterFilaService.php';
-        $jobs = MasterFilaService::listarRecentes(MasterFilaService::TIPO_CLONAR_ESCOLA, 10);
+        $jobs = MasterFilaService::listarRecentes(
+            MasterFilaService::TIPO_CLONAR_ESCOLA,
+            10,
+            ['pending', 'processing']
+        );
         $this->json([
             'success' => true,
             'pendentes' => MasterFilaService::temPendentes(MasterFilaService::TIPO_CLONAR_ESCOLA),

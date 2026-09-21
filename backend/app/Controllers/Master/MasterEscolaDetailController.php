@@ -576,7 +576,7 @@ class MasterEscolaDetailController extends BaseController
                 $stats['alunos'] = (int) $pdo->query("SELECT COUNT(*) FROM alunos WHERE ativo = 1")->fetchColumn();
             } catch (PDOException $e) {}
             try {
-                $stats['professores'] = (int) $pdo->query("SELECT COUNT(*) FROM usuarios WHERE tipo = 'professor' AND ativo = 1")->fetchColumn();
+                $stats['professores'] = (int) $pdo->query("SELECT COUNT(*) FROM professores WHERE ativo = 1")->fetchColumn();
             } catch (PDOException $e) {}
             try {
                 $stats['admins'] = (int) $pdo->query("SELECT COUNT(*) FROM usuarios WHERE tipo = 'admin_escola'")->fetchColumn();
@@ -1992,7 +1992,7 @@ class MasterEscolaDetailController extends BaseController
                 $counts['alunos'] = (int) $pdo->query("SELECT COUNT(*) FROM alunos WHERE ativo = 1")->fetchColumn();
             } catch (PDOException $e) {}
             try {
-                $counts['professores'] = (int) $pdo->query("SELECT COUNT(*) FROM usuarios WHERE tipo = 'professor' AND ativo = 1")->fetchColumn();
+                $counts['professores'] = (int) $pdo->query("SELECT COUNT(*) FROM professores WHERE ativo = 1")->fetchColumn();
             } catch (PDOException $e) {}
             try {
                 $counts['admins'] = (int) $pdo->query("SELECT COUNT(*) FROM usuarios WHERE tipo = 'admin_escola'")->fetchColumn();
