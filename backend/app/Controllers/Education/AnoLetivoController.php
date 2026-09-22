@@ -4,17 +4,22 @@
  * Estrutura escolar normalizada (migration 022).
  */
 
+require_once __DIR__ . '/../../Services/AnoLetivoService.php';
+require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
+
 if (!class_exists('AnoLetivoController')) {
 class AnoLetivoController extends BaseController
 {
     private $auth;
     private $db;
+    private $service;
 
     public function __construct()
     {
         parent::__construct();
         $this->auth = new AuthManager();
         $this->db = Database::getInstance();
+        $this->service = new AnoLetivoService($this->db);
         $user = $this->auth->getUser();
         if ($user && $user['tipo'] !== 'admin' && $user['tipo'] !== 'admin_escola') {
             $this->redirect('/admin');
@@ -23,11 +28,7 @@ class AnoLetivoController extends BaseController
 
     private function tableExists()
     {
-        try {
-            return $this->db->fetch("SHOW TABLES LIKE 'ano_letivo'") !== false;
-        } catch (Exception $e) {
-            return false;
-        }
+        return $this->service->tabelaExiste();
     }
 
     public function avaliacoes()
@@ -232,12 +233,18 @@ class AnoLetivoController extends BaseController
             $this->json(['error' => 'Tabela não disponível.'], 400);
             return;
         }
-        $item = $this->db->fetch("SELECT * FROM ano_letivo WHERE id = :id", ['id' => $id]);
+        $item = $this->service->buscarPorId((int) $id);
         if (!$item) {
             $this->json(['error' => 'Ano letivo não encontrado.'], 404);
             return;
         }
-        $this->json(['success' => true, 'item' => $item]);
+        $uso = $this->service->usoDaDivisao((int) $item['ano']);
+        $this->json([
+            'success' => true,
+            'item' => $item,
+            'divisao_bloqueada' => !empty($uso['bloqueada']),
+            'divisao_motivo' => (string) ($uso['mensagem'] ?? ''),
+        ]);
     }
 
     public function store()
@@ -251,43 +258,15 @@ class AnoLetivoController extends BaseController
             return;
         }
         try {
-            $ano = (int)($_POST['ano'] ?? 0);
-            $dataInicio = trim($_POST['data_inicio'] ?? '') ?: null;
-            $dataFim = trim($_POST['data_fim'] ?? '') ?: null;
-            $ativo = isset($_POST['ativo']) ? 1 : 0;
-            $periodoTipo = $this->periodoTipoDoPost();
-            if ($ano < 2000 || $ano > 2100) {
-                throw new Exception('Ano inválido.');
-            }
-            $existe = $this->db->fetch("SELECT id FROM ano_letivo WHERE ano = :ano", ['ano' => $ano]);
-            if ($existe) {
-                throw new Exception('Já existe ano letivo para este ano.');
-            }
-            if ($this->temColunaPeriodoTipo()) {
-                $this->db->insert(
-                    "INSERT INTO ano_letivo (ano, data_inicio, data_fim, periodo_tipo, ativo) VALUES (:ano, :data_inicio, :data_fim, :periodo_tipo, :ativo)",
-                    [
-                        'ano' => $ano,
-                        'data_inicio' => $dataInicio,
-                        'data_fim' => $dataFim,
-                        'periodo_tipo' => $periodoTipo,
-                        'ativo' => $ativo
-                    ]
-                );
-            } else {
-                $this->db->insert(
-                    "INSERT INTO ano_letivo (ano, data_inicio, data_fim, ativo) VALUES (:ano, :data_inicio, :data_fim, :ativo)",
-                    [
-                        'ano' => $ano,
-                        'data_inicio' => $dataInicio,
-                        'data_fim' => $dataFim,
-                        'ativo' => $ativo
-                    ]
-                );
-            }
+            $this->service->cadastrar($this->dadosDoPost());
             $this->json(['success' => true, 'message' => 'Ano letivo cadastrado com sucesso.']);
-        } catch (Exception $e) {
+        } catch (InvalidArgumentException $e) {
             $this->json(['error' => $e->getMessage()], 400);
+        } catch (RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        } catch (Exception $e) {
+            error_log('AnoLetivo store: ' . $e->getMessage());
+            $this->json(['error' => 'Não foi possível salvar o ano letivo. Tente novamente.'], 400);
         }
     }
 
@@ -302,32 +281,15 @@ class AnoLetivoController extends BaseController
             return;
         }
         try {
-            $ano = (int)($_POST['ano'] ?? 0);
-            $dataInicio = trim($_POST['data_inicio'] ?? '') ?: null;
-            $dataFim = trim($_POST['data_fim'] ?? '') ?: null;
-            $ativo = isset($_POST['ativo']) ? 1 : 0;
-            $periodoTipo = $this->periodoTipoDoPost();
-            if ($ano < 2000 || $ano > 2100) {
-                throw new Exception('Ano inválido.');
-            }
-            $existe = $this->db->fetch("SELECT id FROM ano_letivo WHERE ano = :ano AND id != :id", ['ano' => $ano, 'id' => $id]);
-            if ($existe) {
-                throw new Exception('Já existe outro ano letivo com este ano.');
-            }
-            if ($this->temColunaPeriodoTipo()) {
-                $this->db->update(
-                    "UPDATE ano_letivo SET ano = :ano, data_inicio = :data_inicio, data_fim = :data_fim, periodo_tipo = :periodo_tipo, ativo = :ativo WHERE id = :id",
-                    ['ano' => $ano, 'data_inicio' => $dataInicio, 'data_fim' => $dataFim, 'periodo_tipo' => $periodoTipo, 'ativo' => $ativo, 'id' => $id]
-                );
-            } else {
-                $this->db->update(
-                    "UPDATE ano_letivo SET ano = :ano, data_inicio = :data_inicio, data_fim = :data_fim, ativo = :ativo WHERE id = :id",
-                    ['ano' => $ano, 'data_inicio' => $dataInicio, 'data_fim' => $dataFim, 'ativo' => $ativo, 'id' => $id]
-                );
-            }
+            $this->service->atualizar((int) $id, $this->dadosDoPost());
             $this->json(['success' => true, 'message' => 'Ano letivo atualizado com sucesso.']);
-        } catch (Exception $e) {
+        } catch (InvalidArgumentException $e) {
             $this->json(['error' => $e->getMessage()], 400);
+        } catch (RuntimeException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        } catch (Exception $e) {
+            error_log('AnoLetivo update: ' . $e->getMessage());
+            $this->json(['error' => 'Não foi possível atualizar o ano letivo. Tente novamente.'], 400);
         }
     }
 
@@ -354,30 +316,18 @@ class AnoLetivoController extends BaseController
         }
     }
 
-    private function temColunaPeriodoTipo(): bool
+    /**
+     * @return array{ano:int,data_inicio:string,data_fim:string,periodo_tipo:string,ativo:int}
+     */
+    private function dadosDoPost(): array
     {
-        static $tem = null;
-        if ($tem !== null) {
-            return $tem;
-        }
-        try {
-            $row = $this->db->fetch(
-                "SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ano_letivo' AND COLUMN_NAME = 'periodo_tipo'"
-            );
-            $tem = is_array($row) && (int) ($row['n'] ?? 0) > 0;
-        } catch (Exception $e) {
-            $tem = false;
-        }
-        return $tem;
-    }
-
-    private function periodoTipoDoPost(): string
-    {
-        if (!class_exists('PeriodoLetivo')) {
-            require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
-        }
-        return PeriodoLetivo::normalizarTipo((string) ($_POST['periodo_tipo'] ?? 'bimestre'));
+        return [
+            'ano' => (int) ($_POST['ano'] ?? 0),
+            'data_inicio' => (string) ($_POST['data_inicio'] ?? ''),
+            'data_fim' => (string) ($_POST['data_fim'] ?? ''),
+            'periodo_tipo' => (string) ($_POST['periodo_tipo'] ?? ''),
+            'ativo' => isset($_POST['ativo']) ? 1 : 0,
+        ];
     }
 }
 }

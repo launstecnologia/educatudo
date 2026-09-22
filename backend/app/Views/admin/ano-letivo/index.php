@@ -188,13 +188,15 @@ include __DIR__ . '/../_partials/flash_message.php';
                     </div>
                     <div class="sm:col-span-2">
                         <label for="al_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1">Divisão do ano <span class="text-red-500">*</span></label>
+                        <input type="hidden" id="al_periodo_tipo_lock" name="periodo_tipo" value="" disabled>
                         <select id="al_periodo_tipo" name="periodo_tipo" required
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
                             <?php foreach (PeriodoLetivo::TIPOS as $cod => $lab): ?>
                                 <option value="<?= htmlspecialchars($cod) ?>" <?= $cod === 'bimestre' ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">Define os períodos em prova, jornada, boletim e conselho. Ex.: semestral mostra 1º e 2º semestre.</p>
+                        <p class="text-xs text-gray-500 mt-1">Define os períodos em prova, jornada, boletim e conselho. Ex.: trimestral mostra 1º, 2º e 3º trimestre.</p>
+                        <p id="al_periodo_tipo_aviso" class="hidden mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
                     </div>
                 </div>
             </section>
@@ -214,11 +216,34 @@ include __DIR__ . '/../_partials/flash_message.php';
 </aside>
 
 <script>
+function setDivisaoBloqueada(bloqueada, motivo, valor) {
+    var sel = document.getElementById('al_periodo_tipo');
+    var lock = document.getElementById('al_periodo_tipo_lock');
+    var aviso = document.getElementById('al_periodo_tipo_aviso');
+    var tipo = valor || sel.value || 'bimestre';
+    if (bloqueada) {
+        sel.value = tipo;
+        sel.disabled = true;
+        lock.disabled = false;
+        lock.value = tipo;
+        aviso.textContent = motivo || 'Há cadastros usando os períodos deste ano. A divisão não pode ser alterada.';
+        aviso.classList.remove('hidden');
+    } else {
+        sel.disabled = false;
+        lock.disabled = true;
+        lock.value = '';
+        aviso.textContent = '';
+        aviso.classList.add('hidden');
+        if (tipo) { sel.value = tipo; }
+    }
+}
+
 function openAnoLetivoDrawer(id) {
     var form = document.getElementById('ano-letivo-form');
     form.reset();
     document.getElementById('al_id').value = '';
     document.getElementById('al_ativo').checked = true;
+    setDivisaoBloqueada(false, '', 'bimestre');
 
     if (!id) {
         form.dataset.mode = 'create';
@@ -242,7 +267,11 @@ function openAnoLetivoDrawer(id) {
             document.getElementById('al_ativo').checked = !!parseInt(data.item.ativo, 10);
             document.getElementById('al_data_inicio').value = data.item.data_inicio || '';
             document.getElementById('al_data_fim').value = data.item.data_fim || '';
-            document.getElementById('al_periodo_tipo').value = data.item.periodo_tipo || 'bimestre';
+            setDivisaoBloqueada(
+                !!data.divisao_bloqueada,
+                data.divisao_motivo || '',
+                data.item.periodo_tipo || 'bimestre'
+            );
         })
         .catch(function () { alert('Erro de conexão.'); closeAnoLetivoDrawer(); });
 }
@@ -266,7 +295,12 @@ document.getElementById('ano-letivo-form').addEventListener('submit', function (
     var mode = this.dataset.mode;
     var id = document.getElementById('al_id').value;
     var url = mode === 'create' ? '<?= URL ?>/admin/ano-letivo' : '<?= URL ?>/admin/ano-letivo/' + id + '/update';
-    fetch(url, { method: 'POST', body: new FormData(this) })
+    var fd = new FormData(this);
+    var sel = document.getElementById('al_periodo_tipo');
+    var lock = document.getElementById('al_periodo_tipo_lock');
+    var tipo = sel.disabled ? (lock.value || sel.value) : sel.value;
+    fd.set('periodo_tipo', tipo);
+    fetch(url, { method: 'POST', body: fd })
         .then(function (r) { return r.json(); })
         .then(function (result) {
             if (result.success) { window.location.reload(); }

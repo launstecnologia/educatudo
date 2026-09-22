@@ -15,6 +15,16 @@ class PeriodoLetivo
         'etapa_unica' => 'Etapa única',
     ];
 
+    private const ALIASES = [
+        'bimestral' => 'bimestre',
+        'trimestral' => 'trimestre',
+        'semestral' => 'semestre',
+        'etapa' => 'etapa_unica',
+        'unica' => 'etapa_unica',
+        'único' => 'etapa_unica',
+        'unico' => 'etapa_unica',
+    ];
+
     /** @var array<int, array<string,mixed>> */
     private static array $cachePorAno = [];
 
@@ -25,10 +35,30 @@ class PeriodoLetivo
         return 'bimestre';
     }
 
+    public static function tipoValido(?string $tipo): bool
+    {
+        return self::resolverTipo(strtolower(trim((string) $tipo))) !== null;
+    }
+
     public static function normalizarTipo(?string $tipo): string
     {
-        $tipo = strtolower(trim((string) $tipo));
-        return isset(self::TIPOS[$tipo]) ? $tipo : self::tipoPadrao();
+        $resolvido = self::resolverTipo(strtolower(trim((string) $tipo)));
+        return $resolvido ?? self::tipoPadrao();
+    }
+
+    public static function temColunaPeriodoTipo(): bool
+    {
+        return self::temColuna();
+    }
+
+    public static function invalidarCache(?int $ano = null): void
+    {
+        if ($ano === null) {
+            self::$cachePorAno = [];
+            self::$colunaExiste = null;
+            return;
+        }
+        unset(self::$cachePorAno[$ano]);
     }
 
     public static function quantidade(string $tipo): int
@@ -209,6 +239,40 @@ class PeriodoLetivo
         ];
     }
 
+    /**
+     * Aceita código canônico, rótulo da tela e variações (trimestral, Trimestral (3 períodos)…).
+     */
+    private static function resolverTipo(string $tipo): ?string
+    {
+        if ($tipo === '') {
+            return null;
+        }
+        if (isset(self::TIPOS[$tipo])) {
+            return $tipo;
+        }
+        if (isset(self::ALIASES[$tipo])) {
+            return self::ALIASES[$tipo];
+        }
+        foreach (self::TIPOS as $cod => $lab) {
+            if ($tipo === strtolower($lab)) {
+                return $cod;
+            }
+        }
+        if (str_contains($tipo, 'trimestr')) {
+            return 'trimestre';
+        }
+        if (str_contains($tipo, 'semestr')) {
+            return 'semestre';
+        }
+        if (str_contains($tipo, 'etapa')) {
+            return 'etapa_unica';
+        }
+        if (str_contains($tipo, 'bimestr')) {
+            return 'bimestre';
+        }
+        return null;
+    }
+
     private static function tipoDoBanco(int $ano): string
     {
         if ($ano <= 0 || !self::temColuna()) {
@@ -235,6 +299,16 @@ class PeriodoLetivo
             return self::$colunaExiste;
         }
         self::$colunaExiste = false;
+        try {
+            $db = Database::getInstance();
+            $row = $db->fetch("SHOW COLUMNS FROM `ano_letivo` LIKE 'periodo_tipo'");
+            if (is_array($row) && !empty($row)) {
+                self::$colunaExiste = true;
+                return true;
+            }
+        } catch (Throwable $e) {
+            // tenta INFORMATION_SCHEMA abaixo
+        }
         try {
             $db = Database::getInstance();
             $row = $db->fetch(
