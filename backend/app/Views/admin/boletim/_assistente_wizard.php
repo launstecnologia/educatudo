@@ -840,15 +840,22 @@ $boletimWizardSteps = [
                 if (bimEv <= 0 && Number(bim) !== bimSemCampo) return false;
             }
             var ea = Number(ev.ano_letivo || 0);
-            if (exigirAno && ano > 0 && ea > 0 && ea !== ano) return false;
+            if (exigirAno && ano > 0 && ea > 0 && ea !== ano) {
+                var dy = parseInt(String(ev.data_prova || '').slice(0, 4), 10);
+                if (dy !== ano) return false;
+            }
             return eventoCasaPeca(ev, key, tipoId);
         });
     }
 
     function eventosDaPecaNoBimestre(key, bim) {
         var noAno = eventosDaPecaFiltrados(key, bim, true);
-        if (noAno.length) return noAno;
-        return eventosDaPecaFiltrados(key, bim, false);
+        var todos = eventosDaPecaFiltrados(key, bim, false);
+        if (!noAno.length) return todos;
+        if (todos.length <= noAno.length) return noAno;
+        var byId = {};
+        noAno.concat(todos).forEach(function (ev) { byId[Number(ev.id)] = ev; });
+        return Object.keys(byId).map(function (id) { return byId[id]; });
     }
 
     function papeisCatalogo() {
@@ -1378,6 +1385,7 @@ $boletimWizardSteps = [
 
     function pushToken(tok, at) {
         if (!estado || !tok) return;
+        if (tok.type === 'peca') garantirPecaNaFormula(tok.value);
         if (!Array.isArray(estado.formula_tokens)) estado.formula_tokens = [];
         if (estado.formula_tokens.length >= 80) return;
         if (typeof at === 'number' && at >= 0 && at < estado.formula_tokens.length) {
@@ -1659,11 +1667,28 @@ $boletimWizardSteps = [
         agendarMontar();
     }
 
+    function garantirPecaNaFormula(key) {
+        if (!estado || !key) return;
+        if (key === 'media_sem' || key === 'media_bim' || key === 'media_final') return;
+        if (!Array.isArray(estado.pecas)) estado.pecas = [];
+        if (estado.pecas.indexOf(key) >= 0) return;
+        estado.pecas.push(key);
+        if (!estado.pecas_opcoes || typeof estado.pecas_opcoes !== 'object') estado.pecas_opcoes = {};
+        if (!estado.pecas_opcoes[key]) estado.pecas_opcoes[key] = pecasOpcoesPadraoJs(key);
+    }
+
     function htmlPalettePecasExibir() {
         var html = '';
         var visto = {};
         if (estado.bloco_calc) visto[estado.bloco_calc] = true;
+        (catalogo.pecas || []).forEach(function (p) {
+            if (!p || !p.key || visto[p.key]) return;
+            visto[p.key] = true;
+            visto[pecaCodigoQuadro(p.key)] = true;
+            html += chipHtml({ type: 'peca', value: p.key, label: p.label || pecaLabel(p.key) }, -1, true);
+        });
         (estado.pecas || []).forEach(function (k) {
+            if (!k || visto[k]) return;
             visto[k] = true;
             visto[pecaCodigoQuadro(k)] = true;
             html += chipHtml({ type: 'peca', value: k, label: pecaLabel(k) }, -1, true);

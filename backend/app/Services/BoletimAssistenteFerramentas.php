@@ -419,7 +419,7 @@ class BoletimAssistenteFerramentas
     {
         $porAno = $anoLetivo >= 2000 && $anoLetivo <= 2100;
         $porTipo = $tipoAvaliacaoId !== null && $tipoAvaliacaoId > 0;
-        $teto = ($porAno || $porTipo) ? 4000 : 500;
+        $teto = $porAno ? 50000 : (($porTipo) ? 4000 : 500);
         $limit = max(1, min($limit, $teto));
         $temTipo = $this->temColuna('provas_blocos', 'tipo_avaliacao_id')
             && $this->temTabela('provas_tipos_avaliacao');

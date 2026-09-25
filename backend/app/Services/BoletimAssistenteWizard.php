@@ -1163,9 +1163,6 @@ class BoletimAssistenteWizard
         if ($canon === '') {
             $canon = $this->chaveCanonicaPorTexto((string) ($tipo['nome'] ?? ''));
         }
-        if ($canon === '') {
-            $canon = $this->chaveCanonicaPorTexto((string) ($tipo['descricao'] ?? ''));
-        }
         if ($canon !== '' && empty($usadas[$canon])) {
             return $canon;
         }
