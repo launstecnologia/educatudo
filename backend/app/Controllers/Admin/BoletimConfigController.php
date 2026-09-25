@@ -1311,10 +1311,18 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirectFalhaConfiguracao($regraId);
         }
-        if ($codigoRegra !== '' && $this->boletimConfig->existsRuleCode($codigoRegra, $regraId)) {
-            $_SESSION['boletim_flash'] = 'Já existe outro evento com esse código.';
-            $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirectFalhaConfiguracao($regraId);
+        if ($codigoRegra !== '') {
+            $donoCodigo = $this->boletimConfig->getRuleByCode($codigoRegra);
+            $donoId = is_array($donoCodigo) ? (int) ($donoCodigo['id'] ?? 0) : 0;
+            if ($donoId > 0 && ($regraId === null || (int) $regraId <= 0)) {
+                $regraId = $donoId;
+            } elseif ($donoId > 0 && (int) $regraId > 0 && $donoId !== (int) $regraId) {
+                $eventoAtual = $this->boletimConfig->getRuleById((int) $regraId);
+                $codigoAtual = is_array($eventoAtual) ? trim((string) ($eventoAtual['codigo'] ?? '')) : '';
+                if ($codigoAtual !== '') {
+                    $codigoRegra = $codigoAtual;
+                }
+            }
         }
         if ($anoLetivo < 2000 || $anoLetivo > 2100) {
             $_SESSION['boletim_flash'] = 'Selecione um ano letivo válido.';
@@ -3084,6 +3092,13 @@ class BoletimConfigController extends BaseController
             } elseif (($componente['source_type'] ?? '') === 'jornadas') {
                 $alunoRow = $this->buscarAluno($alunoId);
                 $turmaId = (int) ($alunoRow['turma_id'] ?? 0);
+                if ($turmaId <= 0 && $alunoId > 0) {
+                    $rowTurma = Database::getInstance()->fetch(
+                        'SELECT turma_id FROM alunos WHERE id = :id LIMIT 1',
+                        ['id' => $alunoId]
+                    );
+                    $turmaId = (int) ($rowTurma['turma_id'] ?? 0);
+                }
                 $cfg = $this->parseJornadasConfigFromComponente($componente);
                 // Não sobrescrever o range global da simulação (GET data_inicio/data_fim).
                 $rangePeriodoRef = $this->periodoToRange($periodoRef);
@@ -4253,14 +4268,12 @@ class BoletimConfigController extends BaseController
             if (!isset($matrizPorCodigo[$codigo]) || !is_array($matrizPorCodigo[$codigo])) {
                 $matrizPorCodigo[$codigo] = [];
             }
-            $preencheu = false;
             foreach ($materiaNomesPorId as $mid => $nome) {
                 $mid = (int) $mid;
                 if ($mid === 0) {
                     continue;
                 }
                 if (isset($matrizPorCodigo[$codigo][$mid]) && is_numeric($matrizPorCodigo[$codigo][$mid])) {
-                    $preencheu = true;
                     continue;
                 }
                 $chave = $this->canonicalMateriaNomeKey((string) $nome);
@@ -4269,9 +4282,8 @@ class BoletimConfigController extends BaseController
                 }
                 $valores = $porChave[$chave];
                 $matrizPorCodigo[$codigo][$mid] = round(array_sum($valores) / count($valores), 2);
-                $preencheu = true;
             }
-            if ($preencheu || !isset($notaGeralPorCodigo[$codigo]) || !is_numeric($notaGeralPorCodigo[$codigo])) {
+            if (!isset($notaGeralPorCodigo[$codigo]) || !is_numeric($notaGeralPorCodigo[$codigo])) {
                 continue;
             }
             foreach ($materiaNomesPorId as $mid => $nome) {

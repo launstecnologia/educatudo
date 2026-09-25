@@ -1050,11 +1050,15 @@ class BoletimAssistenteController extends BaseController
         }
 
         $mensagem = trim((string) ($_POST['mensagem'] ?? ''));
-        if ($mensagem === '') {
-            $this->json(['success' => false, 'error' => 'Escreva a pergunta.'], 400);
+        $imagem = trim((string) ($_POST['imagem'] ?? ''));
+        if ($mensagem === '' && $imagem === '') {
+            $this->json(['success' => false, 'error' => 'Escreva a pergunta ou cole um print.'], 400);
         }
         if (mb_strlen($mensagem) > 4000) {
             $this->json(['success' => false, 'error' => 'Mensagem muito longa (máx. 4000 caracteres).'], 400);
+        }
+        if ($imagem !== '' && strlen($imagem) > 6000000) {
+            $this->json(['success' => false, 'error' => 'Print muito grande. Recorte a tela e cole de novo.'], 400);
         }
 
         $historico = [];
@@ -1085,7 +1089,7 @@ class BoletimAssistenteController extends BaseController
 
         require_once __DIR__ . '/../../Services/BoletimConsultaAssistenteService.php';
         $servico = new BoletimConsultaAssistenteService($this->assistente->ferramentas(), $this->wizard);
-        $this->json($servico->processarMensagem($mensagem, $historico, $wizardEstado));
+        $this->json($servico->processarMensagem($mensagem, $historico, $wizardEstado, $imagem !== '' ? $imagem : null));
     }
 
     /**

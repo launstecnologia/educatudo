@@ -49,11 +49,18 @@ class BoletimConsultaAssistenteService
      * @param array<string,mixed>|null $wizardEstado
      * @return array{success:bool,mensagem?:string,error?:string}
      */
-    public function processarMensagem(string $mensagem, array $historico = [], ?array $wizardEstado = null): array
+    public function processarMensagem(string $mensagem, array $historico = [], ?array $wizardEstado = null, ?string $imagem = null): array
     {
         $mensagem = trim($mensagem);
-        if ($mensagem === '') {
-            return ['success' => false, 'error' => 'Escreva a pergunta.'];
+        $imagem = $this->normalizarImagemPrint($imagem);
+        if ($imagem === false) {
+            return ['success' => false, 'error' => 'O print precisa ser uma imagem (PNG ou JPG).'];
+        }
+        if ($mensagem === '' && $imagem === null) {
+            return ['success' => false, 'error' => 'Escreva a pergunta ou cole um print.'];
+        }
+        if ($imagem !== null) {
+            return $this->analisarPrint($mensagem, $imagem, $wizardEstado);
         }
 
         if (!$this->parecePerguntaDeDado($mensagem)) {
@@ -167,6 +174,139 @@ class BoletimConsultaAssistenteService
         }
 
         return null;
+    }
+
+    /**
+     * @return string|false|null data URL válida, false se inválida, null se vazia
+     */
+    private function normalizarImagemPrint(?string $imagem)
+    {
+        if ($imagem === null) {
+            return null;
+        }
+        $imagem = trim($imagem);
+        if ($imagem === '') {
+            return null;
+        }
+        if (strlen($imagem) > 6000000) {
+            return false;
+        }
+        if (!preg_match('#^data:image/(jpeg|jpg|png|webp|gif);base64,[a-z0-9+/=\r\n]+$#i', $imagem)) {
+            return false;
+        }
+
+        return $imagem;
+    }
+
+    /**
+     * @param array<string,mixed>|null $wizardEstado
+     * @return array{success:bool,mensagem?:string,error?:string}
+     */
+    private function analisarPrint(string $mensagem, string $imagem, ?array $wizardEstado): array
+    {
+        if ($mensagem === '') {
+            $mensagem = 'Olhe este print e diga o que está errado ou não marcado, comparado com a configuração deste evento.';
+        }
+        $config = $this->configuracaoParaComparar($wizardEstado);
+        $prompt = <<<PROMPT
+Você confere um print da tela de Evento de Notas do EducaTudo com a configuração que o sistema tem agora. Responda em português, curto, em lista.
+
+O que fazer:
+- Leia o print: o que está marcado, desmarcado, vazio ou com traço.
+- Compare com a configuração do sistema abaixo. Não invente peça, botão ou nota que não esteja no print nem na configuração.
+- Aponte o que está errado ou não marcado e onde ajustar nesta tela: Identidade, Peças, Exibir ou Revisar.
+- Se uma coluna do boletim está com traço, diga qual peça da configuração deveria preenchê-la e se essa peça não está marcada, está sem bimestre ou sem aluno na prévia.
+- Se o print é a própria configuração (caixas de jornada, bimestre, fórmula), diga o que ficou de fora.
+- Não chute número de nota. Se o print mostra traço, diga que está vazio.
+
+Configuração atual do sistema:
+{$config}
+PROMPT;
+
+        try {
+            $raw = $this->openai->chatCompletion(
+                [[
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $mensagem],
+                        ['type' => 'image_url', 'image_url' => ['url' => $imagem, 'detail' => 'high']],
+                    ],
+                ]],
+                $prompt,
+                'gpt-4o-mini',
+                0.1,
+                1200,
+                false
+            );
+        } catch (Throwable $e) {
+            error_log('BoletimConsultaAssistenteService print: ' . $e->getMessage());
+
+            return ['success' => false, 'error' => 'Não deu para ler o print agora. Tente de novo.'];
+        }
+
+        $texto = $this->limparRespostaFinal(trim((string) ($raw['resposta'] ?? '')));
+        if ($texto === '') {
+            $texto = 'Li o print, mas não fechei o que está errado. Cole de novo a parte da tela com as caixas ou a tabela.';
+        }
+
+        return ['success' => true, 'mensagem' => $texto];
+    }
+
+    /**
+     * @param array<string,mixed>|null $estado
+     */
+    private function configuracaoParaComparar(?array $estado): string
+    {
+        if (!is_array($estado)) {
+            return 'Nenhuma configuração deste evento veio com o print.';
+        }
+        $opcoes = is_array($estado['pecas_opcoes'] ?? null) ? $estado['pecas_opcoes'] : [];
+        $pecas = [];
+        foreach ((array) ($estado['pecas'] ?? []) as $peca) {
+            $peca = trim((string) $peca);
+            if ($peca === '') {
+                continue;
+            }
+            $opt = is_array($opcoes[$peca] ?? null) ? $opcoes[$peca] : [];
+            $ids = is_array($opt['blocos_ids'] ?? null) ? $opt['blocos_ids'] : [];
+            $pecas[] = [
+                'peca' => $peca,
+                'bimestres' => array_values(array_map('intval', (array) ($opt['bimestres'] ?? []))),
+                'papel' => (string) ($opt['papel'] ?? ''),
+                'eventos_marcados' => count($ids),
+                'escolheu_eventos_na_mao' => !empty($opt['blocos_ids_manual']),
+            ];
+        }
+        $formulas = [];
+        $nomes = is_array($estado['nomes_blocos'] ?? null) ? $estado['nomes_blocos'] : [];
+        foreach ((array) ($estado['formulas_blocos'] ?? []) as $cod => $tokens) {
+            $rotulo = trim((string) ($nomes[$cod] ?? $cod));
+            $texto = $this->formulaTexto($tokens);
+            if ($rotulo !== '' && $texto !== '') {
+                $formulas[] = $rotulo . ' = ' . $texto;
+            }
+        }
+        $jornadaIds = is_array($estado['jornada_ids'] ?? null) ? $estado['jornada_ids'] : [];
+        $resumo = [
+            'passo' => (string) ($estado['passo'] ?? ''),
+            'nome' => (string) ($estado['nome'] ?? ''),
+            'ano_letivo' => (int) ($estado['ano_letivo'] ?? 0),
+            'bimestre_evento' => (int) ($estado['bimestre'] ?? 0),
+            'pecas_marcadas' => $pecas,
+            'jornada' => [
+                'entra_no_evento' => in_array('jornada', array_map('strval', (array) ($estado['pecas'] ?? [])), true),
+                'modo' => (string) ($estado['jornada_modo'] ?? ''),
+                'bimestres' => array_values(array_map('intval', (array) ($estado['jornada_bimestres'] ?? []))),
+                'quantidade_marcada' => count($jornadaIds),
+                'nota' => (string) ($estado['jornada_nota_modo'] ?? ''),
+            ],
+            'formulas' => $formulas,
+            'aluno_na_previa' => (int) ($estado['aluno_preview_id'] ?? 0) > 0,
+            'colunas' => array_values(array_map('strval', (array) ($estado['colunas_ordem'] ?? []))),
+        ];
+        $json = json_encode($resumo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return is_string($json) ? $json : '{}';
     }
 
     /**

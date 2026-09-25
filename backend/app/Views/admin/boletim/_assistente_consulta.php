@@ -14,7 +14,7 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-900">Assistente do evento de notas</h3>
-                    <p class="text-xs text-slate-500">Como montar o cálculo, e a nota, o lançamento ou a jornada de um aluno.</p>
+                    <p class="text-xs text-slate-500">Pergunte, ou cole um print para conferir o que está errado ou não marcado.</p>
                 </div>
                 <button type="button" id="bw-consulta-fechar" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -22,7 +22,7 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             </div>
             <div id="bw-consulta-msgs" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm bg-white">
                 <div class="bg-indigo-50 border border-indigo-100 text-slate-700 rounded-lg px-3 py-2">
-                    Pergunte como montar a média ou peça um dado real. Nota, jornada e lançamento só entram se o sistema encontrar. Sem chute.
+                    Pergunte como montar a média, peça um dado real, ou cole um print (Ctrl+V). O print é comparado com o que está marcado neste evento.
                 </div>
             </div>
             <div class="px-3 pt-2 flex flex-wrap gap-1.5 border-t border-slate-100 bg-white">
@@ -31,9 +31,16 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Quantas jornadas a Alice Cardoso Mariano fez no 1º bimestre?">Jornadas de um aluno</button>
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Qual a nota da avaliação bimestral de Matemática da Alice Cardoso Mariano?">Nota bimestral</button>
             </div>
-            <form id="bw-consulta-form" class="p-3 flex gap-2 bg-slate-50">
-                <textarea id="bw-consulta-input" rows="2" class="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Ex.: quantas jornadas o aluno fez, ou a nota bimestral de Matemática"></textarea>
-                <button type="submit" id="bw-consulta-enviar" class="self-end px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">Enviar</button>
+            <form id="bw-consulta-form" class="p-3 flex flex-col gap-2 bg-slate-50">
+                <div id="bw-consulta-print" class="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-2 py-1.5">
+                    <img id="bw-consulta-print-img" alt="Print colado" class="h-10 w-16 object-cover rounded">
+                    <span class="text-xs text-slate-600 flex-1">Print pronto para conferir</span>
+                    <button type="button" id="bw-consulta-print-limpar" class="text-xs text-slate-500 hover:text-slate-800">Tirar</button>
+                </div>
+                <div class="flex gap-2">
+                    <textarea id="bw-consulta-input" rows="2" class="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none" placeholder="Pergunte ou cole um print com Ctrl+V"></textarea>
+                    <button type="submit" id="bw-consulta-enviar" class="self-end px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">Enviar</button>
+                </div>
             </form>
         </div>
         <button type="button" id="bw-consulta-toggle" class="inline-flex items-center justify-center w-14 h-14 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Abrir assistente" title="Perguntar sobre boletim e notas">
@@ -52,8 +59,12 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
     var input = document.getElementById('bw-consulta-input');
     var msgs = document.getElementById('bw-consulta-msgs');
     var btn = document.getElementById('bw-consulta-enviar');
+    var printBox = document.getElementById('bw-consulta-print');
+    var printImg = document.getElementById('bw-consulta-print-img');
+    var printLimpar = document.getElementById('bw-consulta-print-limpar');
     var historico = [];
     var enviando = false;
+    var imagemPendente = null;
 
     function abrir(foco) {
         panel.classList.remove('hidden');
@@ -64,14 +75,57 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
         panel.classList.add('hidden');
         toggle.classList.remove('hidden');
     }
-    function bolha(role, texto) {
+    function bolha(role, texto, imagem) {
         var el = document.createElement('div');
         el.className = role === 'user'
             ? 'ml-10 bg-indigo-600 text-white rounded-lg px-3 py-2 whitespace-pre-wrap'
             : 'mr-6 bg-slate-100 text-slate-800 rounded-lg px-3 py-2 whitespace-pre-wrap';
-        el.textContent = texto || '';
+        if (imagem) {
+            var img = document.createElement('img');
+            img.src = imagem;
+            img.alt = 'Print enviado';
+            img.className = 'mb-2 max-h-28 rounded border border-white/30';
+            el.appendChild(img);
+        }
+        el.appendChild(document.createTextNode(texto || ''));
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
+    }
+    function mostrarPrint(dataUrl) {
+        imagemPendente = dataUrl;
+        if (printImg) printImg.src = dataUrl;
+        if (printBox) {
+            printBox.classList.remove('hidden');
+            printBox.classList.add('flex');
+        }
+    }
+    function limparPrint() {
+        imagemPendente = null;
+        if (printImg) printImg.removeAttribute('src');
+        if (printBox) {
+            printBox.classList.add('hidden');
+            printBox.classList.remove('flex');
+        }
+    }
+    function lerArquivoImagem(file) {
+        if (!file || String(file.type || '').indexOf('image/') !== 0) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+            var img = new Image();
+            img.onload = function () {
+                var max = 1400;
+                var escala = Math.min(1, max / Math.max(img.width, img.height));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.width * escala));
+                canvas.height = Math.max(1, Math.round(img.height * escala));
+                var ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                mostrarPrint(canvas.toDataURL('image/jpeg', 0.72));
+            };
+            img.src = String(reader.result || '');
+        };
+        reader.readAsDataURL(file);
     }
     function estadoAtual() {
         try {
@@ -83,11 +137,14 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
     }
     function enviar(texto) {
         texto = String(texto || '').trim();
-        if (!texto || enviando) return;
+        var imagem = imagemPendente;
+        if ((!texto && !imagem) || enviando) return;
         enviando = true;
         if (btn) btn.disabled = true;
-        bolha('user', texto);
+        var textoBolha = texto || 'Conferir este print com a configuração do evento.';
+        bolha('user', textoBolha, imagem);
         if (input) input.value = '';
+        limparPrint();
         var espera = document.createElement('div');
         espera.className = 'mr-6 text-xs text-slate-500 px-3 py-2';
         espera.textContent = 'Consultando…';
@@ -96,6 +153,7 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
         var fd = new FormData();
         fd.append('_token', root.getAttribute('data-csrf') || '');
         fd.append('mensagem', texto);
+        if (imagem) fd.append('imagem', imagem);
         fd.append('historico', JSON.stringify(historico.slice(-8)));
         var est = estadoAtual();
         if (est) fd.append('wizard_estado', JSON.stringify(est));
@@ -108,7 +166,7 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             if (espera.parentNode) espera.parentNode.removeChild(espera);
             var resp = (j && j.success && j.mensagem) ? j.mensagem : ((j && (j.error || j.mensagem)) || 'Não deu para responder agora.');
             bolha('assistant', resp);
-            historico.push({ role: 'user', content: texto });
+            historico.push({ role: 'user', content: textoBolha });
             historico.push({ role: 'assistant', content: resp });
         }).catch(function () {
             if (espera.parentNode) espera.parentNode.removeChild(espera);
@@ -131,6 +189,17 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             enviar(input.value);
         }
     });
+    panel.addEventListener('paste', function (e) {
+        var items = (e.clipboardData && e.clipboardData.items) || [];
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].type && items[i].type.indexOf('image/') === 0) {
+                e.preventDefault();
+                lerArquivoImagem(items[i].getAsFile());
+                return;
+            }
+        }
+    });
+    if (printLimpar) printLimpar.addEventListener('click', limparPrint);
     root.querySelectorAll('.bw-consulta-atalho').forEach(function (b) {
         b.addEventListener('click', function () {
             abrir(false);
