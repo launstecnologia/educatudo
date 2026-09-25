@@ -525,6 +525,7 @@ class ExamController extends BaseController
 
         $this->viewWithLayout('professor', 'teacher/exams/bimestral', [
             'title' => 'Provas Bimestrais - EducaTudo',
+            'page_title' => 'Provas Bimestrais',
             'user' => $user,
             'professor' => $professor,
             'filters' => $filters,

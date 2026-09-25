@@ -1904,7 +1904,8 @@ if (!class_exists('TeacherController')) {
         }
         
         $data = [
-            'title' => 'Gerador de Slides - EducaTudo',
+            'title' => 'Educa Slides - EducaTudo',
+            'page_title' => 'Educa Slides',
             'professor' => $professor,
             'user' => $user,
             'current_page' => 'gerar-slides'
@@ -2106,6 +2107,9 @@ if (!class_exists('TeacherController')) {
      */
     public function jornadasRelatorio()
     {
+        $this->redirect(URL . '/professor/jornadas');
+        return;
+
         $user = $this->authManager->getUser();
         $professorId = (int) ($user['id'] ?? 0);
         if ($professorId <= 0) {

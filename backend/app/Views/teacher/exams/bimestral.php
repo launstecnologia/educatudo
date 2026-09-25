@@ -1,137 +1,184 @@
-<div class="mb-8">
-    <div class="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Provas Bimestrais</h1>
-            <p class="text-gray-600 mt-2">Filtre, selecione e baixe em um único documento as provas que você criou.</p>
+<?php
+$ui = __DIR__ . '/../../admin/_partials/ui';
+$filters = is_array($filters ?? null) ? $filters : [];
+
+$filtrosAtivos = 0;
+if (trim((string) ($filters['busca'] ?? '')) !== '') {
+    $filtrosAtivos++;
+}
+if ((int) ($filters['turma_id'] ?? 0) > 0) {
+    $filtrosAtivos++;
+}
+if ((int) ($filters['ano'] ?? 0) > 0) {
+    $filtrosAtivos++;
+}
+
+$opcoesTurma = ['0' => 'Todas as turmas'];
+foreach (($turmas ?? []) as $turma) {
+    $opcoesTurma[(string) (int) ($turma['id'] ?? 0)] = (string) ($turma['nome'] ?? '');
+}
+$opcoesAno = ['0' => 'Todos os anos'];
+foreach (($anos ?? []) as $ano) {
+    $valorAno = (int) ($ano['ano'] ?? 0);
+    if ($valorAno > 0) {
+        $opcoesAno[(string) $valorAno] = (string) $valorAno;
+    }
+}
+
+ob_start();
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Voltar para Minhas Provas';
+$ui_btn_href = URL . '/professor/provas';
+include $ui . '/btn.php';
+
+$ui_btn_variant = 'filtro';
+$ui_btn_label = 'Filtros';
+$ui_btn_icon = 'fa-solid fa-filter';
+$ui_btn_onclick = 'openFiltroDrawer()';
+$ui_btn_filter_count = $filtrosAtivos;
+$ui_btn_href = '';
+include $ui . '/btn.php';
+$page_header_actions = ob_get_clean();
+
+$page_header_title = 'Provas Bimestrais';
+$page_header_subtitle = 'Filtre, selecione e baixe em um único documento as provas que você criou.';
+include __DIR__ . '/../../admin/_partials/page_header_list.php';
+?>
+
+<form method="POST" action="<?= URL ?>/professor/provas-bimestral/baixar" id="form-provas-bimestral" class="space-y-4">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-wrap items-center justify-between gap-3">
+        <label class="inline-flex items-center gap-3 text-sm text-gray-700">
+            <input type="checkbox" id="selecionar-todas" class="rounded border-gray-300 w-4 h-4">
+            Selecionar todas as provas visíveis
+        </label>
+        <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-500"><?= count($provas ?? []) ?> prova(s)</span>
+            <?php
+            $ui_btn_variant = 'confirm';
+            $ui_btn_label = 'Baixar documento';
+            $ui_btn_type = 'submit';
+            $ui_btn_icon = '';
+            $ui_btn_onclick = '';
+            $ui_btn_href = '';
+            $ui_btn_attrs = '';
+            include $ui . '/btn.php';
+            ?>
         </div>
-        <a href="<?= URL ?>/professor/provas" class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
-            Voltar para Minhas Provas
-        </a>
     </div>
-</div>
 
-<div class="bg-white rounded-xl shadow-lg mb-8">
-    <div class="p-6 border-b border-gray-200">
-        <h2 class="text-xl font-semibold text-gray-900">Filtros</h2>
-    </div>
-    <div class="p-6">
-        <form method="GET" action="<?= URL ?>/professor/provas-bimestral" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
-                <input type="text" name="busca" value="<?= htmlspecialchars($filters['busca'] ?? '') ?>" placeholder="Título, matéria ou turma" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Turma</label>
-                <select name="turma_id" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                    <option value="0">Todas as turmas</option>
-                    <?php foreach (($turmas ?? []) as $turma): ?>
-                        <option value="<?= (int) $turma['id'] ?>" <?= (int) ($filters['turma_id'] ?? 0) === (int) $turma['id'] ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($turma['nome']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Ano</label>
-                <select name="ano" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                    <option value="0">Todos os anos</option>
-                    <?php foreach (($anos ?? []) as $ano): ?>
-                        <?php $valorAno = (int) ($ano['ano'] ?? 0); ?>
-                        <?php if ($valorAno > 0): ?>
-                            <option value="<?= $valorAno ?>" <?= (int) ($filters['ano'] ?? 0) === $valorAno ? 'selected' : '' ?>>
-                                <?= $valorAno ?>
-                            </option>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="flex items-end gap-3">
-                <button type="submit" class="inline-flex items-center px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700">
-                    Filtrar
-                </button>
-                <a href="<?= URL ?>/professor/provas-bimestral" class="inline-flex items-center px-4 py-2.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                    Limpar
-                </a>
-            </div>
-        </form>
-    </div>
-</div>
+    <?php
+    ob_start();
+    if (empty($provas)):
+        $ui_tabela_vazia_colspan = 7;
+        $ui_tabela_vazia_icone = 'fa-solid fa-file-lines';
+        $ui_tabela_vazia_mensagem = 'Nenhuma prova encontrada com os filtros atuais.';
+        include $ui . '/tabela_vazia.php';
+    else:
+        foreach ($provas as $prova):
+            $inicio = !empty($prova['data_inicio']) ? date('d/m/Y H:i', strtotime($prova['data_inicio'])) : '—';
+            $fim = !empty($prova['data_fim']) ? date('d/m/Y H:i', strtotime($prova['data_fim'])) : '—';
+            ?>
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    <input type="checkbox" name="provas[]" value="<?= (int) $prova['id'] ?>" class="checkbox-prova rounded border-gray-300 w-4 h-4">
+                </td>
+                <td class="px-6 py-4">
+                    <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($prova['titulo'] ?? '')) ?></div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars((string) ($prova['materia_nome'] ?? '—')) ?></td>
+                <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars((string) ($prova['turmas_exibicao'] ?? 'Todas as turmas')) ?></td>
+                <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap"><?= (int) ($prova['ano_referencia'] ?? 0) ?: '—' ?></td>
+                <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">
+                    <?= htmlspecialchars($inicio) ?>
+                    <div class="text-xs text-gray-500">até <?= htmlspecialchars($fim) ?></div>
+                </td>
+                <td class="px-6 py-4 text-right whitespace-nowrap">
+                    <?php
+                    $ui_btn_variant = 'detalhes';
+                    $ui_btn_label = 'Ver prova';
+                    $ui_btn_href = URL . '/professor/provas/visualizar/' . (int) $prova['id'];
+                    $ui_btn_type = 'button';
+                    include $ui . '/btn.php';
+                    ?>
+                </td>
+            </tr>
+            <?php
+        endforeach;
+    endif;
+    $ui_tabela_body = ob_get_clean();
+    $ui_tabela_colunas = [
+        ['label' => '', 'class' => 'px-6 py-3 w-12'],
+        'Título',
+        'Matéria',
+        'Turma(s)',
+        'Ano',
+        'Período',
+        ['label' => 'Ações', 'class' => 'px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider'],
+    ];
+    include $ui . '/tabela.php';
+    ?>
+</form>
 
-<div class="bg-white rounded-xl shadow-lg">
-    <div class="p-6 border-b border-gray-200 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-            <h2 class="text-xl font-semibold text-gray-900">Selecione as provas</h2>
-            <p class="text-sm text-gray-600 mt-1"><?= count($provas ?? []) ?> prova(s) encontrada(s)</p>
-        </div>
-    </div>
-    <div class="p-6">
-        <?php if (empty($provas)): ?>
-            <div class="text-center py-12 text-gray-500">
-                Nenhuma prova encontrada com os filtros atuais.
-            </div>
-        <?php else: ?>
-            <form method="POST" action="<?= URL ?>/professor/provas-bimestral/baixar" id="form-provas-bimestral">
-                <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                    <label class="inline-flex items-center gap-3 text-sm text-gray-700">
-                        <input type="checkbox" id="selecionar-todas" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                        Selecionar todas as provas visíveis
-                    </label>
-                    <button type="submit" class="inline-flex items-center px-5 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700">
-                        Baixar documento com selecionadas
-                    </button>
-                </div>
+<?php
+ob_start();
+?>
+<form method="get" action="<?= URL ?>/professor/provas-bimestral" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Buscar';
+        $ui_form_campo_name = 'busca';
+        $ui_form_campo_tipo = 'text';
+        $ui_form_campo_value = (string) ($filters['busca'] ?? '');
+        $ui_form_campo_placeholder = 'Título, matéria ou turma';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
 
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Selecionar</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matéria</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma(s)</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            <?php foreach ($provas as $prova): ?>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-4 py-4 align-top">
-                                        <input type="checkbox" name="provas[]" value="<?= (int) $prova['id'] ?>" class="checkbox-prova rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($prova['titulo'] ?? '') ?></div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-700"><?= htmlspecialchars($prova['materia_nome'] ?? '—') ?></div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-700"><?= htmlspecialchars($prova['turmas_exibicao'] ?? 'Todas as turmas') ?></div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-700"><?= (int) ($prova['ano_referencia'] ?? 0) ?: '—' ?></div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="text-sm text-gray-700">
-                                            <?= !empty($prova['data_inicio']) ? date('d/m/Y H:i', strtotime($prova['data_inicio'])) : '—' ?><br>
-                                            <span class="text-xs text-gray-500">até <?= !empty($prova['data_fim']) ? date('d/m/Y H:i', strtotime($prova['data_fim'])) : '—' ?></span>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="<?= URL ?>/professor/provas/visualizar/<?= (int) $prova['id'] ?>" class="text-blue-600 hover:text-blue-900 text-sm font-medium">
-                                            Ver prova
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </form>
-        <?php endif; ?>
+        $ui_form_campo_label = 'Turma';
+        $ui_form_campo_name = 'turma_id';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesTurma;
+        $ui_form_campo_value = (string) (int) ($filters['turma_id'] ?? 0);
+        $ui_form_campo_placeholder = '';
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Ano';
+        $ui_form_campo_name = 'ano';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesAno;
+        $ui_form_campo_value = (string) (int) ($filters['ano'] ?? 0);
+        include $ui . '/form_campo.php';
+        ?>
     </div>
-</div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = URL . '/professor/provas-bimestral';
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_attrs = '';
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'confirm';
+        $ui_btn_label = 'Aplicar filtros';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

@@ -56,7 +56,8 @@ class TeacherRedacaoLivreController extends BaseController
 
     private function ensureRedacaoLivreEnabled($json = false)
     {
-        $enabled = LayoutHelper::get('module_professor_redacao_livre', '0') === '1';
+        // Tela pausada. Remover esta linha para voltar a respeitar o módulo no Master.
+        $enabled = false && LayoutHelper::get('module_professor_redacao_livre', '0') === '1';
         if (!$enabled) {
             if ($json) {
                 $this->json(['error' => 'O módulo Redação Livre está desabilitado.'], 403);

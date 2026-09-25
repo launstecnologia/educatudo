@@ -336,14 +336,6 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         </svg>
                         <span class="sidebar-text text-sm">Jornada do Aluno</span>
                     </a>
-                    <a href="<?= $jornadasEnabled ? URL . '/professor/jornadas/relatorio' : '#' ?>"
-                       onclick="<?= $jornadasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Jornada do Aluno\'); return false;' ?>"
-                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'jornadas_relatorio' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$jornadasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                        <span class="sidebar-text text-sm">Relatório de jornadas</span>
-                    </a>
                     <?php endif; ?>
                     
                     <!-- Provas Online -->
@@ -428,8 +420,8 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </details>
                     <?php endif; ?>
 
-                    <!-- Redação Livre -->
-                    <?php if (!empty($modulosProfessor['professor_redacao_livre'])): ?>
+                    <!-- Redação Livre pausada. Trocar para o if do módulo para voltar a exibir. -->
+                    <?php if (false && !empty($modulosProfessor['professor_redacao_livre'])): ?>
                     <a href="<?= URL ?>/professor/redacao-livre"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'redacao-livre' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -504,12 +496,12 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             <?php if (LayoutHelper::isModuleEnabled('professor_gerar_slides')): ?>
             <?php $gerarSlidesEnabled = $modulosProfessor['professor_gerar_slides']; ?>
             <a href="<?= $gerarSlidesEnabled ? URL . '/professor/gerar-slides' : '#' ?>" 
-               onclick="<?= $gerarSlidesEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Gerar Slides\'); return false;' ?>"
+               onclick="<?= $gerarSlidesEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Educa Slides\'); return false;' ?>"
                class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'gerar-slides' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 <?= !$gerarSlidesEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
                 </svg>
-                <span class="sidebar-text">Gerar Slides</span>
+                <span class="sidebar-text">Educa Slides</span>
             </a>
             <?php endif; ?>
             

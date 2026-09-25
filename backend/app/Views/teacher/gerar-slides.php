@@ -1,122 +1,118 @@
-<!-- Header Section -->
-<div class="mb-8">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Gerador de Slides com IA 📘</h1>
-            <p class="text-gray-600 mt-2">Crie apresentações profissionais automaticamente usando a Gamma API</p>
-        </div>
-        <div>
-            <a href="<?= URL ?>/professor/meus-slides" 
-               class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                Meus Slides
-            </a>
-        </div>
-    </div>
-</div>
+<?php
+$ui = __DIR__ . '/../admin/_partials/ui';
+ob_start();
+$ui_btn_variant = 'primary';
+$ui_btn_label = 'Meus Slides';
+$ui_btn_href = URL . '/professor/meus-slides';
+$ui_btn_icon = 'fa-solid fa-folder-open';
+include $ui . '/btn.php';
+$page_header_actions = ob_get_clean();
+$page_header_title = 'Educa Slides';
+$page_header_subtitle = 'Crie apresentações a partir do conteúdo da aula.';
+include __DIR__ . '/../admin/_partials/page_header_list.php';
+?>
 
-<!-- Formulário de Geração -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <h2 class="text-xl font-bold mb-4">Gerar Slide da Aula</h2>
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-6">Nova apresentação</h2>
 
-    <form id="formGerarSlides" class="space-y-6">
-        <div>
-            <label for="conteudo" class="block mb-2 font-semibold text-gray-700">Conteúdo da Aula</label>
-            <textarea 
-                id="conteudo" 
-                name="conteudo"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" 
-                rows="8"
-                placeholder="Digite o conteúdo da aula que deseja transformar em slides. Você pode incluir títulos, objetivos, tópicos, explicações, exemplos, etc."
-                required
-            ></textarea>
-            <p class="text-sm text-gray-500 mt-1">Descreva o conteúdo que será transformado em slides</p>
-        </div>
+    <form id="formGerarSlides">
+        <?php
+        $ui_form_campo_label = 'Conteúdo da aula';
+        $ui_form_campo_name = 'conteudo';
+        $ui_form_campo_id = 'conteudo';
+        $ui_form_campo_tipo = 'textarea';
+        $ui_form_campo_rows = 8;
+        $ui_form_campo_placeholder = 'Digite o conteúdo da aula. Você pode incluir títulos, objetivos, tópicos, explicações e exemplos.';
+        $ui_form_campo_ajuda = 'Descreva o conteúdo que será transformado em slides.';
+        $ui_form_campo_obrigatorio = true;
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-6';
+        include $ui . '/form_campo.php';
+        ?>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-                <label for="slides" class="block mb-2 font-semibold text-gray-700">Número de Slides</label>
-                <input 
-                    type="number" 
-                    id="slides" 
-                    name="slides"
-                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" 
-                    min="3" 
-                    max="30" 
-                    value="8"
-                    required
-                />
-                <p class="text-sm text-gray-500 mt-1">Entre 3 e 30 slides</p>
-            </div>
+            <?php
+            $ui_form_campo_label = 'Número de slides';
+            $ui_form_campo_name = 'slides';
+            $ui_form_campo_id = 'slides';
+            $ui_form_campo_tipo = 'number';
+            $ui_form_campo_value = '8';
+            $ui_form_campo_obrigatorio = true;
+            $ui_form_campo_placeholder = '';
+            $ui_form_campo_ajuda = 'Entre 3 e 30 slides.';
+            $ui_form_campo_span = 'half';
+            $ui_form_campo_mb = '';
+            $ui_form_campo_attrs_extra = '';
+            include $ui . '/form_campo.php';
 
-            <div>
-                <label for="tema" class="block mb-2 font-semibold text-gray-700">Modelo (Tema Gamma)</label>
-                <select 
-                    id="tema" 
-                    name="tema"
-                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                    <option value="">Padrão (Auto)</option>
-                    <option value="clean">Clean</option>
-                    <option value="modern">Modern</option>
-                    <option value="simple">Simple</option>
-                    <option value="dark">Dark Mode</option>
-                </select>
-                <p class="text-sm text-gray-500 mt-1">Escolha o estilo visual da apresentação</p>
-            </div>
+            $ui_form_campo_label = 'Modelo';
+            $ui_form_campo_name = 'tema';
+            $ui_form_campo_id = 'tema';
+            $ui_form_campo_tipo = 'select';
+            $ui_form_campo_value = '';
+            $ui_form_campo_opcoes = [
+                '' => 'Padrão (Auto)',
+                'clean' => 'Clean',
+                'modern' => 'Modern',
+                'simple' => 'Simple',
+                'dark' => 'Dark Mode',
+            ];
+            $ui_form_campo_ajuda = 'Estilo visual da apresentação.';
+            $ui_form_campo_obrigatorio = false;
+            include $ui . '/form_campo.php';
 
-            <div>
-                <label for="nivelDetalhamento" class="block mb-2 font-semibold text-gray-700">Conteúdo de Texto</label>
-                <select 
-                    id="nivelDetalhamento" 
-                    name="nivelDetalhamento"
-                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                    <option value="brief">Mínimo</option>
-                    <option value="medium" selected>Conciso</option>
-                    <option value="detailed">Detalhado</option>
-                    <option value="extensive">Extenso</option>
-                </select>
-                <p class="text-sm text-gray-500 mt-1">Nível de detalhamento do conteúdo</p>
-            </div>
+            $ui_form_campo_label = 'Conteúdo de texto';
+            $ui_form_campo_name = 'nivelDetalhamento';
+            $ui_form_campo_id = 'nivelDetalhamento';
+            $ui_form_campo_tipo = 'select';
+            $ui_form_campo_value = 'medium';
+            $ui_form_campo_opcoes = [
+                'brief' => 'Mínimo',
+                'medium' => 'Conciso',
+                'detailed' => 'Detalhado',
+                'extensive' => 'Extenso',
+            ];
+            $ui_form_campo_ajuda = 'Nível de detalhamento do conteúdo.';
+            include $ui . '/form_campo.php';
+            ?>
         </div>
 
-        <!-- Opções de Imagem -->
-        <div>
-            <label for="estiloImagem" class="block mb-2 font-semibold text-gray-700">Estilo de Arte da Imagem</label>
-            <select 
-                id="estiloImagem" 
-                name="estiloImagem"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            >
-                <option value="">Automático (Auto)</option>
-                <option value="illustration">Ilustração</option>
-                <option value="photo">Foto</option>
-                <option value="abstract">Abstrato</option>
-                <option value="3d">3D</option>
-                <option value="line-art">Arte Linear</option>
-                <option value="custom">Personalizado</option>
-            </select>
-            <p class="text-sm text-gray-500 mt-1">Estilo visual das imagens geradas</p>
+        <div class="mt-6">
+            <?php
+            $ui_form_campo_label = 'Estilo das imagens';
+            $ui_form_campo_name = 'estiloImagem';
+            $ui_form_campo_id = 'estiloImagem';
+            $ui_form_campo_tipo = 'select';
+            $ui_form_campo_value = '';
+            $ui_form_campo_opcoes = [
+                '' => 'Automático (Auto)',
+                'illustration' => 'Ilustração',
+                'photo' => 'Foto',
+                'abstract' => 'Abstrato',
+                '3d' => '3D',
+                'line-art' => 'Arte linear',
+                'custom' => 'Personalizado',
+            ];
+            $ui_form_campo_ajuda = 'Estilo visual das imagens geradas.';
+            $ui_form_campo_span = 'full';
+            $ui_form_campo_mb = 'mb-6';
+            include $ui . '/form_campo.php';
+            ?>
         </div>
 
-        <button 
-            type="submit" 
+        <button
+            type="submit"
             id="btnGerar"
-            class="w-full bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors duration-200 flex items-center justify-center"
+            class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm"
         >
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-            <span id="btnText">Gerar Slide</span>
+            <i class="fa-solid fa-wand-magic-sparkles mr-2"></i>
+            <span id="btnText">Gerar apresentação</span>
         </button>
     </form>
 </div>
 
 <!-- Resultado -->
-<div id="resultado" class="bg-white rounded-xl shadow-lg p-6 hidden">
+<div id="resultado" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hidden mt-6">
     <h2 class="text-xl font-bold mb-4">Apresentação Gerada</h2>
     <div id="resultadoContent"></div>
 </div>
@@ -125,7 +121,7 @@
 <div id="loadingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-xl p-8 max-w-md w-full mx-4">
         <div class="flex flex-col items-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Gerando Apresentação...</h3>
             <p class="text-sm text-gray-600 text-center">Isso pode levar alguns segundos. Por favor, aguarde.</p>
         </div>
@@ -204,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     return `
                                         <div class="border border-gray-300 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
                                             <div class="flex items-start">
-                                                <span class="flex-shrink-0 w-8 h-8 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-semibold text-sm mr-3">
+                                                <span class="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-semibold text-sm mr-3">
                                                     ${index + 1}
                                                 </span>
                                                 <div class="flex-1 min-w-0">
@@ -245,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 href="${data.url}" 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                class="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors text-center"
+                                class="flex-1 inline-flex items-center justify-center bg-primary text-primary px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors text-center"
                             >
                                 <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
@@ -254,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </a>
                             <button 
                                 onclick="copiarLink('${data.url}')"
-                                class="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+                                class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                             >
                                 <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -265,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         <div class="border border-gray-200 rounded-lg p-8 bg-gray-50 text-center">
                             <div class="max-w-md mx-auto">
-                                <svg class="w-16 h-16 text-purple-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-16 h-16 text-blue-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>
                                 <h3 class="text-lg font-semibold text-gray-900 mb-2">Apresentação Pronta!</h3>
@@ -313,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } finally {
             // Reabilitar botão e esconder loading
             btnGerar.disabled = false;
-            btnText.textContent = 'Gerar Slide';
+            btnText.textContent = 'Gerar apresentação';
             loadingOverlay.classList.add('hidden');
         }
     });
