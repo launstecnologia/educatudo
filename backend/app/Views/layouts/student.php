@@ -1496,12 +1496,13 @@
                     var texto = elemento.querySelector('.sidebar-text');
                     return (texto ? texto.textContent : elemento.textContent).trim();
                 }
-                function ordenarItensMenu(container, manterSairPorUltimo) {
+                function ordenarItensMenu(container, manterSairPorUltimo, manterDashboardPrimeiro) {
                     if (!container) {
                         return;
                     }
                     var filhos = Array.prototype.slice.call(container.children);
                     var sair = null;
+                    var dashboard = null;
                     var ordenaveis = [];
                     filhos.forEach(function (elemento) {
                         var href = elemento.getAttribute ? (elemento.getAttribute('href') || '') : '';
@@ -1509,11 +1510,18 @@
                             sair = elemento;
                             return;
                         }
+                        if (manterDashboardPrimeiro && elemento.tagName === 'A' && href.indexOf('/dashboard') !== -1 && href.indexOf('#') === -1) {
+                            dashboard = elemento;
+                            return;
+                        }
                         ordenaveis.push(elemento);
                     });
                     ordenaveis.sort(function (a, b) {
                         return rotuloMenu(a).localeCompare(rotuloMenu(b), 'pt', { sensitivity: 'base', numeric: true });
                     });
+                    if (dashboard) {
+                        container.appendChild(dashboard);
+                    }
                     ordenaveis.forEach(function (elemento) {
                         container.appendChild(elemento);
                     });
@@ -1522,7 +1530,7 @@
                     }
                 }
                 var navAluno = document.querySelector('#sidebar nav');
-                ordenarItensMenu(navAluno, true);
+                ordenarItensMenu(navAluno, true, true);
                 ['colag-submenu', 'estudo-submenu', 'sistema-submenu'].forEach(function (id) {
                     ordenarItensMenu(document.getElementById(id), false);
                 });
