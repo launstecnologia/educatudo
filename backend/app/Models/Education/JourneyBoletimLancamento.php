@@ -158,6 +158,46 @@ class JourneyBoletimLancamento
     }
 
     /**
+     * Jornadas ativas daquele bimestre, sem limite das mais recentes.
+     *
+     * @param list<int> $bimestres
+     * @return list<int>
+     */
+    public function listarIdsPorBimestre(array $bimestres, int $anoLetivo = 0): array
+    {
+        $bims = array_values(array_unique(array_filter(array_map('intval', $bimestres), static fn ($b) => $b >= 1 && $b <= 4)));
+        if ($bims === [] || !$this->db->tableExists('jornadas')) {
+            return [];
+        }
+        $params = [];
+        $ph = [];
+        foreach ($bims as $i => $bim) {
+            $k = 'bim' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $bim;
+        }
+        $sql = 'SELECT j.id
+                  FROM jornadas j
+                 WHERE (j.ativo = 1 OR j.ativo IS NULL)
+                   AND j.bimestre IN (' . implode(',', $ph) . ')';
+        if ($anoLetivo > 0) {
+            $sql .= ' AND (j.ano_letivo IS NULL OR j.ano_letivo = 0 OR j.ano_letivo = :ano)';
+            $params['ano'] = $anoLetivo;
+        }
+        $sql .= ' ORDER BY j.id ASC';
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
      * Jornadas escolhidas na regra do boletim: por ID + turma, sem filtrar por datas da jornada
      * (evita escopo vazio quando o bimestre não intercepta data_inicio/fim da jornada).
      *

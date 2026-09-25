@@ -198,22 +198,19 @@ class BoletimAssistenteFerramentas
         if ($bims === []) {
             return [];
         }
-        $ids = [];
-        foreach ($this->listarJornadas(300) as $j) {
-            $jb = (int) ($j['bimestre'] ?? 0);
-            if (!in_array($jb, $bims, true)) {
-                continue;
-            }
-            $ja = (int) ($j['ano_letivo'] ?? 0);
-            if ($anoLetivo > 0 && $ja > 0 && $ja !== $anoLetivo) {
-                continue;
-            }
-            $id = (int) ($j['id'] ?? 0);
-            if ($id > 0) {
-                $ids[] = $id;
-            }
+        $path = __DIR__ . '/../Models/Education/JourneyBoletimLancamento.php';
+        if (!class_exists('JourneyBoletimLancamento', false) && is_file($path)) {
+            require_once $path;
         }
-        return array_values(array_unique($ids));
+        if (!class_exists('JourneyBoletimLancamento', false)) {
+            return [];
+        }
+        try {
+            return (new JourneyBoletimLancamento())->listarIdsPorBimestre($bims, $anoLetivo);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas::resolverIdsJornadaPorBimestre: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /**
