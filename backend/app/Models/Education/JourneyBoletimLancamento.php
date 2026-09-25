@@ -198,6 +198,43 @@ class JourneyBoletimLancamento
     }
 
     /**
+     * Jornadas ativas com bimestre preenchido, para a lista do Evento de Notas.
+     *
+     * @return list<array{id:int,titulo:string,bimestre:int,ano_letivo:?int}>
+     */
+    public function listarResumoParaBoletim(): array
+    {
+        if (!$this->db->tableExists('jornadas')) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT j.id, j.titulo, j.bimestre, j.ano_letivo
+               FROM jornadas j
+              WHERE (j.ativo = 1 OR j.ativo IS NULL)
+                AND j.bimestre BETWEEN 1 AND 4
+              ORDER BY j.bimestre ASC, j.titulo ASC
+              LIMIT 2000'
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $bim = (int) ($row['bimestre'] ?? 0);
+            if ($id <= 0 || $bim < 1 || $bim > 4) {
+                continue;
+            }
+            $ano = $row['ano_letivo'] ?? null;
+            $out[] = [
+                'id' => $id,
+                'titulo' => trim((string) ($row['titulo'] ?? '')),
+                'bimestre' => $bim,
+                'ano_letivo' => ($ano !== null && $ano !== '' && (int) $ano > 0) ? (int) $ano : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Jornadas escolhidas na regra do boletim: por ID + turma, sem filtrar por datas da jornada
      * (evita escopo vazio quando o bimestre não intercepta data_inicio/fim da jornada).
      *

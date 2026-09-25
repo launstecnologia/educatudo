@@ -568,13 +568,35 @@ $boletimWizardSteps = [
         });
     }
 
+    function dataProvaBr(iso) {
+        var s = String(iso || '').slice(0, 10);
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return m ? (m[3] + '/' + m[2] + '/' + m[1]) : '';
+    }
+
+    function tituloEventoLimpo(titulo) {
+        return String(titulo || '').replace(/\s+-\s+Bloco\s+[A-Za-z0-9]+(?:\s+-\s+.*)?$/i, '').trim();
+    }
+
     function labelEventoProva(ev) {
-        var parts = [];
-        parts.push(ev.titulo || ('Evento #' + ev.id));
-        if (ev.semana) parts.push('S' + ev.semana);
+        var titulo = tituloEventoLimpo(ev.titulo) || ('Evento #' + ev.id);
+        var parts = [titulo];
+        var data = dataProvaBr(ev.data_prova);
+        if (data) parts.push(data);
+        var bloco = String(ev.bloco || '').trim();
+        if (!bloco) {
+            var mb = String(ev.titulo || '').match(/Bloco\s+([A-Za-z0-9]+)/i);
+            if (mb) bloco = 'Bloco ' + mb[1].toUpperCase();
+        }
+        if (bloco) parts.push(bloco);
+        var sem = String(ev.semana_rotulo || '').trim();
+        if (!sem && ev.semana) sem = 'S' + ev.semana;
+        if (!sem) {
+            var ms = String(ev.titulo || '').match(/\b(S\d+)\b/i);
+            if (ms) sem = ms[1].toUpperCase();
+        }
+        if (sem) parts.push(sem);
         if (ev.bimestre) parts.push(ev.bimestre + 'º bim.');
-        if (ev.ano_letivo) parts.push(String(ev.ano_letivo));
-        if (ev.data_prova) parts.push(String(ev.data_prova).slice(0, 10));
         return parts.join(' · ');
     }
 
@@ -920,12 +942,15 @@ $boletimWizardSteps = [
 
     function jornadasDoBimestre(bim) {
         var ano = Number((estado && estado.ano_letivo) || 0);
-        return (catalogo.jornadas || []).filter(function (j) {
-            if (Number(j.bimestre) !== Number(bim)) return false;
-            var ja = Number(j.ano_letivo || 0);
-            if (ano > 0 && ja > 0 && ja !== ano) return false;
-            return true;
+        var todas = (catalogo.jornadas || []).filter(function (j) {
+            return Number(j.bimestre) === Number(bim);
         });
+        if (!(ano > 0)) return todas;
+        var noAno = todas.filter(function (j) {
+            var ja = Number(j.ano_letivo || 0);
+            return !(ja > 0 && ja !== ano);
+        });
+        return noAno.length ? noAno : todas;
     }
 
     function estadoVazio() {

@@ -105,7 +105,7 @@ class BoletimAssistenteWizard
 
         $jornadas = [];
         try {
-            $jornadas = $this->ferramentas->listarJornadas(120);
+            $jornadas = $this->ferramentas->listarJornadasDoBoletim();
         } catch (Throwable $e) {
             error_log('BoletimAssistenteWizard catalogo jornadas: ' . $e->getMessage());
         }
@@ -119,7 +119,7 @@ class BoletimAssistenteWizard
 
         $eventosProva = [];
         try {
-            $eventosProva = $this->ferramentas->listarEventosProva(null, 500);
+            $eventosProva = $this->ferramentas->listarEventosProva(null, 4000, $this->ferramentas->anoLetivoPadrao());
         } catch (Throwable $e) {
             error_log('BoletimAssistenteWizard catalogo eventos prova: ' . $e->getMessage());
         }

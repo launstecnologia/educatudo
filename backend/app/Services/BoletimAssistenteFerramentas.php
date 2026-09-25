@@ -214,6 +214,48 @@ class BoletimAssistenteFerramentas
     }
 
     /**
+     * Catálogo do assistente: jornadas com bimestre, sem cortar pelas mais novas nem pela turma.
+     *
+     * @return list<array{id:int,nome:string,materia_nome:?string,bimestre:?int,ano_letivo:?int}>
+     */
+    public function listarJornadasDoBoletim(): array
+    {
+        $path = __DIR__ . '/../Models/Education/JourneyBoletimLancamento.php';
+        if (!class_exists('JourneyBoletimLancamento', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('JourneyBoletimLancamento', false)) {
+            return [];
+        }
+        try {
+            $rows = (new JourneyBoletimLancamento())->listarResumoParaBoletim();
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas::listarJornadasDoBoletim: ' . $e->getMessage());
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $j) {
+            $id = (int) ($j['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => trim((string) ($j['titulo'] ?? '')) !== ''
+                    ? trim((string) $j['titulo'])
+                    : ('Jornada #' . $id),
+                'materia_nome' => null,
+                'bimestre' => (int) ($j['bimestre'] ?? 0),
+                'ano_letivo' => isset($j['ano_letivo']) && (int) $j['ano_letivo'] > 0
+                    ? (int) $j['ano_letivo']
+                    : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<array{id:int,nome:string,codigo:?string,ano_letivo:?int,bimestre:?int,exibir_em:?string,finalidade:string,formula_final:?string}>
      */
     public function listarRegras(int $limit = 100): array
@@ -373,9 +415,12 @@ class BoletimAssistenteFerramentas
      *
      * @return list<array{id:int,titulo:string,tipo_avaliacao_id:?int,tipo_avaliacao_nome:?string,data_prova:?string,ano_letivo:?int,bimestre:?int}>
      */
-    public function listarEventosProva(?int $tipoAvaliacaoId = null, int $limit = 200): array
+    public function listarEventosProva(?int $tipoAvaliacaoId = null, int $limit = 200, int $anoLetivo = 0): array
     {
-        $limit = max(1, min($limit, 500));
+        $porAno = $anoLetivo >= 2000 && $anoLetivo <= 2100;
+        $porTipo = $tipoAvaliacaoId !== null && $tipoAvaliacaoId > 0;
+        $teto = ($porAno || $porTipo) ? 4000 : 500;
+        $limit = max(1, min($limit, $teto));
         $temTipo = $this->temColuna('provas_blocos', 'tipo_avaliacao_id')
             && $this->temTabela('provas_tipos_avaliacao');
 
@@ -399,6 +444,16 @@ class BoletimAssistenteFerramentas
             $sql .= ' AND pb.tipo_avaliacao_id = :tipo_id';
             $params['tipo_id'] = $tipoAvaliacaoId;
         }
+        if ($anoLetivo >= 2000 && $anoLetivo <= 2100 && $this->temColuna('provas_blocos', 'ano_letivo')) {
+            $sql .= ' AND (
+                pb.ano_letivo = :ano
+                OR pb.ano_letivo IS NULL
+                OR pb.ano_letivo = 0
+                OR YEAR(pb.data_prova) = :ano_data
+            )';
+            $params['ano'] = $anoLetivo;
+            $params['ano_data'] = $anoLetivo;
+        }
         $sql .= " ORDER BY pb.data_prova DESC, pb.id DESC LIMIT {$limit}";
 
         $rows = $this->db->fetchAll($sql, $params) ?: [];
@@ -417,12 +472,70 @@ class BoletimAssistenteFerramentas
                 'tipo_avaliacao_nome' => isset($row['tipo_avaliacao_nome']) ? trim((string) $row['tipo_avaliacao_nome']) : null,
                 'chave_quadro' => $chaveEv !== '' ? $chaveEv : null,
                 'semana' => ($semanaEv >= 1 && $semanaEv <= 8) ? $semanaEv : null,
+                'bloco' => null,
+                'semana_rotulo' => null,
                 'data_prova' => isset($row['data_prova']) ? (string) $row['data_prova'] : null,
                 'ano_letivo' => isset($row['ano_letivo']) ? (int) $row['ano_letivo'] : null,
                 'bimestre' => isset($row['bimestre']) ? (int) $row['bimestre'] : null,
             ];
         }
-        return $out;
+
+        return $this->anexarBlocoSemanaQuadro($out);
+    }
+
+    /**
+     * Completa bloco e semana (S1…S8) pelo vínculo do quadro de notas.
+     *
+     * @param list<array<string,mixed>> $eventos
+     * @return list<array<string,mixed>>
+     */
+    private function anexarBlocoSemanaQuadro(array $eventos): array
+    {
+        if ($eventos === []) {
+            return $eventos;
+        }
+        $path = __DIR__ . '/../Models/Exams/ExamBlock.php';
+        if (!class_exists('ExamBlock', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('ExamBlock', false)) {
+            return $eventos;
+        }
+        $ids = [];
+        foreach ($eventos as $ev) {
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        try {
+            $rotulos = (new ExamBlock())->rotulosQuadroPorBlocoIds($ids);
+        } catch (Throwable $e) {
+            error_log('BoletimAssistenteFerramentas::anexarBlocoSemanaQuadro: ' . $e->getMessage());
+            return $eventos;
+        }
+        foreach ($eventos as $i => $ev) {
+            $id = (int) ($ev['id'] ?? 0);
+            $lista = $rotulos[$id] ?? [];
+            if (!is_array($lista) || $lista === []) {
+                continue;
+            }
+            $rotulo = $lista[0];
+            $bloco = trim((string) ($rotulo['bloco'] ?? ''));
+            $semanaRotulo = strtoupper(trim((string) ($rotulo['semana'] ?? '')));
+            if ($bloco !== '') {
+                $eventos[$i]['bloco'] = $bloco;
+            }
+            if (preg_match('/^S(\d+)$/', $semanaRotulo, $m)) {
+                $n = (int) $m[1];
+                if ($n >= 1 && $n <= 8) {
+                    $eventos[$i]['semana'] = $n;
+                    $eventos[$i]['semana_rotulo'] = $semanaRotulo;
+                }
+            }
+        }
+
+        return $eventos;
     }
 
     /**
@@ -528,7 +641,7 @@ class BoletimAssistenteFerramentas
             return ['tipo' => null, 'blocos_ids' => [], 'eventos' => []];
         }
 
-        $eventos = $this->listarEventosProva((int) $tipo['id'], $limit);
+        $eventos = $this->listarEventosProva((int) $tipo['id'], max($limit, 4000));
         $ini = $this->normalizarData($dataInicio);
         $fim = $this->normalizarData($dataFim);
         if ($ini !== null && $fim !== null) {
