@@ -686,20 +686,33 @@ class GrupoRegrasNotasService
                 }
             }
         }
-        $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId, $turmaIds);
-        $usadasMap = [];
-        foreach ($usadas as $uid) {
-            $usadasMap[(int) $uid] = true;
-        }
-        $escolhida = null;
-        $ordemNoBloco = 0;
-        foreach ($candidatas as $m) {
-            $ordemNoBloco++;
-            if (!isset($usadasMap[(int) $m['id']])) {
-                $escolhida = $m;
+        $indice = 0;
+        if ($dataIso !== '') {
+            $indice = $this->model->contarSemanasAnterioresDoBloco(
+                $grupoId,
+                $tipoId,
+                $ano,
+                $bimestre,
+                $dataIso,
+                $excetoBlocoId,
+                $turmaIds
+            );
+        } else {
+            $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId, $turmaIds);
+            $usadasMap = [];
+            foreach ($usadas as $uid) {
+                $usadasMap[(int) $uid] = true;
+            }
+            foreach ($candidatas as $m) {
+                if (isset($usadasMap[(int) $m['id']])) {
+                    $indice++;
+                    continue;
+                }
                 break;
             }
         }
+        $escolhida = $candidatas[$indice] ?? null;
+        $ordemNoBloco = $indice + 1;
         if ($escolhida === null) {
             $nomeBloco = trim((string) ($tipo['nome'] ?? 'bloco'));
             return [

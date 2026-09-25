@@ -404,6 +404,59 @@ class GrupoRegrasNotas
     }
 
     /**
+     * Quantas semanas civis anteriores já têm prova deste bloco para estas turmas.
+     * A próxima coluna segue essa ordem (1ª anterior → S2, 2ª → S4, 3ª → S6).
+     *
+     * @param list<int> $turmaIds
+     */
+    public function contarSemanasAnterioresDoBloco(
+        int $grupoId,
+        int $tipoId,
+        int $ano,
+        int $bimestre,
+        string $dataProva,
+        int $excetoBlocoId = 0,
+        array $turmaIds = []
+    ): int {
+        if ($grupoId <= 0 || $tipoId <= 0 || $ano <= 0 || $bimestre <= 0) {
+            return 0;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataProva)) {
+            return 0;
+        }
+        if ($this->idsPositivos($turmaIds) === []) {
+            return 0;
+        }
+        if (!$this->provasBlocosTemColuna('grupo_regras_notas_id')
+            || !$this->provasBlocosTemColuna('grupo_regras_tipo_id')
+            || !$this->provasBlocosTemColuna('ano_letivo')
+            || !$this->provasBlocosTemColuna('bimestre')
+        ) {
+            return 0;
+        }
+        $sql = 'SELECT COUNT(DISTINCT YEARWEEK(pb.data_prova, 3)) AS n
+                FROM provas_blocos pb
+                WHERE pb.deleted_at IS NULL
+                  AND pb.grupo_regras_notas_id = :g
+                  AND pb.grupo_regras_tipo_id = :t
+                  AND pb.ano_letivo = :ano
+                  AND pb.bimestre = :bim
+                  AND pb.data_prova IS NOT NULL
+                  AND pb.data_prova < :data';
+        $params = ['g' => $grupoId, 't' => $tipoId, 'ano' => $ano, 'bim' => $bimestre, 'data' => $dataProva];
+        if ($excetoBlocoId > 0) {
+            $sql .= ' AND pb.id <> :ex';
+            $params['ex'] = $excetoBlocoId;
+        }
+        $cruzam = $this->sqlBlocoCruzaTurmas('pb', $turmaIds);
+        $sql .= $cruzam['sql'];
+        $params = array_merge($params, $cruzam['params']);
+        $row = $this->db->fetch($sql, $params);
+
+        return (int) ($row['n'] ?? 0);
+    }
+
+    /**
      * Semana já usada no mesmo bloco A/B na mesma semana civil, por evento sem cruzar estas turmas.
      *
      * @param list<int> $turmaIds
@@ -485,6 +538,11 @@ class GrupoRegrasNotas
                 SELECT pbx.turma_id
                   FROM provas_blocos pbx
                  WHERE pbx.id = {$alias}.id AND pbx.turma_id IS NOT NULL AND pbx.turma_id > 0
+                UNION
+                SELECT pbpt.turma_id
+                  FROM provas_blocos_professores pbp
+                  INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp.id
+                 WHERE pbp.bloco_id = {$alias}.id
             ) turmas_ev
             WHERE turmas_ev.turma_id IN ({$in})
         )";
