@@ -658,6 +658,9 @@ class GrupoRegrasNotasService
             return ['ok' => false, 'error' => 'Este bloco não tem coluna de semana no quadro. Gere S1…SN e intercale A/B.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
         }
         $dataIso = $this->dataIso($dataProva);
+        if ($dataIso === '' && $excetoBlocoId > 0) {
+            $dataIso = $this->model->dataProvaIsoDoBloco($excetoBlocoId);
+        }
         $indice = 0;
         if ($dataIso !== '') {
             $turmasDaConta = $turmaIds;

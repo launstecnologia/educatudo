@@ -450,7 +450,14 @@ class GrupoRegrasNotas
         array $turmaIds,
         bool $filtrarTurmas
     ): int {
-        $params = ['g' => $grupoId, 't' => $tipoId, 'ano' => $ano, 'bim' => $bimestre, 'data' => $dataProva];
+        $params = [
+            'g' => $grupoId,
+            't' => $tipoId,
+            'ano' => $ano,
+            'ano_data' => $ano,
+            'bim' => $bimestre,
+            'data' => $dataProva,
+        ];
         $filtroBloco = '(pb.grupo_regras_notas_id = :g AND pb.grupo_regras_tipo_id = :t)';
         $joinVinculo = '';
         if ($this->tabelaVinculosProvaExiste()) {
@@ -461,8 +468,13 @@ class GrupoRegrasNotas
                 FROM provas_blocos pb' . $joinVinculo . '
                 WHERE pb.deleted_at IS NULL
                   AND ' . $filtroBloco . '
-                  AND pb.ano_letivo = :ano
-                  AND pb.bimestre = :bim
+                  AND (
+                        pb.ano_letivo = :ano
+                        OR pb.ano_letivo IS NULL
+                        OR pb.ano_letivo = 0
+                        OR YEAR(pb.data_prova) = :ano_data
+                  )
+                  AND (pb.bimestre = :bim OR pb.bimestre IS NULL OR pb.bimestre = 0)
                   AND pb.data_prova IS NOT NULL
                   AND pb.data_prova < :data';
         if ($excetoBlocoId > 0) {
@@ -480,6 +492,23 @@ class GrupoRegrasNotas
         $row = $this->db->fetch($sql, $params);
 
         return (int) ($row['n'] ?? 0);
+    }
+
+    public function dataProvaIsoDoBloco(int $blocoId): string
+    {
+        if ($blocoId <= 0) {
+            return '';
+        }
+        $row = $this->db->fetch(
+            'SELECT data_prova FROM provas_blocos WHERE id = :id AND deleted_at IS NULL',
+            ['id' => $blocoId]
+        );
+        $data = trim((string) ($row['data_prova'] ?? ''));
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $data, $m)) {
+            return $m[1];
+        }
+
+        return '';
     }
 
     /**
