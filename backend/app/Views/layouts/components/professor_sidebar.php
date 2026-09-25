@@ -216,12 +216,18 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </a>
             <?php foreach ($professorExternalApps as $externalApp): ?>
             <?php
-                $isEducaProf = $externalApp['app'] === 'educaprof';
+                $nomeApp = strtolower((string) ($externalApp['nome'] ?? ''));
+                $chaveApp = strtolower((string) ($externalApp['app'] ?? '') . ' ' . (string) ($externalApp['id'] ?? ''));
+                $isEducaProf = str_contains($chaveApp, 'educaprof')
+                    || str_contains($chaveApp, 'educa-prof')
+                    || str_contains($chaveApp, 'educa_prof')
+                    || str_contains($nomeApp, 'educaprof')
+                    || str_contains($nomeApp, 'educa prof');
                 $isCurrentExternal = ($current_page ?? '') === $externalApp['current_page'] || (($current_page ?? '') === 'educaprof' && $isEducaProf);
             ?>
             <a href="<?= htmlspecialchars($externalApp['href']) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-3 <?= $isCurrentExternal ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <?php if ($isEducaProf): ?>
-                <img src="<?= URL ?>/public/assets/tudinha-educaprof.png" alt="" class="w-5 h-5 mr-3 rounded-full object-cover object-top" width="20" height="20">
+                <img src="<?= URL ?>/public/assets/tudinha-educaprof.png" alt="" class="mr-3 h-6 w-6 shrink-0 rounded-full object-cover object-top bg-white" width="24" height="24">
                 <?php else: ?>
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-1.414 1.414a4 4 0 01-5.656 0M10.172 13.828a4 4 0 01-5.656 0L3.102 12.414a4 4 0 010-5.656L4.516 5.344a4 4 0 015.656 0"></path>
