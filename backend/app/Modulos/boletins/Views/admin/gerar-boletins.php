@@ -124,8 +124,34 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
         </p>
     </div>
     <div class="p-5 overflow-x-auto">
+        <?php
+        $ehQuadroSim = false;
+        foreach ($matrizColunas as $colSim) {
+            if (!is_array($colSim)) {
+                continue;
+            }
+            $grupoSim = strtolower(trim((string) ($colSim['layout_group'] ?? '')));
+            $tipoSim = strtolower(trim((string) ($colSim['layout_type'] ?? '')));
+            $codSim = strtolower(trim((string) ($colSim['codigo'] ?? '')));
+            if ($tipoSim === 'semana_nq' || in_array($grupoSim, ['quadro_a', 'quadro_b'], true) || preg_match('/^s[1-8]$/', $codSim) === 1) {
+                $ehQuadroSim = true;
+                break;
+            }
+        }
+        ?>
         <?php if ($matrizLinhas === [] || $matrizColunas === []): ?>
             <p class="text-sm text-gray-500">Sem dados de simulação para o aluno/evento selecionado.</p>
+        <?php elseif ($ehQuadroSim): ?>
+            <?php
+            if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
+            }
+            $cols = $matrizColunas;
+            $linhas = $matrizLinhas;
+            $decimalPlaces = 1;
+            $ev = is_array($regra) ? $regra : [];
+            include dirname(__DIR__, 4) . '/Views/partials/boletim_quadro_tabela.php';
+            ?>
         <?php else: ?>
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50">

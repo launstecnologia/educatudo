@@ -510,6 +510,22 @@ class JourneyBoletimLancamento
             return (int) ($j['id'] ?? 0);
         }, $jornadas)));
         if ($jornadaIds === []) {
+            $bimsFallback = $this->bimestresDosIds($jornadaIdsEscopo);
+            foreach ($this->listarJornadasCandidatas($turmaIds, null, null) as $jornadaTurma) {
+                $idTurma = (int) ($jornadaTurma['id'] ?? 0);
+                $bimTurma = (int) ($jornadaTurma['bimestre'] ?? 0);
+                if ($idTurma <= 0 || !self::jornadaCobreTurma($jornadaTurma, $turmaId)) {
+                    continue;
+                }
+                if ($bimsFallback !== [] && !isset($bimsFallback[$bimTurma])) {
+                    continue;
+                }
+                $jornadas[] = $jornadaTurma;
+                $jornadaIds[] = $idTurma;
+            }
+            $jornadaIds = array_values(array_unique($jornadaIds));
+        }
+        if ($jornadaIds === []) {
             return [
                 'por_materia' => [],
                 'notas_lista' => [],
@@ -519,6 +535,7 @@ class JourneyBoletimLancamento
                 'percentual_conclusao_escopo' => 0.0,
                 'nota_unica_valor_padrao' => null,
                 'nota_unica_substituicao_por_materia' => [],
+                'por_nome' => [],
             ];
         }
 
@@ -576,9 +593,9 @@ class JourneyBoletimLancamento
             ];
         }
 
-        $totaisModulos = $this->totaisModulosPorJornada($jornadaIds);
-        $concluidasExplicit = $this->paresJornadaConcluidaExplicita($jornadaIds, [$alunoId]);
-        $modulosConcluidos = $this->contagemModulosConcluidosPorAlunoJornada($jornadaIds, [$alunoId]);
+        $totaisModulos = $this->totaisModulosPorJornada($noEscopo);
+        $concluidasExplicit = $this->paresJornadaConcluidaExplicita($noEscopo, [$alunoId]);
+        $modulosConcluidos = $this->contagemModulosConcluidosPorAlunoJornada($noEscopo, [$alunoId]);
 
         $byMid = [];
         $byMidTotais = [];
