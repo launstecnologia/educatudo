@@ -427,14 +427,11 @@ class GrupoRegrasNotas
         if (!$this->provasBlocosTemColuna('ano_letivo') || !$this->provasBlocosTemColuna('bimestre')) {
             return 0;
         }
-        if ($this->idsPositivos($turmaIds) !== []) {
-            $comTurmas = $this->contarSemanasAnterioresSql($grupoId, $tipoId, $ano, $bimestre, $dataProva, $excetoBlocoId, $turmaIds, true);
-            if ($comTurmas > 0) {
-                return $comTurmas;
-            }
+        if ($this->idsPositivos($turmaIds) === []) {
+            return 0;
         }
 
-        return $this->contarSemanasAnterioresSql($grupoId, $tipoId, $ano, $bimestre, $dataProva, $excetoBlocoId, [], false);
+        return $this->contarSemanasAnterioresSql($grupoId, $tipoId, $ano, $bimestre, $dataProva, $excetoBlocoId, $turmaIds, true);
     }
 
     /**

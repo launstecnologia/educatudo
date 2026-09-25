@@ -663,18 +663,6 @@ class GrupoRegrasNotasService
         }
         $indice = 0;
         if ($dataIso !== '') {
-            $turmasDaConta = $turmaIds;
-            foreach ($this->model->turmasIdsDaMesmaSemanaLetiva(
-                $grupoId,
-                $tipoId,
-                $ano,
-                $bimestre,
-                $dataIso,
-                $excetoBlocoId,
-                $turmaIds
-            ) as $turmaIrma) {
-                $turmasDaConta[] = $turmaIrma;
-            }
             $indice = $this->model->contarSemanasAnterioresDoBloco(
                 $grupoId,
                 $tipoId,
@@ -682,7 +670,7 @@ class GrupoRegrasNotasService
                 $bimestre,
                 $dataIso,
                 $excetoBlocoId,
-                $turmasDaConta
+                $turmaIds
             );
         } else {
             $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId, $turmaIds);

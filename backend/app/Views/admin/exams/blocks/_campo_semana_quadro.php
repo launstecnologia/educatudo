@@ -22,7 +22,7 @@ if ($vinculosIni === []) {
     <?php if ($temGruposRegras): ?>
         <div class="mb-2">
             <label class="block text-sm font-medium text-gray-700">Destinos no quadro de notas</label>
-            <p class="text-xs text-gray-500 mt-1">Escolha o quadro e o bloco (A/B). Turmas diferentes no mesmo dia compartilham a mesma semana; a próxima S só entra na semana seguinte daquelas turmas.</p>
+            <p class="text-xs text-gray-500 mt-1">Escolha o quadro, o bloco (A/B) e a semana (S1, S3…). A sugestão segue as provas já lançadas, e você pode trocar a semana se a data de execução for outra.</p>
         </div>
         <div id="lista-vinculos-grupo" class="space-y-3"></div>
         <button type="button" id="btn-add-vinculo-grupo"
@@ -126,45 +126,59 @@ if ($vinculosIni === []) {
                 box.innerHTML = '<div class="flex items-start gap-2"><i class="fa-solid fa-circle-info mt-0.5"></i><span>' + escTxt(texto) + '</span></div>';
             }
 
-            function preencherMarca(row, marcaId, numero, nome) {
+            function marcasDoTipo(g, tipoId) {
+                var marcas = (g && Array.isArray(g.marcas)) ? g.marcas : [];
+                var tipo = null;
+                ((g && g.tipos) || []).forEach(function (t) {
+                    if (Number(t.id) === Number(tipoId)) tipo = t;
+                });
+                var idsOk = tipo && Array.isArray(tipo.marcas_ids) && tipo.marcas_ids.length
+                    ? tipo.marcas_ids.map(Number)
+                    : null;
+                return marcas.filter(function (m) {
+                    if (m.papel === 'calculada') return false;
+                    if (!idsOk) return true;
+                    return idsOk.indexOf(Number(m.id)) >= 0;
+                });
+            }
+
+            function selecionarMarca(row, marcaId) {
                 var selM = row.querySelector('.sel-marca');
                 if (!selM) return;
-                selM.innerHTML = '';
-                var opt = document.createElement('option');
-                opt.value = marcaId ? String(marcaId) : '';
-                opt.textContent = nome || (numero ? ('S' + numero) : 'Coluna');
-                if (numero) opt.setAttribute('data-numero', String(numero));
-                if (marcaId) opt.selected = true;
-                selM.appendChild(opt);
+                var id = String(marcaId || '');
+                if (id && selM.querySelector('option[value="' + id + '"]')) {
+                    selM.value = id;
+                }
                 syncSemana();
             }
 
-            function resolverProxima(row, forcar) {
+            function resolverProxima(row) {
                 var selG = row.querySelector('.sel-grupo');
                 var selT = row.querySelector('.sel-tipo');
+                var selM = row.querySelector('.sel-marca');
                 var wrapM = row.querySelector('.wrap-marca');
                 var g = grupoPorId(selG.value);
                 var tipos = (g && Array.isArray(g.tipos)) ? g.tipos : [];
-                var auto = tipos.length > 0;
-                if (wrapM) wrapM.classList.toggle('hidden', auto);
-                if (!auto) {
+                if (wrapM) wrapM.classList.remove('hidden');
+                if (tipos.length === 0) {
                     setDica(row, '');
+                    return;
+                }
+                if (row.getAttribute('data-marca-manual') === '1' && selM && parseInt(selM.value, 10) > 0) {
+                    setDica(row, 'Semana escolhida por você. A data da prova não troca essa coluna.');
                     return;
                 }
                 var tipoId = parseInt(selT.value, 10) || 0;
                 var p = periodoAtual();
                 if (!tipoId) {
-                    preencherMarca(row, 0, 0, '');
-                    setDica(row, 'Escolha o bloco. A semana (S1, S2…) entra sozinha neste bimestre.');
+                    setDica(row, 'Escolha o bloco e a semana (S1, S3…).');
                     return;
                 }
                 if (!p.ano || !p.bim) {
-                    preencherMarca(row, 0, 0, '');
-                    setDica(row, 'Informe o ano letivo e o período para definir a semana.');
+                    setDica(row, 'Informe o ano letivo e o período para sugerir a semana.');
                     return;
                 }
-                row.removeAttribute('data-marca-ok');
-                setDica(row, 'Definindo a semana…');
+                setDica(row, 'Sugerindo a semana…');
                 var qs = 'tipo_id=' + encodeURIComponent(tipoId)
                     + '&ano=' + encodeURIComponent(p.ano)
                     + '&bimestre=' + encodeURIComponent(p.bim)
@@ -178,17 +192,18 @@ if ($vinculosIni === []) {
                     credentials: 'same-origin',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
                 }).then(function (r) { return r.json(); }).then(function (data) {
+                    if (row.getAttribute('data-marca-manual') === '1') return;
                     if (!data || !data.ok) {
-                        preencherMarca(row, 0, 0, '');
-                        setDica(row, (data && data.error) ? data.error : 'Não foi possível definir a semana.', true);
+                        setDica(row, (data && data.error) ? data.error : 'Não foi possível sugerir a semana. Escolha S1, S3… no campo Semana.', true);
                     } else {
-                        preencherMarca(row, data.marca_id, data.semana, data.nome);
-                        setDica(row, data.dica || ((data.nome || '') + ' neste período.'));
+                        selecionarMarca(row, data.marca_id);
+                        setDica(row, (data.dica || ((data.nome || '') + ' neste período.')) + ' Você pode trocar a semana.');
                     }
                     if (typeof atualizarResumoWizard === 'function') atualizarResumoWizard();
                 }).catch(function () {
-                    preencherMarca(row, 0, 0, '');
-                    setDica(row, 'Falha ao definir a semana deste bloco.', true);
+                    if (row.getAttribute('data-marca-manual') !== '1') {
+                        setDica(row, 'Falha ao sugerir a semana. Escolha S1, S3… no campo Semana.', true);
+                    }
                     if (typeof atualizarResumoWizard === 'function') atualizarResumoWizard();
                 });
             }
@@ -204,7 +219,7 @@ if ($vinculosIni === []) {
                 var marcas = (g && Array.isArray(g.marcas)) ? g.marcas : [];
                 if (wrapT) wrapT.classList.toggle('hidden', tipos.length === 0);
                 var auto = tipos.length > 0;
-                if (wrapM) wrapM.classList.toggle('hidden', auto || marcas.length === 0);
+                if (wrapM) wrapM.classList.toggle('hidden', !auto && marcas.length === 0);
                 var tipoSel = parseInt(selT.getAttribute('data-keep') || selT.value, 10) || 0;
                 fillSelect(selT, 'Bloco de disciplinas', tipos, tipoSel, 'nome');
                 selT.removeAttribute('data-keep');
@@ -214,14 +229,16 @@ if ($vinculosIni === []) {
                         ? (parseInt(selM.value, 10) || 0)
                         : (parseInt(keepAttr, 10) || 0);
                     selM.removeAttribute('data-keep');
-                    if (keepM > 0) {
-                        var marcaKeep = null;
-                        marcas.forEach(function (m) { if (Number(m.id) === keepM) marcaKeep = m; });
-                        if (marcaKeep) {
-                            preencherMarca(row, marcaKeep.id, marcaKeep.numero, marcaKeep.nome);
-                        }
+                    var tipoId = parseInt(selT.value, 10) || 0;
+                    fillSelect(selM, 'Semana', marcasDoTipo(g, tipoId), keepM, 'nome');
+                    if (keepM > 0 && parseInt(selM.value, 10) === keepM) {
+                        row.setAttribute('data-marca-manual', '1');
+                        setDica(row, 'Semana gravada neste evento. Troque só se quiser outra coluna.');
+                        syncSemana();
+                        return;
                     }
-                    resolverProxima(row, true);
+                    row.removeAttribute('data-marca-manual');
+                    resolverProxima(row);
                     return;
                 }
                 var tipo = null;
@@ -248,7 +265,7 @@ if ($vinculosIni === []) {
                     '<select class="sel-grupo w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></select></div>' +
                     '<div class="flex-1 min-w-0 wrap-tipo hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Bloco de disciplinas</label>' +
                     '<select class="sel-tipo w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"><option value="">Bloco de disciplinas</option></select></div>' +
-                    '<div class="flex-1 min-w-0 wrap-marca hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Coluna</label>' +
+                    '<div class="flex-1 min-w-0 wrap-marca"><label class="block text-xs font-medium text-gray-500 mb-1">Semana</label>' +
                     '<select class="sel-marca w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"><option value="">Coluna</option></select></div>' +
                     '<div class="shrink-0"><button type="button" class="btn-rm-vinculo w-full lg:w-auto px-4 py-2 border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50">Remover</button></div>' +
                     '</div>' +
@@ -261,15 +278,21 @@ if ($vinculosIni === []) {
                     wrap.querySelector('.sel-tipo').value = '';
                     wrap.querySelector('.sel-tipo').removeAttribute('data-keep');
                     wrap.querySelector('.sel-marca').setAttribute('data-keep', '');
-                    wrap.removeAttribute('data-marca-ok');
+                    wrap.removeAttribute('data-marca-manual');
                     syncLinha(wrap);
                 });
                 wrap.querySelector('.sel-tipo').addEventListener('change', function () {
-                    wrap.removeAttribute('data-marca-ok');
+                    wrap.removeAttribute('data-marca-manual');
                     wrap.querySelector('.sel-marca').setAttribute('data-keep', '');
                     syncLinha(wrap);
                 });
-                wrap.querySelector('.sel-marca').addEventListener('change', syncSemana);
+                wrap.querySelector('.sel-marca').addEventListener('change', function () {
+                    if (parseInt(wrap.querySelector('.sel-marca').value, 10) > 0) {
+                        wrap.setAttribute('data-marca-manual', '1');
+                        setDica(wrap, 'Semana escolhida por você. A data da prova não troca essa coluna.');
+                    }
+                    syncSemana();
+                });
                 wrap.querySelector('.btn-rm-vinculo').addEventListener('click', function () {
                     wrap.remove();
                     if (!lista.querySelector('.vinculo-grupo-row')) addLinha({});
@@ -349,8 +372,8 @@ if ($vinculosIni === []) {
             syncSemana();
             function reprocessarPeriodo() {
                 lista.querySelectorAll('.vinculo-grupo-row').forEach(function (row) {
-                    row.removeAttribute('data-marca-ok');
-                    resolverProxima(row, true);
+                    if (row.getAttribute('data-marca-manual') === '1') return;
+                    resolverProxima(row);
                 });
             }
             window.reprocessarSemanaQuadro = reprocessarPeriodo;
