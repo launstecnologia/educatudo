@@ -768,6 +768,7 @@ if (!class_exists('TeacherController')) {
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
         $data = [
             'title' => 'Minha Carteira - EducaTudo',
+            'page_title' => 'Minha Carteira',
             'user' => $user,
             'professor' => $professor,
             'saldo' => $saldo,
@@ -796,10 +797,34 @@ if (!class_exists('TeacherController')) {
         if (!$professor) {
             $this->redirect('/logout');
         }
+        require_once __DIR__ . '/../../Services/EducaShopService.php';
+        require_once __DIR__ . '/../../Services/CreditosService.php';
+        $educaShopService = new \App\Services\EducaShopService($this->db);
+        $creditosService = new \App\Services\CreditosService();
         try {
-            $pacotes = $this->db->fetchAll("SELECT id, creditos, valor_centavos, nome FROM pacotes_creditos WHERE ativo = 1 ORDER BY creditos ASC");
+            $pacotes = $educaShopService->listarPacotesVitrine();
         } catch (Exception $e) {
             $pacotes = [];
+        }
+        $categorias = $educaShopService->agruparPorCategoria($pacotes);
+        try {
+            $walletSaldos = $creditosService->getWalletSaldos('professor', (int) $professor['id']);
+        } catch (Exception $e) {
+            $walletSaldos = ['saldo_comprado' => 0, 'saldo_escola' => 0, 'saldo_total' => 0];
+        }
+        try {
+            $compras = $this->db->fetchAll(
+                "SELECT c.id, c.valor_centavos, c.status, c.billing_type, c.created_at,
+                        p.nome AS pacote_nome, p.creditos
+                   FROM compras_creditos c
+                   INNER JOIN pacotes_creditos p ON p.id = c.pacote_id
+                  WHERE c.user_type = 'professor' AND c.user_id = :professor_id
+                  ORDER BY c.id DESC
+                  LIMIT 50",
+                ['professor_id' => (int) $professor['id']]
+            );
+        } catch (Exception $e) {
+            $compras = [];
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['pacote_id'])) {
             if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
@@ -822,10 +847,16 @@ if (!class_exists('TeacherController')) {
             exit;
         }
         $data = [
-            'title' => 'Comprar créditos - EducaTudo',
+            'title' => 'EducaShop - EducaTudo',
+            'page_title' => 'EducaShop',
             'user' => $user,
             'professor' => $professor,
             'pacotes' => $pacotes,
+            'categorias' => $categorias,
+            'categorias_meta' => \App\Services\EducaShopService::CATEGORIAS,
+            'wallet_saldos' => $walletSaldos,
+            'saldo' => $walletSaldos['saldo_total'] ?? 0,
+            'compras' => $compras,
             'current_page' => 'educashop',
             'csrf_token' => $this->generateCsrfToken(),
         ];
@@ -1948,6 +1979,7 @@ if (!class_exists('TeacherController')) {
         
         $data = [
             'title' => 'Meus Slides - EducaTudo',
+            'page_title' => 'Meus Slides',
             'professor' => $professor,
             'user' => $user,
             'slides' => $slides,

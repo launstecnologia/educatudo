@@ -533,6 +533,42 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 <span class="sidebar-text">Sair</span>
             </a>
         </nav>
+        <script>
+        (function () {
+            function rotuloMenu(elemento) {
+                var texto = elemento.querySelector('.sidebar-text');
+                return (texto ? texto.textContent : elemento.textContent).trim();
+            }
+            function ordenarItensMenu(container, manterSairPorUltimo) {
+                if (!container) {
+                    return;
+                }
+                var filhos = Array.prototype.slice.call(container.children);
+                var sair = null;
+                var ordenaveis = [];
+                filhos.forEach(function (elemento) {
+                    var href = elemento.getAttribute ? (elemento.getAttribute('href') || '') : '';
+                    if (manterSairPorUltimo && elemento.tagName === 'A' && href.indexOf('/logout') !== -1) {
+                        sair = elemento;
+                        return;
+                    }
+                    ordenaveis.push(elemento);
+                });
+                ordenaveis.sort(function (a, b) {
+                    return rotuloMenu(a).localeCompare(rotuloMenu(b), 'pt', { sensitivity: 'base', numeric: true });
+                });
+                ordenaveis.forEach(function (elemento) {
+                    container.appendChild(elemento);
+                });
+                if (sair) {
+                    container.appendChild(sair);
+                }
+            }
+            var navProfessor = document.querySelector('#sidebar nav');
+            ordenarItensMenu(navProfessor, true);
+            ordenarItensMenu(document.getElementById('academico-submenu'), false);
+        })();
+        </script>
     </div>
 </aside>
 

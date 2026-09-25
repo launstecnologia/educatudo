@@ -463,6 +463,143 @@ class SlidesController extends BaseController
      * Obtém a API Key do Gamma
      * Busca em múltiplas fontes: banco de dados > config/app.php > .env
      */
+    public function baixarPptx($id)
+    {
+        $user = $this->authManager->getUser();
+        if (!$user || ($user['tipo'] ?? '') !== 'professor') {
+            $this->redirect(URL . '/professor/dashboard');
+            return;
+        }
+
+        $slideId = (int) $id;
+        $slide = $this->db->fetch(
+            "SELECT id, titulo, url_gamma, generation_id
+               FROM professores_slides
+              WHERE id = :id AND professor_id = :professor_id",
+            ['id' => $slideId, 'professor_id' => (int) $user['id']]
+        );
+        if (!$slide) {
+            $this->redirect(URL . '/professor/meus-slides?erro=' . urlencode('Apresentação não encontrada.'));
+            return;
+        }
+
+        $apiKey = $this->getGammaApiKey();
+        if ($apiKey === null || trim((string) $apiKey) === '') {
+            $this->redirect(URL . '/professor/meus-slides?erro=' . urlencode('Não foi possível baixar o PPTX agora.'));
+            return;
+        }
+
+        $gammaId = $this->extrairGammaId((string) ($slide['url_gamma'] ?? ''));
+        if ($gammaId === '' && !empty($slide['generation_id'])) {
+            $status = $this->gammaGet('/v1.0/generations/' . rawurlencode((string) $slide['generation_id']), $apiKey);
+            $gammaId = trim((string) ($status['gammaId'] ?? ''));
+        }
+        if ($gammaId === '') {
+            $this->redirect(URL . '/professor/meus-slides?erro=' . urlencode('Esta apresentação ainda não pode ser baixada em PPTX.'));
+            return;
+        }
+
+        @set_time_limit(90);
+        $export = $this->gammaPost('/v1.0/gammas/' . rawurlencode($gammaId) . '/export', $apiKey, ['exportAs' => 'pptx']);
+        $exportId = trim((string) ($export['exportId'] ?? ''));
+        if ($exportId === '') {
+            $this->redirect(URL . '/professor/meus-slides?erro=' . urlencode('Não foi possível preparar o arquivo PPTX.'));
+            return;
+        }
+
+        $exportUrl = '';
+        for ($tentativa = 0; $tentativa < 20; $tentativa++) {
+            sleep(3);
+            $status = $this->gammaGet('/v1.0/exports/' . rawurlencode($exportId), $apiKey);
+            $situacao = (string) ($status['status'] ?? '');
+            if ($situacao === 'completed') {
+                $exportUrl = trim((string) ($status['exportUrl'] ?? ''));
+                break;
+            }
+            if ($situacao === 'failed') {
+                break;
+            }
+        }
+
+        if ($exportUrl === '' || !preg_match('#^https://#i', $exportUrl)) {
+            $this->redirect(URL . '/professor/meus-slides?erro=' . urlencode('O PPTX ainda não ficou pronto. Tente de novo em instantes.'));
+            return;
+        }
+
+        $nome = trim((string) ($slide['titulo'] ?? 'apresentacao'));
+        $nome = preg_replace('/[^\p{L}\p{N}\-_ ]/u', '', $nome);
+        $nome = trim((string) preg_replace('/\s+/', '-', (string) $nome), '-');
+        if ($nome === '') {
+            $nome = 'apresentacao';
+        }
+
+        $this->enviarDownloadRemoto($exportUrl, $nome . '.pptx');
+    }
+
+    private function extrairGammaId(string $url): string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        if (preg_match('#/docs/([^/]+)#', $path, $match)) {
+            return rawurldecode($match[1]);
+        }
+        return '';
+    }
+
+    private function gammaGet(string $path, string $apiKey): array
+    {
+        $ch = curl_init('https://public-api.gamma.app' . $path);
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPHEADER => ['X-API-KEY: ' . $apiKey, 'Accept: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+        ]);
+        $body = curl_exec($ch);
+        curl_close($ch);
+        $decoded = json_decode((string) $body, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function gammaPost(string $path, string $apiKey, array $payload): array
+    {
+        $ch = curl_init('https://public-api.gamma.app' . $path);
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPHEADER => ['X-API-KEY: ' . $apiKey, 'Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+        ]);
+        $body = curl_exec($ch);
+        curl_close($ch);
+        $decoded = json_decode((string) $body, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function enviarDownloadRemoto(string $url, string $filename): void
+    {
+        if (ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation');
+        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+        header('X-Content-Type-Options: nosniff');
+
+        $saida = fopen('php://output', 'w');
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_FILE => $saida,
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+        if (is_resource($saida)) {
+            fclose($saida);
+        }
+        exit;
+    }
+
     private function getGammaApiKey()
     {
         $apiKey = null;

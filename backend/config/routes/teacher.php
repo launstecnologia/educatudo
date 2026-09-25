@@ -24,6 +24,7 @@ $router->post('/professor/student/{id}/password', 'User/TeacherController@update
 // Gerador de Slides
 $router->get('/professor/gerar-slides', 'User/TeacherController@gerarSlides');
 $router->get('/professor/meus-slides', 'User/TeacherController@listarSlides');
+$router->get('/professor/meus-slides/{id}/pptx', 'Integrations/SlidesController@baixarPptx');
 $router->post('/professor/gerar-slides/api', 'Integrations/SlidesController@gerar');
 // Redirecionamento da rota antiga para a nova
 $router->get('/professor/student-journey', function() {

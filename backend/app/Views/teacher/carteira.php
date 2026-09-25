@@ -32,6 +32,15 @@ $tiposFiltro = [
     'recarga_inicial' => 'Créditos iniciais',
     'recarga_plano' => 'Recarga plano',
 ];
+$gruposOcultosProfessor = ['Chat', 'Flashcards', 'EducaInclui', 'Secretaria', 'Boletim', 'Avaliações'];
+$rotulosGrupoProfessor = ['Apps externos' => 'EducaProf'];
+$notasGrupoProfessor = [
+    'Apps externos' => 'O custo depende do que for feito no EducaProf e pode variar.',
+];
+$tabela_precos_modulos = array_values(array_filter($tabela_precos_modulos, static function ($row) use ($gruposOcultosProfessor) {
+    $grupo = trim((string) ($row['grupo'] ?? ''));
+    return !in_array($grupo, $gruposOcultosProfessor, true);
+}));
 $totalModulosCobrados = count(array_filter($tabela_precos_modulos, static fn($row) => !empty($row['cobra'])));
 $totalModulosGratuitos = max(0, count($tabela_precos_modulos) - $totalModulosCobrados);
 $modulosPorGrupo = [];
@@ -185,10 +194,14 @@ $formatarOrigem = static function ($origem): string {
         <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
             <?php foreach ($modulosPorGrupo as $grupo => $info):
                 $modalId = 'precoGrupoModal-' . md5($grupo);
+                $grupoExibicao = $rotulosGrupoProfessor[$grupo] ?? $grupo;
+                $notaGrupo = $notasGrupoProfessor[$grupo] ?? '';
                 $menor = $info['menor_custo'];
                 $maior = $info['maior_custo'];
                 $precoResumo = 'Sem custo';
-                if ($info['cobrados'] > 0 && $menor !== null && $maior !== null) {
+                if ($notaGrupo !== '') {
+                    $precoResumo = 'Varia conforme o uso';
+                } elseif ($info['cobrados'] > 0 && $menor !== null && $maior !== null) {
                     $precoResumo = abs($menor - $maior) < 0.00001
                         ? \CreditosDecimalHelper::formatDisplay($menor)
                         : \CreditosDecimalHelper::formatDisplay($menor) . ' a ' . \CreditosDecimalHelper::formatDisplay($maior);
@@ -203,9 +216,13 @@ $formatarOrigem = static function ($origem): string {
                     </span>
                     <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600"><?= (int) $info['total'] ?> itens</span>
                 </div>
-                <h3 class="mt-4 text-base font-semibold text-gray-900"><?= htmlspecialchars($grupo) ?></h3>
+                <h3 class="mt-4 text-base font-semibold text-gray-900"><?= htmlspecialchars($grupoExibicao) ?></h3>
                 <p class="mt-1 text-sm text-gray-500">
-                    <?= (int) $info['cobrados'] ?> cobrando<?= $info['gratuitos'] > 0 ? ' · ' . (int) $info['gratuitos'] . ' gratuitos' : '' ?>
+                    <?php if ($notaGrupo !== ''): ?>
+                        <?= htmlspecialchars($notaGrupo) ?>
+                    <?php else: ?>
+                        <?= (int) $info['cobrados'] ?> cobrando<?= $info['gratuitos'] > 0 ? ' · ' . (int) $info['gratuitos'] . ' gratuitos' : '' ?>
+                    <?php endif; ?>
                 </p>
                 <div class="mt-4 flex items-end justify-between gap-3">
                     <div>
@@ -230,13 +247,15 @@ $formatarOrigem = static function ($origem): string {
 
     <?php foreach ($modulosPorGrupo as $grupo => $info):
         $modalId = 'precoGrupoModal-' . md5($grupo);
+        $grupoExibicao = $rotulosGrupoProfessor[$grupo] ?? $grupo;
+        $notaGrupo = $notasGrupoProfessor[$grupo] ?? '';
     ?>
     <div id="<?= htmlspecialchars($modalId) ?>" class="preco-grupo-modal fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/50 p-4">
         <div class="max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
             <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4">
                 <div>
-                    <h2 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars($grupo) ?></h2>
-                    <p class="mt-0.5 text-sm text-gray-500"><?= (int) $info['total'] ?> itens configurados nesta categoria.</p>
+                    <h2 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars($grupoExibicao) ?></h2>
+                    <p class="mt-0.5 text-sm text-gray-500"><?= $notaGrupo !== '' ? htmlspecialchars($notaGrupo) : ((int) $info['total'] . ' itens configurados nesta categoria.') ?></p>
                 </div>
                 <button type="button" data-close-preco-modal class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -307,6 +326,7 @@ $formatarOrigem = static function ($origem): string {
                         <select name="filtro_modulo" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15">
                             <option value="">Todos</option>
                             <?php foreach ($modulos_opcao_filtro as $mk => $mlab): ?>
+                            <?php if (in_array(\CreditosModuleRegistry::getGrupo((string) $mk), $gruposOcultosProfessor, true)) { continue; } ?>
                             <option value="<?= htmlspecialchars($mk) ?>" <?= $filtro_modulo === $mk ? 'selected' : '' ?>><?= htmlspecialchars($mlab) ?></option>
                             <?php endforeach; ?>
                         </select>
