@@ -659,6 +659,7 @@ class JourneyBoletimLancamento
             }
         }
 
+        $porMateria = $this->remapNotasParaMateriasOficiais($porMateria);
         $mids = array_keys($porMateria);
         $nomes = $this->buscarNomesMateriasPorIds($mids);
         $notasLista = [];
@@ -704,6 +705,113 @@ class JourneyBoletimLancamento
         }
 
         return round(array_sum($valores) / count($valores), 2);
+    }
+
+    /**
+     * A jornada guarda a matéria em jornadas_materias. O quadro usa materias.
+     * O id numérico não coincide; o nome sim.
+     *
+     * @param array<int,float> $porMateria
+     * @return array<int,float>
+     */
+    private function remapNotasParaMateriasOficiais(array $porMateria): array
+    {
+        if ($porMateria === []) {
+            return [];
+        }
+        $ids = array_values(array_unique(array_map('intval', array_keys($porMateria))));
+        $nomesOficiais = $this->buscarNomesMateriasPorIds($ids);
+        $nomesJornada = $this->buscarNomesJornadasMateriasPorIds($ids);
+        $catalogo = $this->mapaIdOficialPorNome();
+        $grupos = [];
+        foreach ($porMateria as $mid => $valor) {
+            if (!is_numeric($valor)) {
+                continue;
+            }
+            $mid = (int) $mid;
+            $nomeOficial = trim((string) ($nomesOficiais[$mid] ?? ''));
+            $nomeJornada = trim((string) ($nomesJornada[$mid] ?? ''));
+            $destinos = [$mid];
+            if ($nomeJornada !== '' && ($nomeOficial === '' || !$this->nomesMateriaIguais($nomeOficial, $nomeJornada))) {
+                $chave = $this->normalizarNomeMateria($nomeJornada);
+                if ($chave !== '' && !empty($catalogo[$chave])) {
+                    $destinos = $catalogo[$chave];
+                }
+            }
+            foreach ($destinos as $destino) {
+                $grupos[(int) $destino][] = (float) $valor;
+            }
+        }
+        $out = [];
+        foreach ($grupos as $destino => $valores) {
+            $out[(int) $destino] = round(array_sum($valores) / count($valores), 2);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $materiaIds
+     * @return array<int,string>
+     */
+    private function buscarNomesJornadasMateriasPorIds(array $materiaIds): array
+    {
+        $materiaIds = array_values(array_unique(array_filter(array_map('intval', $materiaIds))));
+        if ($materiaIds === [] || !$this->db->tableExists('jornadas_materias')) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($materiaIds), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT id, nome FROM jornadas_materias WHERE id IN ($ph)",
+            $materiaIds
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int) ($r['id'] ?? 0)] = (string) ($r['nome'] ?? '');
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string,list<int>>
+     */
+    private function mapaIdOficialPorNome(): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT id, nome FROM materias WHERE ativo = 1 ORDER BY id ASC'
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $id = (int) ($r['id'] ?? 0);
+            $chave = $this->normalizarNomeMateria((string) ($r['nome'] ?? ''));
+            if ($id > 0 && $chave !== '') {
+                $out[$chave][] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    private function nomesMateriaIguais(string $a, string $b): bool
+    {
+        $a = $this->normalizarNomeMateria($a);
+        $b = $this->normalizarNomeMateria($b);
+
+        return $a !== '' && $a === $b;
+    }
+
+    private function normalizarNomeMateria(string $nome): string
+    {
+        $nome = mb_strtolower(trim($nome));
+        $nome = strtr($nome, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ü' => 'u', 'ç' => 'c',
+        ]);
+        $nome = preg_replace('/\s+/', ' ', $nome);
+
+        return is_string($nome) ? $nome : '';
     }
 
     /**

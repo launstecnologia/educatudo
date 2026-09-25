@@ -823,8 +823,7 @@ class BoletimAssistenteController extends BaseController
                 continue;
             }
             $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
-            $ids = array_values(array_filter(array_map('intval', (array) ($config['jornada_ids'] ?? [])), static fn ($id) => $id > 0));
-            if ($ids === [] && $idsBimestre !== []) {
+            if ($idsBimestre !== []) {
                 $config['jornada_ids'] = $idsBimestre;
             }
             unset($config['data_ini'], $config['data_fim']);
