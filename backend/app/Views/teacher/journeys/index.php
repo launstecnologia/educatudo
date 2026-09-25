@@ -7,25 +7,30 @@
             <h2 class="text-2xl font-bold text-gray-900 mb-1">Minhas Jornadas</h2>
             <p class="text-gray-600 text-sm">Gerencie suas jornadas de aprendizado.</p>
         </div>
-        <?php
-        $ui = __DIR__ . '/../../admin/_partials/ui';
-        $ui_btn_variant = 'filtro';
-        $ui_btn_label = 'Filtros';
-        $ui_btn_icon = 'fa-solid fa-filter';
-        $ui_btn_onclick = 'openFiltroDrawer()';
-        $ui_btn_filter_count = 0;
-        $ui_btn_href = '';
-        $ui_btn_type = 'button';
-        $ui_btn_id = 'btnFiltrosJornadas';
-        $ui_btn_class = '';
-        $ui_btn_attrs = '';
-        include $ui . '/btn.php';
-        ?>
-        <a href="<?= URL ?>/professor/jornadas/criar" 
-           class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
-            <i class="fa-solid fa-plus mr-2"></i>
-            Nova Jornada
-        </a>
+        <div class="flex items-center gap-3 flex-shrink-0">
+            <?php
+            $ui = __DIR__ . '/../../admin/_partials/ui';
+            $ui_btn_variant = 'filtro';
+            $ui_btn_label = 'Filtros';
+            $ui_btn_icon = 'fa-solid fa-filter';
+            $ui_btn_onclick = 'openFiltroDrawer()';
+            $ui_btn_filter_count = 0;
+            $ui_btn_href = '';
+            $ui_btn_type = 'button';
+            $ui_btn_id = 'btnFiltrosJornadas';
+            $ui_btn_class = '';
+            $ui_btn_attrs = '';
+            include $ui . '/btn.php';
+
+            $ui_btn_variant = 'primary';
+            $ui_btn_label = 'Nova Jornada';
+            $ui_btn_icon = 'fa-solid fa-plus';
+            $ui_btn_onclick = '';
+            $ui_btn_href = URL . '/professor/jornadas/criar';
+            $ui_btn_id = '';
+            include $ui . '/btn.php';
+            ?>
+        </div>
     </div>
 </div>
 

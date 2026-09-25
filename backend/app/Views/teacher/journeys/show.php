@@ -9,57 +9,54 @@
                 <?= htmlspecialchars($jornada['materia_nome'] ?? 'N/A') ?> • <?= !empty($turmas_nomes) ? implode(', ', array_map('htmlspecialchars', $turmas_nomes)) : htmlspecialchars($jornada['turma_nome'] ?? 'N/A') ?>
             </p>
         </div>
+        <?php
+        $mostrarGerenciarBlocos = $mostrarGerenciarBlocos ?? false;
+        $ui = __DIR__ . '/../../admin/_partials/ui';
+        ?>
         <div class="flex flex-wrap gap-2">
-            <a href="<?= URL ?>/professor/jornadas" 
-               title="Voltar"
-               class="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-all duration-300 inline-flex items-center gap-1.5 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-                <span>Voltar</span>
-            </a>
-            <a href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>/editar" 
-               title="Editar"
-               class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-all duration-300 inline-flex items-center gap-1.5 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                </svg>
-                <span>Editar</span>
-            </a>
-            <?php 
-            // A variável $mostrarGerenciarBlocos é calculada no controller
-            // e passada para a view
-            $mostrarGerenciarBlocos = $mostrarGerenciarBlocos ?? false;
+            <?php
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Voltar';
+            $ui_btn_icon = 'fa-solid fa-arrow-left';
+            $ui_btn_href = URL . '/professor/jornadas';
+            $ui_btn_type = 'button';
+            $ui_btn_onclick = '';
+            $ui_btn_id = '';
+            $ui_btn_class = '';
+            $ui_btn_attrs = 'title="Voltar"';
+            $ui_btn_filter_count = 0;
+            include $ui . '/btn.php';
+
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Editar';
+            $ui_btn_icon = 'fa-solid fa-pen';
+            $ui_btn_href = URL . '/professor/jornadas/' . (int) $jornada['id'] . '/editar';
+            $ui_btn_attrs = 'title="Editar"';
+            include $ui . '/btn.php';
+
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Resultados';
+            $ui_btn_icon = 'fa-solid fa-file-lines';
+            $ui_btn_href = URL . '/professor/jornadas/' . (int) $jornada['id'] . '/exercicios-alunos';
+            $ui_btn_attrs = 'title="Resultados"';
+            include $ui . '/btn.php';
+
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Preview';
+            $ui_btn_icon = 'fa-solid fa-eye';
+            $ui_btn_href = URL . '/jornadas/' . (int) $jornada['id'] . '?preview=1';
+            $ui_btn_attrs = 'target="_blank" rel="noopener noreferrer" title="Preview da jornada (como o aluno vê)"';
+            include $ui . '/btn.php';
+
+            if ($mostrarGerenciarBlocos):
+                $ui_btn_variant = 'primary';
+                $ui_btn_label = 'Blocos da Jornada';
+                $ui_btn_icon = 'fa-solid fa-layer-group';
+                $ui_btn_href = URL . '/professor/jornadas/' . (int) $jornada['id'] . '/modulos';
+                $ui_btn_attrs = 'title="Blocos da Jornada"';
+                include $ui . '/btn.php';
+            endif;
             ?>
-            <?php if ($mostrarGerenciarBlocos): ?>
-            <a href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>/modulos" 
-               title="Blocos da Jornada"
-               class="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-all duration-300 inline-flex items-center gap-1.5 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                </svg>
-                <span>Blocos da Jornada</span>
-            </a>
-            <?php endif; ?>
-            <a href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>/exercicios-alunos" 
-               title="Resultados"
-               class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 transition-all duration-300 inline-flex items-center gap-1.5 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <span>Resultados</span>
-            </a>
-            <a href="<?= URL ?>/jornadas/<?= (int)$jornada['id'] ?>?preview=1" 
-               target="_blank"
-               rel="noopener noreferrer"
-               title="Preview da jornada (como o aluno vê)"
-               class="bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 transition-all duration-300 inline-flex items-center gap-1.5 text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-                <span>Preview</span>
-            </a>
         </div>
     </div>
 </div>

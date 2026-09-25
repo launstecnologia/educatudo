@@ -18,13 +18,20 @@
             </p>
         </div>
         <div class="flex space-x-3">
-            <a href="<?= URL ?>/professor/jornadas/<?= $modulo['jornada_id'] ?>/modulos" 
-               class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-all duration-300 flex items-center shadow-lg hover:shadow-xl">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-                Voltar
-            </a>
+            <?php
+            $ui = __DIR__ . '/../../admin/_partials/ui';
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Voltar';
+            $ui_btn_icon = 'fa-solid fa-arrow-left';
+            $ui_btn_href = URL . '/professor/jornadas/' . (int) $modulo['jornada_id'] . '/modulos';
+            $ui_btn_type = 'button';
+            $ui_btn_onclick = '';
+            $ui_btn_id = '';
+            $ui_btn_class = '';
+            $ui_btn_attrs = '';
+            $ui_btn_filter_count = 0;
+            include $ui . '/btn.php';
+            ?>
         </div>
     </div>
 </div>
@@ -180,9 +187,22 @@ $tipoConteudoOption = $temUmVideo ? (($videos[0]['tipo'] ?? 'youtube') === 'link
             <p class="text-xs text-amber-900/80"><strong>Vídeos grandes:</strong> se o envio falhar, o servidor pode ter limite baixo (PHP). Comprima o MP4 ou peça à escola para aumentar <code class="text-xs bg-white/80 px-1 rounded">upload_max_filesize</code> e <code class="text-xs bg-white/80 px-1 rounded">post_max_size</code>.</p>
         </div>
         
-        <button type="submit" class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-            Salvar conteúdo
-        </button>
+        <div class="mt-4">
+            <?php
+            $ui = __DIR__ . '/../../admin/_partials/ui';
+            $ui_btn_variant = 'primary';
+            $ui_btn_label = 'Salvar conteúdo';
+            $ui_btn_icon = 'fa-solid fa-check';
+            $ui_btn_href = '';
+            $ui_btn_type = 'submit';
+            $ui_btn_onclick = '';
+            $ui_btn_id = '';
+            $ui_btn_class = '';
+            $ui_btn_attrs = '';
+            $ui_btn_filter_count = 0;
+            include $ui . '/btn.php';
+            ?>
+        </div>
     </form>
     </div>
 </div>

@@ -9,13 +9,20 @@
                 Crie uma nova jornada de aprendizado para seus alunos
             </p>
         </div>
-        <a href="<?= URL ?>/professor/jornadas" 
-           class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-all duration-300 flex items-center shadow-lg hover:shadow-xl">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-            </svg>
-            Voltar
-        </a>
+        <?php
+        $ui = __DIR__ . '/../../admin/_partials/ui';
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Voltar';
+        $ui_btn_icon = 'fa-solid fa-arrow-left';
+        $ui_btn_href = URL . '/professor/jornadas';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_id = '';
+        $ui_btn_class = '';
+        $ui_btn_attrs = '';
+        $ui_btn_filter_count = 0;
+        include $ui . '/btn.php';
+        ?>
     </div>
 </div>
 
@@ -223,8 +230,8 @@
                class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Cancelar
             </a>
-            <button type="submit" 
-                    class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <span id="submitText">Criar Jornada</span>
                 <span id="loadingText" class="hidden">Criando...</span>
             </button>

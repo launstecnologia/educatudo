@@ -145,11 +145,19 @@
                             <p class="text-xs text-gray-500 mt-2">Pontuação: <?= htmlspecialchars((string)($exercicio['pontuacao'] ?? '1.00')) ?> pontos</p>
                         </div>
 
-                        <div class="flex items-center gap-2 md:pl-4">
-                            <a href="<?= URL ?>/professor/jornadas/modulos/<?= (int)$modulo['id'] ?>/exercicios/criar?editar=<?= (int)$exercicio['id'] ?>"
-                               class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors">Editar</a>
-                            <button type="button" onclick="removerExercicio(<?= (int)$exercicio['id'] ?>)"
-                                    class="px-3 py-1.5 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">Remover</button>
+                        <div class="md:pl-4 shrink-0">
+                            <?php ob_start(); ?>
+                                <a href="<?= URL ?>/professor/jornadas/modulos/<?= (int) $modulo['id'] ?>/exercicios/criar?editar=<?= (int) $exercicio['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
+                                </a>
+                                <button type="button" onclick="removerExercicio(<?= (int) $exercicio['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                    <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Remover
+                                </button>
+                            <?php
+                            $row_actions_dropdown_items = ob_get_clean();
+                            $row_actions_dropdown_id = 'row-actions-exercicio-' . (int) $exercicio['id'];
+                            include __DIR__ . '/../../admin/_partials/row_actions_dropdown.php';
+                            ?>
                         </div>
                     </div>
                 </div>
