@@ -32,14 +32,12 @@ $tiposFiltro = [
     'recarga_inicial' => 'Créditos iniciais',
     'recarga_plano' => 'Recarga plano',
 ];
-$gruposOcultosProfessor = ['Chat', 'Flashcards', 'EducaInclui', 'Secretaria', 'Boletim', 'Avaliações'];
+$gruposOcultosProfessor = ['Chat', 'Flashcards', 'EducaInclui', 'Secretaria', 'Boletim', 'Avaliações', 'Professor'];
 $rotulosGrupoProfessor = ['Apps externos' => 'EducaProf'];
 $notasGrupoProfessor = [
     'Apps externos' => 'O custo depende do que for feito no EducaProf e pode variar.',
 ];
-$descricoesGrupoProfessor = [
-    'Professor' => 'Educa Slides, plano de aula e TudinhaProf.',
-];
+$descricoesGrupoProfessor = [];
 $tabela_precos_modulos = array_values(array_filter($tabela_precos_modulos, static function ($row) use ($gruposOcultosProfessor) {
     $grupo = trim((string) ($row['grupo'] ?? ''));
     return !in_array($grupo, $gruposOcultosProfessor, true);
