@@ -227,7 +227,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             ?>
             <a href="<?= htmlspecialchars($externalApp['href']) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-3 <?= $isCurrentExternal ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <?php if ($isEducaProf): ?>
-                <span class="mr-3 inline-block h-5 w-5 shrink-0 bg-current" style="-webkit-mask: url('<?= URL ?>/public/assets/educaprof-icone.png') center / contain no-repeat; mask: url('<?= URL ?>/public/assets/educaprof-icone.png') center / contain no-repeat;"></span>
+                <img src="<?= URL ?>/public/assets/educaprof-icone.png" alt="" class="mr-3 h-5 w-5 shrink-0 object-contain" width="20" height="20">
                 <?php else: ?>
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-1.414 1.414a4 4 0 01-5.656 0M10.172 13.828a4 4 0 01-5.656 0L3.102 12.414a4 4 0 010-5.656L4.516 5.344a4 4 0 015.656 0"></path>
