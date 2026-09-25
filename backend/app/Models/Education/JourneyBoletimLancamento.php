@@ -493,8 +493,8 @@ class JourneyBoletimLancamento
         $turmaIds = [$turmaId];
         $jornadaIdsEscopo = array_values(array_unique(array_filter(array_map('intval', $jornadaIdsEscopo))));
         if (!empty($jornadaIdsEscopo)) {
+            // IDs já vieram do bimestre da regra. A data do evento não pode esvaziar esse escopo.
             $jornadas = $this->buscarJornadasPorIdsEscopoTurma($turmaIds, $jornadaIdsEscopo);
-            $jornadas = $this->filtrarJornadasPorPeriodo($jornadas, $dataIni, $dataFim);
         } else {
             $jornadas = $this->listarJornadasCandidatas($turmaIds, $dataIni, $dataFim);
         }
@@ -766,7 +766,6 @@ class JourneyBoletimLancamento
         $jornadaIdsEscopo = array_values(array_unique(array_filter(array_map('intval', $jornadaIdsEscopo))));
         if (!empty($jornadaIdsEscopo)) {
             $jornadas = $this->buscarJornadasPorIdsEscopoTurma($turmaIds, $jornadaIdsEscopo);
-            $jornadas = $this->filtrarJornadasPorPeriodo($jornadas, $dataIni, $dataFim);
         } else {
             $jornadas = $this->listarJornadasCandidatas($turmaIds, $dataIni, $dataFim);
         }

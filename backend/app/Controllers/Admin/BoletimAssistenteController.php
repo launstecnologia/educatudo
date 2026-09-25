@@ -215,6 +215,7 @@ class BoletimAssistenteController extends BaseController
         }
 
         $rascunho = $this->rascunhoComFontesSalvas($rascunho, $estado);
+        $rascunho = $this->garantirEscopoJornada($rascunho, $estado);
         [$periodoRef, $dataInicio, $dataFim] = $this->resolverPeriodoPreview($rascunho, $estado);
 
         try {
@@ -222,6 +223,8 @@ class BoletimAssistenteController extends BaseController
             $simulacao = $configController->simularRegraAluno($rascunho, $alunoId, $periodoRef, $dataInicio, $dataFim);
             $previewReal = $this->montarPreviewRealDaSimulacao($simulacao);
             if ($previewReal !== null) {
+                $grupoId = (int) ($rascunho['grupo_regras_notas_id'] ?? $estado['grupo_regras_notas_id'] ?? 0);
+                $previewReal = $this->aplicarMateriasDoQuadro($previewReal, $grupoId);
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
                 $resultado['preview'] = $previewReal;
@@ -296,6 +299,9 @@ class BoletimAssistenteController extends BaseController
         $rascunho['componentes'] = $componentes;
         if (trim((string) ($rascunho['codigo'] ?? '')) === '' && trim((string) ($salva['codigo'] ?? '')) !== '') {
             $rascunho['codigo'] = (string) $salva['codigo'];
+        }
+        if ((int) ($rascunho['grupo_regras_notas_id'] ?? 0) <= 0 && (int) ($salva['grupo_regras_notas_id'] ?? 0) > 0) {
+            $rascunho['grupo_regras_notas_id'] = (int) $salva['grupo_regras_notas_id'];
         }
 
         return $rascunho;
@@ -441,6 +447,7 @@ class BoletimAssistenteController extends BaseController
                 $nome = 'Matéria';
             }
             $linhas[] = [
+                'materia_id' => (int) ($linhaRaw['materia_id'] ?? 0),
                 'materia_nome' => $nome,
                 'notas' => is_array($linhaRaw['notas'] ?? null) ? $linhaRaw['notas'] : [],
             ];
@@ -486,7 +493,7 @@ class BoletimAssistenteController extends BaseController
                     'subtitulo' => 'Prova semanal',
                     'semanas' => $semanasA,
                     'outras' => $outras,
-                    'linhas' => $this->filtrarLinhasPreviewPorSemanas($linhas, $semanasA),
+                    'linhas' => $linhas,
                 ];
             }
             if ($semanasB !== []) {
@@ -496,7 +503,7 @@ class BoletimAssistenteController extends BaseController
                     'subtitulo' => 'Prova semanal',
                     'semanas' => $semanasB,
                     'outras' => $outras,
-                    'linhas' => $this->filtrarLinhasPreviewPorSemanas($linhas, $semanasB),
+                    'linhas' => $linhas,
                 ];
             }
 
@@ -560,33 +567,274 @@ class BoletimAssistenteController extends BaseController
     }
 
     /**
-     * @param list<array<string,mixed>> $linhas
-     * @param list<array<string,mixed>> $semanas
-     * @return list<array<string,mixed>>
+     * Cada bloco do quadro de notas tem a própria lista de matérias.
+     *
+     * @param array<string,mixed> $preview
+     * @return array<string,mixed>
      */
-    private function filtrarLinhasPreviewPorSemanas(array $linhas, array $semanas): array
+    private function aplicarMateriasDoQuadro(array $preview, int $grupoId): array
     {
-        $codigos = array_values(array_filter(array_map(static function ($semana) {
-            return strtolower(trim((string) ($semana['codigo'] ?? '')));
-        }, $semanas)));
-        if ($codigos === []) {
-            return $linhas;
+        if (($preview['modo'] ?? '') !== 'quadro' || empty($preview['tabelas']) || !is_array($preview['tabelas'])) {
+            return $preview;
         }
 
-        $filtradas = [];
-        foreach ($linhas as $linha) {
-            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
-            foreach ($codigos as $codigo) {
-                if (array_key_exists($codigo, $notas)
-                    || array_key_exists($codigo . '__n', $notas)
-                    || array_key_exists($codigo . '__q', $notas)) {
-                    $filtradas[] = $linha;
-                    break;
+        $mapas = $this->mapasMateriasPorBloco($grupoId);
+        $tabelas = [];
+        foreach ($preview['tabelas'] as $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            $key = strtolower(trim((string) ($tab['key'] ?? '')));
+            $linhas = is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+            if ($key === 'a' || $key === 'b') {
+                $letra = $key === 'b' ? 'B' : 'A';
+                if ($mapas['tem']) {
+                    $linhas = $this->linhasDoBlocoQuadro($linhas, $mapas[$letra]['ids'], $mapas[$letra]['nomes']);
+                } else {
+                    $linhas = $this->linhasVisiveisNoBloco($key, $tab, $preview['tabelas']);
                 }
+            }
+            $tab['linhas'] = array_values($linhas);
+            $tabelas[] = $tab;
+        }
+        $preview['tabelas'] = $tabelas;
+
+        return $preview;
+    }
+
+    /**
+     * @return array{tem:bool,A:array{ids:array<int,true>,nomes:array<string,true>},B:array{ids:array<int,true>,nomes:array<string,true>}}
+     */
+    private function mapasMateriasPorBloco(int $grupoId): array
+    {
+        $vazio = ['ids' => [], 'nomes' => []];
+        $out = ['tem' => false, 'A' => $vazio, 'B' => $vazio];
+        $path = dirname(__DIR__, 2) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('GrupoRegrasNotasService', false)) {
+            return $out;
+        }
+        try {
+            $bruto = (new GrupoRegrasNotasService())->materiasQuadroPadrao($grupoId > 0 ? $grupoId : null);
+        } catch (Throwable $e) {
+            return $out;
+        }
+        $pathComp = dirname(__DIR__, 2) . '/Models/Education/ComponenteCurricular.php';
+        if (!class_exists('ComponenteCurricular', false) && is_file($pathComp)) {
+            require_once $pathComp;
+        }
+        $cc = class_exists('ComponenteCurricular', false) ? new ComponenteCurricular() : null;
+        foreach (['A', 'B'] as $letra) {
+            $ids = [];
+            $nomes = [];
+            foreach (is_array($bruto[$letra] ?? null) ? $bruto[$letra] : [] as $materia) {
+                if (!is_array($materia)) {
+                    continue;
+                }
+                $id = (int) ($materia['id'] ?? 0);
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+                $chave = $this->chaveNomeMateria((string) ($materia['nome'] ?? ''));
+                if ($chave !== '') {
+                    $nomes[$chave] = true;
+                }
+            }
+            $set = [];
+            $expandidos = $cc !== null ? $cc->expandirIdsComFilhos($ids) : $ids;
+            foreach ($expandidos as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $set[$id] = true;
+                }
+            }
+            $out[$letra] = ['ids' => $set, 'nomes' => $nomes];
+            if ($set !== [] || $nomes !== []) {
+                $out['tem'] = true;
+            }
+        }
+        if ($out['tem']) {
+            return $out;
+        }
+
+        return $this->mapasMateriasPeloNomeDoTipo($grupoId, $cc);
+    }
+
+    /**
+     * @return array{tem:bool,A:array{ids:array<int,true>,nomes:array<string,true>},B:array{ids:array<int,true>,nomes:array<string,true>}}
+     */
+    private function mapasMateriasPeloNomeDoTipo(int $grupoId, $cc): array
+    {
+        $vazio = ['ids' => [], 'nomes' => []];
+        $out = ['tem' => false, 'A' => $vazio, 'B' => $vazio];
+        if (!class_exists('GrupoRegrasNotasService', false) || $grupoId <= 0) {
+            return $out;
+        }
+        try {
+            $completo = (new GrupoRegrasNotasService())->carregarCompleto($grupoId);
+        } catch (Throwable $e) {
+            return $out;
+        }
+        $tipos = is_array($completo['tipos'] ?? null) ? $completo['tipos'] : [];
+        $porLetra = ['A' => [], 'B' => []];
+        $semLetra = [];
+        foreach ($tipos as $tipo) {
+            if (!is_array($tipo)) {
+                continue;
+            }
+            $blob = $this->chaveNomeMateria((string) ($tipo['nome'] ?? '') . ' ' . (string) ($tipo['codigo'] ?? ''));
+            if (str_contains($blob, 'bloco a') || preg_match('/(^| )a$/', $blob) === 1) {
+                $porLetra['A'][] = $tipo;
+            } elseif (str_contains($blob, 'bloco b') || preg_match('/(^| )b$/', $blob) === 1) {
+                $porLetra['B'][] = $tipo;
+            } else {
+                $semLetra[] = $tipo;
+            }
+        }
+        if ($porLetra['A'] === [] && $porLetra['B'] === [] && count($semLetra) >= 2) {
+            $porLetra['A'][] = $semLetra[0];
+            $porLetra['B'][] = $semLetra[1];
+        }
+        $nomesCatalogo = [];
+        foreach (['A', 'B'] as $letra) {
+            $ids = [];
+            foreach ($porLetra[$letra] as $tipo) {
+                foreach ((array) ($tipo['materias_ids'] ?? []) as $mid) {
+                    $mid = (int) $mid;
+                    if ($mid > 0) {
+                        $ids[] = $mid;
+                    }
+                }
+            }
+            $set = [];
+            foreach ($cc !== null ? $cc->expandirIdsComFilhos($ids) : $ids as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $set[$id] = true;
+                }
+            }
+            $out[$letra] = ['ids' => $set, 'nomes' => $nomesCatalogo];
+            if ($set !== []) {
+                $out['tem'] = true;
             }
         }
 
-        return $filtradas !== [] ? $filtradas : $linhas;
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @param array<int,true> $ids
+     * @param array<string,true> $nomes
+     * @return list<array<string,mixed>>
+     */
+    private function linhasDoBlocoQuadro(array $linhas, array $ids, array $nomes): array
+    {
+        $out = [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0 && isset($ids[$mid])) {
+                $out[] = $linha;
+                continue;
+            }
+            $chave = $this->chaveNomeMateria((string) ($linha['materia_nome'] ?? ''));
+            if ($chave !== '' && isset($nomes[$chave])) {
+                $out[] = $linha;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $tab
+     * @param list<array<string,mixed>> $tabelas
+     * @return list<array<string,mixed>>
+     */
+    private function linhasVisiveisNoBloco(string $blocoKey, array $tab, array $tabelas): array
+    {
+        $path = dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+        if (!class_exists('BoletimQuadroLayoutHelper', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+            return is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+        }
+        $semanasDeste = is_array($tab['semanas'] ?? null) ? $tab['semanas'] : [];
+        $outroKey = $blocoKey === 'b' ? 'a' : 'b';
+        $semanasOutro = [];
+        foreach ($tabelas as $outra) {
+            if (!is_array($outra) || strtolower((string) ($outra['key'] ?? '')) !== $outroKey) {
+                continue;
+            }
+            $semanasOutro = is_array($outra['semanas'] ?? null) ? $outra['semanas'] : [];
+        }
+        $outras = is_array($tab['outras'] ?? null) ? $tab['outras'] : [];
+        $out = [];
+        foreach (is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            if (BoletimQuadroLayoutHelper::linhaVisivelNoQuadro($blocoKey, $semanasDeste, $semanasOutro, $outras, $notas)) {
+                $out[] = $linha;
+            }
+        }
+
+        return $out;
+    }
+
+    private function chaveNomeMateria(string $nome): string
+    {
+        $nome = mb_strtolower(trim($nome));
+        $nome = strtr($nome, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c',
+        ]);
+        $nome = preg_replace('/\s+/', ' ', $nome);
+
+        return is_string($nome) ? $nome : '';
+    }
+
+    /**
+     * A nota de jornada segue as jornadas do bimestre, não o intervalo de datas do evento.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function garantirEscopoJornada(array $rascunho, array $estado): array
+    {
+        $bimestre = (int) ($rascunho['bimestre'] ?? $estado['bimestre'] ?? 0);
+        $ano = (int) ($rascunho['ano_letivo'] ?? $estado['ano_letivo'] ?? 0);
+        $idsBimestre = ($bimestre >= 1 && $bimestre <= 4)
+            ? $this->assistente->ferramentas()->resolverIdsJornadaPorBimestre([$bimestre], $ano)
+            : [];
+        $componentes = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $comp) {
+            if (!is_array($comp) || strtolower(trim((string) ($comp['source_type'] ?? ''))) !== 'jornadas') {
+                $componentes[] = $comp;
+                continue;
+            }
+            $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+            $ids = array_values(array_filter(array_map('intval', (array) ($config['jornada_ids'] ?? [])), static fn ($id) => $id > 0));
+            if ($ids === [] && $idsBimestre !== []) {
+                $config['jornada_ids'] = $idsBimestre;
+            }
+            unset($config['data_ini'], $config['data_fim']);
+            $comp['config'] = $config;
+            unset($comp['config_json']);
+            $componentes[] = $comp;
+        }
+        $rascunho['componentes'] = $componentes;
+
+        return $rascunho;
     }
 
     /**
