@@ -5676,6 +5676,10 @@ class ExamController extends BaseController
         
         $totalBlocos = $blocoModel->getCountFiltered($filters);
         $blocos = $blocoModel->getAllFiltered($filters, $perPage, $offset);
+        $idsBlocos = array_map(static function ($bloco) {
+            return (int) ($bloco['id'] ?? 0);
+        }, $blocos);
+        $rotulosQuadro = $blocoModel->rotulosQuadroPorBlocoIds($idsBlocos);
         
         // Estatísticas por status (getAll já chama marcarConcluidos)
         $stats = $this->db->fetch(
@@ -5746,6 +5750,9 @@ class ExamController extends BaseController
             'title' => 'Provas Online - Administração - EducaTudo',
             'user' => $user,
             'blocos' => $blocos,
+            'rotulos_quadro' => $rotulosQuadro,
+            'page_title' => 'Lançamento de Notas',
+            'page_subtitle' => 'Eventos de prova por bloco, semana, bimestre e turma',
             'stats' => $stats,
             'provas_pendentes' => $provasPendentes,
             'canceladas_por_bloco' => $canceladasPorBloco,

@@ -371,14 +371,36 @@ document.addEventListener('keydown', function(e) {
                                 if ($turmasTexto === '') {
                                     $turmasTexto = !empty($bloco['turma_nome']) ? (string)$bloco['turma_nome'] : 'Todas';
                                 }
-                                $nomeBloco = trim((string)($bloco['bloco_modelo_nome'] ?? ''));
                                 $bimestreNumero = (int)($bloco['bimestre'] ?? 0);
                                 $anoBloco = (int)($bloco['ano_letivo'] ?? 0);
                                 $bimestreTexto = $bimestreNumero > 0 ? PeriodoLetivo::rotulo($anoBloco, $bimestreNumero) : '';
-                                $linhaSecundaria = trim(($nomeBloco !== '' ? $nomeBloco : 'Bloco') . ($bimestreTexto !== '' ? (' ' . $bimestreTexto) : '') . ' - ' . $turmasTexto);
+                                $destinosQuadro = $rotulos_quadro[(int) ($bloco['id'] ?? 0)] ?? [];
+                                if ($destinosQuadro === []) {
+                                    $semanaNum = (int) ($bloco['semana'] ?? 0);
+                                    $nomeBlocoLegado = trim((string) ($bloco['bloco_modelo_nome'] ?? ''));
+                                    if ($nomeBlocoLegado !== '' || ($semanaNum >= 1 && $semanaNum <= 20)) {
+                                        $destinosQuadro = [[
+                                            'bloco' => $nomeBlocoLegado,
+                                            'semana' => ($semanaNum >= 1 && $semanaNum <= 20) ? ('S' . $semanaNum) : '',
+                                        ]];
+                                    }
+                                }
                                 ?>
                                 <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($bloco['titulo']) ?></div>
-                                <div class="text-sm text-gray-500"><?= htmlspecialchars($linhaSecundaria) ?></div>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <?php foreach ($destinosQuadro as $destino): ?>
+                                        <?php if (trim((string) ($destino['bloco'] ?? '')) !== ''): ?>
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
+                                        <?php endif; ?>
+                                        <?php if (trim((string) ($destino['semana'] ?? '')) !== ''): ?>
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                    <?php if ($bimestreTexto !== ''): ?>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><?= htmlspecialchars($bimestreTexto) ?></span>
+                                    <?php endif; ?>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800" title="Turma"><?= htmlspecialchars($turmasTexto) ?></span>
+                                </div>
                                 <?php $qtdCanceladasBloco = (int)(($canceladas_por_bloco ?? [])[(int)$bloco['id']] ?? 0); ?>
                                 <?php if ($qtdCanceladasBloco > 0): ?>
                                 <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/canceladas"

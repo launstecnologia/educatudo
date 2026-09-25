@@ -223,6 +223,88 @@ class ExamBlock
 
         return $out;
     }
+
+    /**
+     * Rótulos do quadro (Bloco A/B e coluna S1, S2…) para a listagem de eventos.
+     *
+     * @param list<int> $ids
+     * @return array<int, list<array{bloco:string,semana:string}>>
+     */
+    public function rotulosQuadroPorBlocoIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === []) {
+            return [];
+        }
+        $tabelaV = $this->tabelaVinculosQuadro();
+        if ($tabelaV === null) {
+            return [];
+        }
+        $tabelaBlocos = $this->hasBaseTable('quadros_notas_blocos')
+            ? 'quadros_notas_blocos'
+            : ($this->hasTable('grupos_regras_notas_tipos') ? 'grupos_regras_notas_tipos' : null);
+        $tabelaColunas = $this->hasBaseTable('quadros_notas_colunas')
+            ? 'quadros_notas_colunas'
+            : ($this->hasTable('grupos_regras_notas_marcas') ? 'grupos_regras_notas_marcas' : null);
+        $selBloco = $tabelaBlocos !== null ? 'qb.nome AS bloco_nome' : 'NULL AS bloco_nome';
+        $selColuna = $tabelaColunas !== null
+            ? 'qc.codigo AS coluna_codigo, qc.nome AS coluna_nome, qc.numero AS coluna_numero'
+            : 'NULL AS coluna_codigo, NULL AS coluna_nome, NULL AS coluna_numero';
+        $joinBloco = $tabelaBlocos !== null ? 'LEFT JOIN `' . $tabelaBlocos . '` qb ON qb.id = v.tipo_id' : '';
+        $joinColuna = $tabelaColunas !== null ? 'LEFT JOIN `' . $tabelaColunas . '` qc ON qc.id = v.marca_id' : '';
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $this->db->fetchAll(
+            'SELECT v.bloco_id, ' . $selBloco . ', ' . $selColuna . '
+               FROM `' . $tabelaV . '` v
+               ' . $joinBloco . '
+               ' . $joinColuna . '
+              WHERE v.bloco_id IN (' . $placeholders . ')
+              ORDER BY v.id ASC',
+            $ids
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $blocoId = (int) ($row['bloco_id'] ?? 0);
+            if ($blocoId <= 0) {
+                continue;
+            }
+            $blocoNome = trim((string) ($row['bloco_nome'] ?? ''));
+            $semana = $this->rotuloSemanaQuadro(
+                (string) ($row['coluna_codigo'] ?? ''),
+                (string) ($row['coluna_nome'] ?? ''),
+                (int) ($row['coluna_numero'] ?? 0)
+            );
+            if ($blocoNome === '' && $semana === '') {
+                continue;
+            }
+            $out[$blocoId][] = [
+                'bloco' => $blocoNome,
+                'semana' => $semana,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function rotuloSemanaQuadro(string $codigo, string $nome, int $numero): string
+    {
+        $codigo = trim($codigo);
+        if ($codigo !== '' && preg_match('/^s\d+$/i', $codigo)) {
+            return strtoupper($codigo);
+        }
+        $nome = trim($nome);
+        if ($nome !== '' && preg_match('/^s\d+$/i', $nome)) {
+            return strtoupper($nome);
+        }
+        if ($numero >= 1 && $numero <= 20) {
+            return 'S' . $numero;
+        }
+        if ($codigo !== '') {
+            return $codigo;
+        }
+
+        return $nome;
+    }
     
     /**
      * Marca como concluído os blocos cujo horário de término já passou
