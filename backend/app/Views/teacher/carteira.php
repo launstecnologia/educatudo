@@ -37,6 +37,9 @@ $rotulosGrupoProfessor = ['Apps externos' => 'EducaProf'];
 $notasGrupoProfessor = [
     'Apps externos' => 'O custo depende do que for feito no EducaProf e pode variar.',
 ];
+$descricoesGrupoProfessor = [
+    'Professor' => 'Educa Slides, plano de aula e TudinhaProf.',
+];
 $tabela_precos_modulos = array_values(array_filter($tabela_precos_modulos, static function ($row) use ($gruposOcultosProfessor) {
     $grupo = trim((string) ($row['grupo'] ?? ''));
     return !in_array($grupo, $gruposOcultosProfessor, true);
@@ -196,6 +199,7 @@ $formatarOrigem = static function ($origem): string {
                 $modalId = 'precoGrupoModal-' . md5($grupo);
                 $grupoExibicao = $rotulosGrupoProfessor[$grupo] ?? $grupo;
                 $notaGrupo = $notasGrupoProfessor[$grupo] ?? '';
+                $descricaoGrupo = $descricoesGrupoProfessor[$grupo] ?? '';
                 $menor = $info['menor_custo'];
                 $maior = $info['maior_custo'];
                 $precoResumo = 'Sem custo';
@@ -204,7 +208,7 @@ $formatarOrigem = static function ($origem): string {
                 } elseif ($info['cobrados'] > 0 && $menor !== null && $maior !== null) {
                     $precoResumo = abs($menor - $maior) < 0.00001
                         ? \CreditosDecimalHelper::formatDisplay($menor)
-                        : \CreditosDecimalHelper::formatDisplay($menor) . ' a ' . \CreditosDecimalHelper::formatDisplay($maior);
+                        : \CreditosDecimalHelper::formatDisplay($menor) . ' – ' . \CreditosDecimalHelper::formatNumero($maior);
                 }
             ?>
             <button type="button"
@@ -220,6 +224,8 @@ $formatarOrigem = static function ($origem): string {
                 <p class="mt-1 text-sm text-gray-500">
                     <?php if ($notaGrupo !== ''): ?>
                         <?= htmlspecialchars($notaGrupo) ?>
+                    <?php elseif ($descricaoGrupo !== ''): ?>
+                        <?= htmlspecialchars($descricaoGrupo) ?>
                     <?php else: ?>
                         <?= (int) $info['cobrados'] ?> cobrando<?= $info['gratuitos'] > 0 ? ' · ' . (int) $info['gratuitos'] . ' gratuitos' : '' ?>
                     <?php endif; ?>
@@ -227,7 +233,7 @@ $formatarOrigem = static function ($origem): string {
                 <div class="mt-4 flex items-end justify-between gap-3">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Custo</p>
-                        <p class="mt-0.5 text-lg font-bold text-gray-900"><?= htmlspecialchars($precoResumo) ?></p>
+                        <p class="mt-0.5 whitespace-nowrap text-base font-bold leading-tight text-gray-900"><?= htmlspecialchars($precoResumo) ?></p>
                     </div>
                     <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition-colors group-hover:bg-primary/10 group-hover:text-primary">
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -306,51 +312,38 @@ $formatarOrigem = static function ($origem): string {
 
     <section data-carteira-tab-panel="extrato" class="hidden">
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div class="border-b border-gray-200 px-5 py-4">
-            <h2 class="text-lg font-semibold text-gray-900">Histórico de movimentações</h2>
-            <p class="mt-0.5 text-sm text-gray-500">Consumos, recargas, compras e estornos da carteira.</p>
-        </div>
-        <form method="get" action="<?= URL ?>/professor/carteira" class="border-b border-gray-100 bg-gray-50/70 px-5 py-4">
-            <div class="flex flex-col gap-3 xl:flex-row xl:items-end">
-                <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[150px_1fr_140px_140px]">
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</label>
-                        <select name="filtro_tipo" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15">
-                            <?php foreach ($tiposFiltro as $k => $lab): ?>
-                            <option value="<?= htmlspecialchars($k) ?>" <?= $filtro_tipo === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Módulo</label>
-                        <select name="filtro_modulo" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15">
-                            <option value="">Todos</option>
-                            <?php foreach ($modulos_opcao_filtro as $mk => $mlab): ?>
-                            <?php if (in_array(\CreditosModuleRegistry::getGrupo((string) $mk), $gruposOcultosProfessor, true)) { continue; } ?>
-                            <option value="<?= htmlspecialchars($mk) ?>" <?= $filtro_modulo === $mk ? 'selected' : '' ?>><?= htmlspecialchars($mlab) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">De</label>
-                        <input type="date" name="data_ini" value="<?= htmlspecialchars($data_ini) ?>" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15">
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Até</label>
-                        <input type="date" name="data_fim" value="<?= htmlspecialchars($data_fim) ?>" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15">
-                    </div>
-                </div>
-                <div class="flex gap-2 xl:pb-0">
-                    <button type="submit" class="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gray-800 sm:flex-none">
-                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"></path>
-                        </svg>
-                        Filtrar
-                    </button>
-                    <a href="<?= URL ?>/professor/carteira#extrato" class="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 sm:flex-none">Limpar</a>
-                </div>
+        <div class="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Histórico de movimentações</h2>
+                <p class="mt-0.5 text-sm text-gray-500">Consumos, recargas, compras e estornos da carteira.</p>
             </div>
-        </form>
+            <?php
+            $ui = __DIR__ . '/../admin/_partials/ui';
+            $filtrosExtratoAtivos = 0;
+            if ($filtro_tipo !== '') {
+                $filtrosExtratoAtivos++;
+            }
+            if ($filtro_modulo !== '') {
+                $filtrosExtratoAtivos++;
+            }
+            if ($data_ini !== '') {
+                $filtrosExtratoAtivos++;
+            }
+            if ($data_fim !== '') {
+                $filtrosExtratoAtivos++;
+            }
+            $ui_btn_variant = 'filtro';
+            $ui_btn_label = 'Filtros';
+            $ui_btn_icon = 'fa-solid fa-filter';
+            $ui_btn_onclick = 'openFiltroDrawer()';
+            $ui_btn_filter_count = $filtrosExtratoAtivos;
+            $ui_btn_href = '';
+            $ui_btn_type = 'button';
+            $ui_btn_class = '';
+            $ui_btn_attrs = '';
+            include $ui . '/btn.php';
+            ?>
+        </div>
         <?php if (empty($movimentacoes)): ?>
         <p class="px-6 py-8 text-gray-500 text-sm">Nenhuma movimentação ainda.</p>
         <?php else: ?>
@@ -405,6 +398,82 @@ $formatarOrigem = static function ($origem): string {
     </div>
     </section>
 </div>
+
+<?php
+$opcoesModuloExtrato = ['' => 'Todos'];
+foreach ($modulos_opcao_filtro as $mk => $mlab) {
+    if (in_array(\CreditosModuleRegistry::getGrupo((string) $mk), $gruposOcultosProfessor, true)) {
+        continue;
+    }
+    $opcoesModuloExtrato[(string) $mk] = (string) $mlab;
+}
+$ui = __DIR__ . '/../admin/_partials/ui';
+ob_start();
+?>
+<form method="get" action="<?= URL ?>/professor/carteira" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Tipo';
+        $ui_form_campo_name = 'filtro_tipo';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $tiposFiltro;
+        $ui_form_campo_value = (string) $filtro_tipo;
+        $ui_form_campo_placeholder = '';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Módulo';
+        $ui_form_campo_name = 'filtro_modulo';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesModuloExtrato;
+        $ui_form_campo_value = (string) $filtro_modulo;
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'De';
+        $ui_form_campo_name = 'data_ini';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = (string) $data_ini;
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Até';
+        $ui_form_campo_name = 'data_fim';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = (string) $data_fim;
+        include $ui . '/form_campo.php';
+        ?>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = URL . '/professor/carteira#extrato';
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_attrs = '';
+        $ui_btn_icon = '';
+        $ui_btn_filter_count = 0;
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'confirm';
+        $ui_btn_label = 'Aplicar filtros';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

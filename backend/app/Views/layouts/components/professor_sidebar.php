@@ -221,9 +221,14 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             ?>
             <a href="<?= htmlspecialchars($externalApp['href']) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-3 <?= $isCurrentExternal ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <?php if ($isEducaProf): ?>
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 20.055a12.083 12.083 0 01-6.16-9.477L12 14z"></path>
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M8.4 8.4c.5-2.5 1.9-3.9 3.6-3.9s3.1 1.4 3.6 3.9"></path>
+                    <path d="M9.1 9.1a1.25 1.25 0 1 0 2.5 0 1.25 1.25 0 0 0-2.5 0z"></path>
+                    <path d="M12.4 9.1a1.25 1.25 0 1 0 2.5 0 1.25 1.25 0 0 0-2.5 0z"></path>
+                    <path d="M11.6 9.1h.8"></path>
+                    <path d="M7.8 20.5c.5-3.1 2.1-4.8 4.2-4.8s3.7 1.7 4.2 4.8"></path>
+                    <path d="M12 15.8v4.7"></path>
+                    <path d="M9.5 17.4 12 15.8l2.5 1.6"></path>
                 </svg>
                 <?php else: ?>
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,7 +252,8 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </a>
             <?php endif; ?>
 
-            <!-- Alunos -->
+            <!-- Alunos pausado no acesso do professor. Remover o if (false) para voltar a exibir. -->
+            <?php if (false): ?>
             <?php $alunosEnabled = $modulosProfessor['professor_alunos']; ?>
             <a href="<?= $alunosEnabled ? URL . '/professor/student' : '#' ?>" 
                onclick="<?= $alunosEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Alunos\'); return false;' ?>"
@@ -257,6 +263,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 </svg>
                 <span class="sidebar-text">Alunos</span>
             </a>
+            <?php endif; ?>
             
             <!-- EducaTudo (Menu Expansível) -->
             <?php 
@@ -539,12 +546,13 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 var texto = elemento.querySelector('.sidebar-text');
                 return (texto ? texto.textContent : elemento.textContent).trim();
             }
-            function ordenarItensMenu(container, manterSairPorUltimo) {
+            function ordenarItensMenu(container, manterSairPorUltimo, manterDashboardPrimeiro) {
                 if (!container) {
                     return;
                 }
                 var filhos = Array.prototype.slice.call(container.children);
                 var sair = null;
+                var dashboard = null;
                 var ordenaveis = [];
                 filhos.forEach(function (elemento) {
                     var href = elemento.getAttribute ? (elemento.getAttribute('href') || '') : '';
@@ -552,11 +560,18 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         sair = elemento;
                         return;
                     }
+                    if (manterDashboardPrimeiro && elemento.tagName === 'A' && href.indexOf('/professor/dashboard') !== -1) {
+                        dashboard = elemento;
+                        return;
+                    }
                     ordenaveis.push(elemento);
                 });
                 ordenaveis.sort(function (a, b) {
                     return rotuloMenu(a).localeCompare(rotuloMenu(b), 'pt', { sensitivity: 'base', numeric: true });
                 });
+                if (dashboard) {
+                    container.appendChild(dashboard);
+                }
                 ordenaveis.forEach(function (elemento) {
                     container.appendChild(elemento);
                 });
@@ -565,8 +580,8 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 }
             }
             var navProfessor = document.querySelector('#sidebar nav');
-            ordenarItensMenu(navProfessor, true);
-            ordenarItensMenu(document.getElementById('academico-submenu'), false);
+            ordenarItensMenu(navProfessor, true, true);
+            ordenarItensMenu(document.getElementById('academico-submenu'), false, false);
         })();
         </script>
     </div>
@@ -843,27 +858,36 @@ function toggleMenuGroup(groupId) {
     }
 }
 
-// Verificar estado salvo dos menus e expandir automaticamente se necessário
-document.addEventListener('DOMContentLoaded', function() {
-    const currentPage = '<?= $current_page ?? '' ?>';
-    
-    // Se estiver em uma das páginas do menu Acadêmico, expandir automaticamente
-    if (['planos-aula', 'diarios_classe', 'conselho_classe', 'provas', 'jornadas', 'jornadas_relatorio', 'essays', 'arquivos', 'apostilas'].includes(currentPage)) {
-        const wasExpanded = localStorage.getItem('menu-academico-expanded') === 'true';
-        if (!wasExpanded) {
-            toggleMenuGroup('academico');
-        } else {
-            // Apenas garantir que está visível
-            const submenu = document.getElementById('academico-submenu');
-            const arrow = document.getElementById('academico-arrow');
-            if (submenu && !submenu.classList.contains('hidden')) {
-                if (arrow) {
-                    arrow.style.transform = 'rotate(180deg)';
-                }
-            }
+function paginaEstaNoColag() {
+    const submenu = document.getElementById('academico-submenu');
+    if (!submenu) {
+        return false;
+    }
+    const links = submenu.querySelectorAll('a');
+    for (let i = 0; i < links.length; i++) {
+        if (links[i].classList.contains('text-white') && links[i].classList.contains('bg-white/20')) {
+            return true;
         }
     }
-});
+    return !!submenu.querySelector('details[open]');
+}
+
+function abrirColag() {
+    const submenu = document.getElementById('academico-submenu');
+    const arrow = document.getElementById('academico-arrow');
+    if (!submenu) {
+        return;
+    }
+    submenu.classList.remove('hidden');
+    if (arrow) {
+        arrow.style.transform = 'rotate(180deg)';
+    }
+    localStorage.setItem('menu-academico-expanded', 'true');
+}
+
+if (paginaEstaNoColag()) {
+    abrirColag();
+}
 
 // Função para mostrar modal quando módulo está desabilitado
 function mostrarModalModuloDesabilitado(nomeModulo) {

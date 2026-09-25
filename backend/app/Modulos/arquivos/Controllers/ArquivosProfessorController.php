@@ -72,15 +72,24 @@ class ArquivosProfessorController extends BaseController
 
         $professor = $this->getProfessor();
         $pastaAtualId = isset($_GET['pasta_id']) && $_GET['pasta_id'] !== '' ? (int) $_GET['pasta_id'] : null;
-        $resultado = $this->arquivosService->listarParaProfessor((int) $professor['id'], $pastaAtualId);
+        $filtros = [
+            'titulo' => trim((string) ($_GET['titulo'] ?? '')),
+            'turma_id' => (int) ($_GET['turma_id'] ?? 0),
+            'materia_id' => (int) ($_GET['materia_id'] ?? 0),
+        ];
+        $resultado = $this->arquivosService->listarParaProfessor((int) $professor['id'], $pastaAtualId, $filtros);
 
         $this->viewWithLayout('professor', 'professor/arquivos/index', [
-            'title' => 'Módulo de Arquivos - EducaTudo',
+            'title' => 'Arquivos - EducaTudo',
+            'page_title' => 'Arquivos',
             'user' => $this->auth->getUser(),
             'lista' => $resultado['lista'],
             'pastas' => $resultado['pastas'],
             'pasta_atual' => $resultado['pasta_atual'],
             'pasta_atual_id' => $resultado['pasta_atual_id'],
+            'turmas' => $this->arquivosService->getTurmasProfessor($professor),
+            'materias' => $this->arquivosService->getMateriasProfessor($professor),
+            'filtros' => $filtros,
             'current_page' => 'arquivos',
             'csrf_token' => $this->generateCsrfToken(),
         ]);

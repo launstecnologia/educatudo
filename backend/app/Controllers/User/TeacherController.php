@@ -1307,8 +1307,15 @@ if (!class_exists('TeacherController')) {
     /**
      * Lista alunos do professor (pasta Student)
      */
+    private function alunosProfessorPausado(): void
+    {
+        $this->redirect('/professor/dashboard');
+    }
+
     public function student()
     {
+        $this->alunosProfessorPausado();
+        return;
         $user = $this->authManager->getUser();
         
         $professor = $this->db->fetch(
@@ -1356,6 +1363,8 @@ if (!class_exists('TeacherController')) {
      */
     public function viewStudent($id)
     {
+        $this->alunosProfessorPausado();
+        return;
         $user = $this->authManager->getUser();
         
         $professor = $this->db->fetch(
@@ -1462,6 +1471,8 @@ if (!class_exists('TeacherController')) {
      */
     public function studentProvas($id)
     {
+        $this->alunosProfessorPausado();
+        return;
         $user = $this->authManager->getUser();
         
         $professor = $this->db->fetch(
@@ -1531,6 +1542,8 @@ if (!class_exists('TeacherController')) {
      */
     public function studentRelatorio($id)
     {
+        $this->alunosProfessorPausado();
+        return;
         $user = $this->authManager->getUser();
         
         $professor = $this->db->fetch(
@@ -1754,6 +1767,8 @@ if (!class_exists('TeacherController')) {
      */
     public function updateStudentPassword($id)
     {
+        $this->alunosProfessorPausado();
+        return;
         // Limpar buffer de saída para evitar HTML antes do JSON
         ob_clean();
         

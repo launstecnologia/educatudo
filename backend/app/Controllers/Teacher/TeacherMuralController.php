@@ -75,6 +75,7 @@ class TeacherMuralController extends BaseController
         $materias_opcoes = $this->getMateriasOpcoes();
         $data = [
             'title' => 'Mural de Recados - Professor',
+            'page_title' => 'Mural de Recados',
             'user' => $user,
             'recados' => $recados,
             'turmas_opcoes' => $turmas,

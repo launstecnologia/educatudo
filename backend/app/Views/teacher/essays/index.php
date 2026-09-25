@@ -1,23 +1,50 @@
-<div class="mb-8">
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Jornada da Redação</h2>
-            <p class="text-gray-600">Criar e gerenciar propostas de redação</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-            <a href="<?= URL ?>/professor/redacao-configuravel/relatorio" class="bg-white text-purple-700 border border-purple-200 px-5 py-3 rounded-xl hover:bg-purple-50 transition-all duration-300 flex items-center shadow-sm">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m4 6V7m4 10v-3M5 21h14"></path></svg>
-                Relatório
-            </a>
-            <a href="<?= URL ?>/professor/redacao-configuravel/novo" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 flex items-center shadow-lg">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Nova Proposta
-            </a>
-        </div>
-    </div>
-</div>
+<?php
+$ui = __DIR__ . '/../../admin/_partials/ui';
+$filtros = $filtros ?? ['titulo' => '', 'status' => '', 'banca' => ''];
+$filtrosAtivos = 0;
+if (trim((string) ($filtros['titulo'] ?? '')) !== '') {
+    $filtrosAtivos++;
+}
+if (trim((string) ($filtros['status'] ?? '')) !== '') {
+    $filtrosAtivos++;
+}
+if (trim((string) ($filtros['banca'] ?? '')) !== '') {
+    $filtrosAtivos++;
+}
 
-<div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200">
+ob_start();
+$ui_btn_variant = 'filtro';
+$ui_btn_label = 'Filtros';
+$ui_btn_icon = 'fa-solid fa-filter';
+$ui_btn_onclick = 'openFiltroDrawer()';
+$ui_btn_filter_count = $filtrosAtivos;
+$ui_btn_href = '';
+$ui_btn_type = 'button';
+$ui_btn_id = '';
+$ui_btn_class = '';
+$ui_btn_attrs = '';
+include $ui . '/btn.php';
+
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Relatório';
+$ui_btn_icon = 'fa-solid fa-chart-column';
+$ui_btn_onclick = '';
+$ui_btn_href = URL . '/professor/redacao-configuravel/relatorio';
+$ui_btn_filter_count = 0;
+include $ui . '/btn.php';
+
+$ui_btn_variant = 'primary';
+$ui_btn_label = 'Nova Proposta';
+$ui_btn_icon = 'fa-solid fa-plus';
+$ui_btn_href = URL . '/professor/redacao-configuravel/novo';
+include $ui . '/btn.php';
+$page_header_actions = ob_get_clean();
+$page_header_title = 'Jornada da Redação';
+$page_header_subtitle = 'Criar e gerenciar propostas de redação';
+include __DIR__ . '/../../admin/_partials/page_header_list.php';
+?>
+
+<div class="bg-white rounded-xl shadow-lg border border-gray-200">
     <div class="p-6 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Minhas Propostas</h3>
     </div>
@@ -38,7 +65,10 @@
                 <?php if (empty($proposals)): ?>
                     <tr>
                         <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                            Nenhuma proposta. <a href="<?= URL ?>/professor/redacao-configuravel/novo" class="text-purple-600 hover:underline">Criar primeira proposta</a>
+                            <?= $filtrosAtivos > 0 ? 'Nenhuma proposta com esse filtro.' : 'Nenhuma proposta.' ?>
+                            <?php if ($filtrosAtivos === 0): ?>
+                            <a href="<?= URL ?>/professor/redacao-configuravel/novo" class="text-primary hover:underline">Criar primeira proposta</a>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php else: ?>
@@ -62,7 +92,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div class="flex items-center gap-3">
                                 <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>"
-                                   class="text-indigo-600 hover:text-indigo-900"
+                                   class="text-primary hover:opacity-80"
                                    title="Ver">
                                     <span class="sr-only">Ver</span>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -71,7 +101,7 @@
                                     </svg>
                                 </a>
                                 <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>/editar"
-                                   class="text-blue-600 hover:text-blue-900"
+                                   class="text-gray-600 hover:text-gray-900"
                                    title="Editar">
                                     <span class="sr-only">Editar</span>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -127,6 +157,78 @@
         </div>
     </div>
 </div>
+
+<?php
+$opcoesStatus = [
+    '' => 'Todos',
+    'published' => 'Publicada',
+    'draft' => 'Rascunho',
+];
+$opcoesBanca = ['' => 'Todas'];
+foreach ($bancas ?? [] as $banca) {
+    $opcoesBanca[(string) $banca] = (string) $banca;
+}
+ob_start();
+?>
+<form method="get" action="<?= URL ?>/professor/redacao-configuravel" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Título';
+        $ui_form_campo_name = 'titulo';
+        $ui_form_campo_tipo = 'text';
+        $ui_form_campo_value = (string) ($filtros['titulo'] ?? '');
+        $ui_form_campo_placeholder = 'Buscar pelo título';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Banca';
+        $ui_form_campo_name = 'banca';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesBanca;
+        $ui_form_campo_value = (string) ($filtros['banca'] ?? '');
+        $ui_form_campo_placeholder = '';
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Status';
+        $ui_form_campo_name = 'status';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesStatus;
+        $ui_form_campo_value = (string) ($filtros['status'] ?? '');
+        include $ui . '/form_campo.php';
+        ?>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = URL . '/professor/redacao-configuravel';
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_icon = '';
+        $ui_btn_filter_count = 0;
+        $ui_btn_attrs = '';
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'confirm';
+        $ui_btn_label = 'Aplicar filtros';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 
 <script>
     (function () {

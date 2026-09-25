@@ -426,10 +426,45 @@ class TeacherEssayController extends BaseController
             }
         }
         unset($proposal);
+        $filtroTitulo = trim((string) ($_GET['titulo'] ?? ''));
+        $filtroStatus = trim((string) ($_GET['status'] ?? ''));
+        $filtroBanca = trim((string) ($_GET['banca'] ?? ''));
+        if (!in_array($filtroStatus, ['', 'published', 'draft'], true)) {
+            $filtroStatus = '';
+        }
+        $bancas = [];
+        foreach ($proposals as $proposal) {
+            $nomeBanca = trim((string) ($proposal['board_name'] ?? ''));
+            if ($nomeBanca !== '') {
+                $bancas[$nomeBanca] = $nomeBanca;
+            }
+        }
+        ksort($bancas, SORT_NATURAL | SORT_FLAG_CASE);
+        if ($filtroTitulo !== '' || $filtroStatus !== '' || $filtroBanca !== '') {
+            $proposals = array_values(array_filter($proposals, static function (array $proposal) use ($filtroTitulo, $filtroStatus, $filtroBanca): bool {
+                if ($filtroTitulo !== '' && stripos((string) ($proposal['title'] ?? ''), $filtroTitulo) === false) {
+                    return false;
+                }
+                if ($filtroStatus !== '' && (string) ($proposal['status'] ?? '') !== $filtroStatus) {
+                    return false;
+                }
+                if ($filtroBanca !== '' && (string) ($proposal['board_name'] ?? '') !== $filtroBanca) {
+                    return false;
+                }
+                return true;
+            }));
+        }
         $this->viewWithLayout('professor', 'teacher/essays/index', [
             'title' => 'Jornada da Redação - EducaTudo',
+            'page_title' => 'Jornada da Redação',
             'user' => $user,
             'proposals' => $proposals,
+            'bancas' => array_values($bancas),
+            'filtros' => [
+                'titulo' => $filtroTitulo,
+                'status' => $filtroStatus,
+                'banca' => $filtroBanca,
+            ],
             'current_page' => 'essays',
             'csrf_token' => $this->generateCsrfToken()
         ]);
@@ -592,6 +627,7 @@ class TeacherEssayController extends BaseController
 
         $this->viewWithLayout('professor', 'teacher/essays/report', [
             'title' => 'Relatório de Redações - EducaTudo',
+            'page_title' => 'Relatório de Redações',
             'user' => $user,
             'rows' => $rows,
             'total' => $total,

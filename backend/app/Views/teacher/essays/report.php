@@ -32,156 +32,50 @@ if ($totalPages > 0) {
 }
 ?>
 
-<style>
-    .report-field {
-        min-height: 42px;
-        -webkit-appearance: none;
-        appearance: none;
-        line-height: 1.2;
+<?php
+$ui = __DIR__ . '/../../admin/_partials/ui';
+$filtrosAtivos = 0;
+foreach (['proposal_title', 'board_name', 'turma_name', 'student_name', 'status', 'submitted_from', 'submitted_to', 'corrected_from', 'corrected_to', 'score_range'] as $chaveFiltro) {
+    if (trim((string) ($filters[$chaveFiltro] ?? '')) !== '') {
+        $filtrosAtivos++;
     }
+}
+if ((string) ($filters['date_order'] ?? 'desc') !== 'desc') {
+    $filtrosAtivos++;
+}
+if ((int) ($filters['per_page'] ?? 10) !== 10) {
+    $filtrosAtivos++;
+}
 
-    .report-field[type="date"] {
-        min-width: 0;
-    }
+ob_start();
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Voltar para propostas';
+$ui_btn_icon = 'fa-solid fa-arrow-left';
+$ui_btn_href = URL . '/professor/redacao-configuravel';
+$ui_btn_type = 'button';
+$ui_btn_onclick = '';
+$ui_btn_id = '';
+$ui_btn_class = '';
+$ui_btn_attrs = '';
+$ui_btn_filter_count = 0;
+include $ui . '/btn.php';
 
-    .report-field::-webkit-date-and-time-value {
-        text-align: left;
-    }
-</style>
+$ui_btn_variant = 'filtro';
+$ui_btn_label = 'Filtros';
+$ui_btn_icon = 'fa-solid fa-filter';
+$ui_btn_onclick = 'openFiltroDrawer()';
+$ui_btn_href = '';
+$ui_btn_filter_count = $filtrosAtivos;
+include $ui . '/btn.php';
+$page_header_actions = ob_get_clean();
+$page_header_title = 'Relatório de Redações';
+$page_header_subtitle = 'Filtre envios por proposta, banca, aluno, status, notas e datas.';
+include __DIR__ . '/../../admin/_partials/page_header_list.php';
+?>
 
-<div class="mb-8">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Relatório de Redações</h2>
-            <p class="text-gray-600">Filtre envios por proposta, banca, aluno, status, notas e datas.</p>
-        </div>
-        <a href="<?= URL ?>/professor/redacao-configuravel" class="inline-flex items-center justify-center bg-white text-gray-700 px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all duration-200">
-            ← Voltar para propostas
-        </a>
-    </div>
-</div>
-
-<div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200 p-6 mb-6">
-    <form method="GET" action="<?= URL ?>/professor/redacao-configuravel/relatorio" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div class="xl:col-span-2">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Título da proposta</label>
-                <input type="text" name="proposal_title" value="<?= htmlspecialchars((string) ($filters['proposal_title'] ?? '')) ?>"
-                       placeholder="Buscar por título"
-                       class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tipo de banca</label>
-                <select name="board_name" class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <option value="">Todas</option>
-                    <?php foreach ($boardOptions as $boardName): ?>
-                    <option value="<?= htmlspecialchars($boardName) ?>" <?= (($filters['board_name'] ?? '') === $boardName) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($boardName) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Aluno</label>
-                <input type="text" name="student_name" value="<?= htmlspecialchars((string) ($filters['student_name'] ?? '')) ?>"
-                       placeholder="Nome do aluno"
-                       class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Turma</label>
-                <select name="turma_name" class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <option value="">Todas</option>
-                    <?php foreach ($turmaOptions as $turmaName): ?>
-                    <option value="<?= htmlspecialchars($turmaName) ?>" <?= (($filters['turma_name'] ?? '') === $turmaName) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($turmaName) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7 gap-4">
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</label>
-                <select name="status" class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <option value="">Todos</option>
-                    <option value="nao_enviado" <?= (($filters['status'] ?? '') === 'nao_enviado') ? 'selected' : '' ?>>Não enviado</option>
-                    <option value="visualizado" <?= (($filters['status'] ?? '') === 'visualizado') ? 'selected' : '' ?>>Visualizado</option>
-                    <option value="enviado" <?= (($filters['status'] ?? '') === 'enviado') ? 'selected' : '' ?>>Enviado</option>
-                    <option value="corrigido" <?= (($filters['status'] ?? '') === 'corrigido') ? 'selected' : '' ?>>Corrigido</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Data envio de</label>
-                <input type="date" name="submitted_from" value="<?= htmlspecialchars((string) ($filters['submitted_from'] ?? '')) ?>"
-                       class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Data envio até</label>
-                <input type="date" name="submitted_to" value="<?= htmlspecialchars((string) ($filters['submitted_to'] ?? '')) ?>"
-                       class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Data correção de</label>
-                <input type="date" name="corrected_from" value="<?= htmlspecialchars((string) ($filters['corrected_from'] ?? '')) ?>"
-                       class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Data correção até</label>
-                <input type="date" name="corrected_to" value="<?= htmlspecialchars((string) ($filters['corrected_to'] ?? '')) ?>"
-                       class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Exibir</label>
-                <select name="per_page" class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <?php foreach ([10, 25, 50, 100] as $perPageOption): ?>
-                    <option value="<?= $perPageOption ?>" <?= ((int) ($filters['per_page'] ?? 10) === $perPageOption) ? 'selected' : '' ?>>
-                        <?= $perPageOption ?> por página
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Faixa de nota</label>
-                <select name="score_range" class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <option value="">Todas</option>
-                    <option value="lt500" <?= (($filters['score_range'] ?? '') === 'lt500') ? 'selected' : '' ?>>Menor de 500</option>
-                    <option value="501_600" <?= (($filters['score_range'] ?? '') === '501_600') ? 'selected' : '' ?>>501 a 600</option>
-                    <option value="601_700" <?= (($filters['score_range'] ?? '') === '601_700') ? 'selected' : '' ?>>601 a 700</option>
-                    <option value="701_800" <?= (($filters['score_range'] ?? '') === '701_800') ? 'selected' : '' ?>>701 a 800</option>
-                    <option value="801_900" <?= (($filters['score_range'] ?? '') === '801_900') ? 'selected' : '' ?>>801 a 900</option>
-                    <option value="901_1000" <?= (($filters['score_range'] ?? '') === '901_1000') ? 'selected' : '' ?>>901 a 1000</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Ordenar por data de envio</label>
-                <select name="date_order" class="report-field w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                    <option value="desc" <?= (($filters['date_order'] ?? 'desc') === 'desc') ? 'selected' : '' ?>>Mais recente primeiro</option>
-                    <option value="asc" <?= (($filters['date_order'] ?? '') === 'asc') ? 'selected' : '' ?>>Mais antiga primeiro</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-3">
-            <button type="submit" class="inline-flex items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-lg">
-                Filtrar
-            </button>
-            <a href="<?= URL ?>/professor/redacao-configuravel/relatorio" class="inline-flex items-center justify-center bg-white text-gray-700 px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all duration-200">
-                Limpar filtros
-            </a>
-            <span class="text-sm text-gray-500">
-                <strong class="text-gray-800"><?= (int) ($total ?? 0) ?></strong> resultado(s) encontrado(s)
-            </span>
-        </div>
-    </form>
-</div>
-
-<div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200 overflow-hidden">
+<div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/70 flex flex-wrap items-center justify-between gap-3">
-        <h3 class="text-lg font-semibold text-gray-900">Resultados</h3>
+        <h3 class="text-lg font-semibold text-gray-900">Resultados <span class="text-sm font-normal text-gray-500">(<?= (int) ($total ?? 0) ?>)</span></h3>
         <p class="text-sm text-gray-500">
             Página <?= (int) ($pagination['page'] ?? 1) ?> de <?= (int) ($pagination['total_pages'] ?? 1) ?>
         </p>
@@ -247,10 +141,10 @@ if ($totalPages > 0) {
                             <?php if (!empty($row['submission_id'])): ?>
                                 <?php $baseDetailUrl = URL . '/professor/redacao-configuravel/propostas/' . (int) ($row['proposal_id'] ?? 0) . '/envios/' . (int) $row['submission_id'] . '/corrigir'; ?>
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#redacao') ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#redacao') ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary/20 text-primary bg-primary/10 hover:bg-primary/15 transition-colors">
                                         Visualizar redação
                                     </a>
-                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#correcao') ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors">
+                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#correcao') ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                                         Ver correção
                                     </a>
                                 </div>
@@ -295,7 +189,7 @@ if ($totalPages > 0) {
                 $pageUrl = URL . '/professor/redacao-configuravel/relatorio?' . http_build_query($pageQuery);
                 ?>
             <a href="<?= htmlspecialchars($pageUrl) ?>"
-               class="min-w-[42px] px-3 py-2 rounded-lg text-sm border text-center <?= $item === $currentPage ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50' ?>">
+               class="min-w-[42px] px-3 py-2 rounded-lg text-sm border text-center <?= $item === $currentPage ? 'bg-primary text-primary border-primary shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50' ?>">
                 <?= $item ?>
             </a>
             <?php endif; ?>
@@ -315,3 +209,159 @@ if ($totalPages > 0) {
     </div>
 </div>
 <?php endif; ?>
+
+<?php
+$opcoesBanca = ['' => 'Todas'];
+foreach ($boardOptions as $boardName) {
+    $opcoesBanca[(string) $boardName] = (string) $boardName;
+}
+$opcoesTurma = ['' => 'Todas'];
+foreach ($turmaOptions as $turmaName) {
+    $opcoesTurma[(string) $turmaName] = (string) $turmaName;
+}
+$opcoesStatus = [
+    '' => 'Todos',
+    'nao_enviado' => 'Não enviado',
+    'visualizado' => 'Visualizado',
+    'enviado' => 'Enviado',
+    'corrigido' => 'Corrigido',
+];
+$opcoesNota = [
+    '' => 'Todas',
+    'lt500' => 'Menor de 500',
+    '501_600' => '501 a 600',
+    '601_700' => '601 a 700',
+    '701_800' => '701 a 800',
+    '801_900' => '801 a 900',
+    '901_1000' => '901 a 1000',
+];
+$opcoesPorPagina = [];
+foreach ([10, 25, 50, 100] as $perPageOption) {
+    $opcoesPorPagina[(string) $perPageOption] = $perPageOption . ' por página';
+}
+$opcoesOrdem = [
+    'desc' => 'Mais recente primeiro',
+    'asc' => 'Mais antiga primeiro',
+];
+ob_start();
+?>
+<form method="get" action="<?= URL ?>/professor/redacao-configuravel/relatorio" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Título da proposta';
+        $ui_form_campo_name = 'proposal_title';
+        $ui_form_campo_tipo = 'text';
+        $ui_form_campo_value = (string) ($filters['proposal_title'] ?? '');
+        $ui_form_campo_placeholder = 'Buscar por título';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Tipo de banca';
+        $ui_form_campo_name = 'board_name';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesBanca;
+        $ui_form_campo_value = (string) ($filters['board_name'] ?? '');
+        $ui_form_campo_placeholder = '';
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Aluno';
+        $ui_form_campo_name = 'student_name';
+        $ui_form_campo_tipo = 'text';
+        $ui_form_campo_value = (string) ($filters['student_name'] ?? '');
+        $ui_form_campo_placeholder = 'Nome do aluno';
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Turma';
+        $ui_form_campo_name = 'turma_name';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesTurma;
+        $ui_form_campo_value = (string) ($filters['turma_name'] ?? '');
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Status';
+        $ui_form_campo_name = 'status';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesStatus;
+        $ui_form_campo_value = (string) ($filters['status'] ?? '');
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Data envio de';
+        $ui_form_campo_name = 'submitted_from';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = (string) ($filters['submitted_from'] ?? '');
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Data envio até';
+        $ui_form_campo_name = 'submitted_to';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = (string) ($filters['submitted_to'] ?? '');
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Data correção de';
+        $ui_form_campo_name = 'corrected_from';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = (string) ($filters['corrected_from'] ?? '');
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Data correção até';
+        $ui_form_campo_name = 'corrected_to';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = (string) ($filters['corrected_to'] ?? '');
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Faixa de nota';
+        $ui_form_campo_name = 'score_range';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesNota;
+        $ui_form_campo_value = (string) ($filters['score_range'] ?? '');
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Exibir';
+        $ui_form_campo_name = 'per_page';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesPorPagina;
+        $ui_form_campo_value = (string) (int) ($filters['per_page'] ?? 10);
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Ordenar por data de envio';
+        $ui_form_campo_name = 'date_order';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesOrdem;
+        $ui_form_campo_value = (string) ($filters['date_order'] ?? 'desc');
+        include $ui . '/form_campo.php';
+        ?>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = URL . '/professor/redacao-configuravel/relatorio';
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_icon = '';
+        $ui_btn_filter_count = 0;
+        $ui_btn_attrs = '';
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'confirm';
+        $ui_btn_label = 'Aplicar filtros';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>

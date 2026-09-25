@@ -2,27 +2,55 @@
 $pastas = $pastas ?? [];
 $pastaAtual = $pasta_atual ?? null;
 $pastaAtualId = $pasta_atual_id ?? null;
+$turmas = $turmas ?? [];
+$materias = $materias ?? [];
+$filtros = $filtros ?? ['titulo' => '', 'turma_id' => 0, 'materia_id' => 0];
 $baseUrl = URL . '/professor/arquivos';
-?>
+$ui = __DIR__ . '/../../../../Views/admin/_partials/ui';
+$filtrosAtivos = 0;
+if (trim((string) ($filtros['titulo'] ?? '')) !== '') {
+    $filtrosAtivos++;
+}
+if ((int) ($filtros['turma_id'] ?? 0) > 0) {
+    $filtrosAtivos++;
+}
+if ((int) ($filtros['materia_id'] ?? 0) > 0) {
+    $filtrosAtivos++;
+}
+$limparUrl = $baseUrl . ($pastaAtualId ? '?pasta_id=' . (int) $pastaAtualId : '');
 
-<div class="mb-6">
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Módulo de Arquivos 📁</h1>
-            <p class="text-gray-600 mt-1">Disponibilize arquivos para suas turmas. O aluno poderá baixar os anexos.</p>
-        </div>
-        <div class="flex items-center gap-2">
-            <button type="button" id="btn-nova-pasta" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-                Nova pasta
-            </button>
-            <a href="<?= $baseUrl ?>/criar<?= $pastaAtualId ? '?pasta_id=' . $pastaAtualId : '' ?>" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Novo arquivo
-            </a>
-        </div>
-    </div>
-</div>
+ob_start();
+$ui_btn_variant = 'filtro';
+$ui_btn_label = 'Filtros';
+$ui_btn_icon = 'fa-solid fa-filter';
+$ui_btn_onclick = 'openFiltroDrawer()';
+$ui_btn_filter_count = $filtrosAtivos;
+$ui_btn_href = '';
+$ui_btn_type = 'button';
+$ui_btn_id = '';
+$ui_btn_class = '';
+$ui_btn_attrs = '';
+include $ui . '/btn.php';
+
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Nova pasta';
+$ui_btn_icon = 'fa-solid fa-folder-plus';
+$ui_btn_onclick = '';
+$ui_btn_id = 'btn-nova-pasta';
+$ui_btn_filter_count = 0;
+include $ui . '/btn.php';
+
+$ui_btn_variant = 'primary';
+$ui_btn_label = 'Novo arquivo';
+$ui_btn_icon = 'fa-solid fa-plus';
+$ui_btn_href = $baseUrl . '/criar' . ($pastaAtualId ? '?pasta_id=' . (int) $pastaAtualId : '');
+$ui_btn_id = '';
+include $ui . '/btn.php';
+$page_header_actions = ob_get_clean();
+$page_header_title = 'Arquivos';
+$page_header_subtitle = 'Disponibilize arquivos para suas turmas. O aluno poderá baixar os anexos.';
+include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
+?>
 
 <?php if (!empty($_SESSION['flash_message'] ?? '')): ?>
     <div class="mb-4 p-4 rounded-lg <?= ($_SESSION['flash_type'] ?? '') === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800' ?>">
@@ -34,7 +62,7 @@ $baseUrl = URL . '/professor/arquivos';
 <!-- Breadcrumb de navegação de pasta -->
 <?php if ($pastaAtual): ?>
 <nav class="mb-4 flex items-center gap-2 text-sm">
-    <a href="<?= $baseUrl ?>" class="text-indigo-600 hover:underline flex items-center gap-1">
+    <a href="<?= $baseUrl ?>" class="text-primary hover:underline flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
         Arquivos
     </a>
@@ -49,14 +77,14 @@ $baseUrl = URL . '/professor/arquivos';
     <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Pastas</h2>
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3" id="grade-pastas">
         <?php foreach ($pastas as $pasta): ?>
-        <div class="group relative bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer" data-pasta-id="<?= (int)$pasta['id'] ?>" data-pasta-nome="<?= htmlspecialchars($pasta['nome']) ?>">
+        <div class="group relative bg-white rounded-xl border border-gray-200 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer" data-pasta-id="<?= (int)$pasta['id'] ?>" data-pasta-nome="<?= htmlspecialchars($pasta['nome']) ?>">
             <a href="<?= $baseUrl ?>?pasta_id=<?= (int)$pasta['id'] ?>" class="flex flex-col items-center p-4 gap-2">
                 <svg class="w-10 h-10" fill="<?= htmlspecialchars($pasta['cor']) ?>" viewBox="0 0 24 24"><path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.097.903 2 2 2h16c1.097 0 2-.903 2-2V8c0-1.11-.9-2-2-2h-8l-2-2z"/></svg>
                 <span class="text-xs font-medium text-gray-700 text-center leading-tight line-clamp-2"><?= htmlspecialchars($pasta['nome']) ?></span>
                 <span class="text-xs text-gray-400"><?= (int)$pasta['total_arquivos'] ?> arquivo<?= (int)$pasta['total_arquivos'] !== 1 ? 's' : '' ?></span>
             </a>
             <div class="absolute top-2 right-2 hidden group-hover:flex items-center gap-1">
-                <button type="button" class="btn-renomear-pasta p-1 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50" data-id="<?= (int)$pasta['id'] ?>" data-nome="<?= htmlspecialchars($pasta['nome']) ?>" title="Renomear">
+                <button type="button" class="btn-renomear-pasta p-1 rounded text-gray-400 hover:text-primary hover:bg-primary/10" data-id="<?= (int)$pasta['id'] ?>" data-nome="<?= htmlspecialchars($pasta['nome']) ?>" title="Renomear">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 </button>
                 <button type="button" class="btn-excluir-pasta p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50" data-id="<?= (int)$pasta['id'] ?>" data-nome="<?= htmlspecialchars($pasta['nome']) ?>" title="Excluir pasta">
@@ -76,16 +104,16 @@ $baseUrl = URL . '/professor/arquivos';
             <?= $pastaAtual ? 'Arquivos em ' . htmlspecialchars($pastaAtual['nome']) : 'Publicações' ?>
         </h2>
         <?php if ($pastaAtual): ?>
-        <a href="<?= $baseUrl ?>" class="text-sm text-indigo-600 hover:underline">Ver todas</a>
+        <a href="<?= $baseUrl ?>" class="text-sm text-primary hover:underline">Ver todas</a>
         <?php endif; ?>
     </div>
     <div class="p-6">
         <?php if (empty($lista)): ?>
             <div class="text-center py-12">
                 <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-                <p class="text-gray-500 text-lg mb-2">Nenhuma publicação<?= $pastaAtual ? ' nesta pasta' : '' ?></p>
+                <p class="text-gray-500 text-lg mb-2">Nenhuma publicação<?= ($pastaAtual || $filtrosAtivos > 0) ? ' com esse filtro' : '' ?></p>
                 <p class="text-sm text-gray-400 mb-4">Crie uma publicação com turma, disciplina, título e anexos.</p>
-                <a href="<?= $baseUrl ?>/criar<?= $pastaAtualId ? '?pasta_id=' . $pastaAtualId : '' ?>" class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg">Criar publicação</a>
+                <a href="<?= $baseUrl ?>/criar<?= $pastaAtualId ? '?pasta_id=' . $pastaAtualId : '' ?>" class="inline-block bg-primary text-primary font-semibold py-2 px-6 rounded-lg hover:opacity-90">Criar publicação</a>
             </div>
         <?php else: ?>
             <div class="overflow-x-auto">
@@ -113,7 +141,7 @@ $baseUrl = URL . '/professor/arquivos';
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-600">
                                     <?php if (!empty($row['aluno_nome'])): ?>
-                                        <span class="text-indigo-600 font-medium">Aluno: <?= htmlspecialchars($row['aluno_nome']) ?></span>
+                                        <span class="text-primary font-medium">Aluno: <?= htmlspecialchars($row['aluno_nome']) ?></span>
                                     <?php else: ?>
                                         <?= htmlspecialchars($row['turma_nome'] ?? '') ?>
                                     <?php endif; ?>
@@ -122,7 +150,7 @@ $baseUrl = URL . '/professor/arquivos';
                                 <td class="px-4 py-3 text-sm text-gray-600"><?= (int)($row['total_anexos'] ?? 0) ?></td>
                                 <?php if (!$pastaAtual && !empty($pastas)): ?>
                                 <td class="px-4 py-3 text-sm">
-                                    <select class="select-mover-pasta text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:border-indigo-400" data-arquivo-id="<?= (int)$row['id'] ?>">
+                                    <select class="select-mover-pasta text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:border-primary" data-arquivo-id="<?= (int)$row['id'] ?>">
                                         <option value="">— sem pasta —</option>
                                         <?php foreach ($pastas as $p): ?>
                                         <option value="<?= (int)$p['id'] ?>" <?= (int)($row['pasta_id'] ?? 0) === (int)$p['id'] ? 'selected' : '' ?>><?= htmlspecialchars($p['nome']) ?></option>
@@ -136,7 +164,7 @@ $baseUrl = URL . '/professor/arquivos';
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                             Visualizar
                                         </button>
-                                        <a href="<?= URL ?>/professor/arquivos/editar/<?= (int)$row['id'] ?>" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200">
+                                        <a href="<?= URL ?>/professor/arquivos/editar/<?= (int)$row['id'] ?>" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-primary bg-primary/10 hover:bg-primary/15 border border-primary/20">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                             Editar
                                         </a>
@@ -172,7 +200,7 @@ $baseUrl = URL . '/professor/arquivos';
             <div class="px-5 py-4 space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nome da pasta</label>
-                    <input type="text" id="input-pasta-nome" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Materiais de Biologia" maxlength="255">
+                    <input type="text" id="input-pasta-nome" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Ex: Materiais de Biologia" maxlength="255">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Cor</label>
@@ -186,7 +214,7 @@ $baseUrl = URL . '/professor/arquivos';
             </div>
             <div class="px-5 py-4 border-t border-gray-200 flex justify-end gap-3">
                 <button type="button" id="modal-pasta-cancelar" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
-                <button type="button" id="modal-pasta-salvar" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Salvar</button>
+                <button type="button" id="modal-pasta-salvar" class="px-5 py-2 bg-primary text-primary hover:opacity-90 text-sm font-semibold rounded-lg transition-colors">Salvar</button>
             </div>
         </div>
     </div>
@@ -209,6 +237,81 @@ $baseUrl = URL . '/professor/arquivos';
         </div>
     </div>
 </div>
+
+<?php
+$opcoesTurma = ['0' => 'Todas as turmas'];
+foreach ($turmas as $turma) {
+    $opcoesTurma[(string) (int) ($turma['id'] ?? 0)] = (string) ($turma['nome'] ?? '');
+}
+$opcoesMateria = ['0' => 'Todas as disciplinas'];
+foreach ($materias as $materia) {
+    $opcoesMateria[(string) (int) ($materia['id'] ?? 0)] = (string) ($materia['nome'] ?? '');
+}
+ob_start();
+?>
+<form method="get" action="<?= $baseUrl ?>" class="flex flex-col flex-1 overflow-hidden">
+    <?php if ($pastaAtualId): ?>
+    <input type="hidden" name="pasta_id" value="<?= (int) $pastaAtualId ?>">
+    <?php endif; ?>
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Título';
+        $ui_form_campo_name = 'titulo';
+        $ui_form_campo_tipo = 'text';
+        $ui_form_campo_value = (string) ($filtros['titulo'] ?? '');
+        $ui_form_campo_placeholder = 'Buscar pelo título ou descrição';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Turma';
+        $ui_form_campo_name = 'turma_id';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesTurma;
+        $ui_form_campo_value = (string) (int) ($filtros['turma_id'] ?? 0);
+        $ui_form_campo_placeholder = '';
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Disciplina';
+        $ui_form_campo_name = 'materia_id';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesMateria;
+        $ui_form_campo_value = (string) (int) ($filtros['materia_id'] ?? 0);
+        include $ui . '/form_campo.php';
+        ?>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = $limparUrl;
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_id = '';
+        $ui_btn_icon = '';
+        $ui_btn_filter_count = 0;
+        $ui_btn_attrs = '';
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'confirm';
+        $ui_btn_label = 'Aplicar filtros';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 
 <script>
 (function() {

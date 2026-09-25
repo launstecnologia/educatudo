@@ -415,7 +415,7 @@ class ArquivosService
     /**
      * @return array{lista: array, pastas: array, pasta_atual: ?array, pasta_atual_id: ?int}
      */
-    public function listarParaProfessor(int $professorId, ?int $pastaId): array
+    public function listarParaProfessor(int $professorId, ?int $pastaId, array $filtros = []): array
     {
         $pastas = $this->pastaModel->listProfessor($professorId);
         $pastaAtual = null;
@@ -427,7 +427,7 @@ class ArquivosService
                 }
             }
         }
-        $lista = $this->arquivoModel->listForProfessor($professorId, $pastaId);
+        $lista = $this->arquivoModel->listForProfessor($professorId, $pastaId, $filtros);
         return [
             'lista' => $lista,
             'pastas' => $pastas,

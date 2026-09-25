@@ -1,16 +1,35 @@
-<!-- Header -->
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Mural de Recados</h2>
-            <p class="text-gray-600">Recados para turmas ou todos os alunos.</p>
-        </div>
-        <a href="<?= URL ?>/professor/mural-recados/criar" class="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-all flex items-center shadow-lg">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-            Novo Recado
-        </a>
-    </div>
-</div>
+<?php
+$ui = __DIR__ . '/../../admin/_partials/ui';
+$filtroMateria = (int) ($filtro_materia ?? 0);
+$filtroDataDe = (string) ($filtro_data_de ?? '');
+$filtroDataAte = (string) ($filtro_data_ate ?? '');
+$filtrosAtivos = ($filtroMateria > 0 ? 1 : 0) + ($filtroDataDe !== '' ? 1 : 0) + ($filtroDataAte !== '' ? 1 : 0);
+
+ob_start();
+$ui_btn_variant = 'filtro';
+$ui_btn_label = 'Filtros';
+$ui_btn_icon = 'fa-solid fa-filter';
+$ui_btn_onclick = 'openFiltroDrawer()';
+$ui_btn_filter_count = $filtrosAtivos;
+$ui_btn_href = '';
+$ui_btn_type = 'button';
+$ui_btn_id = '';
+$ui_btn_class = '';
+$ui_btn_attrs = '';
+include $ui . '/btn.php';
+
+$ui_btn_variant = 'primary';
+$ui_btn_label = 'Novo Recado';
+$ui_btn_icon = 'fa-solid fa-plus';
+$ui_btn_href = URL . '/professor/mural-recados/criar';
+$ui_btn_onclick = '';
+$ui_btn_filter_count = 0;
+include $ui . '/btn.php';
+$page_header_actions = ob_get_clean();
+$page_header_title = 'Mural de Recados';
+$page_header_subtitle = 'Recados para turmas ou todos os alunos.';
+include __DIR__ . '/../../admin/_partials/page_header_list.php';
+?>
 
 <?php if (!empty($_SESSION['flash_message'])): ?>
 <?php
@@ -22,37 +41,6 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
     <?= htmlspecialchars($msg) ?>
 </div>
 <?php endif; ?>
-
-<!-- Filtros: Matéria, Entre datas -->
-<div class="bg-white rounded-xl shadow-lg p-4 mb-6">
-    <form method="get" action="<?= URL ?>/professor/mural-recados" class="flex flex-wrap items-end gap-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Matéria</label>
-            <select name="materia_id" class="rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">Todas</option>
-                <?php foreach ($materias_opcoes ?? [] as $mat): ?>
-                <option value="<?= (int)$mat['id'] ?>" <?= (int)($filtro_materia ?? 0) === (int)$mat['id'] ? 'selected' : '' ?>><?= htmlspecialchars($mat['nome']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Data de</label>
-            <input type="date" name="data_de" value="<?= htmlspecialchars($filtro_data_de ?? '') ?>" class="rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Data até</label>
-            <input type="date" name="data_ate" value="<?= htmlspecialchars($filtro_data_ate ?? '') ?>" class="rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500">
-        </div>
-        <div class="flex gap-2">
-            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                <i class="fas fa-filter"></i> Filtrar
-            </button>
-            <a href="<?= URL ?>/professor/mural-recados" class="inline-flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
-                <i class="fas fa-eraser"></i> Limpar
-            </a>
-        </div>
-    </form>
-</div>
 
 <div class="bg-white rounded-xl shadow-lg overflow-hidden">
     <div class="overflow-x-auto">
@@ -129,6 +117,71 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
         </div>
     </div>
 </div>
+
+<?php
+$opcoesMateria = ['' => 'Todas'];
+foreach ($materias_opcoes ?? [] as $mat) {
+    $opcoesMateria[(string) (int) ($mat['id'] ?? 0)] = (string) ($mat['nome'] ?? '');
+}
+ob_start();
+?>
+<form method="get" action="<?= URL ?>/professor/mural-recados" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Matéria';
+        $ui_form_campo_name = 'materia_id';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesMateria;
+        $ui_form_campo_value = $filtroMateria > 0 ? (string) $filtroMateria : '';
+        $ui_form_campo_placeholder = '';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Data de';
+        $ui_form_campo_name = 'data_de';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = $filtroDataDe;
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Data até';
+        $ui_form_campo_name = 'data_ate';
+        $ui_form_campo_tipo = 'date';
+        $ui_form_campo_value = $filtroDataAte;
+        include $ui . '/form_campo.php';
+        ?>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = URL . '/professor/mural-recados';
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_type = 'button';
+        $ui_btn_onclick = '';
+        $ui_btn_icon = '';
+        $ui_btn_filter_count = 0;
+        $ui_btn_attrs = '';
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'confirm';
+        $ui_btn_label = 'Aplicar filtros';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 
 <script>
 (function() {

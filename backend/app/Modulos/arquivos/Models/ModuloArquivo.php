@@ -212,13 +212,33 @@ class ModuloArquivo
         );
     }
 
-    public function listForProfessor(int $professorId, ?int $pastaId): array
+    public function listForProfessor(int $professorId, ?int $pastaId, array $filtros = []): array
     {
         $params = ['prof_id' => $professorId];
         $whereExtra = '';
         if ($pastaId !== null) {
-            $whereExtra = ' AND ma.pasta_id = :pasta_id';
+            $whereExtra .= ' AND ma.pasta_id = :pasta_id';
             $params['pasta_id'] = $pastaId;
+        }
+        $titulo = trim((string) ($filtros['titulo'] ?? ''));
+        $turmaId = (int) ($filtros['turma_id'] ?? 0);
+        $materiaId = (int) ($filtros['materia_id'] ?? 0);
+        if ($titulo !== '') {
+            $whereExtra .= ' AND (ma.titulo LIKE :titulo OR ma.descricao LIKE :titulo2)';
+            $params['titulo'] = '%' . $titulo . '%';
+            $params['titulo2'] = '%' . $titulo . '%';
+        }
+        if ($materiaId > 0) {
+            $whereExtra .= ' AND ma.materia_id = :materia_id';
+            $params['materia_id'] = $materiaId;
+        }
+        if ($turmaId > 0) {
+            $whereExtra .= ' AND (ma.turma_id = :turma_id OR EXISTS (
+                SELECT 1 FROM modulos_arquivos_turmas matf
+                WHERE matf.modulo_arquivo_id = ma.id AND matf.turma_id = :turma_id2
+            ))';
+            $params['turma_id'] = $turmaId;
+            $params['turma_id2'] = $turmaId;
         }
 
         return $this->db->fetchAll(
