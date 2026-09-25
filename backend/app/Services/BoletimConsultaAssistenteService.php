@@ -63,6 +63,13 @@ class BoletimConsultaAssistenteService
             return $this->analisarPrint($mensagem, $imagem, $wizardEstado);
         }
 
+        if ($this->pareceConferencia($mensagem)) {
+            return ['success' => true, 'mensagem' => $this->textoConferencia($wizardEstado)];
+        }
+        if ($this->pareceDiagnostico($mensagem)) {
+            return ['success' => true, 'mensagem' => $this->textoDiagnostico($mensagem, $wizardEstado)];
+        }
+
         if (!$this->parecePerguntaDeDado($mensagem)) {
             $guia = $this->responderGuia($mensagem);
             if ($guia !== null) {
@@ -130,6 +137,212 @@ class BoletimConsultaAssistenteService
             '/\b(nota|notas|jornada|jornadas|quantas|quanto|quais|lançamento|lancamento|aluno|aluna|fez|tirou|acertou)\b/ui',
             $mensagem
         );
+    }
+
+    private function pareceDiagnostico(string $mensagem): bool
+    {
+        return (bool) preg_match(
+            '/por\s*qu[eê]|tra[cç]o|vazi|n[aã]o aparece|nao aparece|sumiu|em branco|zerad/ui',
+            $mensagem
+        );
+    }
+
+    private function pareceConferencia(string $mensagem): bool
+    {
+        return (bool) preg_match(
+            '/o que falta|antes de salvar|conferir (o )?evento|checklist|t[aá] pronto|est[aá] pronto/ui',
+            $mensagem
+        );
+    }
+
+    /**
+     * @param array<string,mixed>|null $estado
+     */
+    private function textoConferencia(?array $estado): string
+    {
+        if (!is_array($estado)) {
+            return 'Abra o evento em Configurar Notas para eu conferir as peças e a fórmula.';
+        }
+        $avisos = [];
+        $pecas = [];
+        foreach ((array) ($estado['pecas'] ?? []) as $peca) {
+            $peca = trim((string) $peca);
+            if ($peca !== '') {
+                $pecas[] = $peca;
+            }
+        }
+        if ($pecas === []) {
+            $avisos[] = 'Nenhuma peça marcada. Em Peças, marque os tipos de nota deste bimestre.';
+        }
+        $opcoes = is_array($estado['pecas_opcoes'] ?? null) ? $estado['pecas_opcoes'] : [];
+        foreach ($pecas as $peca) {
+            if ($peca === 'jornada') {
+                continue;
+            }
+            $opt = is_array($opcoes[$peca] ?? null) ? $opcoes[$peca] : [];
+            $bims = array_filter(array_map('intval', (array) ($opt['bimestres'] ?? [])));
+            if ($bims === []) {
+                $avisos[] = 'A peça ' . $peca . ' está sem bimestre. Em Peças, marque o bimestre dela.';
+            }
+        }
+        if (in_array('jornada', $pecas, true)) {
+            $bimsJ = array_filter(array_map('intval', (array) ($estado['jornada_bimestres'] ?? [])));
+            $idsJ = is_array($estado['jornada_ids'] ?? null) ? $estado['jornada_ids'] : [];
+            if ($bimsJ === [] && $idsJ === []) {
+                $avisos[] = 'A Jornada do aluno está sem bimestre. Em Peças, marque o bimestre da jornada.';
+            }
+            $formulaTexto = '';
+            foreach ((array) ($estado['formulas_blocos'] ?? []) as $tokens) {
+                $formulaTexto .= ' ' . $this->formulaTexto($tokens);
+            }
+            $formulaTexto .= ' ' . $this->formulaTexto($estado['formula_tokens'] ?? []);
+            if (!str_contains($this->normalizarTexto($formulaTexto), 'jornada')) {
+                $avisos[] = 'A jornada está marcada, mas não entra na fórmula. Em Exibir, coloque Jornada do aluno na média.';
+            }
+        }
+        if ((int) ($estado['aluno_preview_id'] ?? 0) <= 0) {
+            $avisos[] = 'Nenhum aluno na prévia. Em Revisar, escolha um aluno para ver as notas reais. Sem aluno, a tabela é exemplo.';
+        }
+        if ($avisos === []) {
+            return 'Este evento está com peças, bimestre e fórmula. Em Revisar, escolha um aluno e confira se alguma coluna ficou com traço.';
+        }
+
+        return "Antes de salvar, ajuste isto:\n\n- " . implode("\n- ", $avisos);
+    }
+
+    private function textoDiagnostico(string $mensagem, ?array $estado): string
+    {
+        $nomePedido = $this->extrairNomeAluno($mensagem);
+        $diag = $this->diagnosticarCelula([
+            'aluno_nome' => $nomePedido,
+            'materia_nome' => $this->extrairMateria($mensagem),
+            'coluna' => $this->extrairColuna($mensagem),
+            'aluno_id' => ($nomePedido === '' && is_array($estado)) ? (int) ($estado['aluno_preview_id'] ?? 0) : 0,
+        ], $estado);
+        if (!empty($diag['candidatos']) && is_array($diag['candidatos'])) {
+            $nomes = [];
+            foreach ($diag['candidatos'] as $cand) {
+                if (is_array($cand)) {
+                    $nomes[] = trim((string) ($cand['nome'] ?? ''));
+                }
+            }
+            $nomes = array_values(array_filter($nomes));
+
+            return 'Há mais de um aluno com esse nome: ' . implode(', ', $nomes) . '. Diga o nome completo.';
+        }
+        $texto = trim((string) ($diag['texto'] ?? $diag['error'] ?? ''));
+
+        return $texto !== '' ? $texto : 'Não consegui ver essa célula. Diga o aluno, a matéria e a coluna.';
+    }
+
+    /**
+     * @param array<string,mixed> $args
+     * @param array<string,mixed>|null $wizardEstado
+     * @return array<string,mixed>
+     */
+    private function diagnosticarCelula(array $args, ?array $wizardEstado): array
+    {
+        if (!is_array($wizardEstado)) {
+            return [
+                'ok' => false,
+                'texto' => 'Abra o evento em Configurar Notas para eu comparar a célula com as peças.',
+            ];
+        }
+        if (trim((string) ($args['aluno_nome'] ?? '')) === '' && (int) ($args['aluno_id'] ?? 0) <= 0) {
+            return [
+                'ok' => false,
+                'texto' => 'A prévia está sem aluno, então a tabela é exemplo e o traço não é a nota real. Em Revisar, escolha o aluno e pergunte de novo.',
+            ];
+        }
+        $aluno = $this->resolverAlunoUnico($args);
+        if (empty($aluno['ok'])) {
+            return ['ok' => false, 'texto' => (string) ($aluno['error'] ?? 'Aluno não encontrado.')];
+        }
+        if (!empty($aluno['candidatos'])) {
+            return $aluno;
+        }
+        $alunoId = (int) ($aluno['aluno']['id'] ?? 0);
+        $nomeAluno = trim((string) ($aluno['aluno']['nome'] ?? ''));
+        if ($nomeAluno === '' && $alunoId > 0) {
+            $completo = $this->provas->obterAluno($alunoId);
+            $nomeAluno = is_array($completo) ? trim((string) ($completo['nome'] ?? '')) : '';
+        }
+        if ($nomeAluno === '') {
+            $nomeAluno = 'Aluno';
+        }
+        try {
+            $simulacao = $this->simularEventoAberto($wizardEstado, $alunoId);
+        } catch (Throwable $e) {
+            error_log('BoletimConsultaAssistente diagnostico: ' . $e->getMessage());
+
+            return ['ok' => false, 'texto' => 'Não deu para calcular este aluno agora.'];
+        }
+        $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : [];
+        $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+        $colunas = [];
+        foreach ((array) ($matriz['colunas'] ?? []) as $col) {
+            if (!is_array($col)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+            if ($cod !== '') {
+                $colunas[$cod] = (string) ($col['nome'] ?? $cod);
+            }
+        }
+        $colunaAlvo = $this->normalizarTexto((string) ($args['coluna'] ?? ''));
+        $materiaAlvo = $this->normalizarTexto((string) ($args['materia_nome'] ?? ''));
+        $codigosColuna = $this->codigosDaColuna($colunas, $colunaAlvo);
+        if ($codigosColuna === []) {
+            $codigosColuna = array_keys($colunas);
+        }
+        $vazias = [];
+        $preenchidas = [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $nomeMat = trim((string) ($linha['materia_nome'] ?? ''));
+            if ($nomeMat === '') {
+                continue;
+            }
+            if ($materiaAlvo !== '' && !str_contains($this->normalizarTexto($nomeMat), $materiaAlvo)) {
+                continue;
+            }
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            foreach ($codigosColuna as $cod) {
+                $valor = $notas[$cod] ?? null;
+                $rotulo = ($colunas[$cod] ?? $cod) . ' em ' . $nomeMat;
+                if ($this->celulaVazia($valor)) {
+                    $vazias[] = $rotulo;
+                } else {
+                    $preenchidas[] = $rotulo . ' = ' . $this->formatarValorCelula($valor);
+                }
+            }
+        }
+        if ($vazias === [] && $preenchidas === []) {
+            return [
+                'ok' => false,
+                'texto' => 'Não achei essa matéria na simulação de ' . $nomeAluno . '. Diga o nome como está na tabela.',
+            ];
+        }
+        $causa = $this->causaCelulaVazia($simulacao, $colunaAlvo, $wizardEstado);
+        if ($vazias === []) {
+            $amostra = implode('; ', array_slice($preenchidas, 0, 6));
+
+            return [
+                'ok' => true,
+                'texto' => 'Para ' . $nomeAluno . ' essa célula tem nota: ' . $amostra . '.',
+            ];
+        }
+        $lista = implode(', ', array_slice($vazias, 0, 8));
+        $extra = count($vazias) > 8 ? ' e mais ' . (count($vazias) - 8) : '';
+        $texto = 'Para ' . $nomeAluno . ', está vazio em: ' . $lista . $extra . '.';
+        if ($preenchidas !== []) {
+            $texto .= ' Com nota: ' . implode('; ', array_slice($preenchidas, 0, 4)) . '.';
+        }
+        $texto .= "\n\n" . $causa;
+
+        return ['ok' => true, 'texto' => $texto, 'vazias' => $vazias, 'preenchidas' => $preenchidas];
     }
 
     private function responderGuia(string $mensagem): ?string
@@ -214,8 +427,9 @@ Você confere um print da tela de Evento de Notas do EducaTudo com a configuraç
 O que fazer:
 - Leia o print: o que está marcado, desmarcado, vazio ou com traço.
 - Compare com a configuração do sistema abaixo. Não invente peça, botão ou nota que não esteja no print nem na configuração.
-- Aponte o que está errado ou não marcado e onde ajustar nesta tela: Identidade, Peças, Exibir ou Revisar.
-- Se uma coluna do boletim está com traço, diga qual peça da configuração deveria preenchê-la e se essa peça não está marcada, está sem bimestre ou sem aluno na prévia.
+- Cite o nome da coluna e o nome da matéria. Ex.: "Jornada do aluno em Português está com traço."
+- Aponte onde ajustar: Identidade, Peças, Exibir ou Revisar.
+- Se uma coluna está com traço, diga qual peça deveria preenchê-la e se essa peça não está marcada, está sem bimestre ou a prévia está sem aluno.
 - Se o print é a própria configuração (caixas de jornada, bimestre, fórmula), diga o que ficou de fora.
 - Não chute número de nota. Se o print mostra traço, diga que está vazio.
 
@@ -339,6 +553,7 @@ Tools:
 - jornadas_aluno: args aluno_nome ou aluno_id, bimestre (1-4, opcional), materia_nome (opcional). Quantas jornadas fez.
 - lancamentos_aluno: args aluno_nome ou aluno_id, materia_nome, tipo (ex.: Avaliação Bimestral, Prova Semanal), bimestre. Nota lançada na prova.
 - nota_no_evento: args aluno_nome ou aluno_id, materia_nome. Nota já calculada nas colunas DESTE evento aberto na tela.
+- diagnostico_celula: args aluno_nome ou aluno_id, materia_nome (opcional), coluna (opcional, ex.: Jornada do aluno). Use quando a célula está vazia, com traço, ou o usuário pergunta por quê.
 
 Evento aberto agora:
 {$resumo}
@@ -451,6 +666,7 @@ PROMPT;
                 'jornadas_aluno' => $this->jornadas->resumoJornadasAluno($this->filtrosAluno($args)),
                 'lancamentos_aluno' => $this->lancamentosAluno($args),
                 'nota_no_evento' => $this->notaNoEvento($args, $wizardEstado),
+                'diagnostico_celula' => $this->diagnosticarCelula($args, $wizardEstado),
                 default => ['ok' => false, 'error' => 'Consulta desconhecida.'],
             };
         } catch (Throwable $e) {
@@ -773,6 +989,177 @@ PROMPT;
         $ts = strtotime($raw);
 
         return $ts ? date('Y-m-d', $ts) : null;
+    }
+
+    private function extrairNomeAluno(string $mensagem): string
+    {
+        if (preg_match('/\b(?:da|do|de|aluno|aluna)\s+([\p{L}][\p{L}\s]{2,60})/ui', $mensagem, $m)) {
+            $nome = trim((string) $m[1]);
+            $nome = preg_replace('/\b(est[aá]|ficou|tem|na|no|em|com|jornada|nota|coluna|mat[eé]ria|portugu[eê]s|matem[aá]tica|hist[oó]ria|geografia|ingl[eê]s|f[ií]sica|qu[ií]mica|biologia|sociologia|filosofia|literatura|reda[cç][aã]o).*$/ui', '', $nome) ?? $nome;
+
+            return trim($nome);
+        }
+
+        return '';
+    }
+
+    private function extrairMateria(string $mensagem): string
+    {
+        $t = $this->normalizarTexto($mensagem);
+        $materias = [
+            'lingua portuguesa', 'portugues', 'matematica', 'historia', 'geografia',
+            'educacao fisica', 'ingles', 'fisica', 'quimica', 'biologia', 'sociologia',
+            'filosofia', 'literatura', 'redacao', 'leitura e interpretacao',
+        ];
+        foreach ($materias as $materia) {
+            if (str_contains($t, $materia)) {
+                return $materia;
+            }
+        }
+
+        return '';
+    }
+
+    private function extrairColuna(string $mensagem): string
+    {
+        $t = $this->normalizarTexto($mensagem);
+        $colunas = [
+            'jornada do aluno' => 'jornada',
+            'jornada' => 'jornada',
+            'media sem' => 'media sem',
+            'media bim' => 'media bim',
+            'prova bim' => 'prova bim',
+            'enac' => 'enac',
+            'faltas' => 'faltas',
+            'falta' => 'faltas',
+        ];
+        foreach ($colunas as $chave => $rotulo) {
+            if (str_contains($t, $chave)) {
+                return $rotulo;
+            }
+        }
+        if (preg_match('/\bs[1-8]\b/', $t, $m)) {
+            return $m[0];
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function simularEventoAberto(array $estado, int $alunoId): array
+    {
+        $montado = $this->wizard->montar($estado);
+        $rascunho = is_array($montado['rascunho'] ?? null) ? $montado['rascunho'] : null;
+        if ($rascunho === null || empty($rascunho['componentes'])) {
+            throw new Exception('O evento ainda não tem peças para calcular.');
+        }
+        $rascunho = $this->completarRascunhoSalvo($rascunho, $estado);
+        [$periodoRef, $inicio, $fim] = $this->periodoDoRascunho($rascunho, $estado);
+
+        return (new BoletimConfigController(true))->simularRegraAluno(
+            $rascunho,
+            $alunoId,
+            $periodoRef,
+            $inicio,
+            $fim
+        );
+    }
+
+    /**
+     * @param array<string,string> $colunas
+     * @return list<string>
+     */
+    private function codigosDaColuna(array $colunas, string $colunaAlvo): array
+    {
+        if ($colunaAlvo === '') {
+            return [];
+        }
+        $codigos = [];
+        foreach ($colunas as $cod => $nome) {
+            $blob = $this->normalizarTexto($cod . ' ' . $nome);
+            if (str_contains($blob, $colunaAlvo) || str_contains($colunaAlvo, $this->normalizarTexto($nome))) {
+                $codigos[] = $cod;
+            }
+        }
+
+        return $codigos;
+    }
+
+    private function celulaVazia($valor): bool
+    {
+        if ($valor === null || $valor === '') {
+            return true;
+        }
+        if (is_string($valor)) {
+            $t = trim($valor);
+
+            return $t === '' || $t === '-' || $t === '—';
+        }
+
+        return false;
+    }
+
+    private function formatarValorCelula($valor): string
+    {
+        if (is_numeric($valor)) {
+            return rtrim(rtrim(number_format((float) $valor, 2, ',', ''), '0'), ',');
+        }
+
+        return trim((string) $valor);
+    }
+
+    /**
+     * @param array<string,mixed> $simulacao
+     * @param array<string,mixed> $estado
+     */
+    private function causaCelulaVazia(array $simulacao, string $colunaAlvo, array $estado): string
+    {
+        $jornada = $colunaAlvo === '' || str_contains($colunaAlvo, 'jornada');
+        foreach ((array) ($simulacao['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $nome = $this->normalizarTexto((string) ($comp['nome'] ?? '') . ' ' . (string) ($comp['codigo'] ?? ''));
+            $origem = strtolower(trim((string) ($comp['source_type'] ?? '')));
+            $ehJornada = $origem === 'jornadas' || str_contains($nome, 'jornada');
+            if ($jornada && !$ehJornada) {
+                continue;
+            }
+            if (!$jornada && $colunaAlvo !== '' && !str_contains($nome, $colunaAlvo)) {
+                continue;
+            }
+            $det = is_array($comp['detalhes'] ?? null) ? $comp['detalhes'] : [];
+            $erro = trim((string) ($det['erro'] ?? ''));
+            if ($erro !== '') {
+                return $erro . ' Ajuste em Peças e simule de novo.';
+            }
+            $aviso = trim((string) ($det['aviso_jornadas'] ?? ''));
+            $total = (int) ($det['total_jornadas_escopo'] ?? 0);
+            if ($ehJornada && $total <= 0) {
+                $bims = array_filter(array_map('intval', (array) ($estado['jornada_bimestres'] ?? [])));
+                $onde = $bims === []
+                    ? 'Em Peças, marque o bimestre da Jornada do aluno.'
+                    : 'As jornadas desse bimestre não estão ligadas à turma deste aluno. Confira a turma da jornada e do aluno.';
+
+                return ($aviso !== '' ? $aviso . ' ' : '') . $onde;
+            }
+            if ($ehJornada && $total > 0) {
+                $concl = (int) ($det['concluidas'] ?? 0);
+
+                return 'O aluno tem ' . $concl . ' de ' . $total . ' jornadas do bimestre. A nota entra na matéria com o mesmo nome da jornada. Onde o nome não bate, a célula fica com traço. Em Peças, confira o bimestre e a tabela por faixas.';
+            }
+            if ($this->celulaVazia($comp['valor'] ?? null)) {
+                return 'Essa coluna não recebeu lançamento deste aluno no bimestre da peça. Confira em Lançamento de Notas se o tipo e o bimestre são os mesmos da peça.';
+            }
+        }
+        if ((int) ($estado['aluno_preview_id'] ?? 0) <= 0) {
+            return 'Escolha o aluno em Revisar. Sem aluno, a tabela de baixo é só um exemplo.';
+        }
+
+        return 'A peça dessa coluna está sem nota neste bimestre. Em Peças, confira se ela está marcada e se o bimestre é o mesmo do lançamento.';
     }
 
     private function normalizarTexto(string $texto): string

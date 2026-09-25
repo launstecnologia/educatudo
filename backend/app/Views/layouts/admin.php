@@ -568,5 +568,16 @@
 
     <?php include __DIR__ . '/components/row_actions_dropdown_js.php'; ?>
     <?php include __DIR__ . '/components/periodo_letivo_js.php'; ?>
+    <?php
+    $pathBoletim = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+    $pathBoletim = is_string($pathBoletim) ? $pathBoletim : '';
+    $ehTelaBoletim = in_array((string) ($current_page ?? ''), ['boletim_config', 'boletins', 'boletim_guia'], true)
+        || preg_match('#/admin/(boletim-configuracao|boletim|boletins)(/|$)#', $pathBoletim) === 1;
+    if ($ehTelaBoletim) {
+        $csrfToken = (string) ($csrf_token ?? ($_SESSION['csrf_token'] ?? ''));
+        $boletimAssistenteDisponivel = true;
+        include __DIR__ . '/../admin/boletim/_assistente_consulta.php';
+    }
+    ?>
 </body>
 </html>

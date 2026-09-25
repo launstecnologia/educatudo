@@ -30,6 +30,8 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Como calcular a média das peças?">Como calcular a média</button>
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Quantas jornadas a Alice Cardoso Mariano fez no 1º bimestre?">Jornadas de um aluno</button>
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Qual a nota da avaliação bimestral de Matemática da Alice Cardoso Mariano?">Nota bimestral</button>
+                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Por que a jornada está vazia?">Por que está vazio</button>
+                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="O que falta antes de salvar?">O que falta</button>
             </div>
             <form id="bw-consulta-form" class="p-3 flex flex-col gap-2 bg-slate-50">
                 <div id="bw-consulta-print" class="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-2 py-1.5">
