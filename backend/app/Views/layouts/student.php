@@ -611,7 +611,8 @@
                         $iconDs = [
                             'link' => ['M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14'],
                             'book' => ['M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5-1.253'],
-                            'game' => ['M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5-1.253'],
+                            'game' => ['M6.5 9.5h2M7.5 8.5v2M15.5 9.5h.01M17.2 12.2h.01M7 7h10a3 3 0 013 3v1.2a2.2 2.2 0 01-2.2 2.2H15l-1.1 2.1a1 1 0 01-.9.6h-2a1 1 0 01-.9-.6L9 13.4H6.2A2.2 2.2 0 014 11.2V10a3 3 0 013-3z'],
+                            'pencil' => ['M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'],
                             'music' => ['M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3'],
                             'document' => ['M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
                             'globe' => ['M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
@@ -627,6 +628,11 @@
                             $href = rtrim(URL, '/') . '/external-apps/abrir/' . rawurlencode($id);
                             $newTab = !empty($app['nova_guia']);
                             $foraGames = !empty($app['fora_do_horario_games']);
+                            $nomeLowerApp = strtolower($nome . ' ' . $id);
+                            $isTudinhaApp = str_contains($nomeLowerApp, 'tudinha');
+                            if ($isTudinhaApp) {
+                                $nome = 'Tudinha';
+                            }
                             $ik = preg_replace('/[^a-z0-9_-]/', '', strtolower((string) ($app['menu_icone'] ?? 'link')));
                             if ($ik === '' || !isset($iconDs[$ik])) {
                                 $ik = 'link';
@@ -635,11 +641,15 @@
                             <a href="<?= $foraGames ? '#' : htmlspecialchars($href) ?>"
                                <?php if ($foraGames): ?>onclick="event.preventDefault(); alert(<?= $gamesHorarioMsgJs ?>); return false;" aria-disabled="true"<?php else: ?><?= $newTab ? ' target="_blank" rel="noopener noreferrer"' : '' ?><?php endif; ?>
                                class="flex items-center px-4 py-2 text-purple-100 hover:bg-white/20 hover:text-white rounded-lg transition-all duration-200<?= $foraGames ? ' opacity-55 cursor-not-allowed' : '' ?>">
+                                <?php if ($isTudinhaApp): ?>
+                                <img src="<?= URL ?>/public/assets/educaprof-icone-v3.png" alt="" class="mr-3 h-5 w-5 shrink-0 object-contain" width="20" height="20">
+                                <?php else: ?>
                                 <svg class="w-5 h-5 mr-3 flex-shrink-0 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <?php foreach ($iconDs[$ik] as $d): ?>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<?= htmlspecialchars((string) $d, ENT_QUOTES, 'UTF-8') ?>"></path>
                                     <?php endforeach; ?>
                                 </svg>
+                                <?php endif; ?>
                                 <span class="sidebar-text text-sm"><?= htmlspecialchars($nome) ?></span>
                             </a>
                             <?php
@@ -657,7 +667,7 @@
                 };
 
                 $allowedExternalMenuGrupos = ['estudo', 'colag', 'entretenimento', 'sistema'];
-                $allowedMenuIcones = ['link', 'book', 'game', 'music', 'document', 'globe', 'chat', 'sparkles'];
+                $allowedMenuIcones = ['link', 'book', 'game', 'music', 'document', 'globe', 'chat', 'sparkles', 'pencil'];
                 $externalAppsAlunoByMenu = [
                     'estudo' => [],
                     'colag' => [],
@@ -701,26 +711,41 @@
                     if ($nome === '' || $url === '') {
                         continue;
                     }
-                    if ($gamesBloqueadoAluno) {
-                        $idLower = strtolower(trim((string) ($link['id'] ?? '')));
-                        $nomeLower = strtolower($nome);
-                        $urlLower = strtolower($url);
-                        $subNatLower = strtolower(trim((string) ($link['substituir_nativo'] ?? '')));
-                        $isGamesApp = (
-                            $idLower === 'games'
-                            || $subNatLower === 'jogos'
-                            || strpos($nomeLower, 'game') !== false
-                            || strpos($urlLower, 'games') !== false
-                        );
-                        if ($isGamesApp) {
-                            continue;
-                        }
+                    $idLower = strtolower(trim((string) ($link['id'] ?? '')));
+                    $nomeLower = strtolower($nome);
+                    $urlLower = strtolower($url);
+                    $subNatLower = strtolower(trim((string) ($link['substituir_nativo'] ?? '')));
+                    $isGamesApp = (
+                        $idLower === 'games'
+                        || $subNatLower === 'jogos'
+                        || strpos($nomeLower, 'game') !== false
+                        || strpos($urlLower, 'games') !== false
+                    );
+                    $isNotesApp = (
+                        $idLower === 'notes'
+                        || $subNatLower === 'notes'
+                        || strpos($nomeLower, 'notes') !== false
+                    );
+                    $isTudinhaApp = strpos($nomeLower, 'tudinha') !== false || strpos($idLower, 'tudinha') !== false;
+                    if ($isTudinhaApp) {
+                        $nome = 'Tudinha';
+                    }
+                    if ($gamesBloqueadoAluno && $isGamesApp) {
+                        continue;
                     }
                     $mg = strtolower(trim((string) ($link['menu_grupo'] ?? 'colag')));
+                    if ($isGamesApp) {
+                        $mg = 'entretenimento';
+                    }
                     if (!in_array($mg, $allowedExternalMenuGrupos, true)) {
                         $mg = 'colag';
                     }
                     $mic = preg_replace('/[^a-z0-9_-]/', '', strtolower((string) ($link['menu_icone'] ?? 'link')));
+                    if ($isGamesApp) {
+                        $mic = 'game';
+                    } elseif ($isNotesApp) {
+                        $mic = 'pencil';
+                    }
                     if ($mic === '' || !in_array($mic, $allowedMenuIcones, true)) {
                         $mic = 'link';
                     }
@@ -1079,7 +1104,7 @@
                            <?= $jogosPodeHorario ? 'target="_blank" rel="noopener noreferrer"' : '' ?>
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'jogos' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$jogosEnabled || !$gamesHorarioLiberadoAluno ? 'opacity-55 cursor-not-allowed' : '' ?>">
                             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.5 9.5h2M7.5 8.5v2M15.5 9.5h.01M17.2 12.2h.01M7 7h10a3 3 0 013 3v1.2a2.2 2.2 0 01-2.2 2.2H15l-1.1 2.1a1 1 0 01-.9.6h-2a1 1 0 01-.9-.6L9 13.4H6.2A2.2 2.2 0 014 11.2V10a3 3 0 013-3z"></path>
                             </svg>
                             <span class="sidebar-text text-sm">Games</span>
                         </a>
@@ -1465,6 +1490,44 @@
                 </a>
                 <?php endif; ?>
             </nav>
+            <script>
+            (function () {
+                function rotuloMenu(elemento) {
+                    var texto = elemento.querySelector('.sidebar-text');
+                    return (texto ? texto.textContent : elemento.textContent).trim();
+                }
+                function ordenarItensMenu(container, manterSairPorUltimo) {
+                    if (!container) {
+                        return;
+                    }
+                    var filhos = Array.prototype.slice.call(container.children);
+                    var sair = null;
+                    var ordenaveis = [];
+                    filhos.forEach(function (elemento) {
+                        var href = elemento.getAttribute ? (elemento.getAttribute('href') || '') : '';
+                        if (manterSairPorUltimo && elemento.tagName === 'A' && href.indexOf('/logout') !== -1) {
+                            sair = elemento;
+                            return;
+                        }
+                        ordenaveis.push(elemento);
+                    });
+                    ordenaveis.sort(function (a, b) {
+                        return rotuloMenu(a).localeCompare(rotuloMenu(b), 'pt', { sensitivity: 'base', numeric: true });
+                    });
+                    ordenaveis.forEach(function (elemento) {
+                        container.appendChild(elemento);
+                    });
+                    if (sair) {
+                        container.appendChild(sair);
+                    }
+                }
+                var navAluno = document.querySelector('#sidebar nav');
+                ordenarItensMenu(navAluno, true);
+                ['colag-submenu', 'estudo-submenu', 'sistema-submenu'].forEach(function (id) {
+                    ordenarItensMenu(document.getElementById(id), false);
+                });
+            })();
+            </script>
             </div>
         </aside>
         
