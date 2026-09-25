@@ -8238,6 +8238,9 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
         try {
             $user = $this->assertProfessorLogado();
             $fonte = strtolower(trim((string)($_GET['fonte'] ?? 'todos')));
+            if ($fonte !== 'professor') {
+                throw new Exception('A integração com a API de questões está pausada.');
+            }
             if ($fonte === 'professor') {
                 $this->json(['success' => true, 'data' => [
                     'facets' => $this->listarFacetsBancoQuestoesProfessorModulo((int)$user['id'], $_GET)
@@ -8260,6 +8263,9 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
         try {
             $user = $this->assertProfessorLogado();
             $fonte = strtolower(trim((string)($_GET['fonte'] ?? 'todos')));
+            if ($fonte !== 'professor') {
+                throw new Exception('A integração com a API de questões está pausada.');
+            }
             $query = $this->buildBancoQuestoesQueryFromRequest($_GET);
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
             $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
@@ -8391,6 +8397,9 @@ Formato: Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutur
                 $creditoReferencia = null;
                 try {
                     $isQuestaoLocal = str_starts_with((string)$questaoId, 'local:');
+                    if (!$isQuestaoLocal) {
+                        throw new Exception('A integração com a API de questões está pausada.');
+                    }
                     if ($isQuestaoLocal) {
                         $questaoLocalId = (int)substr((string)$questaoId, 6);
                         $questaoLocal = $this->buscarQuestaoBancoProfessor((int)$user['id'], $questaoLocalId);

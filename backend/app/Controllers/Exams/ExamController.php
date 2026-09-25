@@ -7227,6 +7227,7 @@ Retorne APENAS um JSON válido no seguinte formato:
             if (!$isAdmin && (int)$prova['professor_id'] !== (int)$user['id']) {
                 throw new Exception('Você não tem permissão para acessar esta prova');
             }
+            throw new Exception('A integração com a API de questões está pausada.');
             $query = $this->buildBancoQuestoesQueryFromRequest($_GET);
             $payload = $this->bancoQuestoesApiGet('/api/facets', $query);
             $this->json(['success' => true, 'data' => $payload]);
@@ -7249,6 +7250,7 @@ Retorne APENAS um JSON válido no seguinte formato:
                 throw new Exception('Você não tem permissão para acessar esta prova');
             }
 
+            throw new Exception('A integração com a API de questões está pausada.');
             $query = $this->buildBancoQuestoesQueryFromRequest($_GET);
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 20;
             $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
@@ -7279,6 +7281,7 @@ Retorne APENAS um JSON válido no seguinte formato:
                 throw new Exception('Você não tem permissão para editar esta prova');
             }
 
+            throw new Exception('A integração com a API de questões está pausada.');
             $raw = json_decode((string)file_get_contents('php://input'), true);
             if (!is_array($raw)) throw new Exception('Payload JSON inválido');
             $ids = isset($raw['questao_ids']) && is_array($raw['questao_ids']) ? $raw['questao_ids'] : [];

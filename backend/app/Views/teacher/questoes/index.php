@@ -6,7 +6,7 @@ $page = max(1, (int) ($page ?? 1));
 <div class="max-w-7xl mx-auto space-y-6">
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
         <h2 class="text-xl font-semibold text-gray-800">Banco de Questões</h2>
-        <p class="text-sm text-gray-500 mt-1">Importe questões da API, selecione e monte listas para usar com os alunos.</p>
+        <p class="text-sm text-gray-500 mt-1">Questões que você criou ou gerou nas jornadas. Selecione e monte listas para usar com os alunos.</p>
     </div>
 
     <?php if (!empty($success)): ?>
@@ -20,6 +20,7 @@ $page = max(1, (int) ($page ?? 1));
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($integracao_api_externa)): ?>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
         <form method="post" action="<?= URL ?>/professor/questoes/importar" class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
@@ -117,6 +118,7 @@ $page = max(1, (int) ($page ?? 1));
             </div>
         </form>
     </div>
+    <?php endif; ?>
 
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
         <form method="get" action="<?= URL ?>/professor/questoes" class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -152,22 +154,23 @@ $page = max(1, (int) ($page ?? 1));
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 font-medium">Filtrar</button>
             </div>
             <div>
-                <label class="block text-sm text-gray-700 mb-1">Ano</label>
-                <select name="ano" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                    <option value="">Todos</option>
-                    <?php foreach (($anos ?? []) as $row): ?>
-                        <?php $v = (string) ($row['valor'] ?? ''); ?>
-                        <option value="<?= htmlspecialchars($v) ?>" <?= (($filtro_ano ?? '') === $v) ? 'selected' : '' ?>><?= htmlspecialchars($v) ?> (<?= (int) ($row['total'] ?? 0) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
                 <label class="block text-sm text-gray-700 mb-1">Dificuldade</label>
                 <select name="dificuldade" class="w-full border border-gray-300 rounded-lg px-3 py-2">
                     <option value="">Todas</option>
                     <?php foreach (($dificuldades ?? []) as $row): ?>
                         <?php $v = (string) ($row['valor'] ?? ''); ?>
                         <option value="<?= htmlspecialchars($v) ?>" <?= (($filtro_dificuldade ?? '') === $v) ? 'selected' : '' ?>><?= htmlspecialchars($v) ?> (<?= (int) ($row['total'] ?? 0) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php if (!empty($integracao_api_externa)): ?>
+            <div>
+                <label class="block text-sm text-gray-700 mb-1">Ano</label>
+                <select name="ano" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    <option value="">Todos</option>
+                    <?php foreach (($anos ?? []) as $row): ?>
+                        <?php $v = (string) ($row['valor'] ?? ''); ?>
+                        <option value="<?= htmlspecialchars($v) ?>" <?= (($filtro_ano ?? '') === $v) ? 'selected' : '' ?>><?= htmlspecialchars($v) ?> (<?= (int) ($row['total'] ?? 0) ?>)</option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -201,8 +204,9 @@ $page = max(1, (int) ($page ?? 1));
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php endif; ?>
         </form>
-        <?php if (isset($facets_total_filtrado) && $facets_total_filtrado !== null): ?>
+        <?php if (!empty($integracao_api_externa) && isset($facets_total_filtrado) && $facets_total_filtrado !== null): ?>
             <div class="mt-3 text-sm text-gray-600">
                 Total filtrado na API (facets): <strong><?= (int) $facets_total_filtrado ?></strong>
             </div>

@@ -160,9 +160,11 @@
                 🤖 Gerar com IA
             </button>
             <?php endif; ?>
+            <?php if (false): /* Integração da API externa pausada. Trocar para true para voltar o banco da API na prova. */ ?>
             <button onclick="abrirModalBancoQuestoes()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
                 Banco de Questões
             </button>
+            <?php endif; ?>
             <button onclick="abrirModalColarJson()" class="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
                 📚 Importar da Apostila
             </button>

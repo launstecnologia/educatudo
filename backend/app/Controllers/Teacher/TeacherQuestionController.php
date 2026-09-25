@@ -10,6 +10,12 @@ class TeacherQuestionController extends BaseController
     private $db;
     private $apiBase = 'http://69.62.86.185:8080';
 
+    /** Catálogo externo pausado. Voltar para true para reexibir importação e filtros da API. */
+    private function integracaoApiExternaAtiva(): bool
+    {
+        return false;
+    }
+
     public function __construct()
     {
         parent::__construct();
@@ -42,7 +48,10 @@ class TeacherQuestionController extends BaseController
         $limit = 30;
         $offset = ($page - 1) * $limit;
 
-        $where = ['(professor_id IS NULL OR professor_id = :professor_id)'];
+        $integracaoApi = $this->integracaoApiExternaAtiva();
+        $where = [$integracaoApi
+            ? '(professor_id IS NULL OR professor_id = :professor_id)'
+            : 'professor_id = :professor_id'];
         $params = ['professor_id' => $professorId];
 
         if ($materia !== '') {
@@ -90,12 +99,14 @@ class TeacherQuestionController extends BaseController
 
         $facets = [];
         $totalFiltradoApi = null;
-        try {
-            $facetsPayload = $this->apiGet('/api/facets', $facetFilters);
-            $facets = is_array($facetsPayload['facets'] ?? null) ? $facetsPayload['facets'] : [];
-            $totalFiltradoApi = isset($facetsPayload['total_filtrado']) ? (int) $facetsPayload['total_filtrado'] : null;
-        } catch (\Throwable $e) {
-            // Sem bloquear a tela se API estiver indisponível.
+        if ($integracaoApi) {
+            try {
+                $facetsPayload = $this->apiGet('/api/facets', $facetFilters);
+                $facets = is_array($facetsPayload['facets'] ?? null) ? $facetsPayload['facets'] : [];
+                $totalFiltradoApi = isset($facetsPayload['total_filtrado']) ? (int) $facetsPayload['total_filtrado'] : null;
+            } catch (\Throwable $e) {
+                // Sem bloquear a tela se API estiver indisponível.
+            }
         }
 
         $materias = [];
@@ -107,11 +118,21 @@ class TeacherQuestionController extends BaseController
                 }
             }
         } else {
-            $materiasDb = $this->db->fetchAll("SELECT DISTINCT materia FROM professor_questoes_api WHERE materia IS NOT NULL AND materia <> '' ORDER BY materia ASC");
+            $materiasDb = $this->db->fetchAll(
+                "SELECT DISTINCT materia FROM professor_questoes_api
+                  WHERE materia IS NOT NULL AND materia <> '' AND professor_id = :professor_id
+                  ORDER BY materia ASC",
+                ['professor_id' => $professorId]
+            );
             $materias = $materiasDb;
         }
 
-        $tiposDb = $this->db->fetchAll("SELECT DISTINCT tipo FROM professor_questoes_api WHERE tipo IS NOT NULL AND tipo <> '' ORDER BY tipo ASC");
+        $tiposDb = $this->db->fetchAll(
+            "SELECT DISTINCT tipo FROM professor_questoes_api
+              WHERE tipo IS NOT NULL AND tipo <> '' AND professor_id = :professor_id
+              ORDER BY tipo ASC",
+            ['professor_id' => $professorId]
+        );
         $tipos = !empty($tiposDb) ? $tiposDb : [
             ['tipo' => 'alternativas'],
             ['tipo' => 'aberta'],
@@ -127,9 +148,33 @@ class TeacherQuestionController extends BaseController
             }
         }
 
+        if (!$integracaoApi) {
+            $dificuldadesDb = $this->db->fetchAll(
+                "SELECT nivel_dificuldade AS valor, COUNT(*) AS total
+                   FROM professor_questoes_api
+                  WHERE professor_id = :professor_id
+                    AND nivel_dificuldade IS NOT NULL
+                    AND nivel_dificuldade <> ''
+                  GROUP BY nivel_dificuldade
+                  ORDER BY nivel_dificuldade ASC",
+                ['professor_id' => $professorId]
+            );
+            $rotulosNivel = ['facil' => 'Fácil', 'medio' => 'Médio', 'dificil' => 'Difícil'];
+            $dificuldades = [];
+            foreach ($dificuldadesDb as $row) {
+                $valor = (string) ($row['valor'] ?? '');
+                $dificuldades[] = [
+                    'valor' => $rotulosNivel[$valor] ?? $valor,
+                    'total' => (int) ($row['total'] ?? 0),
+                ];
+            }
+        }
+
         $anos = is_array($facets['anos'] ?? null) ? $facets['anos'] : [];
         $origensTitulo = is_array($facets['origens_titulo'] ?? null) ? $facets['origens_titulo'] : [];
-        $dificuldades = is_array($facets['dificuldades'] ?? null) ? $facets['dificuldades'] : [];
+        if ($integracaoApi) {
+            $dificuldades = is_array($facets['dificuldades'] ?? null) ? $facets['dificuldades'] : [];
+        }
         $topicos = is_array($facets['topicos'] ?? null) ? $facets['topicos'] : [];
         $tags = is_array($facets['tags'] ?? null) ? $facets['tags'] : [];
 
@@ -168,6 +213,7 @@ class TeacherQuestionController extends BaseController
             'dificuldades' => $dificuldades,
             'topicos' => $topicos,
             'tags' => $tags,
+            'integracao_api_externa' => $integracaoApi,
             'total' => $total,
             'page' => $page,
             'limit' => $limit,
@@ -181,6 +227,10 @@ class TeacherQuestionController extends BaseController
 
     public function importarApi()
     {
+        if (!$this->integracaoApiExternaAtiva()) {
+            $this->redirect('/professor/questoes?error=' . urlencode('A importação da API está pausada.'));
+        }
+
         $materia = trim((string) ($_POST['materia'] ?? ''));
         $tipo = trim((string) ($_POST['tipo'] ?? ''));
         $ano = trim((string) ($_POST['ano'] ?? ''));

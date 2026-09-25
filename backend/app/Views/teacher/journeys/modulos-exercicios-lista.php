@@ -17,6 +17,7 @@
                 </svg>
                 Novo Exercício
             </a>
+            <?php if (false): /* Integração da API externa pausada. Trocar para true para voltar "Questões do EducaTudo". */ ?>
             <button type="button" onclick="abrirModalBancoQuestoes('educatudo')"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -26,6 +27,7 @@
                 </svg>
                 Questões do EducaTudo
             </button>
+            <?php endif; ?>
             <button type="button" onclick="abrirModalBancoQuestoes('professor')"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
