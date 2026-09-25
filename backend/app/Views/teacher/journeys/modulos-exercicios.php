@@ -35,7 +35,7 @@
                 Extrair Imagem
             </button>
             <button onclick="abrirModalGerarIA()"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-700 bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cyan-800">
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h8l-1 8 11-13h-8l0-7z"></path>
                 </svg>
@@ -109,7 +109,7 @@
 </style>
 
 <!-- Formulário de Criação Manual -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-blue-200">
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
     <h3 class="text-lg font-semibold text-gray-900 mb-6">Criar Exercício Manualmente</h3>
     
     <!-- Form Manual -->
@@ -222,7 +222,7 @@
                           placeholder="Marque as alternativas de gabarito (campo preenchido automaticamente)"></textarea>
             </div>
             
-            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            <button type="submit" class="bg-primary text-primary px-6 py-2 rounded-lg hover:opacity-90 transition-colors">
                 Adicionar Exercício
             </button>
         </form>
@@ -429,8 +429,8 @@
                     Cancelar
                 </button>
                 <button type="submit" 
-                        class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    🤖 Gerar Questões
+                        class="px-6 py-3 bg-primary text-primary rounded-lg hover:opacity-90 transition-colors">
+                    Gerar questões
                 </button>
             </div>
         </form>

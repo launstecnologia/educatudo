@@ -7,6 +7,20 @@
             <h2 class="text-2xl font-bold text-gray-900 mb-1">Minhas Jornadas</h2>
             <p class="text-gray-600 text-sm">Gerencie suas jornadas de aprendizado.</p>
         </div>
+        <?php
+        $ui = __DIR__ . '/../../admin/_partials/ui';
+        $ui_btn_variant = 'filtro';
+        $ui_btn_label = 'Filtros';
+        $ui_btn_icon = 'fa-solid fa-filter';
+        $ui_btn_onclick = 'openFiltroDrawer()';
+        $ui_btn_filter_count = 0;
+        $ui_btn_href = '';
+        $ui_btn_type = 'button';
+        $ui_btn_id = 'btnFiltrosJornadas';
+        $ui_btn_class = '';
+        $ui_btn_attrs = '';
+        include $ui . '/btn.php';
+        ?>
         <a href="<?= URL ?>/professor/jornadas/criar" 
            class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
             <i class="fa-solid fa-plus mr-2"></i>
@@ -15,125 +29,77 @@
     </div>
 </div>
 
-<!-- Filtros e Busca -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
-    <!-- Header do Filtro -->
-    <div class="px-6 py-4 border-b border-gray-200">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <i class="fa-solid fa-filter text-gray-500"></i>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold text-gray-900">Filtros</h3>
-                    <p class="text-sm text-gray-500">Encontre jornadas rapidamente.</p>
-                </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-2 text-sm text-gray-600">
-                    <i class="fa-regular fa-bookmark text-gray-400"></i>
-                    <strong id="jornadaCount" class="text-base text-gray-900"><?= count($jornadas) ?></strong>
-                    jornadas
-                </div>
-                <button id="toggleFiltros" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
-                    <i id="iconMostrar" class="fa-solid fa-chevron-down text-gray-500 hidden"></i>
-                    <i id="iconEsconder" class="fa-solid fa-chevron-up text-gray-500"></i>
-                    <span id="textoToggle">Esconder Filtros</span>
-                </button>
-            </div>
+<span id="jornadaCount" class="hidden"><?= count($jornadas) ?></span>
+<?php
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+}
+$rotuloPeriodo = PeriodoLetivo::doAno((int) date('Y'))['rotulo_campo'] ?? 'Bimestre';
+$opcoesTurma = ['' => 'Todas as turmas'];
+foreach ($turmas as $turma) {
+    $opcoesTurma[(string) ($turma['id'] ?? '')] = (string) ($turma['nome'] ?? '');
+}
+ob_start();
+?>
+<div id="conteudoFiltros" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-4">
+        <div>
+            <label for="filtroBusca" class="block text-sm font-medium text-gray-700 mb-1">Buscar jornada</label>
+            <input type="text" id="filtroBusca" placeholder="Digite título, matéria ou turma..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+        </div>
+        <div>
+            <label for="filtroTurma" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+            <select id="filtroTurma" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                <?php foreach ($opcoesTurma as $valorTurma => $nomeTurma): ?>
+                <option value="<?= htmlspecialchars((string) $valorTurma) ?>"><?= htmlspecialchars($nomeTurma) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="filtroStatus" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select id="filtroStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                <option value="">Todos os status</option>
+                <option value="ativa">Ativa</option>
+                <option value="finalizada">Finalizada</option>
+            </select>
+        </div>
+        <div>
+            <label for="filtroBimestre" class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label><?= htmlspecialchars($rotuloPeriodo) ?></label>
+            <select id="filtroBimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true, 'todos_label' => 'Todos']) ?>
+            </select>
+        </div>
+        <div>
+            <label for="filtroAvaliativo" class="block text-sm font-medium text-gray-700 mb-1">Avaliativo</label>
+            <select id="filtroAvaliativo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                <option value="">Todos</option>
+                <option value="1">Sim</option>
+                <option value="0">Não</option>
+            </select>
+        </div>
+        <div>
+            <label for="ordenarPor" class="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
+            <select id="ordenarPor" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                <option value="data_desc">Mais recente</option>
+                <option value="data_asc">Mais antiga</option>
+                <option value="titulo_asc">Título (A-Z)</option>
+                <option value="titulo_desc">Título (Z-A)</option>
+                <option value="status">Status</option>
+            </select>
         </div>
     </div>
-
-    <!-- Conteúdo dos Filtros -->
-    <div id="conteudoFiltros" class="p-6">
-        <div class="space-y-5">
-            <!-- Busca -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Buscar Jornada
-                </label>
-                <div class="relative">
-                    <input type="text" id="filtroBusca" placeholder="Digite título, matéria ou turma..." 
-                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white">
-                </div>
-            </div>
-            
-            <!-- Filtros em Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <!-- Filtro de Turma -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Turma
-                    </label>
-                    <select id="filtroTurma" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer">
-                        <option value="">Todas as turmas</option>
-                        <?php foreach ($turmas as $turma): ?>
-                            <option value="<?= htmlspecialchars($turma['id']) ?>"><?= htmlspecialchars($turma['nome']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <!-- Filtro de Status -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Status
-                    </label>
-                    <select id="filtroStatus" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer">
-                        <option value="">Todos os status</option>
-                        <option value="ativa">Ativa</option>
-                        <option value="finalizada">Finalizada</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2" data-periodo-label>
-                        <?= htmlspecialchars(class_exists('PeriodoLetivo') ? PeriodoLetivo::doAno((int) date('Y'))['rotulo_campo'] : 'Bimestre') ?>
-                    </label>
-                    <select id="filtroBimestre" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer">
-                        <?php
-                        if (!class_exists('PeriodoLetivo')) {
-                            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
-                        }
-                        ?>
-                        <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true, 'todos_label' => 'Todos']) ?>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Avaliativo
-                    </label>
-                    <select id="filtroAvaliativo" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer">
-                        <option value="">Todos</option>
-                        <option value="1">Sim</option>
-                        <option value="0">Não</option>
-                    </select>
-                </div>
-                
-                <!-- Ordenar por -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Ordenar por
-                    </label>
-                    <select id="ordenarPor" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white appearance-none cursor-pointer">
-                        <option value="data_desc">Mais Recente</option>
-                        <option value="data_asc">Mais Antiga</option>
-                        <option value="titulo_asc">Título (A-Z)</option>
-                        <option value="titulo_desc">Título (Z-A)</option>
-                        <option value="status">Status</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- Botão Limpar Filtros -->
-            <div class="flex justify-end pt-2">
-                <button id="limparFiltros" class="px-4 py-2.5 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
-                    Limpar Filtros
-                </button>
-            </div>
-        </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <button type="button" id="limparFiltros" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Limpar</button>
+        <button type="button" onclick="closeFiltroDrawer()" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Aplicar filtros</button>
     </div>
 </div>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 
 <!-- Stats Card - Status das Jornadas -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
@@ -357,31 +323,30 @@
         const jornadaCount = document.getElementById('jornadaCount');
         const jornadasVisiveis = document.getElementById('jornadasVisiveis');
         const jornadasGrid = document.getElementById('jornadasGrid');
-        const toggleFiltros = document.getElementById('toggleFiltros');
-        const conteudoFiltros = document.getElementById('conteudoFiltros');
-        const iconMostrar = document.getElementById('iconMostrar');
-        const iconEsconder = document.getElementById('iconEsconder');
-        const textoToggle = document.getElementById('textoToggle');
-        
-        // Toggle dos filtros
-        if (toggleFiltros && conteudoFiltros) {
-            toggleFiltros.addEventListener('click', function() {
-                const estaVisivel = conteudoFiltros.style.display !== 'none';
-                
-                if (estaVisivel) {
-                    conteudoFiltros.style.display = 'none';
-                    iconMostrar.classList.remove('hidden');
-                    iconEsconder.classList.add('hidden');
-                    textoToggle.textContent = 'Mostrar Filtros';
-                } else {
-                    conteudoFiltros.style.display = 'block';
-                    iconMostrar.classList.add('hidden');
-                    iconEsconder.classList.remove('hidden');
-                    textoToggle.textContent = 'Esconder Filtros';
-                }
-            });
+        function atualizarContagemFiltros() {
+            let ativos = 0;
+            if ((filtroBusca?.value || '').trim() !== '') ativos++;
+            if ((filtroTurma?.value || '') !== '') ativos++;
+            if ((filtroStatus?.value || '') !== '') ativos++;
+            if ((filtroBimestre?.value || '') !== '') ativos++;
+            if ((filtroAvaliativo?.value || '') !== '') ativos++;
+            if ((ordenarPor?.value || 'data_desc') !== 'data_desc') ativos++;
+            const botao = document.getElementById('btnFiltrosJornadas');
+            if (!botao) return;
+            let badge = botao.querySelector('[data-filtro-contagem]');
+            if (ativos === 0) {
+                if (badge) badge.remove();
+                return;
+            }
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.setAttribute('data-filtro-contagem', '1');
+                badge.className = 'ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold';
+                botao.appendChild(badge);
+            }
+            badge.textContent = String(ativos);
         }
-        
+
         function filtrarJornadas() {
             const busca = filtroBusca?.value.toLowerCase() || '';
             const turma = filtroTurma?.value || '';
@@ -452,6 +417,7 @@
             if (jornadaCount) {
                 jornadaCount.textContent = visiveis;
             }
+            atualizarContagemFiltros();
         }
         
         // Event listeners

@@ -2,7 +2,7 @@
 <div class="mb-6 md:mb-8">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div class="flex-1">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Painel do Professor 👨‍🏫</h1>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Painel do Professor</h1>
             <p class="text-sm md:text-base text-gray-600 mt-2">Bem-vindo, <?= htmlspecialchars($professor['nome']) ?>! Gerencie suas turmas e acompanhe o progresso dos alunos.</p>
         </div>
         <div class="flex items-center space-x-4">

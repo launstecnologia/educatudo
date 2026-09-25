@@ -67,14 +67,16 @@ include __DIR__ . '/../../admin/_partials/page_header_list.php';
                         <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                             <?= $filtrosAtivos > 0 ? 'Nenhuma proposta com esse filtro.' : 'Nenhuma proposta.' ?>
                             <?php if ($filtrosAtivos === 0): ?>
-                            <a href="<?= URL ?>/professor/redacao-configuravel/novo" class="text-primary hover:underline">Criar primeira proposta</a>
+                            <a href="<?= URL ?>/professor/redacao-configuravel/novo" class="text-gray-900 font-semibold hover:underline">Criar primeira proposta</a>
                             <?php endif; ?>
                         </td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($proposals as $p): ?>
                     <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($p['title']) ?></td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                            <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>" class="hover:underline"><?= htmlspecialchars($p['title']) ?></a>
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-500"><?= htmlspecialchars($p['board_name']) ?> — <?= htmlspecialchars($p['text_type_name']) ?></td>
                         <td class="px-6 py-4 text-sm text-gray-700"><?= (int)($p['qtd_alunos'] ?? 0) ?></td>
                         <td class="px-6 py-4 text-sm text-gray-700"><?= (int)($p['qtd_enviados'] ?? 0) ?></td>
@@ -92,7 +94,7 @@ include __DIR__ . '/../../admin/_partials/page_header_list.php';
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div class="flex items-center gap-3">
                                 <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>"
-                                   class="text-primary hover:opacity-80"
+                                   class="text-gray-700 hover:text-gray-900"
                                    title="Ver">
                                     <span class="sr-only">Ver</span>
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">

@@ -11,11 +11,20 @@
             </p>
         </div>
         <div class="flex space-x-3">
-            <a href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>" 
-               class="bg-gray-600 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl">
-                
-                Voltar
-            </a>
+            <?php
+            $ui = __DIR__ . '/../../admin/_partials/ui';
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Voltar';
+            $ui_btn_icon = 'fa-solid fa-arrow-left';
+            $ui_btn_href = URL . '/professor/jornadas/' . (int) $jornada['id'];
+            $ui_btn_type = 'button';
+            $ui_btn_onclick = '';
+            $ui_btn_id = '';
+            $ui_btn_class = '';
+            $ui_btn_attrs = '';
+            $ui_btn_filter_count = 0;
+            include $ui . '/btn.php';
+            ?>
         </div>
     </div>
 </div>
@@ -31,7 +40,7 @@
 </style>
 
 <!-- Adicionar Novo Bloco -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-blue-200">
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
     <h3 class="text-lg font-semibold text-gray-900 mb-4">Adicionar Novo Bloco</h3>
     
     <form id="adicionarModuloForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -66,8 +75,7 @@
         
         <div class="md:col-span-2">
             <button type="submit" 
-                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                
+                    class="bg-primary text-primary px-6 py-2 rounded-lg hover:opacity-90 transition-colors font-semibold">
                 Adicionar Bloco
             </button>
         </div>
@@ -75,7 +83,7 @@
 </div>
 
 <!-- Lista de Blocos -->
-<div class="bg-white rounded-xl shadow-lg p-6 border border-blue-200">
+<div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
     <h3 class="text-lg font-semibold text-gray-900 mb-4">Blocos da Jornada</h3>
     <p class="text-sm text-gray-500 mb-4">Arraste os blocos para reordená-los</p>
     
@@ -335,6 +343,22 @@ function renderizarModulos(modulos) {
         console.log('Módulo completo:', JSON.stringify(modulo, null, 2));
         console.log('===================');
         const tituloEscapado = escapeJsString(modulo.titulo || nomes[tipoModulo] || 'Bloco');
+        const tituloLower = (modulo.titulo || '').toLowerCase();
+        let gerenciarHref = '';
+        if (isDicaProfessor) {
+            gerenciarHref = '<?= URL ?>/professor/jornadas/modulos/' + modulo.id + '/dica-professor';
+        } else if (tipoModulo === 'resumo_aluno') {
+            gerenciarHref = '<?= URL ?>/professor/jornadas/modulos/' + modulo.id + '/resumo-aluno';
+        } else if (tipoModulo === 'exercicios' || tipoModulo === 'exercicio') {
+            gerenciarHref = '<?= URL ?>/professor/jornadas/modulos/' + modulo.id + '/exercicios';
+        } else if (tipoModulo === 'video' || tipoModulo === 'videos' || tipoModulo === 'conteudo') {
+            gerenciarHref = '<?= URL ?>/professor/jornadas/modulos/' + modulo.id + '/videos';
+        } else if (tituloLower.includes('dica') || tituloLower.includes('professor')) {
+            gerenciarHref = '<?= URL ?>/professor/jornadas/modulos/' + modulo.id + '/dica-professor';
+        }
+        const itemGerenciar = gerenciarHref
+            ? `<a href="${gerenciarHref}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><i class="fa-solid fa-folder-open text-gray-400 w-4 text-center"></i> Gerenciar</a>`
+            : '';
         html += `
             <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors draggable-item" 
                  data-modulo-id="${modulo.id}" 
@@ -353,60 +377,24 @@ function renderizarModulos(modulos) {
                             ${modulo.descricao ? `<p class="text-sm text-gray-500 mt-1">${modulo.descricao}</p>` : ''}
                         </div>
                     </div>
-                    <div class="flex items-center space-x-2 ml-4 no-drag">
-                        ${isDicaProfessor ? `
-                            <a href="<?= URL ?>/professor/jornadas/modulos/${modulo.id}/dica-professor" 
-                               class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
-                               title="Gerenciar">
-                                
-                                Gerenciar
-                            </a>
-                        ` : ''}
-                        ${!isDicaProfessor && modulo.titulo && (modulo.titulo.toLowerCase().includes('dica') || modulo.titulo.toLowerCase().includes('professor')) ? `
-                            <!-- Fallback: mostra botão mesmo se a lógica principal falhou -->
-                            <a href="<?= URL ?>/professor/jornadas/modulos/${modulo.id}/dica-professor" 
-                               class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition-colors"
-                               title="Gerenciar (Fallback)">
-                                
-                                Gerenciar
-                            </a>
-                        ` : ''}
-                        ${tipoModulo === 'resumo_aluno' ? `
-                            <a href="<?= URL ?>/professor/jornadas/modulos/${modulo.id}/resumo-aluno" 
-                               class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
-                               title="Gerenciar">
-                                
-                                Gerenciar
-                            </a>
-                        ` : ''}
-                        ${(['exercicios', 'exercicio'].includes(tipoModulo)) ? `
-                            <a href="<?= URL ?>/professor/jornadas/modulos/${modulo.id}/exercicios" 
-                               class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
-                               title="Gerenciar">
-                                
-                                Gerenciar
-                            </a>
-                        ` : ''}
-                        ${(['video', 'videos', 'conteudo'].includes(tipoModulo)) ? `
-                            <a href="<?= URL ?>/professor/jornadas/modulos/${modulo.id}/videos" 
-                               class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors"
-                               title="Gerenciar">
-                                
-                                Gerenciar
-                            </a>
-                        ` : ''}
-                        <button onclick="abrirEditarModuloModal(${modulo.id}, '${tituloEscapado}', ${modulo.obrigatorio ? 1 : 0})" 
-                                class="px-3 py-1 bg-amber-500 text-white rounded text-sm hover:bg-amber-600 transition-colors"
-                                title="Editar">
-                            
-                            Editar
-                        </button>
-                        <button onclick="removerModulo(${modulo.id})" 
-                                class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors"
-                                title="Remover">
-                            
-                            Remover
-                        </button>
+                    <div class="ml-4 no-drag">
+                        <div class="relative inline-block text-left" data-dropdown>
+                            <button type="button" data-dropdown-toggle class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
+                                Ações
+                                <i class="fa-solid fa-chevron-down text-xs text-gray-400"></i>
+                            </button>
+                            <div data-dropdown-menu class="hidden fixed z-50 w-48 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 overflow-hidden">
+                                <div class="py-1">
+                                    ${itemGerenciar}
+                                    <button type="button" onclick="abrirEditarModuloModal(${modulo.id}, '${tituloEscapado}', ${modulo.obrigatorio ? 1 : 0})" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                        <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
+                                    </button>
+                                    <button type="button" onclick="removerModulo(${modulo.id})" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                        <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Remover
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

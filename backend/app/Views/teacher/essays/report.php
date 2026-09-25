@@ -84,21 +84,17 @@ include __DIR__ . '/../../admin/_partials/page_header_list.php';
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título da proposta</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de banca</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aluno</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proposta</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data envio</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data correção</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nota</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($rows)): ?>
                 <tr>
-                    <td colspan="9" class="px-6 py-12 text-center text-gray-500">Nenhum registro encontrado com os filtros informados.</td>
+                    <td colspan="5" class="px-6 py-12 text-center text-gray-500">Nenhum registro encontrado com os filtros informados.</td>
                 </tr>
                 <?php else: ?>
                     <?php foreach ($rows as $row): ?>
@@ -120,31 +116,34 @@ include __DIR__ . '/../../admin/_partials/page_header_list.php';
                                 : 'bg-gray-100 text-gray-800'));
                     ?>
                     <tr class="<?= $isOverduePending ? 'bg-red-50/40 hover:bg-red-50/70' : 'hover:bg-gray-50' ?>">
-                        <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($row['proposal_title'] ?? '')) ?></td>
-                        <td class="px-6 py-4 text-sm text-gray-600"><?= htmlspecialchars((string) ($row['board_name'] ?? '')) ?></td>
-                        <td class="px-6 py-4 text-sm text-gray-600"><?= htmlspecialchars((string) ($row['turma_name'] ?? '—')) ?></td>
-                        <td class="px-6 py-4 text-sm text-gray-800"><?= htmlspecialchars((string) ($row['student_name'] ?? '')) ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex px-2.5 py-1 text-xs font-semibold rounded-full <?= $statusClass ?>">
-                                <?= htmlspecialchars((string) ($row['status_label'] ?? '')) ?>
-                            </span>
-                            <?php if ($isOverduePending): ?>
-                                <span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">
-                                    +15 dias sem correção
-                                </span>
-                            <?php endif; ?>
+                        <td class="px-6 py-4">
+                            <p class="text-sm font-semibold text-gray-900"><?= htmlspecialchars((string) ($row['proposal_title'] ?? '')) ?></p>
+                            <p class="mt-1 text-sm text-gray-800"><?= htmlspecialchars((string) ($row['student_name'] ?? '')) ?></p>
+                            <p class="mt-0.5 text-xs text-gray-500"><?= htmlspecialchars((string) ($row['board_name'] ?? '')) ?> · <?= htmlspecialchars((string) ($row['turma_name'] ?? '—')) ?></p>
                         </td>
-                        <td class="px-6 py-4 text-sm text-gray-500"><?= !empty($row['submitted_at']) ? date('d/m/Y H:i', strtotime((string) $row['submitted_at'])) : '—' ?></td>
-                        <td class="px-6 py-4 text-sm text-gray-500"><?= !empty($row['corrected_at']) ? date('d/m/Y H:i', strtotime((string) $row['corrected_at'])) : '—' ?></td>
+                        <td class="px-6 py-4">
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="inline-flex px-2.5 py-1 text-xs font-semibold rounded-full <?= $statusClass ?>">
+                                    <?= htmlspecialchars((string) ($row['status_label'] ?? '')) ?>
+                                </span>
+                                <?php if ($isOverduePending): ?>
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700">+15 dias</span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">
+                            <span class="block"><?= !empty($row['submitted_at']) ? date('d/m/Y H:i', strtotime((string) $row['submitted_at'])) : '—' ?></span>
+                            <span class="mt-0.5 block text-xs text-gray-500">Correção: <?= !empty($row['corrected_at']) ? date('d/m/Y H:i', strtotime((string) $row['corrected_at'])) : '—' ?></span>
+                        </td>
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800"><?= isset($row['nota_final']) && $row['nota_final'] !== null ? number_format((float) $row['nota_final'], 0, ',', '.') : '—' ?></td>
-                        <td class="px-6 py-4 text-sm">
+                        <td class="px-6 py-4 text-sm text-right">
                             <?php if (!empty($row['submission_id'])): ?>
                                 <?php $baseDetailUrl = URL . '/professor/redacao-configuravel/propostas/' . (int) ($row['proposal_id'] ?? 0) . '/envios/' . (int) $row['submission_id'] . '/corrigir'; ?>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#redacao') ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-primary/20 text-primary bg-primary/10 hover:bg-primary/15 transition-colors">
-                                        Visualizar redação
+                                <div class="inline-flex flex-col items-stretch gap-2">
+                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#redacao') ?>" class="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100">
+                                        Ver redação
                                     </a>
-                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#correcao') ?>" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                                    <a href="<?= htmlspecialchars($baseDetailUrl . '#correcao') ?>" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
                                         Ver correção
                                     </a>
                                 </div>

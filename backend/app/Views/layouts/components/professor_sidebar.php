@@ -221,15 +221,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             ?>
             <a href="<?= htmlspecialchars($externalApp['href']) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-3 <?= $isCurrentExternal ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <?php if ($isEducaProf): ?>
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M8.4 8.4c.5-2.5 1.9-3.9 3.6-3.9s3.1 1.4 3.6 3.9"></path>
-                    <path d="M9.1 9.1a1.25 1.25 0 1 0 2.5 0 1.25 1.25 0 0 0-2.5 0z"></path>
-                    <path d="M12.4 9.1a1.25 1.25 0 1 0 2.5 0 1.25 1.25 0 0 0-2.5 0z"></path>
-                    <path d="M11.6 9.1h.8"></path>
-                    <path d="M7.8 20.5c.5-3.1 2.1-4.8 4.2-4.8s3.7 1.7 4.2 4.8"></path>
-                    <path d="M12 15.8v4.7"></path>
-                    <path d="M9.5 17.4 12 15.8l2.5 1.6"></path>
-                </svg>
+                <img src="<?= URL ?>/public/assets/tudinha-educaprof.png" alt="" class="w-5 h-5 mr-3 rounded-full object-cover object-top" width="20" height="20">
                 <?php else: ?>
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-1.414 1.414a4 4 0 01-5.656 0M10.172 13.828a4 4 0 01-5.656 0L3.102 12.414a4 4 0 010-5.656L4.516 5.344a4 4 0 015.656 0"></path>
