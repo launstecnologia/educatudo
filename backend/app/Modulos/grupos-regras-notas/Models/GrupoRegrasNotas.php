@@ -424,33 +424,59 @@ class GrupoRegrasNotas
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataProva)) {
             return 0;
         }
-        if ($this->idsPositivos($turmaIds) === []) {
+        if (!$this->provasBlocosTemColuna('ano_letivo') || !$this->provasBlocosTemColuna('bimestre')) {
             return 0;
         }
-        if (!$this->provasBlocosTemColuna('grupo_regras_notas_id')
-            || !$this->provasBlocosTemColuna('grupo_regras_tipo_id')
-            || !$this->provasBlocosTemColuna('ano_letivo')
-            || !$this->provasBlocosTemColuna('bimestre')
-        ) {
-            return 0;
+        if ($this->idsPositivos($turmaIds) !== []) {
+            $comTurmas = $this->contarSemanasAnterioresSql($grupoId, $tipoId, $ano, $bimestre, $dataProva, $excetoBlocoId, $turmaIds, true);
+            if ($comTurmas > 0) {
+                return $comTurmas;
+            }
+        }
+
+        return $this->contarSemanasAnterioresSql($grupoId, $tipoId, $ano, $bimestre, $dataProva, $excetoBlocoId, [], false);
+    }
+
+    /**
+     * @param list<int> $turmaIds
+     */
+    private function contarSemanasAnterioresSql(
+        int $grupoId,
+        int $tipoId,
+        int $ano,
+        int $bimestre,
+        string $dataProva,
+        int $excetoBlocoId,
+        array $turmaIds,
+        bool $filtrarTurmas
+    ): int {
+        $params = ['g' => $grupoId, 't' => $tipoId, 'ano' => $ano, 'bim' => $bimestre, 'data' => $dataProva];
+        $filtroBloco = '(pb.grupo_regras_notas_id = :g AND pb.grupo_regras_tipo_id = :t)';
+        $joinVinculo = '';
+        if ($this->tabelaVinculosProvaExiste()) {
+            $joinVinculo = ' LEFT JOIN ' . $this->sql('{vinculos_prova}') . ' vq ON vq.bloco_id = pb.id AND vq.grupo_id = :g AND vq.tipo_id = :t';
+            $filtroBloco = '(vq.bloco_id IS NOT NULL OR (pb.grupo_regras_notas_id = :g AND pb.grupo_regras_tipo_id = :t))';
         }
         $sql = 'SELECT COUNT(DISTINCT YEARWEEK(pb.data_prova, 3)) AS n
-                FROM provas_blocos pb
+                FROM provas_blocos pb' . $joinVinculo . '
                 WHERE pb.deleted_at IS NULL
-                  AND pb.grupo_regras_notas_id = :g
-                  AND pb.grupo_regras_tipo_id = :t
+                  AND ' . $filtroBloco . '
                   AND pb.ano_letivo = :ano
                   AND pb.bimestre = :bim
                   AND pb.data_prova IS NOT NULL
                   AND pb.data_prova < :data';
-        $params = ['g' => $grupoId, 't' => $tipoId, 'ano' => $ano, 'bim' => $bimestre, 'data' => $dataProva];
         if ($excetoBlocoId > 0) {
             $sql .= ' AND pb.id <> :ex';
             $params['ex'] = $excetoBlocoId;
         }
-        $cruzam = $this->sqlBlocoCruzaTurmas('pb', $turmaIds);
-        $sql .= $cruzam['sql'];
-        $params = array_merge($params, $cruzam['params']);
+        if ($filtrarTurmas) {
+            $cruzam = $this->sqlBlocoCruzaTurmas('pb', $turmaIds);
+            if ($cruzam['sql'] === '') {
+                return 0;
+            }
+            $sql .= $cruzam['sql'];
+            $params = array_merge($params, $cruzam['params']);
+        }
         $row = $this->db->fetch($sql, $params);
 
         return (int) ($row['n'] ?? 0);
