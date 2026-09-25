@@ -1127,6 +1127,7 @@ $boletimWizardSteps = [
         if (!estado.grupo_regras_notas_id && catalogo.quadros_notas && catalogo.quadros_notas.length === 1) {
             estado.grupo_regras_notas_id = Number(catalogo.quadros_notas[0].id || 0) || 0;
         }
+        window.boletimWizardEstadoAtual = function () { return estado; };
         return estado;
     }
 
@@ -2123,7 +2124,7 @@ $boletimWizardSteps = [
         html += '<input type="hidden" id="bw-preview-aluno" value="' + (atual > 0 ? atual : 0) + '">';
         html += '</label>';
         html += '<button type="button" id="bw-preview-aluno-limpar" class="h-9 px-3 text-xs rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Sem aluno</button>';
-        html += '<p class="text-xs text-slate-500 max-w-md">Lista filtrada pelo escopo marcado: ' + alunos.length + ' de ' + alunosTodos.length + ' aluno(s). A prévia atualiza na hora; após salvar, use a simulação real da configuração.</p>';
+        html += '<p class="text-xs text-slate-500 max-w-md">Lista filtrada pelo escopo marcado: ' + alunos.length + ' de ' + alunosTodos.length + ' aluno(s). Ao escolher um aluno, a tabela usa as notas lançadas dele.</p>';
         html += '</div>';
         return html;
     }
@@ -2309,6 +2310,18 @@ $boletimWizardSteps = [
     }
 
     function previewEfetivo() {
+        var alunoId = Number((estado && estado.aluno_preview_id) || 0);
+        if (alunoId > 0) {
+            if (previewAtual && Number(previewAtual.aluno_id || 0) === alunoId) return previewAtual;
+            return {
+                modo: 'vazio',
+                aluno_id: alunoId,
+                aviso: 'Buscando as notas reais do aluno…',
+                tabelas: [],
+                colunas: [],
+                pecas_disponiveis: []
+            };
+        }
         if (ehBoletimComposto()) {
             if (previewAtual && previewAtual.modo === 'boletim' && (previewAtual.tabelas || []).length) {
                 return previewAtual;
@@ -2394,10 +2407,10 @@ $boletimWizardSteps = [
     }
 
     function htmlPreview(pv) {
-        if (!pv || !(pv.tabelas || []).length) {
-            return '<p class="text-xs text-gray-500">' + esc((pv && pv.aviso) || 'Monte as peças para ver o exemplo.') + '</p>';
-        }
         var html = htmlAlunoPreviewSelect();
+        if (!pv || !(pv.tabelas || []).length) {
+            return html + '<p class="text-xs text-gray-600 mt-2">' + esc((pv && pv.aviso) || 'Monte as peças para ver o exemplo.') + '</p>';
+        }
         var avisoCls = pv.dados_reais
             ? 'text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 mb-2'
             : 'text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2';
@@ -3701,6 +3714,7 @@ $boletimWizardSteps = [
         var fd = new FormData();
         fd.append('_token', csrf);
         fd.append('wizard_estado', JSON.stringify(estado));
+        var alunoPedido = Number(estado.aluno_preview_id || 0);
         return fetch(urlWizardMontar, {
             method: 'POST',
             body: fd,
@@ -3712,6 +3726,7 @@ $boletimWizardSteps = [
                 if (estado && (estado.passo === 'formula' || estado.passo === 'revisar')) renderRevisarDinamico();
                 return j || null;
             }
+            if (Number((estado && estado.aluno_preview_id) || 0) !== alunoPedido) return j;
             if (j.estado) {
                 estado = j.estado;
                 garantirEstado();

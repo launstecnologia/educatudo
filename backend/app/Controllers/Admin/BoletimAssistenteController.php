@@ -202,32 +202,120 @@ class BoletimAssistenteController extends BaseController
         $estado = is_array($resultado['estado'] ?? null) ? $resultado['estado'] : [];
         $rascunho = is_array($resultado['rascunho'] ?? null) ? $resultado['rascunho'] : null;
         $alunoId = (int) ($estado['aluno_preview_id'] ?? 0);
-        if ($alunoId <= 0 || $rascunho === null || empty($rascunho['componentes'])) {
+        if ($alunoId <= 0) {
+            return $resultado;
+        }
+        if ($rascunho === null || empty($rascunho['componentes'])) {
+            $resultado['preview'] = $this->previewRealVazio(
+                $alunoId,
+                'Salve as peças do evento para puxar as notas reais do aluno.'
+            );
+
             return $resultado;
         }
 
+        $rascunho = $this->rascunhoComFontesSalvas($rascunho, $estado);
         [$periodoRef, $dataInicio, $dataFim] = $this->resolverPeriodoPreview($rascunho, $estado);
 
         try {
-            $configController = new BoletimConfigController();
+            $configController = new BoletimConfigController(true);
             $simulacao = $configController->simularRegraAluno($rascunho, $alunoId, $periodoRef, $dataInicio, $dataFim);
             $previewReal = $this->montarPreviewRealDaSimulacao($simulacao);
             if ($previewReal !== null) {
+                $previewReal['aluno_id'] = $alunoId;
+                $previewReal['dados_reais'] = true;
                 $resultado['preview'] = $previewReal;
             } else {
-                $resultado['preview'] = [
-                    'modo' => 'vazio',
-                    'aviso' => 'Aluno selecionado, mas não há notas reais para este evento no período configurado.',
-                    'tabelas' => [],
-                    'colunas' => [],
-                    'pecas_disponiveis' => [],
-                ];
+                $resultado['preview'] = $this->previewRealVazio(
+                    $alunoId,
+                    'Aluno selecionado, mas não há notas lançadas para este evento no período configurado.'
+                );
             }
         } catch (Throwable $e) {
             error_log('BoletimAssistente preview real aluno #' . $alunoId . ': ' . $e->getMessage());
+            $resultado['preview'] = $this->previewRealVazio(
+                $alunoId,
+                'Não deu para ler as notas reais deste aluno agora.'
+            );
         }
 
         return $resultado;
+    }
+
+    /**
+     * A fórmula em edição fica no rascunho. Provas, jornada e nota manual vêm do evento já salvo,
+     * para a prévia achar os mesmos lançamentos da tela de configuração.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function rascunhoComFontesSalvas(array $rascunho, array $estado): array
+    {
+        $regraId = (int) ($rascunho['id'] ?? 0);
+        if ($regraId <= 0) {
+            $regraId = (int) ($rascunho['regra_id'] ?? $estado['regra_id'] ?? 0);
+        }
+        if ($regraId <= 0) {
+            return $rascunho;
+        }
+        $rascunho['id'] = $regraId;
+        $salva = $this->assistente->ferramentas()->obterRegra($regraId);
+        if (!is_array($salva) || empty($salva['componentes']) || !is_array($salva['componentes'])) {
+            return $rascunho;
+        }
+
+        $salvas = [];
+        foreach ($salva['componentes'] as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            if ($cod !== '') {
+                $salvas[$cod] = $comp;
+            }
+        }
+
+        $componentes = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            $origem = strtolower(trim((string) ($comp['source_type'] ?? '')));
+            $salvaComp = $salvas[$cod] ?? null;
+            if ($origem !== 'calculado' && is_array($salvaComp)) {
+                $nome = trim((string) ($comp['nome'] ?? ''));
+                $comp = $salvaComp;
+                if ($nome !== '') {
+                    $comp['nome'] = $nome;
+                }
+            }
+            $componentes[] = $comp;
+        }
+        $rascunho['componentes'] = $componentes;
+        if (trim((string) ($rascunho['codigo'] ?? '')) === '' && trim((string) ($salva['codigo'] ?? '')) !== '') {
+            $rascunho['codigo'] = (string) $salva['codigo'];
+        }
+
+        return $rascunho;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function previewRealVazio(int $alunoId, string $aviso): array
+    {
+        return [
+            'modo' => 'vazio',
+            'aluno_id' => $alunoId,
+            'dados_reais' => false,
+            'sem_ficcao' => true,
+            'aviso' => $aviso,
+            'tabelas' => [],
+            'colunas' => [],
+            'pecas_disponiveis' => [],
+        ];
     }
 
     /**
@@ -702,6 +790,55 @@ class BoletimAssistenteController extends BaseController
             'erros' => $resultado['erros'] ?? [],
         ]);
         exit;
+    }
+
+    /**
+     * Chat da tela Evento de Notas: explica o cálculo e consulta nota, lançamento e jornada.
+     */
+    public function consulta(): void
+    {
+        $token = (string) ($_POST['_token'] ?? '');
+        if (!$this->verifyCsrfToken($token)) {
+            $this->json(['success' => false, 'error' => 'CSRF inválido.'], 419);
+        }
+
+        $mensagem = trim((string) ($_POST['mensagem'] ?? ''));
+        if ($mensagem === '') {
+            $this->json(['success' => false, 'error' => 'Escreva a pergunta.'], 400);
+        }
+        if (mb_strlen($mensagem) > 4000) {
+            $this->json(['success' => false, 'error' => 'Mensagem muito longa (máx. 4000 caracteres).'], 400);
+        }
+
+        $historico = [];
+        $histRaw = $_POST['historico'] ?? '[]';
+        if (is_string($histRaw) && $histRaw !== '') {
+            if (strlen($histRaw) > self::LIMITE_HISTORICO_BYTES) {
+                $this->json(['success' => false, 'error' => 'Histórico muito grande.'], 400);
+            }
+            $dec = json_decode($histRaw, true);
+            if (is_array($dec)) {
+                $historico = $dec;
+            }
+        }
+
+        $wizardEstado = null;
+        $estadoRaw = $_POST['wizard_estado'] ?? '';
+        if (is_string($estadoRaw) && $estadoRaw !== '') {
+            if (strlen($estadoRaw) > self::LIMITE_ESTADO_BYTES) {
+                $this->json(['success' => false, 'error' => 'Estado do evento muito grande.'], 400);
+            }
+            $decEstado = json_decode($estadoRaw, true);
+            if (is_array($decEstado)) {
+                $wizardEstado = $decEstado;
+            }
+        }
+
+        $this->soltarSessao();
+
+        require_once __DIR__ . '/../../Services/BoletimConsultaAssistenteService.php';
+        $servico = new BoletimConsultaAssistenteService($this->assistente->ferramentas(), $this->wizard);
+        $this->json($servico->processarMensagem($mensagem, $historico, $wizardEstado));
     }
 
     /**

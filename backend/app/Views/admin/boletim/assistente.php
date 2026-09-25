@@ -18,3 +18,4 @@ include __DIR__ . '/../_partials/page_header_form.php';
 <div class="space-y-6">
     <?php include __DIR__ . '/_assistente_wizard.php'; ?>
 </div>
+<?php include __DIR__ . '/_assistente_consulta.php'; ?>

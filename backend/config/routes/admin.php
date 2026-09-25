@@ -381,6 +381,7 @@ $router->post('/admin/boletim-configuracao/assistente/mensagem-stream', 'Admin/B
 $router->post('/admin/boletim-configuracao/assistente/ferramenta', 'Admin/BoletimAssistenteController@ferramenta');
 $router->post('/admin/boletim-configuracao/assistente/wizard/inicio', 'Admin/BoletimAssistenteController@wizardInicio');
 $router->post('/admin/boletim-configuracao/assistente/wizard/montar', 'Admin/BoletimAssistenteController@wizardMontar');
+$router->post('/admin/boletim-configuracao/assistente/consulta', 'Admin/BoletimAssistenteController@consulta');
 
 // MCP / consulta de provas dos alunos (somente leitura)
 $router->post('/admin/consulta-provas-aluno/mcp/ferramenta', 'Admin/ProvasAlunoMcpController@ferramenta');
