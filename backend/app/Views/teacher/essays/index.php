@@ -42,6 +42,13 @@ $page_header_actions = ob_get_clean();
 $page_header_title = 'Jornada da Redação';
 $page_header_subtitle = 'Criar e gerenciar propostas de redação';
 include __DIR__ . '/../../admin/_partials/page_header_list.php';
+
+if (!empty($_SESSION['flash_message'])) {
+    $flash_message = (string) $_SESSION['flash_message'];
+    $flash_status = (($_SESSION['flash_type'] ?? '') === 'success') ? 'success' : 'error';
+    unset($_SESSION['flash_message'], $_SESSION['flash_type']);
+    include __DIR__ . '/../../admin/_partials/flash_message.php';
+}
 ?>
 
 <div class="bg-white rounded-xl shadow-lg border border-gray-200">

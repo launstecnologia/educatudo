@@ -62,7 +62,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 <!-- Breadcrumb de navegação de pasta -->
 <?php if ($pastaAtual): ?>
 <nav class="mb-4 flex items-center gap-2 text-sm">
-    <a href="<?= $baseUrl ?>" class="text-primary hover:underline flex items-center gap-1">
+    <a href="<?= $baseUrl ?>" class="text-gray-700 hover:underline flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
         Arquivos
     </a>
@@ -104,7 +104,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
             <?= $pastaAtual ? 'Arquivos em ' . htmlspecialchars($pastaAtual['nome']) : 'Publicações' ?>
         </h2>
         <?php if ($pastaAtual): ?>
-        <a href="<?= $baseUrl ?>" class="text-sm text-primary hover:underline">Ver todas</a>
+        <a href="<?= $baseUrl ?>" class="text-sm text-gray-700 hover:underline">Ver todas</a>
         <?php endif; ?>
     </div>
     <div class="p-6">
@@ -141,7 +141,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-600">
                                     <?php if (!empty($row['aluno_nome'])): ?>
-                                        <span class="text-primary font-medium">Aluno: <?= htmlspecialchars($row['aluno_nome']) ?></span>
+                                        <span class="text-gray-900 font-medium">Aluno: <?= htmlspecialchars($row['aluno_nome']) ?></span>
                                     <?php else: ?>
                                         <?= htmlspecialchars($row['turma_nome'] ?? '') ?>
                                     <?php endif; ?>
@@ -159,23 +159,24 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                                 </td>
                                 <?php endif; ?>
                                 <td class="px-4 py-3 text-right">
-                                    <div class="flex items-center justify-end gap-2 flex-wrap">
-                                        <button type="button" class="btn-visualizar-arquivo inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300" data-id="<?= (int)$row['id'] ?>" title="Ver como o aluno">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                            Visualizar
+                                    <?php ob_start(); ?>
+                                        <button type="button" class="btn-visualizar-arquivo flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" data-id="<?= (int) $row['id'] ?>">
+                                            <i class="fa-solid fa-eye text-gray-400 w-4 text-center"></i> Visualizar
                                         </button>
-                                        <a href="<?= URL ?>/professor/arquivos/editar/<?= (int)$row['id'] ?>" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-primary bg-primary/10 hover:bg-primary/15 border border-primary/20">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                            Editar
+                                        <a href="<?= URL ?>/professor/arquivos/editar/<?= (int) $row['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                            <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                                         </a>
-                                        <form method="post" action="<?= URL ?>/professor/arquivos/excluir/<?= (int)$row['id'] ?>" class="inline" onsubmit="return confirm('Excluir esta publicação e todos os anexos?');">
+                                        <form method="post" action="<?= URL ?>/professor/arquivos/excluir/<?= (int) $row['id'] ?>" onsubmit="return confirm('Excluir esta publicação e todos os anexos?');">
                                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
-                                            <button type="submit" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                                Excluir
+                                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                                <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                                             </button>
                                         </form>
-                                    </div>
+                                    <?php
+                                    $row_actions_dropdown_items = ob_get_clean();
+                                    $row_actions_dropdown_id = 'row-actions-arquivo-' . (int) $row['id'];
+                                    include __DIR__ . '/../../../../Views/admin/_partials/row_actions_dropdown.php';
+                                    ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
