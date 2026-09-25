@@ -2890,6 +2890,9 @@ class BoletimConfig
         }
 
         $online = $this->db->fetchAll($sql, $execParams) ?: [];
+        if ($online !== []) {
+            $online = $this->anexarEstatisticasQuestoesNasProvas($online, [$alunoId]);
+        }
         $manual = $this->hasNotasLancadasBlocosTable()
             ? $this->fetchNotasLancadasPorBlocosAluno($alunoId, $blocoIds, $inicio, $fim, $materiaId)
             : [];

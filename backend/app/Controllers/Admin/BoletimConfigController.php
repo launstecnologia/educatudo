@@ -3572,7 +3572,10 @@ class BoletimConfigController extends BaseController
                 }
 
                 $statsPorMateria = [];
-                if (!empty($componente['usar_percentual'])) {
+                $layoutNq = $this->parseLayoutMetaFromComponente($componente);
+                $ehSemanaNq = $this->parseSemanaFromComponente($componente) > 0
+                    || strtolower((string) ($layoutNq['type'] ?? '')) === 'semana_nq';
+                if (!empty($componente['usar_percentual']) || $ehSemanaNq) {
                     foreach ($rows as $row) {
                         $midRow = isset($row['materia_id']) ? (int) ($row['materia_id'] ?? 0) : 0;
                         $totalQuestoes = (int) ($row['total_questoes'] ?? 0);

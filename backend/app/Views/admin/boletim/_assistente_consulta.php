@@ -5,12 +5,12 @@
  */
 $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
 ?>
-<div id="bw-consulta-root" class="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none px-3 pb-3"
+<div id="bw-consulta-root" class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none"
      data-url="<?= htmlspecialchars(URL . '/admin/boletim-configuracao/assistente/consulta', ENT_QUOTES, 'UTF-8') ?>"
      data-csrf="<?= htmlspecialchars((string) ($csrfToken ?? ''), ENT_QUOTES, 'UTF-8') ?>"
      data-disponivel="<?= $boletimAssistenteDisponivel ? '1' : '0' ?>">
-    <div class="pointer-events-auto w-full max-w-3xl">
-        <div id="bw-consulta-panel" class="hidden mb-2 h-[min(70vh,32rem)] bg-white border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden">
+    <div class="pointer-events-auto flex flex-col items-end gap-3">
+        <div id="bw-consulta-panel" class="hidden w-[min(100vw-2rem,24rem)] h-[min(70vh,32rem)] bg-white border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden">
             <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-900">Assistente do evento de notas</h3>
@@ -36,12 +36,9 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                 <button type="submit" id="bw-consulta-enviar" class="self-end px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50">Enviar</button>
             </form>
         </div>
-        <div class="flex justify-center">
-            <button type="button" id="bw-consulta-toggle" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                Perguntar sobre boletim e notas
-            </button>
-        </div>
+        <button type="button" id="bw-consulta-toggle" class="inline-flex items-center justify-center w-14 h-14 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Abrir assistente" title="Perguntar sobre boletim e notas">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        </button>
     </div>
 </div>
 <script>

@@ -2362,6 +2362,20 @@ $boletimWizardSteps = [
         return html;
     }
 
+    function notaNqPreview(notas, codigo) {
+        var c = String(codigo || '');
+        var n = notas[c + '__n'];
+        var q = notas[c + '__q'];
+        if (n == null && q == null) {
+            var low = c.toLowerCase();
+            if (low !== c) {
+                n = notas[low + '__n'];
+                q = notas[low + '__q'];
+            }
+        }
+        return { n: n == null ? null : n, q: q == null ? null : q };
+    }
+
     function htmlTabelaPreview(tab) {
         if (tab && (tab.grupos || []).length) return htmlTabelaPreviewBoletim(tab);
         var semanas = tab.semanas || [];
@@ -2390,11 +2404,12 @@ $boletimWizardSteps = [
             var totQ = 0;
             html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
             semanas.forEach(function (s) {
-                var n = notas[(s.codigo || '') + '__n'];
-                var q = notas[(s.codigo || '') + '__q'];
+                var nq = notaNqPreview(notas, s.codigo);
+                var n = nq.n;
+                var q = nq.q;
                 if (n != null) totN += Number(n) || 0;
                 if (q != null) totQ += Number(q) || 0;
-                html += '<td>' + (n != null ? n : 0) + '</td><td>' + (q != null ? q : 0) + '</td>';
+                html += '<td>' + (n != null ? n : '—') + '</td><td>' + (q != null ? q : '—') + '</td>';
             });
             if (semanas.length) html += '<td><strong>' + totN + '</strong></td><td><strong>' + totQ + '</strong></td>';
             outras.forEach(function (o) {

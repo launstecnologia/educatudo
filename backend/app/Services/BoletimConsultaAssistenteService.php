@@ -63,12 +63,6 @@ class BoletimConsultaAssistenteService
             }
         }
 
-        try {
-            $this->assertCreditosDisponiveis();
-        } catch (Throwable $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-
         $mensagens = [];
         foreach (array_slice($historico, -8) as $msg) {
             $role = (string) ($msg['role'] ?? '');
@@ -114,12 +108,6 @@ class BoletimConsultaAssistenteService
         } catch (Throwable $e) {
             error_log('BoletimConsultaAssistenteService: ' . $e->getMessage());
             return ['success' => false, 'error' => 'Não deu para consultar agora. Tente de novo.'];
-        }
-
-        try {
-            $this->debitarCreditos();
-        } catch (Throwable $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
         }
 
         if ($textoFinal === null || $textoFinal === '') {
