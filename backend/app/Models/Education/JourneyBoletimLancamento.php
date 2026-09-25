@@ -193,6 +193,9 @@ class JourneyBoletimLancamento
                 $ids[] = $id;
             }
         }
+        if ($ids === [] && $anoLetivo > 0) {
+            return $this->listarIdsPorBimestre($bims, 0);
+        }
 
         return array_values(array_unique($ids));
     }
@@ -495,8 +498,12 @@ class JourneyBoletimLancamento
         if (!empty($jornadaIdsEscopo)) {
             // IDs já vieram do bimestre da regra. A data do evento não pode esvaziar esse escopo.
             $jornadas = $this->buscarJornadasPorIdsEscopoTurma($turmaIds, $jornadaIdsEscopo);
+            $jornadas = $this->unirJornadasPorId(
+                $jornadas,
+                $this->buscarJornadasComAtividadeDoAluno($alunoId, $jornadaIdsEscopo)
+            );
         } else {
-            $jornadas = $this->listarJornadasCandidatas($turmaIds, $dataIni, $dataFim);
+            $jornadas = $this->listarJornadasCandidatas($turmaIds, null, null);
         }
 
         $jornadaIds = array_values(array_filter(array_map(static function ($j) {
@@ -523,13 +530,35 @@ class JourneyBoletimLancamento
             }
         }
 
+        $idsComAtividade = [];
+        foreach ($this->buscarJornadasComAtividadeDoAluno($alunoId, $jornadaIds) as $jornadaFeita) {
+            $idFeita = (int) ($jornadaFeita['id'] ?? 0);
+            if ($idFeita > 0) {
+                $idsComAtividade[$idFeita] = true;
+                $jornadaById[$idFeita] = $jornadaFeita;
+            }
+        }
+
         $noEscopo = [];
-        foreach ($jornadaIds as $jid) {
+        foreach (array_keys($jornadaById) as $jid) {
+            $jid = (int) $jid;
             $jr = $jornadaById[$jid] ?? null;
-            if (!$jr || !self::jornadaCobreTurma($jr, $turmaId)) {
+            if (!is_array($jr)) {
                 continue;
             }
-            $noEscopo[] = $jid;
+            if (self::jornadaCobreTurma($jr, $turmaId) || isset($idsComAtividade[$jid])) {
+                $noEscopo[] = $jid;
+            }
+        }
+
+        if ($noEscopo === []) {
+            $noEscopo = $this->idsJornadasDaTurmaNoBimestre($turmaId, $jornadaIdsEscopo);
+            foreach ($this->buscarJornadasPorIdsEscopoTurma([$turmaId], $noEscopo) as $jornadaTurma) {
+                $idTurma = (int) ($jornadaTurma['id'] ?? 0);
+                if ($idTurma > 0) {
+                    $jornadaById[$idTurma] = $jornadaTurma;
+                }
+            }
         }
 
         $total = count($noEscopo);
@@ -543,6 +572,7 @@ class JourneyBoletimLancamento
                 'percentual_conclusao_escopo' => 0.0,
                 'nota_unica_valor_padrao' => null,
                 'nota_unica_substituicao_por_materia' => [],
+                'por_nome' => [],
             ];
         }
 
@@ -659,6 +689,7 @@ class JourneyBoletimLancamento
             }
         }
 
+        $porNome = $this->notasAgrupadasPeloNomeDaJornada($porMateria);
         $porMateria = $this->remapNotasParaMateriasOficiais($porMateria);
         $mids = array_keys($porMateria);
         $nomes = $this->buscarNomesMateriasPorIds($mids);
@@ -680,7 +711,158 @@ class JourneyBoletimLancamento
             'percentual_conclusao_escopo' => $pctConclusaoEscopo,
             'nota_unica_valor_padrao' => $notaUnicaValorPadrao,
             'nota_unica_substituicao_por_materia' => $substituicaoPorMateria,
+            'por_nome' => $porNome,
         ];
+    }
+
+    /**
+     * Mesma lista que o assistente usa: jornadas da turma naquele bimestre, sem cortar pela data do evento.
+     *
+     * @param list<int> $jornadaIdsEscopo
+     * @return list<int>
+     */
+    private function idsJornadasDaTurmaNoBimestre(int $turmaId, array $jornadaIdsEscopo): array
+    {
+        if ($turmaId <= 0) {
+            return [];
+        }
+        $bimestres = [];
+        foreach ($this->buscarJornadasPorIdsEscopoTurma([$turmaId], $jornadaIdsEscopo) as $jornada) {
+            $bim = (int) ($jornada['bimestre'] ?? 0);
+            if ($bim >= 1 && $bim <= 4) {
+                $bimestres[$bim] = true;
+            }
+        }
+        if ($bimestres === [] && $jornadaIdsEscopo !== []) {
+            $bimestres = $this->bimestresDosIds($jornadaIdsEscopo);
+        }
+        $ids = [];
+        foreach ($this->listarJornadasCandidatas([$turmaId], null, null) as $jornada) {
+            $id = (int) ($jornada['id'] ?? 0);
+            $bim = (int) ($jornada['bimestre'] ?? 0);
+            if ($id <= 0 || !self::jornadaCobreTurma($jornada, $turmaId)) {
+                continue;
+            }
+            if ($bimestres !== [] && !isset($bimestres[$bim])) {
+                continue;
+            }
+            $ids[] = $id;
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param list<int> $jornadaIds
+     * @return array<int,true>
+     */
+    private function bimestresDosIds(array $jornadaIds): array
+    {
+        $jornadaIds = array_values(array_unique(array_filter(array_map('intval', $jornadaIds))));
+        if ($jornadaIds === [] || !$this->db->tableExists('jornadas')) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($jornadaIds), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT bimestre FROM jornadas WHERE id IN ($ph) AND bimestre BETWEEN 1 AND 4",
+            $jornadaIds
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $bim = (int) ($row['bimestre'] ?? 0);
+            if ($bim >= 1 && $bim <= 4) {
+                $out[$bim] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Jornadas que o aluno fez, mesmo quando a turma gravada na jornada não é a turma atual.
+     *
+     * @param list<int> $jornadaIds
+     * @return list<array<string,mixed>>
+     */
+    private function buscarJornadasComAtividadeDoAluno(int $alunoId, array $jornadaIds): array
+    {
+        $jornadaIds = array_values(array_unique(array_filter(array_map('intval', $jornadaIds))));
+        if ($alunoId <= 0 || $jornadaIds === [] || !$this->db->tableExists('jornadas_progresso_alunos')) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($jornadaIds), '?'));
+        $materiaSql = $this->sqlJornadasMateriaIdSelect();
+        $params = array_merge($jornadaIds, [$alunoId]);
+
+        return $this->db->fetchAll(
+            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id
+             FROM jornadas j
+             WHERE (j.ativo = 1 OR j.ativo IS NULL)
+               AND j.id IN ($ph)
+               AND EXISTS (
+                    SELECT 1 FROM jornadas_progresso_alunos p
+                    WHERE p.jornada_id = j.id AND p.aluno_id = ?
+               )",
+            $params
+        ) ?: [];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $base
+     * @param list<array<string,mixed>> $extras
+     * @return list<array<string,mixed>>
+     */
+    private function unirJornadasPorId(array $base, array $extras): array
+    {
+        $porId = [];
+        foreach (array_merge($base, $extras) as $jornada) {
+            if (!is_array($jornada)) {
+                continue;
+            }
+            $id = (int) ($jornada['id'] ?? 0);
+            if ($id > 0) {
+                $porId[$id] = $jornada;
+            }
+        }
+
+        return array_values($porId);
+    }
+
+    /**
+     * @param array<int,float> $porMateria
+     * @return list<array{nome:string,valor:float}>
+     */
+    private function notasAgrupadasPeloNomeDaJornada(array $porMateria): array
+    {
+        if ($porMateria === []) {
+            return [];
+        }
+        $nomes = $this->buscarNomesJornadasMateriasPorIds(array_map('intval', array_keys($porMateria)));
+        $oficiais = $this->buscarNomesMateriasPorIds(array_map('intval', array_keys($porMateria)));
+        $grupos = [];
+        foreach ($porMateria as $mid => $valor) {
+            if (!is_numeric($valor)) {
+                continue;
+            }
+            $mid = (int) $mid;
+            $nome = trim((string) ($nomes[$mid] ?? ''));
+            if ($nome === '') {
+                $nome = trim((string) ($oficiais[$mid] ?? ''));
+            }
+            if ($nome === '') {
+                continue;
+            }
+            $grupos[$nome][] = (float) $valor;
+        }
+        $out = [];
+        foreach ($grupos as $nome => $valores) {
+            $out[] = [
+                'nome' => (string) $nome,
+                'valor' => round(array_sum($valores) / count($valores), 2),
+            ];
+        }
+
+        return $out;
     }
 
     /**

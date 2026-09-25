@@ -3014,6 +3014,10 @@ class BoletimConfigController extends BaseController
         $matrizPercentStatsPorCodigo = [];
         /** @var array<int, string> */
         $materiaNomesPorId = [];
+        /** @var array<string, list<array{nome:string,valor:float}>> */
+        $notasJornadaPorNome = [];
+        /** @var array<string, float> */
+        $notaGeralJornada = [];
         // Quando algum componente puxa de outro evento via source_type='evento_boletim',
         // herdamos os agrupamentos por linha (group_line) da regra de origem.
         // - $materiasAgrupadasHerdadas: mids de matérias-filhas que devem ficar OCULTAS no destino
@@ -3160,6 +3164,27 @@ class BoletimConfigController extends BaseController
                         $detalhes['nota_unica_substituicao_por_materia'] = (array) ($resJ['nota_unica_substituicao_por_materia'] ?? []);
                     }
                     $detalhes['jornadas_materias_distintas'] = count($resJ['por_materia'] ?? []);
+                    if ($totJ > 0) {
+                        $notaGeralJornada[$codigo] = JourneyBoletimLancamento::notaFromPercentualConclusao(
+                            (float) ($resJ['percentual_conclusao_escopo'] ?? 0),
+                            $escalaJ,
+                            $linearJ,
+                            is_array($cfg['faixas_percentuais'] ?? null) ? $cfg['faixas_percentuais'] : []
+                        );
+                    }
+                    foreach ((array) ($resJ['por_nome'] ?? []) as $itemNome) {
+                        if (!is_array($itemNome)) {
+                            continue;
+                        }
+                        $nomeJornada = trim((string) ($itemNome['nome'] ?? ''));
+                        if ($nomeJornada === '' || !is_numeric($itemNome['valor'] ?? null)) {
+                            continue;
+                        }
+                        $notasJornadaPorNome[$codigo][] = [
+                            'nome' => $nomeJornada,
+                            'valor' => (float) $itemNome['valor'],
+                        ];
+                    }
                     if ($totJ <= 0) {
                         $detalhes['aviso_jornadas'] = 'Nenhuma jornada do escopo aplica-se à turma deste aluno (verifique turmas na jornada).';
                     } else {
@@ -3944,6 +3969,7 @@ class BoletimConfigController extends BaseController
         $final = $this->calcularNotaFinal($regra, $componentesResultado, $valoresPorCodigo, $faltantesObrigatorios);
 
         $aluno = $this->buscarAluno($alunoId);
+        $this->espalharNotasJornadaPeloNome($matrizPorCodigo, $notasJornadaPorNome, $materiaNomesPorId, $notaGeralJornada);
         $matrizMaterias = $this->montarMatrizMateriasSimulacao(
             $regra,
             $componentes,
@@ -4191,6 +4217,74 @@ class BoletimConfigController extends BaseController
         }
 
         return null;
+    }
+
+    /**
+     * A jornada guarda outro id de matéria. A nota entra na linha do quadro com o mesmo nome.
+     *
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     * @param array<string, list<array{nome:string,valor:float}>> $notasJornadaPorNome
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<string, float> $notaGeralPorCodigo
+     */
+    private function espalharNotasJornadaPeloNome(
+        array &$matrizPorCodigo,
+        array $notasJornadaPorNome,
+        array $materiaNomesPorId,
+        array $notaGeralPorCodigo = []
+    ): void {
+        if ($materiaNomesPorId === []) {
+            return;
+        }
+        $codigos = array_unique(array_merge(array_keys($notasJornadaPorNome), array_keys($notaGeralPorCodigo)));
+        foreach ($codigos as $codigo) {
+            $itens = $notasJornadaPorNome[$codigo] ?? [];
+            if ($codigo === '' || ($itens === [] && !isset($notaGeralPorCodigo[$codigo]))) {
+                continue;
+            }
+            $porChave = [];
+            foreach ($itens as $item) {
+                $chave = $this->canonicalMateriaNomeKey((string) ($item['nome'] ?? ''));
+                if ($chave === '' || !is_numeric($item['valor'] ?? null)) {
+                    continue;
+                }
+                $porChave[$chave][] = (float) $item['valor'];
+            }
+            if (!isset($matrizPorCodigo[$codigo]) || !is_array($matrizPorCodigo[$codigo])) {
+                $matrizPorCodigo[$codigo] = [];
+            }
+            $preencheu = false;
+            foreach ($materiaNomesPorId as $mid => $nome) {
+                $mid = (int) $mid;
+                if ($mid === 0) {
+                    continue;
+                }
+                if (isset($matrizPorCodigo[$codigo][$mid]) && is_numeric($matrizPorCodigo[$codigo][$mid])) {
+                    $preencheu = true;
+                    continue;
+                }
+                $chave = $this->canonicalMateriaNomeKey((string) $nome);
+                if ($chave === '' || empty($porChave[$chave])) {
+                    continue;
+                }
+                $valores = $porChave[$chave];
+                $matrizPorCodigo[$codigo][$mid] = round(array_sum($valores) / count($valores), 2);
+                $preencheu = true;
+            }
+            if ($preencheu || !isset($notaGeralPorCodigo[$codigo]) || !is_numeric($notaGeralPorCodigo[$codigo])) {
+                continue;
+            }
+            foreach ($materiaNomesPorId as $mid => $nome) {
+                $mid = (int) $mid;
+                if ($mid === 0) {
+                    continue;
+                }
+                if (isset($matrizPorCodigo[$codigo][$mid]) && is_numeric($matrizPorCodigo[$codigo][$mid])) {
+                    continue;
+                }
+                $matrizPorCodigo[$codigo][$mid] = (float) $notaGeralPorCodigo[$codigo];
+            }
+        }
     }
 
     private function canonicalMateriaNomeKey(string $nome): string
