@@ -814,7 +814,7 @@ $boletimWizardSteps = [
         }
         if (tipoId > 0 && tipoEv === tipoId) return true;
         if (tipoEv > 0 && tiposIdsDoPapel(papel).indexOf(tipoEv) >= 0) return true;
-        var blob = (String(ev.tipo_avaliacao_nome || '') + ' ' + String(ev.titulo || '') + ' ' + String(ev.chave_quadro || '')).toLowerCase();
+        var blob = (String(ev.tipo_avaliacao_nome || '') + ' ' + String(ev.chave_quadro || '')).toLowerCase();
         if (papel === 'bimestral' && blob.indexOf('bimestral') >= 0) return true;
         if (papel === 'enac' && blob.indexOf('enac') >= 0) return true;
         var ch = String(ev.chave_quadro || '').toLowerCase();
