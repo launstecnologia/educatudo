@@ -641,7 +641,18 @@ class BoletimAssistenteFerramentas
             return ['tipo' => null, 'blocos_ids' => [], 'eventos' => []];
         }
 
-        $eventos = $this->listarEventosProva((int) $tipo['id'], max($limit, 4000));
+        $eventos = [];
+        $vistos = [];
+        foreach ($this->idsTiposDaMesmaPeca($tipo) as $tipoId) {
+            foreach ($this->listarEventosProva($tipoId, max($limit, 4000)) as $ev) {
+                $idEv = (int) ($ev['id'] ?? 0);
+                if ($idEv <= 0 || isset($vistos[$idEv])) {
+                    continue;
+                }
+                $vistos[$idEv] = true;
+                $eventos[] = $ev;
+            }
+        }
         $ini = $this->normalizarData($dataInicio);
         $fim = $this->normalizarData($dataFim);
         if ($ini !== null && $fim !== null) {
@@ -686,6 +697,49 @@ class BoletimAssistenteFerramentas
             'blocos_ids' => array_values(array_unique(array_filter($ids))),
             'eventos' => $eventos,
         ];
+    }
+
+    /**
+     * Tipos com o mesmo papel (semanal, bimestral, ENAC), não só o id da peça.
+     *
+     * @param array{id:int,nome:string} $tipo
+     * @return list<int>
+     */
+    private function idsTiposDaMesmaPeca(array $tipo): array
+    {
+        $papel = $this->papelDoTipo($tipo['nome'] ?? '', null);
+        $ids = [(int) $tipo['id']];
+        if ($papel === '') {
+            return $ids;
+        }
+        foreach ($this->listarTiposAvaliacao() as $t) {
+            $id = (int) ($t['id'] ?? 0);
+            if ($id <= 0 || in_array($id, $ids, true)) {
+                continue;
+            }
+            if ($this->papelDoTipo((string) ($t['nome'] ?? ''), $t['chave_quadro'] ?? null) === $papel) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function papelDoTipo(string $nome, $chave): string
+    {
+        $ch = strtolower(trim((string) $chave));
+        $txt = mb_strtolower(trim($nome));
+        if ($ch === 'bimestral' || $ch === 'prova_bim' || str_contains($txt, 'bimestral')) {
+            return 'bimestral';
+        }
+        if ($ch === 'semanal' || str_contains($txt, 'semanal')) {
+            return 'semanal';
+        }
+        if ($ch === 'enac' || str_contains($txt, 'enac')) {
+            return 'enac';
+        }
+
+        return '';
     }
 
     /**

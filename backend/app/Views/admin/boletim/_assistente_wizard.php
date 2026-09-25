@@ -781,25 +781,67 @@ $boletimWizardSteps = [
         return (new Date()).getFullYear();
     }
 
+    function papelDaPeca(key) {
+        var meta = pecaMeta(key);
+        var nome = meta ? String(meta.label || '').toLowerCase() : '';
+        var ch = meta && meta.chave_quadro ? String(meta.chave_quadro).toLowerCase() : String(key || '');
+        if (ch === 'bimestral' || ch === 'prova_bim' || nome.indexOf('bimestral') >= 0 || key === 'bimestral') return 'bimestral';
+        if (ch === 'semanal' || nome.indexOf('semanal') >= 0 || key === 'semanal') return 'semanal';
+        if (ch === 'enac' || nome.indexOf('enac') >= 0 || key === 'enac') return 'enac';
+        return String(key || '');
+    }
+
+    function tiposIdsDoPapel(papel) {
+        var ids = [];
+        (catalogo.tipos_avaliacao || []).forEach(function (t) {
+            var nome = String(t.nome || '').toLowerCase();
+            var ch = String(t.chave_quadro || '').toLowerCase();
+            var ok = false;
+            if (papel === 'bimestral') ok = ch === 'bimestral' || ch === 'prova_bim' || nome.indexOf('bimestral') >= 0;
+            else if (papel === 'semanal') ok = ch === 'semanal' || nome.indexOf('semanal') >= 0;
+            else if (papel === 'enac') ok = ch === 'enac' || nome.indexOf('enac') >= 0;
+            if (ok) ids.push(Number(t.id));
+        });
+        return ids;
+    }
+
+    function eventoCasaPeca(ev, key, tipoId) {
+        var papel = papelDaPeca(key);
+        var tipoEv = Number(ev.tipo_avaliacao_id || 0);
+        if (papel === 'semanal') {
+            if (tipoId > 0 && tipoEv === tipoId) return true;
+            return tipoEv > 0 && tiposIdsDoPapel('semanal').indexOf(tipoEv) >= 0;
+        }
+        if (tipoId > 0 && tipoEv === tipoId) return true;
+        if (tipoEv > 0 && tiposIdsDoPapel(papel).indexOf(tipoEv) >= 0) return true;
+        var blob = (String(ev.tipo_avaliacao_nome || '') + ' ' + String(ev.titulo || '') + ' ' + String(ev.chave_quadro || '')).toLowerCase();
+        if (papel === 'bimestral' && blob.indexOf('bimestral') >= 0) return true;
+        if (papel === 'enac' && blob.indexOf('enac') >= 0) return true;
+        var ch = String(ev.chave_quadro || '').toLowerCase();
+        return ch !== '' && ch === papel;
+    }
+
     function eventosDaPecaFiltrados(key, bim, exigirAno) {
         var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
         var tipoId = Number(opts.tipo_avaliacao_id || 0);
         var meta = pecaMeta(key);
         if (!tipoId && meta) tipoId = Number(meta.tipo_avaliacao_id || 0);
-        var chave = meta && meta.chave_quadro ? String(meta.chave_quadro).toLowerCase() : String(key || '');
         var ano = Number((estado && estado.ano_letivo) || 0);
+        var papel = papelDaPeca(key);
+        var bimsMarcados = normalizarBimestresPeca(opts.bimestres);
+        if (!bimsMarcados.length && estado.bimestre >= 1 && estado.bimestre <= 4) bimsMarcados = [Number(estado.bimestre)];
+        var bimSemCampo = bimsMarcados.length ? Number(bimsMarcados[0]) : Number(bim);
         return (catalogo.eventos_prova || []).filter(function (ev) {
-            if (Number(ev.bimestre) !== Number(bim)) return false;
+            var bimEv = Number(ev.bimestre) || 0;
+            if (papel === 'semanal') {
+                if (bimEv !== Number(bim)) return false;
+            } else {
+                if (bimEv > 0 && bimEv !== Number(bim)) return false;
+                if (bimEv <= 0 && Number(bim) !== bimSemCampo) return false;
+            }
             var ea = Number(ev.ano_letivo || 0);
             if (exigirAno && ano > 0 && ea > 0 && ea !== ano) return false;
-            if (tipoId > 0) return Number(ev.tipo_avaliacao_id) === tipoId;
-            var ch = String(ev.chave_quadro || '').toLowerCase();
-            if (ch) {
-                if (ch === chave) return true;
-                if (chave === 'bimestral' && (ch === 'prova_bim' || ch === 'bimestral')) return true;
-            }
-            var nome = String(ev.tipo_avaliacao_nome || ev.titulo || '').toLowerCase();
-            return chave !== '' && nome.indexOf(chave) >= 0;
+            return eventoCasaPeca(ev, key, tipoId);
         });
     }
 
