@@ -139,7 +139,11 @@ if ($filtro_creditos_ordem !== 'nome') {
                 ?>
                 <tr class="hover:bg-slate-50">
                     <td class="px-6 py-4 text-sm text-slate-700">
+                        <?php if ($creditosDisponiveis): ?>
+                        <a href="<?= $baseUrl ?>/extrato?escola_id=<?= $escolaId ?>&amp;aluno_id=<?= $alunoId ?>&amp;mes=<?= date('Y-m') ?>" class="block font-medium text-slate-900 hover:text-blue-700 hover:underline"><?= htmlspecialchars((string) ($aluno['aluno_nome'] ?? '')) ?></a>
+                        <?php else: ?>
                         <span class="block font-medium text-slate-900"><?= htmlspecialchars((string) ($aluno['aluno_nome'] ?? '')) ?></span>
+                        <?php endif; ?>
                         <?php if (!empty($aluno['email'])): ?>
                         <span class="block text-xs text-slate-500 mt-0.5"><?= htmlspecialchars((string) $aluno['email']) ?></span>
                         <?php endif; ?>
@@ -158,6 +162,10 @@ if ($filtro_creditos_ordem !== 'nome') {
                     </td>
                     <td class="px-6 py-4 text-right whitespace-nowrap">
                         <?php if ($creditosDisponiveis): ?>
+                        <a href="<?= $baseUrl ?>/extrato?escola_id=<?= $escolaId ?>&amp;aluno_id=<?= $alunoId ?>&amp;mes=<?= date('Y-m') ?>"
+                           class="inline-flex items-center justify-center gap-2 px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors mr-2">
+                            <i class="fa-solid fa-receipt text-xs"></i> Extrato
+                        </a>
                         <button type="button"
                                 class="inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                                 data-abrir-tudicoins-aluno

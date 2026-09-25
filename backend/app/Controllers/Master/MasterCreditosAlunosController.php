@@ -167,6 +167,211 @@ class MasterCreditosAlunosController extends BaseController
         exit;
     }
 
+    public function extrato()
+    {
+        $dados = $this->carregarExtratoAluno();
+        if ($dados === null) {
+            return;
+        }
+        $this->viewWithLayout('master', 'master/creditos/aluno-extrato', $dados + [
+            'title' => 'Extrato do aluno - EducaTudo',
+            'page_title' => 'Extrato do aluno',
+            'current_page' => 'creditos_alunos',
+            'master_nome' => $_SESSION['master_user_nome'] ?? 'Admin',
+        ]);
+    }
+
+    public function extratoPdf()
+    {
+        $dados = $this->carregarExtratoAluno();
+        if ($dados === null) {
+            return;
+        }
+        $aluno = $dados['aluno'];
+        $nomeArquivo = 'extrato-' . preg_replace('/[^a-z0-9]+/i', '-', (string) ($aluno['nome'] ?? 'aluno')) . '-' . $dados['mes'];
+        $html = $this->htmlExtratoPdf($dados);
+
+        $oldDisplayErrors = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        try {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . $nomeArquivo . '.pdf"');
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            echo $dompdf->output();
+            exit;
+        } finally {
+            ini_set('display_errors', (string) $oldDisplayErrors);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function carregarExtratoAluno(): ?array
+    {
+        $this->requireMaster();
+        require_once __DIR__ . '/../../Core/MasterTenantConnection.php';
+        require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
+        require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
+
+        $escolaId = (int) ($_GET['escola_id'] ?? 0);
+        $alunoId = (int) ($_GET['aluno_id'] ?? 0);
+        $mes = trim((string) ($_GET['mes'] ?? date('Y-m')));
+        if (!preg_match('/^\d{4}-\d{2}$/', $mes)) {
+            $mes = date('Y-m');
+        }
+        if ($escolaId < 1 || $alunoId < 1) {
+            $this->setFlashMessage('Aluno inválido para o extrato.', 'error');
+            header('Location: ' . URL . '/master/creditos/alunos');
+            exit;
+        }
+
+        $conn = MasterTenantConnection::getPdoAndEscola($escolaId);
+        if (!$conn || empty($conn['pdo'])) {
+            $this->setFlashMessage('Não foi possível abrir o banco da escola.', 'error');
+            header('Location: ' . URL . '/master/creditos/alunos');
+            exit;
+        }
+        $pdo = $conn['pdo'];
+        $stmtAluno = $pdo->prepare(
+            "SELECT a.id, a.nome, a.email, a.ra, t.nome AS turma_nome
+             FROM alunos a
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE a.id = ?
+             LIMIT 1"
+        );
+        $stmtAluno->execute([$alunoId]);
+        $aluno = $stmtAluno->fetch(PDO::FETCH_ASSOC);
+        if (!$aluno) {
+            $this->setFlashMessage('Aluno não encontrado nesta escola.', 'error');
+            header('Location: ' . URL . '/master/creditos/alunos');
+            exit;
+        }
+
+        $inicio = $mes . '-01 00:00:00';
+        $fim = date('Y-m-d H:i:s', strtotime($mes . '-01 +1 month'));
+        try {
+            $observacaoCol = (bool) $pdo->query("SHOW COLUMNS FROM carteira_movimentacoes LIKE 'observacao'")->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            $this->setFlashMessage('Esta escola ainda não tem extrato de TudiCoins.', 'error');
+            header('Location: ' . URL . '/master/creditos/alunos');
+            exit;
+        }
+        $sql = "SELECT id, tipo, valor, modulo_key, referencia_id, created_at";
+        $sql .= $observacaoCol ? ", observacao" : ", NULL AS observacao";
+        $sql .= " FROM carteira_movimentacoes
+                  WHERE user_type = 'aluno' AND user_id = :uid
+                    AND created_at >= :ini AND created_at < :fim
+                  ORDER BY created_at ASC, id ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['uid' => $alunoId, 'ini' => $inicio, 'fim' => $fim]);
+        $movimentacoes = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $entradas = 0.0;
+        $saidas = 0.0;
+        foreach ($movimentacoes as &$mov) {
+            $valor = CreditosDecimalHelper::fromSignedScalar($mov['valor'] ?? 0, 0.0);
+            $mov['valor'] = $valor;
+            $mov['exibicao'] = \CreditosModuleRegistry::formatMovimentacaoExibicao($mov);
+            if ($valor >= 0) {
+                $entradas += $valor;
+            } else {
+                $saidas += abs($valor);
+            }
+        }
+        unset($mov);
+
+        $stmtSaldo = $pdo->prepare(
+            "SELECT saldo FROM carteira_usuarios WHERE user_type = 'aluno' AND user_id = ? LIMIT 1"
+        );
+        $stmtSaldo->execute([$alunoId]);
+        $saldo = CreditosDecimalHelper::fromSignedScalar($stmtSaldo->fetchColumn(), 0.0);
+        $escola = $conn['escola'] ?? [];
+
+        return [
+            'aluno' => $aluno,
+            'escola' => $escola,
+            'escola_id' => $escolaId,
+            'aluno_id' => $alunoId,
+            'mes' => $mes,
+            'mes_label' => $this->rotuloMes($mes),
+            'movimentacoes' => $movimentacoes,
+            'entradas' => round($entradas, 4),
+            'saidas' => round($saidas, 4),
+            'saldo' => $saldo,
+        ];
+    }
+
+    private function rotuloMes(string $mes): string
+    {
+        $nomes = [
+            '01' => 'janeiro', '02' => 'fevereiro', '03' => 'março', '04' => 'abril',
+            '05' => 'maio', '06' => 'junho', '07' => 'julho', '08' => 'agosto',
+            '09' => 'setembro', '10' => 'outubro', '11' => 'novembro', '12' => 'dezembro',
+        ];
+        $partes = explode('-', $mes);
+        $nome = $nomes[$partes[1] ?? ''] ?? $mes;
+
+        return $nome . ' de ' . ($partes[0] ?? '');
+    }
+
+    /**
+     * @param array<string, mixed> $dados
+     */
+    private function htmlExtratoPdf(array $dados): string
+    {
+        $aluno = $dados['aluno'];
+        $escola = $dados['escola'];
+        $h = static function ($value): string {
+            return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+        };
+        $linhas = '';
+        foreach ($dados['movimentacoes'] as $mov) {
+            $valor = (float) ($mov['valor'] ?? 0);
+            $linhas .= '<tr>'
+                . '<td>' . $h(date('d/m/Y H:i', strtotime((string) ($mov['created_at'] ?? 'now')))) . '</td>'
+                . '<td>' . $h($mov['tipo'] ?? '') . '</td>'
+                . '<td>' . $h($mov['exibicao']['label'] ?? '') . '</td>'
+                . '<td style="text-align:right;">' . $h(CreditosDecimalHelper::formatDisplay($valor)) . '</td>'
+                . '</tr>';
+        }
+        if ($linhas === '') {
+            $linhas = '<tr><td colspan="4">Nenhuma movimentação neste mês.</td></tr>';
+        }
+
+        return '<html><head><meta charset="UTF-8"><style>
+            body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #111; }
+            h1 { font-size: 18px; margin: 0 0 4px; }
+            p { margin: 0 0 4px; color: #444; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+            th { background: #f3f4f6; }
+            .totais { margin-top: 12px; }
+        </style></head><body>'
+            . '<h1>Extrato de TudiCoins</h1>'
+            . '<p><strong>' . $h($aluno['nome'] ?? '') . '</strong>'
+            . (!empty($aluno['ra']) ? ' · RA ' . $h($aluno['ra']) : '')
+            . '</p>'
+            . '<p>' . $h($escola['nome'] ?? '') . (!empty($aluno['turma_nome']) ? ' · ' . $h($aluno['turma_nome']) : '') . '</p>'
+            . '<p>Período: ' . $h($dados['mes_label']) . '</p>'
+            . '<p class="totais">Entradas: ' . $h(CreditosDecimalHelper::formatDisplay((float) $dados['entradas']))
+            . ' · Saídas: ' . $h(CreditosDecimalHelper::formatDisplay((float) $dados['saidas']))
+            . ' · Saldo atual: ' . $h(CreditosDecimalHelper::formatDisplay((float) $dados['saldo'])) . '</p>'
+            . '<table><thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead><tbody>'
+            . $linhas
+            . '</tbody></table></body></html>';
+    }
+
     private function requireMaster(): void
     {
         if (!empty($_SESSION['master_user_id']) || !empty($_SESSION['master_user_email']) || !empty($_SESSION['master_user_nome'])) {

@@ -54,6 +54,8 @@ $router->get('/master/mensalidade', 'Master/MasterMensalidadeController@index');
 $router->get('/master/mensalidade/escola/{id}', 'Master/MasterMensalidadeController@escola');
 $router->post('/master/mensalidade/salvar', 'Master/MasterMensalidadeController@salvar');
 $router->get('/master/creditos/alunos', 'Master/MasterCreditosAlunosController@index');
+$router->get('/master/creditos/alunos/extrato', 'Master/MasterCreditosAlunosController@extrato');
+$router->get('/master/creditos/alunos/extrato/pdf', 'Master/MasterCreditosAlunosController@extratoPdf');
 $router->post('/master/creditos/alunos/creditar', 'Master/MasterCreditosAlunosController@creditar');
 $router->get('/master/creditos/extrato', 'Master/MasterCreditosExtratoController@index');
 $router->get('/master/llm-custos', 'Master/MasterLlmCustosController@index');
