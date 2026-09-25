@@ -658,8 +658,10 @@ class GrupoRegrasNotasService
             return ['ok' => false, 'error' => 'Este bloco não tem coluna de semana no quadro. Gere S1…SN e intercale A/B.', 'marca_id' => null, 'semana' => null, 'nome' => null, 'dica' => null];
         }
         $dataIso = $this->dataIso($dataProva);
+        $indice = 0;
         if ($dataIso !== '') {
-            $irma = $this->model->marcaIdDaMesmaSemanaLetiva(
+            $turmasDaConta = $turmaIds;
+            foreach ($this->model->turmasIdsDaMesmaSemanaLetiva(
                 $grupoId,
                 $tipoId,
                 $ano,
@@ -667,27 +669,9 @@ class GrupoRegrasNotasService
                 $dataIso,
                 $excetoBlocoId,
                 $turmaIds
-            );
-            if ($irma > 0) {
-                foreach ($candidatas as $m) {
-                    if ((int) ($m['id'] ?? 0) !== $irma) {
-                        continue;
-                    }
-                    $semana = (int) ($m['numero'] ?? 0);
-                    $nome = trim((string) ($m['nome'] ?? ('S' . $semana)));
-                    $nomeBloco = trim((string) ($tipo['nome'] ?? 'Bloco'));
-                    return [
-                        'ok' => true,
-                        'marca_id' => $irma,
-                        'semana' => $semana,
-                        'nome' => $nome,
-                        'dica' => $nome . ' · ' . $nomeBloco . ' · mesma semana de outra turma neste bloco',
-                    ];
-                }
+            ) as $turmaIrma) {
+                $turmasDaConta[] = $turmaIrma;
             }
-        }
-        $indice = 0;
-        if ($dataIso !== '') {
             $indice = $this->model->contarSemanasAnterioresDoBloco(
                 $grupoId,
                 $tipoId,
@@ -695,7 +679,7 @@ class GrupoRegrasNotasService
                 $bimestre,
                 $dataIso,
                 $excetoBlocoId,
-                $turmaIds
+                $turmasDaConta
             );
         } else {
             $usadas = $this->model->marcasIdsUsadasNoPeriodo($grupoId, $tipoId, $ano, $bimestre, $excetoBlocoId, $turmaIds);

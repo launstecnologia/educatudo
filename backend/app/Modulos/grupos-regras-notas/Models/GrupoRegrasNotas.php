@@ -512,6 +512,99 @@ class GrupoRegrasNotas
     }
 
     /**
+     * Turmas dos outros eventos deste bloco na mesma semana civil.
+     *
+     * @param list<int> $turmaIds
+     * @return list<int>
+     */
+    public function turmasIdsDaMesmaSemanaLetiva(
+        int $grupoId,
+        int $tipoId,
+        int $ano,
+        int $bimestre,
+        string $dataProva,
+        int $excetoBlocoId = 0,
+        array $turmaIds = []
+    ): array {
+        if ($grupoId <= 0 || $tipoId <= 0 || $ano <= 0 || $bimestre <= 0) {
+            return [];
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataProva)) {
+            return [];
+        }
+        if (!$this->provasBlocosTemColuna('grupo_regras_notas_id')
+            || !$this->provasBlocosTemColuna('grupo_regras_tipo_id')
+            || !$this->provasBlocosTemColuna('ano_letivo')
+            || !$this->provasBlocosTemColuna('bimestre')
+        ) {
+            return [];
+        }
+        $sql = 'SELECT pb.id
+                FROM provas_blocos pb
+                WHERE pb.deleted_at IS NULL
+                  AND pb.grupo_regras_notas_id = :g
+                  AND pb.grupo_regras_tipo_id = :t
+                  AND pb.ano_letivo = :ano
+                  AND pb.bimestre = :bim
+                  AND pb.data_prova IS NOT NULL
+                  AND YEARWEEK(pb.data_prova, 3) = YEARWEEK(:data, 3)';
+        $params = ['g' => $grupoId, 't' => $tipoId, 'ano' => $ano, 'bim' => $bimestre, 'data' => $dataProva];
+        if ($excetoBlocoId > 0) {
+            $sql .= ' AND pb.id <> :ex';
+            $params['ex'] = $excetoBlocoId;
+        }
+        $turmaIds = $this->idsPositivos($turmaIds);
+        if ($turmaIds !== []) {
+            $cruzam = $this->sqlBlocoCruzaTurmas('pb', $turmaIds);
+            $sql .= str_replace(' AND EXISTS', ' AND NOT EXISTS', $cruzam['sql']);
+            $params = array_merge($params, $cruzam['params']);
+        }
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $blocoId = (int) ($row['id'] ?? 0);
+            if ($blocoId <= 0) {
+                continue;
+            }
+            foreach ($this->turmasIdsDoBloco($blocoId) as $turmaId) {
+                $out[$turmaId] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($out));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function turmasIdsDoBloco(int $blocoId): array
+    {
+        if ($blocoId <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT turma_id FROM provas_blocos_turmas WHERE bloco_id = :id
+             UNION
+             SELECT turma_id FROM provas_blocos WHERE id = :id_b AND turma_id IS NOT NULL AND turma_id > 0
+             UNION
+             SELECT pbpt.turma_id
+               FROM provas_blocos_professores pbp
+               INNER JOIN provas_blocos_professores_turmas pbpt ON pbpt.bloco_professor_id = pbp.id
+              WHERE pbp.bloco_id = :id_p',
+            ['id' => $blocoId, 'id_b' => $blocoId, 'id_p' => $blocoId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['turma_id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($out));
+    }
+
+    /**
      * @param list<int> $turmaIds
      * @return array{sql:string,params:array<string,int>}
      */
