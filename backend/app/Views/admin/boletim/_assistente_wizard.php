@@ -235,6 +235,7 @@ $boletimWizardSteps = [
     var iniciado = false;
     var montarTimer = null;
     var montarSeq = 0;
+    var formulaVersao = 0;
     var filaChat = [];
     var statusFilaEl = null;
     var formulaDrag = null;
@@ -1435,6 +1436,7 @@ $boletimWizardSteps = [
     }
 
     function afterFormulaChange() {
+        formulaVersao++;
         marcarEdicaoManual();
         estado.formula_tokens = envolverSomaAntesDeDivisao(estado.formula_tokens || []);
         if (estado.bloco_calc) {
@@ -1765,6 +1767,7 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
         if (nome) estado.nomes_blocos[estado.bloco_calc] = nome;
         var codigoSalvo = estado.bloco_calc;
+        formulaVersao++;
         gravarTokensBlocoAberto();
         marcarEdicaoManual();
         previewAtual = null;
@@ -3804,9 +3807,12 @@ $boletimWizardSteps = [
         garantirEstado();
         aplicarMateriaUnicaNasPecas();
         if (estado.bloco_calc) gravarTokensBlocoAberto();
+        var versaoEnvio = formulaVersao;
         var formulaLocal = JSON.parse(JSON.stringify(estado.formulas_blocos || {}));
+        var excecoesLocal = JSON.parse(JSON.stringify(estado.formulas_materias_blocos || {}));
         var tokensLocal = (estado.formula_tokens || []).slice();
         var blocoLocal = estado.bloco_calc || '';
+        var materiaLocal = Number(estado.materia_calc || 0);
         var fd = new FormData();
         fd.append('_token', csrf);
         fd.append('wizard_estado', JSON.stringify(estado));
@@ -3827,13 +3833,26 @@ $boletimWizardSteps = [
             if (Number((estado && estado.aluno_preview_id) || 0) !== alunoPedido) return j;
             if (j.estado) {
                 var remoto = j.estado;
+                if (versaoEnvio !== formulaVersao) {
+                    remoto.formulas_blocos = estado.formulas_blocos || {};
+                    remoto.formulas_materias_blocos = estado.formulas_materias_blocos || {};
+                    remoto.formula_tokens = (estado.formula_tokens || []).slice();
+                    remoto.bloco_calc = estado.bloco_calc || '';
+                    remoto.materia_calc = Number(estado.materia_calc || 0);
+                } else {
                 remoto.formulas_blocos = fundirFormulasLocais(formulaLocal, remoto.formulas_blocos);
-                if (blocoLocal && Array.isArray(tokensLocal) && tokensLocal.length) {
+                remoto.formulas_materias_blocos = excecoesLocal;
+                if (blocoLocal && materiaLocal > 0) {
+                    remoto.formula_tokens = tokensLocal.slice();
+                    remoto.bloco_calc = blocoLocal;
+                    remoto.materia_calc = materiaLocal;
+                } else if (blocoLocal && Array.isArray(tokensLocal) && tokensLocal.length) {
                     var remTok = Array.isArray(remoto.formula_tokens) ? remoto.formula_tokens : [];
                     if (!remTok.length || remoto.bloco_calc !== blocoLocal) {
                         remoto.formula_tokens = tokensLocal.slice();
                         remoto.bloco_calc = blocoLocal;
                     }
+                }
                 }
                 estado = remoto;
                 garantirEstado();

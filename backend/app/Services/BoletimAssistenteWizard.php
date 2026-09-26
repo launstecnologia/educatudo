@@ -1541,7 +1541,7 @@ class BoletimAssistenteWizard
             }
             if ($midCalc > 0 && is_array($porMatCalc) && isset($porMatCalc[$midCalc])) {
                 $merged['formula_tokens'] = $porMatCalc[$midCalc];
-            } elseif (isset($merged['formulas_blocos'][$merged['bloco_calc']])) {
+            } elseif ($midCalc <= 0 && isset($merged['formulas_blocos'][$merged['bloco_calc']])) {
                 $merged['formula_tokens'] = $merged['formulas_blocos'][$merged['bloco_calc']];
             }
         }
@@ -1717,7 +1717,12 @@ class BoletimAssistenteWizard
                 }
             }
         }
-        if ($estado['bloco_calc'] !== '' && isset($estado['formulas_blocos'][$estado['bloco_calc']])) {
+        if (
+            (int) ($estado['materia_calc'] ?? 0) <= 0
+            && $estado['bloco_calc'] !== ''
+            && ($estado['formula_tokens'] ?? []) === []
+            && isset($estado['formulas_blocos'][$estado['bloco_calc']])
+        ) {
             $estado['formula_tokens'] = $estado['formulas_blocos'][$estado['bloco_calc']];
         }
     }
