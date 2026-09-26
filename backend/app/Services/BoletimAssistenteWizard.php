@@ -5206,6 +5206,7 @@ class BoletimAssistenteWizard
             }
         }
 
+        $calculados = [];
         foreach ($comps as $c) {
             if (!is_array($c) || $this->componenteEhSemanaQuadro($c)) {
                 continue;
@@ -5219,9 +5220,7 @@ class BoletimAssistenteWizard
                     $notas[$cod] = $sumQ > 0 ? $this->roundPreviewFicticio(10 * $sumN / $sumQ, $roundMode) : 0.0;
                     continue;
                 }
-                $exp = trim((string) ($cfg['expressao'] ?? ''));
-                $val = $this->avaliarPreviewExpr($exp, $notas);
-                $notas[$cod] = $val !== null ? $this->roundPreviewFicticio($val, $roundMode) : '—';
+                $calculados[] = $c;
                 continue;
             }
             if ($cod === 'rec' && ($hash % 3) === 0) {
@@ -5229,6 +5228,31 @@ class BoletimAssistenteWizard
                 continue;
             }
             $notas[$cod] = $this->roundPreviewFicticio(5 + (($hash + strlen($cod) * 7) % 51) / 10, $roundMode);
+        }
+
+        $pendentes = $calculados;
+        $limite = count($calculados) + 1;
+        while ($pendentes !== [] && $limite-- > 0) {
+            $restou = [];
+            foreach ($pendentes as $c) {
+                $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+                $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+                $exp = trim((string) ($cfg['expressao'] ?? ''));
+                $val = $this->avaliarPreviewExpr($exp, $notas);
+                if ($val === null && $this->expressaoAindaDependeDeColuna($exp, $notas)) {
+                    $restou[] = $c;
+                    continue;
+                }
+                $notas[$cod] = $val !== null ? $this->roundPreviewFicticio($val, $roundMode) : '—';
+            }
+            if (count($restou) === count($pendentes)) {
+                foreach ($restou as $c) {
+                    $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+                    $notas[$cod] = '—';
+                }
+                break;
+            }
+            $pendentes = $restou;
         }
 
         return $notas;
@@ -5253,8 +5277,28 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * @param array<string,mixed> $vals
+     * A fórmula cita uma coluna que ainda não entrou no cálculo (ex.: ENAC depois da Média Bim).
+     *
+     * @param array<string,mixed> $notas
      */
+    private function expressaoAindaDependeDeColuna(string $expr, array $notas): bool
+    {
+        $expr = strtolower(trim($expr));
+        if ($expr === '' || !preg_match_all('/\b[a-z_][a-z0-9_]*\b/', $expr, $achados)) {
+            return false;
+        }
+        foreach ($achados[0] as $cod) {
+            if (in_array($cod, ['max', 'min'], true)) {
+                continue;
+            }
+            if (!isset($notas[$cod]) || !is_numeric($notas[$cod])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function avaliarPreviewExpr(string $expr, array $vals): ?float
     {
         $expr = strtolower(trim($expr));
