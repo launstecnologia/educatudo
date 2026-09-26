@@ -2490,26 +2490,133 @@ $boletimWizardSteps = [
         return !!((pv && pv.tabelas) || []).some(function (t) { return t && (t.semanas || []).length; });
     }
 
+    function chaveNomeMateria(nome) {
+        return String(nome || '').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function agregarNotasLinhas(membros, outras, modo) {
+        var notas = {};
+        (outras || []).forEach(function (col) {
+            if (!col || !col.codigo) return;
+            var ehFaltas = col.layout_type === 'faltas';
+            var vals = [];
+            (membros || []).forEach(function (lin) {
+                var v = notaDaLinhaPreview((lin && lin.notas) || {}, col.codigo);
+                if (v == null || v === '' || v === '—' || v === '-') return;
+                var n = Number(v);
+                if (!isFinite(n)) return;
+                vals.push(n);
+            });
+            if (!vals.length) {
+                notas[col.codigo] = null;
+                return;
+            }
+            var total = vals.reduce(function (a, b) { return a + b; }, 0);
+            if (ehFaltas) {
+                notas[col.codigo] = Math.round(total);
+            } else if (modo === 'soma') {
+                notas[col.codigo] = Math.round(total * 100) / 100;
+            } else {
+                notas[col.codigo] = Math.round((total / vals.length) * 100) / 100;
+            }
+        });
+        return notas;
+    }
+
+    function linhasDoBoletim(pv, outras) {
+        var brutas = (pv && Array.isArray(pv.linhas_completas) && pv.linhas_completas.length)
+            ? pv.linhas_completas.slice()
+            : [];
+        if (!brutas.length) {
+            (pv.tabelas || []).forEach(function (t) {
+                (t.linhas || []).forEach(function (lin) { brutas.push(lin); });
+            });
+        }
+        var porId = {};
+        var porNome = {};
+        var linhas = [];
+        brutas.forEach(function (lin) {
+            if (!lin) return;
+            var id = Number(lin.materia_id || 0);
+            var nome = String(lin.materia_nome || '').trim();
+            var kn = chaveNomeMateria(nome);
+            if (!nome) return;
+            if (id && porId[id]) return;
+            if (kn && porNome[kn]) return;
+            if (id) porId[id] = true;
+            if (kn) porNome[kn] = true;
+            linhas.push({ materia_id: id, materia_nome: nome, notas: lin.notas || {} });
+        });
+
+        var idsEscopo = {};
+        materiasCatalogoDoEscopo().forEach(function (m) { idsEscopo[Number(m.id)] = true; });
+        linhas.forEach(function (lin) { if (lin.materia_id) idsEscopo[lin.materia_id] = true; });
+        var paisOcultos = {};
+        (catalogo.familias_componentes || []).forEach(function (f) {
+            var temFilho = (f.filhos || []).some(function (ch) { return idsEscopo[Number(ch.id)]; });
+            if (temFilho) paisOcultos[Number(f.pai_id)] = true;
+        });
+
+        materiasCatalogoDoEscopo().forEach(function (m) {
+            var id = Number(m.id || 0);
+            var nome = String(m.nome || '').trim();
+            var kn = chaveNomeMateria(nome);
+            if (!id || !nome || paisOcultos[id]) return;
+            if (porId[id] || (kn && porNome[kn])) return;
+            porId[id] = true;
+            if (kn) porNome[kn] = true;
+            linhas.push({ materia_id: id, materia_nome: nome, notas: {} });
+        });
+
+        var gl = (estado && estado.grupo_linha) || {};
+        var onde = gl.aplicar_em || 'boletim';
+        if (!gl.ativo || (onde !== 'boletim' && onde !== 'ambos')) return linhas;
+        var idsGrupo = {};
+        (gl.materias_ids || []).forEach(function (id) {
+            id = Number(id || 0);
+            if (id > 0) idsGrupo[id] = true;
+        });
+        var nomesGrupo = {};
+        (catalogo.materias || []).forEach(function (m) {
+            if (idsGrupo[Number(m.id)]) nomesGrupo[chaveNomeMateria(m.nome)] = true;
+        });
+        if (!Object.keys(idsGrupo).length) return linhas;
+
+        var membros = [];
+        var out = [];
+        var pos = -1;
+        linhas.forEach(function (lin) {
+            var entra = idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)];
+            if (!entra) {
+                out.push(lin);
+                return;
+            }
+            if (pos < 0) {
+                pos = out.length;
+                out.push(null);
+            }
+            membros.push(lin);
+        });
+        if (membros.length < 2 || pos < 0) return linhas;
+        out[pos] = {
+            materia_id: 0,
+            materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
+            notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media')
+        };
+        return out;
+    }
+
     function htmlTabelaSomenteNotas(pv) {
         var outras = [];
         var visto = {};
-        var linhas = [];
-        var nomes = {};
         (pv.tabelas || []).forEach(function (t) {
-            if (!outras.length) {
-                (t.outras || []).forEach(function (o) {
-                    if (!o || !o.codigo || visto[o.codigo]) return;
-                    visto[o.codigo] = true;
-                    outras.push(o);
-                });
-            }
-            (t.linhas || []).forEach(function (lin) {
-                var nome = String((lin && lin.materia_nome) || '');
-                if (!nome || nomes[nome]) return;
-                nomes[nome] = true;
-                linhas.push(lin);
+            (t.outras || []).forEach(function (o) {
+                if (!o || !o.codigo || visto[o.codigo]) return;
+                visto[o.codigo] = true;
+                outras.push(o);
             });
         });
+        var linhas = linhasDoBoletim(pv, outras);
         var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
         html += '<div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">Notas do boletim</div>';
         html += '<table class="bw-preview-table"><thead><tr>';
@@ -2523,7 +2630,7 @@ $boletimWizardSteps = [
             var notas = lin.notas || {};
             html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
             outras.forEach(function (o) {
-                html += '<td>' + fmtPreviewNota(notaDaLinhaPreview(notas, o.codigo)) + '</td>';
+                html += '<td>' + fmtPreviewCelula(notaDaLinhaPreview(notas, o.codigo), o) + '</td>';
             });
             html += '</tr>';
         });

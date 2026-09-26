@@ -579,6 +579,14 @@ class BoletimAssistenteController extends BaseController
         }
 
         $mapas = $this->mapasMateriasPorBloco($grupoId);
+        $linhasCompletas = [];
+        foreach ($preview['tabelas'] as $tabBase) {
+            if (!is_array($tabBase) || !is_array($tabBase['linhas'] ?? null) || $tabBase['linhas'] === []) {
+                continue;
+            }
+            $linhasCompletas = array_values($tabBase['linhas']);
+            break;
+        }
         $tabelas = [];
         foreach ($preview['tabelas'] as $tab) {
             if (!is_array($tab)) {
@@ -598,6 +606,7 @@ class BoletimAssistenteController extends BaseController
             $tabelas[] = $tab;
         }
         $preview['tabelas'] = $tabelas;
+        $preview['linhas_completas'] = $linhasCompletas;
 
         return $preview;
     }

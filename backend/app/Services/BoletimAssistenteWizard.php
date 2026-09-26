@@ -3768,7 +3768,7 @@ class BoletimAssistenteWizard
                 $c['nome'] = $nomeCustom;
             }
             if ($cod === 'media_final') {
-                $c['config']['layout_type'] = 'resultado';
+                $c['config']['layout_type'] = 'media';
                 if ($nomeCustom === '') {
                     $c['nome'] = 'Média Bim Final';
                 }
@@ -3865,7 +3865,7 @@ class BoletimAssistenteWizard
                 $c['config']['expressao'] = $exp;
                 if ($ehQuadro) {
                     $c['config']['layout_group'] = $c['config']['layout_group'] ?? 'quadro_comum';
-                    $c['config']['layout_type'] = $codigoAlvo === 'media_final' ? 'resultado' : 'media';
+                    $c['config']['layout_type'] = 'media';
                 }
                 $c['nome'] = $nome;
                 $comps[$idxExistente] = $c;
@@ -3873,7 +3873,7 @@ class BoletimAssistenteWizard
                 $bloco = $this->blocoCalculado($codigoAlvo, $nome, $exp);
                 if ($ehQuadro) {
                     $bloco['config']['layout_group'] = 'quadro_comum';
-                    $bloco['config']['layout_type'] = $codigoAlvo === 'media_final' ? 'resultado' : 'media';
+                    $bloco['config']['layout_type'] = 'media';
                 }
                 $comps[] = $bloco;
             }
@@ -5212,6 +5212,9 @@ class BoletimAssistenteWizard
             if ($cod === '') {
                 continue;
             }
+            if (trim((string) ($cfg['expressao'] ?? '')) !== '') {
+                continue;
+            }
             $notas[$cod] = ($mediaFinal !== null && $mediaFinal >= $notaMin) ? 'Aprovado' : 'Reprovado';
         }
 
@@ -5301,7 +5304,7 @@ class BoletimAssistenteWizard
                 'config' => [
                     'expressao' => 'max(media_bim, rec)',
                     'layout_group' => 'quadro_comum',
-                    'layout_type' => 'resultado',
+                    'layout_type' => 'media',
                 ],
             ];
         }

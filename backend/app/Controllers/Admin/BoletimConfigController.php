@@ -4651,6 +4651,16 @@ class BoletimConfigController extends BaseController
         $formula = trim((string) ($regra['formula_final'] ?? ''));
         $resultadoCodigos = [];
         $mediaFinalCodigo = '';
+        $temExpressao = [];
+        foreach ($componentesRegra as $cExpr) {
+            $kExpr = trim((string) ($cExpr['codigo'] ?? ''));
+            if ($kExpr === '') {
+                continue;
+            }
+            if ($this->parseExpressaoColunaCalculada($cExpr) !== '') {
+                $temExpressao[$kExpr] = true;
+            }
+        }
         foreach ($colunas as $cMeta) {
             $lt = strtolower(trim((string) ($cMeta['layout_type'] ?? '')));
             $lg = strtolower(trim((string) ($cMeta['layout_group'] ?? '')));
@@ -4658,7 +4668,7 @@ class BoletimConfigController extends BaseController
             if ($cc === '') {
                 continue;
             }
-            if ($lt === 'resultado') {
+            if ($lt === 'resultado' && empty($temExpressao[$cc])) {
                 $resultadoCodigos[] = $cc;
             }
             if ($mediaFinalCodigo === '' && $lg === 'final' && $lt === 'media') {
