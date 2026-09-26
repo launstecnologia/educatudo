@@ -234,6 +234,7 @@ $boletimWizardSteps = [
     var enviando = false;
     var iniciado = false;
     var montarTimer = null;
+    var montarSeq = 0;
     var filaChat = [];
     var statusFilaEl = null;
     var formulaDrag = null;
@@ -410,6 +411,27 @@ $boletimWizardSteps = [
         var set = {};
         ids.forEach(function (id) { set[id] = true; });
         return todas.filter(function (m) { return set[Number(m.id)]; });
+    }
+
+    function materiasDoQuadroSelecionado() {
+        var id = Number(estado && estado.grupo_regras_notas_id ? estado.grupo_regras_notas_id : 0);
+        if (!id) return [];
+        var quadro = (catalogo.quadros_notas || []).filter(function (q) { return Number(q.id) === id; })[0];
+        return (quadro && quadro.materias) || [];
+    }
+
+    function materiasParaExcecao() {
+        var bol = boletimEscolhido();
+        var doBoletim = (bol && (bol.materias_ids || []).length) ? materiasCatalogoDoEscopo() : [];
+        var doQuadro = materiasDoQuadroSelecionado();
+        if (doBoletim.length && doQuadro.length) {
+            var set = {};
+            doQuadro.forEach(function (m) { set[Number(m.id)] = true; });
+            var comuns = doBoletim.filter(function (m) { return set[Number(m.id)]; });
+            return comuns.length ? comuns : doBoletim;
+        }
+        if (doBoletim.length) return doBoletim;
+        return doQuadro;
     }
 
     function familiasDoEscopo() {
@@ -1035,6 +1057,7 @@ $boletimWizardSteps = [
             materia_calc: 0,
             blocos_calc: [],
             colunas_ordem: [],
+            colunas_ocultas: [],
             fontes_bimestres: { 1: 0, 2: 0, 3: 0, 4: 0 },
             fontes_faltas: { 1: 0, 2: 0, 3: 0, 4: 0 },
             data_inicio: '',
@@ -1083,6 +1106,7 @@ $boletimWizardSteps = [
         if (estado.materia_calc == null) estado.materia_calc = 0;
         estado.aluno_preview_id = Number(estado.aluno_preview_id || 0) || 0;
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        if (!Array.isArray(estado.colunas_ocultas)) estado.colunas_ocultas = [];
         if (!estado.fontes_bimestres || typeof estado.fontes_bimestres !== 'object') {
             estado.fontes_bimestres = { 1: 0, 2: 0, 3: 0, 4: 0 };
         } else {
@@ -1613,7 +1637,10 @@ $boletimWizardSteps = [
             var ja = {};
             mids.forEach(function (id) { ja[id] = true; });
             var opts = '<option value="0">Escolher matéria…</option>';
-            ((catalogo && catalogo.materias) || []).forEach(function (m) {
+            var listaEx = materiasParaExcecao().slice().sort(function (a, b) {
+                return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt');
+            });
+            listaEx.forEach(function (m) {
                 var id = Number(m.id);
                 if (!id || ja[id]) return;
                 opts += '<option value="' + id + '">' + esc(m.nome) + '</option>';
@@ -1681,29 +1708,29 @@ $boletimWizardSteps = [
     function htmlPalettePecasExibir() {
         var html = '';
         var visto = {};
-        if (estado.bloco_calc) visto[estado.bloco_calc] = true;
-        (catalogo.pecas || []).forEach(function (p) {
-            if (!p || !p.key || visto[p.key]) return;
-            visto[p.key] = true;
-            visto[pecaCodigoQuadro(p.key)] = true;
-            html += chipHtml({ type: 'peca', value: p.key, label: p.label || pecaLabel(p.key) }, -1, true);
-        });
+        function add(value, label) {
+            value = String(value || '');
+            if (!value || visto[value] || value === '_semanal') return;
+            if (estado.bloco_calc && (value === estado.bloco_calc || value === pecaCodigoQuadro(estado.bloco_calc))) return;
+            visto[value] = true;
+            visto[pecaCodigoQuadro(value)] = true;
+            html += chipHtml({ type: 'peca', value: value, label: label || pecaLabel(value) }, -1, true);
+        }
         (estado.pecas || []).forEach(function (k) {
-            if (!k || visto[k]) return;
-            visto[k] = true;
-            visto[pecaCodigoQuadro(k)] = true;
-            html += chipHtml({ type: 'peca', value: k, label: pecaLabel(k) }, -1, true);
+            if (!k) return;
+            add(k, pecaLabel(k));
+        });
+        var calc = (estado.blocos_calc || []).concat(Object.keys(estado.formulas_blocos || {}));
+        if ((estado.pecas || []).indexOf('semanal') >= 0) calc.push('media_sem');
+        calc.forEach(function (cod) {
+            if (!cod || (estado.pecas || []).indexOf(cod) >= 0) return;
+            add(cod, nomeBlocoCalc(cod));
         });
         var pv = previewEfetivo();
-        if (pv && pv.modo === 'quadro' && !visto.media_sem && (!estado.bloco_calc || estado.bloco_calc !== 'media_sem')) {
-            visto.media_sem = true;
-            html += chipHtml({ type: 'peca', value: 'media_sem', label: 'Média Sem' }, -1, true);
-        }
-        (pv.colunas || []).forEach(function (c) {
-            if (!c || !c.codigo || visto[c.codigo] || c.codigo === '_semanal' || c.travada) return;
+        ((pv && pv.colunas) || []).forEach(function (c) {
+            if (!c || c.travada || c.codigo === '_semanal') return;
             if (c.tipo !== 'calculado' && c.codigo !== 'media_sem') return;
-            visto[c.codigo] = true;
-            html += chipHtml({ type: 'peca', value: c.codigo, label: c.nome || nomeBlocoCalc(c.codigo) }, -1, true);
+            add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
         });
         if (!html) html = '<p class="text-xs text-gray-500">Volte em Peças e marque ao menos uma.</p>';
         return html;
@@ -1742,20 +1769,51 @@ $boletimWizardSteps = [
         var nome = String((inp && inp.value) || '').trim().slice(0, 60);
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
         if (nome) estado.nomes_blocos[estado.bloco_calc] = nome;
+        var codigoSalvo = estado.bloco_calc;
         gravarTokensBlocoAberto();
-        estado.bloco_calc = '';
-        estado.materia_calc = 0;
-        estado.formula_tokens = [];
-        var ed = document.getElementById('bw-formula-editor');
-        if (ed) ed.classList.add('hidden');
         marcarEdicaoManual();
         previewAtual = null;
         renderRevisarDinamico();
+        abrirFormulaBloco(codigoSalvo);
         agendarMontar();
     }
 
+    function pecaDaColuna(codigo) {
+        var mapa = {
+            _semanal: 'semanal',
+            media_sem: 'semanal',
+            prova_bim: 'bimestral',
+            enac: 'enac',
+            trab: 'trabalho',
+            part: 'participacao',
+            rec: 'recuperacao',
+            jornada: 'jornada'
+        };
+        return mapa[codigo] || '';
+    }
+
+    function ocultarColuna(codigo) {
+        if (!estado || !codigo) return;
+        if (!Array.isArray(estado.colunas_ocultas)) estado.colunas_ocultas = [];
+        if (estado.colunas_ocultas.indexOf(codigo) < 0) estado.colunas_ocultas.push(codigo);
+    }
+
+    function colunaOculta(codigo) {
+        return !!estado && (estado.colunas_ocultas || []).indexOf(codigo) >= 0;
+    }
+
     function removerBlocoCalc(codigo) {
-        if (!codigo || codigo === 'media_sem' || codigo === '_semanal') return;
+        if (!codigo) return;
+        ocultarColuna(codigo);
+        if (codigo === '_semanal' || codigo === 'media_sem') {
+            ocultarColuna('_semanal');
+            ocultarColuna('media_sem');
+            ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].forEach(ocultarColuna);
+        }
+        var peca = pecaDaColuna(codigo);
+        if (peca) {
+            estado.pecas = (estado.pecas || []).filter(function (p) { return p !== peca; });
+        }
         estado.blocos_calc = (estado.blocos_calc || []).filter(function (c) { return c !== codigo; });
         if (estado.formulas_blocos) delete estado.formulas_blocos[codigo];
         if (estado.formulas_materias_blocos) delete estado.formulas_materias_blocos[codigo];
@@ -2201,15 +2259,16 @@ $boletimWizardSteps = [
     function previewLocal() {
         if (ehBoletimComposto()) return previewLocalBoletim();
         var pecas = (estado && estado.pecas) ? estado.pecas.slice() : [];
-        var temSemanal = pecas.indexOf('semanal') >= 0;
+        var temSemanal = pecas.indexOf('semanal') >= 0 && !colunaOculta('_semanal') && !colunaOculta('media_sem');
         var semanasA = temSemanal ? [1, 3, 5, 7].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
         var semanasB = temSemanal ? [2, 4, 6, 8].map(function (s) { return { codigo: 's' + s, nome: 'S' + s }; }) : [];
         var outras = temSemanal ? [{ codigo: 'media_sem', nome: 'Média Sem', layout_type: 'media_sem', source_type: 'calculado' }] : [];
-        var colunas = temSemanal ? [{ codigo: '_semanal', nome: 'Prova semanal (S1-S8 · N e Q)', tipo: 'semana_grupo', travada: true }] : [];
+        var colunas = temSemanal ? [{ codigo: '_semanal', nome: 'Prova semanal (S1-S8 · N e Q)', tipo: 'semana_grupo', travada: false }] : [];
         var partesMedia = temSemanal ? ['media_sem'] : [];
         pecas.forEach(function (k) {
             if (k === 'semanal') return;
             var cod = pecaCodigoQuadro(k);
+            if (colunaOculta(cod)) return;
             var nome = k === 'bimestral' ? 'Prova Bim' : pecaNomeQuadro(k);
             outras.push({ codigo: cod, nome: nome, layout_type: k === 'recuperacao' ? 'rec' : 'media', source_type: 'provas_sistema' });
             colunas.push({ codigo: cod, nome: nome, tipo: 'peca', travada: false });
@@ -2220,11 +2279,13 @@ $boletimWizardSteps = [
             colunas.push({ codigo: 'prova_bim', nome: 'Prova Bim', tipo: 'peca', travada: false });
             partesMedia.push('prova_bim');
         }
-        outras.push({ codigo: 'media_bim', nome: nomeBlocoCalc('media_bim'), layout_type: 'media', source_type: 'calculado' });
-        colunas.push({ codigo: 'media_bim', nome: nomeBlocoCalc('media_bim'), tipo: 'calculado', travada: false });
+        if (!colunaOculta('media_bim')) {
+            outras.push({ codigo: 'media_bim', nome: nomeBlocoCalc('media_bim'), layout_type: 'media', source_type: 'calculado' });
+            colunas.push({ codigo: 'media_bim', nome: nomeBlocoCalc('media_bim'), tipo: 'calculado', travada: false });
+        }
         var vistosCalc = { media_bim: true, media_sem: true };
         (estado.blocos_calc || []).concat(Object.keys(estado.formulas_blocos || {})).forEach(function (cod) {
-            if (!cod || vistosCalc[cod] || cod === 'media_sem') return;
+            if (!cod || vistosCalc[cod] || cod === 'media_sem' || colunaOculta(cod)) return;
             vistosCalc[cod] = true;
             var nm = nomeBlocoCalc(cod);
             outras.push({ codigo: cod, nome: nm, layout_type: cod === 'media_final' ? 'resultado' : 'media', source_type: 'calculado' });
@@ -2238,7 +2299,7 @@ $boletimWizardSteps = [
             || (estado.blocos_calc || []).indexOf('media_final') >= 0
             || (estado.formulas_blocos && estado.formulas_blocos.media_final)
             || estado.bloco_calc === 'media_final';
-        if (querFinal && !vistosCalc.media_final) {
+        if (querFinal && !vistosCalc.media_final && !colunaOculta('media_final')) {
             outras.push({ codigo: 'media_final', nome: nomeBlocoCalc('media_final'), layout_type: 'resultado', source_type: 'calculado' });
             colunas.push({ codigo: 'media_final', nome: nomeBlocoCalc('media_final'), tipo: 'calculado', travada: false });
         }
@@ -2481,7 +2542,7 @@ $boletimWizardSteps = [
         html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Ordem das colunas</p>';
         html += '<button type="button" id="bw-add-media" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-950 bg-amber-50 hover:bg-amber-100">Adicionar bloco de cálculo</button>';
         html += '</div>';
-        html += '<p class="text-xs text-gray-500 mb-2">Arraste pelo <strong>⋮⋮</strong> para mudar a ordem (Prova Bim, ENAC, Média…). Clique no nome amarelo para o cálculo.</p>';
+        html += '<p class="text-xs text-gray-500 mb-2">Arraste pelo <strong>⋮⋮</strong> para mudar a ordem. Clique no <strong>×</strong> para tirar a coluna. No nome amarelo, edite a fórmula.</p>';
         html += '<div id="bw-colunas-lista" class="flex flex-wrap gap-2 min-h-[2.5rem] p-2 rounded-lg border border-dashed border-indigo-200 bg-slate-50">';
         if (!cols.length) html += '<span class="text-xs text-gray-400">Nenhuma coluna ainda.</span>';
         cols.forEach(function (c, i) {
@@ -2491,9 +2552,7 @@ $boletimWizardSteps = [
             html += '<span class="' + cls + '" draggable="' + (c.travada ? 'false' : 'true') + '" data-codigo="' + esc(c.codigo) + '" data-tipo="' + esc(c.tipo || '') + '" data-idx="' + i + '">';
             if (!c.travada) html += '<span class="bw-col-grip" title="Arrastar" aria-hidden="true">⋮⋮</span>';
             html += '<span class="bw-col-nome">' + esc(c.nome) + '</span>';
-            if (c.tipo === 'calculado' && c.codigo !== 'media_sem') {
-                html += '<button type="button" class="bw-col-x" data-codigo="' + esc(c.codigo) + '" aria-label="Remover">×</button>';
-            }
+            html += '<button type="button" class="bw-col-x" data-codigo="' + esc(c.codigo) + '" aria-label="Remover">×</button>';
             html += '</span>';
         });
         html += '</div>';
@@ -3349,6 +3408,10 @@ $boletimWizardSteps = [
                     if (!estado.pecas_opcoes[k]) {
                         estado.pecas_opcoes[k] = pecasOpcoesPadraoJs(k);
                     }
+                    var codLib = k === 'semanal' ? '_semanal' : pecaCodigoQuadro(k);
+                    estado.colunas_ocultas = (estado.colunas_ocultas || []).filter(function (c) {
+                        return c !== codLib && c !== pecaCodigoQuadro(k) && !(k === 'semanal' && (c === 'media_sem' || /^s[1-8]$/.test(c)));
+                    });
                 });
                 aplicarMateriaUnicaNasPecas();
                 filtrarTokensOrfaos();
@@ -3723,19 +3786,38 @@ $boletimWizardSteps = [
         montarTimer = setTimeout(montarAgora, 280);
     }
 
+    function fundirFormulasLocais(local, remoto) {
+        var out = {};
+        Object.keys(remoto || {}).forEach(function (cod) {
+            out[cod] = Array.isArray(remoto[cod]) ? remoto[cod].slice() : remoto[cod];
+        });
+        Object.keys(local || {}).forEach(function (cod) {
+            var loc = Array.isArray(local[cod]) ? local[cod] : [];
+            var rem = Array.isArray(out[cod]) ? out[cod] : [];
+            if (loc.length && !rem.length) out[cod] = loc.slice();
+        });
+        return out;
+    }
+
     function montarAgora() {
         garantirEstado();
         aplicarMateriaUnicaNasPecas();
+        if (estado.bloco_calc) gravarTokensBlocoAberto();
+        var formulaLocal = JSON.parse(JSON.stringify(estado.formulas_blocos || {}));
+        var tokensLocal = (estado.formula_tokens || []).slice();
+        var blocoLocal = estado.bloco_calc || '';
         var fd = new FormData();
         fd.append('_token', csrf);
         fd.append('wizard_estado', JSON.stringify(estado));
         var alunoPedido = Number(estado.aluno_preview_id || 0);
+        var seq = ++montarSeq;
         return fetch(urlWizardMontar, {
             method: 'POST',
             body: fd,
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin'
         }).then(function (r) { return r.json();         }).then(function (j) {
+            if (seq !== montarSeq) return j || null;
             if (!j || !j.success) {
                 renderResumo((j && j.resumo) || 'Não deu para montar o rascunho.', (j && j.erros) || [(j && j.error) || 'Falha ao montar.']);
                 if (estado && (estado.passo === 'formula' || estado.passo === 'revisar')) renderRevisarDinamico();
@@ -3743,7 +3825,16 @@ $boletimWizardSteps = [
             }
             if (Number((estado && estado.aluno_preview_id) || 0) !== alunoPedido) return j;
             if (j.estado) {
-                estado = j.estado;
+                var remoto = j.estado;
+                remoto.formulas_blocos = fundirFormulasLocais(formulaLocal, remoto.formulas_blocos);
+                if (blocoLocal && Array.isArray(tokensLocal) && tokensLocal.length) {
+                    var remTok = Array.isArray(remoto.formula_tokens) ? remoto.formula_tokens : [];
+                    if (!remTok.length || remoto.bloco_calc !== blocoLocal) {
+                        remoto.formula_tokens = tokensLocal.slice();
+                        remoto.bloco_calc = blocoLocal;
+                    }
+                }
+                estado = remoto;
                 garantirEstado();
             }
             rascunhoAtual = j.rascunho || null;

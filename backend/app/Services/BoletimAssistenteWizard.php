@@ -193,9 +193,29 @@ class BoletimAssistenteWizard
                 if ($id <= 0) {
                     continue;
                 }
+                $materiasQuadro = [];
+                $vistosQuadro = [];
+                $mapaQuadro = $svc->materiasQuadroPadrao($id);
+                foreach (['A', 'B'] as $letraQuadro) {
+                    foreach ($mapaQuadro[$letraQuadro] ?? [] as $matQuadro) {
+                        if (!is_array($matQuadro)) {
+                            continue;
+                        }
+                        $midQuadro = (int) ($matQuadro['id'] ?? 0);
+                        if ($midQuadro <= 0 || isset($vistosQuadro[$midQuadro])) {
+                            continue;
+                        }
+                        $vistosQuadro[$midQuadro] = true;
+                        $materiasQuadro[] = [
+                            'id' => $midQuadro,
+                            'nome' => trim((string) ($matQuadro['nome'] ?? '')),
+                        ];
+                    }
+                }
                 $out[] = [
                     'id' => $id,
                     'nome' => trim((string) ($g['nome'] ?? ('Quadro #' . $id))),
+                    'materias' => $materiasQuadro,
                 ];
             }
             return $out;
@@ -423,6 +443,7 @@ class BoletimAssistenteWizard
             'materia_calc' => 0,
             'blocos_calc' => [],
             'colunas_ordem' => [],
+            'colunas_ocultas' => [],
             'fontes_bimestres' => [1 => 0, 2 => 0, 3 => 0, 4 => 0],
             'fontes_faltas' => [1 => 0, 2 => 0, 3 => 0, 4 => 0],
             'data_inicio' => '',
@@ -1547,10 +1568,10 @@ class BoletimAssistenteWizard
             $v = (string) ($t['value'] ?? '');
             return isset($pecasOk[$v]) || isset($codigosLivres[$v]);
         };
-        $merged['formula_tokens'] = array_values(array_filter($merged['formula_tokens'], $filtrarTok));
+        $merged['formula_tokens'] = $this->envolverSomaAntesDeDivisao($merged['formula_tokens']);
         foreach ($merged['formulas_blocos'] as $codFb => $toksFb) {
             $merged['formulas_blocos'][$codFb] = $this->envolverSomaAntesDeDivisao(
-                array_values(array_filter($toksFb, $filtrarTok))
+                is_array($toksFb) ? $toksFb : []
             );
         }
         foreach ($merged['formulas_materias_blocos'] as $codFb => $porMat) {
@@ -1634,6 +1655,7 @@ class BoletimAssistenteWizard
         }
         $this->aplicarMateriaUnicaNasPecasOpcoes($merged);
         $merged['colunas_ordem'] = $this->normalizarColunasOrdem($merged['colunas_ordem'] ?? []);
+        $merged['colunas_ocultas'] = $this->normalizarColunasOcultas($merged['colunas_ocultas'] ?? []);
         $merged['fontes_bimestres'] = $this->normalizarFontesBimestres($merged['fontes_bimestres'] ?? []);
         $merged['fontes_faltas'] = $this->normalizarFontesBimestres($merged['fontes_faltas'] ?? []);
         return $merged;
@@ -4367,6 +4389,7 @@ class BoletimAssistenteWizard
         $rascunho = is_array($resultado['rascunho'] ?? null) ? $resultado['rascunho'] : null;
         if ($rascunho !== null) {
             try {
+                $rascunho = $this->aplicarColunasOcultas($rascunho, $estado);
                 if (!$this->ehBoletimComposto($estado)) {
                     $rascunho = $this->aplicarOrdemColunas($rascunho, $estado);
                     $estado['colunas_ordem'] = $this->extrairCodigosColunasMoveis($rascunho);
@@ -4390,6 +4413,65 @@ class BoletimAssistenteWizard
             ];
         }
         return $resultado;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<string>
+     */
+    private function normalizarColunasOcultas($raw): array
+    {
+        $out = [];
+        foreach ((array) $raw as $cod) {
+            $cod = strtolower(trim((string) $cod));
+            if ($cod === '' || !(bool) preg_match('/^[a-z_][a-z0-9_]{0,40}$/', $cod)) {
+                continue;
+            }
+            if (!in_array($cod, $out, true)) {
+                $out[] = $cod;
+            }
+            if (count($out) >= 40) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Tira do rascunho a coluna que o usuário excluiu na ordem.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function aplicarColunasOcultas(array $rascunho, array $estado): array
+    {
+        $ocultas = array_flip($this->normalizarColunasOcultas($estado['colunas_ocultas'] ?? []));
+        if ($ocultas === []) {
+            return $rascunho;
+        }
+        $semanal = isset($ocultas['_semanal']) || isset($ocultas['media_sem']);
+        $comps = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            if ($semanal && ($cod === 'media_sem' || $this->componenteEhSemanaQuadro($c))) {
+                continue;
+            }
+            if (isset($ocultas[$cod])) {
+                continue;
+            }
+            $comps[] = $c;
+        }
+        $rascunho['componentes'] = $comps;
+
+        return $rascunho;
     }
 
     /**
@@ -4565,7 +4647,7 @@ class BoletimAssistenteWizard
                 'codigo' => '_semanal',
                 'nome' => 'Prova semanal (S1–S8 · N e Q)',
                 'tipo' => 'semana_grupo',
-                'travada' => true,
+                'travada' => false,
             ]);
         }
 
