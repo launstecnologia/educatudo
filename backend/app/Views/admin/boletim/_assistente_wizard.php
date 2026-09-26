@@ -236,6 +236,7 @@ $boletimWizardSteps = [
     var montarTimer = null;
     var montarSeq = 0;
     var formulaVersao = 0;
+    var vistaPreview = 'quadro';
     var filaChat = [];
     var statusFilaEl = null;
     var formulaDrag = null;
@@ -2485,6 +2486,51 @@ $boletimWizardSteps = [
         return html;
     }
 
+    function previewTemQuadro(pv) {
+        return !!((pv && pv.tabelas) || []).some(function (t) { return t && (t.semanas || []).length; });
+    }
+
+    function htmlTabelaSomenteNotas(pv) {
+        var outras = [];
+        var visto = {};
+        var linhas = [];
+        var nomes = {};
+        (pv.tabelas || []).forEach(function (t) {
+            if (!outras.length) {
+                (t.outras || []).forEach(function (o) {
+                    if (!o || !o.codigo || visto[o.codigo]) return;
+                    visto[o.codigo] = true;
+                    outras.push(o);
+                });
+            }
+            (t.linhas || []).forEach(function (lin) {
+                var nome = String((lin && lin.materia_nome) || '');
+                if (!nome || nomes[nome]) return;
+                nomes[nome] = true;
+                linhas.push(lin);
+            });
+        });
+        var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
+        html += '<div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">Notas do boletim</div>';
+        html += '<table class="bw-preview-table"><thead><tr>';
+        html += '<th class="text-left">Matéria</th>';
+        outras.forEach(function (o) {
+            var extra = (o.layout_type === 'faltas' || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
+            html += '<th>' + esc(o.nome || o.codigo) + extra + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        linhas.forEach(function (lin) {
+            var notas = lin.notas || {};
+            html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
+            outras.forEach(function (o) {
+                html += '<td>' + fmtPreviewNota(notaDaLinhaPreview(notas, o.codigo)) + '</td>';
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        return html;
+    }
+
     function htmlPreview(pv) {
         var html = htmlAlunoPreviewSelect();
         if (!pv || !(pv.tabelas || []).length) {
@@ -2494,6 +2540,15 @@ $boletimWizardSteps = [
             ? 'text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 mb-2'
             : 'text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2';
         html += '<p class="' + avisoCls + '">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
+        if (previewTemQuadro(pv)) {
+            html += '<div class="flex flex-wrap gap-2 mb-3">';
+            html += '<button type="button" data-vista-preview="quadro" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'quadro' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Quadro de notas</button>';
+            html += '<button type="button" data-vista-preview="boletim" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'boletim' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Boletim</button>';
+            html += '</div>';
+            if (vistaPreview === 'boletim') {
+                return html + htmlTabelaSomenteNotas(pv);
+            }
+        }
         (pv.tabelas || []).forEach(function (t) {
             if (pv.modo === 'boletim' && !(t.grupos || []).length && (pv.grupos || []).length) {
                 t = Object.assign({}, t, { grupos: pv.grupos });
@@ -2575,6 +2630,12 @@ $boletimWizardSteps = [
         if (bodyEl._bwRevisarBound) return;
         bodyEl._bwRevisarBound = true;
         bodyEl.addEventListener('click', function (e) {
+            var vistaBtn = e.target.closest('[data-vista-preview]');
+            if (vistaBtn) {
+                vistaPreview = vistaBtn.getAttribute('data-vista-preview') === 'boletim' ? 'boletim' : 'quadro';
+                renderRevisarDinamico();
+                return;
+            }
             if (e.target.closest('#bw-add-media')) {
                 adicionarBlocoMedia();
                 return;
