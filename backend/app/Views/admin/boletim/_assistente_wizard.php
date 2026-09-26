@@ -423,15 +423,8 @@ $boletimWizardSteps = [
     function materiasParaExcecao() {
         var bol = boletimEscolhido();
         var doBoletim = (bol && (bol.materias_ids || []).length) ? materiasCatalogoDoEscopo() : [];
-        var doQuadro = materiasDoQuadroSelecionado();
-        if (doBoletim.length && doQuadro.length) {
-            var set = {};
-            doQuadro.forEach(function (m) { set[Number(m.id)] = true; });
-            var comuns = doBoletim.filter(function (m) { return set[Number(m.id)]; });
-            return comuns.length ? comuns : doBoletim;
-        }
         if (doBoletim.length) return doBoletim;
-        return doQuadro;
+        return materiasDoQuadroSelecionado();
     }
 
     function familiasDoEscopo() {
@@ -1449,6 +1442,8 @@ $boletimWizardSteps = [
         }
         renderFormulaCanvas();
         renderExcecoesMateria();
+        var avisoSalvo = document.getElementById('bw-formula-salva');
+        if (avisoSalvo) avisoSalvo.classList.add('hidden');
         agendarMontar();
     }
 
@@ -1775,6 +1770,11 @@ $boletimWizardSteps = [
         previewAtual = null;
         renderRevisarDinamico();
         abrirFormulaBloco(codigoSalvo);
+        var avisoSalvo = document.getElementById('bw-formula-salva');
+        if (avisoSalvo) {
+            avisoSalvo.textContent = 'Salvo.';
+            avisoSalvo.classList.remove('hidden');
+        }
         agendarMontar();
     }
 
@@ -3237,6 +3237,7 @@ $boletimWizardSteps = [
                 html += '<input id="bw-formula-bloco-nome-input" type="text" maxlength="60" class="mt-1 w-full h-10 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(nomeBlocoCalc(estado.bloco_calc || '')) + '" placeholder="Ex.: Média Bim">';
                 html += '</label>';
                 html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
+                html += '<p id="bw-formula-salva" class="hidden text-sm font-semibold text-emerald-700">Salvo.</p>';
                 html += '</div>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';

@@ -1658,7 +1658,133 @@ class BoletimAssistenteWizard
         $merged['colunas_ocultas'] = $this->normalizarColunasOcultas($merged['colunas_ocultas'] ?? []);
         $merged['fontes_bimestres'] = $this->normalizarFontesBimestres($merged['fontes_bimestres'] ?? []);
         $merged['fontes_faltas'] = $this->normalizarFontesBimestres($merged['fontes_faltas'] ?? []);
+        $this->reidratarFormulasDosComponentes($merged);
         return $merged;
+    }
+
+    /**
+     * Ao reabrir o evento, a fórmula gravada na coluna volta para os blocos da tela.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function reidratarFormulasDosComponentes(array &$estado): void
+    {
+        $rascunho = is_array($estado['rascunho_preservado'] ?? null) ? $estado['rascunho_preservado'] : [];
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        if ($comps === []) {
+            return;
+        }
+        if (!is_array($estado['formulas_blocos'] ?? null)) {
+            $estado['formulas_blocos'] = [];
+        }
+        if (!is_array($estado['formulas_materias_blocos'] ?? null)) {
+            $estado['formulas_materias_blocos'] = [];
+        }
+        foreach ($comps as $c) {
+            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || $cod === 'media_sem') {
+                continue;
+            }
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            $agregar = is_array($cfg['agregar_nq'] ?? null) ? $cfg['agregar_nq'] : [];
+            if ($agregar !== []) {
+                continue;
+            }
+            if (!isset($estado['formulas_blocos'][$cod]) || $estado['formulas_blocos'][$cod] === []) {
+                $toks = $this->tokensDaExpressao((string) ($cfg['expressao'] ?? ''));
+                if ($toks !== []) {
+                    $estado['formulas_blocos'][$cod] = $toks;
+                }
+            }
+            $porMateria = is_array($cfg['formula_materias'] ?? null) ? $cfg['formula_materias'] : [];
+            if ($porMateria === []) {
+                continue;
+            }
+            if (!isset($estado['formulas_materias_blocos'][$cod]) || !is_array($estado['formulas_materias_blocos'][$cod])) {
+                $estado['formulas_materias_blocos'][$cod] = [];
+            }
+            foreach ($porMateria as $midRaw => $exprRaw) {
+                $mid = (int) $midRaw;
+                if ($mid <= 0 || isset($estado['formulas_materias_blocos'][$cod][$mid])) {
+                    continue;
+                }
+                $toksEx = $this->tokensDaExpressao((string) $exprRaw);
+                if ($toksEx !== []) {
+                    $estado['formulas_materias_blocos'][$cod][$mid] = $toksEx;
+                }
+            }
+        }
+        if ($estado['bloco_calc'] !== '' && isset($estado['formulas_blocos'][$estado['bloco_calc']])) {
+            $estado['formula_tokens'] = $estado['formulas_blocos'][$estado['bloco_calc']];
+        }
+    }
+
+    /**
+     * @return list<array{type:string,value:string,label:string}>
+     */
+    private function tokensDaExpressao(string $expr): array
+    {
+        $expr = trim($expr);
+        if ($expr === '' || !preg_match_all('/\b(?:max|min)\b|\d+(?:\.\d+)?|[A-Za-z_][A-Za-z0-9_]*|[+\-*\/(),]/', $expr, $achados)) {
+            return [];
+        }
+        $partes = $achados[0];
+        $rotulos = [
+            'media_sem' => 'Prova Semanal',
+            'semanal' => 'Prova Semanal',
+            'prova_bim' => 'Avaliação Bimestral',
+            'bimestral' => 'Avaliação Bimestral',
+            'jornada' => 'Jornada do aluno',
+            'enac' => 'ENAC',
+            'media_bim' => 'Média Bim',
+            'media_final' => 'Média Bim Final',
+            'trab' => 'Trabalho',
+            'trabalho' => 'Trabalho',
+            'part' => 'Participação',
+            'participacao' => 'Participação',
+            'rec' => 'Recuperação',
+            'recuperacao' => 'Recuperação',
+            'faltas' => 'Faltas',
+        ];
+        $tokens = [];
+        $n = count($partes);
+        for ($i = 0; $i < $n; $i++) {
+            $p = (string) $partes[$i];
+            $baixo = strtolower($p);
+            if (in_array($baixo, ['max', 'min'], true) && (($partes[$i + 1] ?? '') === '(')) {
+                $tokens[] = [
+                    'type' => 'fn',
+                    'value' => $baixo,
+                    'label' => $baixo === 'max' ? 'maior (' : 'menor (',
+                ];
+                $i++;
+                continue;
+            }
+            if (preg_match('/^\d/', $p)) {
+                $tokens[] = ['type' => 'num', 'value' => $p, 'label' => $p];
+                continue;
+            }
+            if (in_array($p, ['+', '-', '*', '/', '(', ')', ','], true)) {
+                $simbolo = ['*' => '×', '/' => '÷', '-' => '−'][$p] ?? $p;
+                $tokens[] = ['type' => 'op', 'value' => $p, 'label' => $simbolo];
+                continue;
+            }
+            if (preg_match('/^[A-Za-z_]/', $p)) {
+                $tokens[] = [
+                    'type' => 'peca',
+                    'value' => $baixo,
+                    'label' => $rotulos[$baixo] ?? $p,
+                ];
+            }
+            if (count($tokens) >= 80) {
+                break;
+            }
+        }
+
+        return $tokens;
     }
 
     private function normalizarDataCampo($raw): string
