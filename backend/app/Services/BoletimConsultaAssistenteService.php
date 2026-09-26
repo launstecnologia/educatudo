@@ -59,6 +59,15 @@ class BoletimConsultaAssistenteService
         if ($mensagem === '' && $imagem === null) {
             return ['success' => false, 'error' => 'Escreva a pergunta ou cole um print.'];
         }
+        if ($this->pedidoEhMediaComEnac($mensagem)) {
+            return ['success' => true, 'mensagem' => $this->textoMediaComEnac()];
+        }
+        if ($this->parecePerguntaJornadaDeMateria($mensagem)) {
+            $textoJornada = $this->textoJornadaNasMaterias($mensagem, $wizardEstado);
+            if ($textoJornada !== null) {
+                return ['success' => true, 'mensagem' => $textoJornada];
+            }
+        }
         if ($imagem !== null) {
             return $this->analisarPrint($mensagem, $imagem, $wizardEstado);
         }
@@ -347,6 +356,9 @@ class BoletimConsultaAssistenteService
 
     private function responderGuia(string $mensagem): ?string
     {
+        if ($this->pedidoEhMediaComEnac($mensagem)) {
+            return $this->textoMediaComEnac();
+        }
         $t = mb_strtolower($mensagem);
         if (preg_match('/enac|substitu|maior\s*\(/u', $t)) {
             return "Para a Média Bim Final ficar com a média e só trocar quando o ENAC for maior:\n\n"
@@ -390,6 +402,36 @@ class BoletimConsultaAssistenteService
     }
 
     /**
+     * (Média Bim + ENAC) ÷ 2, e só usa esse resultado se for maior que a Média Bim.
+     */
+    private function pedidoEhMediaComEnac(string $mensagem): bool
+    {
+        $t = $this->normalizarTexto($mensagem);
+        if (!str_contains($t, 'enac')) {
+            return false;
+        }
+        $divide = preg_match('/divid|\/\s*2|por 2|÷/u', $t) === 1;
+        $escolheOMaior = preg_match('/maior|mantem|manter|se nao|senao/u', $t) === 1;
+
+        return $divide && $escolheOMaior;
+    }
+
+    private function textoMediaComEnac(): string
+    {
+        return "A Média Bim Final fica com o maior destes dois valores:\n\n"
+            . "• a Média Bim\n"
+            . "• a média da Média Bim com o ENAC: (Média Bim + ENAC) ÷ 2\n\n"
+            . "Se essa conta der maior que a Média Bim, ela entra. Se der menor, a coluna continua com a Média Bim. O ENAC não baixa a nota.\n\n"
+            . "Exemplo: Média Bim 6 e ENAC 10. (6 + 10) ÷ 2 = 8, e 8 é maior que 6, então fica 8.\n"
+            . "Exemplo: Média Bim 8 e ENAC 6. (8 + 6) ÷ 2 = 7, e 7 é menor que 8, então continua 8.\n\n"
+            . "Na coluna Média Bim Final:\n"
+            . "1. Limpe a fórmula.\n"
+            . "2. Monte: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim )\n"
+            . "3. Salvar bloco.\n\n"
+            . "Não use o botão Maior entre as duas primeiras.";
+    }
+
+    /**
      * @return string|false|null data URL válida, false se inválida, null se vazia
      */
     private function normalizarImagemPrint(?string $imagem)
@@ -422,7 +464,7 @@ class BoletimConsultaAssistenteService
         }
         $config = $this->configuracaoParaComparar($wizardEstado);
         $prompt = <<<PROMPT
-Você confere um print da tela de Evento de Notas do EducaTudo com a configuração que o sistema tem agora. Responda em português, curto, em lista.
+Você confere um print da tela de Evento de Notas do EducaTudo com a configuração que o sistema tem agora. Responda em português, curto, em lista. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Média Bim Final.
 
 O que fazer:
 - Leia o print: o que está marcado, desmarcado, vazio ou com traço.
@@ -531,14 +573,17 @@ PROMPT;
         $resumo = $this->resumoEvento($wizardEstado);
 
         return <<<PROMPT
-Você é o assistente da tela Evento de Notas do EducaTudo. Responda em português, curto e direto.
+Você é o assistente da tela Evento de Notas do EducaTudo. Responda em português, curto e direto. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Média Bim Final.
 
 Manual desta tela (não invente botão ou regra fora disto):
 - Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada do aluno…). O título do evento não define o tipo.
 - Prova Semanal mostra os eventos daquele tipo no bimestre marcado. Semanas S1–S8: Bloco A ímpares, Bloco B pares.
 - Média = soma entre parênteses ÷ quantidade. Ex.: (Prova Semanal + Avaliação Bimestral + Jornada) ÷ 3.
 - Para ficar com a média e só trocar se o ENAC for maior: maior ( Média Bim , ENAC ). Não use "Maior entre as duas primeiras".
+- Se a conta for (Média Bim + ENAC) ÷ 2 e esse resultado só entra quando for maior que a Média Bim: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim ). Explique com um exemplo numérico, sem fórmula técnica.
 - Jornada entra pelo bimestre cadastrado na jornada.
+- "1º A", "1a" ou "do 1a" é a turma, não o bimestre. Só use bimestre se a frase disser a palavra bimestre.
+- Se a coluna Jornada do aluno do boletim tiver número, não diga que o aluno não tem jornada. Informe esse número. A jornada pode estar cadastrada com outro nome de matéria e mesmo assim aparecer na linha do boletim.
 - Sem aluno na prévia, os números são exemplo. Com aluno, são as notas lançadas.
 
 Número de nota, quantidade de jornada ou lançamento SÓ pode vir de uma consulta. Se não consultou, não chute.
@@ -649,8 +694,33 @@ PROMPT;
         if ($pos !== false) {
             $resposta = substr($resposta, 0, $pos);
         }
+        $resposta = $this->tirarMarkupTecnico($resposta);
+        if ($this->respostaPareceFormulaTecnicaEnac($resposta)) {
+            return $this->textoMediaComEnac();
+        }
 
         return trim($resposta);
+    }
+
+    private function tirarMarkupTecnico(string $texto): string
+    {
+        $texto = preg_replace('/```[a-z]*\s*/i', '', $texto) ?? $texto;
+        $texto = str_replace(['```', '**'], '', $texto);
+        $texto = preg_replace('/\\\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/', '($1) ÷ ($2)', $texto) ?? $texto;
+        $texto = preg_replace('/\\\\text\s*\{([^{}]*)\}/', '$1', $texto) ?? $texto;
+        $texto = str_replace(['\\[', '\\]', '\\(', '\\)', '$$'], '', $texto);
+        $texto = preg_replace('/\\\\[a-zA-Z]+/', '', $texto) ?? $texto;
+
+        return trim($texto);
+    }
+
+    private function respostaPareceFormulaTecnicaEnac(string $texto): bool
+    {
+        $t = $this->normalizarTexto($texto);
+        $temMax = str_contains($t, 'max(') || str_contains($t, 'maior(');
+        $temDivisao = preg_match('/\/\s*2|÷\s*2|divid/u', $t) === 1;
+
+        return str_contains($t, 'enac') && $temMax && $temDivisao;
     }
 
     /**
@@ -1001,6 +1071,255 @@ PROMPT;
         }
 
         return '';
+    }
+
+    private function parecePerguntaJornadaDeMateria(string $mensagem): bool
+    {
+        $t = $this->normalizarTexto($mensagem);
+        if (!str_contains($t, 'jornada')) {
+            return false;
+        }
+
+        return $this->materiasCitadas($mensagem) !== [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function materiasCitadas(string $mensagem): array
+    {
+        $t = $this->normalizarTexto($mensagem);
+        $map = [
+            'educacao fisica' => 'Educação Física',
+            'ed fisica' => 'Educação Física',
+            'lingua portuguesa' => 'Língua Portuguesa',
+            'leitura e interpretacao' => 'Leitura e Interpretação',
+            'artes' => 'Arte',
+            'arte' => 'Arte',
+            'portugues' => 'Português',
+            'matematica' => 'Matemática',
+            'historia' => 'História',
+            'geografia' => 'Geografia',
+            'ingles' => 'Inglês',
+            'fisica' => 'Física',
+            'quimica' => 'Química',
+            'biologia' => 'Biologia',
+            'sociologia' => 'Sociologia',
+            'filosofia' => 'Filosofia',
+            'literatura' => 'Literatura',
+            'redacao' => 'Redação',
+        ];
+        $achadas = [];
+        foreach ($map as $chave => $rotulo) {
+            if (!str_contains($t, $chave)) {
+                continue;
+            }
+            $achadas[$rotulo] = $rotulo;
+            $t = str_replace($chave, ' ', $t);
+        }
+
+        return array_values($achadas);
+    }
+
+    /**
+     * @param array<string,mixed>|null $wizardEstado
+     */
+    private function textoJornadaNasMaterias(string $mensagem, ?array $wizardEstado): ?string
+    {
+        $nome = $this->extrairNomeAntesDaTurma($mensagem);
+        if ($nome === '') {
+            return null;
+        }
+        $turma = $this->extrairTurmaCurta($mensagem);
+        $t = $this->normalizarTexto($mensagem);
+        $bimestre = 0;
+        if (preg_match('/(\d)\s*[ºo]?\s*bimestre/u', $t, $mBim)) {
+            $bimestre = (int) $mBim[1];
+        }
+        $filtros = [
+            'aluno_nome' => $nome,
+            'turma' => $turma,
+            'bimestre' => $bimestre,
+        ];
+        $resumo = $this->jornadas->resumoJornadasAluno($filtros);
+        if ($turma !== '' && (empty($resumo['ok']) || !empty($resumo['candidatos']))) {
+            $filtros['turma'] = '';
+            $resumo = $this->jornadas->resumoJornadasAluno($filtros);
+        }
+        if (!empty($resumo['candidatos'])) {
+            $nomes = [];
+            foreach ((array) $resumo['candidatos'] as $cand) {
+                if (!is_array($cand)) {
+                    continue;
+                }
+                $rotulo = trim((string) ($cand['nome'] ?? ''));
+                $turmaCand = trim((string) ($cand['turma_nome'] ?? ''));
+                if ($rotulo !== '') {
+                    $nomes[] = $turmaCand !== '' ? $rotulo . ' (' . $turmaCand . ')' : $rotulo;
+                }
+            }
+
+            return $nomes === []
+                ? 'Encontrei mais de um aluno com esse nome. Diga a turma.'
+                : "Encontrei mais de um aluno:\n\n• " . implode("\n• ", $nomes);
+        }
+        if (empty($resumo['ok'])) {
+            return null;
+        }
+
+        $aluno = is_array($resumo['aluno'] ?? null) ? $resumo['aluno'] : [];
+        $nomeAluno = trim((string) ($aluno['nome'] ?? $nome));
+        $turmaAluno = trim((string) ($aluno['turma_nome'] ?? ''));
+        $materias = $this->materiasCitadas($mensagem);
+        $porMateria = is_array($resumo['por_materia'] ?? null) ? $resumo['por_materia'] : [];
+        $linhas = [];
+        foreach ($materias as $rotulo) {
+            $cadastro = $this->resumoJornadaDaMateria($porMateria, $rotulo);
+            $notaBoletim = $this->notaJornadaNoBoletim($rotulo, $nomeAluno, $wizardEstado);
+            if ($notaBoletim !== null) {
+                $frase = 'no boletim a Jornada do aluno está ' . $this->formatarNotaConsulta($notaBoletim);
+            } else {
+                $frase = 'no boletim a Jornada do aluno está vazia';
+            }
+            if ($cadastro !== null) {
+                $frase .= '; ' . $cadastro['quantidade'] . ' jornada(s) cadastrada(s) nessa matéria, '
+                    . $cadastro['concluidas'] . ' concluída(s)';
+            } elseif ($notaBoletim !== null) {
+                $frase .= '; não há jornada com o nome ' . $rotulo
+                    . '. Esse número é o das jornadas que o evento coloca nessa linha';
+            } else {
+                $frase .= '; não há jornada cadastrada com o nome ' . $rotulo;
+            }
+            $linhas[] = $rotulo . ': ' . $frase . '.';
+        }
+
+        $outras = [];
+        foreach ($porMateria as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $nomeMat = trim((string) ($item['materia'] ?? ''));
+            if ($nomeMat === '' || $nomeMat === 'Sem matéria') {
+                continue;
+            }
+            $jaCitada = false;
+            foreach ($materias as $rotulo) {
+                if ($this->nomesMateriaConsultaBatem($nomeMat, $rotulo)) {
+                    $jaCitada = true;
+                    break;
+                }
+            }
+            if ($jaCitada) {
+                continue;
+            }
+            $outras[] = $nomeMat . ' (' . (int) ($item['concluidas'] ?? 0) . ' de ' . (int) ($item['quantidade'] ?? 0) . ' concluídas)';
+        }
+
+        $texto = $nomeAluno . ($turmaAluno !== '' ? ' · ' . $turmaAluno : '') . ".\n\n" . implode("\n", $linhas);
+        if ($outras !== []) {
+            $texto .= "\n\nJornadas em outras matérias: " . implode('; ', array_slice($outras, 0, 12)) . '.';
+        }
+
+        return $texto;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $porMateria
+     * @return array{quantidade:int,concluidas:int}|null
+     */
+    private function resumoJornadaDaMateria(array $porMateria, string $rotulo): ?array
+    {
+        $quantidade = 0;
+        $concluidas = 0;
+        $achou = false;
+        foreach ($porMateria as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $nomeMat = trim((string) ($item['materia'] ?? ''));
+            if (!$this->nomesMateriaConsultaBatem($nomeMat, $rotulo)) {
+                continue;
+            }
+            $achou = true;
+            $quantidade += (int) ($item['quantidade'] ?? 0);
+            $concluidas += (int) ($item['concluidas'] ?? 0);
+        }
+
+        return $achou ? ['quantidade' => $quantidade, 'concluidas' => $concluidas] : null;
+    }
+
+    /**
+     * @param array<string,mixed>|null $wizardEstado
+     */
+    private function notaJornadaNoBoletim(string $materia, string $alunoNome, ?array $wizardEstado): ?float
+    {
+        if (!is_array($wizardEstado)) {
+            return null;
+        }
+        $nota = $this->notaNoEvento([
+            'aluno_nome' => $alunoNome,
+            'materia_nome' => $materia,
+        ], $wizardEstado);
+        if (empty($nota['ok']) || empty($nota['linhas']) || !is_array($nota['linhas'])) {
+            return null;
+        }
+        foreach ($nota['linhas'] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            foreach ((array) ($linha['notas'] ?? []) as $celula) {
+                if (!is_array($celula) || !is_numeric($celula['valor'] ?? null)) {
+                    continue;
+                }
+                $coluna = $this->normalizarTexto((string) ($celula['coluna'] ?? ''));
+                if (str_contains($coluna, 'jornada')) {
+                    return (float) $celula['valor'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function extrairNomeAntesDaTurma(string $mensagem): string
+    {
+        if (preg_match('/([\p{Lu}][\p{L}\']+(?:\s+[\p{Lu}][\p{L}\']+){1,5})\s+d[oa]\s+\d/u', $mensagem, $m)) {
+            return trim((string) $m[1]);
+        }
+
+        return $this->extrairNomeAluno($mensagem);
+    }
+
+    private function extrairTurmaCurta(string $mensagem): string
+    {
+        if (!preg_match('/\bd[oa]\s+(\d+)\s*[ºªo]?\s*([a-zA-Z])\b/u', $mensagem, $m)) {
+            return '';
+        }
+        $trecho = $m[0];
+        if (preg_match('/bimestre/ui', substr($mensagem, (int) strpos($mensagem, $trecho), strlen($trecho) + 12))) {
+            return '';
+        }
+
+        return $m[1] . 'º' . mb_strtoupper($m[2]);
+    }
+
+    private function nomesMateriaConsultaBatem(string $nome, string $pedido): bool
+    {
+        $nome = str_replace('artes', 'arte', $this->normalizarTexto($nome));
+        $pedido = str_replace('artes', 'arte', $this->normalizarTexto($pedido));
+        if ($nome === '' || $pedido === '') {
+            return false;
+        }
+
+        return $nome === $pedido || str_contains($nome, $pedido) || str_contains($pedido, $nome);
+    }
+
+    private function formatarNotaConsulta(float $valor): string
+    {
+        $texto = number_format($valor, 2, ',', '');
+        $texto = rtrim(rtrim($texto, '0'), ',');
+
+        return $texto === '' ? '0' : $texto;
     }
 
     private function extrairMateria(string $mensagem): string
