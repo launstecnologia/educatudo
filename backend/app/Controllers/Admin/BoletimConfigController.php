@@ -6209,26 +6209,14 @@ class BoletimConfigController extends BaseController
      */
     private function parseFormulaMateriasCalculadoFromComponente(array $componente): array
     {
-        $raw = $componente['config_json'] ?? '';
-        if (is_array($raw)) {
-            $decoded = $raw;
-        } else {
-            $decoded = json_decode(trim((string) $raw), true);
-        }
-        if (!is_array($decoded)) {
-            $decoded = [];
-        }
+        // config do assistente (exceção por matéria) precisa vencer o config_json
+        // vazio: sem isso a prévia ignora a fórmula da matéria e usa a geral.
+        $decoded = $this->decodeComponenteConfig($componente);
         $formulaMode = strtolower(trim((string) ($decoded['formula_mode'] ?? '')));
-        if ($formulaMode === '' && isset($componente['config']) && is_array($componente['config'])) {
-            $formulaMode = strtolower(trim((string) ($componente['config']['formula_mode'] ?? '')));
-        }
         if ($formulaMode === 'single') {
             return [];
         }
         $map = $decoded['formula_materias'] ?? [];
-        if (!is_array($map) && isset($componente['config']) && is_array($componente['config'])) {
-            $map = $componente['config']['formula_materias'] ?? [];
-        }
         if (!is_array($map)) {
             return [];
         }
