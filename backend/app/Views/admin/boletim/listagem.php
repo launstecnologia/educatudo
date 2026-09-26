@@ -79,6 +79,11 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 <i class="fa-solid fa-clipboard-list mr-2 text-gray-500"></i>
                 Modelo de Boletim
             </a>
+            <a href="<?= URL ?>/admin/boletim/arquivo"
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-box-archive mr-2 text-gray-500"></i>
+                Arquivo de fórmulas
+            </a>
             <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-file-lines mr-2 text-gray-500"></i>

@@ -27,6 +27,7 @@ $periodoRef = (string) ($periodo_ref ?? '');
 $dataInicio = (string) ($data_inicio ?? '');
 $dataFim = (string) ($data_fim ?? '');
 $simulacao = $simulacao ?? null;
+$modoArquivo = !empty($modo_arquivo);
 $flashMessage = (string) ($flash_message ?? '');
 $flashType = (string) ($flash_type ?? 'success');
 $csrfToken = (string) ($csrf_token ?? '');
@@ -571,10 +572,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                 Configurar Notas
             </a>
-            <a href="<?= URL ?>/admin/boletim"
+            <a href="<?= URL ?>/admin/<?= $modoArquivo ? 'boletim/arquivo' : 'boletim' ?>"
                class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium shrink-0">
                 <i class="fa-solid fa-arrow-left"></i>
-                Todos os eventos
+                <?= $modoArquivo ? 'Arquivo de fórmulas' : 'Todos os eventos' ?>
             </a>
             <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
                class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium shrink-0">
@@ -591,11 +592,16 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     <?php endif; ?>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="xl:col-span-3 hidden" aria-hidden="true">
-            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/salvar" class="p-5 space-y-5" id="form-regra-boletim">
+        <?php if ($modoArquivo): ?>
+        <div class="xl:col-span-3 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Configurador antigo, só para consultar a fórmula deste evento. Esta tela vai sair.
+        </div>
+        <?php endif; ?>
+        <div class="xl:col-span-3<?= $modoArquivo ? '' : ' hidden' ?>"<?= $modoArquivo ? '' : ' aria-hidden="true"' ?>>
+            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/salvar" class="p-5 space-y-5 bg-white rounded-xl shadow-lg" id="form-regra-boletim"<?= $modoArquivo ? ' onsubmit="return false;"' : '' ?>>
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
-                <input type="hidden" name="exibir_em" id="regra-exibir-em" value="notas">
+                <input type="hidden" name="exibir_em" id="regra-exibir-em" value="<?= htmlspecialchars($modoArquivo ? (string) ($regra['exibir_em'] ?? 'notas') : 'notas') ?>">
                 <input type="hidden" name="finalidade" id="regra-finalidade" value="<?= htmlspecialchars($finalidade) ?>">
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Boletim</label>
@@ -882,7 +888,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900">Blocos da regra</h3>
                     </div>
+                    <?php if (!$modoArquivo): ?>
                     <button type="button" id="btn-add-bloco" class="btn-primary-custom shrink-0 h-10 px-3 rounded-lg hover:opacity-90 text-sm font-medium inline-flex items-center justify-center">+ Adicionar bloco</button>
+                    <?php endif; ?>
                 </div>
 
                 <div id="wrap-semanas-quadro" class="hidden rounded-lg border border-indigo-100 bg-indigo-50 p-4">
@@ -902,9 +910,11 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 
                 <div id="lista-blocos" class="space-y-3"></div>
 
+                <?php if (!$modoArquivo): ?>
                 <div class="pt-2">
                     <button type="submit" id="btn-salvar-regra-boletim" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 font-medium">Salvar evento</button>
                 </div>
+                <?php endif; ?>
             </form>
         </div>
 

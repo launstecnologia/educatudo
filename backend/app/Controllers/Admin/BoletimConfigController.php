@@ -231,6 +231,67 @@ class BoletimConfigController extends BaseController
         unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
     }
 
+    /**
+     * Lista temporária dos eventos antigos (Boletim e Notas) para consultar a fórmula.
+     * Fora do menu. Sai quando o configurador novo cobrir esses eventos.
+     */
+    public function arquivo(): void
+    {
+        $user = $this->auth->getUser();
+        $eventos = array_values(array_filter($this->boletimConfig->listAllRules(500), static function ($ev): bool {
+            $tipo = strtolower(trim((string) ($ev['exibir_em'] ?? '')));
+
+            return $tipo === 'notas' || $tipo === 'boletim';
+        }));
+
+        $seriesNomesPorId = [];
+        foreach ($this->boletimConfig->getAvailableSeries(300) as $serie) {
+            $seriesNomesPorId[(int) ($serie['id'] ?? 0)] = trim((string) ($serie['nome'] ?? ''));
+        }
+
+        foreach ($eventos as &$ev) {
+            $nomes = [];
+            $ordemMax = 0;
+            foreach ($this->parseSeriesIdsFromRegra($ev) as $sid) {
+                $nomeSerie = $seriesNomesPorId[(int) $sid] ?? '';
+                if ($nomeSerie === '') {
+                    continue;
+                }
+                $nomes[] = $nomeSerie;
+                if (preg_match('/\d+/', $nomeSerie, $matchSerie)) {
+                    $ordemMax = max($ordemMax, (int) $matchSerie[0]);
+                }
+            }
+            $tipoNotas = strtolower(trim((string) ($ev['exibir_em'] ?? ''))) === 'notas';
+            $ev['tipo_label'] = $tipoNotas ? 'Notas' : 'Boletim';
+            $ev['series_nomes'] = $nomes;
+            $seriesLabel = implode(', ', $nomes);
+            $ev['nome_exibicao'] = trim(
+                $ev['tipo_label'] . ' — ' . (string) ($ev['nome'] ?? 'Evento')
+                . ($seriesLabel !== '' ? ' ' . $seriesLabel : '')
+            );
+            $ev['_serie_ordem'] = $ordemMax;
+        }
+        unset($ev);
+
+        usort($eventos, static function (array $a, array $b): int {
+            $cmp = ((int) ($b['_serie_ordem'] ?? 0)) <=> ((int) ($a['_serie_ordem'] ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strcmp((string) ($a['nome_exibicao'] ?? ''), (string) ($b['nome_exibicao'] ?? ''));
+        });
+
+        $this->viewWithLayout('admin', 'admin/boletim/arquivo', [
+            'title' => 'Arquivo de fórmulas - EducaTudo',
+            'page_title' => 'Arquivo de fórmulas',
+            'user' => $user,
+            'current_page' => 'boletim_config',
+            'eventos' => $eventos,
+        ]);
+    }
+
     public function geracaoStatusJson(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -278,9 +339,14 @@ class BoletimConfigController extends BaseController
     {
         $user = $this->auth->getUser();
         $somenteTabela = isset($_GET['somente_tabela']) && in_array(strtolower(trim((string) $_GET['somente_tabela'])), ['1', 'true', 'sim', 'yes'], true);
+        $modoArquivo = isset($_GET['arquivo']) && in_array(strtolower(trim((string) $_GET['arquivo'])), ['1', 'true', 'sim', 'yes'], true);
         $isNewMode = isset($_GET['novo']) && in_array(strtolower(trim((string) $_GET['novo'])), ['1', 'true', 'sim', 'yes'], true);
         $selectedRegraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
         $boletimIdGet = isset($_GET['boletim_id']) ? (int) $_GET['boletim_id'] : 0;
+        if ($modoArquivo && $selectedRegraId <= 0) {
+            $this->redirect('/admin/boletim/arquivo');
+            return;
+        }
         $regra = null;
         if (!$isNewMode) {
             if ($selectedRegraId > 0) {
@@ -294,7 +360,7 @@ class BoletimConfigController extends BaseController
             } else {
                 $regra = $this->boletimConfig->getUltimaRegraNotas();
             }
-            if ($regra && strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'boletim') {
+            if (!$modoArquivo && $regra && strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'boletim') {
                 $cadastro = new BoletimCadastroService();
                 $bol = $cadastro->model()->findByRegraId((int) ($regra['id'] ?? 0));
                 if ($bol) {
@@ -472,6 +538,7 @@ class BoletimConfigController extends BaseController
             'flash_message' => $_SESSION['boletim_flash'] ?? '',
             'flash_type' => $_SESSION['boletim_flash_type'] ?? 'success',
             'somente_tabela' => $somenteTabela,
+            'modo_arquivo' => $modoArquivo,
             'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
             'geracao_em_andamento' => $this->boletimConfig->temGeracaoEmAndamento((int) ($regra['id'] ?? 0)),
             'alunos_travados' => ((int) ($regra['id'] ?? 0) > 0)
