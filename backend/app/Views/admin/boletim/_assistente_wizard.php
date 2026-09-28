@@ -543,26 +543,72 @@ $boletimWizardSteps = [
         };
     }
 
+    function periodoInfo(ano) {
+        var mapa = (catalogo && catalogo.periodos_por_ano) || {};
+        var chave = String(Number(ano == null ? (estado && estado.ano_letivo) : ano) || 0);
+        var info = mapa[chave] || null;
+        if (info && Number(info.quantidade) > 0) return info;
+        return {
+            tipo: 'bimestre',
+            quantidade: 4,
+            rotulo_campo: 'Bimestre',
+            rotulo_campo_plural: 'Bimestres',
+            rotulos: { '1': '1º Bimestre', '2': '2º Bimestre', '3': '3º Bimestre', '4': '4º Bimestre' }
+        };
+    }
+
+    function maxPeriodo(ano) {
+        return Number(periodoInfo(ano).quantidade) || 4;
+    }
+
+    function periodoNumeroValido(n, ano) {
+        n = Number(n);
+        return n >= 1 && n <= maxPeriodo(ano);
+    }
+
+    function rotuloCampoPeriodo(ano) {
+        return String(periodoInfo(ano).rotulo_campo || 'Bimestre');
+    }
+
+    function rotuloPeriodoNumero(n, ano) {
+        var rotulos = periodoInfo(ano).rotulos || {};
+        return rotulos[String(n)] || rotulos[n] || (n + 'º ' + rotuloCampoPeriodo(ano));
+    }
+
+    function htmlOpcoesPeriodo(ano, selecionado) {
+        var html = '';
+        var i;
+        for (i = 1; i <= maxPeriodo(ano); i++) {
+            html += '<option value="' + i + '"' + (Number(selecionado) === i ? ' selected' : '') + '>' + esc(rotuloPeriodoNumero(i, ano)) + '</option>';
+        }
+        return html;
+    }
+
     function bimestresPadraoPeca() {
         var b = Number((estado && estado.bimestre) || 0);
-        return b >= 1 && b <= 4 ? [b] : [];
+        return periodoNumeroValido(b) ? [b] : [];
     }
 
     function bimestresUiPeca() {
-        return [1, 2, 3, 4];
+        var lista = [];
+        var i;
+        for (i = 1; i <= maxPeriodo(); i++) lista.push(i);
+        return lista;
     }
 
     function htmlBimestresPeca(key, opts) {
         var bimsPeca = normalizarBimestresPeca(opts && opts.bimestres);
-        var html = '<div><span class="text-xs font-medium text-gray-600">Bimestre dos eventos</span>';
-        html += '<p class="text-xs text-gray-500 mt-0.5">Marque o(s) bimestre(s). Nenhum = usa o bimestre escolhido na Identidade.</p>';
+        var campo = rotuloCampoPeriodo();
+        var campoMin = campo.toLocaleLowerCase('pt-BR');
+        var html = '<div><span class="text-xs font-medium text-gray-600">' + esc(campo) + ' dos eventos</span>';
+        html += '<p class="text-xs text-gray-500 mt-0.5">Marque o(s) ' + esc(campoMin) + '(s). Nenhum = usa o ' + esc(campoMin) + ' escolhido na Identidade.</p>';
         html += '<div class="grid grid-cols-3 gap-2 mt-2">';
         bimestresUiPeca().forEach(function (b) {
             var n = eventosDaPecaNoBimestre(key, b).length;
             var on = bimsPeca.some(function (x) { return Number(x) === b; });
             html += '<label class="inline-flex items-center gap-2 text-sm border rounded-lg px-3 py-2 bg-slate-50 cursor-pointer">';
             html += '<input type="checkbox" class="bw-peca-bim rounded border-gray-300 text-indigo-600" data-peca="' + key + '" value="' + b + '"' + (on ? ' checked' : '') + '>';
-            html += '<span>' + b + 'º bim. <span class="text-xs text-gray-500">(' + n + ')</span></span></label>';
+            html += '<span>' + esc(rotuloPeriodoNumero(b)) + ' <span class="text-xs text-gray-500">(' + n + ')</span></span></label>';
         });
         html += '</div></div>';
         return html;
@@ -570,7 +616,7 @@ $boletimWizardSteps = [
 
     function eventosSelecionaveisPeca(key, opts) {
         var bims = normalizarBimestresPeca(opts && opts.bimestres);
-        if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
+        if (!bims.length && periodoNumeroValido(estado.bimestre)) bims = [Number(estado.bimestre)];
         var byId = {};
         bims.forEach(function (b) {
             eventosDaPecaNoBimestre(key, b).forEach(function (ev) {
@@ -613,7 +659,9 @@ $boletimWizardSteps = [
             if (ms) sem = ms[1].toUpperCase();
         }
         if (sem) parts.push(sem);
-        if (ev.bimestre) parts.push(ev.bimestre + 'º bim.');
+        if (ev.bimestre && periodoNumeroValido(ev.bimestre, ev.ano_letivo || (estado && estado.ano_letivo))) {
+            parts.push(rotuloPeriodoNumero(ev.bimestre, ev.ano_letivo || (estado && estado.ano_letivo)));
+        }
         return parts.join(' · ');
     }
 
@@ -628,7 +676,7 @@ $boletimWizardSteps = [
 
     function htmlAvisoAnoEventos(key, opts, eventos) {
         var bims = normalizarBimestresPeca(opts && opts.bimestres);
-        if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
+        if (!bims.length && periodoNumeroValido(estado.bimestre)) bims = [Number(estado.bimestre)];
         var noAno = [];
         bims.forEach(function (b) {
             eventosDaPecaFiltrados(key, b, true).forEach(function (ev) { noAno.push(ev); });
@@ -656,7 +704,8 @@ $boletimWizardSteps = [
         var eventos = eventosSelecionaveisPeca(key, opts || {});
         if (!eventos.length) {
             var anoTxt = Number(estado.ano_letivo || 0) > 0 ? (' de ' + Number(estado.ano_letivo)) : '';
-            return '<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Nenhum evento encontrado para esta peça no bimestre marcado' + anoTxt + '.</div>';
+            var campoMin = rotuloCampoPeriodo().toLocaleLowerCase('pt-BR');
+            return '<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Nenhum evento encontrado para esta peça no ' + esc(campoMin) + ' marcado' + anoTxt + '.</div>';
         }
         var manual = Number((opts && opts.blocos_ids_manual) || 0) === 1;
         var ids = normalizarIdsJs(opts && opts.blocos_ids);
@@ -686,7 +735,7 @@ $boletimWizardSteps = [
         pecas.forEach(function (key) {
             var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
             var bims = normalizarBimestresPeca(opts.bimestres);
-            if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
+            if (!bims.length && periodoNumeroValido(estado.bimestre)) bims = [Number(estado.bimestre)];
             var btxt = bims.length ? bims.map(function (b) { return b + 'º'; }).join(', ') : 'bimestre da identidade';
             if (key === 'jornada') {
                 var jornadas = [];
@@ -705,7 +754,7 @@ $boletimWizardSteps = [
 
     function htmlJornadaPeca(opts) {
         var bims = normalizarBimestresPeca(opts && opts.bimestres);
-        if (!bims.length && estado.bimestre >= 1 && estado.bimestre <= 4) bims = [Number(estado.bimestre)];
+        if (!bims.length && periodoNumeroValido(estado.bimestre)) bims = [Number(estado.bimestre)];
         if (estado.jornada_modo !== 'selecionadas') estado.jornada_modo = 'bimestre';
         estado.jornada_bimestres = bims.slice();
         var total = 0;
@@ -731,7 +780,7 @@ $boletimWizardSteps = [
                 var on = manualJ ? !!selJ[jid] : true;
                 var parts = [j.nome || ('Jornada #' + jid)];
                 if (j.materia_nome) parts.push(j.materia_nome);
-                if (j.bimestre) parts.push(j.bimestre + 'º bim.');
+                if (j.bimestre && periodoNumeroValido(j.bimestre)) parts.push(rotuloPeriodoNumero(j.bimestre));
                 html += '<label class="inline-flex items-start gap-2 text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer">';
                 html += '<input type="checkbox" class="bw-jornada-id mt-0.5 rounded border-gray-300 text-indigo-600" value="' + jid + '"' + (on ? ' checked' : '') + '>';
                 html += '<span>' + esc(parts.join(' · ')) + '</span></label>';
@@ -775,7 +824,7 @@ $boletimWizardSteps = [
         var out = [];
         (Array.isArray(raw) ? raw : []).forEach(function (x) {
             var n = parseInt(x, 10);
-            if (n >= 1 && n <= 4 && out.indexOf(n) < 0) out.push(n);
+            if (periodoNumeroValido(n) && out.indexOf(n) < 0) out.push(n);
         });
         return out;
     }
@@ -846,7 +895,7 @@ $boletimWizardSteps = [
         var ano = Number((estado && estado.ano_letivo) || 0);
         var papel = papelDaPeca(key);
         var bimsMarcados = normalizarBimestresPeca(opts.bimestres);
-        if (!bimsMarcados.length && estado.bimestre >= 1 && estado.bimestre <= 4) bimsMarcados = [Number(estado.bimestre)];
+        if (!bimsMarcados.length && periodoNumeroValido(estado.bimestre)) bimsMarcados = [Number(estado.bimestre)];
         var bimSemCampo = bimsMarcados.length ? Number(bimsMarcados[0]) : Number(bim);
         return (catalogo.eventos_prova || []).filter(function (ev) {
             var bimEv = Number(ev.bimestre) || 0;
@@ -3330,8 +3379,8 @@ $boletimWizardSteps = [
                     html += '<option value="' + Number(r.id) + '"' + (String(estado.clonar_regra_id || '') === String(r.id) ? ' selected' : '') + '>' + esc(label) + '</option>';
                 });
                 html += '</select>';
-                html += '<div class="grid grid-cols-2 gap-3 mt-3"><div><label class="text-xs text-gray-600">Novo bimestre</label>'
-                    + '<input id="bw-clonar-bim" type="number" min="1" max="4" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" value="' + (estado.bimestre || 1) + '"></div>'
+                html += '<div class="grid grid-cols-2 gap-3 mt-3"><div><label class="text-xs text-gray-600">Novo ' + esc(rotuloCampoPeriodo().toLocaleLowerCase('pt-BR')) + '</label>'
+                    + '<input id="bw-clonar-bim" type="number" min="1" max="' + maxPeriodo() + '" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" value="' + (periodoNumeroValido(estado.bimestre) ? estado.bimestre : 1) + '"></div>'
                     + '<div><label class="text-xs text-gray-600">Ano letivo</label>'
                     + '<input id="bw-clonar-ano" type="number" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" value="' + (estado.ano_letivo || '') + '"></div></div>';
             }
@@ -3347,12 +3396,12 @@ $boletimWizardSteps = [
             html += '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium text-gray-700">Ano letivo</label>'
                 + '<input id="bw-ano" type="number" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" value="' + (estado.ano_letivo || '') + '"></div>';
             if (ehBoletimComposto()) {
-                html += '<div><label class="text-sm font-medium text-gray-700">Bimestre</label>'
-                    + '<p class="mt-1 h-10 flex items-center text-sm text-gray-600">Ano todo (1º ao 4º)</p></div></div>';
+                html += '<div><label class="text-sm font-medium text-gray-700">' + esc(rotuloCampoPeriodo()) + '</label>'
+                    + '<p class="mt-1 h-10 flex items-center text-sm text-gray-600">Ano todo (1º ao ' + maxPeriodo() + 'º)</p></div></div>';
             } else {
-                html += '<div><label class="text-sm font-medium text-gray-700">Bimestre</label>'
+                html += '<div><label class="text-sm font-medium text-gray-700">' + esc(rotuloCampoPeriodo()) + '</label>'
                     + '<select id="bw-bim" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">'
-                    + [1,2,3,4].map(function (b) { return '<option value="' + b + '"' + (Number(estado.bimestre) === b ? ' selected' : '') + '>' + b + 'º</option>'; }).join('')
+                    + htmlOpcoesPeriodo(estado.ano_letivo, estado.bimestre)
                     + '</select></div></div>';
             }
             html += '<div><label class="text-sm font-medium text-gray-700">Boletim</label>'
@@ -3369,16 +3418,14 @@ $boletimWizardSteps = [
                 html += '<p class="text-xs text-amber-800 mt-1">Cadastre o modelo em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a> antes de criar a avaliação.</p>';
             }
             html += '</div>';
-            html += '<div><label class="text-sm font-medium text-gray-700">Quadro de Notas</label>'
+            html += '<div><label class="text-sm font-medium text-gray-700">Quadro de Notas <span class="font-normal text-gray-400">(opcional)</span></label>'
                 + '<select id="bw-quadro" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">';
-            html += '<option value="">Selecione o quadro</option>';
+            html += '<option value="">Sem quadro</option>';
             (catalogo.quadros_notas || []).forEach(function (q) {
                 html += '<option value="' + Number(q.id) + '"' + (Number(estado.grupo_regras_notas_id) === Number(q.id) ? ' selected' : '') + '>' + esc(q.nome || ('Quadro #' + q.id)) + '</option>';
             });
             html += '</select>';
-            if (!(catalogo.quadros_notas || []).length) {
-                html += '<p class="text-xs text-amber-800 mt-1">Cadastre o molde em <a href="<?= URL ?>/admin/quadros-notas" class="underline">Acadêmico → Quadro de Notas</a> (colunas S1, AV1…).</p>';
-            }
+            html += '<p class="text-xs text-gray-500 mt-1">Só use se este evento tiver colunas do molde (S1, AV1…).</p>';
             html += '</div>';
             html += '</div>';
             if (ehBoletimComposto()) html += htmlFontesBimestres();
@@ -3386,7 +3433,7 @@ $boletimWizardSteps = [
 
         if (passo === 'pecas') {
             html += '<p class="text-sm text-gray-700">Quais notas entram neste boletim?</p>';
-            html += '<p class="text-xs text-gray-500 mt-1">Marque o que entra e o bimestre de cada peça. Ordem das colunas e fórmulas ficam no passo <strong>Exibir</strong>.</p>';
+            html += '<p class="text-xs text-gray-500 mt-1">Marque o que entra e o ' + esc(rotuloCampoPeriodo().toLocaleLowerCase('pt-BR')) + ' de cada peça. Ordem das colunas e fórmulas ficam no passo <strong>Exibir</strong>.</p>';
             html += '<div class="grid gap-3 mt-3">';
             (catalogo.pecas || []).forEach(function (p) {
                 var on = (estado.pecas || []).indexOf(p.key) >= 0;
@@ -3688,7 +3735,10 @@ $boletimWizardSteps = [
                     agendarMontar();
                     return;
                 }
-                if (id === 'bw-ano' && Number(anoAntes) !== Number(estado.ano_letivo)) {
+                if ((id === 'bw-ano' || id === 'bw-clonar-ano') && Number(anoAntes) !== Number(estado.ano_letivo)) {
+                    if (!periodoNumeroValido(estado.bimestre)) {
+                        estado.bimestre = maxPeriodo();
+                    }
                     var idsOk = {};
                     turmasVisiveis().forEach(function (t) { idsOk[Number(t.id)] = true; });
                     estado.turmas_ids = (estado.turmas_ids || []).filter(function (idTurma) { return idsOk[Number(idTurma)]; });
@@ -3720,7 +3770,7 @@ $boletimWizardSteps = [
                     estado.jornada_modo = 'bimestre';
                     estado.jornada_bimestres = estado.pecas_opcoes[peca].bimestres.slice();
                     estado.jornada_ids = [];
-                    if (!estado.jornada_bimestres.length && estado.bimestre >= 1 && estado.bimestre <= 4) {
+                    if (!estado.jornada_bimestres.length && periodoNumeroValido(estado.bimestre)) {
                         estado.jornada_bimestres = [Number(estado.bimestre)];
                     }
                     renderAll();
@@ -3951,16 +4001,42 @@ $boletimWizardSteps = [
         if (erros && erros.length) {
             errosEl.classList.remove('hidden');
             errosEl.textContent = (resumo ? (resumo + ' ') : '') + erros.join(' ');
-            if (typeof errosEl.scrollIntoView === 'function') {
-                errosEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
         } else {
             errosEl.classList.add('hidden');
             errosEl.textContent = '';
         }
     }
 
+    function capturarScroll() {
+        var lista = [];
+        var el = bodyEl ? bodyEl.parentElement : null;
+        while (el && el !== document.documentElement) {
+            if (el.scrollHeight > el.clientHeight + 1) {
+                lista.push({ el: el, top: el.scrollTop, left: el.scrollLeft });
+            }
+            el = el.parentElement;
+        }
+        lista.push({
+            el: null,
+            top: window.scrollY || document.documentElement.scrollTop || 0,
+            left: window.scrollX || document.documentElement.scrollLeft || 0
+        });
+        return lista;
+    }
+
+    function aplicarScroll(lista) {
+        (lista || []).forEach(function (item) {
+            if (!item.el) {
+                window.scrollTo(item.left, item.top);
+                return;
+            }
+            item.el.scrollTop = item.top;
+            item.el.scrollLeft = item.left;
+        });
+    }
+
     function renderAll() {
+        var scroll = capturarScroll();
         garantirEstado();
         if (ehBoletimComposto() && ['pecas', 'formula'].indexOf(estado.passo) >= 0) {
             estado.passo = 'identidade';
@@ -3970,6 +4046,9 @@ $boletimWizardSteps = [
         }
         renderSteps();
         renderBody();
+        aplicarScroll(scroll);
+        requestAnimationFrame(function () { aplicarScroll(scroll); });
+        setTimeout(function () { aplicarScroll(scroll); }, 0);
     }
 
     function agendarMontar() {
@@ -4239,10 +4318,6 @@ $boletimWizardSteps = [
             renderResumo('Falta o modelo de boletim.', ['Volte em Identidade e selecione o Boletim.']);
             return false;
         }
-        if (!Number(j.rascunho.grupo_regras_notas_id || 0)) {
-            renderResumo('Falta o Quadro de Notas.', ['Volte em Identidade e selecione o Quadro de Notas. Se a lista estiver vazia, cadastre em Acadêmico → Quadro de Notas.']);
-            return false;
-        }
         var aplicado = aplicarRascunhoNaConfiguracao(j.rascunho);
         if (!aplicado) {
             return false;
@@ -4280,10 +4355,6 @@ $boletimWizardSteps = [
         }
         if (estado.passo === 'identidade' && !boletimEscolhido()) {
             renderResumo('', ['Selecione um boletim.']);
-            return;
-        }
-        if (estado.passo === 'identidade' && !(Number(estado.grupo_regras_notas_id || 0) > 0)) {
-            renderResumo('', ['Selecione o Quadro de Notas.']);
             return;
         }
         if (estado.passo === 'formula' && estado.bloco_calc) {

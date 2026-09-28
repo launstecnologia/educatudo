@@ -887,6 +887,7 @@ function adicionarProfessor(professorData = null) {
                 <select name="professores[${professorCounter}][materia_id]" 
                         id="materia_${professorCounter}"
                         required
+                        onchange="filtrarProfessoresPelaMateria(${professorCounter})"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <option value="">Selecione primeiro o professor</option>
                 </select>
@@ -955,6 +956,7 @@ function adicionarProfessor(professorData = null) {
                 }
                 materiaSelect.value = matIdStr;
             }
+            filtrarProfessoresPelaMateria(currentCounter);
         }, 0);
     }
 }
@@ -973,44 +975,23 @@ function carregarMateriasProfessor(professorIndex) {
     
     if (!professorSelect || !materiaSelect) return;
     
+    const valorAtual = materiaSelect.value;
     const selectedOption = professorSelect.options[professorSelect.selectedIndex];
-    materiaSelect.innerHTML = '<option value="">Selecione a matéria</option>';
-    
-    if (!selectedOption.value) {
-        if (professorOpcionalNoEvento()) {
-            preencherSelectMaterias(materiaSelect, materias, materiaSelect.value);
-        }
+
+    if (!selectedOption || !selectedOption.value) {
+        preencherSelectMaterias(materiaSelect, materias, valorAtual);
         return;
     }
-    
+
     const materiasJson = selectedOption.getAttribute('data-materias');
     if (!materiasJson) {
+        preencherSelectMaterias(materiaSelect, [], valorAtual);
         return;
     }
-    
+
     try {
         const materiasProfessor = JSON.parse(materiasJson);
-        if (!Array.isArray(materiasProfessor) || materiasProfessor.length === 0) return;
-
-        let materiasFiltradas;
-        if (typeof materiasProfessor[0] === 'object' && materiasProfessor[0] !== null) {
-            // Array de objetos: extrai IDs
-            const ids = materiasProfessor.map(m => Number(m.id ?? m.materia_id)).filter(id => id > 0);
-            materiasFiltradas = materias.filter(m => ids.includes(Number(m.id)));
-        } else {
-            // Array de IDs numéricos/strings ou nomes
-            const porId = typeof materiasProfessor[0] === 'number' || /^\d+$/.test(String(materiasProfessor[0]));
-            materiasFiltradas = porId
-                ? materias.filter(m => materiasProfessor.includes(Number(m.id)) || materiasProfessor.includes(String(m.id)))
-                : materias.filter(m => materiasProfessor.includes(m.nome));
-        }
-
-        materiasFiltradas.forEach(materia => {
-            const option = document.createElement('option');
-            option.value = materia.id;
-            option.textContent = materia.nome;
-            materiaSelect.appendChild(option);
-        });
+        preencherSelectMaterias(materiaSelect, materiasDoVinculo(materiasProfessor), valorAtual);
     } catch (e) {
         console.error('Erro ao carregar matérias:', e);
     }
@@ -1028,10 +1009,51 @@ function professorOpcionalNoEvento() {
     return getFormatoEvento() === 'lancamento_nota' && !atribuirAoProfessor();
 }
 
+function chaveNomeLista(nome) {
+    return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+}
+
+function ordenarPorNome(lista) {
+    return (lista || []).slice().sort(function (a, b) {
+        return chaveNomeLista(a.nome).localeCompare(chaveNomeLista(b.nome), 'pt-BR');
+    });
+}
+
+function materiasDoVinculo(materiasProfessor) {
+    if (!Array.isArray(materiasProfessor) || materiasProfessor.length === 0) {
+        return [];
+    }
+    if (typeof materiasProfessor[0] === 'object' && materiasProfessor[0] !== null) {
+        const ids = materiasProfessor.map(function (m) { return Number(m.id ?? m.materia_id); }).filter(function (id) { return id > 0; });
+        return materias.filter(function (m) { return ids.includes(Number(m.id)); });
+    }
+    const porId = typeof materiasProfessor[0] === 'number' || /^\d+$/.test(String(materiasProfessor[0]));
+    return porId
+        ? materias.filter(function (m) { return materiasProfessor.includes(Number(m.id)) || materiasProfessor.includes(String(m.id)); })
+        : materias.filter(function (m) { return materiasProfessor.some(function (nome) { return chaveNomeLista(nome) === chaveNomeLista(m.nome); }); });
+}
+
+function professorEnsinaMateria(prof, materia) {
+    const lista = Array.isArray(prof.materias) ? prof.materias : [];
+    const idAlvo = Number(materia.id);
+    const nomeAlvo = chaveNomeLista(materia.nome);
+    return lista.some(function (item) {
+        if (item && typeof item === 'object') {
+            const id = Number(item.id || item.materia_id || 0);
+            if (id > 0 && id === idAlvo) return true;
+            return chaveNomeLista(item.nome) === nomeAlvo;
+        }
+        if (typeof item === 'number' || /^\d+$/.test(String(item))) {
+            return Number(item) === idAlvo;
+        }
+        return chaveNomeLista(item) === nomeAlvo;
+    });
+}
+
 function preencherSelectMaterias(materiaSelect, lista, valorAtual) {
     const atual = valorAtual || materiaSelect.value;
     materiaSelect.innerHTML = '<option value="">Selecione a matéria</option>';
-    (lista || []).forEach(function (materia) {
+    ordenarPorNome(lista).forEach(function (materia) {
         const option = document.createElement('option');
         option.value = materia.id;
         option.textContent = materia.nome;
@@ -1039,6 +1061,38 @@ function preencherSelectMaterias(materiaSelect, lista, valorAtual) {
     });
     if (atual && Array.from(materiaSelect.options).some(function (o) { return String(o.value) === String(atual); })) {
         materiaSelect.value = String(atual);
+    }
+}
+
+function filtrarProfessoresPelaMateria(professorIndex) {
+    const card = document.getElementById('professor_' + professorIndex);
+    const professorSelect = card ? campoProfessor(card, 'professor_id') : null;
+    const materiaSelect = document.getElementById('materia_' + professorIndex);
+    if (!professorSelect || !materiaSelect) return;
+
+    const atual = professorSelect.value;
+    const atualTexto = professorSelect.selectedIndex >= 0 ? professorSelect.options[professorSelect.selectedIndex].textContent : '';
+    const materia = (materias || []).find(function (m) { return String(m.id) === String(materiaSelect.value); });
+    const lista = materia
+        ? (professores || []).filter(function (p) { return professorEnsinaMateria(p, materia); })
+        : (professores || []);
+
+    professorSelect.innerHTML = '<option value="">Selecione o professor</option>';
+    ordenarPorNome(lista).forEach(function (prof) {
+        const option = document.createElement('option');
+        option.value = String(prof.id);
+        option.textContent = prof.nome || '';
+        option.setAttribute('data-materias', JSON.stringify(Array.isArray(prof.materias) ? prof.materias : []));
+        professorSelect.appendChild(option);
+    });
+    if (atual && !Array.from(professorSelect.options).some(function (o) { return String(o.value) === String(atual); })) {
+        const option = document.createElement('option');
+        option.value = String(atual);
+        option.textContent = atualTexto || ('Professor #' + atual);
+        professorSelect.appendChild(option);
+    }
+    if (atual) {
+        professorSelect.value = String(atual);
     }
 }
 

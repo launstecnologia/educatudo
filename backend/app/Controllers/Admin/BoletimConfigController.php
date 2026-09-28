@@ -1493,20 +1493,18 @@ class BoletimConfigController extends BaseController
         unset($decodedExtras['jornada_media_condicional']);
 
         $grupoRegrasId = (int) ($_POST['grupo_regras_notas_id'] ?? 0);
-        if ($grupoRegrasId <= 0) {
-            $_SESSION['boletim_flash'] = FechamentoGates::mensagemAvaliacaoSemQuadro();
-            $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirectFalhaConfiguracao($regraId);
-        }
-        try {
-            $payloadQuadro = (new GrupoRegrasNotasService())->payloadPublico($grupoRegrasId);
-        } catch (Throwable $e) {
-            $payloadQuadro = null;
-        }
-        if (!is_array($payloadQuadro) || empty($payloadQuadro['ativo'])) {
-            $_SESSION['boletim_flash'] = 'Quadro de Notas inválido ou inativo. Revise o cadastro em Acadêmico → Quadro de Notas.';
-            $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirectFalhaConfiguracao($regraId);
+        $payloadQuadro = null;
+        if ($grupoRegrasId > 0) {
+            try {
+                $payloadQuadro = (new GrupoRegrasNotasService())->payloadPublico($grupoRegrasId);
+            } catch (Throwable $e) {
+                $payloadQuadro = null;
+            }
+            if (!is_array($payloadQuadro) || empty($payloadQuadro['ativo'])) {
+                $_SESSION['boletim_flash'] = 'Quadro de Notas inválido ou inativo. Revise o cadastro em Acadêmico → Quadro de Notas.';
+                $_SESSION['boletim_flash_type'] = 'error';
+                $this->redirectFalhaConfiguracao($regraId);
+            }
         }
         if ($grupoRegrasId > 0) {
             $decodedExtras['grupo_regras_notas_id'] = $grupoRegrasId;

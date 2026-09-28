@@ -23,9 +23,6 @@ class FechamentoGates
         if ($boletimId <= 0) {
             $erros[] = self::mensagemAvaliacaoSemModelo();
         }
-        if ($quadroId <= 0) {
-            $erros[] = self::mensagemAvaliacaoSemQuadro();
-        }
         return $erros;
     }
 

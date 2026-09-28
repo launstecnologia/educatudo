@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/BoletimAssistenteFerramentas.php';
+require_once __DIR__ . '/../Core/PeriodoLetivo.php';
 
 class BoletimAssistenteWizard
 {
@@ -151,7 +152,56 @@ class BoletimAssistenteWizard
             'pecas' => $this->pecasMeta($tipos),
             'papeis' => self::papeisMeta(),
             'ano_letivo_ativo' => $this->ferramentas->anoLetivoAtivo(),
+            'periodos_por_ano' => $this->catalogoPeriodos(),
         ];
+    }
+
+    /**
+     * @return array<string, array{tipo:string,quantidade:int,rotulo_campo:string,rotulo_campo_plural:string,rotulos:array<string,string>}>
+     */
+    private function catalogoPeriodos(): array
+    {
+        try {
+            $mapa = PeriodoLetivo::mapaPorAno();
+        } catch (Throwable $e) {
+            $mapa = [(int) date('Y') => PeriodoLetivo::doAno((int) date('Y'))];
+        }
+        $out = [];
+        foreach ($mapa as $ano => $info) {
+            $rotulos = [];
+            foreach ((array) ($info['rotulos'] ?? []) as $num => $lab) {
+                $rotulos[(string) $num] = (string) $lab;
+            }
+            $out[(string) $ano] = [
+                'tipo' => (string) ($info['tipo'] ?? PeriodoLetivo::tipoPadrao()),
+                'quantidade' => (int) ($info['quantidade'] ?? 4),
+                'rotulo_campo' => (string) ($info['rotulo_campo'] ?? 'Bimestre'),
+                'rotulo_campo_plural' => (string) ($info['rotulo_campo_plural'] ?? 'Bimestres'),
+                'rotulos' => $rotulos,
+            ];
+        }
+
+        return $out;
+    }
+
+    private function nomePadraoEvento(int $ano, int $bimestre): string
+    {
+        $info = PeriodoLetivo::doAno($ano > 0 ? $ano : (int) date('Y'));
+        if ($bimestre <= 0) {
+            return sprintf('Notas — %d', (int) $info['ano']);
+        }
+        $adjetivo = match ((string) $info['tipo']) {
+            'trimestre' => 'Trimestrais',
+            'semestre' => 'Semestrais',
+            'etapa_unica' => '',
+            default => 'Bimestrais',
+        };
+        $campo = strtolower((string) $info['rotulo_campo']);
+        if ($adjetivo === '') {
+            return sprintf('Notas — %d', (int) $info['ano']);
+        }
+
+        return sprintf('Notas %s — %dº %s %d', $adjetivo, $bimestre, $campo, (int) $info['ano']);
     }
 
     /**
@@ -557,10 +607,7 @@ class BoletimAssistenteWizard
         }
 
         if ($estado['nome'] === '') {
-            $bim = (int) $estado['bimestre'];
-            $estado['nome'] = $bim > 0
-                ? sprintf('Notas Bimestrais — %dº bimestre %d', $bim, (int) $estado['ano_letivo'])
-                : sprintf('Notas — %d', (int) $estado['ano_letivo']);
+            $estado['nome'] = $this->nomePadraoEvento((int) $estado['ano_letivo'], (int) $estado['bimestre']);
         }
 
         if ((int) ($estado['boletim_id'] ?? 0) <= 0) {
@@ -797,12 +844,6 @@ class BoletimAssistenteWizard
                 require_once dirname(__DIR__) . '/Modulos/fechamento/Services/FechamentoGates.php';
             }
             $erros[] = FechamentoGates::mensagemAvaliacaoSemModelo();
-        }
-        if ((int) ($estado['grupo_regras_notas_id'] ?? 0) <= 0) {
-            if (!class_exists('FechamentoGates', false)) {
-                require_once dirname(__DIR__) . '/Modulos/fechamento/Services/FechamentoGates.php';
-            }
-            $erros[] = FechamentoGates::mensagemAvaliacaoSemQuadro();
         }
 
         if ($this->querLayoutQuadro($estado)) {
