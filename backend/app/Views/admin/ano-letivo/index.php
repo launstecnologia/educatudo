@@ -294,7 +294,7 @@ function abrirModalMapeamento(salvarDepois) {
     var chaves = Object.keys(rotulos);
     salvarAoConfirmarMapa = !!salvarDepois;
     document.getElementById('modalMapaPeriodosTexto').textContent =
-        'O ano passa de ' + rotuloTipo(anoLetivoEdicao.original) + ' para ' + rotuloTipo(novo) + '. Os cadastros (provas, jornadas, boletim, faltas e os demais) passam a usar o período que você escolher.';
+        'O ano passa de ' + rotuloTipo(anoLetivoEdicao.original) + ' para ' + rotuloTipo(novo) + '. Pode juntar dois períodos no mesmo destino, como o 3º e o 4º bimestre no 3º trimestre. Onde a turma já existe nos dois, fica o cadastro do período que já ocupa esse lugar.';
     var lista = document.getElementById('modalMapaPeriodosLista');
     lista.innerHTML = '';
     anoLetivoEdicao.usados.forEach(function (p) {

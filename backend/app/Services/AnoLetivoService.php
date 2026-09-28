@@ -338,6 +338,7 @@ class AnoLetivoService
         }
         $this->exigirTipoAceito('resultado_academico', 'resultados finais', $ano, $tipoAtual, $tipoNovo);
         $this->exigirTipoAceito('fechamento_periodo', 'fechamentos', $ano, $tipoAtual, $tipoNovo);
+        $this->absorverColisoes($ano, $tipoAtual, $mapa);
 
         foreach ($this->fontesBimestre() as $fonte) {
             $this->remapearColunaInteira($fonte['tabela'], $fonte['coluna'], $ano, $mapa);
@@ -622,6 +623,171 @@ class AnoLetivoService
     }
 
     /**
+     * Dois períodos no mesmo destino: provas e jornadas dos dois permanecem.
+     * Onde a mesma turma (ou aluno) já existe nos dois, fica o cadastro do período
+     * que já ocupa esse número e o outro, repetido, sai antes da troca.
+     *
+     * @param array<int,int> $mapa
+     */
+    private function absorverColisoes(int $ano, string $tipoAtual, array $mapa): void
+    {
+        $porDestino = [];
+        foreach ($mapa as $origem => $destino) {
+            $origem = (int) $origem;
+            $destino = (int) $destino;
+            if ($origem < 1 || $destino < 1) {
+                continue;
+            }
+            $porDestino[$destino][] = $origem;
+        }
+        foreach ($porDestino as $destino => $origens) {
+            $origens = array_values(array_unique(array_map('intval', $origens)));
+            if (count($origens) < 2) {
+                continue;
+            }
+            $destino = (int) $destino;
+            $guardaEsseNumero = in_array($destino, $origens, true);
+            $absorvidos = [];
+            foreach ($origens as $origem) {
+                if ($guardaEsseNumero && $origem === $destino) {
+                    continue;
+                }
+                $absorvidos[] = $origem;
+            }
+            if (!$guardaEsseNumero) {
+                sort($absorvidos);
+                array_shift($absorvidos);
+            }
+            foreach ($absorvidos as $origem) {
+                $this->absorverPeriodoDuplicado($ano, $tipoAtual, $origem, $destino);
+            }
+        }
+    }
+
+    private function absorverPeriodoDuplicado(int $ano, string $tipoAtual, int $origem, int $destino): void
+    {
+        if ($this->db->tableExists('conselho_sessoes') && $this->colunaExiste('conselho_sessoes', 'bimestre')) {
+            $this->executarAtualizacao(
+                'DELETE origem FROM conselho_sessoes origem
+                 INNER JOIN conselho_sessoes destino
+                    ON destino.turma_id = origem.turma_id
+                   AND destino.ano_letivo = origem.ano_letivo
+                   AND destino.bimestre = :destino
+                 WHERE origem.ano_letivo = :ano AND origem.bimestre = :origem',
+                ['destino' => $destino, 'ano' => $ano, 'origem' => $origem]
+            );
+        }
+        if ($this->db->tableExists('diario_fechamentos') && $this->colunaExiste('diario_fechamentos', 'bimestre')) {
+            $this->executarAtualizacao(
+                'DELETE origem FROM diario_fechamentos origem
+                 INNER JOIN diario_fechamentos destino
+                    ON destino.turma_id = origem.turma_id
+                   AND destino.materia_id = origem.materia_id
+                   AND destino.professor_id = origem.professor_id
+                   AND destino.ano_letivo = origem.ano_letivo
+                   AND destino.bimestre = :destino
+                 WHERE origem.ano_letivo = :ano AND origem.bimestre = :origem',
+                ['destino' => $destino, 'ano' => $ano, 'origem' => $origem]
+            );
+        }
+        if ($this->db->tableExists('notas_tipo_finais') && $this->colunaExiste('notas_tipo_finais', 'periodo')) {
+            $this->executarAtualizacao(
+                'DELETE origem FROM notas_tipo_finais origem
+                 INNER JOIN notas_tipo_finais destino
+                    ON destino.tipo_avaliacao_id = origem.tipo_avaliacao_id
+                   AND destino.aluno_id = origem.aluno_id
+                   AND destino.materia_id = origem.materia_id
+                   AND destino.turma_id = origem.turma_id
+                   AND destino.ano_letivo = origem.ano_letivo
+                   AND destino.periodo = :destino
+                 WHERE origem.ano_letivo = :ano AND origem.periodo = :origem',
+                ['destino' => $destino, 'ano' => $ano, 'origem' => $origem]
+            );
+        }
+        $this->absorverCelulasFicha($ano, $origem, $destino);
+        $this->absorverResultadoAcademico($ano, $tipoAtual, $origem, $destino);
+        $this->absorverFechamentoVigente($ano, $tipoAtual, $origem, $destino);
+    }
+
+    private function absorverCelulasFicha(int $ano, int $origem, int $destino): void
+    {
+        if (!$this->db->tableExists('boletim_ficha_celulas') || !$this->db->tableExists('boletim_ficha_linhas') || !$this->db->tableExists('boletim_fichas')) {
+            return;
+        }
+        $sets = ['destino.nota = COALESCE(destino.nota, origem.nota)'];
+        if ($this->colunaExiste('boletim_ficha_celulas', 'conceito')) {
+            $sets[] = "destino.conceito = CASE WHEN destino.conceito IS NULL OR destino.conceito = '' THEN origem.conceito ELSE destino.conceito END";
+        }
+        if ($this->colunaExiste('boletim_ficha_celulas', 'faltas')) {
+            $sets[] = 'destino.faltas = CASE WHEN destino.faltas IS NULL THEN origem.faltas WHEN origem.faltas IS NULL THEN destino.faltas ELSE destino.faltas + origem.faltas END';
+        }
+        if ($this->colunaExiste('boletim_ficha_celulas', 'aulas_dadas')) {
+            $sets[] = 'destino.aulas_dadas = CASE WHEN destino.aulas_dadas IS NULL THEN origem.aulas_dadas WHEN origem.aulas_dadas IS NULL THEN destino.aulas_dadas ELSE destino.aulas_dadas + origem.aulas_dadas END';
+        }
+        $this->executarAtualizacao(
+            'UPDATE boletim_ficha_celulas destino
+             INNER JOIN boletim_ficha_celulas origem
+                ON origem.linha_id = destino.linha_id AND origem.periodo_numero = :origem
+             INNER JOIN boletim_ficha_linhas l ON l.id = destino.linha_id
+             INNER JOIN boletim_fichas f ON f.id = l.ficha_id
+             SET ' . implode(', ', $sets) . '
+             WHERE f.ano_letivo = :ano AND destino.periodo_numero = :destino',
+            ['origem' => $origem, 'ano' => $ano, 'destino' => $destino]
+        );
+        $this->executarAtualizacao(
+            'DELETE origem FROM boletim_ficha_celulas origem
+             INNER JOIN boletim_ficha_celulas destino
+                ON destino.linha_id = origem.linha_id AND destino.periodo_numero = :destino
+             INNER JOIN boletim_ficha_linhas l ON l.id = origem.linha_id
+             INNER JOIN boletim_fichas f ON f.id = l.ficha_id
+             WHERE f.ano_letivo = :ano AND origem.periodo_numero = :origem',
+            ['destino' => $destino, 'ano' => $ano, 'origem' => $origem]
+        );
+    }
+
+    private function absorverResultadoAcademico(int $ano, string $tipoAtual, int $origem, int $destino): void
+    {
+        if (!$this->db->tableExists('resultado_academico') || !$this->colunaExiste('resultado_academico', 'periodo_numero') || !$this->colunaExiste('resultado_academico', 'periodo_tipo')) {
+            return;
+        }
+        $this->executarAtualizacao(
+            'DELETE origem FROM resultado_academico origem
+             INNER JOIN resultado_academico destino
+                ON destino.aluno_id = origem.aluno_id
+               AND destino.turma_id = origem.turma_id
+               AND destino.ano_letivo = origem.ano_letivo
+               AND destino.periodo_tipo = origem.periodo_tipo
+               AND destino.periodo_numero = :destino
+             WHERE origem.ano_letivo = :ano
+               AND origem.periodo_tipo = :tipo
+               AND origem.periodo_numero = :origem',
+            ['destino' => $destino, 'ano' => $ano, 'tipo' => $tipoAtual, 'origem' => $origem]
+        );
+    }
+
+    private function absorverFechamentoVigente(int $ano, string $tipoAtual, int $origem, int $destino): void
+    {
+        if (!$this->db->tableExists('fechamento_periodo') || !$this->colunaExiste('fechamento_periodo', 'vigente')) {
+            return;
+        }
+        $this->executarAtualizacao(
+            'UPDATE fechamento_periodo origem
+             INNER JOIN fechamento_periodo destino
+                ON destino.turma_id = origem.turma_id
+               AND destino.ano_letivo = origem.ano_letivo
+               AND destino.periodo_tipo = origem.periodo_tipo
+               AND destino.periodo_numero = :destino
+               AND destino.vigente = 1
+             SET origem.vigente = 0, origem.vigente_chave = NULL
+             WHERE origem.ano_letivo = :ano
+               AND origem.periodo_tipo = :tipo
+               AND origem.periodo_numero = :origem
+               AND origem.vigente = 1',
+            ['destino' => $destino, 'ano' => $ano, 'tipo' => $tipoAtual, 'origem' => $origem]
+        );
+    }
+
+    /**
      * @param array<int,int> $mapa
      */
     private function remapearColunaInteira(string $tabela, string $coluna, int $ano, array $mapa): void
@@ -806,11 +972,6 @@ class AnoLetivoService
                     $n = $this->numeroDeValor($pk);
                     $dest = ($n >= 1 && isset($mapa[$n])) ? $mapa[$n] : $pk;
                     $atual = $novoMapa[$dest] ?? null;
-                    if ($atual !== null && (int) $atual > 0 && (int) $pv > 0 && (int) $atual !== (int) $pv) {
-                        throw new InvalidArgumentException(
-                            'O boletim tem uma fonte diferente em períodos que foram para o mesmo destino. Escolha um período novo para cada um.'
-                        );
-                    }
                     if ($atual === null || (int) $atual === 0) {
                         $novoMapa[$dest] = $pv;
                     }
