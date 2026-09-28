@@ -100,10 +100,11 @@ class AnoLetivoService
         }
 
         $tipoAtual = PeriodoLetivo::normalizarTipo((string) ($atual['periodo_tipo'] ?? PeriodoLetivo::tipoPadrao()));
+        $mapa = [];
         if ($payload['periodo_tipo'] !== $tipoAtual) {
-            $uso = $this->usoDaDivisao((int) $atual['ano']);
-            if (!empty($uso['bloqueada'])) {
-                throw new InvalidArgumentException((string) $uso['mensagem']);
+            $usados = $this->periodosEmUso((int) $atual['ano']);
+            if ($usados !== []) {
+                $mapa = $this->validarMapeamento($usados, $dados['mapeamento'] ?? [], $payload['periodo_tipo']);
             }
         }
 
@@ -112,6 +113,9 @@ class AnoLetivoService
         $params['id'] = $id;
         $this->db->beginTransaction();
         try {
+            if ($payload['periodo_tipo'] !== $tipoAtual) {
+                $this->reclassificarDivisao((int) $atual['ano'], $tipoAtual, $payload['periodo_tipo'], $mapa);
+            }
             if (PeriodoLetivo::temColunaPeriodoTipo()) {
                 $this->db->update(
                     'UPDATE ano_letivo
@@ -145,6 +149,33 @@ class AnoLetivoService
         PeriodoLetivo::invalidarCache((int) $atual['ano']);
         PeriodoLetivo::invalidarCache($payload['ano']);
         return ['id' => $id, 'ano' => $payload['ano'], 'periodo_tipo' => $payload['periodo_tipo']];
+    }
+
+    /**
+     * Períodos que já têm cadastro neste ano (só os números que existem de fato).
+     *
+     * @return list<array{numero:int,rotulo:string}>
+     */
+    public function periodosEmUso(int $ano): array
+    {
+        if ($ano < 2000 || $ano > 2100) {
+            return [];
+        }
+        $tipo = PeriodoLetivo::normalizarTipo((string) (PeriodoLetivo::doAno($ano)['tipo'] ?? PeriodoLetivo::tipoPadrao()));
+        $numeros = [];
+        foreach ($this->coletarNumerosPeriodo($ano, $tipo) as $n) {
+            $numeros[$n] = $n;
+        }
+        ksort($numeros);
+        $rotulos = PeriodoLetivo::rotulosDoTipo($tipo);
+        $lista = [];
+        foreach ($numeros as $n) {
+            $lista[] = [
+                'numero' => $n,
+                'rotulo' => (string) ($rotulos[$n] ?? ($n . 'º período')),
+            ];
+        }
+        return $lista;
     }
 
     /**
@@ -261,6 +292,798 @@ class AnoLetivoService
                 'A divisão do ano não foi gravada. Execute a migration de período do ano letivo e tente novamente.'
             );
         }
+    }
+
+    /**
+     * @param list<array{numero:int,rotulo:string}> $usados
+     * @param mixed $bruto
+     * @return array<int,int>
+     */
+    private function validarMapeamento(array $usados, mixed $bruto, string $tipoNovo): array
+    {
+        if (!is_array($bruto)) {
+            $bruto = [];
+        }
+        $qtd = PeriodoLetivo::quantidade($tipoNovo);
+        $mapa = [];
+        $faltando = [];
+        foreach ($usados as $item) {
+            $origem = (int) ($item['numero'] ?? 0);
+            if ($origem < 1) {
+                continue;
+            }
+            $destBruto = $bruto[$origem] ?? $bruto[(string) $origem] ?? null;
+            $destino = (int) $destBruto;
+            if ($destBruto === null || $destBruto === '' || $destino < 1 || $destino > $qtd) {
+                $faltando[] = (string) ($item['rotulo'] ?? ($origem . 'º período'));
+                continue;
+            }
+            $mapa[$origem] = $destino;
+        }
+        if ($faltando !== []) {
+            throw new InvalidArgumentException(
+                'Indique para onde vai cada período que já tem cadastro: ' . implode(', ', $faltando) . '.'
+            );
+        }
+        return $mapa;
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function reclassificarDivisao(int $ano, string $tipoAtual, string $tipoNovo, array $mapa): void
+    {
+        if ($tipoAtual === $tipoNovo) {
+            return;
+        }
+        $this->exigirTipoAceito('resultado_academico', 'resultados finais', $ano, $tipoAtual, $tipoNovo);
+        $this->exigirTipoAceito('fechamento_periodo', 'fechamentos', $ano, $tipoAtual, $tipoNovo);
+
+        foreach ($this->fontesBimestre() as $fonte) {
+            $this->remapearColunaInteira($fonte['tabela'], $fonte['coluna'], $ano, $mapa);
+        }
+        $this->remapearFaltas($ano, $tipoNovo, $mapa);
+        $this->remapearFichas($ano, $mapa);
+        $this->remapearJsonBoletim($ano, $mapa);
+        $this->remapearRegrasAcademicas($ano, $tipoAtual, $tipoNovo, $mapa);
+        $this->remapearResultadoAcademico($ano, $tipoAtual, $tipoNovo, $mapa);
+        $this->remapearFechamento($ano, $tipoAtual, $tipoNovo, $mapa);
+    }
+
+    /**
+     * @return list<array{tabela:string,coluna:string}>
+     */
+    private function fontesBimestre(): array
+    {
+        return [
+            ['tabela' => 'provas_blocos', 'coluna' => 'bimestre'],
+            ['tabela' => 'jornadas', 'coluna' => 'bimestre'],
+            ['tabela' => 'boletim_regras', 'coluna' => 'bimestre'],
+            ['tabela' => 'conselho_sessoes', 'coluna' => 'bimestre'],
+            ['tabela' => 'diario_fechamentos', 'coluna' => 'bimestre'],
+            ['tabela' => 'notas_tipo_finais', 'coluna' => 'periodo'],
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function coletarNumerosPeriodo(int $ano, string $tipo): array
+    {
+        $numeros = [];
+        foreach ($this->fontesBimestre() as $fonte) {
+            foreach ($this->numerosDaColuna($fonte['tabela'], $fonte['coluna'], $ano) as $n) {
+                $numeros[$n] = $n;
+            }
+        }
+        foreach (['regras_academicas', 'resultado_academico', 'fechamento_periodo'] as $tabela) {
+            foreach ($this->numerosDaColuna($tabela, 'periodo_numero', $ano, 'periodo_tipo', $tipo) as $n) {
+                $numeros[$n] = $n;
+            }
+        }
+        foreach ($this->numerosDasFaltas($ano) as $n) {
+            $numeros[$n] = $n;
+        }
+        foreach ($this->numerosDasFichas($ano) as $n) {
+            $numeros[$n] = $n;
+        }
+        foreach ($this->numerosDoJsonBoletim($ano) as $n) {
+            $numeros[$n] = $n;
+        }
+        $lista = array_values($numeros);
+        sort($lista);
+        return $lista;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function numerosDaColuna(string $tabela, string $coluna, int $ano, ?string $tipoColuna = null, ?string $tipo = null): array
+    {
+        if (!$this->identificadorSql($tabela) || !$this->identificadorSql($coluna)) {
+            return [];
+        }
+        if (!$this->db->tableExists($tabela) || !$this->colunaExiste($tabela, $coluna) || !$this->colunaExiste($tabela, 'ano_letivo')) {
+            return [];
+        }
+        $sql = "SELECT DISTINCT `{$coluna}` AS n FROM `{$tabela}` WHERE ano_letivo = :ano AND `{$coluna}` IS NOT NULL";
+        $params = ['ano' => $ano];
+        if ($tipoColuna !== null && $tipo !== null && $this->identificadorSql($tipoColuna) && $this->colunaExiste($tabela, $tipoColuna)) {
+            $sql .= " AND `{$tipoColuna}` = :tipo";
+            $params['tipo'] = $tipo;
+        }
+        try {
+            $rows = $this->db->fetchAll($sql, $params);
+        } catch (Throwable $e) {
+            error_log('AnoLetivo periodos ' . $tabela . ': ' . $e->getMessage());
+            return [];
+        }
+        return $this->numerosDasLinhas(is_array($rows) ? $rows : []);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<int>
+     */
+    private function numerosDasLinhas(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $n = $this->numeroDeValor($row['n'] ?? '');
+            if ($n >= 1) {
+                $out[$n] = $n;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function numerosDasFaltas(int $ano): array
+    {
+        if (!$this->db->tableExists('faltas_eventos') || !$this->colunaExiste('faltas_eventos', 'bimestre')) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT DISTINCT bimestre AS n FROM faltas_eventos WHERE ano_letivo = :ano',
+                ['ano' => $ano]
+            );
+        } catch (Throwable $e) {
+            error_log('AnoLetivo periodos faltas: ' . $e->getMessage());
+            return [];
+        }
+        return $this->numerosDasLinhas(is_array($rows) ? $rows : []);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function numerosDasFichas(int $ano): array
+    {
+        if (!$this->db->tableExists('boletim_ficha_celulas') || !$this->db->tableExists('boletim_ficha_linhas') || !$this->db->tableExists('boletim_fichas')) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT DISTINCT c.periodo_numero AS n
+                 FROM boletim_ficha_celulas c
+                 INNER JOIN boletim_ficha_linhas l ON l.id = c.linha_id
+                 INNER JOIN boletim_fichas f ON f.id = l.ficha_id
+                 WHERE f.ano_letivo = :ano AND c.periodo_numero BETWEEN 1 AND 12',
+                ['ano' => $ano]
+            );
+        } catch (Throwable $e) {
+            error_log('AnoLetivo periodos fichas: ' . $e->getMessage());
+            return [];
+        }
+        return $this->numerosDasLinhas(is_array($rows) ? $rows : []);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function numerosDoJsonBoletim(int $ano): array
+    {
+        $numeros = [];
+        foreach ($this->jsonsBoletimDoAno($ano) as $json) {
+            foreach ($this->numerosNoJson($json) as $n) {
+                $numeros[$n] = $n;
+            }
+        }
+        return array_values($numeros);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function jsonsBoletimDoAno(int $ano): array
+    {
+        $jsons = [];
+        if ($this->db->tableExists('boletim_componentes') && $this->db->tableExists('boletim_regras') && $this->colunaExiste('boletim_componentes', 'config_json')) {
+            try {
+                $rows = $this->db->fetchAll(
+                    'SELECT c.config_json AS json
+                     FROM boletim_componentes c
+                     INNER JOIN boletim_regras r ON r.id = c.regra_id
+                     WHERE r.ano_letivo = :ano AND c.config_json IS NOT NULL AND c.config_json != \'\'',
+                    ['ano' => $ano]
+                );
+                foreach (is_array($rows) ? $rows : [] as $row) {
+                    $jsons[] = (string) ($row['json'] ?? '');
+                }
+            } catch (Throwable $e) {
+                error_log('AnoLetivo json componentes: ' . $e->getMessage());
+            }
+        }
+        if ($this->db->tableExists('boletim_regras')) {
+            $cols = [];
+            foreach (['extras_json', 'formula_materias_json'] as $col) {
+                if ($this->colunaExiste('boletim_regras', $col)) {
+                    $cols[] = $col;
+                }
+            }
+            if ($cols !== []) {
+                $select = implode(', ', array_map(static fn (string $c): string => '`' . $c . '`', $cols));
+                try {
+                    $rows = $this->db->fetchAll(
+                        "SELECT {$select} FROM boletim_regras WHERE ano_letivo = :ano",
+                        ['ano' => $ano]
+                    );
+                    foreach (is_array($rows) ? $rows : [] as $row) {
+                        foreach ($cols as $col) {
+                            $jsons[] = (string) ($row[$col] ?? '');
+                        }
+                    }
+                } catch (Throwable $e) {
+                    error_log('AnoLetivo json regras: ' . $e->getMessage());
+                }
+            }
+        }
+        return $jsons;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function numerosNoJson(string $json): array
+    {
+        $json = trim($json);
+        if ($json === '') {
+            return [];
+        }
+        $node = json_decode($json, true);
+        if (!is_array($node)) {
+            return [];
+        }
+        $numeros = [];
+        $this->colherNumerosJson($node, $numeros);
+        return array_values($numeros);
+    }
+
+    /**
+     * @param array<mixed> $node
+     * @param array<int,int> $numeros
+     */
+    private function colherNumerosJson(array $node, array &$numeros): void
+    {
+        foreach ($node as $k => $v) {
+            $chave = is_string($k) ? $k : '';
+            if (in_array($chave, ['prova_bimestres', 'jornada_bimestres'], true) && is_array($v)) {
+                foreach ($v as $item) {
+                    $n = $this->numeroDeValor($item);
+                    if ($n >= 1) {
+                        $numeros[$n] = $n;
+                    }
+                }
+                continue;
+            }
+            if (in_array($chave, ['fontes_bimestres', 'fontes_faltas'], true) && is_array($v)) {
+                foreach ($v as $pk => $_pv) {
+                    $n = $this->numeroDeValor($pk);
+                    if ($n >= 1) {
+                        $numeros[$n] = $n;
+                    }
+                }
+                continue;
+            }
+            if ($chave === 'bimestre') {
+                $n = $this->numeroDeValor($v);
+                if ($n >= 1) {
+                    $numeros[$n] = $n;
+                }
+                continue;
+            }
+            if (is_array($v)) {
+                $this->colherNumerosJson($v, $numeros);
+            }
+        }
+    }
+
+    private function numeroDeValor(mixed $valor): int
+    {
+        if (is_int($valor) || (is_string($valor) && preg_match('/^\d+$/', $valor))) {
+            $n = (int) $valor;
+            return ($n >= 1 && $n <= 12) ? $n : 0;
+        }
+        $texto = trim((string) $valor);
+        if ($texto === '') {
+            return 0;
+        }
+        if (preg_match('/etapa/i', $texto)) {
+            return 1;
+        }
+        if (preg_match('/^(\d{1,2})/u', $texto, $m)) {
+            $n = (int) $m[1];
+            return ($n >= 1 && $n <= 12) ? $n : 0;
+        }
+        return 0;
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearColunaInteira(string $tabela, string $coluna, int $ano, array $mapa): void
+    {
+        $pares = $this->paresQueMudamNumero($mapa);
+        if ($pares === [] || !$this->identificadorSql($tabela) || !$this->identificadorSql($coluna)) {
+            return;
+        }
+        if (!$this->db->tableExists($tabela) || !$this->colunaExiste($tabela, $coluna) || !$this->colunaExiste($tabela, 'ano_letivo')) {
+            return;
+        }
+        foreach ($pares as $de => $para) {
+            $this->executarAtualizacao(
+                "UPDATE `{$tabela}` SET `{$coluna}` = :temp WHERE ano_letivo = :ano AND `{$coluna}` = :origem",
+                ['temp' => 100 + $de, 'ano' => $ano, 'origem' => $de]
+            );
+        }
+        foreach ($pares as $de => $para) {
+            $this->executarAtualizacao(
+                "UPDATE `{$tabela}` SET `{$coluna}` = :destino WHERE ano_letivo = :ano AND `{$coluna}` = :temp",
+                ['destino' => $para, 'ano' => $ano, 'temp' => 100 + $de]
+            );
+        }
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearFaltas(int $ano, string $tipoNovo, array $mapa): void
+    {
+        if ($mapa === [] || !$this->db->tableExists('faltas_eventos') || !$this->colunaExiste('faltas_eventos', 'bimestre')) {
+            return;
+        }
+        $rotulos = PeriodoLetivo::rotulosDoTipo($tipoNovo);
+        $rows = $this->db->fetchAll(
+            'SELECT id, bimestre FROM faltas_eventos WHERE ano_letivo = :ano',
+            ['ano' => $ano]
+        );
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $origem = $this->numeroDeValor($row['bimestre'] ?? '');
+            if ($origem < 1 || !isset($mapa[$origem])) {
+                continue;
+            }
+            $destino = (int) $mapa[$origem];
+            $atual = trim((string) ($row['bimestre'] ?? ''));
+            $novo = preg_match('/^\d+$/', $atual) === 1
+                ? (string) $destino
+                : (string) ($rotulos[$destino] ?? (string) $destino);
+            if ($novo === $atual) {
+                continue;
+            }
+            $this->executarAtualizacao(
+                'UPDATE faltas_eventos SET bimestre = :bimestre WHERE id = :id',
+                ['bimestre' => $novo, 'id' => (int) ($row['id'] ?? 0)]
+            );
+        }
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearFichas(int $ano, array $mapa): void
+    {
+        $pares = $this->paresQueMudamNumero($mapa);
+        if ($pares === [] || !$this->db->tableExists('boletim_ficha_celulas') || !$this->db->tableExists('boletim_ficha_linhas') || !$this->db->tableExists('boletim_fichas')) {
+            return;
+        }
+        foreach ($pares as $de => $para) {
+            $this->executarAtualizacao(
+                'UPDATE boletim_ficha_celulas c
+                 INNER JOIN boletim_ficha_linhas l ON l.id = c.linha_id
+                 INNER JOIN boletim_fichas f ON f.id = l.ficha_id
+                 SET c.periodo_numero = :temp
+                 WHERE f.ano_letivo = :ano AND c.periodo_numero = :origem',
+                ['temp' => 100 + $de, 'ano' => $ano, 'origem' => $de]
+            );
+        }
+        foreach ($pares as $de => $para) {
+            $this->executarAtualizacao(
+                'UPDATE boletim_ficha_celulas c
+                 INNER JOIN boletim_ficha_linhas l ON l.id = c.linha_id
+                 INNER JOIN boletim_fichas f ON f.id = l.ficha_id
+                 SET c.periodo_numero = :destino
+                 WHERE f.ano_letivo = :ano AND c.periodo_numero = :temp',
+                ['destino' => $para, 'ano' => $ano, 'temp' => 100 + $de]
+            );
+        }
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearJsonBoletim(int $ano, array $mapa): void
+    {
+        if ($this->paresQueMudamNumero($mapa) === []) {
+            return;
+        }
+        if ($this->db->tableExists('boletim_componentes') && $this->db->tableExists('boletim_regras') && $this->colunaExiste('boletim_componentes', 'config_json')) {
+            $rows = $this->db->fetchAll(
+                'SELECT c.id, c.config_json
+                 FROM boletim_componentes c
+                 INNER JOIN boletim_regras r ON r.id = c.regra_id
+                 WHERE r.ano_letivo = :ano AND c.config_json IS NOT NULL AND c.config_json != \'\'',
+                ['ano' => $ano]
+            );
+            foreach (is_array($rows) ? $rows : [] as $row) {
+                $novo = $this->jsonRemapeado((string) ($row['config_json'] ?? ''), $mapa);
+                if ($novo === null) {
+                    continue;
+                }
+                $this->executarAtualizacao(
+                    'UPDATE boletim_componentes SET config_json = :json WHERE id = :id',
+                    ['json' => $novo, 'id' => (int) ($row['id'] ?? 0)]
+                );
+            }
+        }
+        if (!$this->db->tableExists('boletim_regras')) {
+            return;
+        }
+        foreach (['extras_json', 'formula_materias_json'] as $col) {
+            if (!$this->identificadorSql($col) || !$this->colunaExiste('boletim_regras', $col)) {
+                continue;
+            }
+            $rows = $this->db->fetchAll(
+                "SELECT id, `{$col}` AS json FROM boletim_regras WHERE ano_letivo = :ano AND `{$col}` IS NOT NULL AND `{$col}` != ''",
+                ['ano' => $ano]
+            );
+            foreach (is_array($rows) ? $rows : [] as $row) {
+                $novo = $this->jsonRemapeado((string) ($row['json'] ?? ''), $mapa);
+                if ($novo === null) {
+                    continue;
+                }
+                $this->executarAtualizacao(
+                    "UPDATE boletim_regras SET `{$col}` = :json WHERE id = :id",
+                    ['json' => $novo, 'id' => (int) ($row['id'] ?? 0)]
+                );
+            }
+        }
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function jsonRemapeado(string $json, array $mapa): ?string
+    {
+        $node = json_decode($json, true);
+        if (!is_array($node)) {
+            return null;
+        }
+        $novo = $this->remapearNoJson($node, $mapa);
+        $encoded = json_encode($novo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($encoded === false || $encoded === $json) {
+            return null;
+        }
+        return $encoded;
+    }
+
+    /**
+     * @param array<mixed> $node
+     * @param array<int,int> $mapa
+     * @return array<mixed>
+     */
+    private function remapearNoJson(array $node, array $mapa): array
+    {
+        $out = [];
+        foreach ($node as $k => $v) {
+            $chave = is_string($k) ? $k : '';
+            if (in_array($chave, ['prova_bimestres', 'jornada_bimestres'], true) && is_array($v)) {
+                $nums = [];
+                foreach ($v as $item) {
+                    $n = $this->numeroDeValor($item);
+                    if ($n >= 1) {
+                        $nums[] = $mapa[$n] ?? $n;
+                    }
+                }
+                $out[$k] = array_values(array_unique($nums));
+                continue;
+            }
+            if (in_array($chave, ['fontes_bimestres', 'fontes_faltas'], true) && is_array($v)) {
+                $novoMapa = [];
+                foreach ($v as $pk => $pv) {
+                    $n = $this->numeroDeValor($pk);
+                    $dest = ($n >= 1 && isset($mapa[$n])) ? $mapa[$n] : $pk;
+                    $atual = $novoMapa[$dest] ?? null;
+                    if ($atual !== null && (int) $atual > 0 && (int) $pv > 0 && (int) $atual !== (int) $pv) {
+                        throw new InvalidArgumentException(
+                            'O boletim tem uma fonte diferente em períodos que foram para o mesmo destino. Escolha um período novo para cada um.'
+                        );
+                    }
+                    if ($atual === null || (int) $atual === 0) {
+                        $novoMapa[$dest] = $pv;
+                    }
+                }
+                $out[$k] = $novoMapa;
+                continue;
+            }
+            if ($chave === 'bimestre') {
+                $n = $this->numeroDeValor($v);
+                $out[$k] = ($n >= 1 && isset($mapa[$n])) ? $mapa[$n] : $v;
+                continue;
+            }
+            $out[$k] = is_array($v) ? $this->remapearNoJson($v, $mapa) : $v;
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearRegrasAcademicas(int $ano, string $tipoAtual, string $tipoNovo, array $mapa): void
+    {
+        if (!$this->db->tableExists('regras_academicas') || !$this->colunaExiste('regras_academicas', 'periodo_tipo')) {
+            return;
+        }
+        if (!$this->valorCabeNaColuna('regras_academicas', 'periodo_tipo', $tipoNovo)) {
+            return;
+        }
+        $this->exigirTipoAceito('regras_academicas', 'regras acadêmicas', $ano, $tipoAtual, $tipoNovo);
+        foreach ($mapa as $origem => $destino) {
+            $this->executarAtualizacao(
+                'UPDATE regras_academicas
+                 SET periodo_tipo = :novo, periodo_numero = :destino
+                 WHERE ano_letivo = :ano AND periodo_tipo = :velho AND periodo_numero = :origem',
+                [
+                    'novo' => $tipoNovo,
+                    'destino' => (int) $destino,
+                    'ano' => $ano,
+                    'velho' => $tipoAtual,
+                    'origem' => (int) $origem,
+                ]
+            );
+        }
+        $this->executarAtualizacao(
+            'UPDATE regras_academicas
+             SET periodo_tipo = :novo
+             WHERE ano_letivo = :ano AND periodo_tipo = :velho
+               AND (periodo_numero IS NULL OR periodo_numero = 0)',
+            ['novo' => $tipoNovo, 'ano' => $ano, 'velho' => $tipoAtual]
+        );
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearResultadoAcademico(int $ano, string $tipoAtual, string $tipoNovo, array $mapa): void
+    {
+        if (!$this->db->tableExists('resultado_academico') || !$this->colunaExiste('resultado_academico', 'periodo_tipo')) {
+            return;
+        }
+        if (!$this->valorCabeNaColuna('resultado_academico', 'periodo_tipo', $tipoNovo)) {
+            return;
+        }
+        $snapshots = [];
+        if ($this->colunaExiste('resultado_academico', 'snapshot_json')) {
+            $snapshots = $this->db->fetchAll(
+                'SELECT id, periodo_numero, snapshot_json
+                 FROM resultado_academico
+                 WHERE ano_letivo = :ano AND periodo_tipo = :velho
+                   AND snapshot_json IS NOT NULL AND snapshot_json != \'\'',
+                ['ano' => $ano, 'velho' => $tipoAtual]
+            );
+            $snapshots = is_array($snapshots) ? $snapshots : [];
+        }
+        foreach ($mapa as $origem => $destino) {
+            $this->executarAtualizacao(
+                'UPDATE resultado_academico
+                 SET periodo_tipo = :novo, periodo_numero = :destino
+                 WHERE ano_letivo = :ano AND periodo_tipo = :velho AND periodo_numero = :origem',
+                [
+                    'novo' => $tipoNovo,
+                    'destino' => (int) $destino,
+                    'ano' => $ano,
+                    'velho' => $tipoAtual,
+                    'origem' => (int) $origem,
+                ]
+            );
+        }
+        $this->executarAtualizacao(
+            'UPDATE resultado_academico
+             SET periodo_tipo = :novo
+             WHERE ano_letivo = :ano AND periodo_tipo = :velho AND periodo_numero = 0',
+            ['novo' => $tipoNovo, 'ano' => $ano, 'velho' => $tipoAtual]
+        );
+        foreach ($snapshots as $row) {
+            $origem = (int) ($row['periodo_numero'] ?? 0);
+            $destino = $origem >= 1 ? (int) ($mapa[$origem] ?? $origem) : 0;
+            if ($origem >= 1 && !isset($mapa[$origem])) {
+                continue;
+            }
+            $novo = $this->snapshotReclassificado((string) ($row['snapshot_json'] ?? ''), $tipoNovo, $destino);
+            if ($novo === null) {
+                continue;
+            }
+            $this->executarAtualizacao(
+                'UPDATE resultado_academico SET snapshot_json = :json WHERE id = :id',
+                ['json' => $novo, 'id' => (int) ($row['id'] ?? 0)]
+            );
+        }
+    }
+
+    private function snapshotReclassificado(string $json, string $tipoNovo, int $destino): ?string
+    {
+        $node = json_decode($json, true);
+        if (!is_array($node) || !isset($node['periodo']) || !is_array($node['periodo'])) {
+            return null;
+        }
+        $node['periodo']['tipo'] = $tipoNovo;
+        $node['periodo']['numero'] = $destino;
+        $node['periodo']['label'] = $destino <= 0
+            ? 'Ano letivo'
+            : (string) (PeriodoLetivo::rotulosDoTipo($tipoNovo)[$destino] ?? ($destino . 'º período'));
+        $encoded = json_encode($node, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($encoded === false || $encoded === $json) {
+            return null;
+        }
+        return $encoded;
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     */
+    private function remapearFechamento(int $ano, string $tipoAtual, string $tipoNovo, array $mapa): void
+    {
+        if (!$this->db->tableExists('fechamento_periodo') || !$this->colunaExiste('fechamento_periodo', 'periodo_tipo')) {
+            return;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, turma_id, periodo_numero, vigente
+             FROM fechamento_periodo
+             WHERE ano_letivo = :ano AND periodo_tipo = :tipo AND periodo_numero >= 1',
+            ['ano' => $ano, 'tipo' => $tipoAtual]
+        );
+        $rows = is_array($rows) ? $rows : [];
+        if ($rows === []) {
+            return;
+        }
+        $this->executarAtualizacao(
+            'UPDATE fechamento_periodo SET vigente_chave = NULL
+             WHERE ano_letivo = :ano AND periodo_tipo = :tipo AND periodo_numero >= 1',
+            ['ano' => $ano, 'tipo' => $tipoAtual]
+        );
+        foreach ($rows as $row) {
+            $origem = (int) ($row['periodo_numero'] ?? 0);
+            if ($origem < 1 || !isset($mapa[$origem])) {
+                throw new InvalidArgumentException('Indique para onde vai o período ' . $origem . ' dos fechamentos deste ano.');
+            }
+            $destino = (int) $mapa[$origem];
+            $vigente = (int) ($row['vigente'] ?? 0) === 1;
+            $chave = $vigente ? ((int) $row['turma_id'] . ':' . $ano . ':' . $tipoNovo . ':' . $destino) : null;
+            $this->executarAtualizacao(
+                'UPDATE fechamento_periodo
+                 SET periodo_tipo = :tipo, periodo_numero = :num, periodo_ref = :ref, vigente_chave = :chave
+                 WHERE id = :id',
+                [
+                    'tipo' => $tipoNovo,
+                    'num' => $destino,
+                    'ref' => $this->referenciaPeriodo($ano, $tipoNovo, $destino),
+                    'chave' => $chave,
+                    'id' => (int) ($row['id'] ?? 0),
+                ]
+            );
+        }
+    }
+
+    private function referenciaPeriodo(int $ano, string $tipo, int $numero): string
+    {
+        $prefixo = match (PeriodoLetivo::normalizarTipo($tipo)) {
+            'trimestre' => 'T',
+            'semestre' => 'S',
+            'etapa_unica' => 'E',
+            default => 'B',
+        };
+        if ($numero >= 1) {
+            return $ano . '-' . $prefixo . $numero;
+        }
+        return $ano . '-ANO';
+    }
+
+    private function exigirTipoAceito(string $tabela, string $rotulo, int $ano, string $tipoAtual, string $tipoNovo): void
+    {
+        if (!$this->identificadorSql($tabela) || !$this->db->tableExists($tabela) || !$this->colunaExiste($tabela, 'periodo_tipo')) {
+            return;
+        }
+        if ($this->valorCabeNaColuna($tabela, 'periodo_tipo', $tipoNovo)) {
+            return;
+        }
+        if ($this->temLinhasDoTipo($tabela, $ano, $tipoAtual)) {
+            throw new InvalidArgumentException(
+                'Não é possível usar esta divisão porque já existem ' . $rotulo . ' gravados. Escolha bimestre, trimestre ou semestre.'
+            );
+        }
+    }
+
+    private function temLinhasDoTipo(string $tabela, int $ano, string $tipo): bool
+    {
+        if (!$this->identificadorSql($tabela) || !$this->db->tableExists($tabela) || !$this->colunaExiste($tabela, 'periodo_tipo') || !$this->colunaExiste($tabela, 'ano_letivo')) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            "SELECT 1 AS ok FROM `{$tabela}` WHERE ano_letivo = :ano AND periodo_tipo = :tipo LIMIT 1",
+            ['ano' => $ano, 'tipo' => $tipo]
+        );
+        return is_array($row) && !empty($row['ok']);
+    }
+
+    private function valorCabeNaColuna(string $tabela, string $coluna, string $valor): bool
+    {
+        if (!$this->identificadorSql($tabela) || !$this->identificadorSql($coluna)) {
+            return false;
+        }
+        $row = $this->db->fetch("SHOW COLUMNS FROM `{$tabela}` LIKE '{$coluna}'");
+        $type = strtolower((string) ($row['Type'] ?? ''));
+        if ($type === '' || !str_starts_with($type, 'enum(')) {
+            return true;
+        }
+        preg_match_all("/'([^']*)'/", $type, $m);
+        return in_array($valor, $m[1] ?? [], true);
+    }
+
+    /**
+     * @param array<int,int> $mapa
+     * @return array<int,int>
+     */
+    private function paresQueMudamNumero(array $mapa): array
+    {
+        $pares = [];
+        foreach ($mapa as $de => $para) {
+            $de = (int) $de;
+            $para = (int) $para;
+            if ($de >= 1 && $para >= 1 && $de !== $para) {
+                $pares[$de] = $para;
+            }
+        }
+        return $pares;
+    }
+
+    /**
+     * @param array<string,mixed> $params
+     */
+    private function executarAtualizacao(string $sql, array $params): void
+    {
+        try {
+            $this->db->update($sql, $params);
+        } catch (Throwable $e) {
+            if ($this->ehConflitoUnico($e)) {
+                throw new InvalidArgumentException(
+                    'Não dá para juntar esses períodos: já existe o mesmo cadastro nos dois (por exemplo, a mesma turma ou o mesmo aluno). Escolha um período de destino diferente para cada um.'
+                );
+            }
+            throw $e;
+        }
+    }
+
+    private function ehConflitoUnico(Throwable $e): bool
+    {
+        $msg = $e->getMessage();
+        return str_contains($msg, '1062') || stripos($msg, 'Duplicate') !== false;
+    }
+
+    private function identificadorSql(string $nome): bool
+    {
+        return preg_match('/^[a-zA-Z0-9_]+$/', $nome) === 1;
     }
 
     private function contarPorAno(string $tabela, int $ano, ?string $extra = null): int

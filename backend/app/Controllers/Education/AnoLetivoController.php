@@ -238,12 +238,13 @@ class AnoLetivoController extends BaseController
             $this->json(['error' => 'Ano letivo não encontrado.'], 404);
             return;
         }
-        $uso = $this->service->usoDaDivisao((int) $item['ano']);
+        $periodos = $this->service->periodosEmUso((int) $item['ano']);
         $this->json([
             'success' => true,
             'item' => $item,
-            'divisao_bloqueada' => !empty($uso['bloqueada']),
-            'divisao_motivo' => (string) ($uso['mensagem'] ?? ''),
+            'divisao_bloqueada' => false,
+            'tem_cadastros' => $periodos !== [],
+            'periodos_usados' => $periodos,
         ]);
     }
 
@@ -327,6 +328,7 @@ class AnoLetivoController extends BaseController
             'data_fim' => (string) ($_POST['data_fim'] ?? ''),
             'periodo_tipo' => (string) ($_POST['periodo_tipo'] ?? ''),
             'ativo' => isset($_POST['ativo']) ? 1 : 0,
+            'mapeamento' => is_array($_POST['mapeamento'] ?? null) ? $_POST['mapeamento'] : [],
         ];
     }
 }

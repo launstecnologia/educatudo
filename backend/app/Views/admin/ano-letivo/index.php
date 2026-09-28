@@ -188,7 +188,6 @@ include __DIR__ . '/../_partials/flash_message.php';
                     </div>
                     <div class="sm:col-span-2">
                         <label for="al_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1">Divisão do ano <span class="text-red-500">*</span></label>
-                        <input type="hidden" id="al_periodo_tipo_lock" name="periodo_tipo" value="" disabled>
                         <select id="al_periodo_tipo" name="periodo_tipo" required
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
                             <?php foreach (PeriodoLetivo::TIPOS as $cod => $lab): ?>
@@ -197,6 +196,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                         </select>
                         <p class="text-xs text-gray-500 mt-1">Define os períodos em prova, jornada, boletim e conselho. Ex.: trimestral mostra 1º, 2º e 3º trimestre.</p>
                         <p id="al_periodo_tipo_aviso" class="hidden mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
+                        <div id="al-mapeamento-fields"></div>
                     </div>
                 </div>
             </section>
@@ -215,27 +215,155 @@ include __DIR__ . '/../_partials/flash_message.php';
     </form>
 </aside>
 
+<div id="modalMapaPeriodos" class="fixed inset-0 z-[80] hidden" role="dialog" aria-modal="true" aria-labelledby="modalMapaPeriodosTitulo">
+    <div class="absolute inset-0 bg-black/50" onclick="cancelarMapaPeriodos()"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
+        <div class="pointer-events-auto bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg my-4 overflow-hidden flex flex-col">
+            <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
+                <div>
+                    <h3 id="modalMapaPeriodosTitulo" class="text-lg font-semibold text-gray-900">Para onde vai cada período?</h3>
+                    <p id="modalMapaPeriodosTexto" class="mt-1 text-sm text-gray-500"></p>
+                </div>
+                <button type="button" onclick="cancelarMapaPeriodos()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div id="modalMapaPeriodosLista" class="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto"></div>
+            <div class="px-5 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <button type="button" onclick="cancelarMapaPeriodos()"
+                        class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                    Cancelar
+                </button>
+                <button type="button" id="mapa-periodos-confirmar" onclick="confirmarMapaPeriodos()"
+                        class="btn-primary-custom px-5 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-function setDivisaoBloqueada(bloqueada, motivo, valor) {
+var PERIODOS_LETIVOS = <?= json_encode((function () {
+    $mapa = [];
+    foreach (PeriodoLetivo::TIPOS as $cod => $lab) {
+        $mapa[$cod] = [
+            'nome' => $lab,
+            'rotulos' => PeriodoLetivo::rotulosDoTipo($cod),
+        ];
+    }
+    return $mapa;
+})(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+
+var anoLetivoEdicao = { original: 'bimestre', usados: [], mapaPronto: false };
+var salvarAoConfirmarMapa = false;
+
+function limparMapeamento() {
+    var box = document.getElementById('al-mapeamento-fields');
+    if (box) { box.innerHTML = ''; }
+    anoLetivoEdicao.mapaPronto = false;
+}
+
+function prepararDivisao(tipo, temCadastros, usados) {
     var sel = document.getElementById('al_periodo_tipo');
-    var lock = document.getElementById('al_periodo_tipo_lock');
     var aviso = document.getElementById('al_periodo_tipo_aviso');
-    var tipo = valor || sel.value || 'bimestre';
-    if (bloqueada) {
-        sel.value = tipo;
-        sel.disabled = true;
-        lock.disabled = false;
-        lock.value = tipo;
-        aviso.textContent = motivo || 'Há cadastros usando os períodos deste ano. A divisão não pode ser alterada.';
+    sel.disabled = false;
+    sel.value = tipo || 'bimestre';
+    anoLetivoEdicao.original = sel.value || 'bimestre';
+    anoLetivoEdicao.usados = Array.isArray(usados) ? usados : [];
+    limparMapeamento();
+    if (temCadastros && anoLetivoEdicao.usados.length) {
+        var nomes = anoLetivoEdicao.usados.map(function (p) { return p.rotulo; }).join(', ');
+        aviso.textContent = 'Já existem cadastros neste ano (' + nomes + '). Ao mudar a divisão, você indica para qual período novo cada um vai.';
         aviso.classList.remove('hidden');
     } else {
-        sel.disabled = false;
-        lock.disabled = true;
-        lock.value = '';
         aviso.textContent = '';
         aviso.classList.add('hidden');
-        if (tipo) { sel.value = tipo; }
     }
+}
+
+function rotuloTipo(cod) {
+    var info = PERIODOS_LETIVOS[cod];
+    return info ? info.nome : cod;
+}
+
+function abrirModalMapeamento(salvarDepois) {
+    var novo = document.getElementById('al_periodo_tipo').value;
+    var info = PERIODOS_LETIVOS[novo] || { rotulos: {} };
+    var rotulos = info.rotulos || {};
+    var chaves = Object.keys(rotulos);
+    salvarAoConfirmarMapa = !!salvarDepois;
+    document.getElementById('modalMapaPeriodosTexto').textContent =
+        'O ano passa de ' + rotuloTipo(anoLetivoEdicao.original) + ' para ' + rotuloTipo(novo) + '. Os cadastros (provas, jornadas, boletim, faltas e os demais) passam a usar o período que você escolher.';
+    var lista = document.getElementById('modalMapaPeriodosLista');
+    lista.innerHTML = '';
+    anoLetivoEdicao.usados.forEach(function (p) {
+        var origem = parseInt(p.numero, 10);
+        var row = document.createElement('div');
+        row.className = 'grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-2 items-center';
+        var de = document.createElement('div');
+        de.className = 'text-sm font-medium text-gray-800';
+        de.textContent = p.rotulo || (origem + 'º');
+        var seta = document.createElement('div');
+        seta.className = 'text-gray-400 text-center hidden sm:block';
+        seta.textContent = '→';
+        var sel = document.createElement('select');
+        sel.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm';
+        sel.setAttribute('data-origem', String(origem));
+        sel.required = true;
+        chaves.forEach(function (k) {
+            var opt = document.createElement('option');
+            opt.value = k;
+            opt.textContent = rotulos[k];
+            if (parseInt(k, 10) === origem || (origem > chaves.length && parseInt(k, 10) === chaves.length)) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+        row.appendChild(de);
+        row.appendChild(seta);
+        row.appendChild(sel);
+        lista.appendChild(row);
+    });
+    document.getElementById('mapa-periodos-confirmar').textContent = salvarAoConfirmarMapa ? 'Confirmar e salvar' : 'Confirmar';
+    document.getElementById('modalMapaPeriodos').classList.remove('hidden');
+}
+
+function fecharModalMapeamento() {
+    document.getElementById('modalMapaPeriodos').classList.add('hidden');
+    salvarAoConfirmarMapa = false;
+}
+
+function cancelarMapaPeriodos() {
+    var salvar = salvarAoConfirmarMapa;
+    fecharModalMapeamento();
+    if (!salvar && !anoLetivoEdicao.mapaPronto) {
+        document.getElementById('al_periodo_tipo').value = anoLetivoEdicao.original;
+        limparMapeamento();
+    }
+}
+
+function confirmarMapaPeriodos() {
+    var selects = document.querySelectorAll('#modalMapaPeriodosLista select[data-origem]');
+    var box = document.getElementById('al-mapeamento-fields');
+    box.innerHTML = '';
+    var ok = true;
+    selects.forEach(function (sel) {
+        if (!sel.value) { ok = false; return; }
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'mapeamento[' + sel.getAttribute('data-origem') + ']';
+        input.value = sel.value;
+        box.appendChild(input);
+    });
+    if (!ok) {
+        alert('Escolha o período novo de cada linha.');
+        return;
+    }
+    anoLetivoEdicao.mapaPronto = true;
+    var salvar = salvarAoConfirmarMapa;
+    fecharModalMapeamento();
+    if (salvar) { enviarAnoLetivo(); }
 }
 
 function openAnoLetivoDrawer(id) {
@@ -243,7 +371,8 @@ function openAnoLetivoDrawer(id) {
     form.reset();
     document.getElementById('al_id').value = '';
     document.getElementById('al_ativo').checked = true;
-    setDivisaoBloqueada(false, '', 'bimestre');
+    anoLetivoEdicao.usados = [];
+    prepararDivisao('bimestre', false, []);
 
     if (!id) {
         form.dataset.mode = 'create';
@@ -267,10 +396,10 @@ function openAnoLetivoDrawer(id) {
             document.getElementById('al_ativo').checked = !!parseInt(data.item.ativo, 10);
             document.getElementById('al_data_inicio').value = data.item.data_inicio || '';
             document.getElementById('al_data_fim').value = data.item.data_fim || '';
-            setDivisaoBloqueada(
-                !!data.divisao_bloqueada,
-                data.divisao_motivo || '',
-                data.item.periodo_tipo || 'bimestre'
+            prepararDivisao(
+                data.item.periodo_tipo || 'bimestre',
+                !!data.tem_cadastros,
+                data.periodos_usados || []
             );
         })
         .catch(function () { alert('Erro de conexão.'); closeAnoLetivoDrawer(); });
@@ -284,33 +413,55 @@ function showAnoLetivoDrawer() {
 }
 
 function closeAnoLetivoDrawer() {
+    fecharModalMapeamento();
     var drawer = document.getElementById('anoLetivoDrawer');
     drawer.classList.add('translate-x-full');
     drawer.setAttribute('aria-hidden', 'true');
     setTimeout(function () { document.getElementById('anoLetivoDrawerBackdrop').classList.add('hidden'); }, 300);
 }
 
-document.getElementById('ano-letivo-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var mode = this.dataset.mode;
+function enviarAnoLetivo() {
+    var form = document.getElementById('ano-letivo-form');
+    var mode = form.dataset.mode;
     var id = document.getElementById('al_id').value;
     var url = mode === 'create' ? '<?= URL ?>/admin/ano-letivo' : '<?= URL ?>/admin/ano-letivo/' + id + '/update';
-    var fd = new FormData(this);
-    var sel = document.getElementById('al_periodo_tipo');
-    var lock = document.getElementById('al_periodo_tipo_lock');
-    var tipo = sel.disabled ? (lock.value || sel.value) : sel.value;
-    fd.set('periodo_tipo', tipo);
+    var fd = new FormData(form);
+    fd.set('periodo_tipo', document.getElementById('al_periodo_tipo').value);
     fetch(url, { method: 'POST', body: fd })
         .then(function (r) { return r.json(); })
         .then(function (result) {
             if (result.success) { window.location.reload(); }
-            else { alert('Erro: ' + result.error); }
+            else { alert('Erro: ' + (result.error || 'Não foi possível salvar.')); }
         })
         .catch(function () { alert('Erro de conexão. Tente novamente.'); });
+}
+
+document.getElementById('al_periodo_tipo').addEventListener('change', function () {
+    var form = document.getElementById('ano-letivo-form');
+    limparMapeamento();
+    if (form.dataset.mode !== 'edit') { return; }
+    if (this.value === anoLetivoEdicao.original || !anoLetivoEdicao.usados.length) { return; }
+    abrirModalMapeamento(false);
+});
+
+document.getElementById('ano-letivo-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var sel = document.getElementById('al_periodo_tipo');
+    if (this.dataset.mode === 'edit' && sel.value !== anoLetivoEdicao.original && anoLetivoEdicao.usados.length && !anoLetivoEdicao.mapaPronto) {
+        abrirModalMapeamento(true);
+        return;
+    }
+    enviarAnoLetivo();
 });
 
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeAnoLetivoDrawer(); }
+    if (e.key !== 'Escape') { return; }
+    var modal = document.getElementById('modalMapaPeriodos');
+    if (modal && !modal.classList.contains('hidden')) {
+        cancelarMapaPeriodos();
+        return;
+    }
+    closeAnoLetivoDrawer();
 });
 </script>
 <?php endif; ?>
