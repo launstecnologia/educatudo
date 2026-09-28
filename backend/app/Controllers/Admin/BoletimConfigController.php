@@ -3852,6 +3852,7 @@ class BoletimConfigController extends BaseController
             if ($codigo === '' || ($componente['source_type'] ?? '') !== 'calculado') {
                 continue;
             }
+            $this->fundirMateriasIguaisNaMatriz($matrizPorCodigo, $materiaNomesPorId, $componentes);
 
             $valor = null;
             $detalhes = [];
@@ -4021,6 +4022,7 @@ class BoletimConfigController extends BaseController
                 'detalhes' => $detalhes,
             ];
         }
+        $this->fundirMateriasIguaisNaMatriz($matrizPorCodigo, $materiaNomesPorId, $componentes);
 
         $porCodigoRes = [];
         foreach ($componentesResultado as $cr) {
@@ -4134,7 +4136,7 @@ class BoletimConfigController extends BaseController
                     if (!empty($componente['materia_unica'])) {
                         $listaProc = $this->deduplicarNotasPorMateria($listaProc);
                     }
-                    $v = $this->agruparNotas($listaProc, $calc);
+                    $v = $this->agruparNotas($listaProc, $this->calcAoJuntarMateriasIguais($componente, $calc));
                     if ($v !== null) {
                         $out[$mid] = $v;
                     }
@@ -4161,7 +4163,7 @@ class BoletimConfigController extends BaseController
             if (!empty($componente['materia_unica'])) {
                 $listaProc = $this->deduplicarNotasPorMateria($listaProc);
             }
-            $v = $this->agruparNotas($listaProc, $calc);
+            $v = $this->agruparNotas($listaProc, $this->calcAoJuntarMateriasIguais($componente, $calc));
             if ($v !== null) {
                 $out[$mid] = $v;
             }
@@ -4355,6 +4357,104 @@ class BoletimConfigController extends BaseController
         }
 
         return $key;
+    }
+
+    /**
+     * Prova única (última nota) de dois professores da mesma matéria vira soma
+     * quando o modo escolhido é soma. A média semanal continua média.
+     */
+    private function calcAoJuntarMateriasIguais(array $componente, string $calc): string
+    {
+        if (empty($componente['materia_unica']) || $calc !== 'ultima') {
+            return $calc;
+        }
+        $cfg = $this->decodeComponenteConfig($componente);
+        $grp = $cfg['group_line'] ?? null;
+        $mode = is_array($grp) ? strtolower(trim((string) ($grp['mode'] ?? ''))) : '';
+        if ($mode === 'media') {
+            return $calc;
+        }
+
+        return 'soma';
+    }
+
+    /**
+     * Mesma matéria em dois cadastros (professores diferentes).
+     * Soma, ou tira a média, conforme o modo escolhido em "juntar matérias iguais".
+     *
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<int|string, mixed> $componentes
+     */
+    private function fundirMateriasIguaisNaMatriz(array &$matrizPorCodigo, array $materiaNomesPorId, array $componentes): void
+    {
+        $temUnica = false;
+        $modo = 'soma';
+        foreach ($componentes as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            if (!empty($componente['materia_unica'])) {
+                $temUnica = true;
+            }
+            $cfg = $this->decodeComponenteConfig($componente);
+            $grp = $cfg['group_line'] ?? null;
+            if (!is_array($grp) || empty($grp['enabled'])) {
+                continue;
+            }
+            $mode = strtolower(trim((string) ($grp['mode'] ?? '')));
+            if ($mode === 'media' || $mode === 'soma') {
+                $modo = $mode;
+            }
+        }
+        if (!$temUnica) {
+            return;
+        }
+
+        $idsPorNome = [];
+        foreach ($materiaNomesPorId as $mid => $nome) {
+            $mid = (int) $mid;
+            if ($mid <= 0) {
+                continue;
+            }
+            $chave = $this->canonicalMateriaNomeKey((string) $nome);
+            if ($chave === '') {
+                continue;
+            }
+            $idsPorNome[$chave][$mid] = $mid;
+        }
+
+        foreach ($idsPorNome as $ids) {
+            if (count($ids) < 2) {
+                continue;
+            }
+            $ids = array_values($ids);
+            sort($ids);
+            $primario = (int) $ids[0];
+            foreach ($matrizPorCodigo as $cod => $map) {
+                if (!is_array($map)) {
+                    continue;
+                }
+                $vals = [];
+                foreach ($ids as $mid) {
+                    if (isset($map[$mid]) && is_numeric($map[$mid])) {
+                        $vals[] = (float) $map[$mid];
+                    }
+                }
+                if ($vals === []) {
+                    continue;
+                }
+                $junto = $modo === 'media'
+                    ? array_sum($vals) / count($vals)
+                    : array_sum($vals);
+                $matrizPorCodigo[$cod][$primario] = $junto;
+                foreach ($ids as $mid) {
+                    if ((int) $mid !== $primario) {
+                        unset($matrizPorCodigo[$cod][$mid]);
+                    }
+                }
+            }
+        }
     }
 
     /**

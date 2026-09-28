@@ -2535,6 +2535,9 @@ $boletimWizardSteps = [
         var porId = {};
         var porNome = {};
         var linhas = [];
+        var modoIguais = (estado && estado.materia_unica)
+            ? ((estado.grupo_linha && estado.grupo_linha.ativo && estado.grupo_linha.modo === 'media') ? 'media' : 'soma')
+            : '';
         brutas.forEach(function (lin) {
             if (!lin) return;
             var id = Number(lin.materia_id || 0);
@@ -2542,10 +2545,16 @@ $boletimWizardSteps = [
             var kn = chaveNomeMateria(nome);
             if (!nome) return;
             if (id && porId[id]) return;
-            if (kn && porNome[kn]) return;
+            var registro = { materia_id: id, materia_nome: nome, notas: lin.notas || {} };
+            if (kn && porNome[kn]) {
+                if (modoIguais) {
+                    porNome[kn].notas = agregarNotasLinhas([porNome[kn], registro], outras, modoIguais);
+                }
+                return;
+            }
             if (id) porId[id] = true;
-            if (kn) porNome[kn] = true;
-            linhas.push({ materia_id: id, materia_nome: nome, notas: lin.notas || {} });
+            linhas.push(registro);
+            if (kn) porNome[kn] = registro;
         });
 
         var idsEscopo = {};
