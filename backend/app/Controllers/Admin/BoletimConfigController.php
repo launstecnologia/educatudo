@@ -4710,6 +4710,10 @@ class BoletimConfigController extends BaseController
         $materiasSelecionadas = $this->parseMateriasIdsFromRegra($regra);
         $idsRotuloPai = [];
         if ($pularAgrupamentoLinhas) {
+            $materiasSelecionadas = array_merge(
+                $materiasSelecionadas,
+                $this->materiasIdsDoModeloBoletim((int) ($regra['boletim_id'] ?? 0))
+            );
             $materiasSelecionadas = $this->expandirMateriasComFilhos($materiasSelecionadas);
             $idsRotuloPai = $this->idsRotuloPaiComponente();
         }
@@ -8697,6 +8701,33 @@ class BoletimConfigController extends BaseController
         } catch (Throwable $e) {
             return $this->materiasExpandidasCache[$cacheKey] = $ids;
         }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function materiasIdsDoModeloBoletim(int $boletimId): array
+    {
+        if ($boletimId <= 0) {
+            return [];
+        }
+        try {
+            $cadastro = (new BoletimCadastroService())->model()->findById($boletimId);
+        } catch (Throwable $e) {
+            return [];
+        }
+        if (!is_array($cadastro)) {
+            return [];
+        }
+        $ids = [];
+        foreach ((array) ($cadastro['materias_ids'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
     }
 
     /**

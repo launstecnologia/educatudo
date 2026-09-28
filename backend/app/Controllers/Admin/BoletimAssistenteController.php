@@ -238,7 +238,7 @@ class BoletimAssistenteController extends BaseController
                 $previewQuadro = $this->montarPreviewRealDaSimulacao($simulacaoQuadro);
                 if (is_array($previewQuadro)) {
                     $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);
-                    $previewReal = $this->trocarLinhasDoQuadro($previewReal, $previewQuadro);
+                    $previewReal = $this->trocarLinhasDoQuadro($previewReal, $previewQuadro, $grupoId);
                 }
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
@@ -644,7 +644,7 @@ class BoletimAssistenteController extends BaseController
      * @param array<string,mixed> $previewQuadro
      * @return array<string,mixed>
      */
-    private function trocarLinhasDoQuadro(array $preview, array $previewQuadro): array
+    private function trocarLinhasDoQuadro(array $preview, array $previewQuadro, int $grupoId = 0): array
     {
         if (($preview['modo'] ?? '') !== 'quadro' || empty($preview['tabelas']) || !is_array($preview['tabelas'])) {
             return $preview;
@@ -713,6 +713,7 @@ class BoletimAssistenteController extends BaseController
                 $preview['tabelas'][$i] = $tab;
             }
         }
+        $this->encaixarLinhasSemBloco($preview, $restantes, $grupoId);
         foreach ($preview['tabelas'] as $i => $tab) {
             if (!is_array($tab) || !is_array($tab['linhas'] ?? null)) {
                 continue;
@@ -727,6 +728,90 @@ class BoletimAssistenteController extends BaseController
         }
 
         return $preview;
+    }
+
+    /**
+     * Componente filho do modelo entra no quadro mesmo sem nota semanal.
+     *
+     * @param array<string,mixed> $preview
+     * @param list<array<string,mixed>> $restantes
+     */
+    private function encaixarLinhasSemBloco(array &$preview, array $restantes, int $grupoId): void
+    {
+        if ($restantes === [] || empty($preview['tabelas']) || !is_array($preview['tabelas'])) {
+            return;
+        }
+        $colocadas = [];
+        foreach ($preview['tabelas'] as $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            foreach (is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [] as $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $mid = (int) ($linha['materia_id'] ?? 0);
+                if ($mid > 0) {
+                    $colocadas[$mid] = true;
+                }
+            }
+        }
+        $mapas = $this->mapasMateriasPorBloco($grupoId);
+        $paiPorFilho = [];
+        $path = dirname(__DIR__, 2) . '/Models/Education/ComponenteCurricular.php';
+        if (!class_exists('ComponenteCurricular', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (class_exists('ComponenteCurricular', false)) {
+            try {
+                foreach ((new ComponenteCurricular())->mapaFilhosPorPai() as $paiId => $filhos) {
+                    foreach ($filhos as $filho) {
+                        $fid = (int) ($filho['id'] ?? 0);
+                        if ($fid > 0) {
+                            $paiPorFilho[$fid] = (int) $paiId;
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                $paiPorFilho = [];
+            }
+        }
+        $porLetra = ['a' => [], 'b' => []];
+        foreach ($restantes as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0 && isset($colocadas[$mid])) {
+                continue;
+            }
+            if ($mid <= 0) {
+                continue;
+            }
+            $pai = $paiPorFilho[$mid] ?? 0;
+            $letra = 'a';
+            $idsB = is_array($mapas['B']['ids'] ?? null) ? $mapas['B']['ids'] : [];
+            if (isset($idsB[$mid]) || ($pai > 0 && isset($idsB[$pai]))) {
+                $letra = 'b';
+            }
+            $porLetra[$letra][] = $linha;
+            $colocadas[$mid] = true;
+        }
+        if ($porLetra['a'] === [] && $porLetra['b'] === []) {
+            return;
+        }
+        foreach ($preview['tabelas'] as $i => $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            $key = strtolower(trim((string) ($tab['key'] ?? '')));
+            if (!isset($porLetra[$key]) || $porLetra[$key] === []) {
+                continue;
+            }
+            $atuais = is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+            $tab['linhas'] = $this->linhasQuadroSemRotulo(array_merge($atuais, $porLetra[$key]));
+            $preview['tabelas'][$i] = $tab;
+        }
     }
 
     /**
