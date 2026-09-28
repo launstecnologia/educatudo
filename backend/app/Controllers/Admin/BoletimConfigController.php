@@ -4341,6 +4341,32 @@ class BoletimConfigController extends BaseController
         }
     }
 
+    private function chaveOrdemAlfabeticaMateria(string $nome): string
+    {
+        $v = mb_strtolower(trim($nome), 'UTF-8');
+        if ($v === '') {
+            return '';
+        }
+        if (class_exists(\Normalizer::class)) {
+            $norm = \Normalizer::normalize($v, \Normalizer::FORM_D);
+            if (is_string($norm) && $norm !== '') {
+                $v = preg_replace('/\p{Mn}+/u', '', $norm) ?? $norm;
+            }
+        } else {
+            $v = strtr($v, [
+                'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a',
+                'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+                'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+                'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+                'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+                'ç' => 'c', 'ñ' => 'n',
+            ]);
+        }
+        $v = preg_replace('/\s+/u', ' ', $v) ?? $v;
+
+        return trim($v);
+    }
+
     private function canonicalMateriaNomeKey(string $nome): string
     {
         $key = $this->normalizeEventoCodigoToken($nome);
@@ -4783,12 +4809,18 @@ class BoletimConfigController extends BaseController
             }));
         }
 
-        $mapaOrdemMaterias = $this->mapaOrdemMateriasDaRegra($regra);
-        usort($midsOrdenados, static function (int $a, int $b) use ($materiaNomesPorId, $mapaOrdemMaterias): int {
-            $oa = $mapaOrdemMaterias[$a] ?? ($a < 0 ? 50000 + abs($a) : 100000 + $a);
-            $ob = $mapaOrdemMaterias[$b] ?? ($b < 0 ? 50000 + abs($b) : 100000 + $b);
-            if ($oa !== $ob) {
-                return $oa <=> $ob;
+        $chavesNomeMateria = [];
+        foreach ($midsOrdenados as $midOrdem) {
+            $midOrdem = (int) $midOrdem;
+            $chavesNomeMateria[$midOrdem] = $this->chaveOrdemAlfabeticaMateria(
+                (string) ($materiaNomesPorId[$midOrdem] ?? '')
+            );
+        }
+        usort($midsOrdenados, static function (int $a, int $b) use ($chavesNomeMateria): int {
+            $na = $chavesNomeMateria[$a] ?? '';
+            $nb = $chavesNomeMateria[$b] ?? '';
+            if ($na !== $nb) {
+                return $na <=> $nb;
             }
 
             return $a <=> $b;
@@ -7756,18 +7788,6 @@ class BoletimConfigController extends BaseController
         $lt = strtolower(trim((string) ($cfg['layout_type'] ?? ($comp['layout_type'] ?? ''))));
 
         return $lt === 'faltas';
-    }
-
-    /**
-     * @param array<string,mixed> $regra
-     * @return array<int,int>
-     */
-    private function mapaOrdemMateriasDaRegra(array $regra): array
-    {
-        return $this->boletimConfig->mapaOrdemBoletimMaterias(
-            $this->parseSeriesIdsFromRegra($regra),
-            $this->parseTurmasIdsFromRegra($regra)
-        );
     }
 
     /**

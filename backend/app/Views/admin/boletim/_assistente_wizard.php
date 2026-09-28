@@ -2523,6 +2523,16 @@ $boletimWizardSteps = [
         return notas;
     }
 
+    function ordenarLinhasPorNome(lista) {
+        return (lista || []).slice().sort(function (a, b) {
+            var ka = chaveNomeMateria(a && a.materia_nome);
+            var kb = chaveNomeMateria(b && b.materia_nome);
+            if (ka < kb) return -1;
+            if (ka > kb) return 1;
+            return (Number(a && a.materia_id) || 0) - (Number(b && b.materia_id) || 0);
+        });
+    }
+
     function linhasDoBoletim(pv, outras) {
         var brutas = (pv && Array.isArray(pv.linhas_completas) && pv.linhas_completas.length)
             ? pv.linhas_completas.slice()
@@ -2579,7 +2589,7 @@ $boletimWizardSteps = [
 
         var gl = (estado && estado.grupo_linha) || {};
         var onde = gl.aplicar_em || 'boletim';
-        if (!gl.ativo || (onde !== 'boletim' && onde !== 'ambos')) return linhas;
+        if (!gl.ativo || (onde !== 'boletim' && onde !== 'ambos')) return ordenarLinhasPorNome(linhas);
         var idsGrupo = {};
         (gl.materias_ids || []).forEach(function (id) {
             id = Number(id || 0);
@@ -2589,7 +2599,7 @@ $boletimWizardSteps = [
         (catalogo.materias || []).forEach(function (m) {
             if (idsGrupo[Number(m.id)]) nomesGrupo[chaveNomeMateria(m.nome)] = true;
         });
-        if (!Object.keys(idsGrupo).length) return linhas;
+        if (!Object.keys(idsGrupo).length) return ordenarLinhasPorNome(linhas);
 
         var membros = [];
         var out = [];
@@ -2606,13 +2616,13 @@ $boletimWizardSteps = [
             }
             membros.push(lin);
         });
-        if (membros.length < 2 || pos < 0) return linhas;
+        if (membros.length < 2 || pos < 0) return ordenarLinhasPorNome(linhas);
         out[pos] = {
             materia_id: 0,
             materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
             notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media')
         };
-        return out;
+        return ordenarLinhasPorNome(out);
     }
 
     function htmlTabelaSomenteNotas(pv) {
