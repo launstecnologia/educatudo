@@ -289,6 +289,43 @@ class TipoNotaRegraService
     }
 
     /**
+     * Recalcula a nota da matéria somando ou tirando a média entre professores,
+     * sem gravar por cima do fechamento do tipo.
+     *
+     * @return array<int, float> materia_id => nota
+     */
+    public function notasPorMateriaForcandoCriterioProfessores(
+        int $tipoId,
+        int $alunoId,
+        int $turmaId,
+        int $anoLetivo,
+        int $periodo,
+        string $criterioProfessores
+    ): array {
+        $criterioProfessores = $this->normalizarCriterioProfessores($criterioProfessores);
+        if ($tipoId <= 0 || $alunoId <= 0 || !in_array($criterioProfessores, ['media', 'soma'], true)) {
+            return [];
+        }
+        $tipo = $this->tipos->findById($tipoId);
+        if (!$this->tipoFechaNotaFinal($tipo)) {
+            return [];
+        }
+        $tipo['criterio_professores_mesmo_componente'] = $criterioProfessores;
+        $tipo['media_professores_mesmo_componente'] = $criterioProfessores === 'media' ? 1 : 0;
+        $eventos = $this->coletarEventos($tipoId, $alunoId, $turmaId, $anoLetivo, $periodo);
+        $porMateria = $this->agruparPorMateria($eventos, $tipo);
+        $out = [];
+        foreach ($porMateria as $mid => $fechado) {
+            if (!isset($fechado['nota_final']) || !is_numeric($fechado['nota_final'])) {
+                continue;
+            }
+            $out[(int) $mid] = round((float) $fechado['nota_final'], 2);
+        }
+
+        return $out;
+    }
+
+    /**
      * Recalcula após lançamento na pauta (não quebra o save se falhar).
      */
     public function atualizarAposLancamento(int $blocoId, int $alunoId, int $turmaId, int $materiaId): void

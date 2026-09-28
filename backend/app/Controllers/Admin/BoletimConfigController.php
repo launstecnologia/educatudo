@@ -4359,6 +4359,15 @@ class BoletimConfigController extends BaseController
         return $key;
     }
 
+    private function modoJuncaoMateriasIguais(array $componente): string
+    {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $grp = $cfg['group_line'] ?? null;
+        $mode = is_array($grp) ? strtolower(trim((string) ($grp['mode'] ?? ''))) : '';
+
+        return $mode === 'media' ? 'media' : 'soma';
+    }
+
     /**
      * Prova única (última nota) de dois professores da mesma matéria vira soma
      * quando o modo escolhido é soma. A média semanal continua média.
@@ -4368,10 +4377,7 @@ class BoletimConfigController extends BaseController
         if (empty($componente['materia_unica']) || $calc !== 'ultima') {
             return $calc;
         }
-        $cfg = $this->decodeComponenteConfig($componente);
-        $grp = $cfg['group_line'] ?? null;
-        $mode = is_array($grp) ? strtolower(trim((string) ($grp['mode'] ?? ''))) : '';
-        if ($mode === 'media') {
+        if ($this->modoJuncaoMateriasIguais($componente) === 'media') {
             return $calc;
         }
 
@@ -8071,7 +8077,12 @@ class BoletimConfigController extends BaseController
             $ano = (int) $m[1];
             $periodo = (int) $m[2];
         }
-        $map = $svc->notasFinaisDoAluno($tipoId, $alunoId, $turmaId, $ano, $periodo);
+        $map = !empty($componente['materia_unica']) && $this->modoJuncaoMateriasIguais($componente) === 'soma'
+            ? $svc->notasPorMateriaForcandoCriterioProfessores($tipoId, $alunoId, $turmaId, $ano, $periodo, 'soma')
+            : $svc->notasFinaisDoAluno($tipoId, $alunoId, $turmaId, $ano, $periodo);
+        if ($map === [] && !empty($componente['materia_unica'])) {
+            $map = $svc->notasFinaisDoAluno($tipoId, $alunoId, $turmaId, $ano, $periodo);
+        }
         if ($map === []) {
             return false;
         }

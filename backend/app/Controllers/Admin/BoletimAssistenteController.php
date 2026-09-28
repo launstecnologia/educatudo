@@ -289,9 +289,20 @@ class BoletimAssistenteController extends BaseController
             $salvaComp = $salvas[$cod] ?? null;
             if ($origem !== 'calculado' && is_array($salvaComp)) {
                 $nome = trim((string) ($comp['nome'] ?? ''));
+                $materiaUnica = !empty($comp['materia_unica']);
+                $cfgWizard = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+                $grupoLinha = $cfgWizard['group_line'] ?? null;
                 $comp = $salvaComp;
                 if ($nome !== '') {
                     $comp['nome'] = $nome;
+                }
+                if ($materiaUnica) {
+                    $comp['materia_unica'] = 1;
+                }
+                if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
+                    $cfgSalva = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+                    $cfgSalva['group_line'] = $grupoLinha;
+                    $comp['config'] = $cfgSalva;
                 }
             }
             $componentes[] = $comp;
