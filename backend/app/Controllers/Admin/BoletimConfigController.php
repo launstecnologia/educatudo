@@ -3056,13 +3056,15 @@ class BoletimConfigController extends BaseController
         ?string $rangeInicioOverride = null,
         ?string $rangeFimOverride = null,
         array $visitedRuleCodes = [],
-        bool $forcarAgrupamentoLinhas = false
+        bool $forcarAgrupamentoLinhas = false,
+        bool $pularAgrupamentoLinhas = false
     ): array
     {
         $regraIdCache = (int) ($regra['id'] ?? 0);
         $chaveSimulacao = $regraIdCache . ':' . $alunoId . ':' . $periodoRef . ':'
             . (string) ($rangeInicioOverride ?? '') . ':' . (string) ($rangeFimOverride ?? '')
-            . ':' . ($forcarAgrupamentoLinhas ? 'agrupar' : 'auto');
+            . ':' . ($forcarAgrupamentoLinhas ? 'agrupar' : 'auto')
+            . ':' . ($pularAgrupamentoLinhas ? 'sem-grupo' : 'com-grupo');
         if ($regraIdCache > 0 && isset($this->simulacaoAlunoCache[$chaveSimulacao])) {
             return $this->simulacaoAlunoCache[$chaveSimulacao];
         }
@@ -4063,7 +4065,8 @@ class BoletimConfigController extends BaseController
                 'data_inicio' => substr((string) ($range['inicio'] ?? ''), 0, 10),
                 'data_fim' => substr((string) ($range['fim'] ?? ''), 0, 10),
             ],
-            $forcarAgrupamentoLinhas
+            $forcarAgrupamentoLinhas,
+            $pularAgrupamentoLinhas
         );
 
         $resultado = [
@@ -4574,17 +4577,29 @@ class BoletimConfigController extends BaseController
         array $matrizPercentStatsPorCodigo = [],
         array $materiasAgrupadasHerdadas = [],
         array $contextoAluno = [],
-        bool $forcarAgrupamentoLinhas = false
+        bool $forcarAgrupamentoLinhas = false,
+        bool $pularAgrupamentoLinhas = false
     ): ?array {
         $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
-        $grp = $this->aplicarAgrupamentoLinhasPorComponente(
-            $componentesRegra,
-            $matrizPorCodigo,
-            $materiaNomesPorId,
-            $matrizPercentStatsPorCodigo,
-            (string) ($regra['exibir_em'] ?? 'boletim'),
-            $forcarAgrupamentoLinhas
-        );
+        if ($pularAgrupamentoLinhas) {
+            $grp = [
+                'matriz_por_codigo' => $matrizPorCodigo,
+                'materia_nomes_por_id' => $materiaNomesPorId,
+                'materias_agrupadas' => [],
+                'grupos_virtual_mids' => [],
+                'agrupamento_por_virtual_mid' => [],
+            ];
+            $materiasAgrupadasHerdadas = [];
+        } else {
+            $grp = $this->aplicarAgrupamentoLinhasPorComponente(
+                $componentesRegra,
+                $matrizPorCodigo,
+                $materiaNomesPorId,
+                $matrizPercentStatsPorCodigo,
+                (string) ($regra['exibir_em'] ?? 'boletim'),
+                $forcarAgrupamentoLinhas
+            );
+        }
         $matrizPorCodigo = $grp['matriz_por_codigo'];
         $materiaNomesPorId = $grp['materia_nomes_por_id'];
         $materiasAgrupadas = $grp['materias_agrupadas'];
@@ -4693,6 +4708,11 @@ class BoletimConfigController extends BaseController
         }
 
         $materiasSelecionadas = $this->parseMateriasIdsFromRegra($regra);
+        $idsRotuloPai = [];
+        if ($pularAgrupamentoLinhas) {
+            $materiasSelecionadas = $this->expandirMateriasComFilhos($materiasSelecionadas);
+            $idsRotuloPai = $this->idsRotuloPaiComponente();
+        }
         if ($materiasSelecionadas !== []) {
             $catalogoMaterias = $this->boletimConfig->getAvailableSubjects(2000);
             $nomesCatalogoById = [];
@@ -4732,6 +4752,9 @@ class BoletimConfigController extends BaseController
                 $nomeSel = (string) ($materiaNomesPorId[$midSel] ?? ($nomesCatalogoById[$midSel] ?? ''));
                 $nomeKeySel = $this->canonicalMateriaNomeKey($nomeSel);
                 if ($nomeKeySel !== '' && isset($nomesGruposVirtuais[$nomeKeySel])) {
+                    continue;
+                }
+                if (isset($idsRotuloPai[$midSel])) {
                     continue;
                 }
                 $allMids[$midSel] = true;
@@ -8674,6 +8697,24 @@ class BoletimConfigController extends BaseController
         } catch (Throwable $e) {
             return $this->materiasExpandidasCache[$cacheKey] = $ids;
         }
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private function idsRotuloPaiComponente(): array
+    {
+        $comp = $this->componentesCurriculares();
+        if ($comp === null) {
+            return [];
+        }
+        try {
+            $ids = $comp->idsComFilhos();
+        } catch (Throwable $e) {
+            return [];
+        }
+
+        return is_array($ids) ? $ids : [];
     }
 
     private function componentesCurriculares(): ?\ComponenteCurricular

@@ -225,6 +225,21 @@ class BoletimAssistenteController extends BaseController
             if ($previewReal !== null) {
                 $grupoId = (int) ($rascunho['grupo_regras_notas_id'] ?? $estado['grupo_regras_notas_id'] ?? 0);
                 $previewReal = $this->aplicarMateriasDoQuadro($previewReal, $grupoId);
+                $simulacaoQuadro = $configController->simularRegraAluno(
+                    $rascunho,
+                    $alunoId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    [],
+                    false,
+                    true
+                );
+                $previewQuadro = $this->montarPreviewRealDaSimulacao($simulacaoQuadro);
+                if (is_array($previewQuadro)) {
+                    $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);
+                    $previewReal = $this->trocarLinhasDoQuadro($previewReal, $previewQuadro);
+                }
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
                 $resultado['preview'] = $previewReal;
@@ -620,6 +635,158 @@ class BoletimAssistenteController extends BaseController
         $preview['linhas_completas'] = $linhasCompletas;
 
         return $preview;
+    }
+
+    /**
+     * O quadro mostra os componentes que recebem nota. A linha do boletim continua agrupada.
+     *
+     * @param array<string,mixed> $preview
+     * @param array<string,mixed> $previewQuadro
+     * @return array<string,mixed>
+     */
+    private function trocarLinhasDoQuadro(array $preview, array $previewQuadro): array
+    {
+        if (($preview['modo'] ?? '') !== 'quadro' || empty($preview['tabelas']) || !is_array($preview['tabelas'])) {
+            return $preview;
+        }
+        $porChave = [];
+        foreach (is_array($previewQuadro['tabelas'] ?? null) ? $previewQuadro['tabelas'] : [] as $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            $key = strtolower(trim((string) ($tab['key'] ?? '')));
+            if ($key === '') {
+                continue;
+            }
+            $porChave[$key] = is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+        }
+        $colocadas = [];
+        foreach ($preview['tabelas'] as $i => $tab) {
+            if (!is_array($tab)) {
+                continue;
+            }
+            $key = strtolower(trim((string) ($tab['key'] ?? '')));
+            if (!isset($porChave[$key])) {
+                continue;
+            }
+            $linhas = $this->linhasQuadroSemRotulo($porChave[$key]);
+            foreach ($linhas as $linha) {
+                $mid = (int) ($linha['materia_id'] ?? 0);
+                if ($mid > 0) {
+                    $colocadas[$mid] = true;
+                }
+            }
+            $tab['linhas'] = $linhas;
+            $preview['tabelas'][$i] = $tab;
+        }
+
+        $restantes = [];
+        foreach (is_array($previewQuadro['linhas_completas'] ?? null) ? $previewQuadro['linhas_completas'] : [] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0 && isset($colocadas[$mid])) {
+                continue;
+            }
+            $restantes[] = $linha;
+        }
+        if ($restantes !== []) {
+            foreach ($preview['tabelas'] as $i => $tab) {
+                if (!is_array($tab)) {
+                    continue;
+                }
+                $key = strtolower(trim((string) ($tab['key'] ?? '')));
+                if ($key !== 'a' && $key !== 'b') {
+                    continue;
+                }
+                $extras = $this->linhasVisiveisNoBloco($key, [
+                    'semanas' => $tab['semanas'] ?? [],
+                    'outras' => $tab['outras'] ?? [],
+                    'linhas' => $restantes,
+                ], $preview['tabelas']);
+                if ($extras === []) {
+                    continue;
+                }
+                $atuais = is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [];
+                $tab['linhas'] = $this->linhasQuadroSemRotulo(array_merge($atuais, $extras));
+                $preview['tabelas'][$i] = $tab;
+            }
+        }
+        foreach ($preview['tabelas'] as $i => $tab) {
+            if (!is_array($tab) || !is_array($tab['linhas'] ?? null)) {
+                continue;
+            }
+            $linhas = $tab['linhas'];
+            usort($linhas, function (array $a, array $b): int {
+                return $this->chaveNomeMateria((string) ($a['materia_nome'] ?? ''))
+                    <=> $this->chaveNomeMateria((string) ($b['materia_nome'] ?? ''));
+            });
+            $tab['linhas'] = $linhas;
+            $preview['tabelas'][$i] = $tab;
+        }
+
+        return $preview;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function linhasQuadroSemRotulo(array $linhas): array
+    {
+        $path = dirname(__DIR__, 2) . '/Models/Education/ComponenteCurricular.php';
+        if (!class_exists('ComponenteCurricular', false) && is_file($path)) {
+            require_once $path;
+        }
+        if (!class_exists('ComponenteCurricular', false)) {
+            return array_values($linhas);
+        }
+        try {
+            $mapa = (new ComponenteCurricular())->mapaFilhosPorPai();
+        } catch (Throwable $e) {
+            return array_values($linhas);
+        }
+        $presentes = [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0) {
+                $presentes[$mid] = true;
+            }
+        }
+        $out = [];
+        $vistos = [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0 && isset($vistos[$mid])) {
+                continue;
+            }
+            if ($mid > 0 && isset($mapa[$mid])) {
+                $temFilho = false;
+                foreach ($mapa[$mid] as $filho) {
+                    $fid = (int) ($filho['id'] ?? 0);
+                    if ($fid > 0 && isset($presentes[$fid])) {
+                        $temFilho = true;
+                        break;
+                    }
+                }
+                if ($temFilho) {
+                    continue;
+                }
+            }
+            if ($mid > 0) {
+                $vistos[$mid] = true;
+            }
+            $out[] = $linha;
+        }
+
+        return $out;
     }
 
     /**
