@@ -93,6 +93,12 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
     </div>
 </div>
 
+<?php if (!empty($flash['message'])): ?>
+<div class="mb-6 px-4 py-3 rounded-lg text-sm <?= (!empty($flash['type']) && $flash['type'] === 'error') ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-green-50 border border-green-200 text-green-800' ?>">
+    <?= htmlspecialchars((string) $flash['message']) ?>
+</div>
+<?php endif; ?>
+
 <div id="provaEventoWizard" class="space-y-6">
     <?php include $ui . '/wizard_steps.php'; ?>
 
@@ -240,10 +246,11 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
                 <label class="block text-sm font-medium text-gray-700">
                     Professores e Matérias <span class="text-red-500">*</span>
                 </label>
-                <button type="button" 
+                <button type="button"
+                        id="btnAdicionarProfessorTopo"
                         onclick="adicionarProfessor()"
                         class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
-                    + Adicionar Professor
+                    + Adicionar matéria
                 </button>
             </div>
             <p class="text-sm text-gray-500 mb-4">Adicione um ou mais professores com suas matérias:</p>
@@ -251,6 +258,12 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
             <div id="professoresContainer" class="space-y-4">
                 <!-- Professores serão adicionados aqui via JavaScript -->
             </div>
+            <button type="button"
+                    id="btnAdicionarMateria"
+                    onclick="adicionarProfessor()"
+                    class="mt-4 w-full px-4 py-2.5 text-sm font-semibold rounded-lg border border-dashed border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100">
+                + Adicionar matéria
+            </button>
         </div>
 
         <div class="flex items-center justify-between pt-2">
@@ -657,7 +670,7 @@ function validateWizardStep(step) {
         const faltando = [];
         professorDivs.forEach((div, i) => {
             const n = i + 1;
-            if (!valorProfessor(div, 'professor_id')) {
+            if (!professorOpcionalNoEvento() && !valorProfessor(div, 'professor_id')) {
                 faltando.push('Professor ' + n + ': escolha o professor');
                 return;
             }
@@ -675,7 +688,7 @@ function validateWizardStep(step) {
         });
         ok = professorDivs.length > 0 && faltando.length === 0;
         if (professorDivs.length === 0) {
-            message = 'Adicione pelo menos um professor.';
+            message = professorOpcionalNoEvento() ? 'Adicione pelo menos uma matéria.' : 'Adicione pelo menos um professor.';
         } else if (faltando.length) {
             message = faltando.join('. ') + '.';
         } else {
@@ -851,7 +864,7 @@ function adicionarProfessor(professorData = null) {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Professor <span class="text-red-500">*</span>
+                    Professor <span class="js-req-professor text-red-500">*</span>
                 </label>
                 <select name="professores[${professorCounter}][professor_id]" 
                         required
@@ -964,6 +977,9 @@ function carregarMateriasProfessor(professorIndex) {
     materiaSelect.innerHTML = '<option value="">Selecione a matéria</option>';
     
     if (!selectedOption.value) {
+        if (professorOpcionalNoEvento()) {
+            preencherSelectMaterias(materiaSelect, materias, materiaSelect.value);
+        }
         return;
     }
     
@@ -1008,11 +1024,50 @@ function atribuirAoProfessor() {
     return (inputConfiguracaoNotaNoFormatoAtual()?.value || '') === 'professor_por_questao';
 }
 
+function professorOpcionalNoEvento() {
+    return getFormatoEvento() === 'lancamento_nota' && !atribuirAoProfessor();
+}
+
+function preencherSelectMaterias(materiaSelect, lista, valorAtual) {
+    const atual = valorAtual || materiaSelect.value;
+    materiaSelect.innerHTML = '<option value="">Selecione a matéria</option>';
+    (lista || []).forEach(function (materia) {
+        const option = document.createElement('option');
+        option.value = materia.id;
+        option.textContent = materia.nome;
+        materiaSelect.appendChild(option);
+    });
+    if (atual && Array.from(materiaSelect.options).some(function (o) { return String(o.value) === String(atual); })) {
+        materiaSelect.value = String(atual);
+    }
+}
+
 function exigeNumeroQuestoes() {
     return getFormatoEvento() === 'online_questoes' && atribuirAoProfessor();
 }
 
 function atualizarCamposPassoProfessores() {
+    const profOpcional = professorOpcionalNoEvento();
+    document.querySelectorAll('select[name*="[professor_id]"]').forEach(function (sel) {
+        sel.required = !profOpcional;
+        if (profOpcional) sel.removeAttribute('required');
+    });
+    document.querySelectorAll('.js-req-professor').forEach(function (el) {
+        el.classList.toggle('hidden', profOpcional);
+    });
+    const btnTopo = document.getElementById('btnAdicionarProfessorTopo');
+    if (btnTopo) btnTopo.textContent = profOpcional ? '+ Adicionar matéria' : '+ Adicionar professor';
+    const btnFim = document.getElementById('btnAdicionarMateria');
+    if (btnFim) btnFim.textContent = '+ Adicionar matéria';
+    if (profOpcional) {
+        document.querySelectorAll('[id^="professor_"]').forEach(function (div) {
+            const sel = div.querySelector('select[name*="[professor_id]"]');
+            const materiaSel = div.querySelector('select[name*="[materia_id]"]');
+            if (sel && materiaSel && !sel.value) {
+                preencherSelectMaterias(materiaSel, materias, materiaSel.value);
+            }
+        });
+    }
     const showQtd = exigeNumeroQuestoes();
     document.querySelectorAll('.campo-numero-questoes').forEach(el => {
         el.classList.toggle('hidden', !showQtd);
@@ -1282,7 +1337,7 @@ function atualizarBloco(event, blocoId) {
         professorDivs.forEach(div => {
             const professorId = valorProfessor(div, 'professor_id');
             const materiaId = valorProfessor(div, 'materia_id');
-            if (!professorId || !materiaId) {
+            if ((!professorOpcionalNoEvento() && !professorId) || !materiaId) {
                 professoresInvalidos = true;
                 return;
             }
@@ -1303,7 +1358,7 @@ function atualizarBloco(event, blocoId) {
             }
 
             professoresPayload.push({
-                professor_id: parseInt(professorId, 10),
+                professor_id: professorId ? parseInt(professorId, 10) : null,
                 materia_id: parseInt(materiaId, 10),
                 quantidade_questoes: exigeNumeroQuestoes() ? Math.max(1, quantidadeQuestoes) : 0,
                 turmas: turmasProfessor
@@ -1312,7 +1367,9 @@ function atualizarBloco(event, blocoId) {
         if (professoresInvalidos) {
             mostrarErroBloco(exigeNumeroQuestoes()
                 ? 'Preencha professor, matéria e quantidade de questões para todos os professores adicionados'
-                : 'Preencha professor e matéria para todos os professores adicionados', 4);
+                : (professorOpcionalNoEvento()
+                    ? 'Preencha a matéria de cada item. O professor é opcional quando a coordenação lança a nota.'
+                    : 'Preencha professor e matéria para todos os professores adicionados'), 4);
             return;
         }
         if (turmasProfessorInvalidas) {

@@ -824,16 +824,18 @@ class ExamBlock
                     prof.nome as professor_nome,
                     m.nome as materia_nome
              FROM provas_blocos_professores pbp
-             INNER JOIN professores prof ON pbp.professor_id = prof.id
+             LEFT JOIN professores prof ON pbp.professor_id = prof.id
              INNER JOIN materias m ON pbp.materia_id = m.id
              WHERE pbp.bloco_id = :bloco_id
-             ORDER BY prof.nome ASC",
+             ORDER BY (prof.nome IS NULL), prof.nome ASC, m.nome ASC",
             ['bloco_id' => $blocoId]
         );
         
         // Para cada professor, busca suas turmas e normaliza IDs para o front exibir matéria e checks
         foreach ($professores as &$professor) {
-            $professor['professor_id'] = (int) $professor['professor_id'];
+            $professor['professor_id'] = ($professor['professor_id'] === null || $professor['professor_id'] === '')
+                ? null
+                : (int) $professor['professor_id'];
             $professor['materia_id'] = (int) $professor['materia_id'];
             $turmas = $this->db->fetchAll(
                 "SELECT t.*
@@ -959,7 +961,7 @@ class ExamBlock
                          VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
                         [
                             'bloco_id' => $blocoId,
-                            'professor_id' => $professorData['professor_id'],
+                            'professor_id' => !empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null,
                             'materia_id' => $professorData['materia_id'],
                             'quantidade_questoes' => $qtdQuestoes
                         ]
@@ -1164,7 +1166,7 @@ class ExamBlock
                          VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
                         [
                             'bloco_id' => $id,
-                            'professor_id' => $professorData['professor_id'],
+                            'professor_id' => !empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null,
                             'materia_id' => $professorData['materia_id'],
                             'quantidade_questoes' => $qtdQuestoes
                         ]

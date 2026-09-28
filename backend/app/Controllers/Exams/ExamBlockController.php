@@ -275,8 +275,11 @@ class ExamBlockController extends BaseController
             if ($tipoAvaliacaoId <= 0 || !$this->evaluationTypeModel->findById($tipoAvaliacaoId)) {
                 $errors['tipo_avaliacao_id'] = 'Tipo de avaliação é obrigatório';
             }
+            $professorOpcional = $formatoEvento === 'lancamento_nota' && $configuracaoNota === 'coordenacao_calcula';
             if (empty($postData['professores']) || !is_array($postData['professores']) || count($postData['professores']) === 0) {
-                $errors['professores'] = 'Adicione pelo menos um professor';
+                $errors['professores'] = $professorOpcional
+                    ? 'Adicione pelo menos uma matéria'
+                    : 'Adicione pelo menos um professor';
             }
             if ($exigeDataHoraProva && empty($postData['data_prova'])) {
                 $errors['data_prova'] = 'Data da prova é obrigatória';
@@ -299,7 +302,7 @@ class ExamBlockController extends BaseController
             // Valida cada professor
             if (!empty($postData['professores'])) {
                 foreach ($postData['professores'] as $index => $professor) {
-                    if (empty($professor['professor_id'])) {
+                    if (empty($professor['professor_id']) && !$professorOpcional) {
                         $errors["professor_{$index}"] = "Professor #{$index}: Professor é obrigatório";
                     }
                     if (empty($professor['materia_id'])) {
@@ -462,7 +465,8 @@ class ExamBlockController extends BaseController
             'turmas' => $turmas,
             'tiposAvaliacao' => $tiposAvaliacao,
             'grupos_regras_notas' => $this->catalogoGruposRegrasNotas(),
-            'current_page' => 'provas_blocos'
+            'current_page' => 'provas_blocos',
+            'flash' => $this->getFlashMessage(),
         ];
         
         $this->viewWithLayout('admin', 'admin/exams/blocks/edit', $data);
@@ -556,8 +560,11 @@ class ExamBlockController extends BaseController
             if ($tipoAvaliacaoId <= 0 || !$this->evaluationTypeModel->findById($tipoAvaliacaoId)) {
                 $errors['tipo_avaliacao_id'] = 'Tipo de avaliação é obrigatório';
             }
+            $professorOpcional = $formatoEvento === 'lancamento_nota' && $configuracaoNota === 'coordenacao_calcula';
             if (empty($postData['professores']) || !is_array($postData['professores']) || count($postData['professores']) === 0) {
-                $errors['professores'] = 'Adicione pelo menos um professor';
+                $errors['professores'] = $professorOpcional
+                    ? 'Adicione pelo menos uma matéria'
+                    : 'Adicione pelo menos um professor';
             }
             if ($exigeDataHoraProva && empty($postData['data_prova'])) {
                 $errors['data_prova'] = 'Data da prova é obrigatória';
@@ -579,7 +586,7 @@ class ExamBlockController extends BaseController
             // Valida cada professor
             if (!empty($postData['professores'])) {
                 foreach ($postData['professores'] as $index => $professor) {
-                    if (empty($professor['professor_id'])) {
+                    if (empty($professor['professor_id']) && !$professorOpcional) {
                         $errors["professor_{$index}"] = "Professor #{$index}: Professor é obrigatório";
                     }
                     if (empty($professor['materia_id'])) {
@@ -1230,6 +1237,8 @@ class ExamBlockController extends BaseController
             
             $this->db->commit();
             $this->setFlashMessage('Bloco duplicado com sucesso. O novo bloco está como "Não liberado" e as provas em rascunho.', 'success');
+            $this->redirect('/admin/provas/blocos/' . (int) $novoBlocoId . '/editar');
+            return;
         } catch (Exception $e) {
             $this->db->rollback();
             error_log("Erro ao duplicar bloco: " . $e->getMessage());
