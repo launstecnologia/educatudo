@@ -2658,6 +2658,9 @@ $boletimWizardSteps = [
     }
 
     function linhasDoBoletim(pv, outras) {
+        if (pv && Array.isArray(pv.linhas_boletim) && pv.linhas_boletim.length) {
+            return ordenarLinhasPorNome(pv.linhas_boletim.slice());
+        }
         var brutas = (pv && Array.isArray(pv.linhas_completas) && pv.linhas_completas.length)
             ? pv.linhas_completas.slice()
             : [];
@@ -2780,7 +2783,7 @@ $boletimWizardSteps = [
         });
         var linhas = linhasDoBoletim(pv, outras);
         var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
-        html += '<div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">Boletim (resultado e faltas)</div>';
+        html += '<div class="px-3 py-1.5 text-sm font-semibold border-b" style="background:var(--sidebar-bg-color,#1e3a5f);color:var(--sidebar-text-color,#fff);border-color:color-mix(in srgb,var(--sidebar-bg-color,#1e3a5f) 75%,#000)">Boletim (resultado e faltas)</div>';
         if (!outras.length) {
             html += '<p class="px-3 py-3 text-sm text-gray-500">Não há colunas de resultado ou faltas neste evento.</p></div>';
             return html;

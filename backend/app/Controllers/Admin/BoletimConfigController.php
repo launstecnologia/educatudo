@@ -447,6 +447,9 @@ class BoletimConfigController extends BaseController
 
         $simulacao = null;
         if ($selectedAlunoId > 0 && !empty($regra['componentes'])) {
+            // Igual ao Configurar Notas: provas/jornada/faltas vêm do evento salvo;
+            // o rascunho do assistente só manda fórmula/layout ainda não gravados.
+            $regra = $this->mesclarFontesSalvasNaRegraParaSimulacao($regra);
             $simulacao = $this->simularRegraAluno($regra, $selectedAlunoId, $periodoRef, $dataInicio, $dataFim);
 
             // Vista "Boletim": mesma matriz com group_line forçado (aplicar_em=boletim).
@@ -2845,6 +2848,108 @@ class BoletimConfigController extends BaseController
         }
 
         return $out;
+    }
+
+    /**
+     * Simulação da tela inicial: reusa blocos/jornadas/faltas já salvos no evento
+     * (mesmo critério do assistente em rascunhoComFontesSalvas).
+     *
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function mesclarFontesSalvasNaRegraParaSimulacao(array $regra): array
+    {
+        $regraId = (int) ($regra['id'] ?? 0);
+        if ($regraId <= 0) {
+            return $regra;
+        }
+        $salva = $this->boletimConfig->getRuleById($regraId);
+        if (!is_array($salva) || empty($salva['componentes']) || !is_array($salva['componentes'])) {
+            return $regra;
+        }
+        $salvas = [];
+        foreach ($salva['componentes'] as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            if ($cod !== '') {
+                $salvas[$cod] = $comp;
+            }
+        }
+        if ($salvas === []) {
+            return $regra;
+        }
+        $componentes = [];
+        foreach ((array) ($regra['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            $origem = strtolower(trim((string) ($comp['source_type'] ?? '')));
+            $salvaComp = $salvas[$cod] ?? null;
+            if ($origem !== 'calculado' && is_array($salvaComp)) {
+                $nome = trim((string) ($comp['nome'] ?? ''));
+                $materiaUnica = !empty($comp['materia_unica']);
+                $cfgDraft = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+                if (is_string($comp['config_json'] ?? null) && $comp['config_json'] !== '') {
+                    $decodedDraft = json_decode((string) $comp['config_json'], true);
+                    if (is_array($decodedDraft)) {
+                        $cfgDraft = array_merge($decodedDraft, $cfgDraft);
+                    }
+                }
+                $grupoLinha = $cfgDraft['group_line'] ?? null;
+                $usarPercDraft = array_key_exists('usar_percentual', $comp) ? $comp['usar_percentual'] : null;
+                $comp = $salvaComp;
+                $cfgSalva = [];
+                if (is_string($comp['config_json'] ?? null) && $comp['config_json'] !== '') {
+                    $decodedSalva = json_decode((string) $comp['config_json'], true);
+                    if (is_array($decodedSalva)) {
+                        $cfgSalva = $decodedSalva;
+                    }
+                }
+                if (is_array($comp['config'] ?? null)) {
+                    $cfgSalva = array_merge($cfgSalva, $comp['config']);
+                }
+                if ($nome !== '') {
+                    $comp['nome'] = $nome;
+                }
+                if ($materiaUnica) {
+                    $comp['materia_unica'] = 1;
+                }
+                if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
+                    $cfgSalva['group_line'] = $grupoLinha;
+                }
+                if ($origem === 'jornadas') {
+                    if (isset($cfgDraft['distribuicao_notas'])) {
+                        $cfgSalva['distribuicao_notas'] = $cfgDraft['distribuicao_notas'];
+                    }
+                    if (array_key_exists('faixas_percentuais', $cfgDraft)) {
+                        $cfgSalva['faixas_percentuais'] = $cfgDraft['faixas_percentuais'];
+                    }
+                    if (isset($cfgDraft['jornada_ids']) && is_array($cfgDraft['jornada_ids']) && $cfgDraft['jornada_ids'] !== []) {
+                        $cfgSalva['jornada_ids'] = $cfgDraft['jornada_ids'];
+                    }
+                    if (isset($cfgDraft['jornada_bimestres']) && is_array($cfgDraft['jornada_bimestres'])) {
+                        $cfgSalva['jornada_bimestres'] = $cfgDraft['jornada_bimestres'];
+                    }
+                    if ($usarPercDraft !== null) {
+                        $comp['usar_percentual'] = (int) ((int) $usarPercDraft ? 1 : 0);
+                    }
+                }
+                $comp['config'] = $cfgSalva;
+                $comp['config_json'] = json_encode($cfgSalva, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            $componentes[] = $comp;
+        }
+        if ($componentes !== []) {
+            $regra['componentes'] = $componentes;
+        }
+        if ((int) ($regra['grupo_regras_notas_id'] ?? 0) <= 0 && (int) ($salva['grupo_regras_notas_id'] ?? 0) > 0) {
+            $regra['grupo_regras_notas_id'] = (int) $salva['grupo_regras_notas_id'];
+        }
+
+        return $regra;
     }
 
     /**

@@ -161,8 +161,8 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                                     $temTot = true;
                                 }
                             ?>
-                                <td class="border border-gray-300 px-1 py-1"><?= $fmtQtdQuadro($nq['n'] !== null ? $nq['n'] : 0) ?></td>
-                                <td class="border border-gray-300 px-1 py-1"><?= $fmtQtdQuadro($nq['q'] !== null ? $nq['q'] : 0) ?></td>
+                                <td class="border border-gray-300 px-1 py-1"><?= $nq['n'] !== null ? $fmtQtdQuadro($nq['n']) : '—' ?></td>
+                                <td class="border border-gray-300 px-1 py-1"><?= $nq['q'] !== null ? $fmtQtdQuadro($nq['q']) : '—' ?></td>
                             <?php endforeach; ?>
                             <?php if ($semanasCols !== []): ?>
                                 <td class="border border-gray-300 px-1 py-1 font-semibold"><?= $temTot ? $fmtQtdQuadro($totN) : '—' ?></td>

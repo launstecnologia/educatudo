@@ -243,6 +243,45 @@ class BoletimAssistenteController extends BaseController
                 }
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
+
+                // Mesma matriz agrupada da tela inicial (group_line / Língua Portuguesa).
+                try {
+                    $simBoletim = $configController->simularRegraAluno(
+                        $rascunho,
+                        $alunoId,
+                        $periodoRef,
+                        $dataInicio,
+                        $dataFim,
+                        [],
+                        true
+                    );
+                    $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null)
+                        ? $simBoletim['matriz_materias']
+                        : null;
+                    if (is_array($matrizBoletim) && !empty($matrizBoletim['linhas'])) {
+                        $linhasBoletim = [];
+                        foreach ($matrizBoletim['linhas'] as $linhaRaw) {
+                            if (!is_array($linhaRaw)) {
+                                continue;
+                            }
+                            $nome = trim((string) ($linhaRaw['materia_nome'] ?? ''));
+                            if ($nome === '') {
+                                continue;
+                            }
+                            $linhasBoletim[] = [
+                                'materia_id' => (int) ($linhaRaw['materia_id'] ?? 0),
+                                'materia_nome' => $nome,
+                                'notas' => is_array($linhaRaw['notas'] ?? null) ? $linhaRaw['notas'] : [],
+                            ];
+                        }
+                        if ($linhasBoletim !== []) {
+                            $previewReal['linhas_boletim'] = $linhasBoletim;
+                        }
+                    }
+                } catch (Throwable $e) {
+                    error_log('BoletimAssistente preview boletim agrupado aluno #' . $alunoId . ': ' . $e->getMessage());
+                }
+
                 $resultado['preview'] = $previewReal;
             } else {
                 $resultado['preview'] = $this->previewRealVazio(
