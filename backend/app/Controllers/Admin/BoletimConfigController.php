@@ -7275,6 +7275,17 @@ class BoletimConfigController extends BaseController
             if (!isset($matrizPorCodigo[$codJr]) || !is_array($matrizPorCodigo[$codJr])) {
                 $matrizPorCodigo[$codJr] = [];
             }
+            // Matérias que já têm jornada no escopo (vieram de por_materia).
+            // Não espalha a nota única em Arte/Ed. Física etc. sem jornada própria.
+            $midsComJornada = [];
+            foreach ($matrizPorCodigo[$codJr] as $midExistente => $valExistente) {
+                $midExistente = (int) $midExistente;
+                if ($midExistente > 0 && is_numeric($valExistente)) {
+                    $midsComJornada[$midExistente] = true;
+                }
+            }
+            // Só jornadas sem matéria (mid 0): aí a nota global ainda vale para todas as linhas.
+            $espalharEmTodas = ($midsComJornada === []);
             foreach (array_keys($allMids) as $midRep) {
                 $midRep = (int) $midRep;
                 if (isset($omitSet[$midRep])) {
@@ -7283,7 +7294,13 @@ class BoletimConfigController extends BaseController
                 }
                 if (array_key_exists($midRep, $substNorm)) {
                     $sv = $substNorm[$midRep];
-                    $matrizPorCodigo[$codJr][$midRep] = is_numeric($sv) ? $this->applyRoundMode((float) $sv, $roundModeJr) : null;
+                    $matrizPorCodigo[$codJr][$midRep] = is_numeric($sv)
+                        ? $this->applyRoundMode((float) $sv, $roundModeJr)
+                        : null;
+                    continue;
+                }
+                if (!$espalharEmTodas && !isset($midsComJornada[$midRep])) {
+                    $matrizPorCodigo[$codJr][$midRep] = null;
                     continue;
                 }
                 $matrizPorCodigo[$codJr][$midRep] = $padrao;
