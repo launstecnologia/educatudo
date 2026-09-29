@@ -306,12 +306,13 @@ class ExamBlockManualGrade
     /**
      * @param list<array{turma_id:int, aluno_id:int, nota:?float, observacao?:string}> $linhas
      */
-    public function upsertLinhas(int $blocoId, int $professorId, int $materiaId, array $linhas): void
+    public function upsertLinhas(int $blocoId, int $professorId, int $materiaId, array $linhas, ?int $alteradoPor = null): void
     {
         if (!$this->tableExists() || empty($linhas)) {
             return;
         }
         $this->assertPeriodoEditavel($blocoId, $linhas);
+        $atuais = $this->fetchMap($blocoId, $professorId, $materiaId);
         $alunosFechar = [];
         foreach ($linhas as $linha) {
             $tid = (int) ($linha['turma_id'] ?? 0);
@@ -324,6 +325,30 @@ class ExamBlockManualGrade
                 continue;
             }
             $obs = isset($linha['observacao']) ? substr((string) $linha['observacao'], 0, 500) : null;
+            $notaNova = $nota === '' || $nota === null ? null : round((float) $nota, 2);
+            $obsNova = ($obs !== null && $obs !== '') ? $obs : null;
+
+            $chave = $tid . '_' . $aid;
+            $ant = $atuais[$chave] ?? ['nota' => null, 'observacao' => ''];
+            $notaAnt = $ant['nota'];
+            $obsAnt = trim((string) ($ant['observacao'] ?? ''));
+            $obsAntNull = $obsAnt !== '' ? $obsAnt : null;
+            $mudouNota = $this->notasDiferentes($notaAnt, $notaNova);
+            $mudouObs = $obsAntNull !== $obsNova;
+            if ($mudouNota || $mudouObs) {
+                $this->registrarLogAlteracao(
+                    $blocoId,
+                    $professorId,
+                    $materiaId,
+                    $tid,
+                    $aid,
+                    $notaAnt,
+                    $notaNova,
+                    $obsAntNull,
+                    $obsNova,
+                    $alteradoPor
+                );
+            }
 
             $this->db->query(
                 'INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota, observacao)
@@ -335,13 +360,102 @@ class ExamBlockManualGrade
                     'materia_id' => $materiaId,
                     'turma_id' => $tid,
                     'aluno_id' => $aid,
-                    'nota' => $nota === '' || $nota === null ? null : round((float) $nota, 2),
-                    'observacao' => $obs !== '' ? $obs : null,
+                    'nota' => $notaNova,
+                    'observacao' => $obsNova,
                 ]
             );
             $alunosFechar[$aid] = $tid;
         }
         $this->atualizarNotaFinalDoTipo($blocoId, $alunosFechar, $materiaId);
+    }
+
+    public function logTableExists(): bool
+    {
+        try {
+            return $this->db->fetch("SHOW TABLES LIKE 'provas_blocos_notas_lancadas_log'") !== false;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function fetchLogPorBloco(int $blocoId, int $limite = 100): array
+    {
+        if (!$this->logTableExists() || $blocoId <= 0) {
+            return [];
+        }
+        $limite = max(1, min(500, $limite));
+        return $this->db->fetchAll(
+            "SELECT l.*,
+                    COALESCE(u.nome, 'Sistema') AS alterado_por_nome,
+                    COALESCE(a.nome, CONCAT('Aluno #', l.aluno_id)) AS aluno_nome,
+                    COALESCE(m.nome, CONCAT('Matéria #', l.materia_id)) AS materia_nome,
+                    COALESCE(t.nome, CONCAT('Turma #', l.turma_id)) AS turma_nome
+             FROM provas_blocos_notas_lancadas_log l
+             LEFT JOIN usuarios u ON u.id = l.alterado_por
+             LEFT JOIN alunos a ON a.id = l.aluno_id
+             LEFT JOIN materias m ON m.id = l.materia_id
+             LEFT JOIN turmas t ON t.id = l.turma_id
+             WHERE l.bloco_id = :bloco
+             ORDER BY l.criado_em DESC, l.id DESC
+             LIMIT {$limite}",
+            ['bloco' => $blocoId]
+        ) ?: [];
+    }
+
+    private function notasDiferentes(?float $a, ?float $b): bool
+    {
+        if ($a === null && $b === null) {
+            return false;
+        }
+        if ($a === null || $b === null) {
+            return true;
+        }
+
+        return abs((float) $a - (float) $b) > 0.0001;
+    }
+
+    private function registrarLogAlteracao(
+        int $blocoId,
+        int $professorId,
+        int $materiaId,
+        int $turmaId,
+        int $alunoId,
+        ?float $notaAnterior,
+        ?float $notaNova,
+        ?string $obsAnterior,
+        ?string $obsNova,
+        ?int $alteradoPor
+    ): void {
+        if (!$this->logTableExists()) {
+            return;
+        }
+        try {
+            $this->db->query(
+                'INSERT INTO provas_blocos_notas_lancadas_log
+                 (bloco_id, professor_id, materia_id, turma_id, aluno_id,
+                  nota_anterior, nota_nova, observacao_anterior, observacao_nova, alterado_por)
+                 VALUES
+                 (:bloco_id, :professor_id, :materia_id, :turma_id, :aluno_id,
+                  :nota_anterior, :nota_nova, :observacao_anterior, :observacao_nova, :alterado_por)',
+                [
+                    'bloco_id' => $blocoId,
+                    'professor_id' => $professorId,
+                    'materia_id' => $materiaId,
+                    'turma_id' => $turmaId,
+                    'aluno_id' => $alunoId,
+                    'nota_anterior' => $notaAnterior,
+                    'nota_nova' => $notaNova,
+                    'observacao_anterior' => $obsAnterior,
+                    'observacao_nova' => $obsNova,
+                    'alterado_por' => $alteradoPor !== null && $alteradoPor > 0 ? $alteradoPor : null,
+                ]
+            );
+        } catch (Exception $e) {
+            error_log('ExamBlockManualGrade::registrarLogAlteracao: ' . $e->getMessage());
+        }
     }
 
     /**

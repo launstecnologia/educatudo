@@ -1717,6 +1717,8 @@ class TeacherExamController extends BaseController
         $turmaIdFiltro = $filtros['turma_id'];
         $serieIdFiltro = $filtros['serie_id'];
         $ordenarFiltro = $filtros['ordenar'];
+        $pagina = $filtros['pagina'];
+        $porPagina = $filtros['por_pagina'];
         $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
 
@@ -1829,11 +1831,22 @@ class TeacherExamController extends BaseController
 
         $linhas = $this->ordenarLinhasLancamentoCoordenacao($linhas, $ordenarFiltro, $notaUnicaTodasMaterias);
 
+        $totalLinhas = count($linhas);
+        $totalPaginas = max(1, (int) ceil($totalLinhas / $porPagina));
+        if ($pagina > $totalPaginas) {
+            $pagina = $totalPaginas;
+        }
+        $offset = ($pagina - 1) * $porPagina;
+        $linhasPagina = array_slice($linhas, $offset, $porPagina);
+
+        $historico = $notasModel->fetchLogPorBloco($blocoId, 80);
+        $edicaoDesbloqueada = $this->sessaoDesbloqueioLancamentoValida($blocoId);
+
         $this->viewWithLayout('admin', 'admin/exams/blocks/lancar_notas_coordenacao', [
             'title' => 'Lançar notas (coordenação) — ' . ($bloco['titulo'] ?? 'Evento'),
             'user' => $user,
             'bloco' => $bloco,
-            'linhas' => $linhas,
+            'linhas' => $linhasPagina,
             'materias_filtro' => $materiasFiltro,
             'turmas_filtro' => $turmasFiltro,
             'series_filtro' => $seriesFiltro,
@@ -1841,6 +1854,12 @@ class TeacherExamController extends BaseController
             'turma_id_filtro' => $turmaIdFiltro,
             'serie_id_filtro' => $serieIdFiltro,
             'ordenar_filtro' => $ordenarFiltro,
+            'pagina' => $pagina,
+            'por_pagina' => $porPagina,
+            'total_linhas' => $totalLinhas,
+            'total_paginas' => $totalPaginas,
+            'historico_alteracoes' => $historico,
+            'edicao_desbloqueada' => $edicaoDesbloqueada,
             'csrf_token' => $this->generateCsrfToken(),
             'flash' => $this->getFlashMessage(),
             'current_page' => 'provas_blocos',
@@ -1885,6 +1904,8 @@ class TeacherExamController extends BaseController
             'turma_id' => $filtros['turma_id'],
             'serie_id' => $filtros['serie_id'],
             'ordenar' => $filtros['ordenar'],
+            'pagina' => $filtros['pagina'],
+            'por_pagina' => $filtros['por_pagina'],
         ]);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
 
@@ -1904,6 +1925,100 @@ class TeacherExamController extends BaseController
         if (!is_array($obsPost)) {
             $obsPost = [];
         }
+
+        $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
+        $mapExistente = [];
+        foreach ($existentes as $ln) {
+            $k = (int) ($ln['professor_id'] ?? 0) . '_'
+                . (int) ($ln['materia_id'] ?? 0) . '_'
+                . (int) ($ln['turma_id'] ?? 0) . '_'
+                . (int) ($ln['aluno_id'] ?? 0);
+            $mapExistente[$k] = [
+                'nota' => isset($ln['nota']) && $ln['nota'] !== null && $ln['nota'] !== '' ? (float) $ln['nota'] : null,
+                'observacao' => trim((string) ($ln['observacao'] ?? '')),
+            ];
+        }
+
+        $alteraExistente = false;
+        $coletarAlteracao = static function (int $pid, int $mid, int $tid, int $aid, $valorRaw, string $obs) use (&$alteraExistente, $mapExistente): void {
+            $k = $pid . '_' . $mid . '_' . $tid . '_' . $aid;
+            if (!isset($mapExistente[$k])) {
+                return;
+            }
+            $ant = $mapExistente[$k];
+            $valorStr = is_string($valorRaw) ? trim(str_replace(',', '.', $valorRaw)) : '';
+            $notaNova = null;
+            if ($valorStr !== '' && is_numeric($valorStr)) {
+                $notaNova = round((float) $valorStr, 2);
+            }
+            $obsNova = trim($obs);
+            $notaAnt = $ant['nota'];
+            $mudouNota = ($notaAnt === null && $notaNova !== null)
+                || ($notaAnt !== null && $notaNova === null)
+                || ($notaAnt !== null && $notaNova !== null && abs($notaAnt - $notaNova) > 0.0001);
+            // Só exige senha se já havia nota e ela mudou (ou observação de linha já com nota).
+            if ($notaAnt !== null && ($mudouNota || $obsNova !== (string) ($ant['observacao'] ?? ''))) {
+                $alteraExistente = true;
+            }
+        };
+
+        if ($notaUnicaTodasMaterias) {
+            foreach ($combos as $combo) {
+                $pid = (int) ($combo['professor_id'] ?? 0);
+                $mid = (int) ($combo['materia_id'] ?? 0);
+                if ($pid <= 0 || $mid <= 0) {
+                    continue;
+                }
+                $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], (int) ($bloco['ano_letivo'] ?? 0));
+                foreach ($alunos as $al) {
+                    $tid = (int) ($al['turma_id'] ?? 0);
+                    $aid = (int) ($al['id'] ?? 0);
+                    if ($tid <= 0 || $aid <= 0) {
+                        continue;
+                    }
+                    if (!isset($notasPost[$pid][$mid][$tid][$aid]) && !isset($obsPost[$pid][$mid][$tid][$aid])) {
+                        continue;
+                    }
+                    $valorRaw = $notasPost[$pid][$mid][$tid][$aid] ?? '';
+                    $obs = isset($obsPost[$pid][$mid][$tid][$aid]) ? (string) $obsPost[$pid][$mid][$tid][$aid] : '';
+                    $coletarAlteracao($pid, $mid, $tid, $aid, $valorRaw, $obs);
+                }
+            }
+        } else {
+            foreach ($combos as $combo) {
+                $pid = (int) ($combo['professor_id'] ?? 0);
+                $mid = (int) ($combo['materia_id'] ?? 0);
+                if ($pid <= 0 || $mid <= 0) {
+                    continue;
+                }
+                $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], (int) ($bloco['ano_letivo'] ?? 0));
+                foreach ($alunos as $al) {
+                    $tid = (int) ($al['turma_id'] ?? 0);
+                    $aid = (int) ($al['id'] ?? 0);
+                    if ($tid <= 0 || $aid <= 0) {
+                        continue;
+                    }
+                    if (!isset($notasPost[$pid][$mid][$tid][$aid]) && !isset($obsPost[$pid][$mid][$tid][$aid])) {
+                        continue;
+                    }
+                    $valorRaw = $notasPost[$pid][$mid][$tid][$aid] ?? '';
+                    $obs = isset($obsPost[$pid][$mid][$tid][$aid]) ? (string) $obsPost[$pid][$mid][$tid][$aid] : '';
+                    $coletarAlteracao($pid, $mid, $tid, $aid, $valorRaw, $obs);
+                }
+            }
+        }
+
+        if ($alteraExistente && !$this->sessaoDesbloqueioLancamentoValida($blocoId)) {
+            $senhaPost = (string) ($_POST['senha_confirmacao'] ?? '');
+            if (!$this->verificarSenhaUsuarioLogado($user, $senhaPost)) {
+                $this->setFlashMessage('Para alterar notas já lançadas, digite sua senha de acesso (botão Desbloquear edição).', 'error');
+                $this->redirect($urlVolta);
+                return;
+            }
+            $this->marcarSessaoDesbloqueioLancamento($blocoId);
+        }
+
+        $usuarioId = (int) ($user['id'] ?? 0);
 
         if ($notaUnicaTodasMaterias) {
             // Captura uma nota base por aluno (informada em qualquer matéria) e replica para todas.
@@ -1971,7 +2086,7 @@ class TeacherExamController extends BaseController
                     ];
                 }
                 try {
-                    $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas);
+                    $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas, $usuarioId);
                 } catch (RuntimeException $e) {
                     $this->setFlashMessage($e->getMessage(), 'error');
                     $this->redirect($urlVolta);
@@ -2029,7 +2144,7 @@ class TeacherExamController extends BaseController
                 ];
             }
             try {
-                $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas);
+                $notasModel->upsertLinhas($blocoId, $pid, $mid, $linhas, $usuarioId);
             } catch (RuntimeException $e) {
                 $this->setFlashMessage($e->getMessage(), 'error');
                 $this->redirect($urlVolta);
@@ -2205,19 +2320,27 @@ class TeacherExamController extends BaseController
         $turmaId = (int) ($origem['turma_id'] ?? $origem['turma_id_filtro'] ?? 0);
         $serieId = (int) ($origem['serie_id'] ?? $origem['serie_id_filtro'] ?? 0);
         $ordenar = (string) ($origem['ordenar'] ?? $origem['ordenar_filtro'] ?? 'nome');
-        if (!in_array($ordenar, ['nome', 'chamada', 'sexo'], true)) {
+        $ordens = ['nome', 'nome_desc', 'chamada', 'chamada_desc', 'sexo'];
+        if (!in_array($ordenar, $ordens, true)) {
             $ordenar = 'nome';
+        }
+        $pagina = max(1, (int) ($origem['pagina'] ?? $origem['page'] ?? 1));
+        $porPagina = (int) ($origem['por_pagina'] ?? 40);
+        if (!in_array($porPagina, [20, 40, 60, 100], true)) {
+            $porPagina = 40;
         }
         return [
             'materia_id' => max(0, $materiaId),
             'turma_id' => max(0, $turmaId),
             'serie_id' => max(0, $serieId),
             'ordenar' => $ordenar,
+            'pagina' => $pagina,
+            'por_pagina' => $porPagina,
         ];
     }
 
     /**
-     * @param array{materia_id?:int,turma_id?:int,serie_id?:int,ordenar?:string} $filtros
+     * @param array{materia_id?:int,turma_id?:int,serie_id?:int,ordenar?:string,pagina?:int,por_pagina?:int} $filtros
      */
     private function urlLancamentoNotasCoordenacao(int $blocoId, array $filtros = []): string
     {
@@ -2226,11 +2349,107 @@ class TeacherExamController extends BaseController
             'turma_id' => !empty($filtros['turma_id']) ? (int) $filtros['turma_id'] : null,
             'serie_id' => !empty($filtros['serie_id']) ? (int) $filtros['serie_id'] : null,
             'ordenar' => (($filtros['ordenar'] ?? 'nome') !== 'nome') ? (string) $filtros['ordenar'] : null,
+            'pagina' => (!empty($filtros['pagina']) && (int) $filtros['pagina'] > 1) ? (int) $filtros['pagina'] : null,
+            'por_pagina' => (!empty($filtros['por_pagina']) && (int) $filtros['por_pagina'] !== 40)
+                ? (int) $filtros['por_pagina']
+                : null,
         ], static function ($v) {
             return $v !== null && $v !== '';
         }));
         $path = '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
         return $qs !== '' ? $path . '?' . $qs : $path;
+    }
+
+    private function sessaoDesbloqueioLancamentoValida(int $blocoId): bool
+    {
+        if ($blocoId <= 0) {
+            return false;
+        }
+        $mapa = $_SESSION['lancamento_notas_desbloqueado'] ?? [];
+        if (!is_array($mapa)) {
+            return false;
+        }
+        $quando = (int) ($mapa[$blocoId] ?? 0);
+        if ($quando <= 0) {
+            return false;
+        }
+        // 30 minutos
+        if ((time() - $quando) > 1800) {
+            unset($_SESSION['lancamento_notas_desbloqueado'][$blocoId]);
+            return false;
+        }
+
+        return true;
+    }
+
+    private function marcarSessaoDesbloqueioLancamento(int $blocoId): void
+    {
+        if (!isset($_SESSION['lancamento_notas_desbloqueado']) || !is_array($_SESSION['lancamento_notas_desbloqueado'])) {
+            $_SESSION['lancamento_notas_desbloqueado'] = [];
+        }
+        $_SESSION['lancamento_notas_desbloqueado'][$blocoId] = time();
+    }
+
+    private function verificarSenhaUsuarioLogado(array $user, string $senha): bool
+    {
+        $senha = trim($senha);
+        if ($senha === '') {
+            return false;
+        }
+        $uid = (int) ($user['id'] ?? 0);
+        if ($uid <= 0) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            'SELECT senha_hash FROM usuarios WHERE id = :id LIMIT 1',
+            ['id' => $uid]
+        );
+        if (!$row || empty($row['senha_hash'])) {
+            return false;
+        }
+
+        return password_verify($senha, (string) $row['senha_hash']);
+    }
+
+    /**
+     * Coordenação: confirma senha e libera edição de notas já lançadas nesta sessão.
+     */
+    public function desbloquearLancamentoNotasCoordenacao($blocoId)
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $user = $this->authManager->getUser();
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            echo json_encode(['success' => false, 'error' => 'Não autorizado'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $input = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            $input = $_POST;
+        }
+        $token = (string) ($input['_token'] ?? '');
+        if (!$this->verifyCsrfToken($token)) {
+            echo json_encode(['success' => false, 'error' => 'Token inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $blocoId = (int) $blocoId;
+        $bloco = $this->blocoModel->findById($blocoId);
+        if (!$bloco
+            || (($bloco['formato_evento'] ?? '') !== 'lancamento_nota')
+            || (($bloco['configuracao_nota'] ?? '') !== 'coordenacao_calcula')
+        ) {
+            echo json_encode(['success' => false, 'error' => 'Evento inválido para desbloqueio.'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $senha = (string) ($input['senha'] ?? '');
+        if (!$this->verificarSenhaUsuarioLogado($user, $senha)) {
+            echo json_encode(['success' => false, 'error' => 'Senha incorreta.'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $this->marcarSessaoDesbloqueioLancamento($blocoId);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Edição desbloqueada por 30 minutos.',
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -2240,7 +2459,10 @@ class TeacherExamController extends BaseController
     private function ordenarLinhasLancamentoCoordenacao(array $linhas, string $ordenar, bool $notaUnica): array
     {
         $sexoOrdem = ['F' => 0, 'M' => 1, 'N' => 2];
-        usort($linhas, static function (array $a, array $b) use ($ordenar, $notaUnica, $sexoOrdem): int {
+        $descNome = ($ordenar === 'nome_desc');
+        $descChamada = ($ordenar === 'chamada_desc');
+        $modoChamada = ($ordenar === 'chamada' || $ordenar === 'chamada_desc');
+        usort($linhas, static function (array $a, array $b) use ($ordenar, $notaUnica, $sexoOrdem, $descNome, $descChamada, $modoChamada): int {
             if (!$notaUnica) {
                 $cmp = strcmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
                 if ($cmp !== 0) {
@@ -2254,8 +2476,11 @@ class TeacherExamController extends BaseController
 
             $cmpTurma = strcasecmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
             $cmpNome = strcasecmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
+            if ($descNome) {
+                $cmpNome = -$cmpNome;
+            }
 
-            if ($ordenar === 'chamada') {
+            if ($modoChamada) {
                 if ($cmpTurma !== 0) {
                     return $cmpTurma;
                 }
@@ -2268,7 +2493,8 @@ class TeacherExamController extends BaseController
                     if ($nb <= 0) {
                         return -1;
                     }
-                    return $na <=> $nb;
+                    $cmp = $na <=> $nb;
+                    return $descChamada ? -$cmp : $cmp;
                 }
                 return $cmpNome;
             }

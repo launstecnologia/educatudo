@@ -845,6 +845,8 @@ $router->get('/admin/provas/blocos/{id}/notas-lancadas', 'Teacher/TeacherExamCon
 $router->post('/admin/provas/blocos/{id}/importar-notas-internas', 'Teacher/TeacherExamController@importarNotasInternas');
 $router->get('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Teacher/TeacherExamController@lancarNotasCoordenacao');
 $router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Teacher/TeacherExamController@lancarNotasCoordenacaoSalvar');
+$router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao/desbloquear', 'Teacher/TeacherExamController@desbloquearLancamentoNotasCoordenacao');
+
 $router->get('/admin/provas/blocos/{id}/provas-disponiveis', 'Teacher/TeacherExamController@provasDisponiveisParaVincular');
 $router->post('/admin/provas/blocos/{id}/vincular', 'Teacher/TeacherExamController@vincularProva');
 $router->post('/admin/provas/blocos/{id}/trocar-prova', 'Teacher/TeacherExamController@trocarProva');
