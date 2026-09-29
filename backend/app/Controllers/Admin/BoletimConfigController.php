@@ -2998,6 +2998,7 @@ class BoletimConfigController extends BaseController
                     }
                 }
                 $manualBlocos = !empty($cfg['blocos_ids_manual']) || !empty($cfgDraft['blocos_ids_manual']);
+                unset($cfg['grupo_regras_tipo_id'], $cfg['grupo_regras_marca_id'], $cfg['grupo_regras_notas_id']);
                 if ($manualBlocos) {
                     $cfg['blocos_ids_manual'] = 1;
                     $blocosDraft = $this->idsBlocosDoComponente($comp);
@@ -3011,7 +3012,7 @@ class BoletimConfigController extends BaseController
                     $cfg['tipo_avaliacao_id'] = $tipoSemana;
                     $out['tipo_avaliacao_id'] = $tipoSemana;
                     $out['blocos_ids'] = '';
-                    unset($out['bloco_id']);
+                    unset($out['bloco_id'], $cfg['blocos_ids']);
                     $out['filtro_titulo'] = '';
                 } else {
                     $blocosDraft = $this->idsBlocosDoComponente($comp);
@@ -8172,11 +8173,11 @@ class BoletimConfigController extends BaseController
             if ($tipoNomeTpl !== '') {
                 $cfg['tipo_avaliacao_nome'] = $tipoNomeTpl;
             }
-            foreach ($cfgTplExtra as $chave => $val) {
-                if (empty($cfg[$chave])) {
-                    $cfg[$chave] = $val;
-                }
+            // Só prova_bimestres — grupo_regras_* em sN desvia o resolver e zera N/Q.
+            if (empty($cfg['prova_bimestres']) && !empty($cfgTplExtra['prova_bimestres'])) {
+                $cfg['prova_bimestres'] = $cfgTplExtra['prova_bimestres'];
             }
+            unset($cfg['grupo_regras_tipo_id'], $cfg['grupo_regras_marca_id'], $cfg['grupo_regras_notas_id']);
             if (!isset($cfg['semana']) || (int) $cfg['semana'] <= 0) {
                 if (preg_match('/^s([1-9]|[1-9]\d)$/', $cod, $mSem)) {
                     $cfg['semana'] = (int) $mSem[1];
@@ -8188,7 +8189,7 @@ class BoletimConfigController extends BaseController
             if (!$manualBlocos) {
                 // Mesmo contrato do assistente (componenteSemanaQuadro): busca por tipo+semana.
                 $c['blocos_ids'] = '';
-                unset($c['bloco_id']);
+                unset($c['bloco_id'], $cfg['blocos_ids']);
                 $c['filtro_titulo'] = '';
             }
             $c['usar_percentual'] = 1;
@@ -8453,33 +8454,35 @@ class BoletimConfigController extends BaseController
         ?string $fim,
         array $bimestresComp
     ): array {
-        $tipoGr = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_tipo_id');
-        $marcaGr = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_marca_id');
-        if ($tipoGr > 0 || $marcaGr > 0) {
-            if ($blocoIds !== []) {
-                $filtrados = $this->boletimConfig->filtrarBlocoIdsPorGrupoRegras($blocoIds, $tipoGr, $marcaGr);
-                if ($filtrados !== []) {
-                    return ['bloco_ids' => $filtrados, 'forcada' => true];
-                }
-            }
-            $buscados = $this->boletimConfig->buscarBlocoIdsPorGrupoRegras(
-                $tipoGr,
-                $marcaGr,
-                $inicio,
-                $fim,
-                $bimestresComp
-            );
-
-            return ['bloco_ids' => $buscados, 'forcada' => true];
-        }
-
+        // Coluna sN: sempre tipo + semana (igual ao assistente). grupo_regras_* sem filtro
+        // de semana misturava/zerava S1–S8 na simulação da home.
         $semanaComp = $this->parseSemanaFromComponente($componente);
         $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
         $semanaForcada = $semanaComp >= 1 && $semanaComp <= BoletimQuadroLayoutHelper::SEMANA_MAX;
         if ($semanaForcada && $tipoAvaliacaoComp <= 0) {
             $tipoAvaliacaoComp = (int) ($this->resolverTipoAvaliacaoSemanalCatalogo()['id'] ?? 0);
         }
+
         if (!$semanaForcada) {
+            $tipoGr = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_tipo_id');
+            $marcaGr = $this->parseGrupoRegrasIdFromComponente($componente, 'grupo_regras_marca_id');
+            if ($tipoGr > 0 || $marcaGr > 0) {
+                if ($blocoIds !== []) {
+                    $filtrados = $this->boletimConfig->filtrarBlocoIdsPorGrupoRegras($blocoIds, $tipoGr, $marcaGr);
+                    if ($filtrados !== []) {
+                        return ['bloco_ids' => $filtrados, 'forcada' => true];
+                    }
+                }
+                $buscados = $this->boletimConfig->buscarBlocoIdsPorGrupoRegras(
+                    $tipoGr,
+                    $marcaGr,
+                    $inicio,
+                    $fim,
+                    $bimestresComp
+                );
+
+                return ['bloco_ids' => $buscados, 'forcada' => true];
+            }
             if ($blocoIds !== [] && $bimestresComp !== []) {
                 $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
             }
@@ -8498,6 +8501,7 @@ class BoletimConfigController extends BaseController
 
             return ['bloco_ids' => $blocoIds, 'forcada' => $blocoIds !== []];
         }
+
         if ($blocoIds !== []) {
             $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
             if ($bimestresComp !== [] && $filtradosSemana !== []) {
@@ -8506,35 +8510,30 @@ class BoletimConfigController extends BaseController
             if ($filtradosSemana !== []) {
                 return ['bloco_ids' => $filtradosSemana, 'forcada' => true];
             }
-            if ($tipoAvaliacaoComp > 0) {
-                return [
-                    'bloco_ids' => $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                        $tipoAvaliacaoComp,
-                        $semanaComp,
-                        $inicio,
-                        $fim,
-                        $bimestresComp
-                    ),
-                    'forcada' => true,
-                ];
-            }
-
-            return ['bloco_ids' => [], 'forcada' => true];
         }
         if ($tipoAvaliacaoComp > 0) {
-            return [
-                'bloco_ids' => $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+            $buscados = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                $tipoAvaliacaoComp,
+                $semanaComp,
+                $inicio,
+                $fim,
+                $bimestresComp
+            );
+            // Período do evento às vezes não cobre data_prova da semana; tenta sem filtro de data.
+            if ($buscados === [] && ($inicio !== null || $fim !== null)) {
+                $buscados = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
                     $tipoAvaliacaoComp,
                     $semanaComp,
-                    $inicio,
-                    $fim,
+                    null,
+                    null,
                     $bimestresComp
-                ),
-                'forcada' => true,
-            ];
+                );
+            }
+
+            return ['bloco_ids' => $buscados, 'forcada' => true];
         }
 
-        return ['bloco_ids' => $blocoIds, 'forcada' => true];
+        return ['bloco_ids' => [], 'forcada' => true];
     }
 
     /**
