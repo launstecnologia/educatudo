@@ -4903,7 +4903,8 @@ class BoletimConfigController extends BaseController
                 $materiaNomesPorId,
                 $matrizPercentStatsPorCodigo,
                 (string) ($regra['exibir_em'] ?? 'boletim'),
-                $forcarAgrupamentoLinhas
+                $forcarAgrupamentoLinhas,
+                $roundMode
             );
         }
         $matrizPorCodigo = $grp['matriz_por_codigo'];
@@ -5391,9 +5392,13 @@ class BoletimConfigController extends BaseController
         array $materiaNomesPorId,
         array $matrizPercentStatsPorCodigo = [],
         string $exibirEm = 'boletim',
-        bool $forcarAgrupamento = false
+        bool $forcarAgrupamento = false,
+        string $roundMode = 'half'
     ): array
     {
+        $roundMode = $this->normalizeRoundMode($roundMode);
+        // Média de várias matérias (ex.: 7,5+7,5+8)/3 = 7,67 → arredonda para .00/.50.
+        $roundModeGrupo = $roundMode === 'none' ? 'half' : $roundMode;
         $groupMetaByKey = [];
         $groupMidByKey = [];
         $materiasAgrupadas = [];
@@ -5605,6 +5610,7 @@ class BoletimConfigController extends BaseController
                 ) {
                     // Semanas N/Q: aproveitamento conjunto (soma N ÷ soma Q), não média das notas 0–10.
                     $agr = ($sumAcertos / $sumQuestoes) * 10.0;
+                    $agr = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
                 } else {
                     $modoCfg = strtolower(trim((string) ($cfg['mode'] ?? 'media')));
                     if ($modoCfg !== 'soma') {
@@ -5623,6 +5629,11 @@ class BoletimConfigController extends BaseController
                         }));
                     }
                     $agr = $this->agruparValoresGrupoLinha($vals, $modoCfg, $divisorCfg);
+                    if ($agr !== null && $modoCfg === 'media') {
+                        $agr = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
+                    } elseif ($agr !== null && $modoCfg === 'soma') {
+                        $agr = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
+                    }
                 }
                 $virtualMidCfg = (int) $cfg['virtual_mid'];
                 // Se já existe um valor no id sintético do grupo ANTES de recalcular (só
@@ -5633,7 +5644,7 @@ class BoletimConfigController extends BaseController
                     $map[$virtualMidCfg] = $mapOriginal[$virtualMidCfg];
                     $groupKeysAtivos[(string) ($cfg['key'] ?? '')] = true;
                 } elseif ($agr !== null) {
-                    $map[$virtualMidCfg] = $agr;
+                    $map[$virtualMidCfg] = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
                     $groupKeysAtivos[(string) ($cfg['key'] ?? '')] = true;
                 }
             } else {
@@ -5678,7 +5689,7 @@ class BoletimConfigController extends BaseController
                                 }
                                 $rFormula = $this->avaliarFormula($expr, $vars);
                                 if (!empty($rFormula['ok']) && isset($rFormula['valor']) && is_numeric($rFormula['valor'])) {
-                                    $map[$vmid] = (float) $rFormula['valor'];
+                                    $map[$vmid] = (float) ($this->applyRoundMode((float) $rFormula['valor'], $roundModeGrupo) ?? $rFormula['valor']);
                                     $groupKeysAtivos[(string) $gk] = true;
                                     continue;
                                 }
@@ -5704,7 +5715,9 @@ class BoletimConfigController extends BaseController
                             : (float) ($meta['divisor'] ?? 0)
                     );
                     if ($agr !== null) {
-                        $map[$vmid] = $agr;
+                        $map[$vmid] = $ehFaltasCol
+                            ? $agr
+                            : (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
                         $groupKeysAtivos[(string) $gk] = true;
                     }
                 }

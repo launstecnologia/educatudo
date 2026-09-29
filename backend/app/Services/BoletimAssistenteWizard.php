@@ -3640,7 +3640,7 @@ class BoletimAssistenteWizard
             'series_ids' => $estado['series_ids'] ?? [],
             'default_data_inicio' => (string) ($estado['data_inicio'] ?? ''),
             'default_data_fim' => (string) ($estado['data_fim'] ?? ''),
-            'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
+            'round_mode' => (string) ($estado['round_mode'] ?? 'half'),
             'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'] ?? 6,
             'semanas_a' => $semanas['a'],

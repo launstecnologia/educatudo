@@ -29,7 +29,7 @@ $colsResumo = BoletimQuadroLayoutHelper::filtrarColunasResumoBoletim($colsVista)
 <div class="boletim-sim-vistas" data-sim-vistas="<?= htmlspecialchars($simVistaId, ENT_QUOTES, 'UTF-8') ?>">
     <div class="flex flex-wrap gap-2 mb-3">
         <button type="button" data-sim-vista="demonstrativo"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg border text-white"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border"
             style="background: var(--sidebar-bg-color, #1e3a5f); border-color: var(--sidebar-bg-color, #1e3a5f); color: var(--sidebar-text-color, #fff);">
             Demonstrativo de Notas
         </button>

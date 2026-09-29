@@ -571,12 +571,13 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     btn.style.background = navBg;
                     btn.style.borderColor = navBg;
                     btn.style.color = navFg;
-                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'text-white');
                 } else {
-                    btn.style.background = '';
-                    btn.style.borderColor = '';
-                    btn.style.color = '';
+                    btn.style.background = '#fff';
+                    btn.style.borderColor = '#d1d5db';
+                    btn.style.color = '#374151';
                     btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                    btn.classList.remove('text-white');
                 }
             });
             root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
@@ -5313,12 +5314,13 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     btn.style.background = navBg;
                     btn.style.borderColor = navBg;
                     btn.style.color = navFg;
-                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'text-white');
                 } else {
-                    btn.style.background = '';
-                    btn.style.borderColor = '';
-                    btn.style.color = '';
+                    btn.style.background = '#fff';
+                    btn.style.borderColor = '#d1d5db';
+                    btn.style.color = '#374151';
                     btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                    btn.classList.remove('text-white');
                 }
             });
             root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
