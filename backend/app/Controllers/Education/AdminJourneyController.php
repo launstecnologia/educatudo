@@ -35,21 +35,29 @@ class AdminJourneyController extends BaseController
      */
     private function materiasParaJornada()
     {
-        $jm = $this->db->fetchAll("SELECT id, nome, cor, icone FROM jornadas_materias ORDER BY nome ASC");
+        $jm = [];
+        try {
+            $jm = $this->db->fetchAll("SELECT id, nome, cor, icone FROM jornadas_materias ORDER BY nome ASC") ?: [];
+        } catch (\Throwable $e) {
+            $jm = [];
+        }
         $mat = [];
         try {
-            $mat = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome ASC");
+            $mat = $this->db->fetchAll("SELECT id, nome FROM materias ORDER BY nome ASC") ?: [];
         } catch (\Throwable $e) {
             // tabela materias pode não existir ou ter estrutura diferente
         }
-        $idsJm = array_column($jm, 'id');
+        $idsJm = array_map('intval', array_column($jm, 'id'));
         $materias = $jm;
         foreach ($mat as $m) {
-            if (!in_array($m['id'], $idsJm, true)) {
+            $mid = (int) ($m['id'] ?? 0);
+            if ($mid > 0 && !in_array($mid, $idsJm, true)) {
                 $materias[] = $m;
             }
         }
-        usort($materias, function ($a, $b) { return strcmp($a['nome'] ?? '', $b['nome'] ?? ''); });
+        usort($materias, static function ($a, $b) {
+            return strcmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+        });
         return $materias;
     }
     
@@ -255,8 +263,8 @@ class AdminJourneyController extends BaseController
              ORDER BY t.nome"
         );
         
-        // Matérias e tipos de ensino para os filtros
-        $materias = $this->db->fetchAll("SELECT id, nome FROM jornadas_materias ORDER BY nome ASC");
+        // Matérias e tipos de ensino para os filtros (mesma fonte do criar/editar)
+        $materias = $this->materiasParaJornada();
         $tipos_ensino = $this->db->fetchAll(
             "SELECT DISTINCT tipo_ensino as tipo_ensino FROM turmas WHERE tipo_ensino IS NOT NULL AND tipo_ensino != '' ORDER BY tipo_ensino ASC"
         );
