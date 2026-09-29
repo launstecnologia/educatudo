@@ -2815,8 +2815,8 @@ $boletimWizardSteps = [
         html += '<p class="' + avisoCls + '">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
         if (previewTemQuadro(pv)) {
             html += '<div class="flex flex-wrap gap-2 mb-3">';
-            html += '<button type="button" data-vista-preview="quadro" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'quadro' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Demonstrativo de Notas</button>';
-            html += '<button type="button" data-vista-preview="boletim" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'boletim' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Boletim</button>';
+            html += '<button type="button" data-vista-preview="quadro" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'quadro' ? 'text-white' : 'bg-white text-gray-700 border-gray-300') + '"' + (vistaPreview === 'quadro' ? ' style="background:var(--sidebar-bg-color,#1e3a5f);border-color:var(--sidebar-bg-color,#1e3a5f);color:var(--sidebar-text-color,#fff)"' : '') + '>Demonstrativo de Notas</button>';
+            html += '<button type="button" data-vista-preview="boletim" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'boletim' ? 'text-white' : 'bg-white text-gray-700 border-gray-300') + '"' + (vistaPreview === 'boletim' ? ' style="background:var(--sidebar-bg-color,#1e3a5f);border-color:var(--sidebar-bg-color,#1e3a5f);color:var(--sidebar-text-color,#fff)"' : '') + '>Boletim</button>';
             html += '</div>';
             if (vistaPreview === 'boletim') {
                 return html + htmlTabelaSomenteNotas(pv);

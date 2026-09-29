@@ -449,6 +449,26 @@ class BoletimConfigController extends BaseController
         if ($selectedAlunoId > 0 && !empty($regra['componentes'])) {
             $simulacao = $this->simularRegraAluno($regra, $selectedAlunoId, $periodoRef, $dataInicio, $dataFim);
 
+            // Vista "Boletim": mesma matriz com group_line forçado (aplicar_em=boletim).
+            // O Demonstrativo mantém matérias soltas; o resumo mostra Língua Portuguesa etc.
+            try {
+                $simBoletim = $this->simularRegraAluno(
+                    $regra,
+                    $selectedAlunoId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    [],
+                    true
+                );
+                $matrizBoletim = is_array($simBoletim) ? ($simBoletim['matriz_materias'] ?? null) : null;
+                if (is_array($simulacao) && is_array($matrizBoletim)) {
+                    $simulacao['matriz_materias_boletim'] = $matrizBoletim;
+                }
+            } catch (Throwable $e) {
+                error_log('BoletimConfig simulação boletim agrupado aluno #' . $selectedAlunoId . ': ' . $e->getMessage());
+            }
+
             // Persistir a simulação como PREVIEW para o aluno selecionado.
             // O preview NÃO é exibido para aluno/pais/coordenação (filtrado por preview=0
             // em getGeneratedBoletinsByAluno / getGeneratedBoletimByAlunoAndRegra).
@@ -457,7 +477,11 @@ class BoletimConfigController extends BaseController
             $matriz = is_array($simulacao) ? ($simulacao['matriz_materias'] ?? null) : null;
             if ($regraIdParaPreview > 0 && is_array($matriz)) {
                 $colunasPreview = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
-                $linhasPreview = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+                // Preview persistido usa a vista Boletim (agrupada) quando existir.
+                $matrizPersistir = is_array($simulacao['matriz_materias_boletim'] ?? null)
+                    ? $simulacao['matriz_materias_boletim']
+                    : $matriz;
+                $linhasPreview = is_array($matrizPersistir['linhas'] ?? null) ? $matrizPersistir['linhas'] : [];
                 try {
                     $this->boletimConfig->replaceGeneratedResultsForAluno(
                         $regraIdParaPreview,

@@ -4,6 +4,7 @@
  *
  * Variáveis:
  * - $cols, $linhas, $decimalPlaces
+ * - $linhasBoletim (opcional): linhas com group_line forçado para a vista Boletim
  * - $formatNotaBoletim (callable, opcional)
  * - $simVistaId (string único no DOM)
  */
@@ -13,6 +14,9 @@ if (!class_exists('BoletimQuadroLayoutHelper', false)) {
 
 $colsVista = is_array($cols ?? null) ? $cols : [];
 $linhasVista = is_array($linhas ?? null) ? $linhas : [];
+$linhasVistaBoletim = is_array($linhasBoletim ?? null) && $linhasBoletim !== []
+    ? $linhasBoletim
+    : $linhasVista;
 $decVista = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
 $fmtVista = is_callable($formatNotaBoletim ?? null)
     ? $formatNotaBoletim
@@ -25,7 +29,8 @@ $colsResumo = BoletimQuadroLayoutHelper::filtrarColunasResumoBoletim($colsVista)
 <div class="boletim-sim-vistas" data-sim-vistas="<?= htmlspecialchars($simVistaId, ENT_QUOTES, 'UTF-8') ?>">
     <div class="flex flex-wrap gap-2 mb-3">
         <button type="button" data-sim-vista="demonstrativo"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg border bg-indigo-600 text-white border-indigo-600">
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border text-white"
+            style="background: var(--sidebar-bg-color, #1e3a5f); border-color: var(--sidebar-bg-color, #1e3a5f); color: var(--sidebar-text-color, #fff);">
             Demonstrativo de Notas
         </button>
         <button type="button" data-sim-vista="boletim"
@@ -48,24 +53,30 @@ $colsResumo = BoletimQuadroLayoutHelper::filtrarColunasResumoBoletim($colsVista)
             <p class="text-sm text-gray-500">Não há colunas de resultado ou faltas neste evento.</p>
         <?php else: ?>
             <div class="overflow-x-auto border border-gray-200 rounded-lg">
-                <div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">Boletim (resultado e faltas)</div>
+                <div class="px-3 py-1.5 text-sm font-semibold border-b"
+                     style="background: var(--sidebar-bg-color, #1e3a5f); color: var(--sidebar-text-color, #fff); border-color: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 75%, #000);">
+                    Boletim (resultado e faltas)
+                </div>
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-slate-50">
+                    <thead style="background: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 12%, #fff);">
                         <tr>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-700 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 border-r border-gray-200">Matéria</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide sticky left-0 z-10 border-r border-gray-200"
+                                style="color: var(--sidebar-bg-color, #1e3a5f); background: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 12%, #fff);">Matéria</th>
                             <?php foreach ($colsResumo as $mc): ?>
                                 <?php $isFaltasCab = BoletimQuadroLayoutHelper::colunaEhFaltas($mc); ?>
-                                <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 min-w-[5.5rem]" title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?>">
+                                <th class="px-3 py-2 text-center text-xs font-semibold min-w-[5.5rem]"
+                                    style="color: var(--sidebar-bg-color, #1e3a5f);"
+                                    title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?>">
                                     <span class="block truncate max-w-[8rem] mx-auto"><?= htmlspecialchars((string) ($mc['nome'] ?? $mc['codigo'] ?? '')) ?></span>
                                     <?php if (!$isFaltasCab): ?>
-                                        <span class="block text-[10px] font-normal text-slate-400 normal-case">Valor 10</span>
+                                        <span class="block text-[10px] font-normal opacity-70 normal-case">Valor 10</span>
                                     <?php endif; ?>
                                 </th>
                             <?php endforeach; ?>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
-                        <?php foreach ($linhasVista as $lin): ?>
+                        <?php foreach ($linhasVistaBoletim as $lin): ?>
                             <?php $notasLin = is_array($lin['notas'] ?? null) ? $lin['notas'] : []; ?>
                             <tr class="hover:bg-gray-50">
                                 <td class="px-3 py-2 font-medium text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-200"><?= htmlspecialchars((string) ($lin['materia_nome'] ?? '-')) ?></td>

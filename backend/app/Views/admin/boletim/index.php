@@ -453,6 +453,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         if (BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas)) {
                             $cols = $matrizColunas;
                             $linhas = $matrizLinhas;
+                            $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                                ? $simulacao['matriz_materias_boletim']['linhas']
+                                : $matrizLinhas;
                             $decimalPlaces = $decimalPlacesSelected ?? 2;
                             $simVistaId = 'sim-compacta';
                             include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
@@ -560,14 +563,21 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     <script>
     (function () {
         function ativar(root, vista) {
+            var navBg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-bg-color').trim() || '#1e3a5f';
+            var navFg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-text-color').trim() || '#fff';
             root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
                 var on = btn.getAttribute('data-sim-vista') === vista;
-                btn.classList.toggle('bg-indigo-600', on);
-                btn.classList.toggle('text-white', on);
-                btn.classList.toggle('border-indigo-600', on);
-                btn.classList.toggle('bg-white', !on);
-                btn.classList.toggle('text-gray-700', !on);
-                btn.classList.toggle('border-gray-300', !on);
+                if (on) {
+                    btn.style.background = navBg;
+                    btn.style.borderColor = navBg;
+                    btn.style.color = navFg;
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                } else {
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                    btn.style.color = '';
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                }
             });
             root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
                 panel.classList.toggle('hidden', panel.getAttribute('data-sim-panel') !== vista);
@@ -1114,6 +1124,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     if (BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas)) {
                         $cols = $matrizColunas;
                         $linhas = $matrizLinhas;
+                        $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                            ? $simulacao['matriz_materias_boletim']['linhas']
+                            : $matrizLinhas;
                         $decimalPlaces = $decimalPlacesSelected ?? 2;
                         $simVistaId = 'sim-principal';
                         include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
@@ -5292,14 +5305,21 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 
     (function initSimulacaoVistas() {
         function ativar(root, vista) {
+            var navBg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-bg-color').trim() || '#1e3a5f';
+            var navFg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-text-color').trim() || '#fff';
             root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
                 var on = btn.getAttribute('data-sim-vista') === vista;
-                btn.classList.toggle('bg-indigo-600', on);
-                btn.classList.toggle('text-white', on);
-                btn.classList.toggle('border-indigo-600', on);
-                btn.classList.toggle('bg-white', !on);
-                btn.classList.toggle('text-gray-700', !on);
-                btn.classList.toggle('border-gray-300', !on);
+                if (on) {
+                    btn.style.background = navBg;
+                    btn.style.borderColor = navBg;
+                    btn.style.color = navFg;
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                } else {
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                    btn.style.color = '';
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                }
             });
             root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
                 var on = panel.getAttribute('data-sim-panel') === vista;
