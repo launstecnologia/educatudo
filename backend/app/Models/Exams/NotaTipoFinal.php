@@ -125,4 +125,61 @@ class NotaTipoFinal
             ]
         );
     }
+
+    /**
+     * Remove consolidados de matérias que não têm mais eventos no período.
+     *
+     * @param list<int> $materiasManter
+     */
+    public function removerOrfaos(
+        int $tipoId,
+        int $alunoId,
+        int $turmaId,
+        int $anoLetivo,
+        int $periodo,
+        array $materiasManter
+    ): void {
+        if (!$this->tabelaPronta() || $tipoId <= 0 || $alunoId <= 0) {
+            return;
+        }
+        $materiasManter = array_values(array_unique(array_filter(
+            array_map('intval', $materiasManter),
+            static fn (int $id): bool => $id > 0
+        )));
+        $params = [
+            'tipo' => $tipoId,
+            'aluno' => $alunoId,
+            'turma' => $turmaId,
+            'ano' => $anoLetivo,
+            'periodo' => $periodo,
+        ];
+        if ($materiasManter === []) {
+            $this->db->query(
+                "DELETE FROM notas_tipo_finais
+                 WHERE tipo_avaliacao_id = :tipo
+                   AND aluno_id = :aluno
+                   AND turma_id = :turma
+                   AND ano_letivo = :ano
+                   AND periodo = :periodo",
+                $params
+            );
+            return;
+        }
+        $ph = [];
+        foreach ($materiasManter as $i => $mid) {
+            $k = 'm' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $mid;
+        }
+        $this->db->query(
+            "DELETE FROM notas_tipo_finais
+             WHERE tipo_avaliacao_id = :tipo
+               AND aluno_id = :aluno
+               AND turma_id = :turma
+               AND ano_letivo = :ano
+               AND periodo = :periodo
+               AND materia_id NOT IN (" . implode(',', $ph) . ")",
+            $params
+        );
+    }
 }

@@ -3146,8 +3146,10 @@ class BoletimConfig
                     COALESCE(n.updated_at, CONCAT(pb.data_prova, ' 12:00:00')) AS finalizado_em,
                     {$selectNotaUnica},
                     pb.data_prova,
-                    NULLIF(n.materia_id, 0) AS nota_materia_id,
+                    n.materia_id AS nota_materia_id,
                     m.nome AS nota_materia_nome,
+                    n.materia_id AS materia_id,
+                    m.nome AS materia_nome,
                     (
                         SELECT pbp2.materia_id
                         FROM provas_blocos_professores pbp2
@@ -3165,23 +3167,6 @@ class BoletimConfig
                         ORDER BY (pbp2.materia_id = n.materia_id) DESC, pbp2.id ASC
                         LIMIT 1
                     ) AS professor_materia_nome,
-                    COALESCE(NULLIF(n.materia_id, 0), (
-                        SELECT pbp2.materia_id
-                        FROM provas_blocos_professores pbp2
-                        WHERE pbp2.bloco_id = n.bloco_id
-                          AND pbp2.professor_id = n.professor_id
-                        ORDER BY (pbp2.materia_id = n.materia_id) DESC, pbp2.id ASC
-                        LIMIT 1
-                    )) AS materia_id,
-                    COALESCE(m.nome, (
-                        SELECT m2.nome
-                        FROM provas_blocos_professores pbp2
-                        INNER JOIN materias m2 ON m2.id = pbp2.materia_id
-                        WHERE pbp2.bloco_id = n.bloco_id
-                          AND pbp2.professor_id = n.professor_id
-                        ORDER BY (pbp2.materia_id = n.materia_id) DESC, pbp2.id ASC
-                        LIMIT 1
-                    )) AS materia_nome,
                     CONCAT(COALESCE(pb.titulo, 'Bloco'), ' (pauta)') AS titulo,
                     10 AS valor_total,
                     0 AS total_questoes,
@@ -3191,7 +3176,8 @@ class BoletimConfig
                 LEFT JOIN materias m ON m.id = n.materia_id
                 WHERE n.aluno_id = ?
                   AND n.bloco_id IN ($placeholders)
-                  AND n.nota IS NOT NULL";
+                  AND n.nota IS NOT NULL
+                  AND n.materia_id > 0";
 
         $params = array_merge([$alunoId], $blocoIds);
         if ($inicio !== null && $fim !== null) {
@@ -3260,10 +3246,12 @@ class BoletimConfig
                     COALESCE(n.updated_at, CONCAT(pb.data_prova, ' 12:00:00')) AS finalizado_em,
                     {$selectNotaUnica},
                     pb.data_prova,
-                    NULLIF(n.materia_id, 0) AS nota_materia_id,
+                    n.materia_id AS nota_materia_id,
                     m.nome AS nota_materia_nome,
-                    COALESCE(NULLIF(n.materia_id, 0), pbp.materia_id) AS materia_id,
-                    COALESCE(m.nome, m2.nome) AS materia_nome,
+                    n.materia_id AS materia_id,
+                    m.nome AS materia_nome,
+                    pbp.materia_id AS professor_materia_id,
+                    m2.nome AS professor_materia_nome,
                     CONCAT(COALESCE(pb.titulo, 'Bloco'), ' (pauta)') AS titulo,
                     10 AS valor_total,
                     0 AS total_questoes,
@@ -3274,11 +3262,12 @@ class BoletimConfig
                 LEFT JOIN provas_blocos_professores pbp
                   ON pbp.bloco_id = n.bloco_id
                  AND pbp.professor_id = n.professor_id
-                 AND (n.materia_id = 0 OR pbp.materia_id = n.materia_id)
+                 AND pbp.materia_id = n.materia_id
                 LEFT JOIN materias m2 ON m2.id = pbp.materia_id
                 WHERE n.aluno_id IN ($phAlunos)
                   AND n.bloco_id IN ($phBlocos)
-                  AND n.nota IS NOT NULL";
+                  AND n.nota IS NOT NULL
+                  AND n.materia_id > 0";
 
         $params = array_merge($alunoIds, $blocoIds);
         if ($inicio !== null && $fim !== null) {
@@ -3296,8 +3285,7 @@ class BoletimConfig
             $params[] = $fim;
         }
         if ($materiaId !== null && $materiaId > 0) {
-            $sql .= ' AND (n.materia_id = ? OR pbp.materia_id = ?)';
-            $params[] = $materiaId;
+            $sql .= ' AND n.materia_id = ?';
             $params[] = $materiaId;
         }
         $sql .= ' ORDER BY n.aluno_id ASC, finalizado_em DESC, n.id DESC';

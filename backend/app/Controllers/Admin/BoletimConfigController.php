@@ -4464,6 +4464,9 @@ class BoletimConfigController extends BaseController
         $byMid = [];
         foreach ($notas as $n) {
             $mid = (int) ($n['materia_id'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
             if (!isset($byMid[$mid])) {
                 $byMid[$mid] = [];
             }
@@ -4564,14 +4567,39 @@ class BoletimConfigController extends BaseController
      */
     private function reconciliarMateriaAlternativaSelecionada(array $row, array $setIds, array $idsSelecionadosPorNome): ?array
     {
+        $notaMid = (int) ($row['nota_materia_id'] ?? $row['materia_id'] ?? 0);
+        $notaNome = trim((string) ($row['nota_materia_nome'] ?? $row['materia_nome'] ?? ''));
+
+        // Matéria da nota fora do filtro: descarta (não “empurra” Leitura/Literatura para Português).
+        if ($notaMid > 0 && !isset($setIds[$notaMid])) {
+            $nomeKeyNota = $this->canonicalMateriaNomeKey($notaNome);
+            $candidatosNota = $nomeKeyNota !== '' ? array_values($idsSelecionadosPorNome[$nomeKeyNota] ?? []) : [];
+            if (count($candidatosNota) === 1) {
+                $row['materia_id'] = (int) $candidatosNota[0];
+                if ($notaNome !== '') {
+                    $row['materia_nome'] = $notaNome;
+                }
+
+                return $row;
+            }
+
+            return null;
+        }
+
+        if ($notaMid > 0 && isset($setIds[$notaMid])) {
+            $row['materia_id'] = $notaMid;
+            if ($notaNome !== '') {
+                $row['materia_nome'] = $notaNome;
+            }
+
+            return $row;
+        }
+
+        // Legado sem materia_id na nota: tenta o vínculo do professor.
         $alternativas = [
             [
                 'id' => (int) ($row['professor_materia_id'] ?? 0),
                 'nome' => trim((string) ($row['professor_materia_nome'] ?? '')),
-            ],
-            [
-                'id' => (int) ($row['nota_materia_id'] ?? 0),
-                'nome' => trim((string) ($row['nota_materia_nome'] ?? '')),
             ],
         ];
 
@@ -4780,7 +4808,7 @@ class BoletimConfigController extends BaseController
     /**
      * Blocos de lançamento com "nota única para todas as matérias" podem ter a nota
      * gravada em apenas uma das matérias do evento. Para o boletim, replica essa nota
-     * para as matérias selecionadas no bloco antes de aplicar o filtro final.
+     * só para as demais matérias DO MESMO BLOCO (não para o filtro inteiro do componente).
      *
      * @param list<array<string,mixed>> $rows
      * @param list<int> $materiasSelecionadas
@@ -4795,6 +4823,7 @@ class BoletimConfigController extends BaseController
         if ($ids === [] || $rows === []) {
             return $rows;
         }
+        $setIds = array_fill_keys($ids, true);
 
         if (!is_array($this->materiasDisponiveisCache)) {
             $this->materiasDisponiveisCache = $this->boletimConfig->getAvailableSubjects(1000);
@@ -4809,11 +4838,17 @@ class BoletimConfigController extends BaseController
 
         $temLinhaPorBlocoMateria = [];
         $basePorBloco = [];
+        $materiasDoBloco = [];
         foreach ($rows as $row) {
             $blocoId = (int) ($row['bloco_id'] ?? 0);
             $mid = (int) ($row['materia_id'] ?? 0);
             if ($blocoId > 0 && $mid > 0) {
                 $temLinhaPorBlocoMateria[$blocoId][$mid] = true;
+                $materiasDoBloco[$blocoId][$mid] = true;
+            }
+            $profMid = (int) ($row['professor_materia_id'] ?? 0);
+            if ($blocoId > 0 && $profMid > 0) {
+                $materiasDoBloco[$blocoId][$profMid] = true;
             }
             if ($blocoId <= 0 || empty($row['nota_unica_todas_materias'])) {
                 continue;
@@ -4829,8 +4864,24 @@ class BoletimConfigController extends BaseController
             return $rows;
         }
 
+        $materiasVinculoBloco = $this->materiasIdsDosBlocosNotaUnica(array_keys($basePorBloco));
+        foreach ($materiasVinculoBloco as $blocoId => $midsBloco) {
+            foreach ($midsBloco as $midBloco) {
+                $materiasDoBloco[(int) $blocoId][(int) $midBloco] = true;
+            }
+        }
+
         foreach ($basePorBloco as $blocoId => $base) {
-            foreach ($ids as $midSel) {
+            $candidatos = array_keys($materiasDoBloco[$blocoId] ?? []);
+            if ($candidatos === []) {
+                // Sem vínculo explícito no resultado: limita ao filtro do componente.
+                $candidatos = $ids;
+            }
+            foreach ($candidatos as $midSel) {
+                $midSel = (int) $midSel;
+                if ($midSel <= 0 || !isset($setIds[$midSel])) {
+                    continue;
+                }
                 if (isset($temLinhaPorBlocoMateria[$blocoId][$midSel])) {
                     continue;
                 }
@@ -4846,6 +4897,47 @@ class BoletimConfigController extends BaseController
         }
 
         return $rows;
+    }
+
+    /**
+     * @param list<int|string> $blocoIds
+     * @return array<int, list<int>>
+     */
+    private function materiasIdsDosBlocosNotaUnica(array $blocoIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            $db = \Database::getInstance();
+            $ph = [];
+            $params = [];
+            foreach ($ids as $i => $bid) {
+                $k = 'b' . $i;
+                $ph[] = ':' . $k;
+                $params[$k] = $bid;
+            }
+            $rows = $db->fetchAll(
+                'SELECT bloco_id, materia_id
+                 FROM provas_blocos_professores
+                 WHERE bloco_id IN (' . implode(',', $ph) . ')
+                   AND materia_id > 0',
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $bid = (int) ($row['bloco_id'] ?? 0);
+            $mid = (int) ($row['materia_id'] ?? 0);
+            if ($bid > 0 && $mid > 0) {
+                $out[$bid][] = $mid;
+            }
+        }
+
+        return $out;
     }
 
     /**

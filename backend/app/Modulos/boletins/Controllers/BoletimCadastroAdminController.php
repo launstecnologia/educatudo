@@ -320,7 +320,37 @@ class BoletimCadastroAdminController extends AdminBaseController
                 if ($permitido) {
                     require_once __DIR__ . '/../../../Controllers/Admin/BoletimConfigController.php';
                     $motor = new BoletimConfigController(true);
-                    $simulacao = $motor->simularRegraAluno($regra, $selectedAlunoId, $periodoRef, $dataInicio, $dataFim);
+                    // Igual ao Evento de Notas: Demonstrativo com mãe + filhas (ex.: Língua Portuguesa).
+                    $simulacao = $motor->simularRegraAluno(
+                        $regra,
+                        $selectedAlunoId,
+                        $periodoRef,
+                        $dataInicio,
+                        $dataFim,
+                        [],
+                        false,
+                        true
+                    );
+                    try {
+                        $simBoletim = $motor->simularRegraAluno(
+                            $regra,
+                            $selectedAlunoId,
+                            $periodoRef,
+                            $dataInicio,
+                            $dataFim,
+                            [],
+                            true
+                        );
+                        $matrizBoletim = is_array($simBoletim) ? ($simBoletim['matriz_materias'] ?? null) : null;
+                        if (is_array($simulacao) && is_array($matrizBoletim)) {
+                            $simulacao['matriz_materias_boletim'] = $matrizBoletim;
+                        }
+                    } catch (Throwable $e) {
+                        error_log('Gerar boletins simulação agrupada aluno #' . $selectedAlunoId . ': ' . $e->getMessage());
+                    }
+                    if (is_array($simulacao)) {
+                        $simulacao = $motor->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
+                    }
                 } else {
                     $selectedAlunoId = 0;
                 }

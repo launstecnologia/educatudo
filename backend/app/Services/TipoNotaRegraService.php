@@ -239,11 +239,16 @@ class TipoNotaRegraService
         $eventos = $this->coletarEventos($tipoId, $alunoId, $turmaId, $anoLetivo, $periodo);
         $porMateria = $this->agruparPorMateria($eventos, $tipo);
         $out = [];
+        $materiasManter = [];
         foreach ($porMateria as $materiaId => $fechado) {
+            $materiaId = (int) $materiaId;
+            if ($materiaId <= 0) {
+                continue;
+            }
             $linha = [
                 'tipo_avaliacao_id' => $tipoId,
                 'aluno_id' => $alunoId,
-                'materia_id' => (int) $materiaId,
+                'materia_id' => $materiaId,
                 'turma_id' => $turmaId,
                 'ano_letivo' => $anoLetivo,
                 'periodo' => $periodo,
@@ -253,13 +258,16 @@ class TipoNotaRegraService
                 'eventos_qtd' => $fechado['eventos_qtd'],
             ];
             $this->finais->upsert($linha);
-            $out[(int) $materiaId] = $linha;
+            $out[$materiaId] = $linha;
+            $materiasManter[] = $materiaId;
         }
+        // Sem lançamento da matéria → some do consolidado (evita Prova Bim fantasma).
+        $this->finais->removerOrfaos($tipoId, $alunoId, $turmaId, $anoLetivo, $periodo, $materiasManter);
         return $out;
     }
 
     /**
-     * Lê o consolidado; se vazio, fecha na hora.
+     * Recalcula a partir dos lançamentos vivos (não reutiliza consolidado órfão).
      *
      * @return array<int, float> materia_id => nota_final
      */
@@ -273,14 +281,11 @@ class TipoNotaRegraService
             return [];
         }
 
-        $linhas = $this->finais->listarDoAluno($tipoId, $alunoId, $turmaId, $anoLetivo, $periodo);
-        if ($linhas === []) {
-            $linhas = array_values($this->fecharAluno($tipoId, $alunoId, $turmaId, $anoLetivo, $periodo));
-        }
+        $linhas = array_values($this->fecharAluno($tipoId, $alunoId, $turmaId, $anoLetivo, $periodo));
         $out = [];
         foreach ($linhas as $linha) {
             $mid = (int) ($linha['materia_id'] ?? 0);
-            if (!isset($linha['nota_final']) || !is_numeric($linha['nota_final'])) {
+            if ($mid <= 0 || !isset($linha['nota_final']) || !is_numeric($linha['nota_final'])) {
                 continue;
             }
             $out[$mid] = round((float) $linha['nota_final'], 2);
@@ -384,10 +389,14 @@ class TipoNotaRegraService
                 $params
             ) ?: [];
             foreach ($manuais as $row) {
+                $mid = (int) ($row['materia_id'] ?? 0);
+                if ($mid <= 0) {
+                    continue;
+                }
                 $out[] = [
                     'bloco_id' => (int) ($row['bloco_id'] ?? 0),
                     'professor_id' => (int) ($row['professor_id'] ?? 0),
-                    'materia_id' => (int) ($row['materia_id'] ?? 0),
+                    'materia_id' => $mid,
                     'nota' => (float) ($row['nota'] ?? 0),
                     'acertos' => 0,
                     'questoes' => 0,
@@ -554,6 +563,10 @@ class TipoNotaRegraService
         }
         $out = [];
         foreach ($porMateria as $mid => $lista) {
+            $mid = (int) $mid;
+            if ($mid <= 0) {
+                continue;
+            }
             if ($criterioProf === 'media' || $criterioProf === 'soma') {
                 $porProf = [];
                 foreach ($lista as $ev) {

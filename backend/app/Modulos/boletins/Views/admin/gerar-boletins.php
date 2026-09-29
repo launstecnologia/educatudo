@@ -125,32 +125,23 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
     </div>
     <div class="p-5 overflow-x-auto">
         <?php
-        $ehQuadroSim = false;
-        foreach ($matrizColunas as $colSim) {
-            if (!is_array($colSim)) {
-                continue;
-            }
-            $grupoSim = strtolower(trim((string) ($colSim['layout_group'] ?? '')));
-            $tipoSim = strtolower(trim((string) ($colSim['layout_type'] ?? '')));
-            $codSim = strtolower(trim((string) ($colSim['codigo'] ?? '')));
-            if ($tipoSim === 'semana_nq' || in_array($grupoSim, ['quadro_a', 'quadro_b'], true) || preg_match('/^s[1-8]$/', $codSim) === 1) {
-                $ehQuadroSim = true;
-                break;
-            }
+        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+            require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
         }
+        $ehQuadroSim = BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas);
         ?>
         <?php if ($matrizLinhas === [] || $matrizColunas === []): ?>
             <p class="text-sm text-gray-500">Sem dados de simulação para o aluno/evento selecionado.</p>
         <?php elseif ($ehQuadroSim): ?>
             <?php
-            if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-                require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
-            }
             $cols = $matrizColunas;
             $linhas = $matrizLinhas;
+            $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                ? $simulacao['matriz_materias_boletim']['linhas']
+                : $matrizLinhas;
             $decimalPlaces = 1;
-            $ev = is_array($regra) ? $regra : [];
-            include dirname(__DIR__, 4) . '/Views/partials/boletim_quadro_tabela.php';
+            $simVistaId = 'gerar-boletins-sim';
+            include dirname(__DIR__, 4) . '/Views/partials/boletim_simulacao_vistas.php';
             ?>
         <?php else: ?>
             <table class="min-w-full text-sm">
@@ -164,8 +155,24 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php foreach ($matrizLinhas as $linha): ?>
-                    <tr>
-                        <td class="px-3 py-2 text-gray-900"><?= htmlspecialchars((string) ($linha['materia_nome'] ?? $linha['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <?php
+                    $ehPaiGrupo = !empty($linha['eh_grupo_pai']);
+                    $ehFilhoGrupo = !empty($linha['eh_grupo_filho']);
+                    $clsMat = 'px-3 py-2 text-gray-900';
+                    if ($ehPaiGrupo) {
+                        $clsMat .= ' font-bold';
+                    }
+                    if ($ehFilhoGrupo) {
+                        $clsMat .= ' pl-7 text-gray-800';
+                    }
+                    ?>
+                    <tr class="<?= $ehPaiGrupo ? 'bg-indigo-50/40' : '' ?>">
+                        <td class="<?= $clsMat ?>">
+                            <?php if ($ehFilhoGrupo): ?>
+                                <span class="text-gray-400 mr-1" aria-hidden="true">↳</span>
+                            <?php endif; ?>
+                            <?= htmlspecialchars((string) ($linha['materia_nome'] ?? $linha['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                        </td>
                         <?php
                         $notasLin = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
                         foreach ($matrizColunas as $col):
@@ -342,6 +349,36 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
                 });
         });
     }
+
+    function ativarVistaSim(root, vista) {
+        var navBg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-bg-color').trim() || '#1e3a5f';
+        var navFg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-text-color').trim() || '#fff';
+        root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+            var on = btn.getAttribute('data-sim-vista') === vista;
+            if (on) {
+                btn.style.background = navBg;
+                btn.style.borderColor = navBg;
+                btn.style.color = navFg;
+                btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'text-white');
+            } else {
+                btn.style.background = '#fff';
+                btn.style.borderColor = '#d1d5db';
+                btn.style.color = '#374151';
+                btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                btn.classList.remove('text-white');
+            }
+        });
+        root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+            panel.classList.toggle('hidden', panel.getAttribute('data-sim-panel') !== vista);
+        });
+    }
+    document.querySelectorAll('.boletim-sim-vistas').forEach(function (root) {
+        root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                ativarVistaSim(root, btn.getAttribute('data-sim-vista') || 'demonstrativo');
+            });
+        });
+    });
 })();
 </script>
 <?php endif; ?>
