@@ -5462,9 +5462,16 @@ class BoletimConfigController extends BaseController
                 return $ka <=> $kb;
             });
 
-            $paiNotas = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
-            if ($paiNotas === null) {
-                $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode']);
+            // Filhos trazem tudo do Demonstrativo (semanas N/Q, jornada…). Boletim sobrescreve
+            // só onde a linha agrupada tem valor — jornada costuma faltar no group_line do Boletim.
+            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode']);
+            $paiNotasBoletim = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
+            if ($paiNotasBoletim !== null) {
+                foreach ($paiNotasBoletim as $cod => $val) {
+                    if (is_numeric($val)) {
+                        $paiNotas[(string) $cod] = $val;
+                    }
+                }
             }
             $pai = [
                 'materia_id' => 0,
@@ -5531,41 +5538,42 @@ class BoletimConfigController extends BaseController
     private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode): array
     {
         $mode = $mode === 'soma' ? 'soma' : 'media';
-        $acc = [];
-        $cnt = [];
+        $porCod = [];
         foreach ($filhos as $lin) {
             $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
             foreach ($notas as $cod => $val) {
                 $cod = (string) $cod;
-                if ($cod === '') {
+                if ($cod === '' || !is_numeric($val)) {
                     continue;
                 }
-                $ehNq = str_ends_with($cod, '__n') || str_ends_with($cod, '__q');
-                $ehFaltas = stripos($cod, 'falta') !== false;
-                if (!is_numeric($val)) {
-                    continue;
+                if (!isset($porCod[$cod])) {
+                    $porCod[$cod] = [];
                 }
-                if (!isset($acc[$cod])) {
-                    $acc[$cod] = 0.0;
-                    $cnt[$cod] = 0;
-                }
-                $acc[$cod] += (float) $val;
-                $cnt[$cod]++;
-                if ($ehNq || $ehFaltas) {
-                    // soma — já acumulou
-                }
+                $porCod[$cod][] = (float) $val;
             }
         }
         $out = [];
-        foreach ($acc as $cod => $soma) {
-            $n = max(1, (int) ($cnt[$cod] ?? 1));
-            $ehNq = str_ends_with((string) $cod, '__n') || str_ends_with((string) $cod, '__q');
-            $ehFaltas = stripos((string) $cod, 'falta') !== false;
-            if ($ehNq || $ehFaltas || $mode === 'soma') {
-                $out[$cod] = $ehNq || $ehFaltas ? (int) round($soma) : round($soma, 2);
-            } else {
-                $out[$cod] = round($soma / $n, 2);
+        foreach ($porCod as $cod => $vals) {
+            if ($vals === []) {
+                continue;
             }
+            $ehNq = str_ends_with($cod, '__n') || str_ends_with($cod, '__q');
+            $ehFaltas = stripos($cod, 'falta') !== false;
+            $ehJornada = stripos($cod, 'jornada') !== false;
+            if ($ehNq || $ehFaltas || $mode === 'soma') {
+                $soma = array_sum($vals);
+                $out[$cod] = $ehNq || $ehFaltas ? (int) round($soma) : round($soma, 2);
+                continue;
+            }
+            if ($ehJornada) {
+                $vals = array_values(array_filter($vals, static function (float $v): bool {
+                    return $v > 0.0;
+                }));
+                if ($vals === []) {
+                    continue;
+                }
+            }
+            $out[$cod] = round(array_sum($vals) / count($vals), 2);
         }
 
         return $out;
