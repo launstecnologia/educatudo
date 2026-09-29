@@ -221,7 +221,7 @@ class BoletimAssistenteController extends BaseController
 
         try {
             $configController = new BoletimConfigController(true);
-            // Demonstrativo: matérias soltas (sem group_line / sem pai-rótulo).
+            // Demonstrativo: matérias soltas + linha-mãe do grupo com filhos.
             $simulacao = $configController->simularRegraAluno(
                 $rascunho,
                 $alunoId,
@@ -232,7 +232,29 @@ class BoletimAssistenteController extends BaseController
                 false,
                 true
             );
-            $simulacao = $configController->filtrarMatrizDemonstrativoSemPaiAgrupado($simulacao, $rascunho);
+
+            // Matriz agrupada (notas da mãe) antes de montar a hierarquia do Demonstrativo.
+            try {
+                $simBoletim = $configController->simularRegraAluno(
+                    $rascunho,
+                    $alunoId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    [],
+                    true
+                );
+                $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null)
+                    ? $simBoletim['matriz_materias']
+                    : null;
+                if (is_array($simulacao) && is_array($matrizBoletim)) {
+                    $simulacao['matriz_materias_boletim'] = $matrizBoletim;
+                }
+            } catch (Throwable $e) {
+                error_log('BoletimAssistente preview boletim agrupado aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+
+            $simulacao = $configController->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $rascunho);
             $previewReal = $this->montarPreviewRealDaSimulacao($simulacao);
             if ($previewReal !== null) {
                 $grupoId = (int) ($rascunho['grupo_regras_notas_id'] ?? $estado['grupo_regras_notas_id'] ?? 0);
@@ -247,7 +269,10 @@ class BoletimAssistenteController extends BaseController
                     false,
                     true
                 );
-                $simulacaoQuadro = $configController->filtrarMatrizDemonstrativoSemPaiAgrupado($simulacaoQuadro, $rascunho);
+                if (is_array($simulacao['matriz_materias_boletim'] ?? null)) {
+                    $simulacaoQuadro['matriz_materias_boletim'] = $simulacao['matriz_materias_boletim'];
+                }
+                $simulacaoQuadro = $configController->montarMatrizDemonstrativoComGrupoHierarquico($simulacaoQuadro, $rascunho);
                 $previewQuadro = $this->montarPreviewRealDaSimulacao($simulacaoQuadro);
                 if (is_array($previewQuadro)) {
                     $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);
@@ -256,42 +281,27 @@ class BoletimAssistenteController extends BaseController
                 $previewReal['aluno_id'] = $alunoId;
                 $previewReal['dados_reais'] = true;
 
-                // Mesma matriz agrupada da tela inicial (group_line / Língua Portuguesa).
-                try {
-                    $simBoletim = $configController->simularRegraAluno(
-                        $rascunho,
-                        $alunoId,
-                        $periodoRef,
-                        $dataInicio,
-                        $dataFim,
-                        [],
-                        true
-                    );
-                    $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null)
-                        ? $simBoletim['matriz_materias']
-                        : null;
-                    if (is_array($matrizBoletim) && !empty($matrizBoletim['linhas'])) {
-                        $linhasBoletim = [];
-                        foreach ($matrizBoletim['linhas'] as $linhaRaw) {
-                            if (!is_array($linhaRaw)) {
-                                continue;
-                            }
-                            $nome = trim((string) ($linhaRaw['materia_nome'] ?? ''));
-                            if ($nome === '') {
-                                continue;
-                            }
-                            $linhasBoletim[] = [
-                                'materia_id' => (int) ($linhaRaw['materia_id'] ?? 0),
-                                'materia_nome' => $nome,
-                                'notas' => is_array($linhaRaw['notas'] ?? null) ? $linhaRaw['notas'] : [],
-                            ];
+                // Vista Boletim (só linha agrupada).
+                if (is_array($simulacao['matriz_materias_boletim'] ?? null)
+                    && !empty($simulacao['matriz_materias_boletim']['linhas'])) {
+                    $linhasBoletim = [];
+                    foreach ($simulacao['matriz_materias_boletim']['linhas'] as $linhaRaw) {
+                        if (!is_array($linhaRaw)) {
+                            continue;
                         }
-                        if ($linhasBoletim !== []) {
-                            $previewReal['linhas_boletim'] = $linhasBoletim;
+                        $nome = trim((string) ($linhaRaw['materia_nome'] ?? ''));
+                        if ($nome === '') {
+                            continue;
                         }
+                        $linhasBoletim[] = [
+                            'materia_id' => (int) ($linhaRaw['materia_id'] ?? 0),
+                            'materia_nome' => $nome,
+                            'notas' => is_array($linhaRaw['notas'] ?? null) ? $linhaRaw['notas'] : [],
+                        ];
                     }
-                } catch (Throwable $e) {
-                    error_log('BoletimAssistente preview boletim agrupado aluno #' . $alunoId . ': ' . $e->getMessage());
+                    if ($linhasBoletim !== []) {
+                        $previewReal['linhas_boletim'] = $linhasBoletim;
+                    }
                 }
 
                 $resultado['preview'] = $previewReal;
@@ -548,6 +558,10 @@ class BoletimAssistenteController extends BaseController
                 'materia_id' => (int) ($linhaRaw['materia_id'] ?? 0),
                 'materia_nome' => $nome,
                 'notas' => is_array($linhaRaw['notas'] ?? null) ? $linhaRaw['notas'] : [],
+                'eh_grupo_pai' => !empty($linhaRaw['eh_grupo_pai']) ? 1 : 0,
+                'eh_grupo_filho' => !empty($linhaRaw['eh_grupo_filho']) ? 1 : 0,
+                'grupo_pai_nome' => trim((string) ($linhaRaw['grupo_pai_nome'] ?? '')),
+                'grupo_key' => trim((string) ($linhaRaw['grupo_key'] ?? '')),
             ];
         }
         if ($linhas === []) {
@@ -700,11 +714,11 @@ class BoletimAssistenteController extends BaseController
                     $linhas = $this->linhasVisiveisNoBloco($key, $tab, $preview['tabelas']);
                 }
             }
-            $tab['linhas'] = array_values($linhas);
+            $tab['linhas'] = $this->ordenarLinhasPreservandoGrupo(array_values($linhas));
             $tabelas[] = $tab;
         }
         $preview['tabelas'] = $tabelas;
-        $preview['linhas_completas'] = $linhasCompletas;
+        $preview['linhas_completas'] = $this->ordenarLinhasPreservandoGrupo($linhasCompletas);
 
         return $preview;
     }
@@ -791,15 +805,75 @@ class BoletimAssistenteController extends BaseController
                 continue;
             }
             $linhas = $tab['linhas'];
-            usort($linhas, function (array $a, array $b): int {
-                return $this->chaveNomeMateria((string) ($a['materia_nome'] ?? ''))
-                    <=> $this->chaveNomeMateria((string) ($b['materia_nome'] ?? ''));
-            });
-            $tab['linhas'] = $linhas;
+            $tab['linhas'] = $this->ordenarLinhasPreservandoGrupo($linhas);
             $preview['tabelas'][$i] = $tab;
         }
 
         return $preview;
+    }
+
+    /**
+     * Mantém a mãe do group_line colada nos filhos (não espalha na ordem alfabética).
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function ordenarLinhasPreservandoGrupo(array $linhas): array
+    {
+        $blocos = [];
+        $i = 0;
+        $n = count($linhas);
+        while ($i < $n) {
+            $lin = $linhas[$i];
+            if (!is_array($lin)) {
+                $i++;
+                continue;
+            }
+            if (!empty($lin['eh_grupo_pai'])) {
+                $bloco = [$lin];
+                $i++;
+                while ($i < $n) {
+                    $prox = $linhas[$i];
+                    if (!is_array($prox) || empty($prox['eh_grupo_filho'])) {
+                        break;
+                    }
+                    $bloco[] = $prox;
+                    $i++;
+                }
+                $blocos[] = [
+                    'sort' => $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? '')),
+                    'linhas' => $bloco,
+                ];
+                continue;
+            }
+            if (!empty($lin['eh_grupo_filho'])) {
+                // Filho órfão (sem mãe na lista): trata como linha comum.
+                $blocos[] = [
+                    'sort' => $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? '')),
+                    'linhas' => [$lin],
+                ];
+                $i++;
+                continue;
+            }
+            $blocos[] = [
+                'sort' => $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? '')),
+                'linhas' => [$lin],
+            ];
+            $i++;
+        }
+        usort($blocos, static function (array $a, array $b): int {
+            return strcmp((string) ($a['sort'] ?? ''), (string) ($b['sort'] ?? ''));
+        });
+        $out = [];
+        foreach ($blocos as $bloco) {
+            foreach ((array) ($bloco['linhas'] ?? []) as $lin) {
+                if (is_array($lin)) {
+                    $out[] = $lin;
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1076,20 +1150,40 @@ class BoletimAssistenteController extends BaseController
      */
     private function linhasDoBlocoQuadro(array $linhas, array $ids, array $nomes): array
     {
-        $out = [];
+        $candidatas = [];
+        $keysComFilho = [];
         foreach ($linhas as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
-            $mid = (int) ($linha['materia_id'] ?? 0);
-            if ($mid > 0 && isset($ids[$mid])) {
-                $out[] = $linha;
+            if (!empty($linha['eh_grupo_pai'])) {
+                $candidatas[] = $linha;
                 continue;
             }
+            $mid = (int) ($linha['materia_id'] ?? 0);
             $chave = $this->chaveNomeMateria((string) ($linha['materia_nome'] ?? ''));
-            if ($chave !== '' && isset($nomes[$chave])) {
-                $out[] = $linha;
+            $entra = ($mid > 0 && isset($ids[$mid]))
+                || ($chave !== '' && isset($nomes[$chave]));
+            if (!$entra) {
+                continue;
             }
+            if (!empty($linha['eh_grupo_filho'])) {
+                $gk = trim((string) ($linha['grupo_key'] ?? ''));
+                if ($gk !== '') {
+                    $keysComFilho[$gk] = true;
+                }
+            }
+            $candidatas[] = $linha;
+        }
+        $out = [];
+        foreach ($candidatas as $linha) {
+            if (!empty($linha['eh_grupo_pai'])) {
+                $gk = trim((string) ($linha['grupo_key'] ?? ''));
+                if ($gk === '' || empty($keysComFilho[$gk])) {
+                    continue;
+                }
+            }
+            $out[] = $linha;
         }
 
         return $out;
@@ -1119,15 +1213,37 @@ class BoletimAssistenteController extends BaseController
             $semanasOutro = is_array($outra['semanas'] ?? null) ? $outra['semanas'] : [];
         }
         $outras = is_array($tab['outras'] ?? null) ? $tab['outras'] : [];
-        $out = [];
+        $candidatas = [];
+        $keysComFilho = [];
         foreach (is_array($tab['linhas'] ?? null) ? $tab['linhas'] : [] as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
-            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
-            if (BoletimQuadroLayoutHelper::linhaVisivelNoQuadro($blocoKey, $semanasDeste, $semanasOutro, $outras, $notas)) {
-                $out[] = $linha;
+            if (!empty($linha['eh_grupo_pai'])) {
+                $candidatas[] = $linha;
+                continue;
             }
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            if (!BoletimQuadroLayoutHelper::linhaVisivelNoQuadro($blocoKey, $semanasDeste, $semanasOutro, $outras, $notas)) {
+                continue;
+            }
+            if (!empty($linha['eh_grupo_filho'])) {
+                $gk = trim((string) ($linha['grupo_key'] ?? ''));
+                if ($gk !== '') {
+                    $keysComFilho[$gk] = true;
+                }
+            }
+            $candidatas[] = $linha;
+        }
+        $out = [];
+        foreach ($candidatas as $linha) {
+            if (!empty($linha['eh_grupo_pai'])) {
+                $gk = trim((string) ($linha['grupo_key'] ?? ''));
+                if ($gk === '' || empty($keysComFilho[$gk])) {
+                    continue;
+                }
+            }
+            $out[] = $linha;
         }
 
         return $out;

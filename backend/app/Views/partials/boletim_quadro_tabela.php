@@ -80,14 +80,48 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
             }
         }
         $linhasTab = [];
+        $keysComFilho = [];
+        $paisPendentes = [];
         foreach ($linhasQuadro as $linQ) {
             $notasQ = is_array($linQ['notas'] ?? null) ? $linQ['notas'] : [];
             $keyTab = strtolower((string) ($tabQ['key'] ?? 'a'));
             $semanasOutro = $keyTab === 'b' ? $semanasPorBloco['a'] : $semanasPorBloco['b'];
+            if (!empty($linQ['eh_grupo_pai'])) {
+                $paisPendentes[] = $linQ;
+                continue;
+            }
             if (!BoletimQuadroLayoutHelper::linhaVisivelNoQuadro($keyTab, $semanasCols, $semanasOutro, $outrasCols, $notasQ)) {
                 continue;
             }
+            if (!empty($linQ['eh_grupo_filho'])) {
+                $gk = trim((string) ($linQ['grupo_key'] ?? ''));
+                if ($gk !== '') {
+                    $keysComFilho[$gk] = true;
+                }
+            }
             $linhasTab[] = $linQ;
+        }
+        foreach ($paisPendentes as $paiQ) {
+            $gk = trim((string) ($paiQ['grupo_key'] ?? ''));
+            if ($gk === '' || empty($keysComFilho[$gk])) {
+                continue;
+            }
+            // Insere a mãe imediatamente antes do primeiro filho do grupo.
+            $inserido = false;
+            $novas = [];
+            foreach ($linhasTab as $linExist) {
+                if (!$inserido
+                    && !empty($linExist['eh_grupo_filho'])
+                    && trim((string) ($linExist['grupo_key'] ?? '')) === $gk) {
+                    $novas[] = $paiQ;
+                    $inserido = true;
+                }
+                $novas[] = $linExist;
+            }
+            if (!$inserido) {
+                $novas[] = $paiQ;
+            }
+            $linhasTab = $novas;
         }
         if ($linhasTab === [] && $semanasCols === []) {
             continue;
@@ -145,8 +179,11 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                         $totQ = 0;
                         $temTot = false;
                     ?>
-                        <tr class="<?= $bgQ ?>">
-                            <td class="border border-gray-300 px-3 py-1.5 text-left font-medium text-gray-900 whitespace-nowrap">
+                        <tr class="<?= $bgQ ?><?= !empty($linQ['eh_grupo_pai']) ? ' font-semibold' : '' ?>">
+                            <td class="border border-gray-300 px-3 py-1.5 text-left text-gray-900 whitespace-nowrap<?= !empty($linQ['eh_grupo_pai']) ? ' font-bold' : ' font-medium' ?><?= !empty($linQ['eh_grupo_filho']) ? ' pl-7 text-gray-800' : '' ?>">
+                                <?php if (!empty($linQ['eh_grupo_filho'])): ?>
+                                    <span class="text-gray-400 mr-1" aria-hidden="true">↳</span>
+                                <?php endif; ?>
                                 <?= htmlspecialchars((string) ($linQ['materia_nome'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
                             </td>
                             <?php foreach ($semanasCols as $sc):

@@ -450,7 +450,8 @@ class BoletimConfigController extends BaseController
             // Igual ao Configurar Notas: provas/jornada/faltas vêm do evento salvo;
             // o rascunho do assistente só manda fórmula/layout ainda não gravados.
             $regra = $this->mesclarFontesSalvasNaRegraParaSimulacao($regra);
-            // Demonstrativo: matérias soltas (sem group_line). Boletim: agrupado à parte.
+            // Demonstrativo: matérias soltas + linha-mãe do group_line (ex.: Língua Portuguesa)
+            // com filhos aninhados. Boletim: só a linha agrupada.
             $simulacao = $this->simularRegraAluno(
                 $regra,
                 $selectedAlunoId,
@@ -461,10 +462,8 @@ class BoletimConfigController extends BaseController
                 false,
                 true
             );
-            $simulacao = $this->filtrarMatrizDemonstrativoSemPaiAgrupado($simulacao, $regra);
 
             // Vista "Boletim": mesma matriz com group_line forçado (aplicar_em=boletim).
-            // O Demonstrativo mantém matérias soltas; o resumo mostra Língua Portuguesa etc.
             try {
                 $simBoletim = $this->simularRegraAluno(
                     $regra,
@@ -481,6 +480,10 @@ class BoletimConfigController extends BaseController
                 }
             } catch (Throwable $e) {
                 error_log('BoletimConfig simulação boletim agrupado aluno #' . $selectedAlunoId . ': ' . $e->getMessage());
+            }
+
+            if (is_array($simulacao)) {
+                $simulacao = $this->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
             }
 
             // Persistir a simulação como PREVIEW para o aluno selecionado.
@@ -5296,8 +5299,10 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Demonstrativo: remove a matéria-rótulo do group_line (ex.: Língua Portuguesa),
-     * mantendo só as matérias soltas (Leitura, Literatura…). O agrupado fica no Boletim.
+     * Demonstrativo: linha-mãe do group_line (ex.: Língua Portuguesa) com as médias,
+     * seguida das matérias filhas com as notas individuais.
+     *
+     * Mantém o nome público antigo para callers legados.
      *
      * @param array<string,mixed> $simulacao
      * @param array<string,mixed> $regra
@@ -5305,13 +5310,22 @@ class BoletimConfigController extends BaseController
      */
     public function filtrarMatrizDemonstrativoSemPaiAgrupado(array $simulacao, array $regra): array
     {
+        return $this->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
+    }
+
+    /**
+     * @param array<string,mixed> $simulacao
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    public function montarMatrizDemonstrativoComGrupoHierarquico(array $simulacao, array $regra): array
+    {
         $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : null;
         if (!is_array($matriz) || empty($matriz['linhas']) || !is_array($matriz['linhas'])) {
             return $simulacao;
         }
-        $ocultarIds = [];
-        $ocultarNomes = [];
-        $filhosPorGrupo = [];
+
+        $grupos = [];
         foreach ((array) ($regra['componentes'] ?? []) as $comp) {
             if (!is_array($comp)) {
                 continue;
@@ -5320,66 +5334,241 @@ class BoletimConfigController extends BaseController
             if ($grp === null) {
                 continue;
             }
-            $filhos = [];
+            $gk = (string) ($grp['key'] ?? '');
+            if ($gk === '' || isset($grupos[$gk])) {
+                continue;
+            }
+            $filhosIds = [];
             foreach ((array) ($grp['materias_ids'] ?? []) as $midF) {
                 $midF = (int) $midF;
                 if ($midF > 0) {
-                    $filhos[$midF] = true;
+                    $filhosIds[$midF] = $midF;
                 }
             }
-            $filhosPorGrupo[] = $filhos;
-            $labelKey = $this->canonicalMateriaNomeKey((string) ($grp['label'] ?? ''));
-            if ($labelKey !== '') {
-                $ocultarNomes[$labelKey] = true;
+            if (count($filhosIds) < 2) {
+                continue;
             }
+            $label = trim((string) ($grp['label'] ?? ''));
+            if ($label === '') {
+                $label = 'Grupo';
+            }
+            $rotuloIds = [];
             $agId = (int) ($grp['agrupamento_id'] ?? 0);
             if ($agId > 0) {
                 $cad = $this->carregarAgrupamentoCadastro($agId);
                 $rotuloId = (int) ($cad['materia_rotulo_id'] ?? 0);
-                if ($rotuloId > 0 && empty($filhos[$rotuloId])) {
-                    $ocultarIds[$rotuloId] = true;
+                if ($rotuloId > 0 && empty($filhosIds[$rotuloId])) {
+                    $rotuloIds[$rotuloId] = true;
                 }
-                $nomeCad = $this->canonicalMateriaNomeKey((string) ($cad['nome'] ?? ''));
-                if ($nomeCad !== '') {
-                    $ocultarNomes[$nomeCad] = true;
+                $nomeCad = trim((string) ($cad['nome'] ?? ''));
+                if ($nomeCad !== '' && $label === 'Grupo') {
+                    $label = $nomeCad;
                 }
             }
+            $grupos[$gk] = [
+                'key' => $gk,
+                'label' => $label,
+                'label_key' => $this->canonicalMateriaNomeKey($label),
+                'mode' => strtolower(trim((string) ($grp['mode'] ?? 'media'))) === 'soma' ? 'soma' : 'media',
+                'filhos_ids' => $filhosIds,
+                'rotulo_ids' => $rotuloIds,
+            ];
         }
-        if ($ocultarIds === [] && $ocultarNomes === []) {
+        if ($grupos === []) {
             return $simulacao;
         }
-        $linhasNovas = [];
+
+        $linhasBoletim = [];
+        $matrizBol = is_array($simulacao['matriz_materias_boletim'] ?? null)
+            ? $simulacao['matriz_materias_boletim']
+            : null;
+        if (is_array($matrizBol) && is_array($matrizBol['linhas'] ?? null)) {
+            $linhasBoletim = $matrizBol['linhas'];
+        }
+
+        $todosFilhos = [];
+        $rotulosGrupo = [];
+        $rotulosIds = [];
+        foreach ($grupos as $g) {
+            foreach ($g['filhos_ids'] as $midF) {
+                $todosFilhos[(int) $midF] = true;
+            }
+            if ($g['label_key'] !== '') {
+                $rotulosGrupo[$g['label_key']] = true;
+            }
+            foreach ((array) ($g['rotulo_ids'] ?? []) as $rid => $_) {
+                $rotulosIds[(int) $rid] = true;
+            }
+        }
+
+        $linhasPorMid = [];
+        $outras = [];
         foreach ($matriz['linhas'] as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
             $mid = (int) ($linha['materia_id'] ?? 0);
-            // Linha virtual do grupo (mid negativo) não entra no Demonstrativo.
+            // Virtual / rótulo solto: some do flat; a mãe entra pelo bloco do grupo.
             if ($mid < 0) {
                 continue;
             }
-            if ($mid > 0 && isset($ocultarIds[$mid])) {
+            if ($mid > 0 && isset($rotulosIds[$mid])) {
                 continue;
             }
             $nomeKey = $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? ''));
-            if ($nomeKey !== '' && isset($ocultarNomes[$nomeKey])) {
-                $ehFilho = false;
-                foreach ($filhosPorGrupo as $filhos) {
-                    if ($mid > 0 && isset($filhos[$mid])) {
-                        $ehFilho = true;
-                        break;
-                    }
-                }
-                if (!$ehFilho) {
-                    continue;
+            if ($mid > 0 && isset($todosFilhos[$mid])) {
+                $linhasPorMid[$mid] = $linha;
+                continue;
+            }
+            if ($nomeKey !== '' && isset($rotulosGrupo[$nomeKey]) && !isset($todosFilhos[$mid])) {
+                continue;
+            }
+            $outras[] = $linha;
+        }
+
+        $blocos = [];
+        foreach ($outras as $linha) {
+            $blocos[] = [
+                'sort' => $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? '')),
+                'linhas' => [$linha],
+            ];
+        }
+
+        foreach ($grupos as $g) {
+            $filhosLinhas = [];
+            foreach ($g['filhos_ids'] as $midF) {
+                if (isset($linhasPorMid[$midF])) {
+                    $filho = $linhasPorMid[$midF];
+                    $filho['eh_grupo_pai'] = 0;
+                    $filho['eh_grupo_filho'] = 1;
+                    $filho['grupo_pai_nome'] = $g['label'];
+                    $filho['grupo_key'] = $g['key'];
+                    $filhosLinhas[] = $filho;
                 }
             }
-            $linhasNovas[] = $linha;
+            if (count($filhosLinhas) < 2) {
+                foreach ($filhosLinhas as $f) {
+                    unset($f['eh_grupo_pai'], $f['eh_grupo_filho'], $f['grupo_pai_nome'], $f['grupo_key']);
+                    $blocos[] = [
+                        'sort' => $this->canonicalMateriaNomeKey((string) ($f['materia_nome'] ?? '')),
+                        'linhas' => [$f],
+                    ];
+                }
+                continue;
+            }
+            usort($filhosLinhas, function (array $a, array $b): int {
+                $ka = $this->canonicalMateriaNomeKey((string) ($a['materia_nome'] ?? ''));
+                $kb = $this->canonicalMateriaNomeKey((string) ($b['materia_nome'] ?? ''));
+                return $ka <=> $kb;
+            });
+
+            $paiNotas = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
+            if ($paiNotas === null) {
+                $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode']);
+            }
+            $pai = [
+                'materia_id' => 0,
+                'materia_nome' => $g['label'],
+                'notas' => $paiNotas,
+                'eh_grupo_pai' => 1,
+                'eh_grupo_filho' => 0,
+                'grupo_key' => $g['key'],
+                'grupo_filhos_qtd' => count($filhosLinhas),
+            ];
+            $blocos[] = [
+                'sort' => $g['label_key'] !== '' ? $g['label_key'] : 'grupo',
+                'linhas' => array_merge([$pai], $filhosLinhas),
+            ];
+        }
+
+        usort($blocos, static function (array $a, array $b): int {
+            return strcmp((string) ($a['sort'] ?? ''), (string) ($b['sort'] ?? ''));
+        });
+
+        $linhasNovas = [];
+        foreach ($blocos as $bloco) {
+            foreach ((array) ($bloco['linhas'] ?? []) as $lin) {
+                if (is_array($lin)) {
+                    $linhasNovas[] = $lin;
+                }
+            }
         }
         $matriz['linhas'] = $linhasNovas;
         $simulacao['matriz_materias'] = $matriz;
 
         return $simulacao;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhasBoletim
+     * @return array<string,mixed>|null
+     */
+    private function notasLinhaGrupoDoBoletim(array $linhasBoletim, string $label, string $labelKey): ?array
+    {
+        foreach ($linhasBoletim as $lin) {
+            if (!is_array($lin)) {
+                continue;
+            }
+            $nome = trim((string) ($lin['materia_nome'] ?? ''));
+            $nk = $this->canonicalMateriaNomeKey($nome);
+            $matchNome = ($labelKey !== '' && $nk === $labelKey)
+                || ($label !== '' && strcasecmp($nome, $label) === 0);
+            if (!$matchNome) {
+                continue;
+            }
+            $notas = $lin['notas'] ?? null;
+
+            return is_array($notas) ? $notas : [];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $filhos
+     * @return array<string,mixed>
+     */
+    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode): array
+    {
+        $mode = $mode === 'soma' ? 'soma' : 'media';
+        $acc = [];
+        $cnt = [];
+        foreach ($filhos as $lin) {
+            $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
+            foreach ($notas as $cod => $val) {
+                $cod = (string) $cod;
+                if ($cod === '') {
+                    continue;
+                }
+                $ehNq = str_ends_with($cod, '__n') || str_ends_with($cod, '__q');
+                $ehFaltas = stripos($cod, 'falta') !== false;
+                if (!is_numeric($val)) {
+                    continue;
+                }
+                if (!isset($acc[$cod])) {
+                    $acc[$cod] = 0.0;
+                    $cnt[$cod] = 0;
+                }
+                $acc[$cod] += (float) $val;
+                $cnt[$cod]++;
+                if ($ehNq || $ehFaltas) {
+                    // soma — já acumulou
+                }
+            }
+        }
+        $out = [];
+        foreach ($acc as $cod => $soma) {
+            $n = max(1, (int) ($cnt[$cod] ?? 1));
+            $ehNq = str_ends_with((string) $cod, '__n') || str_ends_with((string) $cod, '__q');
+            $ehFaltas = stripos((string) $cod, 'falta') !== false;
+            if ($ehNq || $ehFaltas || $mode === 'soma') {
+                $out[$cod] = $ehNq || $ehFaltas ? (int) round($soma) : round($soma, 2);
+            } else {
+                $out[$cod] = round($soma / $n, 2);
+            }
+        }
+
+        return $out;
     }
 
     /**

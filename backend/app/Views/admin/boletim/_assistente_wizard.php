@@ -2591,7 +2591,12 @@ $boletimWizardSteps = [
             var notas = lin.notas || {};
             var totN = 0;
             var totQ = 0;
-            html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
+            var clsMat = 'mat';
+            if (lin.eh_grupo_pai) clsMat += ' font-bold';
+            if (lin.eh_grupo_filho) clsMat += ' pl-4 text-gray-700';
+            var nomeMat = esc(lin.materia_nome);
+            if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
+            html += '<tr' + (lin.eh_grupo_pai ? ' class="bg-indigo-50/40"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
             semanas.forEach(function (s) {
                 var nq = notaNqPreview(notas, s.codigo);
                 var n = nq.n;
@@ -2618,33 +2623,108 @@ $boletimWizardSteps = [
         return String(nome || '').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
     }
 
-    function agregarNotasLinhas(membros, outras, modo) {
+    function agregarNotasLinhas(membros, outras, modo, semanas) {
         var notas = {};
-        (outras || []).forEach(function (col) {
-            if (!col || !col.codigo) return;
-            var ehFaltas = colunaEhFaltas(col);
+        function agregarCodigo(codigo, forcarSoma) {
+            if (!codigo) return;
             var vals = [];
             (membros || []).forEach(function (lin) {
-                var v = notaDaLinhaPreview((lin && lin.notas) || {}, col.codigo);
+                var v = notaDaLinhaPreview((lin && lin.notas) || {}, codigo);
                 if (v == null || v === '' || v === '—' || v === '-') return;
                 var n = Number(v);
                 if (!isFinite(n)) return;
                 vals.push(n);
             });
             if (!vals.length) {
-                notas[col.codigo] = null;
+                notas[codigo] = null;
                 return;
             }
             var total = vals.reduce(function (a, b) { return a + b; }, 0);
-            if (ehFaltas) {
-                notas[col.codigo] = Math.round(total);
-            } else if (modo === 'soma') {
-                notas[col.codigo] = Math.round(total * 100) / 100;
+            if (forcarSoma || modo === 'soma') {
+                notas[codigo] = Math.round(total * 100) / 100;
             } else {
-                notas[col.codigo] = Math.round((total / vals.length) * 100) / 100;
+                notas[codigo] = Math.round((total / vals.length) * 100) / 100;
+            }
+        }
+        (outras || []).forEach(function (col) {
+            if (!col || !col.codigo) return;
+            agregarCodigo(col.codigo, colunaEhFaltas(col));
+        });
+        (semanas || []).forEach(function (s) {
+            if (!s || !s.codigo) return;
+            var cn = s.codigo + '__n';
+            var cq = s.codigo + '__q';
+            var sumN = 0;
+            var sumQ = 0;
+            var tem = false;
+            (membros || []).forEach(function (lin) {
+                var nq = notaNqPreview((lin && lin.notas) || {}, s.codigo);
+                if (nq.n != null) { sumN += Number(nq.n) || 0; tem = true; }
+                if (nq.q != null) { sumQ += Number(nq.q) || 0; tem = true; }
+            });
+            if (tem) {
+                notas[cn] = sumN;
+                notas[cq] = sumQ;
             }
         });
         return notas;
+    }
+
+    /**
+     * Demonstrativo: mãe (médias) + filhos aninhados. Se o servidor já mandou eh_grupo_pai, mantém.
+     */
+    function linhasDoDemonstrativo(brutas, outras, semanas) {
+        var lista = (brutas || []).slice();
+        if (lista.some(function (l) { return l && l.eh_grupo_pai; })) {
+            return lista;
+        }
+        var gl = (estado && estado.grupo_linha) || {};
+        if (!gl.ativo || !(gl.materias_ids || []).length) {
+            return lista;
+        }
+        var idsGrupo = {};
+        (gl.materias_ids || []).forEach(function (id) {
+            id = Number(id || 0);
+            if (id > 0) idsGrupo[id] = true;
+        });
+        var nomesGrupo = {};
+        (catalogo.materias || []).forEach(function (m) {
+            if (idsGrupo[Number(m.id)]) nomesGrupo[chaveNomeMateria(m.nome)] = true;
+        });
+        var membros = [];
+        var out = [];
+        var pos = -1;
+        lista.forEach(function (lin) {
+            if (!lin) return;
+            var entra = idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)];
+            if (!entra) {
+                out.push(lin);
+                return;
+            }
+            if (pos < 0) {
+                pos = out.length;
+                out.push(null);
+            }
+            membros.push(Object.assign({}, lin, {
+                eh_grupo_filho: 1,
+                eh_grupo_pai: 0,
+                grupo_pai_nome: String(gl.nome || 'Grupo').trim() || 'Grupo'
+            }));
+        });
+        if (membros.length < 2 || pos < 0) return lista;
+        membros.sort(function (a, b) {
+            return chaveNomeMateria(a.materia_nome).localeCompare(chaveNomeMateria(b.materia_nome));
+        });
+        var pai = {
+            materia_id: 0,
+            materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
+            notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', semanas),
+            eh_grupo_pai: 1,
+            eh_grupo_filho: 0
+        };
+        out[pos] = pai;
+        Array.prototype.splice.apply(out, [pos + 1, 0].concat(membros));
+        return out.filter(Boolean);
     }
 
     function ordenarLinhasPorNome(lista) {
@@ -2668,6 +2748,12 @@ $boletimWizardSteps = [
             (pv.tabelas || []).forEach(function (t) {
                 (t.linhas || []).forEach(function (lin) { brutas.push(lin); });
             });
+        }
+        // Se veio hierarquia do Demonstrativo, colapsa para só a mãe (vista Boletim).
+        if (brutas.some(function (l) { return l && l.eh_grupo_pai; })) {
+            return ordenarLinhasPorNome(brutas.filter(function (l) {
+                return l && !l.eh_grupo_filho;
+            }));
         }
         var porId = {};
         var porNome = {};
@@ -2827,6 +2913,11 @@ $boletimWizardSteps = [
         (pv.tabelas || []).forEach(function (t) {
             if (pv.modo === 'boletim' && !(t.grupos || []).length && (pv.grupos || []).length) {
                 t = Object.assign({}, t, { grupos: pv.grupos });
+            }
+            if (vistaPreview !== 'boletim' && !(t.grupos || []).length) {
+                t = Object.assign({}, t, {
+                    linhas: linhasDoDemonstrativo(t.linhas || [], t.outras || [], t.semanas || [])
+                });
             }
             html += htmlTabelaPreview(t);
         });
