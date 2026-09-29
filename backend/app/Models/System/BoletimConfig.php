@@ -3173,6 +3173,10 @@ class BoletimConfig
                     0 AS acertos
                 FROM provas_blocos_notas_lancadas n
                 INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                INNER JOIN provas_blocos_professores pbp_ok
+                  ON pbp_ok.bloco_id = n.bloco_id
+                 AND pbp_ok.professor_id = n.professor_id
+                 AND pbp_ok.materia_id = n.materia_id
                 LEFT JOIN materias m ON m.id = n.materia_id
                 WHERE n.aluno_id = ?
                   AND n.bloco_id IN ($placeholders)
@@ -3258,11 +3262,11 @@ class BoletimConfig
                     0 AS acertos
                 FROM provas_blocos_notas_lancadas n
                 INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
-                LEFT JOIN materias m ON m.id = n.materia_id
-                LEFT JOIN provas_blocos_professores pbp
+                INNER JOIN provas_blocos_professores pbp
                   ON pbp.bloco_id = n.bloco_id
                  AND pbp.professor_id = n.professor_id
                  AND pbp.materia_id = n.materia_id
+                LEFT JOIN materias m ON m.id = n.materia_id
                 LEFT JOIN materias m2 ON m2.id = pbp.materia_id
                 WHERE n.aluno_id IN ($phAlunos)
                   AND n.bloco_id IN ($phBlocos)

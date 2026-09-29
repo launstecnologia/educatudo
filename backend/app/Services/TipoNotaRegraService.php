@@ -379,13 +379,21 @@ class TipoNotaRegraService
         $out = [];
 
         try {
+            // Só conta lançamento com vínculo real no bloco (igual ao progresso do manage).
+            // Notas órfãs (professor/matéria fora da pauta) geravam Prova Bim fantasma
+            // — ex.: Português = 4 com manage 0/181.
             $manuais = $this->db->fetchAll(
                 "SELECT n.bloco_id, n.professor_id, n.materia_id, n.nota,
                         COALESCE(n.updated_at, n.created_at) AS quando
                  FROM provas_blocos_notas_lancadas n
+                 INNER JOIN provas_blocos_professores pbp
+                   ON pbp.bloco_id = n.bloco_id
+                  AND pbp.professor_id = n.professor_id
+                  AND pbp.materia_id = n.materia_id
                  WHERE n.aluno_id = :aluno
                    AND n.bloco_id IN ($in)
-                   AND n.nota IS NOT NULL",
+                   AND n.nota IS NOT NULL
+                   AND n.materia_id > 0",
                 $params
             ) ?: [];
             foreach ($manuais as $row) {
@@ -428,11 +436,15 @@ class TipoNotaRegraService
             $stats = $this->estatisticasQuestoes($alunoId, $online);
             foreach ($online as $row) {
                 $provaId = (int) ($row['prova_id'] ?? 0);
+                $mid = (int) ($row['materia_id'] ?? 0);
+                if ($mid <= 0) {
+                    continue;
+                }
                 $st = $stats[$provaId] ?? ['acertos' => 0, 'questoes' => 0];
                 $out[] = [
                     'bloco_id' => (int) ($row['bloco_id'] ?? 0),
                     'professor_id' => (int) ($row['professor_id'] ?? 0),
-                    'materia_id' => (int) ($row['materia_id'] ?? 0),
+                    'materia_id' => $mid,
                     'nota' => isset($row['nota']) && $row['nota'] !== null ? (float) $row['nota'] : null,
                     'acertos' => (int) $st['acertos'],
                     'questoes' => (int) $st['questoes'],

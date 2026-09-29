@@ -4872,6 +4872,12 @@ class BoletimConfigController extends BaseController
         }
 
         foreach ($basePorBloco as $blocoId => $base) {
+            $midsJaComNota = array_keys($temLinhaPorBlocoMateria[$blocoId] ?? []);
+            // Bloco já lançado por matéria (Leitura=1, Literatura=3…): não clona a
+            // base para Português vazio — isso inventava Prova Bim fantasma.
+            if (count($midsJaComNota) > 1) {
+                continue;
+            }
             $candidatos = array_keys($materiasDoBloco[$blocoId] ?? []);
             if ($candidatos === []) {
                 // Sem vínculo explícito no resultado: limita ao filtro do componente.
