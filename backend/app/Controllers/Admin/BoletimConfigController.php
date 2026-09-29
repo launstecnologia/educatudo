@@ -2979,15 +2979,66 @@ class BoletimConfigController extends BaseController
                 $out['materia_unica'] = 1;
             }
 
-            $blocosDraft = $this->idsBlocosDoComponente($comp);
-            $blocosSalvo = $this->idsBlocosDoComponente($salvaComp);
-            if ($blocosSalvo !== []) {
-                $out['blocos_ids'] = implode(',', $blocosSalvo);
-            } elseif ($blocosDraft !== []) {
-                $out['blocos_ids'] = implode(',', $blocosDraft);
-            }
-            if (!empty($comp['filtro_titulo']) && empty($out['filtro_titulo'])) {
-                $out['filtro_titulo'] = $comp['filtro_titulo'];
+            // Semana do quadro: igual ao assistente — tipo + busca dinâmica por semana.
+            // blocos_ids fixos (snapshot) deixam S1/S3 vazios quando a lista não cobre a semana.
+            // Exceção: seleção manual explícita (blocos_ids_manual) — mantém os IDs.
+            if ($ehSemana) {
+                $tipoSemana = (int) ($cfg['tipo_avaliacao_id'] ?? 0);
+                if ($tipoSemana <= 0) {
+                    $tipoSemana = (int) ($cfgDraft['tipo_avaliacao_id'] ?? $comp['tipo_avaliacao_id'] ?? 0);
+                }
+                if ($tipoSemana <= 0 && is_array($fonteSemanal)) {
+                    $cfgFs = $this->decodeComponenteConfig($fonteSemanal);
+                    $tipoSemana = (int) ($cfgFs['tipo_avaliacao_id'] ?? $fonteSemanal['tipo_avaliacao_id'] ?? 0);
+                    if ($tipoSemana > 0) {
+                        $cfg['tipo_avaliacao_id'] = $tipoSemana;
+                        if (!empty($cfgFs['tipo_avaliacao_nome'])) {
+                            $cfg['tipo_avaliacao_nome'] = $cfgFs['tipo_avaliacao_nome'];
+                        }
+                    }
+                }
+                $manualBlocos = !empty($cfg['blocos_ids_manual']) || !empty($cfgDraft['blocos_ids_manual']);
+                if ($manualBlocos) {
+                    $cfg['blocos_ids_manual'] = 1;
+                    $blocosDraft = $this->idsBlocosDoComponente($comp);
+                    $blocosSalvo = $this->idsBlocosDoComponente($salvaComp);
+                    if ($blocosDraft !== []) {
+                        $out['blocos_ids'] = implode(',', $blocosDraft);
+                    } elseif ($blocosSalvo !== []) {
+                        $out['blocos_ids'] = implode(',', $blocosSalvo);
+                    }
+                } elseif ($tipoSemana > 0) {
+                    $cfg['tipo_avaliacao_id'] = $tipoSemana;
+                    $out['tipo_avaliacao_id'] = $tipoSemana;
+                    $out['blocos_ids'] = '';
+                    unset($out['bloco_id']);
+                    $out['filtro_titulo'] = '';
+                } else {
+                    $blocosDraft = $this->idsBlocosDoComponente($comp);
+                    $blocosSalvo = $this->idsBlocosDoComponente($salvaComp);
+                    if ($blocosSalvo !== []) {
+                        $out['blocos_ids'] = implode(',', $blocosSalvo);
+                    } elseif ($blocosDraft !== []) {
+                        $out['blocos_ids'] = implode(',', $blocosDraft);
+                    }
+                }
+                if ($tipoSemana > 0) {
+                    $cfg['tipo_avaliacao_id'] = $tipoSemana;
+                    $out['tipo_avaliacao_id'] = $tipoSemana;
+                }
+                $out['usar_percentual'] = 1;
+                $out['materia_unica'] = 1;
+            } else {
+                $blocosDraft = $this->idsBlocosDoComponente($comp);
+                $blocosSalvo = $this->idsBlocosDoComponente($salvaComp);
+                if ($blocosSalvo !== []) {
+                    $out['blocos_ids'] = implode(',', $blocosSalvo);
+                } elseif ($blocosDraft !== []) {
+                    $out['blocos_ids'] = implode(',', $blocosDraft);
+                }
+                if (!empty($comp['filtro_titulo']) && empty($out['filtro_titulo'])) {
+                    $out['filtro_titulo'] = $comp['filtro_titulo'];
+                }
             }
 
             $out['config'] = $cfg;
@@ -3001,7 +3052,7 @@ class BoletimConfigController extends BaseController
             $componentes[] = $out;
         }
         if ($componentes !== []) {
-            $regra['componentes'] = $componentes;
+            $regra['componentes'] = $this->enriquecerSemanasComFonteSemanal($componentes, $componentes);
         }
         if ($this->grupoRegrasNotasIdDaRegra($regra) <= 0) {
             $gid = $this->grupoRegrasNotasIdDaRegra($salva);
@@ -8047,7 +8098,8 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Garante que cada coluna sN tenha tipo_avaliacao / blocos herdados da peça semanal.
+     * Garante que cada coluna sN resolva provas como no assistente:
+     * tipo Semanal + semana no config, sem blocos_ids fixos.
      *
      * @param list<array<string,mixed>> $novos
      * @param list<array<string,mixed>> $originais
@@ -8056,30 +8108,55 @@ class BoletimConfigController extends BaseController
     private function enriquecerSemanasComFonteSemanal(array $novos, array $originais): array
     {
         $template = null;
-        foreach ($originais as $c) {
-            if (is_array($c) && $this->componenteEhFonteSemanalSalva($c)) {
+        $tipoTpl = 0;
+        $tipoNomeTpl = '';
+        $cfgTplExtra = [];
+        foreach (array_merge($originais, $novos) as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if ($template === null && $this->componenteEhFonteSemanalSalva($c)) {
                 $template = $c;
-                break;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if (!BoletimQuadroLayoutHelper::codigoEhSemana($cod) && $cod !== 'semanal' && $cod !== 'prova_semanal') {
+                continue;
+            }
+            $cfgC = $this->decodeComponenteConfig($c);
+            $t = (int) ($cfgC['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
+            if ($t > 0 && $tipoTpl <= 0) {
+                $tipoTpl = $t;
+                $tipoNomeTpl = trim((string) ($cfgC['tipo_avaliacao_nome'] ?? $c['tipo_avaliacao_nome'] ?? ''));
+                foreach (['prova_bimestres', 'grupo_regras_tipo_id', 'grupo_regras_marca_id'] as $chave) {
+                    if (!empty($cfgC[$chave])) {
+                        $cfgTplExtra[$chave] = $cfgC[$chave];
+                    }
+                }
             }
         }
-        if ($template === null) {
-            foreach ($novos as $c) {
-                if (!is_array($c)) {
-                    continue;
-                }
-                $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-                if ($cod === 'semanal' || $cod === 'prova_semanal') {
-                    $template = $c;
-                    break;
+        if ($template !== null) {
+            $cfgTpl = $this->decodeComponenteConfig($template);
+            if ($tipoTpl <= 0) {
+                $tipoTpl = (int) ($cfgTpl['tipo_avaliacao_id'] ?? $template['tipo_avaliacao_id'] ?? 0);
+                $tipoNomeTpl = trim((string) ($cfgTpl['tipo_avaliacao_nome'] ?? $template['tipo_avaliacao_nome'] ?? ''));
+            }
+            foreach (['prova_bimestres', 'grupo_regras_tipo_id', 'grupo_regras_marca_id'] as $chave) {
+                if (empty($cfgTplExtra[$chave]) && !empty($cfgTpl[$chave])) {
+                    $cfgTplExtra[$chave] = $cfgTpl[$chave];
                 }
             }
         }
-        if ($template === null) {
+        if ($tipoTpl <= 0) {
+            $cat = $this->resolverTipoAvaliacaoSemanalCatalogo();
+            $tipoTpl = (int) ($cat['id'] ?? 0);
+            if ($tipoNomeTpl === '' && !empty($cat['nome'])) {
+                $tipoNomeTpl = (string) $cat['nome'];
+            }
+        }
+        if ($tipoTpl <= 0) {
             return $novos;
         }
-        $cfgTpl = $this->decodeComponenteConfig($template);
-        $blocosTpl = $this->idsBlocosDoComponente($template);
-        $tipoTpl = (int) ($cfgTpl['tipo_avaliacao_id'] ?? $template['tipo_avaliacao_id'] ?? 0);
+
         $out = [];
         foreach ($novos as $c) {
             if (!is_array($c)) {
@@ -8091,26 +8168,34 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             $cfg = $this->decodeComponenteConfig($c);
-            $tipoAtual = (int) ($cfg['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
-            if ($tipoAtual <= 0 && $tipoTpl > 0) {
-                $cfg['tipo_avaliacao_id'] = $tipoTpl;
-                if (!empty($cfgTpl['tipo_avaliacao_nome'])) {
-                    $cfg['tipo_avaliacao_nome'] = $cfgTpl['tipo_avaliacao_nome'];
+            $cfg['tipo_avaliacao_id'] = $tipoTpl;
+            if ($tipoNomeTpl !== '') {
+                $cfg['tipo_avaliacao_nome'] = $tipoNomeTpl;
+            }
+            foreach ($cfgTplExtra as $chave => $val) {
+                if (empty($cfg[$chave])) {
+                    $cfg[$chave] = $val;
                 }
             }
-            foreach (['prova_bimestres', 'grupo_regras_tipo_id', 'grupo_regras_marca_id'] as $chave) {
-                if (empty($cfg[$chave]) && !empty($cfgTpl[$chave])) {
-                    $cfg[$chave] = $cfgTpl[$chave];
+            if (!isset($cfg['semana']) || (int) $cfg['semana'] <= 0) {
+                if (preg_match('/^s([1-9]|[1-9]\d)$/', $cod, $mSem)) {
+                    $cfg['semana'] = (int) $mSem[1];
                 }
             }
-            if ($this->idsBlocosDoComponente($c) === [] && $blocosTpl !== []) {
-                $c['blocos_ids'] = implode(',', $blocosTpl);
+            $cfg['layout_type'] = $cfg['layout_type'] ?? 'semana_nq';
+
+            $manualBlocos = !empty($cfg['blocos_ids_manual']);
+            if (!$manualBlocos) {
+                // Mesmo contrato do assistente (componenteSemanaQuadro): busca por tipo+semana.
+                $c['blocos_ids'] = '';
+                unset($c['bloco_id']);
+                $c['filtro_titulo'] = '';
             }
-            if (empty($c['filtro_titulo']) && !empty($template['filtro_titulo'])) {
-                $c['filtro_titulo'] = $template['filtro_titulo'];
-            }
-            if (!isset($c['usar_percentual'])) {
-                $c['usar_percentual'] = 1;
+            $c['usar_percentual'] = 1;
+            $c['materia_unica'] = 1;
+            $c['tipo_avaliacao_id'] = $tipoTpl;
+            if ($tipoNomeTpl !== '') {
+                $c['tipo_avaliacao_nome'] = $tipoNomeTpl;
             }
             $c['config'] = $cfg;
             $c['config_json'] = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -8118,6 +8203,49 @@ class BoletimConfigController extends BaseController
         }
 
         return $out;
+    }
+
+    /**
+     * @return array{id:int,nome:string}
+     */
+    private function resolverTipoAvaliacaoSemanalCatalogo(): array
+    {
+        static $cache = null;
+        if (is_array($cache)) {
+            return $cache;
+        }
+        $cache = ['id' => 0, 'nome' => ''];
+        try {
+            if (!class_exists('ExamEvaluationType', false)) {
+                require_once dirname(__DIR__, 2) . '/Models/Exams/ExamEvaluationType.php';
+            }
+            if (!class_exists('ExamEvaluationType', false)) {
+                return $cache;
+            }
+            $fallbackNome = null;
+            foreach ((new ExamEvaluationType())->getAllActive() as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $chave = strtolower(trim((string) ($row['chave_quadro'] ?? '')));
+                $nome = trim((string) ($row['nome'] ?? ''));
+                if ($chave === 'semanal') {
+                    $cache = ['id' => $id, 'nome' => $nome !== '' ? $nome : 'Semanal'];
+                    break;
+                }
+                if ($fallbackNome === null && str_contains(mb_strtolower($nome, 'UTF-8'), 'semanal')) {
+                    $fallbackNome = ['id' => $id, 'nome' => $nome !== '' ? $nome : 'Semanal'];
+                }
+            }
+            if (($cache['id'] ?? 0) <= 0 && is_array($fallbackNome)) {
+                $cache = $fallbackNome;
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimConfig tipo semanal catálogo: ' . $e->getMessage());
+        }
+
+        return $cache;
     }
 
     /**
@@ -8348,6 +8476,9 @@ class BoletimConfigController extends BaseController
         $semanaComp = $this->parseSemanaFromComponente($componente);
         $tipoAvaliacaoComp = $this->parseTipoAvaliacaoIdFromComponente($componente);
         $semanaForcada = $semanaComp >= 1 && $semanaComp <= BoletimQuadroLayoutHelper::SEMANA_MAX;
+        if ($semanaForcada && $tipoAvaliacaoComp <= 0) {
+            $tipoAvaliacaoComp = (int) ($this->resolverTipoAvaliacaoSemanalCatalogo()['id'] ?? 0);
+        }
         if (!$semanaForcada) {
             if ($blocoIds !== [] && $bimestresComp !== []) {
                 $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
