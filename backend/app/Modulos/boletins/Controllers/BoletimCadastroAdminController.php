@@ -368,7 +368,7 @@ class BoletimCadastroAdminController extends AdminBaseController
         }
 
         $this->viewWithLayout('admin', 'admin/boletins/gerar-boletins', [
-            'title' => ($abrirSimular ? 'Simular boletim' : 'Gerar boletins') . ' — EducaTudo',
+            'title' => 'Notas / Boletins — EducaTudo',
             'user' => $this->auth->getUser(),
             'current_page' => 'boletins',
             'boletim' => $item,

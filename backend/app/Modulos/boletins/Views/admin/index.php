@@ -81,13 +81,9 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center shrink-0"></i> Editar
                         </a>
-                        <a href="<?= URL ?>/admin/boletins/<?= (int) $item['id'] ?>/simular"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">
-                            <i class="fa-solid fa-flask text-gray-400 w-4 text-center shrink-0"></i> Simular boletim
-                        </a>
                         <a href="<?= URL ?>/admin/boletins/<?= (int) $item['id'] ?>/gerar-boletins"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">
-                            <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center shrink-0"></i> Gerar boletins
+                            <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center shrink-0"></i> Notas / Boletins
                         </a>
                         <a href="<?= URL ?>/admin/reports/boletim-coordenacao?fonte=vida_escolar<?= !empty($item['ano_letivo']) ? '&amp;ano_letivo=' . (int) $item['ano_letivo'] : '' ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">

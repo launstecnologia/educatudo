@@ -15,13 +15,29 @@ $dataFim = (string) ($data_fim ?? '');
 $geracaoEmAndamento = !empty($geracao_em_andamento);
 $abrirSimular = !empty($abrir_simular);
 $retornoPath = '/admin/boletins/' . $boletimId . '/gerar-boletins?regra_id=' . $selectedRegraId;
+$boletimNome = trim((string) ($boletim['nome'] ?? ''));
+$eventoNome = is_array($regra) ? trim((string) ($regra['nome'] ?? '')) : '';
+$bimestreEv = is_array($regra) ? (int) ($regra['bimestre'] ?? 0) : 0;
 
-$page_header_title = $abrirSimular ? 'Simular boletim' : 'Gerar boletins';
-$page_header_subtitle = (string) ($boletim['nome'] ?? '');
 $page_header_back_url = URL . '/admin/boletins';
+$page_header_title = 'Notas / Boletins';
+$page_header_subtitle_html = 'Modelo: <strong>' . htmlspecialchars($boletimNome !== '' ? $boletimNome : '—', ENT_QUOTES, 'UTF-8') . '</strong>'
+    . ' · Simule um aluno e gere o boletim do período.';
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_form.php';
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 ?>
+
+<nav class="mb-5 text-sm text-gray-500" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1.5">
+        <li><a href="<?= URL ?>/admin/boletins" class="hover:text-gray-800 hover:underline">Modelo de Boletim</a></li>
+        <li aria-hidden="true" class="text-gray-300">/</li>
+        <li class="text-gray-800 font-medium">Notas / Boletins</li>
+        <?php if ($abrirSimular): ?>
+        <li aria-hidden="true" class="text-gray-300">/</li>
+        <li class="text-gray-800 font-medium">Simular</li>
+        <?php endif; ?>
+    </ol>
+</nav>
 
 <?php if ($eventos === []): ?>
 <div class="bg-white rounded-xl shadow-lg p-6 w-full">
@@ -30,21 +46,22 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         <div class="mt-3 flex flex-wrap gap-2">
             <a href="<?= URL ?>/admin/boletim-configuracao/assistente?boletim_id=<?= $boletimId ?>&amp;voltar=boletins"
                class="inline-flex items-center px-4 py-2 border border-amber-300 rounded-lg text-sm font-medium bg-white hover:bg-amber-50">
-                Fórmulas
+                <i class="fa-solid fa-table mr-2"></i>Fórmulas
             </a>
             <a href="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-avaliacoes"
                class="inline-flex items-center px-4 py-2 border border-amber-300 rounded-lg text-sm font-medium bg-white hover:bg-amber-50">
-                Gerar avaliações do ano
+                <i class="fa-solid fa-calendar-plus mr-2"></i>Gerar avaliações do ano
             </a>
         </div>
     </div>
 </div>
 <?php else: ?>
+
 <div class="bg-white rounded-xl shadow-lg p-6 w-full mb-6">
-    <form method="GET" action="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-boletins" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
+    <form method="GET" action="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-boletins" class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
+        <div class="lg:col-span-2">
             <label for="regra_id" class="block text-sm font-medium text-gray-700 mb-2">Evento de notas</label>
-            <select name="regra_id" id="regra_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white" onchange="this.form.submit()">
+            <select name="regra_id" id="regra_id" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white" onchange="this.form.submit()">
                 <?php foreach ($eventos as $ev): ?>
                     <?php $evId = (int) ($ev['id'] ?? 0); ?>
                     <option value="<?= $evId ?>" <?= $evId === $selectedRegraId ? 'selected' : '' ?>>
@@ -54,41 +71,61 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="flex items-end">
-            <p class="text-sm text-gray-500">
-                Período <?= htmlspecialchars($dataInicio, ENT_QUOTES, 'UTF-8') ?>
-                a <?= htmlspecialchars($dataFim, ENT_QUOTES, 'UTF-8') ?>
-            </p>
+        <div>
+            <span class="block text-sm font-medium text-gray-700 mb-2">Período</span>
+            <div class="inline-flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 w-full">
+                <i class="fa-regular fa-calendar text-gray-400" aria-hidden="true"></i>
+                <span>
+                    <?= htmlspecialchars($dataInicio, ENT_QUOTES, 'UTF-8') ?>
+                    <span class="text-gray-400">→</span>
+                    <?= htmlspecialchars($dataFim, ENT_QUOTES, 'UTF-8') ?>
+                </span>
+            </div>
         </div>
     </form>
+    <?php if ($eventoNome !== '' || $bimestreEv > 0): ?>
+    <p class="mt-3 text-xs text-gray-500">
+        <?php if ($eventoNome !== ''): ?>
+            Evento selecionado: <span class="font-medium text-gray-700"><?= htmlspecialchars($eventoNome, ENT_QUOTES, 'UTF-8') ?></span>
+        <?php endif; ?>
+        <?php if ($bimestreEv > 0): ?>
+            · <?= $bimestreEv ?>º bimestre
+        <?php endif; ?>
+    </p>
+    <?php endif; ?>
 </div>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 w-full">
-    <div class="px-5 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-            <h2 class="text-lg font-semibold text-gray-900">Geração em lote</h2>
-            <p class="text-sm text-gray-500 mt-1">Simule um aluno e depois gere o período. Alunos travados não entram.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-full flex flex-col">
+        <div class="flex items-start gap-3 mb-4">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                <i class="fa-solid fa-flask" aria-hidden="true"></i>
+            </span>
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Simular boletim</h2>
+                <p class="text-sm text-gray-500 mt-0.5">Confira um aluno (Demonstrativo com filhas de Língua Portuguesa) ou valide um lote sem gravar.</p>
+            </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="mt-auto">
             <button type="button" id="btn-abrir-conferir-boletim"
-                    class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
-                <i class="fa-solid fa-flask mr-2"></i>Simular boletim
+                    class="btn-primary-custom inline-flex items-center justify-center w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                <i class="fa-solid fa-user-check mr-2" aria-hidden="true"></i>
+                Escolher aluno / simular lote
             </button>
-            <?php if ($geracaoEmAndamento): ?>
-            <a href="<?= URL ?>/admin/boletim"
-               class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                Ver status
-            </a>
-            <?php elseif ($selectedRegraId > 0): ?>
-            <button type="submit" form="form-gerar-lote-boletim"
-                    class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
-                Gerar boletins
-            </button>
-            <?php endif; ?>
         </div>
     </div>
-    <div class="p-5 space-y-4">
-        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" id="form-gerar-lote-boletim" class="space-y-3">
+
+    <div class="bg-white rounded-xl shadow-lg p-6 w-full flex flex-col">
+        <div class="flex items-start gap-3 mb-4">
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600 shrink-0">
+                <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+            </span>
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Gerar boletins</h2>
+                <p class="text-sm text-gray-500 mt-0.5">Gera o período em segundo plano. Alunos travados não entram. O histórico fica guardado.</p>
+            </div>
+        </div>
+        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" id="form-gerar-lote-boletim" class="mt-auto space-y-3">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="regra_id" value="<?= $selectedRegraId ?>">
             <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef, ENT_QUOTES, 'UTF-8') ?>">
@@ -99,14 +136,23 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <input type="checkbox" id="incluir-novos-boletim" name="incluir_novos" value="1" class="mt-1 w-4 h-4 rounded border-gray-300" checked>
                 <span>Incluir alunos que ainda não têm boletim neste período</span>
             </label>
-            <p class="text-xs text-gray-500">Nova versão vigente; o histórico fica guardado. Roda em segundo plano.</p>
             <?php if ($geracaoEmAndamento): ?>
             <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
+            <a href="<?= URL ?>/admin/boletim"
+               class="inline-flex items-center justify-center w-full sm:w-auto px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                Ver status
+            </a>
+            <?php elseif ($selectedRegraId > 0): ?>
+            <button type="submit"
+                    class="btn-primary-custom inline-flex items-center justify-center w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                <i class="fa-solid fa-play mr-2" aria-hidden="true"></i>
+                Gerar boletins do período
+            </button>
             <?php endif; ?>
+            <p class="text-xs text-gray-500">
+                <a href="<?= URL ?>/admin/boletim-configuracao/gerados" class="text-blue-700 hover:underline">Ver boletins gerados</a>
+            </p>
         </form>
-        <p class="text-xs text-gray-500">
-            <a href="<?= URL ?>/admin/boletim-configuracao/gerados" class="hover:underline">Ver boletins gerados</a>
-        </p>
     </div>
 </div>
 
@@ -115,13 +161,21 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 $matrizSim = $simulacao['matriz_materias'] ?? null;
 $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
 $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
+$alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
 ?>
-<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-    <div class="px-5 py-4 border-b border-gray-200">
-        <h2 class="text-lg font-semibold text-gray-900">Resultado da simulação</h2>
-        <p class="text-sm text-gray-500 mt-1">
-            Aluno: <strong><?= htmlspecialchars((string) (($simulacao['aluno']['nome'] ?? '-')), ENT_QUOTES, 'UTF-8') ?></strong>
-        </p>
+<div class="bg-white rounded-xl shadow-lg overflow-hidden w-full">
+    <div class="px-6 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-900">Resultado da simulação</h2>
+            <p class="text-sm text-gray-500 mt-0.5">
+                Aluno: <strong class="text-gray-800"><?= htmlspecialchars($alunoSimNome !== '' ? $alunoSimNome : '—', ENT_QUOTES, 'UTF-8') ?></strong>
+            </p>
+        </div>
+        <button type="button" onclick="abrirConferirBoletim()"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <i class="fa-solid fa-user mr-2 text-gray-400" aria-hidden="true"></i>
+            Trocar aluno
+        </button>
     </div>
     <div class="p-5 overflow-x-auto">
         <?php
@@ -198,17 +252,21 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
 
 <div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharConferirBoletim()"></div>
 <aside id="boletimConferirDrawer"
-       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
-    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
-        <h2 class="text-xl font-bold text-gray-900">Simular boletim</h2>
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Notas / Boletins</p>
+            <h2 class="text-xl font-bold text-gray-900">Simular boletim</h2>
+        </div>
         <button type="button" onclick="fecharConferirBoletim()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
-    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
-        <section>
-            <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Ver um aluno</h3>
+    <div class="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+        <section class="bg-gray-50 rounded-xl border border-gray-200 p-4">
+            <h3 class="text-sm font-semibold text-gray-900 mb-1">Ver um aluno</h3>
+            <p class="text-xs text-gray-500 mb-4">Mostra o Demonstrativo (com filhas) e a vista Boletim.</p>
             <form method="GET" action="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-boletins" class="space-y-4">
                 <input type="hidden" name="regra_id" value="<?= $selectedRegraId ?>">
                 <input type="hidden" name="simular" value="1">
@@ -222,12 +280,14 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm">Ver simulação</button>
+                <button type="submit" class="btn-primary-custom w-full px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm">
+                    Ver simulação
+                </button>
             </form>
         </section>
         <section>
-            <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Simular lote</h3>
-            <p class="text-sm text-gray-500 mb-4">Valida até 60 alunos sem gravar. A turma é opcional.</p>
+            <h3 class="text-sm font-semibold text-gray-900 mb-1">Simular lote</h3>
+            <p class="text-xs text-gray-500 mb-4">Valida até 60 alunos sem gravar. A turma é opcional.</p>
             <div class="space-y-4">
                 <div>
                     <label for="lote-turma-id" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
@@ -238,13 +298,15 @@ $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matriz
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <button type="button" id="btn-simular-lote" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm text-sm">Simular lote</button>
+                <button type="button" id="btn-simular-lote" class="inline-flex items-center justify-center w-full px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Simular lote
+                </button>
                 <div id="lote-resultado" class="hidden max-h-72 overflow-y-auto border border-gray-200 rounded-lg bg-white"></div>
             </div>
         </section>
     </div>
-    <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex justify-end">
-        <button type="button" onclick="fecharConferirBoletim()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Fechar</button>
+    <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <button type="button" onclick="fecharConferirBoletim()" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Fechar</button>
     </div>
 </aside>
 
