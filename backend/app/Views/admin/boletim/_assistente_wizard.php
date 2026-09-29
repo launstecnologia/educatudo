@@ -152,13 +152,13 @@ $boletimWizardSteps = [
 .bw-canvas-ph { width: 100%; font-size: 12px; color: #94a3b8; padding: 18px 8px; text-align: center; }
 .bw-preview-table { border-collapse: collapse; width: 100%; font-size: 11px; text-align: center; }
 .bw-preview-table thead th { position: sticky; top: 0; z-index: 1; }
-.bw-preview-table th { background: #1f2937; color: #fff; border: 1px solid #111827; padding: 4px 6px; font-weight: 600; }
-.bw-preview-table th.sub { background: #374151; }
+.bw-preview-table th { background: #4f46e5; color: #fff; border: 1px solid #4338ca; padding: 4px 6px; font-weight: 600; }
+.bw-preview-table th.sub { background: #6366f1; }
 .bw-preview-table td { border: 1px solid #d1d5db; padding: 3px 5px; }
 .bw-preview-table td.mat { text-align: left; font-weight: 600; color: #111827; white-space: nowrap; }
 .bw-preview-table tr:nth-child(even) td { background: #f3f4f6; }
-.bw-preview-table.boletim th { background: #334155; color: #fff; border-color: #1e293b; text-transform: uppercase; letter-spacing: .02em; }
-.bw-preview-table.boletim th.sub { background: #fde68a; color: #334155; text-transform: none; font-weight: 700; }
+.bw-preview-table.boletim th { background: #4f46e5; color: #fff; border-color: #4338ca; text-transform: uppercase; letter-spacing: .02em; }
+.bw-preview-table.boletim th.sub { background: #e0e7ff; color: #3730a3; text-transform: none; font-weight: 700; }
 .bw-preview-table.boletim th.mat { text-transform: none; letter-spacing: 0; }
 .bw-preview-table.boletim tr:nth-child(even) td { background: #f8fafc; }
 .bw-preview-table.boletim td.ok { color: #047857; font-weight: 700; }
@@ -2141,10 +2141,19 @@ $boletimWizardSteps = [
         return Math.abs(h);
     }
 
+    function colunaEhFaltas(col) {
+        if (!col) return false;
+        if ((col.layout_type || '') === 'faltas') return true;
+        if ((col.source_type || '') === 'faltas_evento') return true;
+        var cod = String(col.codigo || '').toLowerCase();
+        var nome = String(col.nome || '').toLowerCase();
+        return cod.indexOf('falta') >= 0 || nome.indexOf('falta') >= 0;
+    }
+
     function fmtPreviewCelula(v, col) {
         var lt = (col && col.layout_type) || '';
         if (lt === 'resultado' && typeof v === 'string') return esc(v);
-        if (lt === 'faltas') {
+        if (colunaEhFaltas(col)) {
             if (v == null || v === '' || v === '—') return '—';
             var nf = Number(v);
             if (!isFinite(nf)) return '—';
@@ -2450,8 +2459,8 @@ $boletimWizardSteps = [
             return { key: p.key, label: p.label };
         });
         var tabelas = temSemanal ? [
-            { key: 'a', titulo: 'Matérias Bloco A', subtitulo: 'Prova semanal', semanas: semanasA, outras: outras, linhas: matsA.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasA) }; }) },
-            { key: 'b', titulo: 'Matérias Bloco B', subtitulo: 'Prova semanal', semanas: semanasB, outras: outras, linhas: matsB.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasB) }; }) }
+            { key: 'a', titulo: 'Matérias Bloco A', subtitulo: '', semanas: semanasA, outras: outras, linhas: matsA.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasA) }; }) },
+            { key: 'b', titulo: 'Matérias Bloco B', subtitulo: '', semanas: semanasB, outras: outras, linhas: matsB.map(function (n) { return { materia_nome: n, notas: notasLinha(n, semanasB) }; }) }
         ] : [
             { key: 'u', titulo: 'Matérias', subtitulo: 'Exemplo', semanas: [], outras: outras, linhas: mats.map(function (n) { return { materia_nome: n, notas: notasLinha(n, []) }; }) }
         ];
@@ -2546,7 +2555,7 @@ $boletimWizardSteps = [
         });
         if (semanas.length) html += '<th colspan="2">Total</th>';
         outras.forEach(function (o) {
-            var extra = (o.layout_type === 'faltas' || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
+            var extra = (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
             html += '<th rowspan="2">' + esc(o.nome || o.codigo) + extra + '</th>';
         });
         html += '</tr><tr>';
@@ -2568,7 +2577,7 @@ $boletimWizardSteps = [
             });
             if (semanas.length) html += '<td><strong>' + totN + '</strong></td><td><strong>' + totQ + '</strong></td>';
             outras.forEach(function (o) {
-                html += '<td>' + fmtPreviewNota(notaDaLinhaPreview(notas, o.codigo)) + '</td>';
+                html += '<td>' + fmtPreviewCelula(notaDaLinhaPreview(notas, o.codigo), o) + '</td>';
             });
             html += '</tr>';
         });
@@ -2588,7 +2597,7 @@ $boletimWizardSteps = [
         var notas = {};
         (outras || []).forEach(function (col) {
             if (!col || !col.codigo) return;
-            var ehFaltas = col.layout_type === 'faltas';
+            var ehFaltas = colunaEhFaltas(col);
             var vals = [];
             (membros || []).forEach(function (lin) {
                 var v = notaDaLinhaPreview((lin && lin.notas) || {}, col.codigo);
@@ -2731,7 +2740,7 @@ $boletimWizardSteps = [
         html += '<table class="bw-preview-table"><thead><tr>';
         html += '<th class="text-left">Matéria</th>';
         outras.forEach(function (o) {
-            var extra = (o.layout_type === 'faltas' || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
+            var extra = (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
             html += '<th>' + esc(o.nome || o.codigo) + extra + '</th>';
         });
         html += '</tr></thead><tbody>';

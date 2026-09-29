@@ -516,7 +516,7 @@ class BoletimAssistenteController extends BaseController
                 $tabelas[] = [
                     'key' => 'a',
                     'titulo' => 'Matérias Bloco A',
-                    'subtitulo' => 'Prova semanal',
+                    'subtitulo' => '',
                     'semanas' => $semanasA,
                     'outras' => $outras,
                     'linhas' => $linhas,
@@ -526,7 +526,7 @@ class BoletimAssistenteController extends BaseController
                 $tabelas[] = [
                     'key' => 'b',
                     'titulo' => 'Matérias Bloco B',
-                    'subtitulo' => 'Prova semanal',
+                    'subtitulo' => '',
                     'semanas' => $semanasB,
                     'outras' => $outras,
                     'linhas' => $linhas,

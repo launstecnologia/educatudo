@@ -150,7 +150,7 @@ class BoletimQuadroLayoutHelper
             $out[] = [
                 'key' => $chaveTab,
                 'titulo' => $titulo,
-                'subtitulo' => 'Prova semanal',
+                'subtitulo' => '',
                 'cols' => array_merge($colsGrupo, $comum),
             ];
         }

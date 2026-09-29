@@ -4934,7 +4934,7 @@ class BoletimAssistenteWizard
             $out[] = [
                 'key' => 'a',
                 'titulo' => 'Matérias Bloco A',
-                'subtitulo' => 'Prova semanal',
+                'subtitulo' => '',
                 'semanas' => $blocoA,
                 'outras' => $comum,
                 'materias' => $materiasA,
@@ -4944,7 +4944,7 @@ class BoletimAssistenteWizard
             $out[] = [
                 'key' => 'b',
                 'titulo' => 'Matérias Bloco B',
-                'subtitulo' => 'Prova semanal',
+                'subtitulo' => '',
                 'semanas' => $blocoB,
                 'outras' => $comum,
                 'materias' => $materiasB,
