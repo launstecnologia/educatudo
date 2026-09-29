@@ -1120,6 +1120,7 @@ $boletimWizardSteps = [
             grupo_regras_notas_id: 0,
             nota_minima_aprovacao: 7,
             round_mode: 'half',
+            decimal_places: 2,
             pecas: [],
             pecas_opcoes: {},
             materia_unica: 0,
@@ -2071,12 +2072,19 @@ $boletimWizardSteps = [
         });
     }
 
+    function casasDecimaisPreview() {
+        return (estado && Number(estado.decimal_places) === 1) ? 1 : 2;
+    }
+
     function fmtPreviewNota(v) {
         if (v == null || v === '' || v === '—') return '—';
         if (typeof v === 'string' && !/^-?\d/.test(v)) return esc(v);
         var n = Number(v);
         if (!isFinite(n)) return '—';
-        return String(Math.round(n * 100) / 100).replace('.', ',');
+        var casas = casasDecimaisPreview();
+        var fator = Math.pow(10, casas);
+        n = Math.round(n * fator) / fator;
+        return n.toFixed(casas).replace('.', ',');
     }
 
     function notaDaLinhaPreview(notas, codigo) {
@@ -3040,6 +3048,13 @@ $boletimWizardSteps = [
         if (formulaEl && r.formula_final != null) formulaEl.value = r.formula_final;
         var roundEl = document.querySelector('[name="round_mode"]');
         if (roundEl && r.round_mode) roundEl.value = r.round_mode;
+        if (r.decimal_places != null) {
+            estado.decimal_places = Number(r.decimal_places) === 1 ? 1 : 2;
+        }
+        var decEl = document.querySelector('[name="decimal_places"]');
+        if (decEl && estado.decimal_places) {
+            decEl.value = String(estado.decimal_places);
+        }
         var exibirEl = document.querySelector('[name="exibir_em"]');
         if (exibirEl && r.exibir_em) {
             if (exibirEl.tagName === 'SELECT' || exibirEl.type === 'text' || exibirEl.type === 'hidden') {
@@ -3208,9 +3223,7 @@ $boletimWizardSteps = [
             estado.turmas_ids = (bol.turmas_ids || []).slice();
             estado.nota_minima_aprovacao = bol.nota_minima_aprovacao != null ? bol.nota_minima_aprovacao : 6;
             estado.round_mode = bol.round_mode || 'none';
-            if (bol.decimal_places != null) {
-                estado.decimal_places = Number(bol.decimal_places) === 1 ? 1 : 2;
-            }
+            estado.decimal_places = Number(bol.decimal_places) === 1 ? 1 : 2;
         }
         if (reRender) renderAll();
     }
@@ -4304,7 +4317,7 @@ $boletimWizardSteps = [
             add('default_data_inicio', r.default_data_inicio || '');
             add('default_data_fim', r.default_data_fim || '');
             add('round_mode', r.round_mode || 'none');
-            add('decimal_places', r.decimal_places || 2);
+            add('decimal_places', (Number(r.decimal_places) === 1 ? 1 : 2));
             add('nota_minima_aprovacao', r.nota_minima_aprovacao != null ? r.nota_minima_aprovacao : 6);
             if (r.usar_resultado_aprovacao == null || Number(r.usar_resultado_aprovacao) === 1) {
                 add('usar_resultado_aprovacao', '1');

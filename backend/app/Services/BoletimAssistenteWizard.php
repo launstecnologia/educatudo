@@ -312,6 +312,9 @@ class BoletimAssistenteWizard
         if (($estado['round_mode'] ?? '') === '') {
             $estado['round_mode'] = (string) ($bol['round_mode'] ?? 'half');
         }
+        if (!isset($estado['decimal_places']) || $estado['decimal_places'] === '' || $estado['decimal_places'] === null) {
+            $estado['decimal_places'] = ((int) ($bol['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        }
     }
 
     /**
@@ -479,6 +482,7 @@ class BoletimAssistenteWizard
             'grupo_regras_notas_id' => 0,
             'nota_minima_aprovacao' => 7.0,
             'round_mode' => 'half',
+            'decimal_places' => 2,
             'pecas' => [],
             'pecas_opcoes' => $this->pecasOpcoesPadrao([]),
             'materia_unica' => 0,
@@ -558,6 +562,9 @@ class BoletimAssistenteWizard
             if (!empty($estadoFormulario['round_mode'])) {
                 $estado['round_mode'] = (string) $estadoFormulario['round_mode'];
             }
+            if (isset($estadoFormulario['decimal_places']) && $estadoFormulario['decimal_places'] !== '') {
+                $estado['decimal_places'] = ((int) $estadoFormulario['decimal_places'] === 1) ? 1 : 2;
+            }
             $estado['series_ids'] = array_values(array_map('intval', (array) ($estadoFormulario['series_ids'] ?? [])));
             $estado['turmas_ids'] = array_values(array_map('intval', (array) ($estadoFormulario['turmas_ids'] ?? [])));
             $estado['materias_ids'] = array_values(array_map('intval', (array) ($estadoFormulario['materias_ids'] ?? [])));
@@ -598,6 +605,7 @@ class BoletimAssistenteWizard
                     'materias_ids' => $estado['materias_ids'],
                     'series_ids' => $estado['series_ids'],
                     'round_mode' => $estado['round_mode'],
+                    'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
                     'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'],
                     'componentes' => $comps,
                 ];
@@ -738,6 +746,7 @@ class BoletimAssistenteWizard
             $rascunho['boletim_id'] = (int) ($estado['boletim_id'] ?? $rascunho['boletim_id'] ?? 0);
             $rascunho['grupo_regras_notas_id'] = (int) ($estado['grupo_regras_notas_id'] ?? $rascunho['grupo_regras_notas_id'] ?? 0);
             $rascunho['round_mode'] = (string) ($estado['round_mode'] ?? $rascunho['round_mode'] ?? 'half');
+            $rascunho['decimal_places'] = ((int) ($estado['decimal_places'] ?? $rascunho['decimal_places'] ?? 2) === 1) ? 1 : 2;
             $rascunho['nota_minima_aprovacao'] = $estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 7;
             $rascunho['series_ids'] = $estado['series_ids'] !== []
                 ? $estado['series_ids']
@@ -1543,6 +1552,7 @@ class BoletimAssistenteWizard
         $merged['round_mode'] = in_array((string) ($merged['round_mode'] ?? ''), ['none', 'half'], true)
             ? (string) $merged['round_mode']
             : 'half';
+        $merged['decimal_places'] = ((int) ($merged['decimal_places'] ?? 2) === 1) ? 1 : 2;
         $pecas = [];
         foreach ((array) ($merged['pecas'] ?? []) as $p) {
             $p = strtolower(trim((string) $p));
@@ -2175,6 +2185,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'] !== [] ? $estado['materias_ids'] : ($regra['materias_ids'] ?? []),
             'series_ids' => $estado['series_ids'] !== [] ? $estado['series_ids'] : ($regra['series_ids'] ?? []),
             'round_mode' => (string) ($estado['round_mode'] ?? $regra['round_mode'] ?? 'half'),
+            'decimal_places' => ((int) ($estado['decimal_places'] ?? $regra['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'] ?? $regra['nota_minima_aprovacao'] ?? 7.0,
             'componentes' => $this->ajustarComponentesClonados(
                 is_array($regra['componentes'] ?? null) ? $regra['componentes'] : [],
@@ -2243,6 +2254,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'],
             'series_ids' => $estado['series_ids'],
             'round_mode' => (string) ($estado['round_mode'] ?? 'half'),
+            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 7),
             'componentes' => $componentes,
         ];
@@ -2538,6 +2550,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'] ?? [],
             'series_ids' => $estado['series_ids'] ?? [],
             'round_mode' => (string) ($estado['round_mode'] ?? 'half'),
+            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 7),
             'componentes' => $componentes,
         ];
@@ -3543,6 +3556,7 @@ class BoletimAssistenteWizard
             'default_data_inicio' => (string) ($estado['data_inicio'] ?? ''),
             'default_data_fim' => (string) ($estado['data_fim'] ?? ''),
             'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
+            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'] ?? 6,
             'semanas_a' => $semanas['a'],
             'semanas_b' => $semanas['b'],
