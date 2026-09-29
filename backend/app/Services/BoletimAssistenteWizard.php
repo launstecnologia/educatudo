@@ -3309,22 +3309,23 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * Tabela padrão: 90% concluídas → 10, 80% → 9, … (igual ao motor do boletim).
+     * Tabela padrão: 100% concluídas → 10, 90% → 9,5, 80% → 9, …
      *
      * @return list<array{percentual_min:int,nota:float}>
      */
     public static function faixasJornadaPadrao(): array
     {
         return [
-            ['percentual_min' => 90, 'nota' => 10.0],
+            ['percentual_min' => 100, 'nota' => 10.0],
+            ['percentual_min' => 90, 'nota' => 9.5],
             ['percentual_min' => 80, 'nota' => 9.0],
-            ['percentual_min' => 70, 'nota' => 8.0],
-            ['percentual_min' => 60, 'nota' => 7.0],
-            ['percentual_min' => 50, 'nota' => 6.0],
-            ['percentual_min' => 40, 'nota' => 5.0],
-            ['percentual_min' => 30, 'nota' => 3.75],
-            ['percentual_min' => 20, 'nota' => 2.5],
-            ['percentual_min' => 10, 'nota' => 1.25],
+            ['percentual_min' => 70, 'nota' => 8.5],
+            ['percentual_min' => 60, 'nota' => 8.0],
+            ['percentual_min' => 50, 'nota' => 7.5],
+            ['percentual_min' => 40, 'nota' => 7.0],
+            ['percentual_min' => 30, 'nota' => 6.5],
+            ['percentual_min' => 20, 'nota' => 6.0],
+            ['percentual_min' => 10, 'nota' => 5.5],
         ];
     }
 

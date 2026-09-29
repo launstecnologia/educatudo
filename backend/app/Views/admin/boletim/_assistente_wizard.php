@@ -794,7 +794,7 @@ $boletimWizardSteps = [
         html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-jornada-nota" class="bw-jornada-nota-modo" value="faixas"' + (estado.jornada_nota_modo === 'faixas' ? ' checked' : '') + '> Tabela por faixas</label>';
         html += '</div></div>';
         if (estado.jornada_nota_modo === 'faixas') {
-            if (!estado.jornada_faixas || !estado.jornada_faixas.length) estado.jornada_faixas = faixasJornadaPadrao();
+            estado.jornada_faixas = normalizarFaixasJornadaUi(estado.jornada_faixas);
             html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">';
             estado.jornada_faixas.forEach(function (f, idx) {
                 html += '<label class="flex items-center gap-2 text-sm bg-white border rounded-lg px-2 py-1.5">';
@@ -1043,16 +1043,49 @@ $boletimWizardSteps = [
 
     function faixasJornadaPadrao() {
         return [
-            { percentual_min: 90, nota: 10 },
+            { percentual_min: 100, nota: 10 },
+            { percentual_min: 90, nota: 9.5 },
             { percentual_min: 80, nota: 9 },
-            { percentual_min: 70, nota: 8 },
-            { percentual_min: 60, nota: 7 },
-            { percentual_min: 50, nota: 6 },
-            { percentual_min: 40, nota: 5 },
-            { percentual_min: 30, nota: 3.75 },
-            { percentual_min: 20, nota: 2.5 },
-            { percentual_min: 10, nota: 1.25 }
+            { percentual_min: 70, nota: 8.5 },
+            { percentual_min: 60, nota: 8 },
+            { percentual_min: 50, nota: 7.5 },
+            { percentual_min: 40, nota: 7 },
+            { percentual_min: 30, nota: 6.5 },
+            { percentual_min: 20, nota: 6 },
+            { percentual_min: 10, nota: 5.5 }
         ];
+    }
+
+    /** Garante 100%…10% mesmo em regras antigas sem a faixa de 100. */
+    function normalizarFaixasJornadaUi(raw) {
+        var base = faixasJornadaPadrao();
+        if (!Array.isArray(raw) || !raw.length) {
+            return base;
+        }
+        var map = {};
+        raw.forEach(function (it) {
+            if (!it || typeof it !== 'object') {
+                return;
+            }
+            var p = Number(it.percentual_min);
+            if (!Number.isFinite(p)) {
+                return;
+            }
+            p = Math.round(p);
+            if (p < 0 || p > 100) {
+                return;
+            }
+            if (it.nota === '' || it.nota === null || typeof it.nota === 'undefined') {
+                return;
+            }
+            map[p] = it.nota;
+        });
+        return base.map(function (b) {
+            return {
+                percentual_min: b.percentual_min,
+                nota: Object.prototype.hasOwnProperty.call(map, b.percentual_min) ? map[b.percentual_min] : b.nota
+            };
+        });
     }
 
     function jornadasDoBimestre(bim) {
@@ -3813,8 +3846,8 @@ $boletimWizardSteps = [
         bodyEl.querySelectorAll('.bw-jornada-nota-modo').forEach(function (el) {
             el.addEventListener('change', function () {
                 estado.jornada_nota_modo = el.value;
-                if (estado.jornada_nota_modo === 'faixas' && !(estado.jornada_faixas || []).length) {
-                    estado.jornada_faixas = faixasJornadaPadrao();
+                if (estado.jornada_nota_modo === 'faixas') {
+                    estado.jornada_faixas = normalizarFaixasJornadaUi(estado.jornada_faixas);
                 }
                 renderAll();
                 agendarMontar();
