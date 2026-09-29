@@ -4,7 +4,6 @@
  * Acesso: Coordenação
  */
 $modoLancamentoNota = !empty($modo_lancamento_nota);
-$colunaVisivelPortalAluno = !empty($coluna_visivel_portal_aluno);
 $lancamentoPorCoordenacao = $modoLancamentoNota && (($bloco['configuracao_nota'] ?? '') === 'coordenacao_calcula');
 $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica_todas_materias']);
 ?>
@@ -20,17 +19,14 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                     Gerenciar Provas: <?= htmlspecialchars($bloco['titulo']) ?>
                 <?php endif; ?>
             </h2>
+            <?php if (!$modoLancamentoNota): ?>
             <p class="text-gray-600">
                 Status: <span class="font-semibold"><?= ucfirst(str_replace('_', ' ', $bloco['status'])) ?></span>
                 <?php if ($bloco['prazo_entrega_professor']): ?>
                     | Prazo: <?= date('d/m/Y H:i', strtotime($bloco['prazo_entrega_professor'])) ?>
                 <?php endif; ?>
-                <?php if ($modoLancamentoNota): ?>
-                    <span class="block mt-1 text-sm text-purple-700">
-                        Modo: <?= $lancamentoPorCoordenacao ? 'coordenação' : 'professor' ?> informa nota cheia por aluno (0 a 10). Não há prova com questões neste evento.
-                    </span>
-                <?php endif; ?>
             </p>
+            <?php endif; ?>
         </div>
         <div class="flex flex-wrap gap-2 justify-end">
             <?php if ($modoLancamentoNota && $lancamentoPorCoordenacao): ?>
@@ -113,6 +109,118 @@ $flashClasses = [
 
 <?php if ($modoLancamentoNota): ?>
 <!-- Painel lançamento de notas -->
+<?php
+$desc = is_array($evento_descricao ?? null) ? $evento_descricao : [];
+$destinosQuadro = is_array($desc['destinos_quadro'] ?? null) ? $desc['destinos_quadro'] : [];
+$statusMap = [
+    'aguardando' => 'Aguardando',
+    'aprovado' => 'Aprovado',
+    'liberado' => 'Liberado',
+    'concluido' => 'Concluído',
+];
+$statusTexto = $statusMap[(string) ($desc['status'] ?? '')] ?? ucfirst(str_replace('_', ' ', (string) ($desc['status'] ?? $bloco['status'] ?? '')));
+$dataTxt = !empty($desc['data_prova']) ? date('d/m/Y', strtotime((string) $desc['data_prova'])) : '';
+$horaIni = !empty($desc['hora_inicio']) ? substr((string) $desc['hora_inicio'], 0, 5) : '';
+$horaFim = !empty($desc['hora_fim']) ? substr((string) $desc['hora_fim'], 0, 5) : '';
+$horarioTxt = ($horaIni !== '' || $horaFim !== '') ? trim($horaIni . ($horaFim !== '' ? ' – ' . $horaFim : '')) : '';
+$prazoTxt = !empty($desc['prazo_professor']) ? date('d/m/Y H:i', strtotime((string) $desc['prazo_professor'])) : '';
+$turmasTxt = !empty($desc['turmas']) ? implode(', ', $desc['turmas']) : '—';
+$materiasTxt = !empty($desc['materias']) ? implode(', ', $desc['materias']) : '—';
+$tipoTxt = trim((string) ($desc['tipo_nota'] ?? ''));
+$periodoTxt = trim((string) ($desc['periodo_texto'] ?? ''));
+$anoTxt = (int) ($desc['ano_letivo'] ?? 0);
+?>
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
+    <div class="flex items-start gap-3 mb-4">
+        <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 shrink-0">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        </span>
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Detalhes do evento</h3>
+            <p class="text-sm text-gray-600 mt-0.5">Resumo completo do lançamento: período, tipo de nota, destino no quadro e turmas.</p>
+        </div>
+    </div>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Ano letivo</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= $anoTxt > 0 ? (int) $anoTxt : '—' ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Período / bimestre</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= $periodoTxt !== '' ? htmlspecialchars($periodoTxt) : '—' ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo de nota</dt>
+            <dd class="mt-1 font-semibold text-gray-900">
+                <?= $tipoTxt !== '' ? htmlspecialchars($tipoTxt) : '—' ?>
+                <?php if (!empty($desc['tipo_chave'])): ?>
+                    <span class="ml-1 text-xs font-normal text-gray-500">(<?= htmlspecialchars((string) $desc['tipo_chave']) ?>)</span>
+                <?php endif; ?>
+            </dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 sm:col-span-2 lg:col-span-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Destino no quadro (bloco / semana)</dt>
+            <dd class="mt-2 flex flex-wrap gap-1.5">
+                <?php if ($destinosQuadro === []): ?>
+                    <span class="text-gray-500">Sem vínculo de quadro (S1, Bloco A/B etc.).</span>
+                <?php else: ?>
+                    <?php foreach ($destinosQuadro as $destino): ?>
+                        <?php if (trim((string) ($destino['bloco'] ?? '')) !== ''): ?>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($destino['semana'] ?? '')) !== ''): ?>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Formato</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars((string) ($desc['formato'] ?? 'Lançamento de notas')) ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Quem lança a nota</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars((string) ($desc['quem_lanca'] ?? 'Professor')) ?> <span class="font-normal text-gray-600">(0 a 10)</span></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nota única para todas as matérias</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= !empty($desc['nota_unica']) ? 'Sim' : 'Não' ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars($statusTexto) ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Data / horário</dt>
+            <dd class="mt-1 font-semibold text-gray-900">
+                <?= $dataTxt !== '' ? htmlspecialchars($dataTxt) : '—' ?>
+                <?php if ($horarioTxt !== ''): ?>
+                    <span class="font-normal text-gray-600"> · <?= htmlspecialchars($horarioTxt) ?></span>
+                <?php endif; ?>
+            </dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Prazo do professor</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= $prazoTxt !== '' ? htmlspecialchars($prazoTxt) : '—' ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 sm:col-span-2">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Turmas</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars($turmasTxt) ?></dd>
+        </div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 sm:col-span-2 lg:col-span-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Matérias deste evento</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars($materiasTxt) ?></dd>
+        </div>
+        <?php if (!empty($desc['criado_por'])): ?>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Criado por</dt>
+            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars((string) $desc['criado_por']) ?></dd>
+        </div>
+        <?php endif; ?>
+    </dl>
+</div>
+
 <?php if (isset($contagem)): ?>
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-gray-400">
@@ -133,191 +241,6 @@ $flashClasses = [
     </div>
 </div>
 <?php endif; ?>
-
-<?php if ($modoLancamentoNota && $colunaVisivelPortalAluno): ?>
-<div class="mb-6 p-4 bg-white rounded-xl shadow border border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-    <div class="flex items-start gap-3">
-        <input type="checkbox"
-               id="chkVisivelPortalAluno"
-               class="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-               <?= !empty($bloco['visivel_no_portal_aluno']) ? 'checked' : '' ?>
-               onchange="salvarVisivelPortalAluno(<?= (int)($bloco['id'] ?? 0) ?>, this)">
-        <div>
-            <label for="chkVisivelPortalAluno" class="text-sm font-medium text-gray-900 cursor-pointer">Mostrar este evento no portal do aluno</label>
-            <p class="text-xs text-gray-500 mt-1">Quando desmarcado, o aluno não vê em &quot;Minhas provas&quot; e não acessa por link (avaliações bimestrais internas, etc.).</p>
-        </div>
-    </div>
-    <span id="msgVisivelPortalAluno" class="text-xs text-gray-500 shrink-0"></span>
-</div>
-<script>
-function salvarVisivelPortalAluno(blocoId, el) {
-    var msg = document.getElementById('msgVisivelPortalAluno');
-    if (msg) { msg.textContent = 'Salvando...'; }
-    fetch('<?= URL ?>/admin/provas/blocos/' + blocoId + '/visivel-portal-aluno', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visivel: el.checked ? 1 : 0 })
-    })
-    .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
-    .then(function(res) {
-        if (res.ok && res.data.success) {
-            if (msg) { msg.textContent = res.data.message || 'Salvo.'; }
-            setTimeout(function() { if (msg) msg.textContent = ''; }, 4000);
-            return;
-        }
-        if (msg) { msg.textContent = ''; }
-        alert(res.data.error || 'Não foi possível salvar.');
-        el.checked = !el.checked;
-    })
-    .catch(function() {
-        if (msg) { msg.textContent = ''; }
-        alert('Erro de conexão ao salvar.');
-        el.checked = !el.checked;
-    });
-}
-</script>
-<?php elseif ($modoLancamentoNota && !$colunaVisivelPortalAluno): ?>
-<div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-sm">
-    Para ativar o controle &quot;exibir no portal do aluno&quot; nesta tela, rode pelo painel Master (Migrations) ou execute no MySQL do tenant o arquivo <code class="bg-amber-100 px-1 rounded">database/migrations/2026_04_18_provas_blocos_visivel_portal_aluno.sql</code> (na pasta do código: <code class="bg-amber-100 px-1 rounded">src/database/migrations/</code>).
-</div>
-<?php endif; ?>
-
-<?php
-$fontesImportacao = is_array($fontes_importacao_notas ?? null) ? $fontes_importacao_notas : [];
-$eventosImportacao = [];
-foreach ($fontesImportacao as $fonte) {
-    $fid = (int) ($fonte['bloco_id'] ?? 0);
-    if ($fid <= 0) {
-        continue;
-    }
-    $eventosImportacao[$fid] = [
-        'titulo' => (string) ($fonte['bloco_titulo'] ?? ('Evento #' . $fid)),
-        'data' => !empty($fonte['data_prova']) ? date('d/m/Y', strtotime((string) $fonte['data_prova'])) : '',
-        'bimestre' => (int) ($fonte['bimestre'] ?? 0),
-    ];
-}
-?>
-<div id="importacao-notas-internas" class="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-indigo-500 scroll-mt-6">
-    <div class="flex items-start gap-3 mb-5">
-        <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 shrink-0">
-            <i class="fa-solid fa-file-import" aria-hidden="true"></i>
-        </span>
-        <div>
-            <h3 class="text-lg font-semibold text-gray-900">Importação de notas internas</h3>
-            <p class="text-sm text-gray-600 mt-1">Traga notas já lançadas em outro evento para o professor e a matéria correspondentes deste evento.</p>
-        </div>
-    </div>
-
-    <?php if (empty($fontesImportacao)): ?>
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Nenhum evento anterior possui notas de professor e matéria compatíveis com este evento.
-        </div>
-    <?php else: ?>
-        <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/importar-notas-internas"
-              class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="formImportacaoNotas">
-            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token_importacao ?? '')) ?>">
-            <input type="hidden" name="fonte_professor_id" id="fonteProfessorId" value="">
-            <input type="hidden" name="fonte_materia_id" id="fonteMateriaId" value="">
-
-            <div>
-                <label for="fonteBlocoId" class="block text-sm font-medium text-gray-700 mb-1">1. Evento de origem</label>
-                <select name="fonte_bloco_id" id="fonteBlocoId" required
-                        class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">Selecione o evento</option>
-                    <?php foreach ($eventosImportacao as $eventoId => $evento): ?>
-                        <option value="<?= (int) $eventoId ?>">
-                            <?= htmlspecialchars($evento['titulo']) ?>
-                            <?= $evento['bimestre'] > 0 ? ' · ' . (int) $evento['bimestre'] . 'º bimestre' : '' ?>
-                            <?= $evento['data'] !== '' ? ' · ' . htmlspecialchars($evento['data']) : '' ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div>
-                <label for="fonteProfessorMateria" class="block text-sm font-medium text-gray-700 mb-1">2. Professor e matéria</label>
-                <select id="fonteProfessorMateria" required disabled
-                        class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100">
-                    <option value="">Selecione primeiro o evento</option>
-                    <?php foreach ($fontesImportacao as $fonte): ?>
-                        <option value="<?= (int) $fonte['professor_id'] ?>_<?= (int) $fonte['materia_id'] ?>"
-                                data-evento="<?= (int) $fonte['bloco_id'] ?>"
-                                data-professor="<?= (int) $fonte['professor_id'] ?>"
-                                data-materia="<?= (int) $fonte['materia_id'] ?>"
-                                data-total="<?= (int) ($fonte['total_notas'] ?? 0) ?>"
-                                hidden>
-                            <?= htmlspecialchars((string) ($fonte['professor_nome'] ?? '')) ?> · <?= htmlspecialchars((string) ($fonte['materia_nome'] ?? '')) ?>
-                            (<?= (int) ($fonte['total_notas'] ?? 0) ?> notas)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="lg:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-1">
-                <label class="inline-flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input type="checkbox" name="sobrescrever" value="1"
-                           class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    <span><strong>Sobrescrever notas já lançadas</strong><br><span class="text-xs text-gray-500">Desmarcado, o sistema preserva as notas existentes e completa somente as que faltam.</span></span>
-                </label>
-                <button type="submit" id="btnImportarNotas" disabled
-                        class="btn-primary-custom inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed shrink-0 hover:opacity-90">
-                    <i class="fa-solid fa-file-import" aria-hidden="true"></i>
-                    Importar notas
-                </button>
-            </div>
-        </form>
-
-        <script>
-        (function () {
-            var evento = document.getElementById('fonteBlocoId');
-            var combo = document.getElementById('fonteProfessorMateria');
-            var professor = document.getElementById('fonteProfessorId');
-            var materia = document.getElementById('fonteMateriaId');
-            var botao = document.getElementById('btnImportarNotas');
-            if (!evento || !combo) return;
-
-            function limparDestino() {
-                professor.value = '';
-                materia.value = '';
-                botao.disabled = true;
-            }
-            evento.addEventListener('change', function () {
-                var id = evento.value;
-                var encontrou = false;
-                Array.prototype.forEach.call(combo.options, function (option, index) {
-                    if (index === 0) return;
-                    var mostrar = option.dataset.evento === id;
-                    option.hidden = !mostrar;
-                    option.disabled = !mostrar;
-                    if (mostrar) encontrou = true;
-                });
-                combo.value = '';
-                combo.disabled = !encontrou;
-                combo.options[0].textContent = encontrou ? 'Selecione o professor e a matéria' : 'Nenhuma nota compatível neste evento';
-                limparDestino();
-            });
-            combo.addEventListener('change', function () {
-                var option = combo.options[combo.selectedIndex];
-                professor.value = option && option.dataset.professor ? option.dataset.professor : '';
-                materia.value = option && option.dataset.materia ? option.dataset.materia : '';
-                botao.disabled = professor.value === '' || materia.value === '';
-            });
-            document.getElementById('formImportacaoNotas').addEventListener('submit', function (e) {
-                if (!professor.value || !materia.value) {
-                    e.preventDefault();
-                    return;
-                }
-                if (!window.confirm('Importar as notas selecionadas para este evento?')) {
-                    e.preventDefault();
-                    return;
-                }
-                botao.disabled = true;
-                botao.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Importando...';
-            });
-        })();
-        </script>
-    <?php endif; ?>
-</div>
 
 <?php if ($notaUnicaTodasMaterias): ?>
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-violet-500">
@@ -344,8 +267,6 @@ foreach ($fontesImportacao as $fonte) {
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progresso</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Média</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">&lt; 6</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
@@ -360,8 +281,6 @@ foreach ($fontesImportacao as $fonte) {
                             <span class="text-gray-500">(<?= htmlspecialchars((string)($row['perc'] ?? '')) ?>%)</span>
                         <?php endif; ?>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-700"><?= $row['media_nota'] !== null ? htmlspecialchars(number_format((float)$row['media_nota'], 2, ',', '.')) : '—' ?></td>
-                    <td class="px-6 py-4 text-sm text-gray-700"><?= (int)($row['abaixo_seis'] ?? 0) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php
                         $st = $row['status'] ?? '';

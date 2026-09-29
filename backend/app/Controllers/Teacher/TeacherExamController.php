@@ -2378,18 +2378,109 @@ class TeacherExamController extends BaseController
             'concluido' => 0,
         ];
 
-        $combosDestino = [];
-        foreach ($profRows as $pr) {
-            $combosDestino[(int) ($pr['professor_id'] ?? 0) . '_' . (int) ($pr['materia_id'] ?? 0)] = true;
-        }
-        $fontesImportacao = array_values(array_filter(
-            $notasModel->fetchFontesImportacao($blocoId),
-            static function (array $fonte) use ($combosDestino): bool {
-                $key = (int) ($fonte['professor_id'] ?? 0) . '_' . (int) ($fonte['materia_id'] ?? 0);
-                return !empty($combosDestino[$key]);
-            }
-        ));
         $flash = $this->getFlashMessage();
+
+        $blocoId = (int) ($bloco['id'] ?? $blocoId);
+        $tipoId = (int) ($bloco['tipo_avaliacao_id'] ?? 0);
+        if ($tipoId > 0 && empty($bloco['tipo_avaliacao_nome'])) {
+            try {
+                $tipoRow = $this->db->fetch(
+                    'SELECT nome, chave_quadro FROM provas_tipos_avaliacao
+                     WHERE id = :id AND deleted_at IS NULL LIMIT 1',
+                    ['id' => $tipoId]
+                );
+                if (is_array($tipoRow)) {
+                    $bloco['tipo_avaliacao_nome'] = (string) ($tipoRow['nome'] ?? '');
+                    $bloco['tipo_avaliacao_chave'] = (string) ($tipoRow['chave_quadro'] ?? '');
+                }
+            } catch (Throwable $e) {
+                // Catálogo opcional em tenants antigos.
+            }
+        }
+
+        $rotulosMap = $this->blocoModel->rotulosQuadroPorBlocoIds([$blocoId]);
+        $destinosQuadro = $rotulosMap[$blocoId] ?? [];
+        if ($destinosQuadro === []) {
+            $semanaNum = (int) ($bloco['semana'] ?? 0);
+            $nomeBlocoLegado = trim((string) ($bloco['bloco_modelo_nome'] ?? ''));
+            if ($nomeBlocoLegado !== '' || ($semanaNum >= 1 && $semanaNum <= 20)) {
+                $destinosQuadro = [[
+                    'bloco' => $nomeBlocoLegado,
+                    'semana' => ($semanaNum >= 1 && $semanaNum <= 20) ? ('S' . $semanaNum) : '',
+                ]];
+            }
+        }
+
+        $turmasNomes = [];
+        foreach ((array) ($bloco['turmas'] ?? []) as $turma) {
+            $nomeT = trim((string) ($turma['nome'] ?? ''));
+            if ($nomeT !== '') {
+                $turmasNomes[$nomeT] = $nomeT;
+            }
+        }
+        if ($turmasNomes === []) {
+            foreach ((array) ($bloco['professores'] ?? []) as $prof) {
+                foreach ((array) ($prof['turmas'] ?? []) as $turma) {
+                    $nomeT = trim((string) ($turma['nome'] ?? ''));
+                    if ($nomeT !== '') {
+                        $turmasNomes[$nomeT] = $nomeT;
+                    }
+                }
+            }
+        }
+        $turmasNomes = array_values($turmasNomes);
+        sort($turmasNomes, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $materiasNomes = [];
+        foreach ((array) ($bloco['professores'] ?? []) as $prof) {
+            $nomeM = trim((string) ($prof['materia_nome'] ?? ''));
+            if ($nomeM !== '') {
+                $materiasNomes[$nomeM] = $nomeM;
+            }
+        }
+        $materiasNomes = array_values($materiasNomes);
+        sort($materiasNomes, SORT_NATURAL | SORT_FLAG_CASE);
+
+        if (!class_exists('PeriodoLetivo', false)) {
+            $periodoPath = dirname(__DIR__, 2) . '/Core/PeriodoLetivo.php';
+            if (is_file($periodoPath)) {
+                require_once $periodoPath;
+            }
+        }
+        $anoLetivo = (int) ($bloco['ano_letivo'] ?? 0);
+        $bimestre = (int) ($bloco['bimestre'] ?? 0);
+        $periodoTexto = ($bimestre > 0 && class_exists('PeriodoLetivo', false))
+            ? PeriodoLetivo::rotulo($anoLetivo, $bimestre)
+            : ($bimestre > 0 ? ($bimestre . 'º bimestre') : '');
+
+        $configNota = (string) ($bloco['configuracao_nota'] ?? '');
+        $quemLanca = $configNota === 'coordenacao_calcula' ? 'Coordenação' : 'Professor';
+        $formato = (string) ($bloco['formato_evento'] ?? '');
+        $formatoTexto = match ($formato) {
+            'lancamento_nota' => 'Lançamento de notas (sem prova com questões)',
+            'online_questoes' => 'Prova online com questões',
+            default => ($formato !== '' ? $formato : 'Lançamento de notas'),
+        };
+
+        $eventoDescricao = [
+            'ano_letivo' => $anoLetivo,
+            'bimestre' => $bimestre,
+            'periodo_texto' => $periodoTexto,
+            'tipo_nota' => trim((string) ($bloco['tipo_avaliacao_nome'] ?? '')),
+            'tipo_chave' => trim((string) ($bloco['tipo_avaliacao_chave'] ?? '')),
+            'destinos_quadro' => $destinosQuadro,
+            'quem_lanca' => $quemLanca,
+            'formato' => $formatoTexto,
+            'nota_unica' => !empty($bloco['nota_unica_todas_materias']),
+            'turmas' => $turmasNomes,
+            'materias' => $materiasNomes,
+            'status' => (string) ($bloco['status'] ?? ''),
+            'data_prova' => (string) ($bloco['data_prova'] ?? ''),
+            'hora_inicio' => (string) ($bloco['hora_inicio'] ?? ''),
+            'hora_fim' => (string) ($bloco['hora_fim'] ?? ''),
+            'prazo_professor' => (string) ($bloco['prazo_entrega_professor'] ?? ''),
+            'criado_por' => trim((string) ($bloco['criado_por_nome'] ?? '')),
+        ];
 
         return [
             'title' => 'Gerenciar lançamento de notas — EducaTudo',
@@ -2403,9 +2494,7 @@ class TeacherExamController extends BaseController
             'mostrarBotaoAprovacaoFinal' => false,
             'status_filtro' => '',
             'current_page' => 'provas_blocos',
-            'coluna_visivel_portal_aluno' => $this->blocoModel->columnExistsOnBloco('visivel_no_portal_aluno'),
-            'fontes_importacao_notas' => $fontesImportacao,
-            'csrf_token_importacao' => $this->generateCsrfToken(),
+            'evento_descricao' => $eventoDescricao,
             'flash_importacao_notas' => $flash,
         ];
     }
