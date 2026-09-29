@@ -454,7 +454,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                             $cols = $matrizColunas;
                             $linhas = $matrizLinhas;
                             $decimalPlaces = $decimalPlacesSelected ?? 2;
-                            include dirname(__DIR__, 2) . '/partials/boletim_quadro_tabela.php';
+                            $simVistaId = 'sim-compacta';
+                            include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
                         } else {
                         ?>
                         <div class="overflow-x-auto border border-gray-200 rounded-lg">
@@ -556,6 +557,31 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             <div class="p-3 text-sm text-gray-500 border border-gray-200 rounded-lg bg-white">Selecione um aluno e salve o evento para visualizar a tabela.</div>
         <?php endif; ?>
     </div>
+    <script>
+    (function () {
+        function ativar(root, vista) {
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                var on = btn.getAttribute('data-sim-vista') === vista;
+                btn.classList.toggle('bg-indigo-600', on);
+                btn.classList.toggle('text-white', on);
+                btn.classList.toggle('border-indigo-600', on);
+                btn.classList.toggle('bg-white', !on);
+                btn.classList.toggle('text-gray-700', !on);
+                btn.classList.toggle('border-gray-300', !on);
+            });
+            root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+                panel.classList.toggle('hidden', panel.getAttribute('data-sim-panel') !== vista);
+            });
+        }
+        document.querySelectorAll('.boletim-sim-vistas').forEach(function (root) {
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    ativar(root, btn.getAttribute('data-sim-vista') || 'demonstrativo');
+                });
+            });
+        });
+    })();
+    </script>
 <?php else: ?>
 <div class="space-y-6">
     <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -1089,7 +1115,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         $cols = $matrizColunas;
                         $linhas = $matrizLinhas;
                         $decimalPlaces = $decimalPlacesSelected ?? 2;
-                        include dirname(__DIR__, 2) . '/partials/boletim_quadro_tabela.php';
+                        $simVistaId = 'sim-principal';
+                        include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
                     } else {
                     ?>
                     <div class="mb-8">
@@ -5259,6 +5286,31 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         document.querySelectorAll('[data-cell-editavel="1"]').forEach(function (td) {
             td.addEventListener('click', function () {
                 enterEditMode(td);
+            });
+        });
+    })();
+
+    (function initSimulacaoVistas() {
+        function ativar(root, vista) {
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                var on = btn.getAttribute('data-sim-vista') === vista;
+                btn.classList.toggle('bg-indigo-600', on);
+                btn.classList.toggle('text-white', on);
+                btn.classList.toggle('border-indigo-600', on);
+                btn.classList.toggle('bg-white', !on);
+                btn.classList.toggle('text-gray-700', !on);
+                btn.classList.toggle('border-gray-300', !on);
+            });
+            root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+                var on = panel.getAttribute('data-sim-panel') === vista;
+                panel.classList.toggle('hidden', !on);
+            });
+        }
+        document.querySelectorAll('.boletim-sim-vistas').forEach(function (root) {
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    ativar(root, btn.getAttribute('data-sim-vista') || 'demonstrativo');
+                });
             });
         });
     })();

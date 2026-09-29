@@ -100,6 +100,93 @@ class BoletimQuadroLayoutHelper
         return strtolower(trim((string) ($col['codigo'] ?? ''))) === 'media_sem';
     }
 
+    public static function colunaEhFaltas(array $col): bool
+    {
+        if (strtolower(trim((string) ($col['source_type'] ?? ''))) === 'faltas_evento') {
+            return true;
+        }
+        if (strtolower(trim((string) ($col['layout_type'] ?? ''))) === 'faltas') {
+            return true;
+        }
+        $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+        $nome = mb_strtolower(trim((string) ($col['nome'] ?? '')), 'UTF-8');
+
+        return str_contains($cod, 'falta') || str_contains($nome, 'falta');
+    }
+
+    /**
+     * Coluna de resultado final do período (média bim final / resultado).
+     */
+    public static function colunaEhResultadoResumo(array $col): bool
+    {
+        $lt = strtolower(trim((string) ($col['layout_type'] ?? '')));
+        if ($lt === 'resultado') {
+            return true;
+        }
+        $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+        if (in_array($cod, ['resultado', 'media_final', 'media_bim_final'], true)) {
+            return true;
+        }
+        if ((bool) preg_match('/(?:^|_)media_(?:bim_)?final$/', $cod)) {
+            return true;
+        }
+        $nome = mb_strtolower(trim((string) ($col['nome'] ?? '')), 'UTF-8');
+        if (class_exists('Normalizer', false)) {
+            $nomeNorm = Normalizer::normalize($nome, Normalizer::FORM_D);
+            $nomeNorm = is_string($nomeNorm) ? preg_replace('/\p{Mn}/u', '', $nomeNorm) : $nome;
+        } else {
+            $nomeNorm = str_replace(
+                ['á', 'à', 'ã', 'â', 'ä', 'é', 'è', 'ê', 'ë', 'í', 'ì', 'î', 'ï', 'ó', 'ò', 'õ', 'ô', 'ö', 'ú', 'ù', 'û', 'ü', 'ç'],
+                ['a', 'a', 'a', 'a', 'a', 'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i', 'o', 'o', 'o', 'o', 'o', 'u', 'u', 'u', 'u', 'c'],
+                $nome
+            );
+        }
+        if (str_contains($nomeNorm, 'resultado')) {
+            return true;
+        }
+        if (str_contains($nomeNorm, 'media bim final') || str_contains($nomeNorm, 'media final')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Vista "Boletim": só resultado final + faltas (sem semanas/provas/jornada).
+     *
+     * @param list<array<string,mixed>> $cols
+     * @return list<array<string,mixed>>
+     */
+    public static function filtrarColunasResumoBoletim(array $cols): array
+    {
+        $resultado = [];
+        $faltas = [];
+        $visto = [];
+        foreach ($cols as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if (self::colunaEhSemanaNq($c) || self::colunaEhMediaSem($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || isset($visto[$cod])) {
+                continue;
+            }
+            if (self::colunaEhFaltas($c)) {
+                $visto[$cod] = true;
+                $faltas[] = $c;
+                continue;
+            }
+            if (self::colunaEhResultadoResumo($c)) {
+                $visto[$cod] = true;
+                $resultado[] = $c;
+            }
+        }
+
+        return array_merge($resultado, $faltas);
+    }
+
     /**
      * Parte as colunas em uma tabela por tipo do quadro (A/B, Humanas…).
      * Colunas comuns (média sem, prova bim, rec) entram em todas as tabelas.

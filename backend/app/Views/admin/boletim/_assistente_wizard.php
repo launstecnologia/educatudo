@@ -2749,23 +2749,46 @@ $boletimWizardSteps = [
         return ordenarLinhasPorNome(out);
     }
 
+    function colunaEhResultadoResumo(o) {
+        if (!o) return false;
+        var lt = String(o.layout_type || '').toLowerCase();
+        if (lt === 'resultado') return true;
+        var cod = String(o.codigo || '').toLowerCase();
+        if (cod === 'resultado' || cod === 'media_final' || cod === 'media_bim_final') return true;
+        if (/(?:^|_)media_(?:bim_)?final$/.test(cod)) return true;
+        var nome = String(o.nome || '').toLocaleLowerCase('pt-BR');
+        if (nome.indexOf('resultado') >= 0) return true;
+        var nomeNorm = nome.normalize ? nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : nome;
+        return nomeNorm.indexOf('media bim final') >= 0 || nomeNorm.indexOf('media final') >= 0;
+    }
+
     function htmlTabelaSomenteNotas(pv) {
         var outras = [];
         var visto = {};
         (pv.tabelas || []).forEach(function (t) {
             (t.outras || []).forEach(function (o) {
                 if (!o || !o.codigo || visto[o.codigo]) return;
+                if (!colunaEhFaltas(o) && !colunaEhResultadoResumo(o)) return;
                 visto[o.codigo] = true;
                 outras.push(o);
             });
         });
+        outras.sort(function (a, b) {
+            var af = colunaEhFaltas(a) ? 1 : 0;
+            var bf = colunaEhFaltas(b) ? 1 : 0;
+            return af - bf;
+        });
         var linhas = linhasDoBoletim(pv, outras);
         var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
-        html += '<div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">Notas do boletim</div>';
+        html += '<div class="px-3 py-1.5 text-sm font-semibold text-gray-800 bg-gray-50 border-b">Boletim (resultado e faltas)</div>';
+        if (!outras.length) {
+            html += '<p class="px-3 py-3 text-sm text-gray-500">Não há colunas de resultado ou faltas neste evento.</p></div>';
+            return html;
+        }
         html += '<table class="bw-preview-table"><thead><tr>';
         html += '<th class="text-left">Matéria</th>';
         outras.forEach(function (o) {
-            var extra = (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
+            var extra = colunaEhFaltas(o) ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
             html += '<th>' + esc(o.nome || o.codigo) + extra + '</th>';
         });
         html += '</tr></thead><tbody>';
@@ -2792,7 +2815,7 @@ $boletimWizardSteps = [
         html += '<p class="' + avisoCls + '">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
         if (previewTemQuadro(pv)) {
             html += '<div class="flex flex-wrap gap-2 mb-3">';
-            html += '<button type="button" data-vista-preview="quadro" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'quadro' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Quadro de notas</button>';
+            html += '<button type="button" data-vista-preview="quadro" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'quadro' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Demonstrativo de Notas</button>';
             html += '<button type="button" data-vista-preview="boletim" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'boletim' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300') + '">Boletim</button>';
             html += '</div>';
             if (vistaPreview === 'boletim') {
