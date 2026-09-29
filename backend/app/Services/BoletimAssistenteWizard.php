@@ -713,8 +713,10 @@ class BoletimAssistenteWizard
                 $estado
             );
             if (!$this->deveRemontarComoQuadro($estado, $rascunho)) {
+                $rascunho = $this->aplicarConfigJornadaDoEstadoNoRascunho($rascunho, $estado);
                 $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
                 $rascunhoOk = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
+                $estado['rascunho_preservado'] = $rascunhoOk;
                 $resumo = $this->montarResumoHumano($rascunhoOk);
                 $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
                 return [
@@ -786,10 +788,12 @@ class BoletimAssistenteWizard
                 $this->aplicarGrupoLinhaNoRascunho($rascunho, $estado),
                 $estado
             );
+            $rascunho = $this->aplicarConfigJornadaDoEstadoNoRascunho($rascunho, $estado);
             $rascunho = $this->aplicarFormulasBlocos($rascunho, $estado, []);
             $validado = $this->ferramentas->validarEEnriquecerRascunho($rascunho);
             $errosOut = array_values(array_unique(array_merge($erros, $validado['erros'])));
             $rascunhoOk = $this->aplicarLayoutBimestreNoRascunhoNotas($validado['rascunho'], $estado);
+            $estado['rascunho_preservado'] = $rascunhoOk;
             return [
                 'ok' => $rascunhoOk['componentes'] !== [],
                 'estado' => $estado,
@@ -3442,6 +3446,75 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * Espelha no componente jornadas as opções da peça (média única, faixas, IDs).
+     * Necessário quando o rascunho preservado da edição ainda tem a config antiga.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function aplicarConfigJornadaDoEstadoNoRascunho(array $rascunho, array $estado): array
+    {
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        if ($comps === []) {
+            return $rascunho;
+        }
+        $dist = ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas'
+            ? 'nota_unica_todas_linhas'
+            : 'por_materia';
+        $notaModo = (string) ($estado['jornada_nota_modo'] ?? 'linear');
+        $faixas = $notaModo === 'faixas'
+            ? $this->normalizarFaixasJornada($estado['jornada_faixas'] ?? null)
+            : [];
+        $modo = (string) ($estado['jornada_modo'] ?? 'bimestre');
+        $idsEstado = [];
+        if ($modo === 'selecionadas') {
+            $idsEstado = array_values(array_unique(array_filter(
+                array_map('intval', (array) ($estado['jornada_ids'] ?? [])),
+                static fn ($id) => $id > 0
+            )));
+        } else {
+            $idsEstado = $this->resolverIdsJornadaPorBimestre($estado);
+        }
+        $bimsEstado = $this->bimestresJornadaDoEstado($estado);
+        $alterado = false;
+        foreach ($comps as $i => $c) {
+            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'jornadas') {
+                continue;
+            }
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            if (is_string($c['config_json'] ?? null) && $c['config_json'] !== '') {
+                $decoded = json_decode((string) $c['config_json'], true);
+                if (is_array($decoded)) {
+                    $cfg = array_merge($decoded, $cfg);
+                }
+            }
+            $cfg['distribuicao_notas'] = $dist;
+            if ($notaModo === 'faixas') {
+                $cfg['faixas_percentuais'] = $faixas;
+                $c['usar_percentual'] = 0;
+            } else {
+                $cfg['faixas_percentuais'] = [];
+                $c['usar_percentual'] = 1;
+            }
+            $cfg['jornada_ids'] = $idsEstado;
+            if ($modo === 'selecionadas') {
+                unset($cfg['jornada_bimestres']);
+            } elseif ($bimsEstado !== []) {
+                $cfg['jornada_bimestres'] = $bimsEstado;
+            }
+            $c['config'] = $cfg;
+            $c['config_json'] = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $comps[$i] = $c;
+            $alterado = true;
+        }
+        if ($alterado) {
+            $rascunho['componentes'] = $comps;
+        }
+        return $rascunho;
+    }
+
+    /**
      * @param array<string,mixed> $comp
      */
     private function resumoEscopoJornada(array $comp): string
@@ -5387,6 +5460,8 @@ class BoletimAssistenteWizard
     private function notasFicticiasLinha(string $materia, array $comps, array $codigosSemanaBloco, array $estado): array
     {
         $hash = abs(crc32(mb_strtolower($materia))) + $this->hashAlunoPreview($estado);
+        $hashJornadaUnica = 1700 + $this->hashAlunoPreview($estado);
+        $jornadaNotaUnicaEstado = ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas';
         $roundMode = ((string) ($estado['round_mode'] ?? 'none')) === 'half' ? 'half' : 'none';
         $notas = [];
         $sumN = 0;
@@ -5429,7 +5504,13 @@ class BoletimAssistenteWizard
                 $notas[$cod] = '—';
                 continue;
             }
-            $notas[$cod] = $this->roundPreviewFicticio(5 + (($hash + strlen($cod) * 7) % 51) / 10, $roundMode);
+            $cfgDist = strtolower(trim((string) ($cfg['distribuicao_notas'] ?? '')));
+            $jornadaUnica = $src === 'jornadas'
+                && ($jornadaNotaUnicaEstado || $cfgDist === 'nota_unica_todas_linhas');
+            $seed = $jornadaUnica
+                ? ($hashJornadaUnica + strlen($cod) * 7)
+                : ($hash + strlen($cod) * 7);
+            $notas[$cod] = $this->roundPreviewFicticio(5 + ($seed % 51) / 10, $roundMode);
         }
 
         $pendentes = $calculados;

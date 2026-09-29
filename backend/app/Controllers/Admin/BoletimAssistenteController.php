@@ -216,6 +216,7 @@ class BoletimAssistenteController extends BaseController
 
         $rascunho = $this->rascunhoComFontesSalvas($rascunho, $estado);
         $rascunho = $this->garantirEscopoJornada($rascunho, $estado);
+        $rascunho = $this->aplicarJornadaDoEstadoNoRascunhoPreview($rascunho, $estado);
         [$periodoRef, $dataInicio, $dataFim] = $this->resolverPeriodoPreview($rascunho, $estado);
 
         try {
@@ -307,6 +308,7 @@ class BoletimAssistenteController extends BaseController
                 $materiaUnica = !empty($comp['materia_unica']);
                 $cfgWizard = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                 $grupoLinha = $cfgWizard['group_line'] ?? null;
+                $usarPercWizard = array_key_exists('usar_percentual', $comp) ? $comp['usar_percentual'] : null;
                 $comp = $salvaComp;
                 if ($nome !== '') {
                     $comp['nome'] = $nome;
@@ -314,11 +316,30 @@ class BoletimAssistenteController extends BaseController
                 if ($materiaUnica) {
                     $comp['materia_unica'] = 1;
                 }
+                $cfgSalva = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                 if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
-                    $cfgSalva = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                     $cfgSalva['group_line'] = $grupoLinha;
-                    $comp['config'] = $cfgSalva;
                 }
+                // Mantém opções da peça Jornada escolhidas no assistente (ainda não salvas).
+                if ($origem === 'jornadas') {
+                    if (isset($cfgWizard['distribuicao_notas'])) {
+                        $cfgSalva['distribuicao_notas'] = $cfgWizard['distribuicao_notas'];
+                    }
+                    if (array_key_exists('faixas_percentuais', $cfgWizard)) {
+                        $cfgSalva['faixas_percentuais'] = $cfgWizard['faixas_percentuais'];
+                    }
+                    if (isset($cfgWizard['jornada_ids']) && is_array($cfgWizard['jornada_ids']) && $cfgWizard['jornada_ids'] !== []) {
+                        $cfgSalva['jornada_ids'] = $cfgWizard['jornada_ids'];
+                    }
+                    if (isset($cfgWizard['jornada_bimestres']) && is_array($cfgWizard['jornada_bimestres'])) {
+                        $cfgSalva['jornada_bimestres'] = $cfgWizard['jornada_bimestres'];
+                    }
+                    if ($usarPercWizard !== null) {
+                        $comp['usar_percentual'] = (int) ((int) $usarPercWizard ? 1 : 0);
+                    }
+                }
+                $comp['config'] = $cfgSalva;
+                unset($comp['config_json']);
             }
             $componentes[] = $comp;
         }
@@ -1099,6 +1120,59 @@ class BoletimAssistenteController extends BaseController
                 $config['jornada_ids'] = $idsBimestre;
             }
             unset($config['data_ini'], $config['data_fim']);
+            $comp['config'] = $config;
+            unset($comp['config_json']);
+            $componentes[] = $comp;
+        }
+        $rascunho['componentes'] = $componentes;
+
+        return $rascunho;
+    }
+
+    /**
+     * A prévia real mescla fontes salvas; reaplica média única / faixas do assistente.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function aplicarJornadaDoEstadoNoRascunhoPreview(array $rascunho, array $estado): array
+    {
+        $dist = ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas'
+            ? 'nota_unica_todas_linhas'
+            : 'por_materia';
+        $notaModo = (string) ($estado['jornada_nota_modo'] ?? 'linear');
+        $faixas = [];
+        if ($notaModo === 'faixas' && is_array($estado['jornada_faixas'] ?? null)) {
+            foreach ($estado['jornada_faixas'] as $f) {
+                if (!is_array($f)) {
+                    continue;
+                }
+                $p = (int) ($f['percentual_min'] ?? -1);
+                if ($p < 0 || $p > 100 || !is_numeric($f['nota'] ?? null)) {
+                    continue;
+                }
+                $faixas[] = [
+                    'percentual_min' => $p,
+                    'nota' => (float) $f['nota'],
+                ];
+            }
+        }
+        $componentes = [];
+        foreach ((array) ($rascunho['componentes'] ?? []) as $comp) {
+            if (!is_array($comp) || strtolower(trim((string) ($comp['source_type'] ?? ''))) !== 'jornadas') {
+                $componentes[] = $comp;
+                continue;
+            }
+            $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+            $config['distribuicao_notas'] = $dist;
+            if ($notaModo === 'faixas') {
+                $config['faixas_percentuais'] = $faixas;
+                $comp['usar_percentual'] = 0;
+            } else {
+                $config['faixas_percentuais'] = [];
+                $comp['usar_percentual'] = 1;
+            }
             $comp['config'] = $config;
             unset($comp['config_json']);
             $componentes[] = $comp;

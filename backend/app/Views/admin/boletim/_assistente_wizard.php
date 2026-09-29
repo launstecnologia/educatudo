@@ -809,7 +809,14 @@ $boletimWizardSteps = [
             estado.jornada_faixas.forEach(function (f, idx) {
                 html += '<label class="flex items-center gap-2 text-sm bg-white border rounded-lg px-2 py-1.5">';
                 html += '<span class="text-xs font-medium text-amber-900 min-w-[3.5rem]">' + f.percentual_min + '%</span>';
-                html += '<input type="number" min="0" step="0.01" class="bw-jornada-faixa-nota flex-1 h-9 border rounded-md px-2 text-sm" data-idx="' + idx + '" value="' + (f.nota != null ? f.nota : '') + '">';
+                var notaFaixa = f.nota;
+                if (typeof notaFaixa === 'string') {
+                    notaFaixa = String(notaFaixa).trim().replace(',', '.');
+                }
+                if (notaFaixa !== '' && notaFaixa != null && isFinite(Number(notaFaixa))) {
+                    notaFaixa = Number(notaFaixa);
+                }
+                html += '<input type="number" min="0" step="0.01" class="bw-jornada-faixa-nota flex-1 h-9 border rounded-md px-2 text-sm" data-idx="' + idx + '" value="' + (notaFaixa != null && notaFaixa !== '' ? notaFaixa : '') + '">';
                 html += '</label>';
             });
             html += '</div>';
@@ -1088,7 +1095,11 @@ $boletimWizardSteps = [
             if (it.nota === '' || it.nota === null || typeof it.nota === 'undefined') {
                 return;
             }
-            map[p] = it.nota;
+            var n = typeof it.nota === 'number' ? it.nota : parseFloat(String(it.nota).replace(',', '.'));
+            if (!Number.isFinite(n)) {
+                return;
+            }
+            map[p] = n;
         });
         return base.map(function (b) {
             return {
@@ -2098,7 +2109,7 @@ $boletimWizardSteps = [
         var casas = casasDecimaisPreview();
         var fator = Math.pow(10, casas);
         n = Math.round(n * fator) / fator;
-        return n.toFixed(casas).replace('.', ',');
+        return n.toFixed(casas);
     }
 
     function notaDaLinhaPreview(notas, codigo) {
