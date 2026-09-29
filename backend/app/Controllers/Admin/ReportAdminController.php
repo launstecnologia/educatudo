@@ -794,7 +794,7 @@ class ReportAdminController extends AdminBaseController
     private function listarEventosBoletimCoordenacao(): array
     {
         $eventos = $this->db->fetchAll(
-            "SELECT g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.series_ids, r.exibir_em,
+            "SELECT g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em,
                     COUNT(DISTINCT g.aluno_id) AS total_alunos,
                     GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome ASC SEPARATOR ', ') AS turmas_nomes,
                     MAX(g.updated_at) AS updated_at
@@ -804,8 +804,8 @@ class ReportAdminController extends AdminBaseController
              LEFT JOIN turmas t ON t.id = a.turma_id
              WHERE g.preview = 0 AND g.vigente = 1 AND r.ativo = 1
                AND r.exibir_em IN ('boletim', 'notas') AND a.ativo = 1
-             GROUP BY g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.series_ids, r.exibir_em
-             ORDER BY COALESCE(r.ano_letivo, 0) DESC, updated_at DESC, r.nome ASC"
+             GROUP BY g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em
+             ORDER BY COALESCE(r.ano_letivo, 0) DESC, COALESCE(r.bimestre, 0) ASC, updated_at DESC, r.nome ASC"
         ) ?: [];
 
         $seriesRows = $this->db->fetchAll(
@@ -823,6 +823,10 @@ class ReportAdminController extends AdminBaseController
                 $seriesById[$serieIdAtual]['ordem'] = (int) $matchSerie[0];
             }
         }
+        $pathPeriodo = __DIR__ . '/../../Core/PeriodoLetivo.php';
+        if (is_file($pathPeriodo)) {
+            require_once $pathPeriodo;
+        }
         foreach ($eventos as &$evento) {
             $ids = $this->parseIdsJsonBoletimCoordenacao($evento['series_ids'] ?? null);
             $nomes = [];
@@ -837,15 +841,45 @@ class ReportAdminController extends AdminBaseController
             $seriesLabel = $this->joinLabelsBoletimCoordenacao($nomes);
             $evento['series_nomes'] = $seriesLabel;
             $tipoLabel = (($evento['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
-            $evento['nome_exibicao'] = trim(
-                $tipoLabel . ' — ' . (string) ($evento['nome'] ?? 'Evento')
-                . ($seriesLabel !== '' ? ' ' . $seriesLabel : '')
-            );
+            $nomeBase = trim((string) ($evento['nome'] ?? 'Evento'));
+            $partes = [$tipoLabel . ' — ' . $nomeBase];
+            if ($seriesLabel !== '' && mb_stripos($nomeBase, $seriesLabel) === false) {
+                $partes[0] .= ' ' . $seriesLabel;
+            }
+            $ano = (int) ($evento['ano_letivo'] ?? 0);
+            if ($ano > 0) {
+                $partes[] = (string) $ano;
+            }
+            $bimestre = (int) ($evento['bimestre'] ?? 0);
+            $rotuloPeriodo = '';
+            if ($bimestre > 0 && class_exists('PeriodoLetivo')) {
+                $rotuloPeriodo = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
+            }
+            if ($rotuloPeriodo === '') {
+                $periodoRef = trim((string) ($evento['periodo_ref'] ?? ''));
+                if ($periodoRef !== '') {
+                    $rotuloPeriodo = $periodoRef;
+                }
+            }
+            if ($rotuloPeriodo !== '') {
+                $partes[] = $rotuloPeriodo;
+            }
+            $evento['nome_exibicao'] = implode(' · ', $partes);
             $evento['_serie_ordem'] = $ordemMax;
+            $evento['_ano_ordem'] = $ano;
+            $evento['_bim_ordem'] = $bimestre;
         }
         unset($evento);
         usort($eventos, static function (array $a, array $b): int {
+            $cmp = ((int) ($b['_ano_ordem'] ?? 0)) <=> ((int) ($a['_ano_ordem'] ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
             $cmp = ((int) ($b['_serie_ordem'] ?? 0)) <=> ((int) ($a['_serie_ordem'] ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = ((int) ($a['_bim_ordem'] ?? 0)) <=> ((int) ($b['_bim_ordem'] ?? 0));
             if ($cmp !== 0) {
                 return $cmp;
             }
