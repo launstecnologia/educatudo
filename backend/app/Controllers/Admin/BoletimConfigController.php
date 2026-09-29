@@ -5015,22 +5015,23 @@ class BoletimConfigController extends BaseController
         }
 
         $materiasSelecionadas = $this->parseMateriasIdsFromRegra($regra);
-        $idsRotuloPai = [];
+        // Pais com desdobramento nunca viram linha avulsa (só o group_line / filhos).
+        $idsRotuloPai = $this->idsRotuloPaiComponente();
         if ($pularAgrupamentoLinhas) {
             $materiasSelecionadas = array_merge(
                 $materiasSelecionadas,
                 $this->materiasIdsDoModeloBoletim((int) ($regra['boletim_id'] ?? 0))
             );
             $materiasSelecionadas = $this->expandirMateriasComFilhos($materiasSelecionadas);
-            $idsRotuloPai = $this->idsRotuloPaiComponente();
         }
-        if ($materiasSelecionadas !== []) {
+        $nomesCatalogoById = [];
+        if ($materiasSelecionadas !== [] || $allMids !== []) {
             $catalogoMaterias = $this->boletimConfig->getAvailableSubjects(2000);
-            $nomesCatalogoById = [];
             foreach ((array) $catalogoMaterias as $mCat) {
                 $midCat = (int) ($mCat['id'] ?? 0);
-                if ($midCat > 0) {
-                    $nomesCatalogoById[$midCat] = trim((string) ($mCat['nome'] ?? ('Matéria #' . $midCat)));
+                $nomeCat = trim((string) ($mCat['nome'] ?? ''));
+                if ($midCat > 0 && $nomeCat !== '') {
+                    $nomesCatalogoById[$midCat] = $nomeCat;
                 }
             }
             $pathComp = dirname(__DIR__, 2) . '/Models/Education/ComponenteCurricular.php';
@@ -5039,14 +5040,17 @@ class BoletimConfigController extends BaseController
                 try {
                     foreach ((new \ComponenteCurricular())->getOficiaisParaMatriz(true) as $of) {
                         $oid = (int) ($of['id'] ?? 0);
-                        if ($oid > 0 && !isset($nomesCatalogoById[$oid])) {
-                            $nomesCatalogoById[$oid] = trim((string) ($of['nome'] ?? ('Matéria #' . $oid)));
+                        $nomeOf = trim((string) ($of['nome'] ?? ''));
+                        if ($oid > 0 && $nomeOf !== '' && !isset($nomesCatalogoById[$oid])) {
+                            $nomesCatalogoById[$oid] = $nomeOf;
                         }
                     }
                 } catch (Throwable $e) {
                     // catálogo operacional já preenchido
                 }
             }
+        }
+        if ($materiasSelecionadas !== []) {
             $nomesGruposVirtuais = [];
             foreach (array_keys($gruposVirtualMids) as $vmidNome) {
                 $nomeGrupo = trim((string) ($materiaNomesPorId[(int) $vmidNome] ?? ''));
@@ -5060,7 +5064,11 @@ class BoletimConfigController extends BaseController
                 if ($midSel <= 0) {
                     continue;
                 }
-                $nomeSel = (string) ($materiaNomesPorId[$midSel] ?? ($nomesCatalogoById[$midSel] ?? ''));
+                // Sem nome no catálogo = id órfão (ex.: matéria apagada) — não inventa linha.
+                if (!isset($nomesCatalogoById[$midSel])) {
+                    continue;
+                }
+                $nomeSel = (string) ($materiaNomesPorId[$midSel] ?? $nomesCatalogoById[$midSel]);
                 $nomeKeySel = $this->canonicalMateriaNomeKey($nomeSel);
                 if ($nomeKeySel !== '' && isset($nomesGruposVirtuais[$nomeKeySel])) {
                     continue;
@@ -5070,9 +5078,31 @@ class BoletimConfigController extends BaseController
                 }
                 $allMids[$midSel] = true;
                 if (!isset($materiaNomesPorId[$midSel])) {
-                    $materiaNomesPorId[$midSel] = (string) ($nomesCatalogoById[$midSel] ?? ('Matéria #' . $midSel));
+                    $materiaNomesPorId[$midSel] = $nomesCatalogoById[$midSel];
                 }
             }
+        }
+        // Remove órfãos / pais-rótulo que já entraram via nota sem nome resolvido.
+        foreach (array_keys($allMids) as $midLimpeza) {
+            $midLimpeza = (int) $midLimpeza;
+            if ($midLimpeza <= 0) {
+                continue;
+            }
+            if (isset($idsRotuloPai[$midLimpeza])) {
+                unset($allMids[$midLimpeza]);
+                continue;
+            }
+            $nomeLimpeza = trim((string) ($materiaNomesPorId[$midLimpeza] ?? ($nomesCatalogoById[$midLimpeza] ?? '')));
+            if ($nomeLimpeza === '' || preg_match('/^Matéria #\d+$/u', $nomeLimpeza) === 1) {
+                unset($allMids[$midLimpeza]);
+                continue;
+            }
+            if (!isset($materiaNomesPorId[$midLimpeza])) {
+                $materiaNomesPorId[$midLimpeza] = $nomeLimpeza;
+            }
+        }
+        if ($allMids === []) {
+            return null;
         }
 
         $this->aplicarEspalhamentoJornadasNotaUnicaNaMatriz($componentesRegra, $matrizPorCodigo, $componentesResultado, $allMids, $roundMode);
