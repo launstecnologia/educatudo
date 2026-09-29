@@ -2851,8 +2851,8 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Simulação da tela inicial: reusa blocos/jornadas/faltas já salvos no evento
-     * (mesmo critério do assistente em rascunhoComFontesSalvas).
+     * Simulação da tela inicial: reusa blocos/jornadas/faltas já salvos no evento.
+     * Colunas s1/s3… herdam tipo/blocos da peça "semanal" quando o salvo não tem a semana.
      *
      * @param array<string,mixed> $regra
      * @return array<string,mixed>
@@ -2868,13 +2868,18 @@ class BoletimConfigController extends BaseController
             return $regra;
         }
         $salvas = [];
+        $fonteSemanal = null;
         foreach ($salva['componentes'] as $comp) {
             if (!is_array($comp)) {
                 continue;
             }
             $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
-            if ($cod !== '') {
-                $salvas[$cod] = $comp;
+            if ($cod === '') {
+                continue;
+            }
+            $salvas[$cod] = $comp;
+            if ($fonteSemanal === null && $this->componenteEhFonteSemanalSalva($comp)) {
+                $fonteSemanal = $comp;
             }
         }
         if ($salvas === []) {
@@ -2887,69 +2892,180 @@ class BoletimConfigController extends BaseController
             }
             $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
             $origem = strtolower(trim((string) ($comp['source_type'] ?? '')));
-            $salvaComp = $salvas[$cod] ?? null;
-            if ($origem !== 'calculado' && is_array($salvaComp)) {
-                $nome = trim((string) ($comp['nome'] ?? ''));
-                $materiaUnica = !empty($comp['materia_unica']);
-                $cfgDraft = is_array($comp['config'] ?? null) ? $comp['config'] : [];
-                if (is_string($comp['config_json'] ?? null) && $comp['config_json'] !== '') {
-                    $decodedDraft = json_decode((string) $comp['config_json'], true);
-                    if (is_array($decodedDraft)) {
-                        $cfgDraft = array_merge($decodedDraft, $cfgDraft);
-                    }
-                }
-                $grupoLinha = $cfgDraft['group_line'] ?? null;
-                $usarPercDraft = array_key_exists('usar_percentual', $comp) ? $comp['usar_percentual'] : null;
-                $comp = $salvaComp;
-                $cfgSalva = [];
-                if (is_string($comp['config_json'] ?? null) && $comp['config_json'] !== '') {
-                    $decodedSalva = json_decode((string) $comp['config_json'], true);
-                    if (is_array($decodedSalva)) {
-                        $cfgSalva = $decodedSalva;
-                    }
-                }
-                if (is_array($comp['config'] ?? null)) {
-                    $cfgSalva = array_merge($cfgSalva, $comp['config']);
-                }
-                if ($nome !== '') {
-                    $comp['nome'] = $nome;
-                }
-                if ($materiaUnica) {
-                    $comp['materia_unica'] = 1;
-                }
-                if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
-                    $cfgSalva['group_line'] = $grupoLinha;
-                }
-                if ($origem === 'jornadas') {
-                    if (isset($cfgDraft['distribuicao_notas'])) {
-                        $cfgSalva['distribuicao_notas'] = $cfgDraft['distribuicao_notas'];
-                    }
-                    if (array_key_exists('faixas_percentuais', $cfgDraft)) {
-                        $cfgSalva['faixas_percentuais'] = $cfgDraft['faixas_percentuais'];
-                    }
-                    if (isset($cfgDraft['jornada_ids']) && is_array($cfgDraft['jornada_ids']) && $cfgDraft['jornada_ids'] !== []) {
-                        $cfgSalva['jornada_ids'] = $cfgDraft['jornada_ids'];
-                    }
-                    if (isset($cfgDraft['jornada_bimestres']) && is_array($cfgDraft['jornada_bimestres'])) {
-                        $cfgSalva['jornada_bimestres'] = $cfgDraft['jornada_bimestres'];
-                    }
-                    if ($usarPercDraft !== null) {
-                        $comp['usar_percentual'] = (int) ((int) $usarPercDraft ? 1 : 0);
-                    }
-                }
-                $comp['config'] = $cfgSalva;
-                $comp['config_json'] = json_encode($cfgSalva, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($origem === 'calculado') {
+                $componentes[] = $comp;
+                continue;
             }
-            $componentes[] = $comp;
+            $ehSemana = BoletimQuadroLayoutHelper::codigoEhSemana($cod);
+            $salvaComp = $salvas[$cod] ?? null;
+            if ($salvaComp === null && $ehSemana && is_array($fonteSemanal)) {
+                $salvaComp = $fonteSemanal;
+            }
+            if (!is_array($salvaComp)) {
+                $componentes[] = $comp;
+                continue;
+            }
+
+            $cfgDraft = $this->decodeComponenteConfig($comp);
+            $cfgFonte = $this->decodeComponenteConfig($salvaComp);
+            $cfg = $cfgFonte;
+
+            // Mantém layout/semana do rascunho (s1… no quadro).
+            foreach (['layout_group', 'layout_type', 'layout', 'semana', 'group_line'] as $chaveLayout) {
+                if (isset($cfgDraft[$chaveLayout]) && $cfgDraft[$chaveLayout] !== '' && $cfgDraft[$chaveLayout] !== null) {
+                    $cfg[$chaveLayout] = $cfgDraft[$chaveLayout];
+                }
+            }
+            if ($ehSemana) {
+                if (!isset($cfg['semana']) || (int) $cfg['semana'] <= 0) {
+                    if (preg_match('/^s([1-9]|[1-9]\d)$/', $cod, $mSem)) {
+                        $cfg['semana'] = (int) $mSem[1];
+                    }
+                }
+                $cfg['layout_type'] = $cfg['layout_type'] ?? 'semana_nq';
+                if (empty($cfg['layout_group']) && !empty($cfgDraft['layout_group'])) {
+                    $cfg['layout_group'] = $cfgDraft['layout_group'];
+                }
+            }
+
+            // Fontes de prova: preferir salvo; se vazio, manter draft.
+            foreach (['tipo_avaliacao_id', 'tipo_avaliacao_nome', 'prova_bimestres', 'blocos_ids_manual', 'grupo_regras_tipo_id', 'grupo_regras_marca_id'] as $chaveFonte) {
+                $vSalvo = $cfgFonte[$chaveFonte] ?? null;
+                $vDraft = $cfgDraft[$chaveFonte] ?? null;
+                $salvoVazio = $vSalvo === null || $vSalvo === '' || $vSalvo === [] || $vSalvo === 0 || $vSalvo === '0';
+                if ($salvoVazio && $vDraft !== null && $vDraft !== '' && $vDraft !== []) {
+                    $cfg[$chaveFonte] = $vDraft;
+                }
+            }
+
+            if ($origem === 'jornadas') {
+                if (isset($cfgDraft['distribuicao_notas'])) {
+                    $cfg['distribuicao_notas'] = $cfgDraft['distribuicao_notas'];
+                }
+                if (array_key_exists('faixas_percentuais', $cfgDraft)) {
+                    $cfg['faixas_percentuais'] = $cfgDraft['faixas_percentuais'];
+                }
+                if (isset($cfgDraft['jornada_ids']) && is_array($cfgDraft['jornada_ids']) && $cfgDraft['jornada_ids'] !== []) {
+                    $cfg['jornada_ids'] = $cfgDraft['jornada_ids'];
+                }
+                if (isset($cfgDraft['jornada_bimestres']) && is_array($cfgDraft['jornada_bimestres'])) {
+                    $cfg['jornada_bimestres'] = $cfgDraft['jornada_bimestres'];
+                }
+            }
+
+            $nome = trim((string) ($comp['nome'] ?? ''));
+            $out = $salvaComp;
+            // Semana do quadro: mantém codigo/nome/layout do draft (s1, S1…).
+            if ($ehSemana) {
+                $out['codigo'] = (string) ($comp['codigo'] ?? $cod);
+                if ($nome !== '') {
+                    $out['nome'] = $nome;
+                }
+                $out['source_type'] = (string) ($comp['source_type'] ?? $out['source_type'] ?? 'provas_sistema');
+                if (array_key_exists('usar_percentual', $comp)) {
+                    $out['usar_percentual'] = (int) ((int) $comp['usar_percentual'] ? 1 : 0);
+                } else {
+                    $out['usar_percentual'] = 1;
+                }
+            } else {
+                if ($nome !== '') {
+                    $out['nome'] = $nome;
+                }
+                if (array_key_exists('usar_percentual', $comp)) {
+                    $out['usar_percentual'] = (int) ((int) $comp['usar_percentual'] ? 1 : 0);
+                }
+            }
+            if (!empty($comp['materia_unica'])) {
+                $out['materia_unica'] = 1;
+            }
+
+            $blocosDraft = $this->idsBlocosDoComponente($comp);
+            $blocosSalvo = $this->idsBlocosDoComponente($salvaComp);
+            if ($blocosSalvo !== []) {
+                $out['blocos_ids'] = implode(',', $blocosSalvo);
+            } elseif ($blocosDraft !== []) {
+                $out['blocos_ids'] = implode(',', $blocosDraft);
+            }
+            if (!empty($comp['filtro_titulo']) && empty($out['filtro_titulo'])) {
+                $out['filtro_titulo'] = $comp['filtro_titulo'];
+            }
+
+            $out['config'] = $cfg;
+            $out['config_json'] = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (!empty($cfg['layout_group'])) {
+                $out['layout_group'] = $cfg['layout_group'];
+            }
+            if (!empty($cfg['layout_type'])) {
+                $out['layout_type'] = $cfg['layout_type'];
+            }
+            $componentes[] = $out;
         }
         if ($componentes !== []) {
             $regra['componentes'] = $componentes;
         }
-        if ((int) ($regra['grupo_regras_notas_id'] ?? 0) <= 0 && (int) ($salva['grupo_regras_notas_id'] ?? 0) > 0) {
-            $regra['grupo_regras_notas_id'] = (int) $salva['grupo_regras_notas_id'];
+        if ($this->grupoRegrasNotasIdDaRegra($regra) <= 0) {
+            $gid = $this->grupoRegrasNotasIdDaRegra($salva);
+            if ($gid > 0) {
+                $regra['grupo_regras_notas_id'] = $gid;
+            }
         }
 
         return $regra;
+    }
+
+    /**
+     * @param array<string,mixed> $comp
+     */
+    private function componenteEhFonteSemanalSalva(array $comp): bool
+    {
+        $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+        if ($cod === 'semanal' || $cod === 'prova_semanal') {
+            return true;
+        }
+        if (BoletimQuadroLayoutHelper::codigoEhSemana($cod)) {
+            return false;
+        }
+        $nome = mb_strtolower(trim((string) ($comp['nome'] ?? '')), 'UTF-8');
+
+        return str_contains($nome, 'semanal') || str_contains($nome, 'prova semanal');
+    }
+
+    /**
+     * @param array<string,mixed> $comp
+     * @return list<int>
+     */
+    private function idsBlocosDoComponente(array $comp): array
+    {
+        $ids = [];
+        $raw = $comp['blocos_ids'] ?? null;
+        if (is_array($raw)) {
+            foreach ($raw as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+        } elseif (is_string($raw) && trim($raw) !== '') {
+            foreach (explode(',', $raw) as $id) {
+                $id = (int) trim($id);
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+        }
+        $blocoId = (int) ($comp['bloco_id'] ?? 0);
+        if ($blocoId > 0) {
+            $ids[] = $blocoId;
+        }
+        $cfg = $this->decodeComponenteConfig($comp);
+        foreach ((array) ($cfg['blocos_ids'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**
@@ -7931,6 +8047,80 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Garante que cada coluna sN tenha tipo_avaliacao / blocos herdados da peça semanal.
+     *
+     * @param list<array<string,mixed>> $novos
+     * @param list<array<string,mixed>> $originais
+     * @return list<array<string,mixed>>
+     */
+    private function enriquecerSemanasComFonteSemanal(array $novos, array $originais): array
+    {
+        $template = null;
+        foreach ($originais as $c) {
+            if (is_array($c) && $this->componenteEhFonteSemanalSalva($c)) {
+                $template = $c;
+                break;
+            }
+        }
+        if ($template === null) {
+            foreach ($novos as $c) {
+                if (!is_array($c)) {
+                    continue;
+                }
+                $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+                if ($cod === 'semanal' || $cod === 'prova_semanal') {
+                    $template = $c;
+                    break;
+                }
+            }
+        }
+        if ($template === null) {
+            return $novos;
+        }
+        $cfgTpl = $this->decodeComponenteConfig($template);
+        $blocosTpl = $this->idsBlocosDoComponente($template);
+        $tipoTpl = (int) ($cfgTpl['tipo_avaliacao_id'] ?? $template['tipo_avaliacao_id'] ?? 0);
+        $out = [];
+        foreach ($novos as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if (!BoletimQuadroLayoutHelper::codigoEhSemana($cod)) {
+                $out[] = $c;
+                continue;
+            }
+            $cfg = $this->decodeComponenteConfig($c);
+            $tipoAtual = (int) ($cfg['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
+            if ($tipoAtual <= 0 && $tipoTpl > 0) {
+                $cfg['tipo_avaliacao_id'] = $tipoTpl;
+                if (!empty($cfgTpl['tipo_avaliacao_nome'])) {
+                    $cfg['tipo_avaliacao_nome'] = $cfgTpl['tipo_avaliacao_nome'];
+                }
+            }
+            foreach (['prova_bimestres', 'grupo_regras_tipo_id', 'grupo_regras_marca_id'] as $chave) {
+                if (empty($cfg[$chave]) && !empty($cfgTpl[$chave])) {
+                    $cfg[$chave] = $cfgTpl[$chave];
+                }
+            }
+            if ($this->idsBlocosDoComponente($c) === [] && $blocosTpl !== []) {
+                $c['blocos_ids'] = implode(',', $blocosTpl);
+            }
+            if (empty($c['filtro_titulo']) && !empty($template['filtro_titulo'])) {
+                $c['filtro_titulo'] = $template['filtro_titulo'];
+            }
+            if (!isset($c['usar_percentual'])) {
+                $c['usar_percentual'] = 1;
+            }
+            $c['config'] = $cfg;
+            $c['config_json'] = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $out[] = $c;
+        }
+
+        return $out;
+    }
+
+    /**
      * @param array<string,mixed> $comp
      */
     private function componenteContaComoFalta(array $comp): bool
@@ -8040,6 +8230,7 @@ class BoletimConfigController extends BaseController
             $semanas['a'],
             $semanas['b']
         );
+        $novos = $this->enriquecerSemanasComFonteSemanal($novos, $componentes);
         $formula = trim((string) ($regra['formula_final'] ?? ''));
         if ($formula !== '') {
             $regra['formula_final'] = BoletimQuadroLayoutHelper::reescreverCodigoSemanalNaFormula($formula, $codigoSemanal);
@@ -8098,8 +8289,18 @@ class BoletimConfigController extends BaseController
     {
         $cfg = $this->decodeComponenteConfig($componente);
         $s = (int) ($cfg['semana'] ?? $componente['semana'] ?? 0);
+        if ($s >= 1 && $s <= BoletimQuadroLayoutHelper::SEMANA_MAX) {
+            return $s;
+        }
+        $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+        if (preg_match('/^s([1-9]|[1-9]\d)$/', $cod, $m)) {
+            $s = (int) $m[1];
+            if ($s >= 1 && $s <= BoletimQuadroLayoutHelper::SEMANA_MAX) {
+                return $s;
+            }
+        }
 
-        return ($s >= 1 && $s <= BoletimQuadroLayoutHelper::SEMANA_MAX) ? $s : 0;
+        return 0;
     }
 
     private function parseGrupoRegrasIdFromComponente(array $componente, string $chave): int
