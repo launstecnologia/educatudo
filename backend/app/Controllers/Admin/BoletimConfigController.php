@@ -5598,21 +5598,31 @@ class BoletimConfigController extends BaseController
                 $agr = null;
                 if ($ehFaltasCol) {
                     $agr = $this->agruparValoresGrupoLinha($vals, 'soma', 0.0);
-                } elseif (!empty($cfg['usar_percentual']) && strtolower((string) $cfg['mode']) === 'media' && $sumQuestoes > 0) {
+                } elseif (!empty($cfg['usar_percentual'])
+                    && strtolower((string) ($cfg['mode'] ?? 'media')) === 'media'
+                    && $sumQuestoes > 0
+                    && $this->componenteAgregaGrupoPorNq($codigo, $cfg)
+                ) {
+                    // Semanas N/Q: aproveitamento conjunto (soma N ÷ soma Q), não média das notas 0–10.
                     $agr = ($sumAcertos / $sumQuestoes) * 10.0;
                 } else {
-                    $divisorCfg = (float) ($cfg['divisor'] ?? 0);
-                    // Em Jornadas, a média agrupada deve respeitar só as matérias com nota
-                    // no período, sem forçar divisor fixo (evita queda artificial, ex.: 4,5).
-                    if (($cfg['source_type'] ?? '') === 'jornadas' && strtolower((string) ($cfg['mode'] ?? 'media')) === 'media') {
-                        // Também ignora zeros no agrupamento de Jornadas para não diluir
+                    $modoCfg = strtolower(trim((string) ($cfg['mode'] ?? 'media')));
+                    if ($modoCfg !== 'soma') {
+                        $modoCfg = 'media';
+                    }
+                    // Média do grupo = média aritmética das matérias (Leitura, Literatura, Português…).
+                    // Divisor fixo do cadastro só vale para modo soma (ex.: dividir total por N).
+                    $divisorCfg = ($modoCfg === 'media')
+                        ? 0.0
+                        : (float) ($cfg['divisor'] ?? 0);
+                    if (($cfg['source_type'] ?? '') === 'jornadas' && $modoCfg === 'media') {
+                        // Ignora zeros no agrupamento de Jornadas para não diluir
                         // a nota da área quando há matérias do grupo sem jornada aplicável.
                         $vals = array_values(array_filter($vals, static function ($v) {
                             return is_numeric($v) && (float) $v > 0.0;
                         }));
-                        $divisorCfg = 0.0;
                     }
-                    $agr = $this->agruparValoresGrupoLinha($vals, $cfg['mode'], $divisorCfg);
+                    $agr = $this->agruparValoresGrupoLinha($vals, $modoCfg, $divisorCfg);
                 }
                 $virtualMidCfg = (int) $cfg['virtual_mid'];
                 // Se já existe um valor no id sintético do grupo ANTES de recalcular (só
@@ -5744,9 +5754,7 @@ class BoletimConfigController extends BaseController
             if ($nomeKeyDup === '' || !isset($nomesRotuloGrupo[$nomeKeyDup])) {
                 continue;
             }
-            if ($this->midTemNotaForaDeFaltas($midNome, $matrizPorCodigo, $codigosFaltas)) {
-                continue;
-            }
+            // Rótulo do grupo (ex.: matéria "Língua Portuguesa") cede lugar à linha virtual.
             $materiasAgrupadasAtivas[$midNome] = true;
         }
 
@@ -6132,6 +6140,17 @@ class BoletimConfigController extends BaseController
             }
             $matrizPorCodigo[$codigo] = $map;
         }
+    }
+
+    /**
+     * Só colunas sN agregam N/Q em conjunto. Média final / prova / jornada / media_sem
+     * usam a média (ou soma) das notas 0–10 de cada matéria do grupo.
+     *
+     * @param array<string,mixed> $cfgGroup
+     */
+    private function componenteAgregaGrupoPorNq(string $codigo, array $cfgGroup): bool
+    {
+        return BoletimQuadroLayoutHelper::codigoEhSemana(strtolower(trim($codigo)));
     }
 
     private function agruparValoresGrupoLinha(array $valores, string $modo, float $divisor): ?float
