@@ -268,11 +268,10 @@ class ProvasAlunoConsultaService
         if ($tipoId <= 0 && $tipoNome !== '') {
             $tipo = $this->resolverTipoAvaliacao($tipoNome);
             $tipoId = $tipo ? (int) $tipo['id'] : 0;
-            if ($tipoId <= 0) {
-                return ['ok' => false, 'error' => 'Tipo de avaliação não encontrado: ' . $tipoNome];
-            }
+            // Tipo não encontrado: não aborta — ainda busca e deixa o filtro frouxo no título.
         }
 
+        $professorNome = trim((string) ($filtros['professor_nome'] ?? $filtros['professor'] ?? ''));
         $dataInicio = $this->normalizarData($filtros['data_inicio'] ?? null);
         $dataFim = $this->normalizarData($filtros['data_fim'] ?? null);
         $bimestre = (int) ($filtros['bimestre'] ?? 0);
@@ -298,15 +297,62 @@ class ProvasAlunoConsultaService
             $bimestre > 0 ? $bimestre : null
         );
 
+        $lancamentos = $this->consultarLancamentosCoordenacao(
+            $alunoId,
+            $materiaId > 0 ? $materiaId : null,
+            $tipoId > 0 ? $tipoId : null,
+            $tipoNome !== '' ? $tipoNome : null,
+            $bimestre > 0 ? $bimestre : null,
+            $dataInicio,
+            $dataFim,
+            $professorNome !== '' ? $professorNome : null,
+            $limite
+        );
+
+        // Se filtro de tipo não resolveu id, filtra online pelo nome aproximado no título/tipo.
+        if ($tipoId <= 0 && $tipoNome !== '') {
+            $provas = array_values(array_filter($provas, function (array $p) use ($tipoNome): bool {
+                $tipoAv = mb_strtolower((string) ($p['tipo_avaliacao']['nome'] ?? ''));
+                $titulo = mb_strtolower((string) ($p['titulo'] ?? '') . ' ' . (string) ($p['evento']['titulo'] ?? ''));
+                $needle = mb_strtolower($tipoNome);
+                return str_contains($tipoAv, $needle)
+                    || str_contains($needle, $tipoAv)
+                    || str_contains($titulo, $needle)
+                    || $this->tipoAliasCasa($needle, $tipoAv);
+            }));
+        }
+
+        if ($professorNome !== '') {
+            $provas = array_values(array_filter($provas, function (array $p) use ($professorNome): bool {
+                $nome = mb_strtolower(trim((string) ($p['professor']['nome'] ?? '')));
+                if ($nome === '') {
+                    return true; // prova online sem professor no join: mantém
+                }
+                return $this->textoContem($nome, $professorNome);
+            }));
+        }
+
+        $merged = array_merge($provas, $lancamentos);
+        usort($merged, static function (array $a, array $b): int {
+            $da = (string) ($a['evento']['data_prova'] ?? $a['realizacao']['finalizado_em'] ?? '');
+            $db = (string) ($b['evento']['data_prova'] ?? $b['realizacao']['finalizado_em'] ?? '');
+            return strcmp($db, $da);
+        });
+        if (count($merged) > $limite) {
+            $merged = array_slice($merged, 0, $limite);
+        }
+
         return [
             'ok' => true,
             'aluno' => $aluno,
-            'provas' => $provas,
-            'total' => count($provas),
+            'provas' => $merged,
+            'total' => count($merged),
             'filtros_aplicados' => [
                 'aluno_id' => $alunoId,
                 'materia_id' => $materiaId > 0 ? $materiaId : null,
                 'tipo_avaliacao_id' => $tipoId > 0 ? $tipoId : null,
+                'tipo_avaliacao_nome' => $tipoNome !== '' ? $tipoNome : null,
+                'professor_nome' => $professorNome !== '' ? $professorNome : null,
                 'bimestre' => $bimestre > 0 ? $bimestre : null,
                 'data_inicio' => $dataInicio,
                 'data_fim' => $dataFim,
@@ -865,6 +911,7 @@ class ProvasAlunoConsultaService
 
             $out[] = [
                 'prova_id' => $provaId,
+                'origem' => 'prova_online',
                 'titulo' => trim((string) ($r['prova_titulo'] ?? '')),
                 'materia' => [
                     'id' => isset($r['materia_id']) ? (int) $r['materia_id'] : null,
@@ -873,6 +920,10 @@ class ProvasAlunoConsultaService
                 'tipo_avaliacao' => [
                     'id' => isset($r['tipo_avaliacao_id']) ? (int) $r['tipo_avaliacao_id'] : null,
                     'nome' => isset($r['tipo_avaliacao_nome']) ? trim((string) $r['tipo_avaliacao_nome']) : null,
+                ],
+                'professor' => [
+                    'id' => null,
+                    'nome' => null,
                 ],
                 'evento' => [
                     'id' => $blocoId > 0 ? $blocoId : null,
@@ -900,6 +951,183 @@ class ProvasAlunoConsultaService
                 break;
             }
         }
+        return $out;
+    }
+
+    /**
+     * Notas da pauta (Lançamento de Notas / coordenação), formato lancamento_nota.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function consultarLancamentosCoordenacao(
+        int $alunoId,
+        ?int $materiaId,
+        ?int $tipoId,
+        ?string $tipoNome,
+        ?int $bimestre,
+        ?string $dataInicio,
+        ?string $dataFim,
+        ?string $professorNome,
+        int $limite
+    ): array {
+        if ($alunoId <= 0 || !$this->temTabela('provas_blocos_notas_lancadas')) {
+            return [];
+        }
+        $temTipo = $this->temColuna('provas_blocos', 'tipo_avaliacao_id')
+            && $this->temTabela('provas_tipos_avaliacao');
+        $temProf = $this->temTabela('professores');
+        $selectTipoId = $temTipo ? 'pta.id AS tipo_avaliacao_id' : 'NULL AS tipo_avaliacao_id';
+        $selectTipoNome = $temTipo ? 'pta.nome AS tipo_avaliacao_nome' : 'NULL AS tipo_avaliacao_nome';
+        $joinTipo = $temTipo
+            ? 'LEFT JOIN provas_tipos_avaliacao pta ON pta.id = pb.tipo_avaliacao_id AND pta.deleted_at IS NULL'
+            : '';
+        $selectProfId = $temProf ? 'pr.id AS professor_id' : 'n.professor_id AS professor_id';
+        $selectProfNome = $temProf ? 'pr.nome AS professor_nome' : 'NULL AS professor_nome';
+        $joinProf = $temProf
+            ? 'LEFT JOIN professores pr ON pr.id = n.professor_id'
+            : '';
+
+        $sql = "SELECT
+                    n.id AS lancamento_id,
+                    n.bloco_id,
+                    n.nota,
+                    n.observacao,
+                    n.updated_at,
+                    n.materia_id,
+                    m.nome AS materia_nome,
+                    pb.titulo AS bloco_titulo,
+                    pb.data_prova,
+                    pb.bimestre,
+                    pb.ano_letivo,
+                    {$selectTipoId},
+                    {$selectTipoNome},
+                    {$selectProfId},
+                    {$selectProfNome}
+                FROM provas_blocos_notas_lancadas n
+                INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                LEFT JOIN materias m ON m.id = n.materia_id
+                {$joinTipo}
+                {$joinProf}
+                WHERE n.aluno_id = :aluno_id
+                  AND n.nota IS NOT NULL";
+        $params = ['aluno_id' => $alunoId];
+
+        if ($materiaId !== null && $materiaId > 0) {
+            $sql .= ' AND n.materia_id = :materia_id';
+            $params['materia_id'] = $materiaId;
+        }
+        if ($temTipo && $tipoId !== null && $tipoId > 0) {
+            $sql .= ' AND pb.tipo_avaliacao_id = :tipo_id';
+            $params['tipo_id'] = $tipoId;
+        }
+        if ($bimestre !== null && $bimestre > 0) {
+            $sql .= ' AND pb.bimestre = :bimestre';
+            $params['bimestre'] = $bimestre;
+        }
+        if ($dataInicio !== null && $dataFim !== null) {
+            $sql .= ' AND (
+                (n.updated_at IS NOT NULL AND DATE(n.updated_at) BETWEEN :di1 AND :df1)
+                OR (pb.data_prova IS NOT NULL AND CAST(pb.data_prova AS CHAR) <> \'0000-00-00\'
+                    AND pb.data_prova BETWEEN :di2 AND :df2)
+            )';
+            $params['di1'] = $dataInicio;
+            $params['df1'] = $dataFim;
+            $params['di2'] = $dataInicio;
+            $params['df2'] = $dataFim;
+        } elseif ($dataInicio !== null) {
+            $sql .= ' AND (
+                (n.updated_at IS NOT NULL AND DATE(n.updated_at) >= :di1)
+                OR (pb.data_prova IS NOT NULL AND pb.data_prova >= :di2)
+            )';
+            $params['di1'] = $dataInicio;
+            $params['di2'] = $dataInicio;
+        } elseif ($dataFim !== null) {
+            $sql .= ' AND (
+                (n.updated_at IS NOT NULL AND DATE(n.updated_at) <= :df1)
+                OR (pb.data_prova IS NOT NULL AND pb.data_prova <= :df2)
+            )';
+            $params['df1'] = $dataFim;
+            $params['df2'] = $dataFim;
+        }
+
+        $limiteSql = min(300, max($limite * 2, $limite));
+        $sql .= " ORDER BY COALESCE(pb.data_prova, DATE(n.updated_at)) DESC, n.id DESC LIMIT {$limiteSql}";
+
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        $needleTipo = $tipoNome !== null ? mb_strtolower(trim($tipoNome)) : '';
+        $needleProf = $professorNome !== null ? mb_strtolower(trim($professorNome)) : '';
+
+        foreach ($rows as $r) {
+            $tipoAvNome = trim((string) ($r['tipo_avaliacao_nome'] ?? ''));
+            $tituloBloco = trim((string) ($r['bloco_titulo'] ?? ''));
+            if ($tipoId === null || $tipoId <= 0) {
+                if ($needleTipo !== '') {
+                    $hay = mb_strtolower($tipoAvNome . ' ' . $tituloBloco);
+                    if (!str_contains($hay, $needleTipo)
+                        && !$this->tipoAliasCasa($needleTipo, mb_strtolower($tipoAvNome))
+                        && !$this->tipoAliasCasa($needleTipo, mb_strtolower($tituloBloco))
+                    ) {
+                        continue;
+                    }
+                }
+            }
+            $profNome = trim((string) ($r['professor_nome'] ?? ''));
+            if ($needleProf !== '' && $profNome !== '' && !$this->textoContem($profNome, $professorNome ?? '')) {
+                continue;
+            }
+
+            $nota = isset($r['nota']) && $r['nota'] !== null && $r['nota'] !== ''
+                ? (float) $r['nota']
+                : null;
+            if ($nota === null) {
+                continue;
+            }
+            $lancId = (int) ($r['lancamento_id'] ?? 0);
+            $blocoId = (int) ($r['bloco_id'] ?? 0);
+            $out[] = [
+                'prova_id' => 2000000000 + $lancId,
+                'origem' => 'lancamento_coordenacao',
+                'titulo' => $tituloBloco !== '' ? $tituloBloco : 'Lançamento de nota',
+                'materia' => [
+                    'id' => isset($r['materia_id']) ? (int) $r['materia_id'] : null,
+                    'nome' => isset($r['materia_nome']) ? trim((string) $r['materia_nome']) : null,
+                ],
+                'tipo_avaliacao' => [
+                    'id' => isset($r['tipo_avaliacao_id']) ? (int) $r['tipo_avaliacao_id'] : null,
+                    'nome' => $tipoAvNome !== '' ? $tipoAvNome : null,
+                ],
+                'professor' => [
+                    'id' => isset($r['professor_id']) ? (int) $r['professor_id'] : null,
+                    'nome' => $profNome !== '' ? $profNome : null,
+                ],
+                'evento' => [
+                    'id' => $blocoId > 0 ? $blocoId : null,
+                    'titulo' => $tituloBloco !== '' ? $tituloBloco : null,
+                    'data_prova' => $this->formatarData($r['data_prova'] ?? null),
+                    'bimestre' => isset($r['bimestre']) ? (int) $r['bimestre'] : null,
+                    'ano_letivo' => isset($r['ano_letivo']) ? (int) $r['ano_letivo'] : null,
+                ],
+                'realizacao' => [
+                    'id' => $lancId > 0 ? $lancId : null,
+                    'status' => 'lancado',
+                    'iniciado_em' => null,
+                    'finalizado_em' => isset($r['updated_at']) ? (string) $r['updated_at'] : null,
+                    'dia_realizacao' => $this->formatarData($r['updated_at'] ?? $r['data_prova'] ?? null),
+                    'nota' => $nota,
+                    'valor_total' => 10.0,
+                    'acertos' => 0,
+                    'erros' => 0,
+                    'total_questoes' => 0,
+                    'percentual_acerto' => null,
+                    'observacao' => trim((string) ($r['observacao'] ?? '')),
+                ],
+            ];
+            if (count($out) >= $limite) {
+                break;
+            }
+        }
+
         return $out;
     }
 
@@ -935,11 +1163,91 @@ class ProvasAlunoConsultaService
             if ($n === $needle) {
                 return ['id' => (int) $t['id'], 'nome' => $t['nome']];
             }
+            if ($this->tipoAliasCasa($needle, $n) || $this->tipoAliasCasa($n, $needle)) {
+                return ['id' => (int) $t['id'], 'nome' => $t['nome']];
+            }
             if ($parcial === null && (str_contains($n, $needle) || str_contains($needle, $n))) {
                 $parcial = ['id' => (int) $t['id'], 'nome' => $t['nome']];
             }
         }
         return $parcial;
+    }
+
+    private function tipoAliasCasa(string $a, string $b): bool
+    {
+        $a = $this->normalizarChaveTipo($a);
+        $b = $this->normalizarChaveTipo($b);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b || str_contains($a, $b) || str_contains($b, $a)) {
+            return true;
+        }
+        $aliases = [
+            'semanal' => ['prova semanal', 'avaliacao semanal', 'semanais'],
+            'bimestral' => ['avaliacao bimestral', 'prova bimestral'],
+            'enac' => ['enac'],
+            'trabalho' => ['trabalho', 'trab'],
+            'recuperacao' => ['recuperacao', 'rec'],
+        ];
+        foreach ($aliases as $chave => $lista) {
+            $grupo = array_merge([$chave], $lista);
+            $temA = false;
+            $temB = false;
+            foreach ($grupo as $g) {
+                if ($a === $g || str_contains($a, $g)) {
+                    $temA = true;
+                }
+                if ($b === $g || str_contains($b, $g)) {
+                    $temB = true;
+                }
+            }
+            if ($temA && $temB) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizarChaveTipo(string $s): string
+    {
+        $s = mb_strtolower(trim($s));
+        $s = strtr($s, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
+        $s = preg_replace('/[^a-z0-9\s]/u', ' ', $s) ?? $s;
+        $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
+
+        return trim($s);
+    }
+
+    private function textoContem(string $haystack, string $needle): bool
+    {
+        $h = mb_strtolower(trim($haystack));
+        $n = mb_strtolower(trim($needle));
+        if ($h === '' || $n === '') {
+            return false;
+        }
+        if (str_contains($h, $n) || str_contains($n, $h)) {
+            return true;
+        }
+        $tokens = preg_split('/\s+/u', $n) ?: [];
+        foreach ($tokens as $tok) {
+            if (mb_strlen($tok) < 3) {
+                continue;
+            }
+            if (!str_contains($h, $tok)) {
+                return false;
+            }
+        }
+
+        return $tokens !== [];
     }
 
     private function normalizarData($raw): ?string

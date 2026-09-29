@@ -143,7 +143,7 @@ class BoletimConsultaAssistenteService
     private function parecePerguntaDeDado(string $mensagem): bool
     {
         return (bool) preg_match(
-            '/\b(nota|notas|jornada|jornadas|quantas|quanto|quais|lançamento|lancamento|aluno|aluna|fez|tirou|acertou)\b/ui',
+            '/\b(nota|notas|jornada|jornadas|quantas|quanto|quais|lançamento|lancamento|aluno|aluna|fez|tirou|acertou|bimestral|semanal|enac|avalia[cç][aã]o|mat[eé]ria|professor|no caso|na verdade|quero saber)\b/ui',
             $mensagem
         );
     }
@@ -368,7 +368,7 @@ class BoletimConsultaAssistenteService
                 . "4. Salvar bloco.\n\n"
                 . "Exemplo: média 7 e ENAC 9 vira 9. Média 8 e ENAC 6 continua 8. Não use o botão Maior entre as duas primeiras — ele pega os dois primeiros tipos da lista, não a Média Bim com o ENAC.";
         }
-        if (preg_match('/semanal|s1|semana/u', $t)) {
+        if (preg_match('/semanal|s1|semana/u', $t) && !preg_match('/\b(aluno|aluna|nota|tirou|fez|lançamento|lancamento)\b/u', $t)) {
             return "A Prova Semanal lista os eventos do tipo de nota Prova Semanal no bimestre marcado na peça. O título do evento (Avaliação Semanal) não define o tipo.\n\n"
                 . "No passo das peças, marque Prova Semanal e o bimestre. Cada evento entra com a data, o bloco e a semana (S1, S2…). Bloco A fica nas semanas ímpares e Bloco B nas pares.\n\n"
                 . "Se faltar evento, confira em Lançamento de Notas se o tipo é Prova Semanal e se o bimestre é o mesmo da peça.";
@@ -382,7 +382,7 @@ class BoletimConsultaAssistenteService
             return "A Jornada do aluno entra como peça. Marque o bimestre dela. O sistema usa as jornadas ativas daquele bimestre, não só as mais novas.\n\n"
                 . "Se a peça mostrar zero, a jornada está sem o campo Bimestre preenchido no cadastro.";
         }
-        if (preg_match('/tipo de nota|peça|peca|bimestral/u', $t)) {
+        if (preg_match('/tipo de nota|pe[cç]a\b|como (marcar|montar) (a )?pe[cç]a/u', $t)) {
             return "Cada peça é um tipo de nota ativo (Prova Semanal, Avaliação Bimestral, ENAC, Jornada…). O nome do evento não vira tipo.\n\n"
                 . "Marque a peça, escolha o bimestre e, se quiser, os eventos que entram. O fechamento (média, acertos/questões) vem do tipo de nota, em Avaliações → Tipos de nota.";
         }
@@ -596,9 +596,11 @@ Para consultar, responda APENAS este bloco (sem texto antes):
 Tools:
 - buscar_aluno: args aluno_nome, turma (opcional). Use se houver mais de um candidato.
 - jornadas_aluno: args aluno_nome ou aluno_id, bimestre (1-4, opcional), materia_nome (opcional). Quantas jornadas fez.
-- lancamentos_aluno: args aluno_nome ou aluno_id, materia_nome, tipo (ex.: Avaliação Bimestral, Prova Semanal), bimestre. Nota lançada na prova.
+- lancamentos_aluno: args aluno_nome ou aluno_id, materia_nome (opcional), tipo (opcional: Avaliação Bimestral, Prova Semanal, ENAC…), bimestre (opcional), professor_nome (opcional). Busca notas de TODOS os formatos: prova online e lançamento da coordenação (Lançamento de Notas). Sempre use esta tool quando o usuário pedir nota/lançamento de qualquer tipo.
 - nota_no_evento: args aluno_nome ou aluno_id, materia_nome. Nota já calculada nas colunas DESTE evento aberto na tela.
 - diagnostico_celula: args aluno_nome ou aluno_id, materia_nome (opcional), coluna (opcional, ex.: Jornada do aluno). Use quando a célula está vazia, com traço, ou o usuário pergunta por quê.
+
+Se o usuário corrigir o tipo (ex.: "no caso é Avaliação Bimestral"), consulte de novo com lancamentos_aluno e o tipo novo. Não explique peça/tipo no lugar de buscar a nota.
 
 Evento aberto agora:
 {$resumo}
@@ -760,6 +762,7 @@ PROMPT;
             'turma' => trim((string) ($args['turma'] ?? '')),
             'turma_nome' => trim((string) ($args['turma'] ?? '')),
             'materia_nome' => trim((string) ($args['materia_nome'] ?? $args['materia'] ?? '')),
+            'professor_nome' => trim((string) ($args['professor_nome'] ?? $args['professor'] ?? '')),
             'bimestre' => ($bimestre >= 1 && $bimestre <= 4) ? $bimestre : 0,
             'limite' => 40,
         ];
@@ -801,7 +804,7 @@ PROMPT;
         }
 
         $itens = [];
-        foreach (array_slice((array) ($lista['provas'] ?? []), 0, 20) as $prova) {
+        foreach (array_slice((array) ($lista['provas'] ?? []), 0, 30) as $prova) {
             if (!is_array($prova)) {
                 continue;
             }
@@ -809,13 +812,16 @@ PROMPT;
             $evento = is_array($prova['evento'] ?? null) ? $prova['evento'] : [];
             $materia = is_array($prova['materia'] ?? null) ? $prova['materia'] : [];
             $tipoAv = is_array($prova['tipo_avaliacao'] ?? null) ? $prova['tipo_avaliacao'] : [];
+            $prof = is_array($prova['professor'] ?? null) ? $prova['professor'] : [];
             $itens[] = [
+                'origem' => (string) ($prova['origem'] ?? 'prova_online'),
                 'titulo' => (string) ($prova['titulo'] ?? ''),
                 'evento' => (string) ($evento['titulo'] ?? ''),
                 'data' => (string) ($evento['data_prova'] ?? ''),
                 'bimestre' => $evento['bimestre'] ?? null,
                 'materia' => (string) ($materia['nome'] ?? ''),
                 'tipo' => (string) ($tipoAv['nome'] ?? ''),
+                'professor' => (string) ($prof['nome'] ?? ''),
                 'nota' => $real['nota'] ?? null,
                 'acertos' => $real['acertos'] ?? null,
                 'questoes' => $real['total_questoes'] ?? null,
