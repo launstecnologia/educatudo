@@ -16,9 +16,14 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                     <h3 class="text-sm font-semibold text-slate-900">Assistente do evento de notas</h3>
                     <p class="text-xs text-slate-500">Pergunte, ou cole um print para conferir o que está errado ou não marcado.</p>
                 </div>
-                <button type="button" id="bw-consulta-fechar" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
+                <div class="flex items-center gap-0.5 shrink-0">
+                    <button type="button" id="bw-consulta-minimizar" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Minimizar" title="Minimizar">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                    </button>
+                    <button type="button" id="bw-consulta-fechar" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar" title="Fechar">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
             </div>
             <div id="bw-consulta-msgs" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm bg-white">
                 <div class="bg-indigo-50 border border-indigo-100 text-slate-700 rounded-lg px-3 py-2">
@@ -45,6 +50,14 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                 </div>
             </form>
         </div>
+        <button type="button" id="bw-consulta-barra" class="hidden inline-flex items-center gap-2 max-w-[min(100vw-2rem,20rem)] pl-3 pr-2 py-2 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Restaurar assistente" title="Clique para abrir de novo">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <span class="text-sm font-medium truncate">Assistente</span>
+            <span id="bw-consulta-barra-badge" class="hidden min-w-[1.25rem] h-5 px-1.5 rounded-full bg-white text-indigo-700 text-xs font-semibold leading-5 text-center">0</span>
+            <span class="shrink-0 text-indigo-100 pl-1" aria-hidden="true">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+            </span>
+        </button>
         <button type="button" id="bw-consulta-toggle" class="inline-flex items-center justify-center w-14 h-14 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Abrir assistente" title="Perguntar sobre boletim e notas">
             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
         </button>
@@ -56,6 +69,9 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
     if (!root) return;
     var panel = document.getElementById('bw-consulta-panel');
     var toggle = document.getElementById('bw-consulta-toggle');
+    var barra = document.getElementById('bw-consulta-barra');
+    var barraBadge = document.getElementById('bw-consulta-barra-badge');
+    var minimizar = document.getElementById('bw-consulta-minimizar');
     var fechar = document.getElementById('bw-consulta-fechar');
     var form = document.getElementById('bw-consulta-form');
     var input = document.getElementById('bw-consulta-input');
@@ -68,13 +84,35 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
     var enviando = false;
     var imagemPendente = null;
 
+    function atualizarBadge() {
+        if (!barraBadge) return;
+        var n = historico.length;
+        if (n > 0) {
+            barraBadge.textContent = String(Math.min(n, 99));
+            barraBadge.classList.remove('hidden');
+        } else {
+            barraBadge.classList.add('hidden');
+        }
+    }
     function abrir(foco) {
         panel.classList.remove('hidden');
         toggle.classList.add('hidden');
+        if (barra) barra.classList.add('hidden');
         if (foco && input) input.focus();
+    }
+    function minimizarPainel() {
+        panel.classList.add('hidden');
+        toggle.classList.add('hidden');
+        if (barra) {
+            atualizarBadge();
+            barra.classList.remove('hidden');
+        } else {
+            toggle.classList.remove('hidden');
+        }
     }
     function fecharPainel() {
         panel.classList.add('hidden');
+        if (barra) barra.classList.add('hidden');
         toggle.classList.remove('hidden');
     }
     function bolha(role, texto, imagem) {
@@ -170,6 +208,7 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             bolha('assistant', resp);
             historico.push({ role: 'user', content: textoBolha });
             historico.push({ role: 'assistant', content: resp });
+            atualizarBadge();
         }).catch(function () {
             if (espera.parentNode) espera.parentNode.removeChild(espera);
             bolha('assistant', 'Não deu para falar com o servidor.');
@@ -180,6 +219,8 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
     }
 
     toggle.addEventListener('click', function () { abrir(true); });
+    if (barra) barra.addEventListener('click', function () { abrir(true); });
+    if (minimizar) minimizar.addEventListener('click', minimizarPainel);
     fechar.addEventListener('click', fecharPainel);
     form.addEventListener('submit', function (e) {
         e.preventDefault();

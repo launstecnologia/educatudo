@@ -118,14 +118,29 @@ class BoletimConsultaAssistenteService
                 $tool = (string) ($pedido['tool'] ?? '');
                 $args = is_array($pedido['args'] ?? null) ? $pedido['args'] : [];
                 $resultado = $this->executarTool($tool, $args, $wizardEstado);
+                if (
+                    $tool === 'lancamentos_aluno'
+                    && !empty($resultado['ok'])
+                    && empty($resultado['candidatos'])
+                    && !empty($resultado['resumo_para_responder'])
+                ) {
+                    $textoFinal = trim((string) $resultado['resumo_para_responder']);
+                    break;
+                }
                 $mensagens[] = ['role' => 'assistant', 'content' => $resposta];
+                $instrucao = "Resultado de {$tool} (fonte do sistema, não invente além disto):\n"
+                    . json_encode($resultado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    . "\n\nResponda em português, curto, só com o que veio neste JSON. "
+                    . 'Se houver candidatos, peça para escolher. Se faltar o número, diga que não encontrou. '
+                    . 'Não emita outra consulta se já deu para responder.';
+                if ($tool === 'lancamentos_aluno' && !empty($resultado['resumo_para_responder'])) {
+                    $instrucao .= "\n\nUse o campo resumo_para_responder quase como está. "
+                        . 'Quando houver mais de um professor, diga claramente: Professor Fulano: nota X,00 · Professor Cicrano: nota Y,00. '
+                        . 'Não junte as notas num único número sem dizer de quem é cada uma.';
+                }
                 $mensagens[] = [
                     'role' => 'user',
-                    'content' => "Resultado de {$tool} (fonte do sistema, não invente além disto):\n"
-                        . json_encode($resultado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-                        . "\n\nResponda em português, curto, só com o que veio neste JSON. "
-                        . 'Se houver candidatos, peça para escolher. Se faltar o número, diga que não encontrou. '
-                        . 'Não emita outra consulta se já deu para responder.',
+                    'content' => $instrucao,
                 ];
             }
         } catch (Throwable $e) {
@@ -602,6 +617,11 @@ Tools:
 
 Se o usuário corrigir o tipo (ex.: "no caso é Avaliação Bimestral"), consulte de novo com lancamentos_aluno e o tipo novo. Não explique peça/tipo no lugar de buscar a nota.
 
+Ao responder lançamentos, use nota com vírgula (ex.: 6,00) e cite o professor de cada nota. Exemplo:
+JULIA GARCIA CABRAL · 1ªA:
+• Professor Eduardo Luis Sinastre · Biologia · Avaliação Bimestral · 1º bimestre: nota 6,00
+• Professor Maria Silva · Biologia · Avaliação Bimestral · 1º bimestre: nota 4,00
+
 Evento aberto agora:
 {$resumo}
 PROMPT;
@@ -813,6 +833,8 @@ PROMPT;
             $materia = is_array($prova['materia'] ?? null) ? $prova['materia'] : [];
             $tipoAv = is_array($prova['tipo_avaliacao'] ?? null) ? $prova['tipo_avaliacao'] : [];
             $prof = is_array($prova['professor'] ?? null) ? $prova['professor'] : [];
+            $notaRaw = $real['nota'] ?? null;
+            $notaFmt = is_numeric($notaRaw) ? $this->formatarNotaConsulta((float) $notaRaw) : '—';
             $itens[] = [
                 'origem' => (string) ($prova['origem'] ?? 'prova_online'),
                 'titulo' => (string) ($prova['titulo'] ?? ''),
@@ -822,18 +844,94 @@ PROMPT;
                 'materia' => (string) ($materia['nome'] ?? ''),
                 'tipo' => (string) ($tipoAv['nome'] ?? ''),
                 'professor' => (string) ($prof['nome'] ?? ''),
-                'nota' => $real['nota'] ?? null,
+                'nota' => $notaRaw,
+                'nota_formatada' => $notaFmt,
                 'acertos' => $real['acertos'] ?? null,
                 'questoes' => $real['total_questoes'] ?? null,
             ];
         }
+
+        $alunoInfo = is_array($lista['aluno'] ?? null) ? $lista['aluno'] : [];
+        $resumo = $this->montarResumoLancamentos($alunoInfo, $itens, $filtros);
 
         return [
             'ok' => true,
             'aluno' => $lista['aluno'] ?? null,
             'total' => (int) ($lista['total'] ?? count($itens)),
             'lancamentos' => $itens,
+            'resumo_para_responder' => $resumo,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $aluno
+     * @param list<array<string,mixed>> $itens
+     * @param array<string,mixed> $filtros
+     */
+    private function montarResumoLancamentos(array $aluno, array $itens, array $filtros): string
+    {
+        $nomeAluno = trim((string) ($aluno['nome'] ?? 'Aluno'));
+        $turma = trim((string) ($aluno['turma_nome'] ?? ''));
+        $cabeca = $nomeAluno . ($turma !== '' ? ' · ' . $turma : '');
+        if ($itens === []) {
+            $mat = trim((string) ($filtros['materia_nome'] ?? ''));
+            $tipo = trim((string) ($filtros['tipo_avaliacao_nome'] ?? ''));
+            $bim = (int) ($filtros['bimestre'] ?? 0);
+            $ctx = [];
+            if ($mat !== '') {
+                $ctx[] = $mat;
+            }
+            if ($tipo !== '') {
+                $ctx[] = $tipo;
+            }
+            if ($bim > 0) {
+                $ctx[] = $bim . 'º bimestre';
+            }
+
+            return $cabeca . ': não encontrei lançamento'
+                . ($ctx !== [] ? ' de ' . implode(', ', $ctx) : '') . '.';
+        }
+
+        $linhas = [$cabeca . ':'];
+        foreach ($itens as $item) {
+            $nota = (string) ($item['nota_formatada'] ?? '—');
+            $prof = trim((string) ($item['professor'] ?? ''));
+            $tipo = trim((string) ($item['tipo'] ?? ''));
+            $mat = trim((string) ($item['materia'] ?? ''));
+            $evento = trim((string) ($item['evento'] ?? $item['titulo'] ?? ''));
+            $bim = (int) ($item['bimestre'] ?? 0);
+            $data = trim((string) ($item['data'] ?? ''));
+            $acertos = $item['acertos'] ?? null;
+            $questoes = $item['questoes'] ?? null;
+
+            $partes = [];
+            if ($prof !== '') {
+                $partes[] = 'Professor ' . $prof;
+            }
+            if ($mat !== '') {
+                $partes[] = $mat;
+            }
+            if ($tipo !== '') {
+                $partes[] = $tipo;
+            }
+            if ($bim > 0) {
+                $partes[] = $bim . 'º bimestre';
+            }
+            if ($evento !== '' && $prof === '') {
+                $partes[] = $evento;
+            }
+            if ($data !== '') {
+                $partes[] = $data;
+            }
+            $nq = '';
+            if (is_numeric($acertos) && is_numeric($questoes) && (int) $questoes > 0) {
+                $nq = ' (N ' . (int) $acertos . ' / Q ' . (int) $questoes . ')';
+            }
+            $prefixo = $partes !== [] ? implode(' · ', $partes) : 'Lançamento';
+            $linhas[] = '• ' . $prefixo . ': nota ' . $nota . $nq;
+        }
+
+        return implode("\n", $linhas);
     }
 
     /**
