@@ -5017,11 +5017,14 @@ class BoletimConfigController extends BaseController
         $materiasSelecionadas = $this->parseMateriasIdsFromRegra($regra);
         // Pais com desdobramento nunca viram linha avulsa (só o group_line / filhos).
         $idsRotuloPai = $this->idsRotuloPaiComponente();
-        if ($pularAgrupamentoLinhas) {
-            $materiasSelecionadas = array_merge(
-                $materiasSelecionadas,
-                $this->materiasIdsDoModeloBoletim((int) ($regra['boletim_id'] ?? 0))
-            );
+        $boletimIdEscopo = (int) ($regra['boletim_id'] ?? 0);
+        $modeloMaterias = $boletimIdEscopo > 0
+            ? $this->materiasIdsDoModeloBoletim($boletimIdEscopo)
+            : [];
+        if ($modeloMaterias !== []) {
+            // Modelo de Boletim é a fonte da verdade (ex.: Redação desmarcada some da simulação).
+            $materiasSelecionadas = $this->expandirMateriasComFilhos($modeloMaterias);
+        } elseif ($pularAgrupamentoLinhas) {
             $materiasSelecionadas = $this->expandirMateriasComFilhos($materiasSelecionadas);
         }
         $nomesCatalogoById = [];
@@ -5113,8 +5116,9 @@ class BoletimConfigController extends BaseController
                 return $mid <= 0 || !isset($materiasAgrupadas[$mid]);
             }));
         }
-        $exibirEmRegra = strtolower(trim((string) ($regra['exibir_em'] ?? 'boletim')));
-        if ($materiasSelecionadas !== [] && $exibirEmRegra === 'notas') {
+        // Com lista do modelo/evento: só exibe essas matérias (notas órfãs de disciplina
+        // desmarcada — ex. Redação — não entram na simulação).
+        if ($materiasSelecionadas !== []) {
             $set = array_fill_keys($materiasSelecionadas, true);
             $midsOrdenados = array_values(array_filter($midsOrdenados, static function (int $mid) use ($set) {
                 return $mid <= 0 || isset($set[$mid]);

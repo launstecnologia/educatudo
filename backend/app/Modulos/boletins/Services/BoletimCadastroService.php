@@ -56,6 +56,19 @@ class BoletimCadastroService
             }
             $data['regra_id'] = $atual['regra_id'] ?? null;
             $this->model->atualizar($id, $data);
+            $materiasParaEventos = array_map('intval', (array) ($data['materias_ids'] ?? []));
+            try {
+                require_once dirname(__DIR__, 3) . '/Models/Education/ComponenteCurricular.php';
+                $materiasParaEventos = (new \ComponenteCurricular())->expandirIdsComFilhos($materiasParaEventos);
+            } catch (Throwable $e) {
+                // mantém ids do modelo
+            }
+            $this->boletimConfig->sincronizarEscopoEventosNotasDoBoletim(
+                $id,
+                $materiasParaEventos,
+                (array) ($data['series_ids'] ?? []),
+                (array) ($data['turmas_ids'] ?? [])
+            );
             $this->sincronizarDocumento($id);
             return ['success' => true, 'id' => $id];
         }

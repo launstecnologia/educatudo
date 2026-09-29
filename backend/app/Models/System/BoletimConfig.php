@@ -3929,6 +3929,51 @@ class BoletimConfig
         );
     }
 
+    /**
+     * Espelha as matérias do modelo nos eventos de notas vinculados (exibir_em=notas).
+     *
+     * @param list<int> $materiasIds
+     * @param list<int> $seriesIds
+     * @param list<int> $turmasIds
+     */
+    public function sincronizarEscopoEventosNotasDoBoletim(
+        int $boletimId,
+        array $materiasIds,
+        array $seriesIds = [],
+        array $turmasIds = []
+    ): void {
+        if ($boletimId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return;
+        }
+        $materiasJson = $this->trimConfigJson(json_encode(
+            array_values(array_unique(array_filter(array_map('intval', $materiasIds), static fn ($id) => $id > 0))),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        ));
+        $seriesJson = $this->trimConfigJson(json_encode(
+            array_values(array_unique(array_filter(array_map('intval', $seriesIds), static fn ($id) => $id > 0))),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        ));
+        $turmasJson = $this->trimConfigJson(json_encode(
+            array_values(array_unique(array_filter(array_map('intval', $turmasIds), static fn ($id) => $id > 0))),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        ));
+        $this->db->update(
+            "UPDATE boletim_regras
+             SET materias_ids = :materias_ids,
+                 series_ids = :series_ids,
+                 turmas_ids = :turmas_ids
+             WHERE boletim_id = :boletim_id
+               AND ativo = 1
+               AND exibir_em = 'notas'",
+            [
+                'boletim_id' => $boletimId,
+                'materias_ids' => $materiasJson,
+                'series_ids' => $seriesJson,
+                'turmas_ids' => $turmasJson,
+            ]
+        );
+    }
+
     public function desvincularEventosDoBoletim(int $boletimId): void
     {
         if ($boletimId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
