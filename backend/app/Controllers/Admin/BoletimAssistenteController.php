@@ -221,7 +221,18 @@ class BoletimAssistenteController extends BaseController
 
         try {
             $configController = new BoletimConfigController(true);
-            $simulacao = $configController->simularRegraAluno($rascunho, $alunoId, $periodoRef, $dataInicio, $dataFim);
+            // Demonstrativo: matérias soltas (sem group_line / sem pai-rótulo).
+            $simulacao = $configController->simularRegraAluno(
+                $rascunho,
+                $alunoId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                [],
+                false,
+                true
+            );
+            $simulacao = $configController->filtrarMatrizDemonstrativoSemPaiAgrupado($simulacao, $rascunho);
             $previewReal = $this->montarPreviewRealDaSimulacao($simulacao);
             if ($previewReal !== null) {
                 $grupoId = (int) ($rascunho['grupo_regras_notas_id'] ?? $estado['grupo_regras_notas_id'] ?? 0);
@@ -236,6 +247,7 @@ class BoletimAssistenteController extends BaseController
                     false,
                     true
                 );
+                $simulacaoQuadro = $configController->filtrarMatrizDemonstrativoSemPaiAgrupado($simulacaoQuadro, $rascunho);
                 $previewQuadro = $this->montarPreviewRealDaSimulacao($simulacaoQuadro);
                 if (is_array($previewQuadro)) {
                     $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);

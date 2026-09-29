@@ -450,7 +450,18 @@ class BoletimConfigController extends BaseController
             // Igual ao Configurar Notas: provas/jornada/faltas vêm do evento salvo;
             // o rascunho do assistente só manda fórmula/layout ainda não gravados.
             $regra = $this->mesclarFontesSalvasNaRegraParaSimulacao($regra);
-            $simulacao = $this->simularRegraAluno($regra, $selectedAlunoId, $periodoRef, $dataInicio, $dataFim);
+            // Demonstrativo: matérias soltas (sem group_line). Boletim: agrupado à parte.
+            $simulacao = $this->simularRegraAluno(
+                $regra,
+                $selectedAlunoId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                [],
+                false,
+                true
+            );
+            $simulacao = $this->filtrarMatrizDemonstrativoSemPaiAgrupado($simulacao, $regra);
 
             // Vista "Boletim": mesma matriz com group_line forçado (aplicar_em=boletim).
             // O Demonstrativo mantém matérias soltas; o resumo mostra Língua Portuguesa etc.
@@ -5274,6 +5285,93 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Demonstrativo: remove a matéria-rótulo do group_line (ex.: Língua Portuguesa),
+     * mantendo só as matérias soltas (Leitura, Literatura…). O agrupado fica no Boletim.
+     *
+     * @param array<string,mixed> $simulacao
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    public function filtrarMatrizDemonstrativoSemPaiAgrupado(array $simulacao, array $regra): array
+    {
+        $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : null;
+        if (!is_array($matriz) || empty($matriz['linhas']) || !is_array($matriz['linhas'])) {
+            return $simulacao;
+        }
+        $ocultarIds = [];
+        $ocultarNomes = [];
+        $filhosPorGrupo = [];
+        foreach ((array) ($regra['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $grp = $this->parseGroupLineConfigFromComponente($comp);
+            if ($grp === null) {
+                continue;
+            }
+            $filhos = [];
+            foreach ((array) ($grp['materias_ids'] ?? []) as $midF) {
+                $midF = (int) $midF;
+                if ($midF > 0) {
+                    $filhos[$midF] = true;
+                }
+            }
+            $filhosPorGrupo[] = $filhos;
+            $labelKey = $this->canonicalMateriaNomeKey((string) ($grp['label'] ?? ''));
+            if ($labelKey !== '') {
+                $ocultarNomes[$labelKey] = true;
+            }
+            $agId = (int) ($grp['agrupamento_id'] ?? 0);
+            if ($agId > 0) {
+                $cad = $this->carregarAgrupamentoCadastro($agId);
+                $rotuloId = (int) ($cad['materia_rotulo_id'] ?? 0);
+                if ($rotuloId > 0 && empty($filhos[$rotuloId])) {
+                    $ocultarIds[$rotuloId] = true;
+                }
+                $nomeCad = $this->canonicalMateriaNomeKey((string) ($cad['nome'] ?? ''));
+                if ($nomeCad !== '') {
+                    $ocultarNomes[$nomeCad] = true;
+                }
+            }
+        }
+        if ($ocultarIds === [] && $ocultarNomes === []) {
+            return $simulacao;
+        }
+        $linhasNovas = [];
+        foreach ($matriz['linhas'] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            // Linha virtual do grupo (mid negativo) não entra no Demonstrativo.
+            if ($mid < 0) {
+                continue;
+            }
+            if ($mid > 0 && isset($ocultarIds[$mid])) {
+                continue;
+            }
+            $nomeKey = $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? ''));
+            if ($nomeKey !== '' && isset($ocultarNomes[$nomeKey])) {
+                $ehFilho = false;
+                foreach ($filhosPorGrupo as $filhos) {
+                    if ($mid > 0 && isset($filhos[$mid])) {
+                        $ehFilho = true;
+                        break;
+                    }
+                }
+                if (!$ehFilho) {
+                    continue;
+                }
+            }
+            $linhasNovas[] = $linha;
+        }
+        $matriz['linhas'] = $linhasNovas;
+        $simulacao['matriz_materias'] = $matriz;
+
+        return $simulacao;
+    }
+
+    /**
      * Agrupa linhas por componente (ex.: Linguagem) com estratégia própria por bloco.
      *
      * @param array<int, array<string, mixed>> $componentesRegra
@@ -9666,6 +9764,7 @@ class BoletimConfigController extends BaseController
                     ? (float) $row['divisor']
                     : null,
                 'materias_ids' => array_values(array_map('intval', $row['materias_ids'])),
+                'materia_rotulo_id' => (int) ($row['materia_rotulo_id'] ?? 0),
             ];
         } catch (Throwable $e) {
             return null;
