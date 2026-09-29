@@ -2672,9 +2672,8 @@ $boletimWizardSteps = [
         var porId = {};
         var porNome = {};
         var linhas = [];
-        var modoIguais = (estado && estado.materia_unica)
-            ? ((estado.grupo_linha && estado.grupo_linha.ativo && estado.grupo_linha.modo === 'media') ? 'media' : 'soma')
-            : '';
+        // "Juntar matérias iguais" sempre soma (não herda média/soma da linha única).
+        var modoIguais = (estado && estado.materia_unica) ? 'soma' : '';
         brutas.forEach(function (lin) {
             if (!lin) return;
             var id = Number(lin.materia_id || 0);

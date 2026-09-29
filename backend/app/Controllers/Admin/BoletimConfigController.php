@@ -4694,25 +4694,13 @@ class BoletimConfigController extends BaseController
         return $key;
     }
 
-    private function modoJuncaoMateriasIguais(array $componente): string
-    {
-        $cfg = $this->decodeComponenteConfig($componente);
-        $grp = $cfg['group_line'] ?? null;
-        $mode = is_array($grp) ? strtolower(trim((string) ($grp['mode'] ?? ''))) : '';
-
-        return $mode === 'media' ? 'media' : 'soma';
-    }
-
     /**
      * Prova única (última nota) de dois professores da mesma matéria vira soma
-     * quando o modo escolhido é soma. A média semanal continua média.
+     * com "juntar matérias iguais". A média semanal continua média.
      */
     private function calcAoJuntarMateriasIguais(array $componente, string $calc): string
     {
         if (empty($componente['materia_unica']) || $calc !== 'ultima') {
-            return $calc;
-        }
-        if ($this->modoJuncaoMateriasIguais($componente) === 'media') {
             return $calc;
         }
 
@@ -4720,8 +4708,8 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Mesma matéria em dois cadastros (professores diferentes).
-     * Soma, ou tira a média, conforme o modo escolhido em "juntar matérias iguais".
+     * Mesma matéria em dois cadastros (professores diferentes): soma as células.
+     * Independente do modo da "linha única" (média/soma entre matérias distintas).
      *
      * @param array<string, array<int, float|null>> $matrizPorCodigo
      * @param array<int, string> $materiaNomesPorId
@@ -4730,22 +4718,13 @@ class BoletimConfigController extends BaseController
     private function fundirMateriasIguaisNaMatriz(array &$matrizPorCodigo, array $materiaNomesPorId, array $componentes): void
     {
         $temUnica = false;
-        $modo = 'soma';
         foreach ($componentes as $componente) {
             if (!is_array($componente)) {
                 continue;
             }
             if (!empty($componente['materia_unica'])) {
                 $temUnica = true;
-            }
-            $cfg = $this->decodeComponenteConfig($componente);
-            $grp = $cfg['group_line'] ?? null;
-            if (!is_array($grp) || empty($grp['enabled'])) {
-                continue;
-            }
-            $mode = strtolower(trim((string) ($grp['mode'] ?? '')));
-            if ($mode === 'media' || $mode === 'soma') {
-                $modo = $mode;
+                break;
             }
         }
         if (!$temUnica) {
@@ -4785,10 +4764,7 @@ class BoletimConfigController extends BaseController
                 if ($vals === []) {
                     continue;
                 }
-                $junto = $modo === 'media'
-                    ? array_sum($vals) / count($vals)
-                    : array_sum($vals);
-                $matrizPorCodigo[$cod][$primario] = $junto;
+                $matrizPorCodigo[$cod][$primario] = array_sum($vals);
                 foreach ($ids as $mid) {
                     if ((int) $mid !== $primario) {
                         unset($matrizPorCodigo[$cod][$mid]);
@@ -8763,7 +8739,7 @@ class BoletimConfigController extends BaseController
             $ano = (int) $m[1];
             $periodo = (int) $m[2];
         }
-        $map = !empty($componente['materia_unica']) && $this->modoJuncaoMateriasIguais($componente) === 'soma'
+        $map = !empty($componente['materia_unica'])
             ? $svc->notasPorMateriaForcandoCriterioProfessores($tipoId, $alunoId, $turmaId, $ano, $periodo, 'soma')
             : $svc->notasFinaisDoAluno($tipoId, $alunoId, $turmaId, $ano, $periodo);
         if ($map === [] && !empty($componente['materia_unica'])) {
