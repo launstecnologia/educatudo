@@ -506,6 +506,7 @@ class BoletimAssistenteWizard
             'jornada_ids' => [],
             'jornada_bimestres' => [],
             'jornada_nota_modo' => 'linear',
+            'jornada_distribuicao_notas' => 'por_materia',
             'jornada_faixas' => self::faixasJornadaPadrao(),
             'series_ids' => [],
             'turmas_ids' => [],
@@ -1684,6 +1685,9 @@ class BoletimAssistenteWizard
         $merged['jornada_nota_modo'] = in_array((string) ($merged['jornada_nota_modo'] ?? ''), ['linear', 'faixas'], true)
             ? (string) $merged['jornada_nota_modo']
             : 'linear';
+        $merged['jornada_distribuicao_notas'] = ((string) ($merged['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas'
+            ? 'nota_unica_todas_linhas'
+            : 'por_materia';
         $merged['jornada_faixas'] = $this->normalizarFaixasJornada($merged['jornada_faixas'] ?? null);
         $merged['series_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['series_ids'] ?? [])))));
         $merged['turmas_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['turmas_ids'] ?? [])))));
@@ -3221,6 +3225,10 @@ class BoletimAssistenteWizard
                 $config['faixas_percentuais'] = [];
                 $usarPerc = 1;
             }
+            $dist = (string) ($estado['jornada_distribuicao_notas'] ?? 'por_materia');
+            $config['distribuicao_notas'] = ($dist === 'nota_unica_todas_linhas')
+                ? 'nota_unica_todas_linhas'
+                : 'por_materia';
         } elseif ($base['source_type'] === 'provas_sistema') {
             $tipoRef = $tipoId > 0 ? $tipoId : ($base['tipo_sugerido'] !== '' ? $base['tipo_sugerido'] : $filtroTitulo);
             $bimsPeca = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
@@ -3425,6 +3433,10 @@ class BoletimAssistenteWizard
             } elseif (!empty($c['usar_percentual'])) {
                 $estado['jornada_nota_modo'] = 'linear';
             }
+            $dist = strtolower(trim((string) ($cfg['distribuicao_notas'] ?? 'por_materia')));
+            $estado['jornada_distribuicao_notas'] = ($dist === 'nota_unica_todas_linhas')
+                ? 'nota_unica_todas_linhas'
+                : 'por_materia';
             return;
         }
     }

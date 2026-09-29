@@ -604,7 +604,10 @@ $boletimWizardSteps = [
         html += '<p class="text-xs text-gray-500 mt-0.5">Marque o(s) ' + esc(campoMin) + '(s). Nenhum = usa o ' + esc(campoMin) + ' escolhido na Identidade.</p>';
         html += '<div class="grid grid-cols-3 gap-2 mt-2">';
         bimestresUiPeca().forEach(function (b) {
-            var n = eventosDaPecaNoBimestre(key, b).length;
+            var n = key === 'jornada'
+                ? jornadasDoBimestre(b).length
+                : eventosDaPecaNoBimestre(key, b).length;
+            n = Number(n) || 0;
             var on = bimsPeca.some(function (x) { return Number(x) === b; });
             html += '<label class="inline-flex items-center gap-2 text-sm border rounded-lg px-3 py-2 bg-slate-50 cursor-pointer">';
             html += '<input type="checkbox" class="bw-peca-bim rounded border-gray-300 text-indigo-600" data-peca="' + key + '" value="' + b + '"' + (on ? ' checked' : '') + '>';
@@ -787,6 +790,13 @@ $boletimWizardSteps = [
             });
             html += '</div></div>';
         }
+        html += '<div><span class="text-xs font-medium text-gray-600">Como lançar a nota</span>';
+        html += '<p class="text-xs text-gray-500 mt-0.5">Por matéria usa a jornada de cada disciplina. Média única calcula o % geral de conclusão e repete a mesma nota em todas as matérias.</p>';
+        html += '<div class="mt-2 flex flex-wrap gap-3 text-sm">';
+        var dist = (estado.jornada_distribuicao_notas === 'nota_unica_todas_linhas') ? 'nota_unica_todas_linhas' : 'por_materia';
+        html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-jornada-dist" class="bw-jornada-dist" value="por_materia"' + (dist === 'por_materia' ? ' checked' : '') + '> Por matéria</label>';
+        html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-jornada-dist" class="bw-jornada-dist" value="nota_unica_todas_linhas"' + (dist === 'nota_unica_todas_linhas' ? ' checked' : '') + '> Média única (mesma nota em todas)</label>';
+        html += '</div></div>';
         html += '<div><span class="text-xs font-medium text-gray-600">Pontuação por conclusão</span>';
         html += '<p class="text-xs text-gray-500 mt-0.5">A nota depende de quantas jornadas do bimestre o aluno concluiu.</p>';
         html += '<div class="mt-2 flex flex-wrap gap-3 text-sm">';
@@ -1144,6 +1154,7 @@ $boletimWizardSteps = [
             jornada_ids: [],
             jornada_bimestres: [],
             jornada_nota_modo: 'linear',
+            jornada_distribuicao_notas: 'por_materia',
             jornada_faixas: faixasJornadaPadrao(),
             series_ids: [],
             turmas_ids: [],
@@ -1168,6 +1179,9 @@ $boletimWizardSteps = [
         if (estado.materia_unica == null) estado.materia_unica = 0;
         if (estado.materia_unica_tocada == null) estado.materia_unica_tocada = false;
         if (!estado.jornada_nota_modo) estado.jornada_nota_modo = 'linear';
+        if (estado.jornada_distribuicao_notas !== 'nota_unica_todas_linhas') {
+            estado.jornada_distribuicao_notas = 'por_materia';
+        }
         if ((estado.pecas || []).indexOf('jornada') >= 0 && estado.jornada_modo === 'todas') estado.jornada_modo = 'bimestre';
         if (!Array.isArray(estado.formula_tokens)) estado.formula_tokens = [];
         if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object') estado.formulas_blocos = {};
@@ -3872,6 +3886,14 @@ $boletimWizardSteps = [
                     estado.jornada_faixas = normalizarFaixasJornadaUi(estado.jornada_faixas);
                 }
                 renderAll();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-jornada-dist').forEach(function (el) {
+            el.addEventListener('change', function () {
+                estado.jornada_distribuicao_notas = el.value === 'nota_unica_todas_linhas'
+                    ? 'nota_unica_todas_linhas'
+                    : 'por_materia';
                 agendarMontar();
             });
         });
