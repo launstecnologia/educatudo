@@ -154,6 +154,8 @@ class BoletimCadastroAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
+        require_once __DIR__ . '/../Services/GeradorAvaliacoesAnualService.php';
+        $id = (int) $id;
         $gerador = new \App\Modulos\Boletins\Services\GeradorAvaliacoesAnualService();
         $prev = $gerador->previsualizar($id, (int) ($_GET['ano_letivo'] ?? 0));
         if (empty($prev['ok'])) {

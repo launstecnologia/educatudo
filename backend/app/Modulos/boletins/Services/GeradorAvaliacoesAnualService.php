@@ -301,7 +301,7 @@ class GeradorAvaliacoesAnualService
             }
             $seriesLabel = implode(' e ', $nomesSerie);
             $titulo = 'Notas — ' . $nome;
-            if ($seriesLabel !== '' && mb_stripos($nome, $seriesLabel) === false) {
+            if ($seriesLabel !== '' && stripos($nome, $seriesLabel) === false) {
                 $titulo .= ' ' . $seriesLabel;
             }
             $partes = [$titulo];
