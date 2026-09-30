@@ -436,8 +436,8 @@ class GeradorAvaliacoesAnualService
 
     /**
      * @param array<int,int> $modelosPorBimestre bimestre => regra_id modelo
-     * @param list<int>|null $bimestresSelecionados null = todos faltantes; lista = só esses
-     * @return array{success:bool,error?:string,criados?:list<int>,ignorados?:list<int>,pulados?:list<int>}
+     * @param list<int>|null $bimestresSelecionados null = todos faltantes; lista = só esses (cria ou substitui)
+     * @return array{success:bool,error?:string,criados?:list<int>,substituidos?:list<int>,ignorados?:list<int>,pulados?:list<int>}
      */
     public function gerar(int $boletimId, array $modelosPorBimestre, int $anoLetivo = 0, ?array $bimestresSelecionados = null): array
     {
@@ -479,6 +479,7 @@ class GeradorAvaliacoesAnualService
         $ano = (int) $prev['ano'];
         $nomePadraoBoletim = trim((string) ($prev['boletim']['nome'] ?? 'Avaliação'));
         $criados = [];
+        $substituidos = [];
         $ignorados = [];
         $pulados = [];
         foreach ($prev['periodos'] as $periodo) {
@@ -486,14 +487,19 @@ class GeradorAvaliacoesAnualService
             if (!PeriodoLetivo::numeroValido($ano, $bim)) {
                 continue;
             }
-            if (!empty($periodo['ja_existe'])) {
-                $ignorados[] = $bim;
-                continue;
-            }
+            $jaExiste = !empty($periodo['ja_existe']);
+            $regraAntigaId = (int) ($periodo['regra_id'] ?? 0);
+
             if ($filtroBim !== null && !isset($filtroBim[$bim])) {
                 $pulados[] = $bim;
                 continue;
             }
+            // Sem seleção explícita: mantém o comportamento antigo (não recria existentes).
+            if ($filtroBim === null && $jaExiste) {
+                $ignorados[] = $bim;
+                continue;
+            }
+
             $modeloRegraId = (int) ($modelosPorBimestre[$bim] ?? 0);
             if ($modeloRegraId <= 0) {
                 $modeloRegraId = $this->modeloPadraoParaBimestre($permitidos, $bim);
@@ -535,22 +541,61 @@ class GeradorAvaliacoesAnualService
                 'default_data_fim' => $periodo['fim'] ?? null,
             ]);
             $this->boletimConfig->alinharComponentesAoBimestre($novoId, $bim);
-            $criados[] = $novoId;
+
+            if ($jaExiste && $regraAntigaId > 0) {
+                $this->desativarEventoSubstituido($regraAntigaId, $boletimId, $novoId);
+                $substituidos[] = $novoId;
+            } else {
+                $criados[] = $novoId;
+            }
         }
 
-        if ($criados === [] && $ignorados === [] && $pulados === []) {
+        if ($criados === [] && $substituidos === [] && $ignorados === [] && $pulados === []) {
             return ['success' => false, 'error' => 'Nenhum período para gerar.'];
         }
-        if ($criados === [] && $pulados !== [] && $ignorados === []) {
+        if ($criados === [] && $substituidos === [] && $pulados !== [] && $ignorados === []) {
             return ['success' => false, 'error' => 'Marque ao menos um bimestre para gerar.'];
         }
 
         return [
             'success' => true,
             'criados' => $criados,
+            'substituidos' => $substituidos,
             'ignorados' => $ignorados,
             'pulados' => $pulados,
         ];
+    }
+
+    /**
+     * Soft-delete da regra antiga + demove resultados vigentes (histórico preservado).
+     */
+    private function desativarEventoSubstituido(int $regraAntigaId, int $boletimId, int $novoId): void
+    {
+        if ($regraAntigaId <= 0 || $regraAntigaId === $novoId) {
+            return;
+        }
+        $antiga = $this->boletimConfig->getRuleById($regraAntigaId);
+        if (!is_array($antiga)) {
+            return;
+        }
+        $boletimDaRegra = (int) ($antiga['boletim_id'] ?? 0);
+        if ($boletimDaRegra > 0 && $boletimDaRegra !== $boletimId) {
+            return;
+        }
+        $this->boletimConfig->deactivateRule($regraAntigaId);
+        try {
+            if (!$this->db->fetch("SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'vigente'")) {
+                return;
+            }
+            $this->db->update(
+                'UPDATE boletim_resultados_gerados
+                 SET vigente = 0
+                 WHERE regra_id = :rid AND preview = 0 AND vigente = 1',
+                ['rid' => $regraAntigaId]
+            );
+        } catch (Throwable $e) {
+            error_log('[GeradorAvaliacoesAnual] demover vigentes regra ' . $regraAntigaId . ': ' . $e->getMessage());
+        }
     }
 
     /**

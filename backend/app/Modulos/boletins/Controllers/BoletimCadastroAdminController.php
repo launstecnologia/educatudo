@@ -166,7 +166,7 @@ class BoletimCadastroAdminController extends AdminBaseController
         $eventos = $gerador->listarEventosModelo($id, (int) ($prev['ano'] ?? 0));
         $modelosPorBimestre = [];
         foreach (($prev['periodos'] ?? []) as $periodoPrev) {
-            if (!is_array($periodoPrev) || !empty($periodoPrev['ja_existe'])) {
+            if (!is_array($periodoPrev)) {
                 continue;
             }
             $bimPrev = (int) ($periodoPrev['bimestre'] ?? 0);
@@ -235,15 +235,23 @@ class BoletimCadastroAdminController extends AdminBaseController
             return;
         }
         $nCriados = count($result['criados'] ?? []);
+        $nSubst = count($result['substituidos'] ?? []);
         $nIgn = count($result['ignorados'] ?? []);
         $nPulados = count($result['pulados'] ?? []);
-        $msg = $nCriados > 0
-            ? ($nCriados . ' avaliação(ões) criada(s).')
-            : 'Nenhum evento novo foi criado.';
-        if ($nIgn > 0 && $nCriados > 0) {
-            $msg .= ' ' . $nIgn . ' bimestre(s) já cadastrado(s) foram ignorados.';
+        $partes = [];
+        if ($nCriados > 0) {
+            $partes[] = $nCriados . ' avaliação(ões) criada(s)';
         }
-        if ($nPulados > 0 && $nCriados > 0) {
+        if ($nSubst > 0) {
+            $partes[] = $nSubst . ' substituída(s)';
+        }
+        $msg = $partes !== []
+            ? (implode(', ', $partes) . '.')
+            : 'Nenhum evento novo foi criado.';
+        if ($nIgn > 0 && ($nCriados > 0 || $nSubst > 0)) {
+            $msg .= ' ' . $nIgn . ' bimestre(s) já cadastrado(s) foram mantidos.';
+        }
+        if ($nPulados > 0 && ($nCriados > 0 || $nSubst > 0)) {
             $msg .= ' ' . $nPulados . ' bimestre(s) ficaram de fora desta geração.';
         }
         $this->setFlashMessage($msg, 'success');
