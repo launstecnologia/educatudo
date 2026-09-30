@@ -137,15 +137,6 @@ $mostrarCapa = $podeVidaEscolar && $prontuario !== [];
             echo '<p class="text-sm text-slate-500">Não foi possível carregar o boletim oficial.</p>';
         }
         ?>
-        <div class="student-card mt-5" data-perm-key="tab_boletim" data-perm-action="visualizar">
-            <div class="student-card-header">
-                <h3 class="text-base font-semibold text-slate-900">Eventos de notas (origem)</h3>
-                <p class="text-xs text-slate-500 mt-1">Composição de provas, jornadas e faltas. O documento oficial é o boletim acima.</p>
-            </div>
-            <div class="student-card-body">
-                <?php include __DIR__ . '/_secao_boletim_eventos.php'; ?>
-            </div>
-        </div>
     </div>
 
     <div id="ve-painel-notas" class="ve-painel <?= $veAba === 'notas' ? '' : 'hidden' ?>" data-ve-aba="notas" data-perm-key="tab_notas" data-perm-action="visualizar">

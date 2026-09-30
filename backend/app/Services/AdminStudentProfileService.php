@@ -521,6 +521,7 @@ class AdminStudentProfileService
         $boletimEventosNotas = [];
         $boletimEventosBoletim = [];
         $boletinsGeradosCoordenacao = [];
+        $boletinsGeradosNotas = [];
         $boletinsGeradosNotasPorRegra = [];
         try {
             $boletimCfg = new \BoletimConfig();
@@ -601,12 +602,16 @@ class AdminStudentProfileService
                 ];
                 $exibir = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
                 if ($exibir === 'notas') {
-                    if (isset($seenNotas[$rid])) {
+                    $chaveNotas = $rid . ':' . (int) ($ev['ano_letivo'] ?? 0) . ':' . (int) ($ev['bimestre'] ?? 0);
+                    if (isset($seenNotas[$chaveNotas])) {
                         continue;
                     }
-                    $seenNotas[$rid] = true;
+                    $seenNotas[$chaveNotas] = true;
+                    $boletinsGeradosNotas[] = $ev;
                     $boletimEventosNotas[] = $item;
-                    $boletinsGeradosNotasPorRegra[$rid] = $ev;
+                    if (!isset($boletinsGeradosNotasPorRegra[$rid])) {
+                        $boletinsGeradosNotasPorRegra[$rid] = $ev;
+                    }
                 } else {
                     if (strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
                         continue;
@@ -750,6 +755,7 @@ class AdminStudentProfileService
             $boletimEventosNotas = [];
             $boletimEventosBoletim = [];
             $boletinsGeradosCoordenacao = [];
+            $boletinsGeradosNotas = [];
             $boletinsGeradosNotasPorRegra = [];
         }
 
@@ -781,6 +787,7 @@ class AdminStudentProfileService
             'boletim_eventos_notas' => $boletimEventosNotas,
             'boletim_eventos_boletim' => $boletimEventosBoletim,
             'boletins_gerados' => $boletinsGeradosCoordenacao,
+            'boletins_gerados_notas' => $boletinsGeradosNotas,
             'boletins_gerados_notas_por_regra' => $boletinsGeradosNotasPorRegra,
             'boletim_observacao' => $this->controller->boletimObservacaoSafe((int) $id),
             'boletim_pode_excluir' => $this->controller->coordenacaoPodeEditarBoletim($user),

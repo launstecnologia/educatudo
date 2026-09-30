@@ -17,6 +17,7 @@ $boletim_eventos_notas = is_array($boletim_eventos_notas ?? null) ? $boletim_eve
 $paineis_notas = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 $boletim_eventos_boletim = is_array($boletim_eventos_boletim ?? null) ? $boletim_eventos_boletim : [];
 $boletins_gerados = is_array($boletins_gerados ?? null) ? $boletins_gerados : [];
+$boletins_gerados_notas = is_array($boletins_gerados_notas ?? null) ? $boletins_gerados_notas : [];
 $boletins_gerados_notas_por_regra = is_array($boletins_gerados_notas_por_regra ?? null) ? $boletins_gerados_notas_por_regra : [];
 $matriculas = is_array($matriculas ?? null) ? $matriculas : [];
 $matriculas_schema_ready = (bool)($matriculas_schema_ready ?? false);

@@ -1,5 +1,6 @@
 <?php
 $boletim_eventos_notas = is_array($boletim_eventos_notas ?? null) ? $boletim_eventos_notas : [];
+$boletins_gerados_notas = is_array($boletins_gerados_notas ?? null) ? $boletins_gerados_notas : [];
 $boletins_gerados_notas_por_regra = is_array($boletins_gerados_notas_por_regra ?? null) ? $boletins_gerados_notas_por_regra : [];
 $paineis_notas_originais = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 $paineis_notas = $paineis_notas_originais;
@@ -32,6 +33,23 @@ foreach ($resumosNotas as $resumo) {
     }
 }
 
+// Índice dos resultados gerados (layout Matérias Bloco A/B) por regra/período.
+$geradosNotasLista = $boletins_gerados_notas;
+if ($geradosNotasLista === [] && $boletins_gerados_notas_por_regra !== []) {
+    $geradosNotasLista = array_values($boletins_gerados_notas_por_regra);
+}
+$geradoPorChave = [];
+foreach ($geradosNotasLista as $evG) {
+    if (!is_array($evG) || empty($evG['linhas']) || empty($evG['colunas'])) {
+        continue;
+    }
+    $ridG = (int) ($evG['regra_id'] ?? 0);
+    $anoG = (int) ($evG['ano_letivo'] ?? 0);
+    $bimG = (int) ($evG['bimestre'] ?? 0);
+    $chaveG = $ridG . ':' . $anoG . ':' . $bimG;
+    $geradoPorChave[$chaveG] = $evG;
+}
+
 $linhasPeriodo = [];
 foreach ($boletim_eventos_notas as $ev) {
     if (!is_array($ev)) {
@@ -47,6 +65,7 @@ foreach ($boletim_eventos_notas as $ev) {
     $linhasPeriodo[$chave] = [
         'ano' => $ano,
         'numero' => $bim,
+        'regra_id' => $rid,
         'descricao' => trim((string) ($ev['nome'] ?? '')),
         'resumo' => is_array($resumo) ? $resumo : null,
     ];
@@ -61,6 +80,7 @@ if ($linhasPeriodo === []) {
         $linhasPeriodo['r-' . $idx] = [
             'ano' => $ano,
             'numero' => $bim,
+            'regra_id' => (int) ($resumo['regra_id'] ?? 0),
             'descricao' => trim((string) ($resumo['titulo'] ?? '')),
             'resumo' => $resumo,
         ];
@@ -93,14 +113,15 @@ if (!class_exists('PainelNotasService', false) && is_file($svcPainelPath)) {
 $temPainelNotasService = class_exists('PainelNotasService', false);
 
 $fontesNotas = [];
-$htmlQuadroPorPeriodo = [];
+$htmlQuadroPorChave = [];
 $idxLinha = 0;
 foreach ($linhasPeriodo as &$linhaP) {
     $idxLinha++;
     $anoP = (int) $linhaP['ano'];
     $bimP = (int) $linhaP['numero'];
+    $ridP = (int) ($linhaP['regra_id'] ?? 0);
     $idResumo = 'fonte-notas-resumo-' . $idxLinha;
-    $idQuadro = 'fonte-notas-quadro-' . $anoP . '-' . $bimP;
+    $idQuadro = 'fonte-notas-quadro-' . $anoP . '-' . $bimP . '-' . $ridP . '-' . $idxLinha;
     $htmlResumo = '';
     if (is_array($linhaP['resumo'] ?? null)) {
         $resumos_notas = [$linhaP['resumo']];
@@ -109,10 +130,26 @@ foreach ($linhasPeriodo as &$linhaP) {
         $htmlResumo = (string) ob_get_clean();
         unset($resumos_notas);
     }
-    $chaveQuadro = $anoP . ':' . $bimP;
-    if (!array_key_exists($chaveQuadro, $htmlQuadroPorPeriodo)) {
-        $htmlQuadroPorPeriodo[$chaveQuadro] = '';
-        if ($temPainelNotasService && $alunoIdNotas > 0 && $bimP > 0) {
+
+    $chaveQuadro = $ridP . ':' . $anoP . ':' . $bimP;
+    if (!array_key_exists($chaveQuadro, $htmlQuadroPorChave)) {
+        $htmlQuadroPorChave[$chaveQuadro] = '';
+        $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
+        if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+            $boletinsGeradosBackup = $boletins_gerados ?? [];
+            $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
+            $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
+            ob_start();
+            $boletins_gerados = [$evGerado];
+            $boletim_pode_excluir = false;
+            $boletim_aluno_id = 0;
+            require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
+            $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
+            $boletins_gerados = $boletinsGeradosBackup;
+            $boletim_pode_excluir = $boletimPodeExcluirBackup;
+            $boletim_aluno_id = $boletimAlunoIdBackup;
+        } elseif ($temPainelNotasService && $alunoIdNotas > 0 && $bimP > 0) {
+            // Fallback: painel vivo do quadro (sem resultado gerado ainda).
             $paineis_notas = PainelNotasService::paraAluno($alunoIdNotas, [
                 'portal' => false,
                 'ano_letivo' => $anoP > 0 ? $anoP : null,
@@ -123,15 +160,15 @@ foreach ($linhasPeriodo as &$linhaP) {
             }
             ob_start();
             require dirname(__DIR__, 2) . '/partials/painel_notas_tabelas.php';
-            $htmlQuadroPorPeriodo[$chaveQuadro] = (string) ob_get_clean();
+            $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
         } elseif ($paineis_notas_originais !== []) {
             $paineis_notas = $paineis_notas_originais;
             ob_start();
             require dirname(__DIR__, 2) . '/partials/painel_notas_tabelas.php';
-            $htmlQuadroPorPeriodo[$chaveQuadro] = (string) ob_get_clean();
+            $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
         }
     }
-    $htmlQuadro = $htmlQuadroPorPeriodo[$chaveQuadro];
+    $htmlQuadro = $htmlQuadroPorChave[$chaveQuadro];
     $linhaP['id_resumo'] = $idResumo;
     $linhaP['id_quadro'] = $idQuadro;
     $linhaP['tem_resumo'] = trim($htmlResumo) !== '';
@@ -247,7 +284,7 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
 
 <?php if ($linhasPeriodo !== []): ?>
 <div id="modalNotasAluno" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/50 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="modalNotasAlunoTitulo" onclick="if (event.target === this) fecharModalNotasAluno()">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[92vh] flex flex-col">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-[96vw] max-h-[92vh] flex flex-col">
         <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 shrink-0">
             <h3 id="modalNotasAlunoTitulo" class="text-lg font-semibold text-gray-900">Notas</h3>
             <button type="button" onclick="fecharModalNotasAluno()" class="text-gray-400 hover:text-gray-700 p-1" aria-label="Fechar">
