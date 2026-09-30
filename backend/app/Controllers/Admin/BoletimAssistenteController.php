@@ -367,6 +367,7 @@ class BoletimAssistenteController extends BaseController
             if ($origem !== 'calculado' && is_array($salvaComp)) {
                 $nome = trim((string) ($comp['nome'] ?? ''));
                 $materiaUnica = !empty($comp['materia_unica']);
+                $materiaUnicaModo = strtolower(trim((string) ($comp['materia_unica_modo'] ?? 'soma'))) === 'media' ? 'media' : 'soma';
                 $cfgWizard = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                 $grupoLinha = $cfgWizard['group_line'] ?? null;
                 $usarPercWizard = array_key_exists('usar_percentual', $comp) ? $comp['usar_percentual'] : null;
@@ -376,6 +377,7 @@ class BoletimAssistenteController extends BaseController
                 }
                 if ($materiaUnica) {
                     $comp['materia_unica'] = 1;
+                    $comp['materia_unica_modo'] = $materiaUnicaModo;
                 }
                 $cfgSalva = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                 if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {

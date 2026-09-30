@@ -486,6 +486,7 @@ class BoletimAssistenteWizard
             'pecas' => [],
             'pecas_opcoes' => $this->pecasOpcoesPadrao([]),
             'materia_unica' => 0,
+            'materia_unica_modo' => 'soma',
             'materia_unica_tocada' => false,
             'formula_preset' => 'media_simples',
             'formula_custom' => '',
@@ -586,6 +587,10 @@ class BoletimAssistenteWizard
                     (string) ($estadoFormulario['formula_final'] ?? '')
                 );
                 $estado['materia_unica'] = $this->inferirMateriaUnicaDeComponentes($comps);
+                $modoInf = $this->inferirMateriaUnicaModoDeComponentes($comps);
+                if ($modoInf !== '') {
+                    $estado['materia_unica_modo'] = $modoInf;
+                }
                 $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
                 $this->aplicarJornadaDoFormulario($estado, $comps);
                 $this->aplicarGrupoLinhaDoFormulario($estado, $comps);
@@ -700,6 +705,12 @@ class BoletimAssistenteWizard
                 $estado['materia_unica'] = $this->inferirMateriaUnicaDeComponentes(
                     is_array($base['componentes'] ?? null) ? $base['componentes'] : []
                 );
+                $modoInf = $this->inferirMateriaUnicaModoDeComponentes(
+                    is_array($base['componentes'] ?? null) ? $base['componentes'] : []
+                );
+                if ($modoInf !== '') {
+                    $estado['materia_unica_modo'] = $modoInf;
+                }
                 $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
             }
             if ($estado['series_ids'] === [] && is_array($rascunho['series_ids'] ?? null)) {
@@ -782,6 +793,12 @@ class BoletimAssistenteWizard
                 $estado['materia_unica'] = $this->inferirMateriaUnicaDeComponentes(
                     is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : []
                 );
+                $modoInf = $this->inferirMateriaUnicaModoDeComponentes(
+                    is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : []
+                );
+                if ($modoInf !== '') {
+                    $estado['materia_unica_modo'] = $modoInf;
+                }
                 $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
             }
             $rascunho = $this->aplicarMateriaUnicaNoRascunho(
@@ -867,6 +884,12 @@ class BoletimAssistenteWizard
                 $estado['materia_unica'] = $this->inferirMateriaUnicaDeComponentes(
                     is_array($rascunhoQuadro['componentes'] ?? null) ? $rascunhoQuadro['componentes'] : []
                 );
+                $modoInf = $this->inferirMateriaUnicaModoDeComponentes(
+                    is_array($rascunhoQuadro['componentes'] ?? null) ? $rascunhoQuadro['componentes'] : []
+                );
+                if ($modoInf !== '') {
+                    $estado['materia_unica_modo'] = $modoInf;
+                }
                 $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
             }
             $rascunhoQuadro = $this->aplicarMateriaUnicaNoRascunho($rascunhoQuadro, $estado);
@@ -1712,6 +1735,27 @@ class BoletimAssistenteWizard
             }
             $merged['materia_unica'] = $flag;
         }
+        $merged['materia_unica_modo'] = $this->normalizarMateriaUnicaModo($merged['materia_unica_modo'] ?? null);
+        if ($merged['materia_unica_modo'] === 'soma' && empty($merged['materia_unica_tocada'])) {
+            $modoInferido = $this->inferirMateriaUnicaModoDeComponentes(
+                is_array($merged['rascunho_preservado']['componentes'] ?? null)
+                    ? $merged['rascunho_preservado']['componentes']
+                    : []
+            );
+            if ($modoInferido !== '') {
+                $merged['materia_unica_modo'] = $modoInferido;
+            } else {
+                foreach ($merged['pecas_opcoes'] as $opts) {
+                    if (!is_array($opts)) {
+                        continue;
+                    }
+                    if (!empty($opts['materia_unica_modo'])) {
+                        $merged['materia_unica_modo'] = $this->normalizarMateriaUnicaModo($opts['materia_unica_modo']);
+                        break;
+                    }
+                }
+            }
+        }
         $this->aplicarMateriaUnicaNasPecasOpcoes($merged);
         $merged['colunas_ordem'] = $this->normalizarColunasOrdem($merged['colunas_ordem'] ?? []);
         $merged['colunas_ocultas'] = $this->normalizarColunasOcultas($merged['colunas_ocultas'] ?? []);
@@ -1957,6 +2001,9 @@ class BoletimAssistenteWizard
             }
             $base[$peca]['calc_type'] = $calc;
             $base[$peca]['materia_unica'] = !empty($opts['materia_unica']) ? 1 : 0;
+            if (!empty($opts['materia_unica_modo'])) {
+                $base[$peca]['materia_unica_modo'] = $this->normalizarMateriaUnicaModo($opts['materia_unica_modo']);
+            }
             if (array_key_exists('usar_percentual', $opts)) {
                 $base[$peca]['usar_percentual'] = !empty($opts['usar_percentual']) ? 1 : 0;
             }
@@ -2008,6 +2055,7 @@ class BoletimAssistenteWizard
                 $out[$key]['calc_type'] = $calc;
             }
             $out[$key]['materia_unica'] = !empty($c['materia_unica']) ? 1 : 0;
+            $out[$key]['materia_unica_modo'] = $this->normalizarMateriaUnicaModo($c['materia_unica_modo'] ?? 'soma');
             $out[$key]['usar_percentual'] = !empty($c['usar_percentual']) ? 1 : 0;
             if (!$this->pecaPermiteAcertosQuestoes($key)) {
                 $out[$key]['usar_percentual'] = 0;
@@ -3288,6 +3336,7 @@ class BoletimAssistenteWizard
             'blocos_ids' => $blocosIds,
             'materias_ids' => [],
             'materia_unica' => $materiaUnica,
+            'materia_unica_modo' => $this->normalizarMateriaUnicaModo($estado['materia_unica_modo'] ?? ($opts['materia_unica_modo'] ?? 'soma')),
             'usar_percentual' => $usarPerc,
             'escala_max' => 10,
             'obrigatorio' => 0,
@@ -4439,6 +4488,10 @@ class BoletimAssistenteWizard
         $label = $g['nome'];
         $modo = $g['modo'];
         $aplicarEm = $g['aplicar_em'];
+        $idsDoEstado = array_values(array_unique(array_filter(
+            array_map('intval', (array) $ids),
+            static fn ($id) => $id > 0
+        )));
         if ($g['agrupamento_id'] > 0) {
             $encontrado = null;
             foreach ($this->catalogoAgrupamentos() as $ag) {
@@ -4453,9 +4506,14 @@ class BoletimAssistenteWizard
             if ($label === '') {
                 $label = (string) ($encontrado['nome'] ?? '');
             }
-            $ids = array_values(array_map('intval', (array) ($encontrado['materias_ids'] ?? [])));
-            $modo = (($encontrado['modo'] ?? 'media') === 'soma') ? 'soma' : 'media';
-            $aplicarEm = (($encontrado['aplicar_em'] ?? 'boletim') === 'ambos') ? 'ambos' : 'boletim';
+            // Catálogo é o padrão; se o evento já tem lista editada (incluir/excluir filha), respeita.
+            if (count($idsDoEstado) >= 2) {
+                $ids = $idsDoEstado;
+            } else {
+                $ids = array_values(array_map('intval', (array) ($encontrado['materias_ids'] ?? [])));
+                $modo = (($encontrado['modo'] ?? 'media') === 'soma') ? 'soma' : 'media';
+                $aplicarEm = (($encontrado['aplicar_em'] ?? 'boletim') === 'ambos') ? 'ambos' : 'boletim';
+            }
         }
         if ($label === '' || count($ids) < 2) {
             return null;
@@ -4483,6 +4541,7 @@ class BoletimAssistenteWizard
     private function aplicarMateriaUnicaNoRascunho(array $rascunho, array $estado): array
     {
         $flag = !empty($estado['materia_unica']) ? 1 : 0;
+        $modo = $this->normalizarMateriaUnicaModo($estado['materia_unica_modo'] ?? 'soma');
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
         foreach ($comps as $i => $c) {
             if (!is_array($c)) {
@@ -4492,6 +4551,7 @@ class BoletimAssistenteWizard
                 continue;
             }
             $c['materia_unica'] = $flag;
+            $c['materia_unica_modo'] = $modo;
             $comps[$i] = $c;
         }
         $rascunho['componentes'] = $comps;
@@ -4504,12 +4564,14 @@ class BoletimAssistenteWizard
     private function aplicarMateriaUnicaNasPecasOpcoes(array &$estado): void
     {
         $flag = !empty($estado['materia_unica']) ? 1 : 0;
+        $modo = $this->normalizarMateriaUnicaModo($estado['materia_unica_modo'] ?? 'soma');
         $opcoes = is_array($estado['pecas_opcoes'] ?? null) ? $estado['pecas_opcoes'] : [];
         foreach ($opcoes as $k => $opts) {
             if (!is_array($opts)) {
                 $opts = [];
             }
             $opts['materia_unica'] = $flag;
+            $opts['materia_unica_modo'] = $modo;
             $opcoes[$k] = $opts;
         }
         $estado['pecas_opcoes'] = $opcoes;
@@ -4532,6 +4594,33 @@ class BoletimAssistenteWizard
             }
         }
         return 0;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $comps
+     */
+    private function inferirMateriaUnicaModoDeComponentes(array $comps): string
+    {
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if ((string) ($c['source_type'] ?? '') === 'calculado') {
+                continue;
+            }
+            if (!empty($c['materia_unica'])) {
+                return $this->normalizarMateriaUnicaModo($c['materia_unica_modo'] ?? 'soma');
+            }
+        }
+        return '';
+    }
+
+    /**
+     * @param mixed $modo
+     */
+    private function normalizarMateriaUnicaModo($modo): string
+    {
+        return strtolower(trim((string) $modo)) === 'media' ? 'media' : 'soma';
     }
 
     /**

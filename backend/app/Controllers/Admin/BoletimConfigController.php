@@ -1491,6 +1491,7 @@ class BoletimConfigController extends BaseController
                 'materia_id' => !empty($componente['materia_id']) ? (int) $componente['materia_id'] : null,
                 'materias_ids' => json_encode($this->parseMateriasIdsFromComponente($componente), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 'materia_unica' => !empty($componente['materia_unica']) ? 1 : 0,
+                'materia_unica_modo' => $this->normalizeMateriaUnicaModo($componente['materia_unica_modo'] ?? null),
                 'usar_percentual' => ($src === 'jornadas' && $temFaixasJTmp) ? 0 : (!empty($componente['usar_percentual']) ? 1 : 0),
                 'escala_max' => max(0.01, (float) ($componente['escala_max'] ?? 10)),
                 'obrigatorio' => !empty($componente['obrigatorio']) ? 1 : 0,
@@ -2991,6 +2992,7 @@ class BoletimConfigController extends BaseController
             }
             if (!empty($comp['materia_unica'])) {
                 $out['materia_unica'] = 1;
+                $out['materia_unica_modo'] = $this->normalizeMateriaUnicaModo($comp['materia_unica_modo'] ?? null);
             }
 
             // Semana do quadro: igual ao assistente — tipo + busca dinâmica por semana.
@@ -3043,6 +3045,9 @@ class BoletimConfigController extends BaseController
                 }
                 $out['usar_percentual'] = 1;
                 $out['materia_unica'] = 1;
+                $out['materia_unica_modo'] = $this->normalizeMateriaUnicaModo(
+                    $comp['materia_unica_modo'] ?? $salvaComp['materia_unica_modo'] ?? 'soma'
+                );
             } else {
                 $blocosDraft = $this->idsBlocosDoComponente($comp);
                 $blocosSalvo = $this->idsBlocosDoComponente($salvaComp);
@@ -4021,7 +4026,7 @@ class BoletimConfigController extends BaseController
                 }
 
                 if (!empty($componente['materia_unica'])) {
-                    $notas = $this->deduplicarNotasPorMateria($notas);
+                    $notas = $this->deduplicarNotasPorMateria($notas, $this->modoMateriaUnica($componente));
                     $detalhes['qtd_materias_unicas'] = count($notas);
                 }
 
@@ -4446,7 +4451,7 @@ class BoletimConfigController extends BaseController
                 foreach ($byMid as $mid => $lista) {
                     $listaProc = $lista;
                     if (!empty($componente['materia_unica'])) {
-                        $listaProc = $this->deduplicarNotasPorMateria($listaProc);
+                        $listaProc = $this->deduplicarNotasPorMateria($listaProc, $this->modoMateriaUnica($componente));
                     }
                     $v = $this->agruparNotas($listaProc, $this->calcAoJuntarMateriasIguais($componente, $calc));
                     if ($v !== null) {
@@ -4476,7 +4481,7 @@ class BoletimConfigController extends BaseController
         foreach ($byMid as $mid => $lista) {
             $listaProc = $lista;
             if (!empty($componente['materia_unica'])) {
-                $listaProc = $this->deduplicarNotasPorMateria($listaProc);
+                $listaProc = $this->deduplicarNotasPorMateria($listaProc, $this->modoMateriaUnica($componente));
             }
             $v = $this->agruparNotas($listaProc, $this->calcAoJuntarMateriasIguais($componente, $calc));
             if ($v !== null) {
@@ -4726,8 +4731,9 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Prova única (última nota) de dois professores da mesma matéria vira soma
-     * com "juntar matérias iguais". A média semanal continua média.
+     * Prova única (última nota) de dois professores da mesma matéria:
+     * com "juntar matérias iguais" usa soma ou média conforme materia_unica_modo.
+     * A média semanal continua média (agrega semanas); a deduplicação já aplica o modo.
      */
     private function calcAoJuntarMateriasIguais(array $componente, string $calc): string
     {
@@ -4735,11 +4741,51 @@ class BoletimConfigController extends BaseController
             return $calc;
         }
 
+        return $this->modoMateriaUnica($componente);
+    }
+
+    /**
+     * @param mixed $modo
+     */
+    private function normalizeMateriaUnicaModo($modo): string
+    {
+        return strtolower(trim((string) $modo)) === 'media' ? 'media' : 'soma';
+    }
+
+    /**
+     * Retorna 'soma'|'media' se materia_unica ativo; string vazia caso contrário.
+     */
+    private function modoMateriaUnica(array $componente): string
+    {
+        if (empty($componente['materia_unica'])) {
+            return '';
+        }
+
+        return $this->normalizeMateriaUnicaModo($componente['materia_unica_modo'] ?? 'soma');
+    }
+
+    /**
+     * Modo de juntar matérias iguais a partir da lista de componentes (primeiro ativo).
+     *
+     * @param array<int|string, mixed> $componentes
+     */
+    private function modoMateriaUnicaDosComponentes(array $componentes): string
+    {
+        foreach ($componentes as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $modo = $this->modoMateriaUnica($componente);
+            if ($modo !== '') {
+                return $modo;
+            }
+        }
+
         return 'soma';
     }
 
     /**
-     * Mesma matéria em dois cadastros (professores diferentes): soma as células.
+     * Mesma matéria em dois cadastros (professores diferentes): soma ou média as células.
      * Independente do modo da "linha única" (média/soma entre matérias distintas).
      *
      * @param array<string, array<int, float|null>> $matrizPorCodigo
@@ -4761,6 +4807,8 @@ class BoletimConfigController extends BaseController
         if (!$temUnica) {
             return;
         }
+
+        $modo = $this->modoMateriaUnicaDosComponentes($componentes);
 
         $idsPorNome = [];
         foreach ($materiaNomesPorId as $mid => $nome) {
@@ -4795,7 +4843,9 @@ class BoletimConfigController extends BaseController
                 if ($vals === []) {
                     continue;
                 }
-                $matrizPorCodigo[$cod][$primario] = array_sum($vals);
+                $matrizPorCodigo[$cod][$primario] = $modo === 'media'
+                    ? round(array_sum($vals) / count($vals), 2)
+                    : array_sum($vals);
                 foreach ($ids as $mid) {
                     if ((int) $mid !== $primario) {
                         unset($matrizPorCodigo[$cod][$mid]);
@@ -6836,8 +6886,9 @@ class BoletimConfigController extends BaseController
         return round(array_sum($valores) / count($valores), 2);
     }
 
-    private function deduplicarNotasPorMateria(array $notas): array
+    private function deduplicarNotasPorMateria(array $notas, string $modo = 'soma'): array
     {
+        $modo = strtolower(trim($modo)) === 'media' ? 'media' : 'soma';
         $porMateriaEProva = [];
         $semMateria = [];
         $seqSemProva = 0;
@@ -6859,9 +6910,15 @@ class BoletimConfigController extends BaseController
             }
             $k = $materiaId . '|' . $provaUid;
             if (!isset($porMateriaEProva[$k])) {
-                $porMateriaEProva[$k] = ['valor' => 0.0, 'materia_id' => $materiaId, 'materia_nome' => $materiaNome];
+                $porMateriaEProva[$k] = [
+                    'soma' => 0.0,
+                    'qtd' => 0,
+                    'materia_id' => $materiaId,
+                    'materia_nome' => $materiaNome,
+                ];
             }
-            $porMateriaEProva[$k]['valor'] += $valor;
+            $porMateriaEProva[$k]['soma'] += $valor;
+            $porMateriaEProva[$k]['qtd']++;
             if (($porMateriaEProva[$k]['materia_nome'] ?? '') === '' && $materiaNome !== '') {
                 $porMateriaEProva[$k]['materia_nome'] = $materiaNome;
             }
@@ -6869,8 +6926,10 @@ class BoletimConfigController extends BaseController
 
         $saida = [];
         foreach ($porMateriaEProva as $item) {
+            $soma = (float) ($item['soma'] ?? 0);
+            $qtd = max(1, (int) ($item['qtd'] ?? 1));
             $saida[] = [
-                'valor' => (float) ($item['valor'] ?? 0),
+                'valor' => $modo === 'media' ? round($soma / $qtd, 2) : $soma,
                 'materia_id' => (int) ($item['materia_id'] ?? 0),
                 'materia_nome' => (string) ($item['materia_nome'] ?? ''),
             ];
@@ -8066,19 +8125,23 @@ class BoletimConfigController extends BaseController
             $divisor = 0;
         }
         $aplicarEm = $this->normalizarGroupLineAplicarEm($grp['aplicar_em'] ?? 'ambos');
+        $idsLocais = $ids;
         if (is_array($cadastro) && count((array) ($cadastro['materias_ids'] ?? [])) >= 2) {
             $labelCad = trim((string) ($cadastro['nome'] ?? ''));
-            if ($labelCad !== '') {
+            if ($label === '' && $labelCad !== '') {
                 $label = $labelCad;
             }
-            $modeCad = strtolower(trim((string) ($cadastro['modo'] ?? 'media')));
-            $mode = $modeCad === 'soma' ? 'soma' : 'media';
-            $ids = array_values(array_map('intval', (array) $cadastro['materias_ids']));
-            $divCad = $cadastro['divisor'] ?? null;
-            $divisor = ($divCad !== null && $divCad !== '' && (float) $divCad > 0)
-                ? (float) $divCad
-                : 0.0;
-            $aplicarEm = $this->normalizarGroupLineAplicarEm($cadastro['aplicar_em'] ?? $aplicarEm);
+            // Lista do evento (materias_ids) prevalece sobre o cadastro — permite excluir/incluir filha por bimestre.
+            if (count($idsLocais) < 2) {
+                $modeCad = strtolower(trim((string) ($cadastro['modo'] ?? 'media')));
+                $mode = $modeCad === 'soma' ? 'soma' : 'media';
+                $ids = array_values(array_map('intval', (array) $cadastro['materias_ids']));
+                $divCad = $cadastro['divisor'] ?? null;
+                $divisor = ($divCad !== null && $divCad !== '' && (float) $divCad > 0)
+                    ? (float) $divCad
+                    : 0.0;
+                $aplicarEm = $this->normalizarGroupLineAplicarEm($cadastro['aplicar_em'] ?? $aplicarEm);
+            }
             if ($key === '' && $labelCad !== '') {
                 $key = $this->slug($labelCad);
             }
@@ -8646,6 +8709,9 @@ class BoletimConfigController extends BaseController
             }
             $c['usar_percentual'] = 1;
             $c['materia_unica'] = 1;
+            if (empty($c['materia_unica_modo'])) {
+                $c['materia_unica_modo'] = 'soma';
+            }
             $c['tipo_avaliacao_id'] = $tipoTpl;
             if ($tipoNomeTpl !== '') {
                 $c['tipo_avaliacao_nome'] = $tipoNomeTpl;
@@ -9228,11 +9294,22 @@ class BoletimConfigController extends BaseController
             if (trim((string) ($grp['label'] ?? '')) === '') {
                 $grp['label'] = (string) ($cadastro['nome'] ?? '');
             }
-            $grp['materias_ids'] = $cadastro['materias_ids'];
-            $grp['mode'] = $cadastro['modo'];
-            $grp['aplicar_em'] = $cadastro['aplicar_em'];
-            if (($cadastro['divisor'] ?? null) !== null) {
-                $grp['divisor'] = $cadastro['divisor'];
+            $idsLocais = [];
+            foreach ((array) ($grp['materias_ids'] ?? []) as $v) {
+                $id = (int) $v;
+                if ($id > 0) {
+                    $idsLocais[] = $id;
+                }
+            }
+            $idsLocais = array_values(array_unique($idsLocais));
+            // Só herda do cadastro se o evento não trouxe lista própria.
+            if (count($idsLocais) < 2) {
+                $grp['materias_ids'] = $cadastro['materias_ids'];
+                $grp['mode'] = $cadastro['modo'];
+                $grp['aplicar_em'] = $cadastro['aplicar_em'];
+                if (($cadastro['divisor'] ?? null) !== null) {
+                    $grp['divisor'] = $cadastro['divisor'];
+                }
             }
         }
         $key = $this->slug((string) ($grp['key'] ?? ''));

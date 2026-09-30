@@ -12,6 +12,16 @@ $selectedAlunoId = (int) ($selected_aluno_id ?? 0);
 $periodoRef = (string) ($periodo_ref ?? '');
 $dataInicio = (string) ($data_inicio ?? '');
 $dataFim = (string) ($data_fim ?? '');
+$fmtDataBr = static function (string $ymd): string {
+    $ymd = trim($ymd);
+    if ($ymd === '') {
+        return '—';
+    }
+    $ts = strtotime($ymd);
+    return $ts ? date('d/m/Y', $ts) : $ymd;
+};
+$dataInicioBr = $fmtDataBr($dataInicio);
+$dataFimBr = $fmtDataBr($dataFim);
 $geracaoEmAndamento = !empty($geracao_em_andamento);
 $abrirSimular = !empty($abrir_simular);
 $retornoPath = '/admin/boletins/' . $boletimId . '/gerar-boletins?regra_id=' . $selectedRegraId;
@@ -76,9 +86,9 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <div class="inline-flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 w-full">
                 <i class="fa-regular fa-calendar text-gray-400" aria-hidden="true"></i>
                 <span>
-                    <?= htmlspecialchars($dataInicio, ENT_QUOTES, 'UTF-8') ?>
+                    <?= htmlspecialchars($dataInicioBr, ENT_QUOTES, 'UTF-8') ?>
                     <span class="text-gray-400">→</span>
-                    <?= htmlspecialchars($dataFim, ENT_QUOTES, 'UTF-8') ?>
+                    <?= htmlspecialchars($dataFimBr, ENT_QUOTES, 'UTF-8') ?>
                 </span>
             </div>
         </div>

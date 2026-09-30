@@ -399,6 +399,7 @@ foreach ($componentes as $comp) {
         'materia_id' => (int) ($comp['materia_id'] ?? 0),
         'materias_ids' => $materiasIdsComp,
         'materia_unica' => (int) ($comp['materia_unica'] ?? 0) === 1,
+        'materia_unica_modo' => (strtolower(trim((string) ($comp['materia_unica_modo'] ?? 'soma'))) === 'media') ? 'media' : 'soma',
         'usar_percentual' => (int) ($comp['usar_percentual'] ?? 0) === 1,
         'escala_max' => (float) ($comp['escala_max'] ?? 10),
         'obrigatorio' => (int) ($comp['obrigatorio'] ?? 0) === 1,
@@ -1903,10 +1904,26 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 </label>
                 <p id="hint-percentual-jornadas" class="text-xs text-slate-600 hidden pl-7">Marcado: nota = (% de jornadas <strong>concluídas</strong> no escopo) ÷ 100 × escala máx. Desmarcado: <strong>tabela por faixas</strong> sobre esse mesmo percentual (ex.: 40%–100% → 5–10). Em ambos os casos vale só conclusão da jornada, não acerto em questões.</p>
                 </div>
-                <label class="inline-flex items-center gap-2 text-sm text-gray-700" id="wrap-materia-unica">
-                    <input id="bloco-materia-unica" type="checkbox" class="rounded border-gray-300">
-                    Matérias únicas (somar notas da mesma matéria entre professores)
-                </label>
+                <div id="wrap-materia-unica" class="space-y-2">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input id="bloco-materia-unica" type="checkbox" class="rounded border-gray-300">
+                        Juntar matérias iguais (mesma matéria, vários professores)
+                    </label>
+                    <div id="wrap-materia-unica-modo" class="hidden ml-6 pl-2 border-l-2 border-gray-200 space-y-1">
+                        <span class="text-xs font-medium text-gray-600">Como juntar</span>
+                        <div class="flex flex-wrap gap-3 text-sm text-gray-700">
+                            <label class="inline-flex items-center gap-1.5">
+                                <input type="radio" name="bloco-materia-unica-modo" value="soma" class="bloco-materia-unica-modo" checked>
+                                Somar
+                            </label>
+                            <label class="inline-flex items-center gap-1.5">
+                                <input type="radio" name="bloco-materia-unica-modo" value="media" class="bloco-materia-unica-modo">
+                                Média
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500">Somar: 3+4+3=10. Média: 10+10+10÷3=10.</p>
+                    </div>
+                </div>
             </div>
             <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label class="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -2160,6 +2177,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         blocoIds: document.getElementById('bloco-ids'),
         materiaId: document.getElementById('bloco-materia-id'),
         materiaUnica: document.getElementById('bloco-materia-unica'),
+        wrapMateriaUnicaModo: document.getElementById('wrap-materia-unica-modo'),
         percentual: document.getElementById('bloco-percentual'),
         obrigatorio: document.getElementById('bloco-obrigatorio'),
         roundModeOverride: document.getElementById('bloco-round-mode-override'),
@@ -3452,6 +3470,25 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         fields.groupFields.classList.toggle('hidden', !ativo);
     }
 
+    function getMateriaUnicaModoFromModal() {
+        var el = document.querySelector('input[name="bloco-materia-unica-modo"]:checked');
+        return (el && el.value === 'media') ? 'media' : 'soma';
+    }
+
+    function setMateriaUnicaModoOnModal(modo) {
+        var alvo = (String(modo || '').toLowerCase() === 'media') ? 'media' : 'soma';
+        document.querySelectorAll('input[name="bloco-materia-unica-modo"]').forEach(function (el) {
+            el.checked = el.value === alvo;
+        });
+    }
+
+    function toggleMateriaUnicaModoFields() {
+        if (!fields.wrapMateriaUnicaModo || !fields.materiaUnica) {
+            return;
+        }
+        fields.wrapMateriaUnicaModo.classList.toggle('hidden', !fields.materiaUnica.checked);
+    }
+
     function aplicarAgrupamentoCadastroNoModal() {
         if (!fields.groupAgrupamento) {
             return;
@@ -3860,7 +3897,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     materiasTxt = ' | matérias: ' + nomesMat.join(', ');
                 }
             }
-            const materiaUnicaTxt = item.materia_unica ? ' | matérias únicas' : '';
+            const materiaUnicaTxt = item.materia_unica
+                ? (' | matérias únicas (' + ((item.materia_unica_modo === 'media') ? 'média' : 'soma') + ')')
+                : '';
             var groupTxt = '';
             if (item.config && item.config.group_line && item.config.group_line.enabled) {
                 var gl = item.config.group_line;
@@ -3971,6 +4010,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         fields.materiaId.value = '';
         setSelectedMateriasOnModal([]);
         fields.materiaUnica.checked = false;
+        setMateriaUnicaModoOnModal('soma');
+        toggleMateriaUnicaModoFields();
         fields.percentual.checked = true;
         fields.obrigatorio.checked = false;
         if (fields.roundModeOverride) {
@@ -4159,6 +4200,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             fields.materiaId.value = item.materia_id ? String(item.materia_id) : '';
             setSelectedMateriasOnModal(Array.isArray(item.materias_ids) ? item.materias_ids : []);
             fields.materiaUnica.checked = !!item.materia_unica;
+            setMateriaUnicaModoOnModal(item.materia_unica_modo || 'soma');
+            toggleMateriaUnicaModoFields();
             fields.percentual.checked = !!item.usar_percentual;
             fields.obrigatorio.checked = !!item.obrigatorio;
             if (fields.roundModeOverride) {
@@ -4399,6 +4442,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     fields.percentual.addEventListener('change', function () {
         toggleBySource();
     });
+    if (fields.materiaUnica) {
+        fields.materiaUnica.addEventListener('change', toggleMateriaUnicaModoFields);
+    }
     if (fields.groupEnabled) {
         fields.groupEnabled.addEventListener('change', toggleGroupLineFields);
     }
@@ -4600,6 +4646,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             materia_id: Number(fields.materiaId.value || 0),
             materias_ids: getSelectedMateriasFromModal(),
             materia_unica: fields.materiaUnica.checked,
+            materia_unica_modo: fields.materiaUnica.checked ? getMateriaUnicaModoFromModal() : 'soma',
             usar_percentual: fields.percentual.checked,
             escala_max: Number(fields.escala.value || 10),
             obrigatorio: fields.obrigatorio.checked

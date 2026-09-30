@@ -83,6 +83,7 @@ class BoletimConfig
         $this->ensureComponenteColumn('bloco_id', "ALTER TABLE boletim_componentes ADD COLUMN bloco_id INT NULL AFTER filtro_titulo");
         $this->ensureComponenteColumn('materia_id', "ALTER TABLE boletim_componentes ADD COLUMN materia_id INT NULL AFTER bloco_id");
         $this->ensureComponenteColumn('materia_unica', "ALTER TABLE boletim_componentes ADD COLUMN materia_unica TINYINT(1) NOT NULL DEFAULT 0 AFTER materia_id");
+        $this->ensureComponenteColumn('materia_unica_modo', "ALTER TABLE boletim_componentes ADD COLUMN materia_unica_modo VARCHAR(10) NOT NULL DEFAULT 'soma' AFTER materia_unica");
         $this->ensureComponenteColumn('blocos_ids', "ALTER TABLE boletim_componentes ADD COLUMN blocos_ids VARCHAR(500) NULL AFTER bloco_id");
         $this->ensureComponenteColumn('materias_ids', "ALTER TABLE boletim_componentes ADD COLUMN materias_ids TEXT NULL AFTER materia_id");
         $this->ensureComponenteColumn('config_json', "ALTER TABLE boletim_componentes ADD COLUMN config_json TEXT NULL AFTER blocos_ids");
@@ -850,9 +851,9 @@ class BoletimConfig
 
                 $this->db->insert(
                     "INSERT INTO boletim_componentes
-                    (regra_id, codigo, nome, source_type, calc_type, peso, filtro_titulo, bloco_id, blocos_ids, config_json, materia_id, materias_ids, materia_unica, usar_percentual, escala_max, obrigatorio, ativo, ordem)
+                    (regra_id, codigo, nome, source_type, calc_type, peso, filtro_titulo, bloco_id, blocos_ids, config_json, materia_id, materias_ids, materia_unica, materia_unica_modo, usar_percentual, escala_max, obrigatorio, ativo, ordem)
                     VALUES
-                    (:regra_id, :codigo, :nome, :source_type, :calc_type, :peso, :filtro_titulo, :bloco_id, :blocos_ids, :config_json, :materia_id, :materias_ids, :materia_unica, :usar_percentual, :escala_max, :obrigatorio, 1, :ordem)",
+                    (:regra_id, :codigo, :nome, :source_type, :calc_type, :peso, :filtro_titulo, :bloco_id, :blocos_ids, :config_json, :materia_id, :materias_ids, :materia_unica, :materia_unica_modo, :usar_percentual, :escala_max, :obrigatorio, 1, :ordem)",
                     [
                         'regra_id' => $regraId,
                         'codigo' => $codigo,
@@ -867,6 +868,7 @@ class BoletimConfig
                         'materia_id' => !empty($componente['materia_id']) ? (int) $componente['materia_id'] : null,
                         'materias_ids' => $this->trimConfigJson($componente['materias_ids'] ?? null),
                         'materia_unica' => !empty($componente['materia_unica']) ? 1 : 0,
+                        'materia_unica_modo' => $this->normalizeMateriaUnicaModo($componente['materia_unica_modo'] ?? null),
                         'usar_percentual' => !empty($componente['usar_percentual']) ? 1 : 0,
                         'escala_max' => max(0.01, (float) ($componente['escala_max'] ?? 10)),
                         'obrigatorio' => !empty($componente['obrigatorio']) ? 1 : 0,
@@ -1568,8 +1570,8 @@ class BoletimConfig
 
             $this->db->insert(
                 "INSERT INTO boletim_componentes
-                (regra_id, codigo, nome, source_type, calc_type, peso, filtro_titulo, bloco_id, blocos_ids, config_json, materia_id, materias_ids, materia_unica, usar_percentual, escala_max, obrigatorio, ativo, ordem)
-                SELECT :novo_regra_id, codigo, nome, source_type, calc_type, peso, filtro_titulo, bloco_id, blocos_ids, config_json, materia_id, materias_ids, materia_unica, usar_percentual, escala_max, obrigatorio, ativo, ordem
+                (regra_id, codigo, nome, source_type, calc_type, peso, filtro_titulo, bloco_id, blocos_ids, config_json, materia_id, materias_ids, materia_unica, materia_unica_modo, usar_percentual, escala_max, obrigatorio, ativo, ordem)
+                SELECT :novo_regra_id, codigo, nome, source_type, calc_type, peso, filtro_titulo, bloco_id, blocos_ids, config_json, materia_id, materias_ids, materia_unica, materia_unica_modo, usar_percentual, escala_max, obrigatorio, ativo, ordem
                 FROM boletim_componentes WHERE regra_id = :regra_id AND ativo = 1",
                 ['novo_regra_id' => $novoId, 'regra_id' => $ruleId]
             );
@@ -3768,6 +3770,14 @@ class BoletimConfig
         $calcType = strtolower(trim($calcType));
         $allowed = ['media', 'soma', 'maior', 'ultima'];
         return in_array($calcType, $allowed, true) ? $calcType : 'media';
+    }
+
+    /**
+     * @param mixed $modo
+     */
+    private function normalizeMateriaUnicaModo($modo): string
+    {
+        return strtolower(trim((string) $modo)) === 'media' ? 'media' : 'soma';
     }
 
     private function normalizeSourceTypeForSave(string $sourceType): string

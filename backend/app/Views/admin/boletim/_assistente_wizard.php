@@ -490,11 +490,13 @@ $boletimWizardSteps = [
         if (!estado) return;
         if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
         var flag = estado.materia_unica ? 1 : 0;
+        var modo = estado.materia_unica_modo === 'media' ? 'media' : 'soma';
         (estado.pecas || []).forEach(function (k) {
             if (!estado.pecas_opcoes[k]) {
                 estado.pecas_opcoes[k] = pecasOpcoesPadraoJs(k);
             } else {
                 estado.pecas_opcoes[k].materia_unica = flag;
+                estado.pecas_opcoes[k].materia_unica_modo = modo;
                 if (!estado.pecas_opcoes[k].papel) estado.pecas_opcoes[k].papel = papelPadrao(k);
             }
         });
@@ -534,6 +536,7 @@ $boletimWizardSteps = [
         return {
             calc_type: (meta && meta.calc_type) ? meta.calc_type : calcTypePadrao(key),
             materia_unica: estado && estado.materia_unica ? 1 : 0,
+            materia_unica_modo: (estado && estado.materia_unica_modo === 'media') ? 'media' : 'soma',
             usar_percentual: (meta && typeof meta.usar_percentual !== 'undefined') ? (meta.usar_percentual ? 1 : 0) : usarPercentualPadrao(key),
             tipo_avaliacao_id: meta && meta.tipo_avaliacao_id ? Number(meta.tipo_avaliacao_id) : 0,
             papel: papelPadrao(key),
@@ -997,6 +1000,7 @@ $boletimWizardSteps = [
             if (!opcoes[key]) opcoes[key] = pecasOpcoesPadraoJs(key);
             opcoes[key].calc_type = c.calc_type || opcoes[key].calc_type;
             opcoes[key].materia_unica = c.materia_unica ? 1 : 0;
+            opcoes[key].materia_unica_modo = c.materia_unica_modo === 'media' ? 'media' : 'soma';
             opcoes[key].usar_percentual = c.usar_percentual ? 1 : 0;
             var cfg = c.config && typeof c.config === 'object' ? c.config : {};
             if (cfg.tipo_avaliacao_id) opcoes[key].tipo_avaliacao_id = Number(cfg.tipo_avaliacao_id);
@@ -1056,6 +1060,17 @@ $boletimWizardSteps = [
         return (r && Array.isArray(r.componentes) ? r.componentes : []).some(function (c) {
             return c && c.source_type !== 'calculado' && !!c.materia_unica;
         }) ? 1 : 0;
+    }
+
+    function materiaUnicaModoDoRascunho(r) {
+        var comps = r && Array.isArray(r.componentes) ? r.componentes : [];
+        for (var i = 0; i < comps.length; i++) {
+            var c = comps[i];
+            if (c && c.source_type !== 'calculado' && c.materia_unica) {
+                return c.materia_unica_modo === 'media' ? 'media' : 'soma';
+            }
+        }
+        return 'soma';
     }
 
     function faixasJornadaPadrao() {
@@ -1145,6 +1160,7 @@ $boletimWizardSteps = [
             pecas: [],
             pecas_opcoes: {},
             materia_unica: 0,
+            materia_unica_modo: 'soma',
             materia_unica_tocada: false,
             formula_preset: 'media_simples',
             formula_custom: '',
@@ -1188,6 +1204,7 @@ $boletimWizardSteps = [
         if (estado.grupo_regras_notas_id == null) estado.grupo_regras_notas_id = 0;
         estado.exibir_em = 'notas';
         if (estado.materia_unica == null) estado.materia_unica = 0;
+        if (estado.materia_unica_modo !== 'media') estado.materia_unica_modo = 'soma';
         if (estado.materia_unica_tocada == null) estado.materia_unica_tocada = false;
         if (!estado.jornada_nota_modo) estado.jornada_nota_modo = 'linear';
         if (estado.jornada_distribuicao_notas !== 'nota_unica_todas_linhas') {
@@ -2758,8 +2775,10 @@ $boletimWizardSteps = [
         var porId = {};
         var porNome = {};
         var linhas = [];
-        // "Juntar matérias iguais" sempre soma (não herda média/soma da linha única).
-        var modoIguais = (estado && estado.materia_unica) ? 'soma' : '';
+        // "Juntar matérias iguais": soma ou média conforme materia_unica_modo.
+        var modoIguais = (estado && estado.materia_unica)
+            ? (estado.materia_unica_modo === 'media' ? 'media' : 'soma')
+            : '';
         brutas.forEach(function (lin) {
             if (!lin) return;
             var id = Number(lin.materia_id || 0);
@@ -3116,6 +3135,7 @@ $boletimWizardSteps = [
         estado.rascunho_preservado = r;
         estado.passo = 'revisar';
         estado.materia_unica = materiaUnicaDoRascunho(r);
+        estado.materia_unica_modo = materiaUnicaModoDoRascunho(r);
         estado.materia_unica_tocada = false;
         aplicarMateriaUnicaNasPecas();
         if (r.nome) estado.nome = r.nome;
@@ -3722,6 +3742,17 @@ $boletimWizardSteps = [
             html += '<label class="inline-flex items-start gap-2 text-sm text-gray-800">';
             html += '<input type="checkbox" id="bw-materia-unica" class="mt-0.5 rounded border-gray-300 text-indigo-600"' + (estado.materia_unica ? ' checked' : '') + '>';
             html += '<span><strong>Juntar matérias iguais</strong><span class="block text-xs text-gray-600 font-normal">Mesma matéria, professores diferentes (ex.: dois Português). Vale para todas as peças. Não junta Português com Literatura.</span></span></label>';
+            if (estado.materia_unica) {
+                var modoIguaisUi = (estado.materia_unica_modo === 'media') ? 'media' : 'soma';
+                html += '<div class="ml-6 pl-1 border-l-2 border-indigo-200 space-y-2">';
+                html += '<span class="text-xs font-medium text-gray-600">Como juntar as notas dos professores</span>';
+                html += '<div class="flex flex-wrap gap-3 text-sm">';
+                html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-materia-unica-modo" class="bw-materia-unica-modo" value="soma"' + (modoIguaisUi === 'soma' ? ' checked' : '') + '> Somar</label>';
+                html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-materia-unica-modo" class="bw-materia-unica-modo" value="media"' + (modoIguaisUi === 'media' ? ' checked' : '') + '> Média</label>';
+                html += '</div>';
+                html += '<p class="text-xs text-gray-500">Somar: cada professor contribui (ex.: 3+4+3 = 10). Média: 10+10+10 ÷ 3 = 10. Independente do Tipo de Nota.</p>';
+                html += '</div>';
+            }
             html += '<label class="inline-flex items-start gap-2 text-sm text-gray-800">';
             html += '<input type="checkbox" id="bw-grupo-ativo" class="mt-0.5 rounded border-gray-300 text-indigo-600"' + (gl.ativo ? ' checked' : '') + '>';
             html += '<span><strong>Linha única no boletim</strong><span class="block text-xs text-gray-600 font-normal">Junta os desdobramentos numa linha só. Ex.: Gramática + Interpretação + Literatura → “Língua Portuguesa”.</span></span></label>';
@@ -3741,6 +3772,17 @@ $boletimWizardSteps = [
                     });
                     html += '</div></div>';
                 }
+                html += '<div><span class="text-xs font-medium text-gray-600">Matérias nesta área (neste evento)</span>';
+                html += '<p class="text-xs text-gray-500 mt-0.5 mb-2">Altera só este Evento de Notas (este bimestre). Os outros bimestres não mudam. Marque ou desmarque para incluir/excluir filhas.</p>';
+                html += '<div class="grid sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-white">';
+                materiasCatalogoDoEscopo().forEach(function (m) {
+                    var on = (gl.materias_ids || []).some(function (id) { return Number(id) === Number(m.id); });
+                    html += '<label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" class="bw-grupo-materia rounded border-gray-300 text-indigo-600" value="' + m.id + '"' + (on ? ' checked' : '') + '> ' + esc(m.nome) + '</label>';
+                });
+                if (!materiasCatalogoDoEscopo().length) {
+                    html += '<p class="text-xs text-gray-500">Nenhuma matéria neste boletim.</p>';
+                }
+                html += '</div></div>';
                 html += '<div><span class="text-xs font-medium text-gray-600">Como juntar as notas dessas matérias</span>';
                 html += '<div class="mt-1 flex flex-wrap gap-3 text-sm">';
                 html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo" class="bw-grupo-modo" value="media"' + (gl.modo !== 'soma' ? ' checked' : '') + '> Média</label>';
@@ -3756,20 +3798,12 @@ $boletimWizardSteps = [
                     html += '<span><strong>No boletim e nas notas</strong><span class="block text-xs text-gray-600 font-normal">Junta as matérias nos dois lugares.</span></span></label>';
                     html += '</div></div>';
                 }
-                html += '<details class="text-xs text-gray-600"><summary class="cursor-pointer">Nome da linha e matérias à mão</summary>';
+                html += '<details class="text-xs text-gray-600"><summary class="cursor-pointer">Nome da linha (avançado)</summary>';
                 html += '<div class="mt-2 space-y-2">';
                 html += '<div><label class="text-xs text-gray-600">Nome da linha</label>';
                 html += '<input id="bw-grupo-nome" type="text" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" placeholder="Língua Portuguesa" value="' + esc(gl.nome || '') + '"></div>';
-                html += '<p class="text-xs text-gray-500">Só use se a área não estiver em Componentes Curriculares.</p>';
-                html += '<div class="grid sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-lg p-3 bg-white">';
-                materiasCatalogoDoEscopo().forEach(function (m) {
-                    var on = (gl.materias_ids || []).some(function (id) { return Number(id) === Number(m.id); });
-                    html += '<label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" class="bw-grupo-materia rounded border-gray-300 text-indigo-600" value="' + m.id + '"' + (on ? ' checked' : '') + '> ' + esc(m.nome) + '</label>';
-                });
-                if (!materiasCatalogoDoEscopo().length) {
-                    html += '<p class="text-xs text-gray-500">Nenhuma matéria neste boletim.</p>';
-                }
-                html += '</div></div></details>';
+                html += '<p class="text-xs text-gray-500">Use se quiser um rótulo diferente do nome da área em Componentes.</p>';
+                html += '</div></details>';
             }
             html += '</div>';
         }
@@ -4058,10 +4092,20 @@ $boletimWizardSteps = [
             materiaUnicaEl.addEventListener('change', function () {
                 estado.materia_unica = materiaUnicaEl.checked ? 1 : 0;
                 estado.materia_unica_tocada = true;
+                if (!estado.materia_unica_modo) estado.materia_unica_modo = 'soma';
                 aplicarMateriaUnicaNasPecas();
+                renderAll();
                 agendarMontar();
             });
         }
+        bodyEl.querySelectorAll('.bw-materia-unica-modo').forEach(function (el) {
+            el.addEventListener('change', function () {
+                estado.materia_unica_modo = el.value === 'media' ? 'media' : 'soma';
+                estado.materia_unica_tocada = true;
+                aplicarMateriaUnicaNasPecas();
+                agendarMontar();
+            });
+        });
         var grupoAtivoEl = document.getElementById('bw-grupo-ativo');
         if (grupoAtivoEl) {
             grupoAtivoEl.addEventListener('change', function () {
@@ -4125,6 +4169,8 @@ $boletimWizardSteps = [
                 bodyEl.querySelectorAll('.bw-grupo-materia:checked').forEach(function (c) {
                     estado.grupo_linha.materias_ids.push(parseInt(c.value, 10));
                 });
+                // Lista deste evento prevalece sobre o cadastro de agrupamento.
+                estado.grupo_linha.agrupamento_id = 0;
                 agendarMontar();
             });
         });
