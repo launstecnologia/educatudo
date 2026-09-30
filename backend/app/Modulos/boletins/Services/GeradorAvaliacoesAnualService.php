@@ -436,9 +436,10 @@ class GeradorAvaliacoesAnualService
 
     /**
      * @param array<int,int> $modelosPorBimestre bimestre => regra_id modelo
-     * @return array{success:bool,error?:string,criados?:list<int>,ignorados?:list<int>}
+     * @param list<int>|null $bimestresSelecionados null = todos faltantes; lista = só esses
+     * @return array{success:bool,error?:string,criados?:list<int>,ignorados?:list<int>,pulados?:list<int>}
      */
-    public function gerar(int $boletimId, array $modelosPorBimestre, int $anoLetivo = 0): array
+    public function gerar(int $boletimId, array $modelosPorBimestre, int $anoLetivo = 0, ?array $bimestresSelecionados = null): array
     {
         if ($anoLetivo <= 0) {
             $boletim = $this->boletim->findById($boletimId);
@@ -456,6 +457,20 @@ class GeradorAvaliacoesAnualService
             return ['success' => false, 'error' => 'Escolha um evento modelo para duplicar (crie a primeira avaliação do modelo).'];
         }
 
+        $filtroBim = null;
+        if ($bimestresSelecionados !== null) {
+            $filtroBim = [];
+            foreach ($bimestresSelecionados as $bSel) {
+                $b = (int) $bSel;
+                if ($b > 0) {
+                    $filtroBim[$b] = true;
+                }
+            }
+            if ($filtroBim === []) {
+                return ['success' => false, 'error' => 'Marque ao menos um bimestre para gerar.'];
+            }
+        }
+
         $prev = $this->previsualizar($boletimId, $anoLetivo);
         if (empty($prev['ok'])) {
             return ['success' => false, 'error' => $prev['error'] ?? 'Não foi possível montar os períodos.'];
@@ -465,6 +480,7 @@ class GeradorAvaliacoesAnualService
         $nomePadraoBoletim = trim((string) ($prev['boletim']['nome'] ?? 'Avaliação'));
         $criados = [];
         $ignorados = [];
+        $pulados = [];
         foreach ($prev['periodos'] as $periodo) {
             $bim = (int) ($periodo['bimestre'] ?? 0);
             if (!PeriodoLetivo::numeroValido($ano, $bim)) {
@@ -472,6 +488,10 @@ class GeradorAvaliacoesAnualService
             }
             if (!empty($periodo['ja_existe'])) {
                 $ignorados[] = $bim;
+                continue;
+            }
+            if ($filtroBim !== null && !isset($filtroBim[$bim])) {
+                $pulados[] = $bim;
                 continue;
             }
             $modeloRegraId = (int) ($modelosPorBimestre[$bim] ?? 0);
@@ -518,14 +538,18 @@ class GeradorAvaliacoesAnualService
             $criados[] = $novoId;
         }
 
-        if ($criados === [] && $ignorados === []) {
+        if ($criados === [] && $ignorados === [] && $pulados === []) {
             return ['success' => false, 'error' => 'Nenhum período para gerar.'];
+        }
+        if ($criados === [] && $pulados !== [] && $ignorados === []) {
+            return ['success' => false, 'error' => 'Marque ao menos um bimestre para gerar.'];
         }
 
         return [
             'success' => true,
             'criados' => $criados,
             'ignorados' => $ignorados,
+            'pulados' => $pulados,
         ];
     }
 

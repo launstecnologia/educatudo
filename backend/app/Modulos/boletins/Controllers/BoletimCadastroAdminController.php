@@ -216,8 +216,19 @@ class BoletimCadastroAdminController extends AdminBaseController
                 }
             }
         }
+        $bimestresSelecionados = [];
+        $rawBims = $_POST['bimestres'] ?? [];
+        if (is_array($rawBims)) {
+            foreach ($rawBims as $bimRaw) {
+                $bim = (int) $bimRaw;
+                if ($bim > 0) {
+                    $bimestresSelecionados[$bim] = $bim;
+                }
+            }
+        }
+        $bimestresSelecionados = array_values($bimestresSelecionados);
         $ano = (int) ($_POST['ano_letivo'] ?? 0);
-        $result = $gerador->gerar($id, $modelosPorBimestre, $ano);
+        $result = $gerador->gerar($id, $modelosPorBimestre, $ano, $bimestresSelecionados);
         if (empty($result['success'])) {
             $this->setFlashMessage($result['error'] ?? 'Não foi possível gerar os eventos.', 'error');
             $this->redirect('/admin/boletins/' . $id . '/gerar-avaliacoes');
@@ -225,11 +236,15 @@ class BoletimCadastroAdminController extends AdminBaseController
         }
         $nCriados = count($result['criados'] ?? []);
         $nIgn = count($result['ignorados'] ?? []);
+        $nPulados = count($result['pulados'] ?? []);
         $msg = $nCriados > 0
             ? ($nCriados . ' avaliação(ões) criada(s).')
-            : 'Nenhum evento novo: os bimestres já existiam.';
+            : 'Nenhum evento novo foi criado.';
         if ($nIgn > 0 && $nCriados > 0) {
             $msg .= ' ' . $nIgn . ' bimestre(s) já cadastrado(s) foram ignorados.';
+        }
+        if ($nPulados > 0 && $nCriados > 0) {
+            $msg .= ' ' . $nPulados . ' bimestre(s) ficaram de fora desta geração.';
         }
         $this->setFlashMessage($msg, 'success');
         $this->redirect('/admin/boletins');

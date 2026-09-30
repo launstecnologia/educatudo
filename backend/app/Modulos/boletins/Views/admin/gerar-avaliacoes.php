@@ -29,7 +29,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             · Ano <?= $anoLetivo ?>
             · <?= $usouCalendario ? 'Datas do calendário letivo' : 'Períodos padrão (4 bimestres)' ?>
         </p>
-        <p class="text-xs text-gray-500 mt-1">Bimestres que já têm avaliação neste modelo são ignorados. Em cada bimestre faltante, escolha qual evento vigente copiar.</p>
+        <p class="text-xs text-gray-500 mt-1">Marque só os bimestres que deseja criar agora e, em cada um, escolha o evento vigente a copiar.</p>
     </div>
 
     <?php if ($eventosModelo === []): ?>
@@ -41,7 +41,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-avaliacoes" class="space-y-4">
+    <form method="POST" action="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-avaliacoes" class="space-y-4" id="form-gerar-avaliacoes">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
 
@@ -49,6 +49,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-16">Gerar</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim</th>
@@ -60,15 +61,39 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <tbody class="divide-y divide-gray-200">
                     <?php if ($periodos === []): ?>
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">Nenhum período calculado.</td>
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-500">Nenhum período calculado.</td>
                     </tr>
                     <?php else: foreach ($periodos as $p):
                         $bim = (int) ($p['bimestre'] ?? 0);
                         $jaExiste = !empty($p['ja_existe']);
                         $modeloSel = (int) ($modelosPorBimestre[$bim] ?? 0);
+                        $rowId = 'bim-gerar-' . $bim;
                     ?>
-                    <tr>
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($p['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                    <tr class="<?= $jaExiste ? 'bg-gray-50/60' : '' ?>">
+                        <td class="px-4 py-3">
+                            <?php if ($jaExiste): ?>
+                                <input type="checkbox" disabled class="rounded border-gray-300 text-gray-400" title="Já existe">
+                            <?php else: ?>
+                                <input
+                                    type="checkbox"
+                                    name="bimestres[]"
+                                    value="<?= $bim ?>"
+                                    id="<?= htmlspecialchars($rowId, ENT_QUOTES, 'UTF-8') ?>"
+                                    class="js-bim-gerar rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    checked
+                                    <?= $eventosModelo === [] ? 'disabled' : '' ?>
+                                >
+                            <?php endif; ?>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                            <?php if (!$jaExiste && $eventosModelo !== []): ?>
+                                <label for="<?= htmlspecialchars($rowId, ENT_QUOTES, 'UTF-8') ?>" class="cursor-pointer">
+                                    <?= htmlspecialchars((string) ($p['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                </label>
+                            <?php else: ?>
+                                <?= htmlspecialchars((string) ($p['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($p['inicio'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                         <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($p['fim'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
                         <td class="px-4 py-3 text-sm text-gray-600"><?= (($p['origem'] ?? '') === 'calendario') ? 'Calendário' : 'Padrão' ?></td>
@@ -76,7 +101,8 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <?php if ($jaExiste): ?>
                                 <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Já existe</span>
                             <?php else: ?>
-                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Será criado</span>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 js-status-criar">Será criado</span>
+                                <span class="hidden inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 js-status-pular">Não gerar agora</span>
                             <?php endif; ?>
                         </td>
                         <td class="px-4 py-3 min-w-[18rem]">
@@ -87,7 +113,8 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <?php else: ?>
                                 <select
                                     name="modelo_por_bimestre[<?= $bim ?>]"
-                                    class="w-full max-w-xl px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                                    class="js-modelo-select w-full max-w-xl px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                                    data-bim="<?= $bim ?>"
                                     required
                                 >
                                     <?php foreach ($eventosModelo as $ev):
@@ -110,12 +137,52 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         <div class="flex items-center gap-3">
             <button
                 type="submit"
+                id="btn-gerar-avaliacoes"
                 class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90"
                 <?= ($eventosModelo === [] || !$temPeriodoParaCriar) ? 'disabled' : '' ?>
             >
-                Gerar eventos faltantes
+                Gerar selecionados
             </button>
             <a href="<?= URL ?>/admin/boletins" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">Cancelar</a>
         </div>
     </form>
 </div>
+<?php if ($temPeriodoParaCriar && $eventosModelo !== []): ?>
+<script>
+(function () {
+    var form = document.getElementById('form-gerar-avaliacoes');
+    if (!form) return;
+    var btn = document.getElementById('btn-gerar-avaliacoes');
+
+    function syncRow(cb) {
+        var tr = cb.closest('tr');
+        if (!tr) return;
+        var criar = tr.querySelector('.js-status-criar');
+        var pular = tr.querySelector('.js-status-pular');
+        var sel = tr.querySelector('.js-modelo-select');
+        var on = !!cb.checked;
+        if (criar) criar.classList.toggle('hidden', !on);
+        if (pular) pular.classList.toggle('hidden', on);
+        if (sel) {
+            sel.disabled = !on;
+            sel.required = on;
+        }
+    }
+
+    function syncAll() {
+        var checks = form.querySelectorAll('.js-bim-gerar');
+        var any = false;
+        checks.forEach(function (cb) {
+            syncRow(cb);
+            if (cb.checked) any = true;
+        });
+        if (btn) btn.disabled = !any;
+    }
+
+    form.querySelectorAll('.js-bim-gerar').forEach(function (cb) {
+        cb.addEventListener('change', syncAll);
+    });
+    syncAll();
+})();
+</script>
+<?php endif; ?>
