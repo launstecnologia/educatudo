@@ -623,7 +623,8 @@ class VidaEscolarService
      */
     public function alimentarDoCalculo(int $alunoId, ?string $periodoRef = null, ?array $usuario = null, ?int $fichaId = null): array
     {
-        return $this->sincronizarDeEventosGerados($alunoId, $usuario ?? [], null, $periodoRef, $fichaId, true, true);
+        // forcarEscrita: atualiza células já calculadas/fechadas (exceto externa/homologada).
+        return $this->sincronizarDeEventosGerados($alunoId, $usuario ?? [], null, $periodoRef, $fichaId, true, true, true);
     }
 
     /**
@@ -677,7 +678,7 @@ class VidaEscolarService
         if (!is_array($ficha)) {
             return ['success' => false, 'error' => 'Ficha não encontrada para este aluno.'];
         }
-        if (($ficha['status'] ?? '') === 'homologada' && !$forcarEscrita) {
+        if (($ficha['status'] ?? '') === 'homologada') {
             return ['success' => true, 'atualizadas' => 0];
         }
 
@@ -699,6 +700,8 @@ class VidaEscolarService
         $n = 0;
         $linhasTocadas = [];
         $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
+        /** @var array<int, array<int, array{nota:?float, faltas:?int, prio:int}>> */
+        $propostas = [];
         foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
             if (!$this->eventoPertenceAoAno($row, $ano)) {
                 continue;
@@ -737,6 +740,20 @@ class VidaEscolarService
             if ($bimRow >= 1 && $bimRow <= 4 && !isset($periodosGerados[$bimRow])) {
                 $periodosGerados[$bimRow] = ['nota' => null, 'faltas' => null];
             }
+            $prioBase = 0;
+            if ($bimRow >= 1 && $bimRow <= 4) {
+                $prioBase += 10;
+            }
+            $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
+            if ($exibir === 'notas') {
+                $prioBase += 5;
+            } elseif ($exibir === 'boletim') {
+                $prioBase += 2;
+            }
+            $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
+            if ($temMediaFinalRow) {
+                $prioBase += 20;
+            }
             foreach ($periodosGerados as $periodo => $vals) {
                 if ($periodo < 1 || $periodo > 4) {
                     continue;
@@ -745,16 +762,47 @@ class VidaEscolarService
                 if ($faltas === null && $mid > 0) {
                     $faltas = $this->faltasLancadasAlunoMateria($alunoId, $mid, $periodo, $ano);
                 }
+                $nota = $vals['nota'] ?? null;
+                $prio = $prioBase;
+                if ($temMediaFinalRow && $nota !== null
+                    && abs((float) $nota - (float) $row['media_final']) < 0.001) {
+                    $prio += 30;
+                }
+                $atual = $propostas[$linhaId][$periodo] ?? null;
+                if ($atual !== null && (int) ($atual['prio'] ?? 0) > $prio) {
+                    // Mantém faltas se a proposta vencedora ainda não tiver.
+                    if ($faltas !== null && (($atual['faltas'] ?? null) === null)) {
+                        $propostas[$linhaId][$periodo]['faltas'] = $faltas;
+                    }
+                    continue;
+                }
+                if ($atual !== null && (int) ($atual['prio'] ?? 0) === $prio
+                    && $nota === null && ($atual['nota'] ?? null) !== null) {
+                    if ($faltas !== null) {
+                        $propostas[$linhaId][$periodo]['faltas'] = $faltas;
+                    }
+                    continue;
+                }
+                $propostas[$linhaId][$periodo] = [
+                    'nota' => $nota,
+                    'faltas' => $faltas !== null ? $faltas : ($atual['faltas'] ?? null),
+                    'prio' => $prio,
+                ];
+            }
+        }
+
+        foreach ($propostas as $linhaId => $porPeriodo) {
+            foreach ($porPeriodo as $periodo => $vals) {
                 if ($this->aplicarCelulaCalculada(
-                    $linhaId,
-                    $periodo,
+                    (int) $linhaId,
+                    (int) $periodo,
                     $vals['nota'] ?? null,
-                    $faltas,
+                    $vals['faltas'] ?? null,
                     $incluirReabertas,
                     $forcarEscrita
                 )) {
                     $n++;
-                    $linhasTocadas[$linhaId] = true;
+                    $linhasTocadas[(int) $linhaId] = true;
                 }
             }
         }
@@ -765,7 +813,7 @@ class VidaEscolarService
             $this->mapaCoberturaBimestresGerados($alunoId, $ano, $modeloBoletimId),
             $linhasTocadas,
             $incluirReabertas,
-            $forcarEscrita
+            false
         );
 
         foreach (array_keys($linhasTocadas) as $linhaId) {
@@ -891,6 +939,8 @@ class VidaEscolarService
                     }
                 }
                 $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
+                /** @var array<string, int> */
+                $prioCelula = [];
                 foreach ($resultadosPorAluno[$aid] ?? [] as $row) {
                     if (!$this->eventoPertenceAoAno($row, (int) $ano)) {
                         continue;
@@ -936,6 +986,20 @@ class VidaEscolarService
                     if ($bimRow >= 1 && $bimRow <= 4 && !isset($periodosGerados[$bimRow])) {
                         $periodosGerados[$bimRow] = ['nota' => null, 'faltas' => null];
                     }
+                    $prioBase = 0;
+                    if ($bimRow >= 1 && $bimRow <= 4) {
+                        $prioBase += 10;
+                    }
+                    $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
+                    if ($exibir === 'notas') {
+                        $prioBase += 5;
+                    } elseif ($exibir === 'boletim') {
+                        $prioBase += 2;
+                    }
+                    $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
+                    if ($temMediaFinalRow) {
+                        $prioBase += 20;
+                    }
                     foreach ($periodosGerados as $periodo => $vals) {
                         $periodo = (int) $periodo;
                         if ($periodo < 1 || $periodo > 4) {
@@ -958,6 +1022,15 @@ class VidaEscolarService
                         if ($nota === null && $faltas === null) {
                             continue;
                         }
+                        $prio = $prioBase;
+                        if ($temMediaFinalRow && $nota !== null
+                            && abs((float) $nota - (float) $row['media_final']) < 0.001) {
+                            $prio += 30;
+                        }
+                        if (isset($prioCelula[$chaveCel]) && $prioCelula[$chaveCel] > $prio) {
+                            continue;
+                        }
+                        $prioCelula[$chaveCel] = $prio;
                         $campos = ['id' => (int) $cel['id'], 'origem' => 'calculada'];
                         if ($nota !== null) {
                             $campos['nota'] = round((float) $nota, 2);
@@ -1699,8 +1772,9 @@ class VidaEscolarService
             unset($out[$p]['nota_prio']);
         }
 
-        // 2) Fallback direto da coluna/campo media_final do resultado gerado.
-        if ($bimEvento >= 1 && $bimEvento <= 4 && ($out[$bimEvento]['nota'] ?? null) === null) {
+        // 2) Sempre prioriza a média final persistida do evento (pós-ENAC),
+        // mesmo se alguma coluna "resultado" parcial já tiver preenchido a nota.
+        if ($bimEvento >= 1 && $bimEvento <= 4) {
             if (is_numeric($row['media_final'] ?? null)) {
                 $aplicar($bimEvento, (float) $row['media_final'], null);
             } elseif (isset($notasLower['media_final']) && is_numeric($notasLower['media_final'])) {
