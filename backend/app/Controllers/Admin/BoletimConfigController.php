@@ -4069,7 +4069,8 @@ class BoletimConfigController extends BaseController
                     $mapPorMateria,
                     $rows,
                     $materiasFiltro,
-                    $materiaNomesPorId
+                    $materiaNomesPorId,
+                    $regra
                 );
                 $roundModeComp = $this->resolveRoundModeComponente($componente, $roundMode);
                 $matrizPorCodigo[$codigo] = $this->applyRoundModeToMateriaMap($mapPorMateria, $roundModeComp);
@@ -4918,7 +4919,7 @@ class BoletimConfigController extends BaseController
             if ($blocoId > 0 && $profMid > 0) {
                 $materiasDoBloco[$blocoId][$profMid] = true;
             }
-            if ($blocoId <= 0 || (int) ($row['nota_unica_todas_materias'] ?? 0) !== 1) {
+            if ($blocoId <= 0 || !$this->flagNotaUnicaVerdadeira($row['nota_unica_todas_materias'] ?? 0)) {
                 continue;
             }
             if (!isset($row['nota']) || $row['nota'] === '' || $row['nota'] === null) {
@@ -4979,31 +4980,63 @@ class BoletimConfigController extends BaseController
      * @param list<array<string,mixed>> $rows
      * @param list<int> $materiasFiltro
      * @param array<int, string> $materiaNomesPorId
+     * @param array<string,mixed> $regra
      * @return array<int, float|int|string|null>
      */
     private function completarMapaNotaUnicaBloco(
         array $map,
         array $rows,
         array $materiasFiltro,
-        array &$materiaNomesPorId
+        array &$materiaNomesPorId,
+        array $regra = []
     ): array {
-        $basePorBloco = [];
+        $blocoIdsNasRows = [];
+        $notaPorBloco = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
             }
-            if ((int) ($row['nota_unica_todas_materias'] ?? 0) !== 1) {
-                continue;
-            }
             $blocoId = (int) ($row['bloco_id'] ?? 0);
-            if ($blocoId <= 0 || !isset($row['nota']) || $row['nota'] === '' || $row['nota'] === null) {
+            if ($blocoId <= 0) {
                 continue;
             }
-            if (!is_numeric($row['nota'])) {
+            $blocoIdsNasRows[$blocoId] = true;
+            if (!isset($row['nota']) || $row['nota'] === '' || $row['nota'] === null || !is_numeric($row['nota'])) {
                 continue;
             }
-            if (!isset($basePorBloco[$blocoId])) {
-                $basePorBloco[$blocoId] = (float) $row['nota'];
+            if (!isset($notaPorBloco[$blocoId])) {
+                $notaPorBloco[$blocoId] = (float) $row['nota'];
+            }
+        }
+        if ($blocoIdsNasRows === [] || $notaPorBloco === []) {
+            return $map;
+        }
+
+        $blocosNotaUnica = $this->filtrarBlocoIdsComNotaUnica(array_keys($blocoIdsNasRows));
+        // Fallback: confia no flag trazido na row se a coluna/consulta falhar.
+        if ($blocosNotaUnica === []) {
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                if (!$this->flagNotaUnicaVerdadeira($row['nota_unica_todas_materias'] ?? 0)) {
+                    continue;
+                }
+                $blocoId = (int) ($row['bloco_id'] ?? 0);
+                if ($blocoId > 0) {
+                    $blocosNotaUnica[$blocoId] = true;
+                }
+            }
+        }
+        if ($blocosNotaUnica === []) {
+            return $map;
+        }
+
+        $basePorBloco = [];
+        foreach (array_keys($blocosNotaUnica) as $blocoId) {
+            $blocoId = (int) $blocoId;
+            if (isset($notaPorBloco[$blocoId])) {
+                $basePorBloco[$blocoId] = $notaPorBloco[$blocoId];
             }
         }
         if ($basePorBloco === []) {
@@ -5027,13 +5060,58 @@ class BoletimConfigController extends BaseController
             }
         }
 
-        $vinculos = $this->materiasIdsDosBlocosNotaUnica(array_keys($basePorBloco));
+        $candidatosPorBloco = $this->materiasIdsDosBlocosNotaUnica(array_keys($basePorBloco));
+
+        // Inclui irmãs do group_line (Gramática tem ENAC → completa Leitura).
+        $midsComNota = [];
+        foreach ($map as $midMap => $valMap) {
+            if (is_numeric($valMap) && (int) $midMap > 0) {
+                $midsComNota[(int) $midMap] = true;
+            }
+        }
+        foreach ((array) ($regra['componentes'] ?? []) as $compGl) {
+            if (!is_array($compGl)) {
+                continue;
+            }
+            $grp = $this->parseGroupLineConfigFromComponente($compGl);
+            if ($grp === null) {
+                continue;
+            }
+            $idsGrupo = [];
+            foreach ((array) ($grp['materias_ids'] ?? []) as $midG) {
+                $midG = (int) $midG;
+                if ($midG > 0) {
+                    $idsGrupo[$midG] = true;
+                }
+            }
+            if (count($idsGrupo) < 2) {
+                continue;
+            }
+            $intersecta = false;
+            foreach (array_keys($idsGrupo) as $midG) {
+                if (isset($midsComNota[$midG])) {
+                    $intersecta = true;
+                    break;
+                }
+            }
+            if (!$intersecta) {
+                continue;
+            }
+            foreach (array_keys($basePorBloco) as $blocoId) {
+                foreach (array_keys($idsGrupo) as $midG) {
+                    $candidatosPorBloco[(int) $blocoId][] = $midG;
+                }
+            }
+        }
+
         foreach ($basePorBloco as $blocoId => $notaBase) {
-            foreach ((array) ($vinculos[$blocoId] ?? []) as $mid) {
+            $vistos = [];
+            foreach ((array) ($candidatosPorBloco[$blocoId] ?? []) as $mid) {
                 $mid = (int) $mid;
-                if ($mid <= 0) {
+                if ($mid <= 0 || isset($vistos[$mid])) {
                     continue;
                 }
+                $vistos[$mid] = true;
                 if ($setFiltro !== null && !isset($setFiltro[$mid])) {
                     continue;
                 }
@@ -5053,6 +5131,54 @@ class BoletimConfigController extends BaseController
         return $map;
     }
 
+    /** @param mixed $raw */
+    private function flagNotaUnicaVerdadeira($raw): bool
+    {
+        if (is_bool($raw)) {
+            return $raw;
+        }
+        if (is_int($raw) || is_float($raw)) {
+            return (int) $raw === 1;
+        }
+        $s = strtolower(trim((string) $raw));
+
+        return $s === '1' || $s === 'true' || $s === 'yes' || $s === 'sim';
+    }
+
+    /**
+     * @param list<int> $blocoIds
+     * @return array<int, true>
+     */
+    private function filtrarBlocoIdsComNotaUnica(array $blocoIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static fn ($id) => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            $db = \Database::getInstance();
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $rows = $db->fetchAll(
+                "SELECT id FROM provas_blocos
+                 WHERE deleted_at IS NULL
+                   AND nota_unica_todas_materias = 1
+                   AND id IN ({$ph})",
+                $ids
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = true;
+            }
+        }
+
+        return $out;
+    }
+
     /**
      * @param list<int|string> $blocoIds
      * @return array<int, list<int>>
@@ -5065,19 +5191,13 @@ class BoletimConfigController extends BaseController
         }
         try {
             $db = \Database::getInstance();
-            $ph = [];
-            $params = [];
-            foreach ($ids as $i => $bid) {
-                $k = 'b' . $i;
-                $ph[] = ':' . $k;
-                $params[$k] = $bid;
-            }
+            $ph = implode(',', array_fill(0, count($ids), '?'));
             $rows = $db->fetchAll(
-                'SELECT bloco_id, materia_id
+                "SELECT bloco_id, materia_id
                  FROM provas_blocos_professores
-                 WHERE bloco_id IN (' . implode(',', $ph) . ')
-                   AND materia_id > 0',
-                $params
+                 WHERE bloco_id IN ({$ph})
+                   AND materia_id > 0",
+                $ids
             ) ?: [];
         } catch (Throwable $e) {
             return [];
