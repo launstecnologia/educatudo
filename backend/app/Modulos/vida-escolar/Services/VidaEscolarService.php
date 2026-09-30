@@ -1590,12 +1590,18 @@ class VidaEscolarService
      * Extrai nota/faltas por bimestre do resultado gerado.
      * Evento com bimestre 1–4 só atualiza aquele bim (evita o JSON
      * cumulativo do 3º sobrescrever o 1º/2º corretos da origem).
+     * A nota do bimestre prioriza a média final (pós-ENAC / resultado),
+     * não a média parcial do quadro.
      *
      * @param array<string,mixed> $row
      * @return array<int, array{nota:?float, faltas:?int}>
      */
     private function periodosDaLinhaGerada(array $row): array
     {
+        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+            require_once __DIR__ . '/../../../Helpers/BoletimQuadroLayoutHelper.php';
+        }
+
         $notas = json_decode((string) ($row['notas_json'] ?? ''), true);
         $notas = is_array($notas) ? $notas : [];
         $notasLower = [];
@@ -1609,7 +1615,7 @@ class VidaEscolarService
         if ($bimEvento < 1 || $bimEvento > 4) {
             $bimEvento = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
         }
-        $aplicar = static function (int $periodo, ?float $nota, ?int $faltas) use (&$out, $bimEvento): void {
+        $aplicar = static function (int $periodo, ?float $nota, ?int $faltas, bool $somenteSeVazio = false) use (&$out, $bimEvento): void {
             if ($periodo < 1 || $periodo > 4) {
                 return;
             }
@@ -1621,10 +1627,14 @@ class VidaEscolarService
                 $out[$periodo] = ['nota' => null, 'faltas' => null];
             }
             if ($nota !== null) {
-                $out[$periodo]['nota'] = $nota;
+                if (!$somenteSeVazio || ($out[$periodo]['nota'] ?? null) === null) {
+                    $out[$periodo]['nota'] = $nota;
+                }
             }
             if ($faltas !== null) {
-                $out[$periodo]['faltas'] = $faltas;
+                if (!$somenteSeVazio || ($out[$periodo]['faltas'] ?? null) === null) {
+                    $out[$periodo]['faltas'] = $faltas;
+                }
             }
         };
         $periodoDe = static function (string $grupo, string $codigo): ?int {
@@ -1641,7 +1651,66 @@ class VidaEscolarService
             }
             return null;
         };
+        $resolverPeriodo = static function (array $col) use ($periodoDe, $bimEvento): ?int {
+            $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+            $grupo = strtolower(trim((string) ($col['layout_group'] ?? '')));
+            $periodo = $periodoDe($grupo, $cod);
+            if ($periodo === null && $bimEvento >= 1 && $bimEvento <= 4) {
+                $periodo = $bimEvento;
+            }
+            return $periodo;
+        };
+        $valorColuna = static function (array $col) use ($notas, $notasLower) {
+            $codOrig = trim((string) ($col['codigo'] ?? ''));
+            if ($codOrig === '') {
+                return null;
+            }
+            $val = $notas[$codOrig] ?? $notasLower[strtolower($codOrig)] ?? null;
+            return is_numeric($val) ? (float) $val : null;
+        };
 
+        // 1) Resultado oficial do período (média final / média bim final pós-ENAC).
+        // Preferência: códigos media_final/media_bim_final > layout resultado > match por nome.
+        foreach ($colunas as $col) {
+            if (!is_array($col) || !\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($col)) {
+                continue;
+            }
+            $periodo = $resolverPeriodo($col);
+            $val = $valorColuna($col);
+            if ($periodo === null || $val === null) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+            $lt = strtolower(trim((string) ($col['layout_type'] ?? '')));
+            $prio = 1;
+            if ($cod === 'media_final' || $cod === 'media_bim_final' || (bool) preg_match('/(?:^|_)media_(?:bim_)?final$/', $cod)) {
+                $prio = 3;
+            } elseif ($lt === 'resultado') {
+                $prio = 2;
+            }
+            $ja = $out[$periodo]['nota_prio'] ?? 0;
+            if ($ja > $prio) {
+                continue;
+            }
+            $aplicar($periodo, $val, null);
+            $out[$periodo]['nota_prio'] = $prio;
+        }
+        foreach ($out as $p => $vals) {
+            unset($out[$p]['nota_prio']);
+        }
+
+        // 2) Fallback direto da coluna/campo media_final do resultado gerado.
+        if ($bimEvento >= 1 && $bimEvento <= 4 && ($out[$bimEvento]['nota'] ?? null) === null) {
+            if (is_numeric($row['media_final'] ?? null)) {
+                $aplicar($bimEvento, (float) $row['media_final'], null);
+            } elseif (isset($notasLower['media_final']) && is_numeric($notasLower['media_final'])) {
+                $aplicar($bimEvento, (float) $notasLower['media_final'], null);
+            } elseif (isset($notasLower['media_bim_final']) && is_numeric($notasLower['media_bim_final'])) {
+                $aplicar($bimEvento, (float) $notasLower['media_bim_final'], null);
+            }
+        }
+
+        // 3) Média parcial e faltas (não sobrescrevem a média final já definida).
         foreach ($colunas as $col) {
             if (!is_array($col)) {
                 continue;
@@ -1650,9 +1719,11 @@ class VidaEscolarService
             if ($codOrig === '') {
                 continue;
             }
+            if (\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($col)) {
+                continue;
+            }
             $cod = strtolower($codOrig);
             $tipo = strtolower(trim((string) ($col['layout_type'] ?? '')));
-            $grupo = strtolower(trim((string) ($col['layout_group'] ?? '')));
             if (in_array($tipo, ['rec', 'resultado', 'semana_nq', 'media_sem', 'n', 'q', 'other'], true)) {
                 continue;
             }
@@ -1661,21 +1732,18 @@ class VidaEscolarService
             if (!$ehFalta && !$ehMedia) {
                 continue;
             }
-            $periodo = $periodoDe($grupo, $cod);
-            if ($periodo === null && $bimEvento >= 1 && $bimEvento <= 4) {
-                $periodo = $bimEvento;
-            }
+            $periodo = $resolverPeriodo($col);
             if ($periodo === null) {
                 continue;
             }
-            $val = $notas[$codOrig] ?? $notasLower[$cod] ?? null;
-            if (!is_numeric($val)) {
+            $val = $valorColuna($col);
+            if ($val === null) {
                 continue;
             }
             if ($ehFalta) {
-                $aplicar($periodo, null, (int) round((float) $val));
+                $aplicar($periodo, null, (int) round($val), true);
             } else {
-                $aplicar($periodo, (float) $val, null);
+                $aplicar($periodo, $val, null, true);
             }
         }
 
@@ -1683,12 +1751,12 @@ class VidaEscolarService
         foreach ($bimsAlvo as $b) {
             foreach (['b' . $b . '_media', 'media_b' . $b] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $aplicar($b, (float) $notasLower[$k], null);
+                    $aplicar($b, (float) $notasLower[$k], null, true);
                 }
             }
             foreach (['b' . $b . '_faltas', 'faltas_b' . $b] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $aplicar($b, null, (int) round((float) $notasLower[$k]));
+                    $aplicar($b, null, (int) round((float) $notasLower[$k]), true);
                 }
             }
         }
@@ -1696,7 +1764,7 @@ class VidaEscolarService
         if ($bimEvento >= 1 && $bimEvento <= 4 && ($out[$bimEvento]['faltas'] ?? null) === null) {
             foreach (['faltas', 'faltas_bim'] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $aplicar($bimEvento, null, (int) round((float) $notasLower[$k]));
+                    $aplicar($bimEvento, null, (int) round((float) $notasLower[$k]), true);
                     break;
                 }
             }
@@ -1711,14 +1779,10 @@ class VidaEscolarService
         }
         if (!$temNotaNoAlvo && $bimEvento >= 1 && $bimEvento <= 4) {
             $media = null;
-            if (is_numeric($row['media_final'] ?? null)) {
-                $media = (float) $row['media_final'];
-            } else {
-                foreach (['media_final', 'media_bim', 'media'] as $k) {
-                    if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                        $media = (float) $notasLower[$k];
-                        break;
-                    }
+            foreach (['media_final', 'media_bim_final', 'media_bim', 'media'] as $k) {
+                if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
+                    $media = (float) $notasLower[$k];
+                    break;
                 }
             }
             if ($media !== null) {
