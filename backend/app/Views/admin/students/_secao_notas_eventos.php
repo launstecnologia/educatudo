@@ -67,6 +67,8 @@ foreach ($boletim_eventos_notas as $ev) {
         'numero' => $bim,
         'regra_id' => $rid,
         'descricao' => trim((string) ($ev['nome'] ?? '')),
+        'data_inicio' => trim((string) ($ev['default_data_inicio'] ?? '')),
+        'data_fim' => trim((string) ($ev['default_data_fim'] ?? '')),
         'resumo' => is_array($resumo) ? $resumo : null,
     ];
 }
@@ -82,6 +84,8 @@ if ($linhasPeriodo === []) {
             'numero' => $bim,
             'regra_id' => (int) ($resumo['regra_id'] ?? 0),
             'descricao' => trim((string) ($resumo['titulo'] ?? '')),
+            'data_inicio' => '',
+            'data_fim' => '',
             'resumo' => $resumo,
         ];
     }
@@ -112,6 +116,146 @@ if (!class_exists('PainelNotasService', false) && is_file($svcPainelPath)) {
 }
 $temPainelNotasService = class_exists('PainelNotasService', false);
 
+$motorDemonstrativo = null;
+$cfgBoletimNotas = null;
+$normalizarDataYmd = static function (string $raw): ?string {
+    $raw = trim($raw);
+    if ($raw === '') {
+        return null;
+    }
+    if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $m)) {
+        return $m[1];
+    }
+    return null;
+};
+$obterMotorDemonstrativo = static function () use (&$motorDemonstrativo, $appDirNotas) {
+    if (is_object($motorDemonstrativo)) {
+        return $motorDemonstrativo;
+    }
+    $ctrlPath = $appDirNotas . '/Controllers/Admin/BoletimConfigController.php';
+    if (!class_exists('BoletimConfigController', false) && is_file($ctrlPath)) {
+        require_once $ctrlPath;
+    }
+    if (!class_exists('BoletimConfigController', false)) {
+        return null;
+    }
+    $motorDemonstrativo = new BoletimConfigController(true);
+    return $motorDemonstrativo;
+};
+$obterCfgBoletim = static function () use (&$cfgBoletimNotas, $appDirNotas) {
+    if (is_object($cfgBoletimNotas)) {
+        return $cfgBoletimNotas;
+    }
+    if (!class_exists('BoletimConfig', false)) {
+        require_once $appDirNotas . '/Models/System/BoletimConfig.php';
+    }
+    $cfgBoletimNotas = new BoletimConfig();
+    return $cfgBoletimNotas;
+};
+$renderQuadroDemonstrativo = static function (
+    int $alunoId,
+    int $regraId,
+    string $dataInicio,
+    string $dataFim,
+    string $simVistaId
+) use ($obterMotorDemonstrativo, $obterCfgBoletim, $normalizarDataYmd): string {
+    if ($alunoId <= 0 || $regraId <= 0) {
+        return '';
+    }
+    try {
+        $motor = $obterMotorDemonstrativo();
+        $cfg = $obterCfgBoletim();
+        if ($motor === null || $cfg === null) {
+            return '';
+        }
+        $regra = $cfg->getRuleById($regraId);
+        if (!is_array($regra) || empty($regra['componentes'])) {
+            return '';
+        }
+        $ini = $normalizarDataYmd($dataInicio);
+        $fim = $normalizarDataYmd($dataFim);
+        if ($ini === null) {
+            $ini = $normalizarDataYmd((string) ($regra['default_data_inicio'] ?? ''));
+        }
+        if ($fim === null) {
+            $fim = $normalizarDataYmd((string) ($regra['default_data_fim'] ?? ''));
+        }
+        if ($ini === null || $fim === null) {
+            error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': datas do período ausentes.');
+            return '';
+        }
+        if ($ini > $fim) {
+            [$ini, $fim] = [$fim, $ini];
+        }
+        $periodoRef = 'RANGE:' . $ini . ':' . $fim;
+        $simulacao = $motor->simularRegraAluno(
+            $regra,
+            $alunoId,
+            $periodoRef,
+            $ini,
+            $fim,
+            [],
+            false,
+            true
+        );
+        try {
+            $simBoletim = $motor->simularRegraAluno(
+                $regra,
+                $alunoId,
+                $periodoRef,
+                $ini,
+                $fim,
+                [],
+                true
+            );
+            $matrizBoletim = is_array($simBoletim) ? ($simBoletim['matriz_materias'] ?? null) : null;
+            if (is_array($simulacao) && is_array($matrizBoletim)) {
+                $simulacao['matriz_materias_boletim'] = $matrizBoletim;
+            }
+        } catch (Throwable $eSimB) {
+            // Vista Boletim opcional; Demonstrativo segue.
+        }
+        if (!is_array($simulacao)) {
+            return '';
+        }
+        $simulacao = $motor->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
+        $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : [];
+        $cols = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
+        $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+        if ($cols === [] || $linhas === []) {
+            return '';
+        }
+        if (!BoletimQuadroLayoutHelper::ehLayoutQuadro($cols)) {
+            // Sem layout de quadro: usa tabela gerada padrão.
+            $evRender = [
+                'regra_id' => $regraId,
+                'regra_nome' => (string) ($regra['nome'] ?? ''),
+                'exibir_em' => 'notas',
+                'colunas' => $cols,
+                'linhas' => $linhas,
+                'decimal_places' => (int) ($regra['decimal_places'] ?? 2),
+            ];
+            ob_start();
+            $boletins_gerados = [$evRender];
+            $boletim_pode_excluir = false;
+            $boletim_aluno_id = 0;
+            require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
+            return (string) ob_get_clean();
+        }
+        $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+            ? $simulacao['matriz_materias_boletim']['linhas']
+            : $linhas;
+        $decimalPlaces = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        ob_start();
+        $simVistaId = $simVistaId;
+        include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
+        return (string) ob_get_clean();
+    } catch (Throwable $e) {
+        error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
+        return '';
+    }
+};
+
 $fontesNotas = [];
 $htmlQuadroPorChave = [];
 $idxLinha = 0;
@@ -134,38 +278,73 @@ foreach ($linhasPeriodo as &$linhaP) {
     $chaveQuadro = $ridP . ':' . $anoP . ':' . $bimP;
     if (!array_key_exists($chaveQuadro, $htmlQuadroPorChave)) {
         $htmlQuadroPorChave[$chaveQuadro] = '';
-        $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
-        if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
-            $boletinsGeradosBackup = $boletins_gerados ?? [];
-            $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
-            $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
-            ob_start();
-            $boletins_gerados = [$evGerado];
-            $boletim_pode_excluir = false;
-            $boletim_aluno_id = 0;
-            require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
-            $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
-            $boletins_gerados = $boletinsGeradosBackup;
-            $boletim_pode_excluir = $boletimPodeExcluirBackup;
-            $boletim_aluno_id = $boletimAlunoIdBackup;
-        } elseif ($temPainelNotasService && $alunoIdNotas > 0 && $bimP > 0) {
-            // Fallback: painel vivo do quadro (sem resultado gerado ainda).
-            $paineis_notas = PainelNotasService::paraAluno($alunoIdNotas, [
-                'portal' => false,
-                'ano_letivo' => $anoP > 0 ? $anoP : null,
-                'bimestre' => $bimP,
-            ]);
-            if ($paineis_notas === []) {
-                $paineis_notas = $paineis_notas_originais;
+        // 1) Mesmo Demonstrativo de Notas/Boletins (simulação ao vivo).
+        if ($ridP > 0 && $alunoIdNotas > 0) {
+            $htmlQuadroPorChave[$chaveQuadro] = $renderQuadroDemonstrativo(
+                $alunoIdNotas,
+                $ridP,
+                (string) ($linhaP['data_inicio'] ?? ''),
+                (string) ($linhaP['data_fim'] ?? ''),
+                'aluno-quadro-' . $ridP . '-' . $anoP . '-' . $bimP . '-' . $idxLinha
+            );
+        }
+        // 2) Resultado já gerado (layout Matérias Bloco A/B) — só se for quadro.
+        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '') {
+            $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
+            if ($evGerado === null && $ridP > 0) {
+                foreach ($geradosNotasLista as $evCand) {
+                    if (!is_array($evCand)) {
+                        continue;
+                    }
+                    if ((int) ($evCand['regra_id'] ?? 0) !== $ridP) {
+                        continue;
+                    }
+                    $bimCand = (int) ($evCand['bimestre'] ?? 0);
+                    if ($bimP > 0 && $bimCand > 0 && $bimCand !== $bimP) {
+                        continue;
+                    }
+                    $evGerado = $evCand;
+                    break;
+                }
             }
-            ob_start();
-            require dirname(__DIR__, 2) . '/partials/painel_notas_tabelas.php';
-            $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
-        } elseif ($paineis_notas_originais !== []) {
-            $paineis_notas = $paineis_notas_originais;
-            ob_start();
-            require dirname(__DIR__, 2) . '/partials/painel_notas_tabelas.php';
-            $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
+            if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+                $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
+                if (BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
+                    $boletinsGeradosBackup = $boletins_gerados ?? [];
+                    $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
+                    $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
+                    ob_start();
+                    $boletins_gerados = [$evGerado];
+                    $boletim_pode_excluir = false;
+                    $boletim_aluno_id = 0;
+                    require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
+                    $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
+                    $boletins_gerados = $boletinsGeradosBackup;
+                    $boletim_pode_excluir = $boletimPodeExcluirBackup;
+                    $boletim_aluno_id = $boletimAlunoIdBackup;
+                }
+            }
+        }
+        // 3) Painel vivo legado só quando não há regra de notas (evita Semanais e Blocos no lugar do Demonstrativo).
+        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP <= 0) {
+            if ($temPainelNotasService && $alunoIdNotas > 0 && $bimP > 0) {
+                $paineis_notas = PainelNotasService::paraAluno($alunoIdNotas, [
+                    'portal' => false,
+                    'ano_letivo' => $anoP > 0 ? $anoP : null,
+                    'bimestre' => $bimP,
+                ]);
+                if ($paineis_notas === []) {
+                    $paineis_notas = $paineis_notas_originais;
+                }
+                ob_start();
+                require dirname(__DIR__, 2) . '/partials/painel_notas_tabelas.php';
+                $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
+            } elseif ($paineis_notas_originais !== []) {
+                $paineis_notas = $paineis_notas_originais;
+                ob_start();
+                require dirname(__DIR__, 2) . '/partials/painel_notas_tabelas.php';
+                $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
+            }
         }
     }
     $htmlQuadro = $htmlQuadroPorChave[$chaveQuadro];
@@ -321,6 +500,32 @@ document.addEventListener('keydown', function (e) {
     var modal = document.getElementById('modalNotasAluno');
     if (!modal || modal.classList.contains('hidden')) return;
     fecharModalNotasAluno();
+});
+document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-sim-vista]');
+    if (!btn) return;
+    var root = btn.closest('.boletim-sim-vistas');
+    if (!root) return;
+    var vista = btn.getAttribute('data-sim-vista') || 'demonstrativo';
+    root.querySelectorAll('[data-sim-vista]').forEach(function (b) {
+        var on = b.getAttribute('data-sim-vista') === vista;
+        b.classList.toggle('bg-white', !on);
+        b.classList.toggle('text-gray-700', !on);
+        b.classList.toggle('border-gray-300', !on);
+        if (on) {
+            b.style.background = 'var(--sidebar-bg-color,#1e3a5f)';
+            b.style.borderColor = 'var(--sidebar-bg-color,#1e3a5f)';
+            b.style.color = 'var(--sidebar-text-color,#fff)';
+        } else {
+            b.style.background = '';
+            b.style.borderColor = '';
+            b.style.color = '';
+        }
+    });
+    root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+        var show = panel.getAttribute('data-sim-panel') === vista;
+        panel.classList.toggle('hidden', !show);
+    });
 });
 </script>
 <?php endif; ?>
