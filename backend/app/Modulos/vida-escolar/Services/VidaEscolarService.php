@@ -623,7 +623,9 @@ class VidaEscolarService
      */
     public function alimentarDoCalculo(int $alunoId, ?string $periodoRef = null, ?array $usuario = null, ?int $fichaId = null): array
     {
-        // forcarEscrita: atualiza células já calculadas/fechadas (exceto externa/homologada).
+        // forcarEscrita: corrige células já abertas/fechadas (exceto externa) com a média final oficial.
+        // O merge abaixo usa "primeiro id vence" (igual ao documento oficial) para não trocar 7→6
+        // quando há duas gerações vigentes.
         return $this->sincronizarDeEventosGerados($alunoId, $usuario ?? [], null, $periodoRef, $fichaId, true, true, true);
     }
 
@@ -754,6 +756,7 @@ class VidaEscolarService
             if ($temMediaFinalRow) {
                 $prioBase += 20;
             }
+            $rowId = (int) ($row['id'] ?? 0);
             foreach ($periodosGerados as $periodo => $vals) {
                 if ($periodo < 1 || $periodo > 4) {
                     continue;
@@ -763,21 +766,37 @@ class VidaEscolarService
                     $faltas = $this->faltasLancadasAlunoMateria($alunoId, $mid, $periodo, $ano);
                 }
                 $nota = $vals['nota'] ?? null;
-                $prio = $prioBase;
+                $qualidade = (int) ($vals['qualidade'] ?? 0);
+                if ($qualidade <= 0) {
+                    $qualidade = $this->qualidadeNotaExtraida($nota, $row, $temMediaFinalRow);
+                }
+                $prio = $prioBase + ($qualidade * 100);
                 if ($temMediaFinalRow && $nota !== null
                     && abs((float) $nota - (float) $row['media_final']) < 0.001) {
                     $prio += 30;
                 }
                 $atual = $propostas[$linhaId][$periodo] ?? null;
-                if ($atual !== null && (int) ($atual['prio'] ?? 0) > $prio) {
-                    // Mantém faltas se a proposta vencedora ainda não tiver.
-                    if ($faltas !== null && (($atual['faltas'] ?? null) === null)) {
-                        $propostas[$linhaId][$periodo]['faltas'] = $faltas;
+                // Empate: mantém a primeira (id menor) — mesmo critério do DocumentoOficialService.
+                if ($atual !== null) {
+                    $prioAtual = (int) ($atual['prio'] ?? 0);
+                    if ($prioAtual > $prio) {
+                        if ($faltas !== null && (($atual['faltas'] ?? null) === null)) {
+                            $propostas[$linhaId][$periodo]['faltas'] = $faltas;
+                        }
+                        continue;
                     }
-                    continue;
+                    if ($prioAtual === $prio) {
+                        if ($faltas !== null && (($atual['faltas'] ?? null) === null)) {
+                            $propostas[$linhaId][$periodo]['faltas'] = $faltas;
+                        }
+                        continue;
+                    }
+                    // Qualidade inferior nunca substitui média final já escolhida.
+                    if ((int) ($atual['qualidade'] ?? 0) >= 3 && $qualidade < 3) {
+                        continue;
+                    }
                 }
-                if ($atual !== null && (int) ($atual['prio'] ?? 0) === $prio
-                    && $nota === null && ($atual['nota'] ?? null) !== null) {
+                if ($atual !== null && $nota === null && ($atual['nota'] ?? null) !== null) {
                     if ($faltas !== null) {
                         $propostas[$linhaId][$periodo]['faltas'] = $faltas;
                     }
@@ -787,6 +806,8 @@ class VidaEscolarService
                     'nota' => $nota,
                     'faltas' => $faltas !== null ? $faltas : ($atual['faltas'] ?? null),
                     'prio' => $prio,
+                    'qualidade' => $qualidade,
+                    'row_id' => $rowId,
                 ];
             }
         }
@@ -1027,7 +1048,17 @@ class VidaEscolarService
                             && abs((float) $nota - (float) $row['media_final']) < 0.001) {
                             $prio += 30;
                         }
-                        if (isset($prioCelula[$chaveCel]) && $prioCelula[$chaveCel] > $prio) {
+                        $qualidade = (int) ($vals['qualidade'] ?? 0);
+                        if ($qualidade <= 0) {
+                            $qualidade = $this->qualidadeNotaExtraida(
+                                $nota !== null ? (float) $nota : null,
+                                $row,
+                                $temMediaFinalRow
+                            );
+                        }
+                        $prio += $qualidade * 100;
+                        // Empate: primeira geração (id menor) vence — igual ao documento oficial.
+                        if (isset($prioCelula[$chaveCel]) && $prioCelula[$chaveCel] >= $prio) {
                             continue;
                         }
                         $prioCelula[$chaveCel] = $prio;
@@ -1688,7 +1719,7 @@ class VidaEscolarService
         if ($bimEvento < 1 || $bimEvento > 4) {
             $bimEvento = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
         }
-        $aplicar = static function (int $periodo, ?float $nota, ?int $faltas, bool $somenteSeVazio = false) use (&$out, $bimEvento): void {
+        $aplicar = static function (int $periodo, ?float $nota, ?int $faltas, bool $somenteSeVazio = false, int $qualidade = 0) use (&$out, $bimEvento): void {
             if ($periodo < 1 || $periodo > 4) {
                 return;
             }
@@ -1697,11 +1728,19 @@ class VidaEscolarService
                 return;
             }
             if (!isset($out[$periodo])) {
-                $out[$periodo] = ['nota' => null, 'faltas' => null];
+                $out[$periodo] = ['nota' => null, 'faltas' => null, 'qualidade' => 0];
             }
             if ($nota !== null) {
-                if (!$somenteSeVazio || ($out[$periodo]['nota'] ?? null) === null) {
+                $qualidadeAtual = (int) ($out[$periodo]['qualidade'] ?? 0);
+                if ($somenteSeVazio && ($out[$periodo]['nota'] ?? null) !== null) {
+                    // não sobrescreve
+                } elseif ($qualidade > 0 && $qualidadeAtual > $qualidade) {
+                    // mantém fonte melhor (média final > parcial)
+                } else {
                     $out[$periodo]['nota'] = $nota;
+                    if ($qualidade > 0) {
+                        $out[$periodo]['qualidade'] = $qualidade;
+                    }
                 }
             }
             if ($faltas !== null) {
@@ -1765,22 +1804,21 @@ class VidaEscolarService
             if ($ja > $prio) {
                 continue;
             }
-            $aplicar($periodo, $val, null);
+            $aplicar($periodo, $val, null, false, $prio >= 3 ? 3 : ($prio >= 2 ? 2 : 1));
             $out[$periodo]['nota_prio'] = $prio;
         }
         foreach ($out as $p => $vals) {
             unset($out[$p]['nota_prio']);
         }
 
-        // 2) Sempre prioriza a média final persistida do evento (pós-ENAC),
-        // mesmo se alguma coluna "resultado" parcial já tiver preenchido a nota.
+        // 2) Sempre prioriza a média final persistida do evento (pós-ENAC).
         if ($bimEvento >= 1 && $bimEvento <= 4) {
             if (is_numeric($row['media_final'] ?? null)) {
-                $aplicar($bimEvento, (float) $row['media_final'], null);
+                $aplicar($bimEvento, (float) $row['media_final'], null, false, 3);
             } elseif (isset($notasLower['media_final']) && is_numeric($notasLower['media_final'])) {
-                $aplicar($bimEvento, (float) $notasLower['media_final'], null);
+                $aplicar($bimEvento, (float) $notasLower['media_final'], null, false, 3);
             } elseif (isset($notasLower['media_bim_final']) && is_numeric($notasLower['media_bim_final'])) {
-                $aplicar($bimEvento, (float) $notasLower['media_bim_final'], null);
+                $aplicar($bimEvento, (float) $notasLower['media_bim_final'], null, false, 3);
             }
         }
 
@@ -1815,9 +1853,9 @@ class VidaEscolarService
                 continue;
             }
             if ($ehFalta) {
-                $aplicar($periodo, null, (int) round($val), true);
+                $aplicar($periodo, null, (int) round($val), true, 0);
             } else {
-                $aplicar($periodo, $val, null, true);
+                $aplicar($periodo, $val, null, true, 2);
             }
         }
 
@@ -1825,12 +1863,12 @@ class VidaEscolarService
         foreach ($bimsAlvo as $b) {
             foreach (['b' . $b . '_media', 'media_b' . $b] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $aplicar($b, (float) $notasLower[$k], null, true);
+                    $aplicar($b, (float) $notasLower[$k], null, true, 2);
                 }
             }
             foreach (['b' . $b . '_faltas', 'faltas_b' . $b] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $aplicar($b, null, (int) round((float) $notasLower[$k]), true);
+                    $aplicar($b, null, (int) round((float) $notasLower[$k]), true, 0);
                 }
             }
         }
@@ -1838,7 +1876,7 @@ class VidaEscolarService
         if ($bimEvento >= 1 && $bimEvento <= 4 && ($out[$bimEvento]['faltas'] ?? null) === null) {
             foreach (['faltas', 'faltas_bim'] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
-                    $aplicar($bimEvento, null, (int) round((float) $notasLower[$k]), true);
+                    $aplicar($bimEvento, null, (int) round((float) $notasLower[$k]), true, 0);
                     break;
                 }
             }
@@ -1853,18 +1891,49 @@ class VidaEscolarService
         }
         if (!$temNotaNoAlvo && $bimEvento >= 1 && $bimEvento <= 4) {
             $media = null;
-            foreach (['media_final', 'media_bim_final', 'media_bim', 'media'] as $k) {
+            $qualidade = 1;
+            foreach (['media_final' => 3, 'media_bim_final' => 3, 'media_bim' => 2, 'media' => 2] as $k => $q) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
                     $media = (float) $notasLower[$k];
+                    $qualidade = $q;
                     break;
                 }
             }
             if ($media !== null) {
-                $aplicar($bimEvento, $media, null);
+                $aplicar($bimEvento, $media, null, false, $qualidade);
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Qualidade da nota extraída: 3 = média final, 2 = média parcial, 1 = fraca.
+     */
+    private function qualidadeNotaExtraida(?float $nota, array $row, bool $temMediaFinalRow): int
+    {
+        if ($nota === null) {
+            return 0;
+        }
+        if ($temMediaFinalRow && abs($nota - (float) $row['media_final']) < 0.001) {
+            return 3;
+        }
+        $notas = json_decode((string) ($row['notas_json'] ?? ''), true);
+        if (!is_array($notas)) {
+            return $temMediaFinalRow ? 2 : 1;
+        }
+        foreach (['media_final', 'media_bim_final'] as $k) {
+            if (isset($notas[$k]) && is_numeric($notas[$k]) && abs($nota - (float) $notas[$k]) < 0.001) {
+                return 3;
+            }
+        }
+        foreach (['media_bim', 'media'] as $k) {
+            if (isset($notas[$k]) && is_numeric($notas[$k]) && abs($nota - (float) $notas[$k]) < 0.001) {
+                return 2;
+            }
+        }
+
+        return 1;
     }
 
     private function faltasLancadasAlunoMateria(int $alunoId, int $materiaId, int $bimestre, int $anoLetivo): ?int
