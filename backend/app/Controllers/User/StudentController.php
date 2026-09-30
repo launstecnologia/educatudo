@@ -1532,6 +1532,18 @@ if (!class_exists('StudentController')) {
         } catch (\Throwable $e) {
             $quadroOficial = null;
         }
+
+        // TEMPORÁRIO: portal não exibe notas (semanais/blocos e eventos) até estabilizar a média final.
+        $portalNotasOcultas = true;
+        $paineisNotas = [];
+        if ($portalNotasOcultas) {
+            $notasLancamentoEventos = [];
+            $boletinsGeradosNotas = [];
+            $boletinsGeradosNotasExtra = [];
+        } else {
+            $paineisNotas = $this->paineisNotasDoAluno((int) $aluno['id']);
+        }
+
         $data = [
             'title' => 'Notas/Boletins - EducaTudo',
             'user' => $user,
@@ -1547,7 +1559,8 @@ if (!class_exists('StudentController')) {
             'boletins_gerados_complementar' => $boletinsGeradosComplementar,
             'boletim_observacao' => $boletimObservacao,
             'quadro_oficial' => $quadroOficial,
-            'paineis_notas' => $this->paineisNotasDoAluno((int) $aluno['id']),
+            'paineis_notas' => $paineisNotas,
+            'portal_notas_ocultas' => $portalNotasOcultas,
             'primary_color' => $primaryColor,
             'current_page' => 'notas_boletins',
             'csrf_token' => $this->generateCsrfToken(),
@@ -1621,6 +1634,18 @@ if (!class_exists('StudentController')) {
         } catch (\Throwable $e) {
             $quadroOficial = null;
         }
+
+        // TEMPORÁRIO: portal não exibe notas (semanais/blocos e eventos) até estabilizar a média final.
+        $portalNotasOcultas = true;
+        $paineisNotas = [];
+        if ($portalNotasOcultas) {
+            $notasLancamentoEventos = [];
+            $boletinsGeradosNotas = [];
+            $boletinsGeradosNotasExtra = [];
+        } else {
+            $paineisNotas = $this->paineisNotasDoAluno((int) $aluno['id']);
+        }
+
         $data = [
             'title' => 'Notas - EducaTudo',
             'user' => $user,
@@ -1635,7 +1660,8 @@ if (!class_exists('StudentController')) {
             'boletins_gerados_complementar' => $boletinsGeradosComplementar,
             'quadro_oficial' => $quadroOficial,
             'default_notas_tab' => 'notas',
-            'paineis_notas' => $this->paineisNotasDoAluno((int) $aluno['id']),
+            'paineis_notas' => $paineisNotas,
+            'portal_notas_ocultas' => $portalNotasOcultas,
             'primary_color' => $primaryColor,
             'current_page' => 'notas',
             'csrf_token' => $this->generateCsrfToken(),

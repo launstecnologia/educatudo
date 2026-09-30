@@ -54,6 +54,11 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                         </div>
                     <?php endif; ?>
                 <?php elseif ($secaoNotas === 'notas'): ?>
+                    <?php if (!empty($portal_notas_ocultas)): ?>
+                        <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
+                            <p class="text-gray-500">As notas desta seção estão temporariamente indisponíveis.</p>
+                        </div>
+                    <?php else: ?>
                     <?php require __DIR__ . '/../partials/resumo_notas_tabelas.php'; ?>
                     <?php if (!empty($notas_lancamento_eventos)): ?>
                         <div class="overflow-x-auto border border-gray-200 rounded-lg bg-white">
@@ -119,6 +124,7 @@ $buildSecaoUrl = static function (string $secao) use ($baseUrlNotas): string {
                         <div class="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                             <p class="text-gray-500">Nenhuma nota encontrada.</p>
                         </div>
+                    <?php endif; ?>
                     <?php endif; ?>
                 <?php else: ?>
                     <?php require __DIR__ . '/../partials/provas_matriz_blocos.php'; ?>

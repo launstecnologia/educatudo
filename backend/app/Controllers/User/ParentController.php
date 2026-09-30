@@ -941,6 +941,18 @@ class ParentController extends BaseController
         $boletinsBoletim = $classificados['boletim'];
         $boletinsComplementar = $classificados['complementar'];
 
+        // TEMPORÁRIO: portal dos pais não exibe notas (semanais/blocos e eventos).
+        $portalNotasOcultas = true;
+        $paineisNotas = [];
+        $notasLancamentoEventos = is_array($notasLancamentoEventos ?? null) ? $notasLancamentoEventos : [];
+        if ($portalNotasOcultas) {
+            $notasLancamentoEventos = [];
+            $boletinsNotas = [];
+            $boletinsNotasExtra = [];
+        } else {
+            $paineisNotas = $this->paineisNotasDoAluno((int) $filho['id'], $anoLetivo, $bimestre);
+        }
+
         $anosDisponiveis = [];
         foreach ((array) $provasRealizadasBase as $pr) {
             $d = $pr['bloco_data_prova'] ?? $pr['iniciado_em'] ?? null;
@@ -987,7 +999,8 @@ class ParentController extends BaseController
             'boletins_gerados_complementar' => $boletinsComplementar,
             'boletim_observacao' => $boletimObservacao,
             'quadro_oficial' => $quadroOficial,
-            'paineis_notas' => $this->paineisNotasDoAluno((int) $filho['id'], $anoLetivo, $bimestre),
+            'paineis_notas' => $paineisNotas,
+            'portal_notas_ocultas' => $portalNotasOcultas,
         ];
 
         $this->viewWithLayout('parent', 'parents/notas-filho', $data);
