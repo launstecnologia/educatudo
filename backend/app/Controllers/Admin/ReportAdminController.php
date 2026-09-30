@@ -858,11 +858,15 @@ class ReportAdminController extends AdminBaseController
             if ($rotuloPeriodo === '') {
                 $periodoRef = trim((string) ($evento['periodo_ref'] ?? ''));
                 if ($periodoRef !== '') {
-                    $rotuloPeriodo = $periodoRef;
+                    $rotuloPeriodo = $this->formatarPeriodoRefBoletimCoordenacao($periodoRef);
                 }
             }
             if ($rotuloPeriodo !== '') {
                 $partes[] = $rotuloPeriodo;
+            }
+            $geradoEm = $this->formatarDataGeracaoBoletimCoordenacao((string) ($evento['updated_at'] ?? ''));
+            if ($geradoEm !== '') {
+                $partes[] = 'Gerado em ' . $geradoEm;
             }
             $evento['nome_exibicao'] = implode(' · ', $partes);
             $evento['_serie_ordem'] = $ordemMax;
@@ -886,6 +890,35 @@ class ReportAdminController extends AdminBaseController
             return strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
         });
         return $eventos;
+    }
+
+    /**
+     * Converte periodo_ref técnico (ex.: RANGE:2026-07-01:2026-09-30) em rótulo legível.
+     */
+    private function formatarPeriodoRefBoletimCoordenacao(string $periodoRef): string
+    {
+        $periodoRef = trim($periodoRef);
+        if ($periodoRef === '') {
+            return '';
+        }
+        if (preg_match('/^RANGE:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$/', $periodoRef, $m)) {
+            $iniTs = strtotime($m[1]);
+            $fimTs = strtotime($m[2]);
+            if ($iniTs !== false && $fimTs !== false) {
+                return date('d/m/Y', $iniTs) . ' – ' . date('d/m/Y', $fimTs);
+            }
+        }
+        return $periodoRef;
+    }
+
+    private function formatarDataGeracaoBoletimCoordenacao(string $dt): string
+    {
+        $dt = trim($dt);
+        if ($dt === '') {
+            return '';
+        }
+        $ts = strtotime($dt);
+        return $ts === false ? '' : date('d/m/Y H:i', $ts);
     }
 
     private function parseEventoBoletimCoordenacao(string $evento): array

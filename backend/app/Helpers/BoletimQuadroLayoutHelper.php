@@ -424,6 +424,52 @@ class BoletimQuadroLayoutHelper
     }
 
     /**
+     * Mantém só semanas (S1–S8) que têm alguma nota/N/Q em ao menos uma linha.
+     *
+     * @param list<array<string,mixed>> $semanasCols
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    public static function filtrarSemanasComNota(array $semanasCols, array $linhas): array
+    {
+        if ($semanasCols === [] || $linhas === []) {
+            return $semanasCols;
+        }
+        $out = [];
+        foreach ($semanasCols as $col) {
+            if (!is_array($col) || !self::colunaEhSemanaNq($col)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            $tem = false;
+            foreach ($linhas as $lin) {
+                if (!is_array($lin)) {
+                    continue;
+                }
+                $notas = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
+                $nq = self::celulaNq($notas, $cod);
+                if (($nq['n'] !== null && $nq['n'] > 0) || ($nq['q'] !== null && $nq['q'] > 0)) {
+                    $tem = true;
+                    break;
+                }
+                $nv = $notas[$cod] ?? null;
+                if (is_numeric($nv) && (float) $nv != 0.0) {
+                    $tem = true;
+                    break;
+                }
+            }
+            if ($tem) {
+                $out[] = $col;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * A linha pertence à tabela se tiver N/Q em alguma semana do bloco ou nota nas colunas comuns.
      *
      * @param list<array<string,mixed>> $colsTabela

@@ -67,6 +67,8 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                 $outrasCols[] = $cq;
             }
         }
+        // Semana sem nenhuma prova/nota no lote: some da tabela (ex.: S5/S6 vazias).
+        $semanasCols = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasCols, $linhasQuadro);
         $semanasPorBloco = ['a' => [], 'b' => []];
         foreach ($tabelasQuadro as $tabPre) {
             $kPre = strtolower((string) ($tabPre['key'] ?? ''));

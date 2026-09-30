@@ -570,6 +570,13 @@ class BoletimAssistenteController extends BaseController
             return null;
         }
 
+        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+            require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+        }
+        $semanasA = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasA, $linhas);
+        $semanasB = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasB, $linhas);
+        $temQuadro = $semanasA !== [] || $semanasB !== [];
+
         if ($temBoletim && !$temQuadro) {
             $grupos = array_values($gruposBoletim);
             return [

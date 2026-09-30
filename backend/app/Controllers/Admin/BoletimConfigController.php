@@ -3989,6 +3989,9 @@ class BoletimConfigController extends BaseController
                     $rows = $this->expandirNotaUnicaBlocoParaMateriasSelecionadas($rows, $materiasFiltro);
                     $rows = $this->filtrarEReconciliarMateriasSelecionadas($rows, $materiasFiltro);
                     $detalhes['materias_ids'] = $materiasFiltro;
+                } else {
+                    // ENAC nota única sem filtro: preenche matérias do bloco adicionadas depois do lançamento.
+                    $rows = $this->expandirNotaUnicaBlocoParaMateriasSelecionadas($rows, []);
                 }
 
                 $statsPorMateria = [];
@@ -4876,11 +4879,13 @@ class BoletimConfigController extends BaseController
         $ids = array_values(array_unique(array_filter(array_map('intval', $materiasSelecionadas), static function (int $id): bool {
             return $id > 0;
         })));
-        $ids = $this->expandirMateriasComFilhos($ids);
-        if ($ids === [] || $rows === []) {
+        if ($ids !== []) {
+            $ids = $this->expandirMateriasComFilhos($ids);
+        }
+        if ($rows === []) {
             return $rows;
         }
-        $setIds = array_fill_keys($ids, true);
+        $setIds = $ids !== [] ? array_fill_keys($ids, true) : null;
 
         if (!is_array($this->materiasDisponiveisCache)) {
             $this->materiasDisponiveisCache = $this->boletimConfig->getAvailableSubjects(1000);
@@ -4929,20 +4934,18 @@ class BoletimConfigController extends BaseController
         }
 
         foreach ($basePorBloco as $blocoId => $base) {
-            $midsJaComNota = array_keys($temLinhaPorBlocoMateria[$blocoId] ?? []);
-            // Bloco já lançado por matéria (Leitura=1, Literatura=3…): não clona a
-            // base para Português vazio — isso inventava Prova Bim fantasma.
-            if (count($midsJaComNota) > 1) {
-                continue;
-            }
+            // Só preenche matérias vinculadas ao evento (provas_blocos_professores),
+            // inclusive as adicionadas depois do primeiro lançamento.
             $candidatos = array_keys($materiasDoBloco[$blocoId] ?? []);
-            if ($candidatos === []) {
-                // Sem vínculo explícito no resultado: limita ao filtro do componente.
+            if ($candidatos === [] && $setIds !== null) {
                 $candidatos = $ids;
             }
             foreach ($candidatos as $midSel) {
                 $midSel = (int) $midSel;
-                if ($midSel <= 0 || !isset($setIds[$midSel])) {
+                if ($midSel <= 0) {
+                    continue;
+                }
+                if ($setIds !== null && !isset($setIds[$midSel])) {
                     continue;
                 }
                 if (isset($temLinhaPorBlocoMateria[$blocoId][$midSel])) {
@@ -5539,11 +5542,16 @@ class BoletimConfigController extends BaseController
                 'mode' => strtolower(trim((string) ($grp['mode'] ?? 'media'))) === 'soma' ? 'soma' : 'media',
                 'filhos_ids' => $filhosIds,
                 'rotulo_ids' => $rotuloIds,
+                'agrupamento_id' => $agId,
             ];
         }
         if ($grupos === []) {
             return $simulacao;
         }
+
+        // Filhas da área no cadastro que foram desmarcadas neste evento não aparecem
+        // (nem aninhadas, nem como linha avulsa). Ex.: Literatura fora de materias_ids.
+        $excluidosDoGrupo = $this->materiasExcluidasDoGroupLineNoEvento($grupos);
 
         $linhasBoletim = [];
         $matrizBol = is_array($simulacao['matriz_materias_boletim'] ?? null)
@@ -5577,6 +5585,9 @@ class BoletimConfigController extends BaseController
             $mid = (int) ($linha['materia_id'] ?? 0);
             // Virtual / rótulo solto: some do flat; a mãe entra pelo bloco do grupo.
             if ($mid < 0) {
+                continue;
+            }
+            if ($mid > 0 && isset($excluidosDoGrupo[$mid])) {
                 continue;
             }
             if ($mid > 0 && isset($rotulosIds[$mid])) {
@@ -5671,6 +5682,113 @@ class BoletimConfigController extends BaseController
         $simulacao['matriz_materias'] = $matriz;
 
         return $simulacao;
+    }
+
+    /**
+     * Irmãs de cadastro (área / pai→filhos) que não estão em group_line.materias_ids
+     * neste evento — devem sumir do Demonstrativo.
+     *
+     * @param array<string, array{filhos_ids:array<int,int>,agrupamento_id?:int}> $grupos
+     * @return array<int, true>
+     */
+    private function materiasExcluidasDoGroupLineNoEvento(array $grupos): array
+    {
+        $excluidos = [];
+        $comp = $this->componentesCurriculares();
+        $mapaPai = [];
+        $mapaFilhos = [];
+        if ($comp !== null) {
+            try {
+                $mapaPai = $comp->mapaPaiPorFilho();
+                $mapaFilhos = $comp->mapaFilhosPorPai();
+            } catch (Throwable $e) {
+                $mapaPai = [];
+                $mapaFilhos = [];
+            }
+        }
+        $catalogoAreas = null;
+
+        foreach ($grupos as $g) {
+            if (!is_array($g)) {
+                continue;
+            }
+            $incluidos = [];
+            foreach ((array) ($g['filhos_ids'] ?? []) as $midF) {
+                $midF = (int) $midF;
+                if ($midF > 0) {
+                    $incluidos[$midF] = true;
+                }
+            }
+            if (count($incluidos) < 2) {
+                continue;
+            }
+
+            $familia = [];
+            $agId = (int) ($g['agrupamento_id'] ?? 0);
+            if ($agId > 0) {
+                $cad = $this->carregarAgrupamentoCadastro($agId);
+                foreach ((array) ($cad['materias_ids'] ?? []) as $midCad) {
+                    $midCad = (int) $midCad;
+                    if ($midCad > 0) {
+                        $familia[$midCad] = true;
+                    }
+                }
+            }
+            // Após editar checkboxes o wizard zera agrupamento_id — recupera a área pelo catálogo.
+            if ($familia === []) {
+                if ($catalogoAreas === null) {
+                    $catalogoAreas = $this->listarAgrupamentosComponentesCatalogo();
+                }
+                foreach ((array) $catalogoAreas as $area) {
+                    if (!is_array($area)) {
+                        continue;
+                    }
+                    $idsArea = [];
+                    foreach ((array) ($area['materias_ids'] ?? []) as $midA) {
+                        $midA = (int) $midA;
+                        if ($midA > 0) {
+                            $idsArea[$midA] = true;
+                        }
+                    }
+                    if (count($idsArea) < 2) {
+                        continue;
+                    }
+                    $cobreTodos = true;
+                    foreach (array_keys($incluidos) as $midInc) {
+                        if (!isset($idsArea[$midInc])) {
+                            $cobreTodos = false;
+                            break;
+                        }
+                    }
+                    if ($cobreTodos) {
+                        $familia = $idsArea;
+                        break;
+                    }
+                }
+            }
+            // Fallback: só irmãos do mesmo pai curricular (sem ampliar se já há área).
+            if ($familia === []) {
+                foreach (array_keys($incluidos) as $midInc) {
+                    $paiId = (int) ($mapaPai[$midInc] ?? 0);
+                    if ($paiId <= 0) {
+                        continue;
+                    }
+                    foreach ((array) ($mapaFilhos[$paiId] ?? []) as $filhoRow) {
+                        $fid = (int) (is_array($filhoRow) ? ($filhoRow['id'] ?? 0) : $filhoRow);
+                        if ($fid > 0) {
+                            $familia[$fid] = true;
+                        }
+                    }
+                }
+            }
+            foreach (array_keys($familia) as $midFam) {
+                if (!isset($incluidos[$midFam])) {
+                    $excluidos[$midFam] = true;
+                }
+            }
+        }
+
+        return $excluidos;
     }
 
     /**
