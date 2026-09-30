@@ -317,6 +317,9 @@ foreach ($componentes as $comp) {
                     'materias_ids' => array_values(array_unique($gm)),
                     'aplicar_em' => (strtolower(trim((string) ($g['aplicar_em'] ?? 'ambos'))) === 'boletim') ? 'boletim' : 'ambos',
                     'agrupamento_id' => (int) ($g['agrupamento_id'] ?? 0),
+                    'arredondamento' => in_array(strtolower(trim((string) ($g['arredondamento'] ?? 'todos'))), ['filhas', 'mae'], true)
+                        ? strtolower(trim((string) $g['arredondamento']))
+                        : 'todos',
                 ];
             }
             if (isset($dec['layout']) && is_array($dec['layout'])) {
@@ -1867,6 +1870,14 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                             </select>
                         </div>
                         <div>
+                            <label class="block text-xs font-medium text-indigo-900 mb-1">Arredondamento</label>
+                            <select id="bloco-group-arredondamento" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm">
+                                <option value="todos">Todos (filhas + mãe)</option>
+                                <option value="filhas">Só filhas</option>
+                                <option value="mae">Só mãe</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-xs font-medium text-indigo-900 mb-1">Divisor fixo (opcional)</label>
                             <input id="bloco-group-divisor" type="number" min="0" step="0.01" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm" placeholder="4">
                         </div>
@@ -2219,6 +2230,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         ,groupKey: document.getElementById('bloco-group-key')
         ,groupLabel: document.getElementById('bloco-group-label')
         ,groupMode: document.getElementById('bloco-group-mode')
+        ,groupArredondamento: document.getElementById('bloco-group-arredondamento')
         ,groupDivisor: document.getElementById('bloco-group-divisor')
         ,groupAplicarEm: document.getElementById('bloco-group-aplicar-em')
         ,wrapJornadaNotaUnicaExtras: document.getElementById('wrap-jornada-nota-unica-extras')
@@ -4074,6 +4086,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         if (fields.groupMode) {
             fields.groupMode.value = 'media';
         }
+        if (fields.groupArredondamento) {
+            fields.groupArredondamento.value = 'todos';
+        }
         if (fields.groupDivisor) {
             fields.groupDivisor.value = '';
         }
@@ -4160,6 +4175,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             }
             if (fields.groupMode) {
                 fields.groupMode.value = (String(grp.mode || 'media') === 'soma') ? 'soma' : 'media';
+            }
+            if (fields.groupArredondamento) {
+                var arG = String(grp.arredondamento || 'todos').toLowerCase();
+                fields.groupArredondamento.value = (arG === 'filhas' || arG === 'mae') ? arG : 'todos';
             }
             if (fields.groupDivisor) {
                 fields.groupDivisor.value = (grp.divisor && Number(grp.divisor) > 0) ? String(Number(grp.divisor)) : '';
@@ -4659,6 +4678,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             var gKey = fields.groupKey ? String(fields.groupKey.value || '').trim() : '';
             var gLabel = fields.groupLabel ? String(fields.groupLabel.value || '').trim() : '';
             var gMode = fields.groupMode ? String(fields.groupMode.value || 'media').trim() : 'media';
+            var gArred = fields.groupArredondamento ? String(fields.groupArredondamento.value || 'todos').trim() : 'todos';
+            if (gArred !== 'filhas' && gArred !== 'mae') {
+                gArred = 'todos';
+            }
             var gDiv = fields.groupDivisor ? Number(fields.groupDivisor.value || 0) : 0;
             var gAplicar = fields.groupAplicarEm ? String(fields.groupAplicarEm.value || 'boletim').trim() : 'boletim';
             if (gAplicar !== 'boletim') {
@@ -4683,6 +4706,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 key: gKey,
                 label: gLabel,
                 mode: gMode,
+                arredondamento: gArred,
                 divisor: gDiv > 0 ? gDiv : 0,
                 materias_ids: gMats,
                 aplicar_em: gAplicar

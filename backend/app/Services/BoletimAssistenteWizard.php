@@ -4327,6 +4327,7 @@ class BoletimAssistenteWizard
             'materias_ids' => [],
             'aplicar_em' => 'boletim',
             'agrupamento_id' => 0,
+            'arredondamento' => 'todos',
         ];
     }
 
@@ -4461,6 +4462,13 @@ class BoletimAssistenteWizard
         $aplicarEm = array_key_exists('aplicar_em', $raw)
             ? $this->normalizarAplicarEmGrupoLinha($raw['aplicar_em'], 'ambos')
             : 'boletim';
+        $arred = strtolower(trim((string) ($raw['arredondamento'] ?? 'todos')));
+        if ($arred === 'mãe') {
+            $arred = 'mae';
+        }
+        if (!in_array($arred, ['todos', 'filhas', 'mae'], true)) {
+            $arred = 'todos';
+        }
         return [
             'ativo' => !empty($raw['ativo']),
             'nome' => trim((string) ($raw['nome'] ?? '')),
@@ -4468,6 +4476,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $ids,
             'aplicar_em' => $aplicarEm,
             'agrupamento_id' => max(0, (int) ($raw['agrupamento_id'] ?? 0)),
+            'arredondamento' => $arred,
         ];
     }
 
@@ -4526,6 +4535,7 @@ class BoletimAssistenteWizard
             'divisor' => 1.0,
             'materias_ids' => $ids,
             'aplicar_em' => $aplicarEm,
+            'arredondamento' => $g['arredondamento'] ?? 'todos',
         ];
         if ($g['agrupamento_id'] > 0) {
             $out['agrupamento_id'] = $g['agrupamento_id'];
@@ -4689,6 +4699,9 @@ class BoletimAssistenteWizard
                 'materias_ids' => $ids,
                 'aplicar_em' => $this->normalizarAplicarEmGrupoLinha($gl['aplicar_em'] ?? 'ambos', 'ambos'),
                 'agrupamento_id' => max(0, (int) ($gl['agrupamento_id'] ?? 0)),
+                'arredondamento' => in_array(strtolower((string) ($gl['arredondamento'] ?? 'todos')), ['filhas', 'mae'], true)
+                    ? strtolower((string) $gl['arredondamento'])
+                    : 'todos',
             ];
             return;
         }

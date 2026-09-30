@@ -363,7 +363,7 @@ $boletimWizardSteps = [
     }
 
     function grupoLinhaPadrao() {
-        return { ativo: false, nome: '', modo: 'media', materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0 };
+        return { ativo: false, nome: '', modo: 'media', materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0, arredondamento: 'todos' };
     }
 
     function agrupamentoCadastroPorId(id) {
@@ -1198,6 +1198,9 @@ $boletimWizardSteps = [
         if (!estado.grupo_linha.aplicar_em) estado.grupo_linha.aplicar_em = 'boletim';
         if (estado.grupo_linha.agrupamento_id === undefined || estado.grupo_linha.agrupamento_id === null) {
             estado.grupo_linha.agrupamento_id = 0;
+        }
+        if (estado.grupo_linha.arredondamento !== 'filhas' && estado.grupo_linha.arredondamento !== 'mae') {
+            estado.grupo_linha.arredondamento = 'todos';
         }
         if (!estado.finalidade) estado.finalidade = 'oficial';
         if (estado.boletim_id == null) estado.boletim_id = 0;
@@ -3788,6 +3791,17 @@ $boletimWizardSteps = [
                 html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo" class="bw-grupo-modo" value="media"' + (gl.modo !== 'soma' ? ' checked' : '') + '> Média</label>';
                 html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo" class="bw-grupo-modo" value="soma"' + (gl.modo === 'soma' ? ' checked' : '') + '> Soma</label>';
                 html += '</div></div>';
+                var arredG = (gl.arredondamento === 'filhas' || gl.arredondamento === 'mae') ? gl.arredondamento : 'todos';
+                html += '<div><span class="text-xs font-medium text-gray-600">Arredondamento da área</span>';
+                html += '<p class="text-xs text-gray-500 mt-0.5 mb-1">Usa o arredondamento do evento (ex.: .00 / .50). Escolha quem recebe.</p>';
+                html += '<div class="mt-1 space-y-1.5 text-sm">';
+                html += '<label class="flex items-start gap-2"><input type="radio" name="bw-grupo-arred" class="bw-grupo-arred mt-0.5" value="todos"' + (arredG === 'todos' ? ' checked' : '') + '>';
+                html += '<span><strong>Todos</strong><span class="block text-xs text-gray-600 font-normal">Filhas e linha-mãe.</span></span></label>';
+                html += '<label class="flex items-start gap-2"><input type="radio" name="bw-grupo-arred" class="bw-grupo-arred mt-0.5" value="filhas"' + (arredG === 'filhas' ? ' checked' : '') + '>';
+                html += '<span><strong>Só filhas</strong><span class="block text-xs text-gray-600 font-normal">Arredonda as matérias; a mãe fica com a média/soma exata.</span></span></label>';
+                html += '<label class="flex items-start gap-2"><input type="radio" name="bw-grupo-arred" class="bw-grupo-arred mt-0.5" value="mae"' + (arredG === 'mae' ? ' checked' : '') + '>';
+                html += '<span><strong>Só mãe</strong><span class="block text-xs text-gray-600 font-normal">Filhas sem arredondamento especial; só a linha-mãe arredonda.</span></span></label>';
+                html += '</div></div>';
                 if (estado.exibir_em === 'notas') {
                     var aplicar = gl.aplicar_em === 'ambos' ? 'ambos' : 'boletim';
                     html += '<div><span class="text-xs font-medium text-gray-600">Onde essa linha única aparece</span>';
@@ -4145,6 +4159,14 @@ $boletimWizardSteps = [
             el.addEventListener('change', function () {
                 if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
                 estado.grupo_linha.modo = el.value === 'soma' ? 'soma' : 'media';
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-grupo-arred').forEach(function (el) {
+            el.addEventListener('change', function () {
+                if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
+                var v = el.value;
+                estado.grupo_linha.arredondamento = (v === 'filhas' || v === 'mae') ? v : 'todos';
                 agendarMontar();
             });
         });

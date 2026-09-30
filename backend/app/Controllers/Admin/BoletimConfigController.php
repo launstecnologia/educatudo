@@ -28,6 +28,8 @@ class BoletimConfigController extends BaseController
     /** @var array<string, list<int>> */
     private array $materiasExpandidasCache = [];
     private ?ResultadoAcademicoService $resultadoAcademicoSvc = null;
+    /** @var array<int, bool> Matérias filhas de group_line com arredondamento=mae (não aplicam half nas células). */
+    private array $midsSemArredondamentoGrupo = [];
     /** @var array<int, ?int> */
     private array $cursoPorTurmaCache = [];
     /** @var array<string, mixed>|null Usuário do job CLI (sem sessão). */
@@ -3395,6 +3397,11 @@ class BoletimConfigController extends BaseController
         $regra = $expansaoQuadro['regra'];
         $componentes = $expansaoQuadro['componentes'];
         $regra['componentes'] = $componentes;
+        $this->carregarMidsSemArredondamentoGrupo(
+            $componentes,
+            (string) ($regra['exibir_em'] ?? 'boletim'),
+            $forcarAgrupamentoLinhas
+        );
 
         $componentesResultado = [];
         $valoresPorCodigo = [];
@@ -5377,7 +5384,19 @@ class BoletimConfigController extends BaseController
                 $mapCod = $matrizPorCodigo[$cod] ?? [];
                 $cell = $mapCod[$mid] ?? null;
                 $roundModeCol = (string) ($col['round_mode_efetivo'] ?? $roundMode);
-                $vcell = is_numeric($cell) ? $this->applyRoundMode((float) $cell, $roundModeCol) : null;
+                if (is_numeric($cell)) {
+                    $midLinha = (int) $mid;
+                    // Mãe (mid virtual < 0): já saiu arredondada (ou não) do group_line — não reaplicar half.
+                    if ($midLinha < 0) {
+                        $vcell = round((float) $cell, 2);
+                    } elseif ($midLinha > 0 && !empty($this->midsSemArredondamentoGrupo[$midLinha])) {
+                        $vcell = round((float) $cell, 2);
+                    } else {
+                        $vcell = $this->applyRoundMode((float) $cell, $roundModeCol);
+                    }
+                } else {
+                    $vcell = null;
+                }
                 $colunaEhFaltas = ((string) ($col['source_type'] ?? '')) === 'faltas_evento'
                     || strtolower((string) ($col['layout_type'] ?? '')) === 'faltas';
                 if (!$colunaEhFaltas && is_numeric($vcell)) {
@@ -5752,8 +5771,8 @@ class BoletimConfigController extends BaseController
     ): array
     {
         $roundMode = $this->normalizeRoundMode($roundMode);
-        // Média de várias matérias (ex.: 7,5+7,5+8)/3 = 7,67 → arredonda para .00/.50.
-        $roundModeGrupo = $roundMode === 'none' ? 'half' : $roundMode;
+        // Estilo do arredondamento vem do evento; quem recebe (mãe/filhas) vem de group_line.arredondamento.
+        $roundModeGrupo = $roundMode;
         $groupMetaByKey = [];
         $groupMidByKey = [];
         $materiasAgrupadas = [];
@@ -5798,6 +5817,7 @@ class BoletimConfigController extends BaseController
                     'mode' => $grp['mode'],
                     'divisor' => $grp['divisor'],
                     'agrupamento_id' => (int) ($grp['agrupamento_id'] ?? 0),
+                    'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
                 ];
             }
             // Mantém o grupo ativo sempre que foi configurado, mesmo com notas faltantes.
@@ -5956,6 +5976,9 @@ class BoletimConfigController extends BaseController
                     }
                 }
                 $agr = null;
+                $arredGrupo = $this->normalizarArredondamentoGrupo(
+                    $cfg['arredondamento'] ?? ($groupMetaByKey[(string) ($cfg['key'] ?? '')]['arredondamento'] ?? 'todos')
+                );
                 if ($ehFaltasCol) {
                     $agr = $this->agruparValoresGrupoLinha($vals, 'soma', 0.0);
                 } elseif (!empty($cfg['usar_percentual'])
@@ -5965,7 +5988,6 @@ class BoletimConfigController extends BaseController
                 ) {
                     // Semanas N/Q: aproveitamento conjunto (soma N ÷ soma Q), não média das notas 0–10.
                     $agr = ($sumAcertos / $sumQuestoes) * 10.0;
-                    $agr = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
                 } else {
                     $modoCfg = strtolower(trim((string) ($cfg['mode'] ?? 'media')));
                     if ($modoCfg !== 'soma') {
@@ -5984,11 +6006,9 @@ class BoletimConfigController extends BaseController
                         }));
                     }
                     $agr = $this->agruparValoresGrupoLinha($vals, $modoCfg, $divisorCfg);
-                    if ($agr !== null && $modoCfg === 'media') {
-                        $agr = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
-                    } elseif ($agr !== null && $modoCfg === 'soma') {
-                        $agr = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
-                    }
+                }
+                if ($agr !== null) {
+                    $agr = $this->aplicarArredondamentoMaeGrupo((float) $agr, $roundModeGrupo, $arredGrupo);
                 }
                 $virtualMidCfg = (int) $cfg['virtual_mid'];
                 // Se já existe um valor no id sintético do grupo ANTES de recalcular (só
@@ -5999,7 +6019,7 @@ class BoletimConfigController extends BaseController
                     $map[$virtualMidCfg] = $mapOriginal[$virtualMidCfg];
                     $groupKeysAtivos[(string) ($cfg['key'] ?? '')] = true;
                 } elseif ($agr !== null) {
-                    $map[$virtualMidCfg] = (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
+                    $map[$virtualMidCfg] = (float) $agr;
                     $groupKeysAtivos[(string) ($cfg['key'] ?? '')] = true;
                 }
             } else {
@@ -6044,7 +6064,12 @@ class BoletimConfigController extends BaseController
                                 }
                                 $rFormula = $this->avaliarFormula($expr, $vars);
                                 if (!empty($rFormula['ok']) && isset($rFormula['valor']) && is_numeric($rFormula['valor'])) {
-                                    $map[$vmid] = (float) ($this->applyRoundMode((float) $rFormula['valor'], $roundModeGrupo) ?? $rFormula['valor']);
+                                    $arredFormula = $this->normalizarArredondamentoGrupo($meta['arredondamento'] ?? 'todos');
+                                    $map[$vmid] = $this->aplicarArredondamentoMaeGrupo(
+                                        (float) $rFormula['valor'],
+                                        $roundModeGrupo,
+                                        $arredFormula
+                                    );
                                     $groupKeysAtivos[(string) $gk] = true;
                                     continue;
                                 }
@@ -6070,9 +6095,10 @@ class BoletimConfigController extends BaseController
                             : (float) ($meta['divisor'] ?? 0)
                     );
                     if ($agr !== null) {
+                        $arredMeta = $this->normalizarArredondamentoGrupo($meta['arredondamento'] ?? 'todos');
                         $map[$vmid] = $ehFaltasCol
                             ? $agr
-                            : (float) ($this->applyRoundMode((float) $agr, $roundModeGrupo) ?? $agr);
+                            : $this->aplicarArredondamentoMaeGrupo((float) $agr, $roundModeGrupo, $arredMeta);
                         $groupKeysAtivos[(string) $gk] = true;
                     }
                 }
@@ -6701,9 +6727,74 @@ class BoletimConfigController extends BaseController
     private function applyRoundModeToMateriaMap(array $map, string $mode): array
     {
         foreach ($map as $k => $v) {
+            if (!is_numeric($v)) {
+                continue;
+            }
+            $mid = (int) $k;
+            if ($mid > 0 && !empty($this->midsSemArredondamentoGrupo[$mid])) {
+                $map[$k] = round((float) $v, 2);
+                continue;
+            }
             $map[$k] = (float) ($this->applyRoundMode((float) $v, $mode) ?? $v);
         }
         return $map;
+    }
+
+    /**
+     * @param mixed $raw
+     */
+    private function normalizarArredondamentoGrupo($raw): string
+    {
+        $v = strtolower(trim((string) $raw));
+        if ($v === 'filhas' || $v === 'mae' || $v === 'mãe') {
+            return $v === 'mãe' ? 'mae' : $v;
+        }
+        return 'todos';
+    }
+
+    private function aplicarArredondamentoMaeGrupo(float $valor, string $roundMode, string $arredondamento): float
+    {
+        // filhas: média/soma exata da mãe (sem half); todos/mae: aplica round do evento.
+        if ($arredondamento === 'filhas') {
+            return round($valor, 2);
+        }
+        return (float) ($this->applyRoundMode($valor, $roundMode) ?? round($valor, 2));
+    }
+
+    /**
+     * Filhas de group_line com arredondamento=mae não passam pelo half nas células.
+     *
+     * @param list<array<string,mixed>> $componentes
+     */
+    private function carregarMidsSemArredondamentoGrupo(array $componentes, string $exibirEm, bool $forcarAgrupamento): void
+    {
+        $this->midsSemArredondamentoGrupo = [];
+        $exibirEmNorm = strtolower(trim($exibirEm)) === 'notas' ? 'notas' : 'boletim';
+        foreach ($componentes as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $grp = $this->parseGroupLineConfigFromComponente($comp);
+            if ($grp === null) {
+                continue;
+            }
+            if (
+                !$forcarAgrupamento
+                && $exibirEmNorm === 'notas'
+                && (($grp['aplicar_em'] ?? 'ambos') === 'boletim')
+            ) {
+                continue;
+            }
+            if ($this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos') !== 'mae') {
+                continue;
+            }
+            foreach ((array) ($grp['materias_ids'] ?? []) as $mid) {
+                $mid = (int) $mid;
+                if ($mid > 0) {
+                    $this->midsSemArredondamentoGrupo[$mid] = true;
+                }
+            }
+        }
     }
 
     private function avaliarFormula(string $formula, array $valoresPorCodigo): array
@@ -8163,6 +8254,7 @@ class BoletimConfigController extends BaseController
             'divisor' => $divisor,
             'materias_ids' => $ids,
             'aplicar_em' => $aplicarEm,
+            'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
             'usar_percentual' => !empty($componente['usar_percentual']),
             'source_type' => strtolower(trim((string) ($componente['source_type'] ?? 'provas_sistema'))),
             'agrupamento_id' => $agrupamentoId > 0 ? $agrupamentoId : 0,
@@ -9348,6 +9440,7 @@ class BoletimConfigController extends BaseController
             'divisor' => $divisor,
             'materias_ids' => $ids,
             'aplicar_em' => $this->normalizarGroupLineAplicarEm($grp['aplicar_em'] ?? 'ambos'),
+            'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
         ];
         $agrupamentoId = (int) ($grp['agrupamento_id'] ?? 0);
         if ($agrupamentoId > 0) {
