@@ -2,11 +2,18 @@
 $boletim = is_array($boletim ?? null) ? $boletim : [];
 $periodos = is_array($periodos ?? null) ? $periodos : [];
 $eventosModelo = is_array($eventos_modelo ?? null) ? $eventos_modelo : [];
-$modeloRegraId = (int) ($modelo_regra_id ?? 0);
+$modelosPorBimestre = is_array($modelos_por_bimestre ?? null) ? $modelos_por_bimestre : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));
 $usouCalendario = !empty($usou_calendario);
 $csrf_token = $csrf_token ?? '';
 $boletimId = (int) ($boletim['id'] ?? 0);
+$temPeriodoParaCriar = false;
+foreach ($periodos as $pCheck) {
+    if (empty($pCheck['ja_existe'])) {
+        $temPeriodoParaCriar = true;
+        break;
+    }
+}
 
 $page_header_title = 'Gerar avaliações do ano';
 $page_header_subtitle = 'Cria os bimestres a partir do calendário letivo (tipo Avaliação) ou de 4 períodos padrão, clipados no ano letivo.';
@@ -22,7 +29,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             · Ano <?= $anoLetivo ?>
             · <?= $usouCalendario ? 'Datas do calendário letivo' : 'Períodos padrão (4 bimestres)' ?>
         </p>
-        <p class="text-xs text-gray-500 mt-1">Bimestres que já têm avaliação neste modelo são ignorados.</p>
+        <p class="text-xs text-gray-500 mt-1">Bimestres que já têm avaliação neste modelo são ignorados. Em cada bimestre faltante, escolha qual evento vigente copiar.</p>
     </div>
 
     <?php if ($eventosModelo === []): ?>
@@ -34,57 +41,78 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         </div>
     <?php endif; ?>
 
-    <div class="overflow-x-auto mb-6">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origem</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-                <?php if ($periodos === []): ?>
-                <tr>
-                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">Nenhum período calculado.</td>
-                </tr>
-                <?php else: foreach ($periodos as $p): ?>
-                <tr>
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($p['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($p['inicio'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($p['fim'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    <td class="px-4 py-3 text-sm text-gray-600"><?= (($p['origem'] ?? '') === 'calendario') ? 'Calendário' : 'Padrão' ?></td>
-                    <td class="px-4 py-3">
-                        <?php if (!empty($p['ja_existe'])): ?>
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Já existe</span>
-                        <?php else: ?>
-                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Será criado</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-
     <form method="POST" action="<?= URL ?>/admin/boletins/<?= $boletimId ?>/gerar-avaliacoes" class="space-y-4">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token, ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Evento modelo (duplicar estrutura)</label>
-            <select name="modelo_regra_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white" <?= $eventosModelo === [] ? 'disabled' : '' ?>>
-                <?php foreach ($eventosModelo as $ev): ?>
-                    <option value="<?= (int) ($ev['id'] ?? 0) ?>" <?= $modeloRegraId === (int) ($ev['id'] ?? 0) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string) ($ev['nome_exibicao'] ?? $ev['nome'] ?? ('#' . (int) ($ev['id'] ?? 0))), ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Escolha o evento vigente (como em Notas da Coordenação) cuja estrutura deve ser copiada para os bimestres faltantes.</p>
+
+        <div class="overflow-x-auto mb-2">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origem</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Evento modelo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <?php if ($periodos === []): ?>
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">Nenhum período calculado.</td>
+                    </tr>
+                    <?php else: foreach ($periodos as $p):
+                        $bim = (int) ($p['bimestre'] ?? 0);
+                        $jaExiste = !empty($p['ja_existe']);
+                        $modeloSel = (int) ($modelosPorBimestre[$bim] ?? 0);
+                    ?>
+                    <tr>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($p['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($p['inicio'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($p['fim'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                        <td class="px-4 py-3 text-sm text-gray-600"><?= (($p['origem'] ?? '') === 'calendario') ? 'Calendário' : 'Padrão' ?></td>
+                        <td class="px-4 py-3">
+                            <?php if ($jaExiste): ?>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Já existe</span>
+                            <?php else: ?>
+                                <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Será criado</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="px-4 py-3 min-w-[18rem]">
+                            <?php if ($jaExiste): ?>
+                                <span class="text-xs text-gray-400">—</span>
+                            <?php elseif ($eventosModelo === []): ?>
+                                <span class="text-xs text-amber-700">Sem modelo disponível</span>
+                            <?php else: ?>
+                                <select
+                                    name="modelo_por_bimestre[<?= $bim ?>]"
+                                    class="w-full max-w-xl px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                                    required
+                                >
+                                    <?php foreach ($eventosModelo as $ev):
+                                        $evId = (int) ($ev['id'] ?? 0);
+                                        $label = (string) ($ev['nome_exibicao'] ?? $ev['nome'] ?? ('#' . $evId));
+                                    ?>
+                                        <option value="<?= $evId ?>" <?= $modeloSel === $evId ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
         </div>
+
         <div class="flex items-center gap-3">
-            <button type="submit" class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90" <?= $eventosModelo === [] ? 'disabled' : '' ?>>
+            <button
+                type="submit"
+                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90"
+                <?= ($eventosModelo === [] || !$temPeriodoParaCriar) ? 'disabled' : '' ?>
+            >
                 Gerar eventos faltantes
             </button>
             <a href="<?= URL ?>/admin/boletins" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">Cancelar</a>

@@ -403,20 +403,46 @@ class GeradorAvaliacoesAnualService
     }
 
     /**
+     * Escolhe o evento modelo padrão para um bimestre (mesmo bimestre, senão vigente).
+     *
+     * @param list<array<string,mixed>> $eventos
+     */
+    public function modeloPadraoParaBimestre(array $eventos, int $bimestre): int
+    {
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            if ($bimestre > 0 && (int) ($ev['bimestre'] ?? 0) === $bimestre) {
+                $id = (int) ($ev['id'] ?? 0);
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+        }
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            if (!empty($ev['eh_vigente'])) {
+                $id = (int) ($ev['id'] ?? 0);
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+        }
+        return (int) ($eventos[0]['id'] ?? 0);
+    }
+
+    /**
+     * @param array<int,int> $modelosPorBimestre bimestre => regra_id modelo
      * @return array{success:bool,error?:string,criados?:list<int>,ignorados?:list<int>}
      */
-    public function gerar(int $boletimId, int $modeloRegraId, int $anoLetivo = 0): array
+    public function gerar(int $boletimId, array $modelosPorBimestre, int $anoLetivo = 0): array
     {
-        $modelo = $this->boletimConfig->getRuleById($modeloRegraId);
-        if (!is_array($modelo) || (int) ($modelo['id'] ?? 0) <= 0) {
-            return ['success' => false, 'error' => 'Escolha um evento modelo para duplicar (crie a primeira avaliação do modelo).'];
-        }
-        if (strtolower(trim((string) ($modelo['exibir_em'] ?? ''))) !== 'notas') {
-            return ['success' => false, 'error' => 'O evento modelo precisa ser do tipo Notas.'];
-        }
-        // Permite copiar de evento vigente de outro cadastro; as cópias ligam a este boletim.
         if ($anoLetivo <= 0) {
-            $anoLetivo = (int) ($modelo['ano_letivo'] ?? 0);
+            $boletim = $this->boletim->findById($boletimId);
+            $anoLetivo = (int) ($boletim['ano_letivo'] ?? date('Y'));
         }
         $permitidos = $this->listarEventosModelo($boletimId, $anoLetivo);
         $idsPermitidos = [];
@@ -426,21 +452,17 @@ class GeradorAvaliacoesAnualService
                 $idsPermitidos[$rid] = true;
             }
         }
-        if (!isset($idsPermitidos[$modeloRegraId])) {
-            return ['success' => false, 'error' => 'O evento modelo escolhido não está disponível para este boletim.'];
+        if ($idsPermitidos === []) {
+            return ['success' => false, 'error' => 'Escolha um evento modelo para duplicar (crie a primeira avaliação do modelo).'];
         }
+
         $prev = $this->previsualizar($boletimId, $anoLetivo);
         if (empty($prev['ok'])) {
             return ['success' => false, 'error' => $prev['error'] ?? 'Não foi possível montar os períodos.'];
         }
 
         $ano = (int) $prev['ano'];
-        $nomeBaseModelo = trim((string) ($modelo['nome'] ?? ''));
-        $nomeBaseModelo = preg_replace('/\s*[—\-]\s*\d+[ºoª]?\s*(bim|bimestre).*$/iu', '', $nomeBaseModelo) ?? $nomeBaseModelo;
-        $nomeBaseModelo = trim($nomeBaseModelo);
-        if ($nomeBaseModelo === '') {
-            $nomeBaseModelo = trim((string) ($prev['boletim']['nome'] ?? 'Avaliação'));
-        }
+        $nomePadraoBoletim = trim((string) ($prev['boletim']['nome'] ?? 'Avaliação'));
         $criados = [];
         $ignorados = [];
         foreach ($prev['periodos'] as $periodo) {
@@ -452,6 +474,31 @@ class GeradorAvaliacoesAnualService
                 $ignorados[] = $bim;
                 continue;
             }
+            $modeloRegraId = (int) ($modelosPorBimestre[$bim] ?? 0);
+            if ($modeloRegraId <= 0) {
+                $modeloRegraId = $this->modeloPadraoParaBimestre($permitidos, $bim);
+            }
+            if ($modeloRegraId <= 0 || !isset($idsPermitidos[$modeloRegraId])) {
+                return [
+                    'success' => false,
+                    'error' => 'Escolha um evento modelo válido para o ' . self::nomeBimestre($bim, $ano) . '.',
+                ];
+            }
+            $modelo = $this->boletimConfig->getRuleById($modeloRegraId);
+            if (!is_array($modelo) || (int) ($modelo['id'] ?? 0) <= 0) {
+                return ['success' => false, 'error' => 'Evento modelo não encontrado.'];
+            }
+            if (strtolower(trim((string) ($modelo['exibir_em'] ?? ''))) !== 'notas') {
+                return ['success' => false, 'error' => 'O evento modelo precisa ser do tipo Notas.'];
+            }
+
+            $nomeBaseModelo = trim((string) ($modelo['nome'] ?? ''));
+            $nomeBaseModelo = preg_replace('/\s*[—\-]\s*\d+[ºoª]?\s*(bim|bimestre).*$/iu', '', $nomeBaseModelo) ?? $nomeBaseModelo;
+            $nomeBaseModelo = trim($nomeBaseModelo);
+            if ($nomeBaseModelo === '') {
+                $nomeBaseModelo = $nomePadraoBoletim;
+            }
+
             $novoId = $this->boletimConfig->duplicateRule($modeloRegraId);
             if ($novoId === null || $novoId <= 0) {
                 return ['success' => false, 'error' => 'Não foi possível duplicar o evento modelo.'];

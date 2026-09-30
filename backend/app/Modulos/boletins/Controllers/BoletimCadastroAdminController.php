@@ -164,15 +164,16 @@ class BoletimCadastroAdminController extends AdminBaseController
             return;
         }
         $eventos = $gerador->listarEventosModelo($id, (int) ($prev['ano'] ?? 0));
-        $modeloRegraId = 0;
-        foreach ($eventos as $evModelo) {
-            if (!empty($evModelo['eh_vigente'])) {
-                $modeloRegraId = (int) ($evModelo['id'] ?? 0);
-                break;
+        $modelosPorBimestre = [];
+        foreach (($prev['periodos'] ?? []) as $periodoPrev) {
+            if (!is_array($periodoPrev) || !empty($periodoPrev['ja_existe'])) {
+                continue;
             }
-        }
-        if ($modeloRegraId <= 0) {
-            $modeloRegraId = (int) ($eventos[0]['id'] ?? 0);
+            $bimPrev = (int) ($periodoPrev['bimestre'] ?? 0);
+            if ($bimPrev <= 0) {
+                continue;
+            }
+            $modelosPorBimestre[$bimPrev] = $gerador->modeloPadraoParaBimestre($eventos, $bimPrev);
         }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/boletins/gerar-avaliacoes', [
@@ -182,7 +183,7 @@ class BoletimCadastroAdminController extends AdminBaseController
             'boletim' => $prev['boletim'],
             'periodos' => $prev['periodos'] ?? [],
             'eventos_modelo' => $eventos,
-            'modelo_regra_id' => $modeloRegraId,
+            'modelos_por_bimestre' => $modelosPorBimestre,
             'ano_letivo' => (int) ($prev['ano'] ?? date('Y')),
             'usou_calendario' => !empty($prev['usou_calendario']),
             'csrf_token' => $this->generateCsrfToken(),
@@ -204,9 +205,19 @@ class BoletimCadastroAdminController extends AdminBaseController
         }
         require_once __DIR__ . '/../Services/GeradorAvaliacoesAnualService.php';
         $gerador = new \App\Modulos\Boletins\Services\GeradorAvaliacoesAnualService();
-        $modeloRegraId = (int) ($_POST['modelo_regra_id'] ?? 0);
+        $modelosPorBimestre = [];
+        $rawModelos = $_POST['modelo_por_bimestre'] ?? [];
+        if (is_array($rawModelos)) {
+            foreach ($rawModelos as $bimRaw => $regraRaw) {
+                $bim = (int) $bimRaw;
+                $regraId = (int) $regraRaw;
+                if ($bim > 0 && $regraId > 0) {
+                    $modelosPorBimestre[$bim] = $regraId;
+                }
+            }
+        }
         $ano = (int) ($_POST['ano_letivo'] ?? 0);
-        $result = $gerador->gerar($id, $modeloRegraId, $ano);
+        $result = $gerador->gerar($id, $modelosPorBimestre, $ano);
         if (empty($result['success'])) {
             $this->setFlashMessage($result['error'] ?? 'Não foi possível gerar os eventos.', 'error');
             $this->redirect('/admin/boletins/' . $id . '/gerar-avaliacoes');
