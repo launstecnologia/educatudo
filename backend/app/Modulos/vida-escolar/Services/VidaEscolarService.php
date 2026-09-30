@@ -362,7 +362,7 @@ class VidaEscolarService
         );
         $linhas = $this->linhasUnicasDoQuadro($ficha, $linhas, $idsOcultos);
         $modelo = $this->modeloOficialDaFicha($ficha);
-        $bimsGerados = $this->bimestresGeradosPorMateria(
+        $coberturaBims = $this->mapaCoberturaBimestresGerados(
             (int) ($ficha['aluno_id'] ?? 0),
             (int) ($ficha['ano_letivo'] ?? 0),
             (int) ($modelo['id'] ?? 0)
@@ -379,8 +379,9 @@ class VidaEscolarService
                 'celulas' => $this->celulasQuadroVisiveis(
                     $porLinha[$lid] ?? [],
                     $mid,
-                    $bimsGerados,
-                    $orfao
+                    $coberturaBims,
+                    $orfao,
+                    (string) ($l['componente_nome'] ?? '')
                 ),
             ];
         }
@@ -761,7 +762,7 @@ class VidaEscolarService
         $linhas = $this->model->listarLinhas((int) $fichaId);
         $n += $this->limparBimsSemEventoNaFicha(
             $linhas,
-            $this->bimestresGeradosPorMateria($alunoId, $ano, $modeloBoletimId),
+            $this->mapaCoberturaBimestresGerados($alunoId, $ano, $modeloBoletimId),
             $linhasTocadas,
             $incluirReabertas,
             $forcarEscrita
@@ -1892,29 +1893,34 @@ class VidaEscolarService
      * Apaga nota calculada aberta em bimestre que não tem evento gerado.
      *
      * @param list<array<string,mixed>> $linhas
-     * @param array<int, array<int, true>> $bimsGerados
+     * @param array{materias: array<int, array<int, true>>, nomes: array<string, array<int, true>>} $cobertura
      * @param array<int, true> $linhasTocadas
      */
     private function limparBimsSemEventoNaFicha(
         array $linhas,
-        array $bimsGerados,
+        array $cobertura,
         array &$linhasTocadas,
         bool $incluirReabertas,
         bool $forcarEscrita
     ): int {
         $n = 0;
         $permitidos = $incluirReabertas ? ['aberta', 'reaberta'] : ['aberta'];
+        $bimsGerados = $cobertura['materias'] ?? [];
+        $bimsPorNome = $cobertura['nomes'] ?? [];
         foreach ($linhas as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
             $linhaId = (int) ($linha['id'] ?? 0);
             $mid = (int) ($linha['materia_id'] ?? 0);
+            $nomeKey = mb_strtolower(trim((string) ($linha['componente_nome'] ?? '')));
             if ($linhaId <= 0) {
                 continue;
             }
             foreach ([1, 2, 3, 4] as $periodo) {
-                if ($mid > 0 && isset($bimsGerados[$mid][$periodo])) {
+                $coberto = ($mid > 0 && isset($bimsGerados[$mid][$periodo]))
+                    || ($nomeKey !== '' && isset($bimsPorNome[$nomeKey][$periodo]));
+                if ($coberto) {
                     continue;
                 }
                 $cel = $this->model->findCelulaLinhaPeriodo($linhaId, $periodo);
@@ -2531,14 +2537,19 @@ class VidaEscolarService
     }
 
     /**
-     * @return array<int, array<int, true>> materia_id => bimestre => true
+     * Cobertura de bimestres gerados: por materia_id e por nome (group_line,
+     * ex.: Língua Portuguesa com materia_id nulo no resultado).
+     *
+     * @return array{materias: array<int, array<int, true>>, nomes: array<string, array<int, true>>}
      */
-    private function bimestresGeradosPorMateria(int $alunoId, int $anoLetivo, int $boletimId = 0): array
+    private function mapaCoberturaBimestresGerados(int $alunoId, int $anoLetivo, int $boletimId = 0): array
     {
+        $materias = [];
+        $nomes = [];
         if ($alunoId <= 0 || $anoLetivo <= 0) {
-            return [];
+            return ['materias' => $materias, 'nomes' => $nomes];
         }
-        $out = [];
+        $grupos = $this->gruposLinhaDoAluno($alunoId, $anoLetivo);
         foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
             if (!$this->eventoPertenceAoAno($row, $anoLetivo)) {
                 continue;
@@ -2546,31 +2557,71 @@ class VidaEscolarService
             if (!$this->resultadoPertenceAoModelo($row, $boletimId)) {
                 continue;
             }
-            $mid = (int) ($row['materia_id'] ?? 0);
-            if ($mid <= 0) {
-                continue;
-            }
+            $bimsLinha = [];
             foreach (array_keys($this->periodosDaLinhaGerada($row)) as $bim) {
                 $bim = (int) $bim;
                 if ($bim >= 1 && $bim <= 4) {
-                    $out[$mid][$bim] = true;
+                    $bimsLinha[] = $bim;
+                }
+            }
+            if ($bimsLinha === []) {
+                continue;
+            }
+            $mid = (int) ($row['materia_id'] ?? 0);
+            $nomeKey = mb_strtolower(trim((string) ($row['materia_nome'] ?? '')));
+            $idsCobertos = [];
+            if ($mid > 0) {
+                $idsCobertos[$mid] = true;
+            }
+            if ($nomeKey !== '') {
+                foreach ($bimsLinha as $bim) {
+                    $nomes[$nomeKey][$bim] = true;
+                }
+                foreach ($grupos as $g) {
+                    $label = mb_strtolower(trim((string) ($g['label'] ?? '')));
+                    if ($label === '' || $label !== $nomeKey) {
+                        continue;
+                    }
+                    foreach ((array) ($g['materias_ids'] ?? []) as $fid) {
+                        $fid = (int) $fid;
+                        if ($fid <= 0) {
+                            continue;
+                        }
+                        $idsCobertos[$fid] = true;
+                        $pai = $this->paiIdDaMateria($fid);
+                        if ($pai > 0) {
+                            $idsCobertos[$pai] = true;
+                        }
+                    }
+                }
+            }
+            foreach (array_keys($idsCobertos) as $idCoberto) {
+                foreach ($bimsLinha as $bim) {
+                    $materias[(int) $idCoberto][$bim] = true;
                 }
             }
         }
 
-        return $out;
+        return ['materias' => $materias, 'nomes' => $nomes];
     }
 
     /**
      * Esconde nota de demonstração (linha antiga / bimestre sem evento gerado).
      *
      * @param array<int, array<string,mixed>> $celulas
-     * @param array<int, array<int, true>> $bimsGerados
+     * @param array{materias: array<int, array<int, true>>, nomes: array<string, array<int, true>>} $cobertura
      * @return array<int, array<string,mixed>>
      */
-    private function celulasQuadroVisiveis(array $celulas, int $materiaId, array $bimsGerados, bool $linhaOrfa): array
-    {
-        $temEventoMateria = $materiaId > 0 && isset($bimsGerados[$materiaId]);
+    private function celulasQuadroVisiveis(
+        array $celulas,
+        int $materiaId,
+        array $cobertura,
+        bool $linhaOrfa,
+        string $componenteNome = ''
+    ): array {
+        $bimsGerados = $cobertura['materias'] ?? [];
+        $bimsPorNome = $cobertura['nomes'] ?? [];
+        $nomeKey = mb_strtolower(trim($componenteNome));
         $alterou = false;
         foreach ($celulas as $periodo => $c) {
             if (!is_array($c)) {
@@ -2584,7 +2635,8 @@ class VidaEscolarService
             if ($origem === 'externa') {
                 continue;
             }
-            $temEventoBim = $temEventoMateria && isset($bimsGerados[$materiaId][$p]);
+            $temEventoBim = ($materiaId > 0 && isset($bimsGerados[$materiaId][$p]))
+                || ($nomeKey !== '' && isset($bimsPorNome[$nomeKey][$p]));
             if ($temEventoBim) {
                 continue;
             }
