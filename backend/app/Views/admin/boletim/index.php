@@ -214,6 +214,7 @@ foreach ($componentes as $comp) {
             'materias_ids' => [],
             'aplicar_em' => 'boletim',
             'agrupamento_id' => 0,
+            'arredondamento' => 'todos',
         ],
         'layout_group' => '',
         'layout_type' => '',

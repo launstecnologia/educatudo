@@ -366,6 +366,22 @@ $boletimWizardSteps = [
         return { ativo: false, nome: '', modo: 'media', materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0, arredondamento: 'todos' };
     }
 
+    /** Garante que o rascunho aplicado/salvo leve o arredondamento da área escolhido no wizard. */
+    function garantirArredondamentoGrupoNoRascunho(r) {
+        if (!r || !estado || !estado.grupo_linha) return r;
+        var ar = estado.grupo_linha.arredondamento;
+        if (ar !== 'filhas' && ar !== 'mae' && ar !== 'todos') ar = 'todos';
+        if (!estado.grupo_linha.ativo) return r;
+        (r.componentes || []).forEach(function (c) {
+            if (!c || typeof c !== 'object') return;
+            if (!c.config || typeof c.config !== 'object') c.config = {};
+            if (!c.config.group_line || typeof c.config.group_line !== 'object') return;
+            if (!c.config.group_line.enabled) return;
+            c.config.group_line.arredondamento = ar;
+        });
+        return r;
+    }
+
     function agrupamentoCadastroPorId(id) {
         id = Number(id || 0);
         var found = null;
@@ -4370,6 +4386,7 @@ $boletimWizardSteps = [
             }
             if (Number((estado && estado.aluno_preview_id) || 0) !== alunoPedido) return j;
             if (j.estado) {
+                var arredLocal = (estado && estado.grupo_linha && estado.grupo_linha.arredondamento) || '';
                 var remoto = j.estado;
                 if (versaoEnvio !== formulaVersao) {
                     remoto.formulas_blocos = estado.formulas_blocos || {};
@@ -4392,10 +4409,18 @@ $boletimWizardSteps = [
                     }
                 }
                 }
+                // Não perde escolha local de arredondamento da área se o remoto voltar sem ela.
+                if ((arredLocal === 'filhas' || arredLocal === 'mae')
+                    && (!remoto.grupo_linha || (remoto.grupo_linha.arredondamento !== 'filhas'
+                        && remoto.grupo_linha.arredondamento !== 'mae'))) {
+                    if (!remoto.grupo_linha) remoto.grupo_linha = grupoLinhaPadrao();
+                    remoto.grupo_linha.arredondamento = arredLocal;
+                }
                 estado = remoto;
                 garantirEstado();
             }
             rascunhoAtual = j.rascunho || null;
+            garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
             previewAtual = j.preview || previewAtual;
             formulasDisp = j.formulas_disponiveis || formulasDisp;
             renderResumo(j.resumo, j.erros || []);
@@ -4575,6 +4600,7 @@ $boletimWizardSteps = [
             renderResumo((j && (j.error || (j.erros && j.erros[0]))) || 'Não consegui montar o evento.', ['Volte nas etapas anteriores, confira as peças/fontes e tente de novo.']);
             return false;
         }
+        garantirArredondamentoGrupoNoRascunho(j.rascunho);
         var compsRasc = (j.rascunho && Array.isArray(j.rascunho.componentes)) ? j.rascunho.componentes : [];
         if (j.ok !== true && !compsRasc.length) {
             renderResumo(j.resumo || 'Ainda falta ajustar o evento.', j.erros && j.erros.length ? j.erros : ['O assistente ainda não conseguiu montar um evento válido.']);

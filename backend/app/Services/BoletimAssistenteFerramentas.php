@@ -843,6 +843,7 @@ class BoletimAssistenteFerramentas
                 'aplicar_em' => strtolower(trim((string) ($groupLine['aplicar_em'] ?? 'ambos'))) === 'boletim'
                     ? 'boletim'
                     : 'ambos',
+                'arredondamento' => $this->normalizarArredondamentoGrupoLinha($groupLine['arredondamento'] ?? 'todos'),
             ];
             $agIdGl = (int) ($groupLine['agrupamento_id'] ?? 0);
             if ($agIdGl > 0) {
@@ -1125,6 +1126,7 @@ class BoletimAssistenteFerramentas
                     'mode' => 'media',
                     'divisor' => 1,
                     'materias_ids' => [],
+                    'arredondamento' => 'todos',
                 ],
             ],
         ];
@@ -1229,6 +1231,9 @@ class BoletimAssistenteFerramentas
                 $lines[] = 'group_line_mode: ' . $this->escaparReceitaValor($gl['mode'] ?? 'media');
                 $lines[] = 'group_line_materias_ids: ' . $this->formatarListaIdsReceita($gl['materias_ids'] ?? []);
                 $lines[] = 'group_line_aplicar_em: ' . $this->escaparReceitaValor($gl['aplicar_em'] ?? 'ambos');
+                $lines[] = 'group_line_arredondamento: ' . $this->escaparReceitaValor(
+                    $this->normalizarArredondamentoGrupoLinha($gl['arredondamento'] ?? 'todos')
+                );
                 $agIdRec = (int) ($gl['agrupamento_id'] ?? 0);
                 if ($agIdRec > 0) {
                     $lines[] = 'group_line_agrupamento_id: ' . $agIdRec;
@@ -1333,6 +1338,9 @@ class BoletimAssistenteFerramentas
                     'aplicar_em' => strtolower(trim((string) ($kv['group_line_aplicar_em'] ?? 'ambos'))) === 'boletim'
                         ? 'boletim'
                         : 'ambos',
+                    'arredondamento' => $this->normalizarArredondamentoGrupoLinha(
+                        $kv['group_line_arredondamento'] ?? 'todos'
+                    ),
                 ];
                 $agIdKv = (int) ($kv['group_line_agrupamento_id'] ?? 0);
                 if ($agIdKv > 0) {
@@ -1825,6 +1833,19 @@ class BoletimAssistenteFerramentas
             }
         }
         return array_values(array_unique($ids));
+    }
+
+    /** @param mixed $raw */
+    private function normalizarArredondamentoGrupoLinha($raw): string
+    {
+        $v = strtolower(trim((string) $raw));
+        if ($v === 'mãe') {
+            $v = 'mae';
+        }
+        if ($v === 'filhas' || $v === 'mae') {
+            return $v;
+        }
+        return 'todos';
     }
 
     private function slugCodigo(string $codigo): string

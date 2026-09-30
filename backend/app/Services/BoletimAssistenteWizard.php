@@ -4316,7 +4316,7 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int}
+     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int,arredondamento:string}
      */
     public static function grupoLinhaPadrao(): array
     {
@@ -4335,9 +4335,9 @@ class BoletimAssistenteWizard
      * Se a linha única está ligada e ainda não tem matérias, usa a única
      * família pai/filhos do escopo (Componentes Curriculares).
      *
-     * @param array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int} $g
+     * @param array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int,arredondamento:string} $g
      * @param array<string,mixed> $estado
-     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int}
+     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int,arredondamento:string}
      */
     private function completarGrupoLinhaComFamilia(array $g, array $estado): array
     {
@@ -4446,7 +4446,7 @@ class BoletimAssistenteWizard
 
     /**
      * @param mixed $raw
-     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int}
+     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int,arredondamento:string}
      */
     private function normalizarGrupoLinha($raw): array
     {
@@ -4482,7 +4482,7 @@ class BoletimAssistenteWizard
 
     /**
      * @param array<string,mixed> $estado
-     * @return array{enabled:bool,key:string,label:string,mode:string,divisor:float,materias_ids:list<int>,aplicar_em:string,agrupamento_id?:int}|null
+     * @return array{enabled:bool,key:string,label:string,mode:string,divisor:float,materias_ids:list<int>,aplicar_em:string,arredondamento:string,agrupamento_id?:int}|null
      */
     private function configGrupoLinha(array $estado): ?array
     {
