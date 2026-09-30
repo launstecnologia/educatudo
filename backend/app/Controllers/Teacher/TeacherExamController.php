@@ -941,13 +941,15 @@ class TeacherExamController extends BaseController
         }
 
         if (($bloco['formato_evento'] ?? 'online_questoes') === 'lancamento_nota') {
-            $notasModel = new ExamBlockManualGrade();
-            $linhas = $notasModel->fetchTodasNotasBlocoAdmin((int) $blocoId);
+            $relatorio = $this->montarRelatorioLancamentoNotasAdmin($bloco, $_GET);
             $this->viewWithLayout('admin', 'admin/exams/blocks/results_lancamento_notas', [
                 'title' => 'Relatório de notas — ' . ($bloco['titulo'] ?? 'Evento'),
                 'user' => $user,
                 'bloco' => $bloco,
-                'notas_linhas' => $linhas,
+                'notas_linhas' => $relatorio['linhas'],
+                'filtros' => $relatorio['filtros'],
+                'opcoes_filtro' => $relatorio['opcoes'],
+                'totais' => $relatorio['totais'],
                 'current_page' => 'provas_blocos',
             ]);
             return;
@@ -2156,6 +2158,257 @@ class TeacherExamController extends BaseController
 
         $this->setFlashMessage('Notas salvas com sucesso.', 'success');
         $this->redirect($urlVolta);
+    }
+
+    /**
+     * Monta o relatório completo do evento de lançamento (com e sem nota),
+     * incluindo transferidos e filtros da tela.
+     *
+     * @param array<string,mixed> $bloco
+     * @param array<string,mixed> $origem
+     * @return array{
+     *   linhas:list<array<string,mixed>>,
+     *   filtros:array<string,mixed>,
+     *   opcoes:array<string,array<int|string,string>>,
+     *   totais:array{total:int,com_nota:int,sem_nota:int,transferidos:int}
+     * }
+     */
+    private function montarRelatorioLancamentoNotasAdmin(array $bloco, array $origem): array
+    {
+        $blocoId = (int) ($bloco['id'] ?? 0);
+        $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
+        $filtros = [
+            'professor_id' => (int) ($origem['professor_id'] ?? 0),
+            'professor_filtro' => trim((string) ($origem['professor_id'] ?? '')),
+            'materia_id' => (int) ($origem['materia_id'] ?? 0),
+            'turma_id' => (int) ($origem['turma_id'] ?? 0),
+            'aluno' => trim((string) ($origem['aluno'] ?? '')),
+            'situacao_nota' => (string) ($origem['situacao_nota'] ?? ''),
+            'transferido' => (string) ($origem['transferido'] ?? ''),
+        ];
+        if ($filtros['professor_filtro'] === 'coordenacao') {
+            $filtros['professor_id'] = 0;
+        }
+        if (!in_array($filtros['situacao_nota'], ['', 'com_nota', 'sem_nota'], true)) {
+            $filtros['situacao_nota'] = '';
+        }
+        if (!in_array($filtros['transferido'], ['', '1', '0'], true)) {
+            $filtros['transferido'] = '';
+        }
+
+        require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
+        $notasModel = new ExamBlockManualGrade();
+        $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
+        $mapExistente = [];
+        foreach ($existentes as $ln) {
+            $k = (int) ($ln['professor_id'] ?? 0) . '_'
+                . (int) ($ln['materia_id'] ?? 0) . '_'
+                . (int) ($ln['turma_id'] ?? 0) . '_'
+                . (int) ($ln['aluno_id'] ?? 0);
+            $mapExistente[$k] = $ln;
+        }
+
+        $combos = $this->combosLancamentoNotaBloco($bloco, 0);
+        $comboKeys = [];
+        foreach ($combos as $c) {
+            $comboKeys[(int) ($c['professor_id'] ?? 0) . '_' . (int) ($c['materia_id'] ?? 0)] = true;
+        }
+        // Inclui vínculos sem professor (coordenação) mesmo quando já existem combos com professor.
+        foreach ($bloco['professores'] ?? [] as $pe) {
+            $mid = (int) ($pe['materia_id'] ?? 0);
+            $pid = (int) ($pe['professor_id'] ?? 0);
+            if ($mid <= 0 || $pid > 0) {
+                continue;
+            }
+            $ck = '0_' . $mid;
+            if (isset($comboKeys[$ck])) {
+                continue;
+            }
+            $turmaIds = [];
+            foreach ($pe['turmas'] ?? [] as $t) {
+                $tid = is_array($t) ? (int) ($t['id'] ?? 0) : (int) $t;
+                if ($tid > 0) {
+                    $turmaIds[$tid] = $tid;
+                }
+            }
+            if ($turmaIds === []) {
+                continue;
+            }
+            $comboKeys[$ck] = true;
+            $combos[] = [
+                'professor_id' => 0,
+                'professor_nome' => (string) (($pe['professor_nome'] ?? '') !== '' ? $pe['professor_nome'] : 'Coordenação'),
+                'materia_id' => $mid,
+                'materia_nome' => (string) ($pe['materia_nome'] ?? ''),
+                'turma_ids' => array_values($turmaIds),
+            ];
+        }
+
+        $linhas = [];
+        $vistos = [];
+        foreach ($combos as $combo) {
+            $alunos = $this->alunosAtivosPorTurmas($combo['turma_ids'], $anoLetivoEvento);
+            foreach ($alunos as $al) {
+                $tid = (int) ($al['turma_id'] ?? 0);
+                $aid = (int) ($al['id'] ?? 0);
+                if ($tid <= 0 || $aid <= 0) {
+                    continue;
+                }
+                $pid = (int) ($combo['professor_id'] ?? 0);
+                $mid = (int) ($combo['materia_id'] ?? 0);
+                $k = $pid . '_' . $mid . '_' . $tid . '_' . $aid;
+                if (isset($vistos[$k])) {
+                    continue;
+                }
+                $vistos[$k] = true;
+                $ant = $mapExistente[$k] ?? null;
+                $linhas[] = [
+                    'professor_id' => $pid,
+                    'professor_nome' => (string) ($combo['professor_nome'] ?? ($ant['professor_nome'] ?? '')),
+                    'materia_id' => $mid,
+                    'materia_nome' => (string) ($combo['materia_nome'] ?? ($ant['materia_nome'] ?? '')),
+                    'turma_id' => $tid,
+                    'turma_nome' => (string) ($al['turma_nome'] ?? ($ant['turma_nome'] ?? '')),
+                    'aluno_id' => $aid,
+                    'aluno_nome' => (string) ($al['nome'] ?? ($ant['aluno_nome'] ?? '')),
+                    'transferido' => !empty($al['transferido']) ? 1 : (int) ($ant['transferido'] ?? 0),
+                    'nota' => $ant['nota'] ?? null,
+                    'observacao' => (string) ($ant['observacao'] ?? ''),
+                    'updated_at' => $ant['updated_at'] ?? null,
+                ];
+                unset($mapExistente[$k]);
+            }
+        }
+
+        // Notas órfãs (aluno saiu da turma, mas a nota permanece no relatório).
+        foreach ($mapExistente as $ln) {
+            $linhas[] = [
+                'professor_id' => (int) ($ln['professor_id'] ?? 0),
+                'professor_nome' => (string) ($ln['professor_nome'] ?? ''),
+                'materia_id' => (int) ($ln['materia_id'] ?? 0),
+                'materia_nome' => (string) ($ln['materia_nome'] ?? ''),
+                'turma_id' => (int) ($ln['turma_id'] ?? 0),
+                'turma_nome' => (string) ($ln['turma_nome'] ?? ''),
+                'aluno_id' => (int) ($ln['aluno_id'] ?? 0),
+                'aluno_nome' => (string) ($ln['aluno_nome'] ?? ''),
+                'transferido' => !empty($ln['transferido']) ? 1 : 0,
+                'nota' => $ln['nota'] ?? null,
+                'observacao' => (string) ($ln['observacao'] ?? ''),
+                'updated_at' => $ln['updated_at'] ?? null,
+            ];
+        }
+
+        $professoresFiltro = [];
+        $materiasFiltro = [];
+        $turmasFiltro = [];
+        $temCoordenacao = false;
+        foreach ($linhas as $ln) {
+            $pid = (int) ($ln['professor_id'] ?? 0);
+            $mid = (int) ($ln['materia_id'] ?? 0);
+            $tid = (int) ($ln['turma_id'] ?? 0);
+            if ($pid > 0) {
+                $professoresFiltro[$pid] = (string) ($ln['professor_nome'] ?? ('Professor #' . $pid));
+            } else {
+                $temCoordenacao = true;
+            }
+            if ($mid > 0) {
+                $materiasFiltro[$mid] = (string) ($ln['materia_nome'] ?? ('Matéria #' . $mid));
+            }
+            if ($tid > 0) {
+                $turmasFiltro[$tid] = (string) ($ln['turma_nome'] ?? ('Turma #' . $tid));
+            }
+        }
+        asort($professoresFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+        asort($materiasFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+        asort($turmasFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $alunoBusca = $filtros['aluno'] !== ''
+            ? mb_strtolower(AlunoLancamentoNotaHelper::normalizarNome($filtros['aluno']), 'UTF-8')
+            : '';
+        $filtroProfessorRaw = (string) ($filtros['professor_filtro'] ?? '');
+
+        $filtradas = array_values(array_filter($linhas, static function (array $ln) use ($filtros, $alunoBusca, $filtroProfessorRaw): bool {
+            if ($filtroProfessorRaw === 'coordenacao') {
+                if ((int) ($ln['professor_id'] ?? 0) !== 0) {
+                    return false;
+                }
+            } elseif ($filtros['professor_id'] > 0 && (int) ($ln['professor_id'] ?? 0) !== $filtros['professor_id']) {
+                return false;
+            }
+            if ($filtros['materia_id'] > 0 && (int) ($ln['materia_id'] ?? 0) !== $filtros['materia_id']) {
+                return false;
+            }
+            if ($filtros['turma_id'] > 0 && (int) ($ln['turma_id'] ?? 0) !== $filtros['turma_id']) {
+                return false;
+            }
+            $temNota = ($ln['nota'] !== null && $ln['nota'] !== '');
+            if ($filtros['situacao_nota'] === 'com_nota' && !$temNota) {
+                return false;
+            }
+            if ($filtros['situacao_nota'] === 'sem_nota' && $temNota) {
+                return false;
+            }
+            if ($filtros['transferido'] === '1' && empty($ln['transferido'])) {
+                return false;
+            }
+            if ($filtros['transferido'] === '0' && !empty($ln['transferido'])) {
+                return false;
+            }
+            if ($alunoBusca !== '') {
+                $nome = mb_strtolower(AlunoLancamentoNotaHelper::normalizarNome((string) ($ln['aluno_nome'] ?? '')), 'UTF-8');
+                if ($nome === '' || strpos($nome, $alunoBusca) === false) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+
+        usort($filtradas, static function (array $a, array $b): int {
+            $cmp = strcasecmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = strcasecmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcasecmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
+        });
+
+        $comNota = 0;
+        $semNota = 0;
+        $transferidos = 0;
+        foreach ($filtradas as $ln) {
+            if ($ln['nota'] !== null && $ln['nota'] !== '') {
+                $comNota++;
+            } else {
+                $semNota++;
+            }
+            if (!empty($ln['transferido'])) {
+                $transferidos++;
+            }
+        }
+
+        return [
+            'linhas' => $filtradas,
+            'filtros' => $filtros,
+            'opcoes' => [
+                'professores' => $professoresFiltro,
+                'materias' => $materiasFiltro,
+                'turmas' => $turmasFiltro,
+                'tem_coordenacao' => $temCoordenacao,
+            ],
+            'totais' => [
+                'total' => count($filtradas),
+                'com_nota' => $comNota,
+                'sem_nota' => $semNota,
+                'transferidos' => $transferidos,
+            ],
+        ];
     }
 
     /**
