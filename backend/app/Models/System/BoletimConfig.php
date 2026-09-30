@@ -1117,8 +1117,81 @@ class BoletimConfig
     }
 
     /**
-     * Fragmento SQL para ler só a versão vigente. Vazio se a coluna ainda não existir.
+     * Garante no máximo uma geração vigente por regra (independente do periodo_ref).
+     * Mantém a mais recente; as demais passam a histórico (vigente = 0).
+     * Usar na geração em lote — não chamar em GET de relatório.
+     *
+     * @return int Linhas de resultado afetadas
      */
+    public function consolidarVigenteUnicaPorRegra(?int $regraId = null): int
+    {
+        if (!$this->hasColumn('boletim_resultados_gerados', 'vigente')) {
+            return 0;
+        }
+
+        $params = [];
+        $filtroRegra = '';
+        if ($regraId !== null && $regraId > 0) {
+            $filtroRegra = ' AND regra_id = :regra_id';
+            $params['regra_id'] = $regraId;
+        }
+
+        $candidatos = $this->db->fetchAll(
+            "SELECT regra_id, periodo_ref, MAX(updated_at) AS updated_at
+             FROM boletim_resultados_gerados
+             WHERE preview = 0 AND vigente = 1{$filtroRegra}
+             GROUP BY regra_id, periodo_ref
+             ORDER BY regra_id ASC, updated_at DESC, periodo_ref DESC",
+            $params
+        ) ?: [];
+
+        $manterPorRegra = [];
+        foreach ($candidatos as $row) {
+            $rid = (int) ($row['regra_id'] ?? 0);
+            if ($rid <= 0 || isset($manterPorRegra[$rid])) {
+                continue;
+            }
+            $manterPorRegra[$rid] = (string) ($row['periodo_ref'] ?? '');
+        }
+        if ($manterPorRegra === []) {
+            return 0;
+        }
+
+        $afetadas = 0;
+        foreach ($manterPorRegra as $rid => $periodoKeep) {
+            if ($periodoKeep === '') {
+                continue;
+            }
+            $afetadas += (int) $this->db->update(
+                "UPDATE boletim_resultados_gerados
+                 SET vigente = 0
+                 WHERE regra_id = :regra_id
+                   AND preview = 0
+                   AND vigente = 1
+                   AND periodo_ref <> :periodo_ref",
+                [
+                    'regra_id' => (int) $rid,
+                    'periodo_ref' => $periodoKeep,
+                ]
+            );
+            if ($this->hasTable('boletim_geracoes') && $this->hasColumn('boletim_geracoes', 'vigente')) {
+                $this->db->update(
+                    "UPDATE boletim_geracoes
+                     SET vigente = 0
+                     WHERE regra_id = :regra_id
+                       AND vigente = 1
+                       AND periodo_ref <> :periodo_ref",
+                    [
+                        'regra_id' => (int) $rid,
+                        'periodo_ref' => $periodoKeep,
+                    ]
+                );
+            }
+        }
+
+        return $afetadas;
+    }
+
     public function sqlFiltroVigente(string $alias = 'g'): string
     {
         if (!$this->hasColumn('boletim_resultados_gerados', 'vigente')) {
@@ -1160,6 +1233,15 @@ class BoletimConfig
                  WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref AND vigente = 1",
                 ['regra_id' => $regraId, 'periodo_ref' => $periodoRef]
             );
+            // Uma vigente por regra: gerações com outro intervalo de datas deixam de ser oficiais.
+            $this->db->update(
+                "UPDATE boletim_geracoes
+                 SET vigente = 0
+                 WHERE regra_id = :regra_id AND periodo_ref <> :periodo_ref AND vigente = 1",
+                ['regra_id' => $regraId, 'periodo_ref' => $periodoRef]
+            );
+            // Limpa vigentes órfãs de RANGE antigo (mesma regra) antes do novo lote.
+            $this->consolidarVigenteUnicaPorRegra($regraId);
         }
 
         $id = (int) $this->db->insert(
@@ -1989,6 +2071,14 @@ class BoletimConfig
                     "UPDATE boletim_resultados_gerados
                      SET vigente = 0
                      WHERE regra_id = :regra_id AND periodo_ref = :periodo_ref
+                       AND preview = 0 AND vigente = 1 AND aluno_id IN ({$in['sql']})",
+                    $baseParams
+                );
+                // Mesma regra, outro RANGE de datas: deixa de ser oficial para esses alunos.
+                $this->db->update(
+                    "UPDATE boletim_resultados_gerados
+                     SET vigente = 0
+                     WHERE regra_id = :regra_id AND periodo_ref <> :periodo_ref
                        AND preview = 0 AND vigente = 1 AND aluno_id IN ({$in['sql']})",
                     $baseParams
                 );

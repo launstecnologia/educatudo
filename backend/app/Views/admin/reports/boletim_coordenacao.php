@@ -17,7 +17,9 @@ $queryExport = [
     'nota_abaixo_de' => $nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '',
     'materias_exibicao' => $materias_exibicao ?? 'todas',
     'assinatura' => !empty($incluir_assinatura) ? 1 : 0,
+    'incluir_antigas' => !empty($incluir_antigas) ? 1 : 0,
 ];
+$incluirAntigas = !empty($incluir_antigas);
 $formatNota = static function ($value, int $places): string {
     return is_numeric($value) ? number_format((float) $value, $places, ',', '.') : ((string) $value !== '' ? (string) $value : '—');
 };
@@ -66,13 +68,24 @@ include __DIR__ . '/../_partials/flash_message.php';
             <select name="evento" id="evento-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'evento' ? 'required' : '' ?>>
                 <option value="">Selecione...</option>
                 <?php foreach ((array) ($eventos ?? []) as $evento):
-                    $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']); ?>
+                    $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
+                    ?>
                     <option value="<?= htmlspecialchars($value) ?>" <?= ($evento_selecionado ?? '') === $value ? 'selected' : '' ?>>
                         <?= htmlspecialchars((string) ($evento['nome_exibicao'] ?? $evento['nome'])) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
             </span>
+            <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                <input type="checkbox" name="incluir_antigas" value="1" id="incluir-antigas-boletim-coord"
+                       class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                       <?= $incluirAntigas ? 'checked' : '' ?>
+                       onchange="this.form.submit()">
+                Incluir versões anteriores
+            </label>
+            <?php if ($incluirAntigas): ?>
+                <span class="block text-xs text-gray-500 mt-1">Vigente = oficial (aluno/pais/ficha). Anterior = histórico da mesma regra.</span>
+            <?php endif; ?>
             <?php if (empty($eventos)): ?>
                 <span class="block text-xs text-gray-500 mt-1">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</span>
             <?php endif; ?>

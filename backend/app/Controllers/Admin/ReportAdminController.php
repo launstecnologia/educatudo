@@ -273,6 +273,24 @@ class ReportAdminController extends AdminBaseController
                 : $this->montarRelatorioBoletimCoordenacao($regraId, $periodoRef, $turmaId, $notaAbaixoDe, $materiasExibicao);
         }
 
+        $incluirAntigas = !empty($_GET['incluir_antigas']);
+        $eventoSelecionado = (string) ($_GET['evento'] ?? '');
+        $eventos = $this->listarEventosBoletimCoordenacao($incluirAntigas);
+        if (!$incluirAntigas && $eventoSelecionado !== '') {
+            $temNaLista = false;
+            foreach ($eventos as $evLista) {
+                $valorLista = (int) ($evLista['regra_id'] ?? 0) . ':' . base64_encode((string) ($evLista['periodo_ref'] ?? ''));
+                if ($valorLista === $eventoSelecionado) {
+                    $temNaLista = true;
+                    break;
+                }
+            }
+            if (!$temNaLista) {
+                $incluirAntigas = true;
+                $eventos = $this->listarEventosBoletimCoordenacao(true);
+            }
+        }
+
         $flash = $this->getFlashMessage();
         $zipJob = $this->resolverZipJobBoletinsVidaEscolar();
         $this->viewWithLayout('admin', 'admin/reports/boletim_coordenacao', [
@@ -280,10 +298,11 @@ class ReportAdminController extends AdminBaseController
             'user' => $user,
             'current_page' => 'reports_boletim_coordenacao',
             'fonte' => $fonte,
-            'eventos' => $this->listarEventosBoletimCoordenacao(),
+            'eventos' => $eventos,
+            'incluir_antigas' => $incluirAntigas,
             'anos_letivos' => $this->listarAnosBoletimCoordenacao(),
             'turmas' => $this->db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome ASC") ?: [],
-            'evento_selecionado' => (string) ($_GET['evento'] ?? ''),
+            'evento_selecionado' => $eventoSelecionado,
             'ano_letivo' => $anoLetivo,
             'turma_id' => $turmaId,
             'nota_abaixo_de' => $notaAbaixoDe,
@@ -791,22 +810,65 @@ class ReportAdminController extends AdminBaseController
         }
     }
 
-    private function listarEventosBoletimCoordenacao(): array
+    private function listarEventosBoletimCoordenacao(bool $incluirAntigas = false): array
     {
-        $eventos = $this->db->fetchAll(
-            "SELECT g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em,
+        $sqlBase = "SELECT g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em,
                     COUNT(DISTINCT g.aluno_id) AS total_alunos,
                     GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome ASC SEPARATOR ', ') AS turmas_nomes,
-                    MAX(g.updated_at) AS updated_at
+                    MAX(g.updated_at) AS updated_at,
+                    %s
+                    MAX(g.vigente) AS vigente
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              INNER JOIN alunos a ON a.id = g.aluno_id
              LEFT JOIN turmas t ON t.id = a.turma_id
-             WHERE g.preview = 0 AND g.vigente = 1 AND r.ativo = 1
+             WHERE g.preview = 0 AND r.ativo = 1
                AND r.exibir_em IN ('boletim', 'notas') AND a.ativo = 1
              GROUP BY g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em
-             ORDER BY COALESCE(r.ano_letivo, 0) DESC, COALESCE(r.bimestre, 0) ASC, updated_at DESC, r.nome ASC"
-        ) ?: [];
+             ORDER BY COALESCE(r.ano_letivo, 0) DESC, COALESCE(r.bimestre, 0) ASC, updated_at DESC, r.nome ASC";
+        $eventos = [];
+        try {
+            $eventos = $this->db->fetchAll(sprintf($sqlBase, 'MAX(g.versao) AS versao,')) ?: [];
+        } catch (\Throwable $eVersao) {
+            $eventos = $this->db->fetchAll(sprintf($sqlBase, '1 AS versao,')) ?: [];
+        }
+
+        // Uma vigente por regra: a mais recente marcada vigente; demais viram "anterior" na UI.
+        $principalPorRegra = [];
+        foreach ($eventos as $ev) {
+            $rid = (int) ($ev['regra_id'] ?? 0);
+            if ($rid <= 0 || (int) ($ev['vigente'] ?? 0) !== 1) {
+                continue;
+            }
+            $atual = $principalPorRegra[$rid] ?? null;
+            $uNovo = strtotime((string) ($ev['updated_at'] ?? '')) ?: 0;
+            $uAtual = is_array($atual) ? (strtotime((string) ($atual['updated_at'] ?? '')) ?: 0) : -1;
+            if ($atual === null || $uNovo > $uAtual) {
+                $principalPorRegra[$rid] = $ev;
+            }
+        }
+        // Sem vigente marcada: usa a geração mais recente da regra.
+        foreach ($eventos as $ev) {
+            $rid = (int) ($ev['regra_id'] ?? 0);
+            if ($rid <= 0 || isset($principalPorRegra[$rid])) {
+                continue;
+            }
+            $melhor = null;
+            $melhorTs = -1;
+            foreach ($eventos as $ev2) {
+                if ((int) ($ev2['regra_id'] ?? 0) !== $rid) {
+                    continue;
+                }
+                $ts = strtotime((string) ($ev2['updated_at'] ?? '')) ?: 0;
+                if ($melhor === null || $ts > $melhorTs) {
+                    $melhor = $ev2;
+                    $melhorTs = $ts;
+                }
+            }
+            if (is_array($melhor)) {
+                $principalPorRegra[$rid] = $melhor;
+            }
+        }
 
         $seriesRows = $this->db->fetchAll(
             "SELECT id, nome, ordem FROM serie WHERE ativo = 1 ORDER BY ordem ASC, nome ASC"
@@ -827,7 +889,18 @@ class ReportAdminController extends AdminBaseController
         if (is_file($pathPeriodo)) {
             require_once $pathPeriodo;
         }
-        foreach ($eventos as &$evento) {
+
+        $saida = [];
+        foreach ($eventos as $evento) {
+            $rid = (int) ($evento['regra_id'] ?? 0);
+            $periodoRef = trim((string) ($evento['periodo_ref'] ?? ''));
+            $principal = $principalPorRegra[$rid] ?? null;
+            $ehPrincipal = is_array($principal)
+                && trim((string) ($principal['periodo_ref'] ?? '')) === $periodoRef;
+            if (!$incluirAntigas && !$ehPrincipal) {
+                continue;
+            }
+
             $ids = $this->parseIdsJsonBoletimCoordenacao($evento['series_ids'] ?? null);
             $nomes = [];
             $ordemMax = 0;
@@ -856,7 +929,6 @@ class ReportAdminController extends AdminBaseController
                 $rotuloPeriodo = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
             }
             if ($rotuloPeriodo === '') {
-                $periodoRef = trim((string) ($evento['periodo_ref'] ?? ''));
                 if ($periodoRef !== '') {
                     $rotuloPeriodo = $this->formatarPeriodoRefBoletimCoordenacao($periodoRef);
                 }
@@ -868,13 +940,22 @@ class ReportAdminController extends AdminBaseController
             if ($geradoEm !== '') {
                 $partes[] = 'Gerado em ' . $geradoEm;
             }
+            if ($ehPrincipal) {
+                $partes[] = 'Vigente';
+            } else {
+                $versao = (int) ($evento['versao'] ?? 0);
+                $partes[] = $versao > 0 ? ('Anterior (v' . $versao . ')') : 'Anterior';
+            }
+            $evento['eh_vigente'] = $ehPrincipal;
             $evento['nome_exibicao'] = implode(' · ', $partes);
             $evento['_serie_ordem'] = $ordemMax;
             $evento['_ano_ordem'] = $ano;
             $evento['_bim_ordem'] = $bimestre;
+            $evento['_vigente_ordem'] = $ehPrincipal ? 0 : 1;
+            $saida[] = $evento;
         }
-        unset($evento);
-        usort($eventos, static function (array $a, array $b): int {
+
+        usort($saida, static function (array $a, array $b): int {
             $cmp = ((int) ($b['_ano_ordem'] ?? 0)) <=> ((int) ($a['_ano_ordem'] ?? 0));
             if ($cmp !== 0) {
                 return $cmp;
@@ -887,9 +968,13 @@ class ReportAdminController extends AdminBaseController
             if ($cmp !== 0) {
                 return $cmp;
             }
+            $cmp = ((int) ($a['_vigente_ordem'] ?? 0)) <=> ((int) ($b['_vigente_ordem'] ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
             return strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
         });
-        return $eventos;
+        return $saida;
     }
 
     /**
@@ -943,21 +1028,57 @@ class ReportAdminController extends AdminBaseController
         if ($turmaId > 0) {
             $params['turma_id'] = $turmaId;
         }
-        $rows = $this->db->fetchAll(
-            "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
-                    a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
-                    r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo,
-                    o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
-             FROM boletim_resultados_gerados g
-             INNER JOIN boletim_regras r ON r.id = g.regra_id
-             INNER JOIN alunos a ON a.id = g.aluno_id
-             LEFT JOIN turmas t ON t.id = a.turma_id
-             LEFT JOIN boletim_observacoes o ON o.aluno_id = a.id
-             WHERE g.preview = 0 AND g.vigente = 1 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
-               AND a.ativo = 1{$whereTurma}
-             ORDER BY t.nome ASC, a.nome ASC, g.ordem_linha ASC, g.id ASC",
-            $params
-        ) ?: [];
+        $rows = [];
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
+                        a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
+                        r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo,
+                        o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
+                 FROM boletim_resultados_gerados g
+                 INNER JOIN boletim_regras r ON r.id = g.regra_id
+                 INNER JOIN alunos a ON a.id = g.aluno_id
+                 LEFT JOIN turmas t ON t.id = a.turma_id
+                 LEFT JOIN boletim_observacoes o ON o.aluno_id = a.id
+                 WHERE g.preview = 0 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
+                   AND a.ativo = 1{$whereTurma}
+                   AND g.versao = (
+                        SELECT MAX(g2.versao)
+                        FROM boletim_resultados_gerados g2
+                        WHERE g2.aluno_id = g.aluno_id
+                          AND g2.regra_id = g.regra_id
+                          AND g2.periodo_ref = g.periodo_ref
+                          AND g2.preview = 0
+                   )
+                 ORDER BY t.nome ASC, a.nome ASC, g.ordem_linha ASC, g.id ASC",
+                $params
+            ) ?: [];
+        } catch (\Throwable $eVersao) {
+            $rows = [];
+        }
+        if ($rows === []) {
+            // Fallback: vigente do período, ou qualquer linha do período (ambientes sem versão).
+            $rows = $this->db->fetchAll(
+                "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
+                        a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
+                        r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo,
+                        o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
+                 FROM boletim_resultados_gerados g
+                 INNER JOIN boletim_regras r ON r.id = g.regra_id
+                 INNER JOIN alunos a ON a.id = g.aluno_id
+                 LEFT JOIN turmas t ON t.id = a.turma_id
+                 LEFT JOIN boletim_observacoes o ON o.aluno_id = a.id
+                 WHERE g.preview = 0 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
+                   AND a.ativo = 1{$whereTurma}
+                   AND (g.vigente = 1 OR NOT EXISTS (
+                        SELECT 1 FROM boletim_resultados_gerados g3
+                        WHERE g3.aluno_id = g.aluno_id AND g3.regra_id = g.regra_id
+                          AND g3.periodo_ref = g.periodo_ref AND g3.preview = 0 AND g3.vigente = 1
+                   ))
+                 ORDER BY t.nome ASC, a.nome ASC, g.ordem_linha ASC, g.id ASC",
+                $params
+            ) ?: [];
+        }
 
         $columnsRaw = [];
         if ($rows !== []) {
