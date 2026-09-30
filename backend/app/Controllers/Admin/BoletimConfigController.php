@@ -4065,6 +4065,12 @@ class BoletimConfigController extends BaseController
                 }
 
                 $mapPorMateria = $this->valoresPorMateriaFromNotasLista($notasParaMatriz, $componente, $statsPorMateria);
+                $mapPorMateria = $this->completarMapaNotaUnicaBloco(
+                    $mapPorMateria,
+                    $rows,
+                    $materiasFiltro,
+                    $materiaNomesPorId
+                );
                 $roundModeComp = $this->resolveRoundModeComponente($componente, $roundMode);
                 $matrizPorCodigo[$codigo] = $this->applyRoundModeToMateriaMap($mapPorMateria, $roundModeComp);
 
@@ -4912,7 +4918,7 @@ class BoletimConfigController extends BaseController
             if ($blocoId > 0 && $profMid > 0) {
                 $materiasDoBloco[$blocoId][$profMid] = true;
             }
-            if ($blocoId <= 0 || empty($row['nota_unica_todas_materias'])) {
+            if ($blocoId <= 0 || (int) ($row['nota_unica_todas_materias'] ?? 0) !== 1) {
                 continue;
             }
             if (!isset($row['nota']) || $row['nota'] === '' || $row['nota'] === null) {
@@ -4963,6 +4969,88 @@ class BoletimConfigController extends BaseController
         }
 
         return $rows;
+    }
+
+    /**
+     * Garante ENAC/nota única nas matérias do bloco que ainda não têm valor na matriz
+     * (ex.: Leitura adicionada depois do lançamento).
+     *
+     * @param array<int, float|int|string|null> $map
+     * @param list<array<string,mixed>> $rows
+     * @param list<int> $materiasFiltro
+     * @param array<int, string> $materiaNomesPorId
+     * @return array<int, float|int|string|null>
+     */
+    private function completarMapaNotaUnicaBloco(
+        array $map,
+        array $rows,
+        array $materiasFiltro,
+        array &$materiaNomesPorId
+    ): array {
+        $basePorBloco = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            if ((int) ($row['nota_unica_todas_materias'] ?? 0) !== 1) {
+                continue;
+            }
+            $blocoId = (int) ($row['bloco_id'] ?? 0);
+            if ($blocoId <= 0 || !isset($row['nota']) || $row['nota'] === '' || $row['nota'] === null) {
+                continue;
+            }
+            if (!is_numeric($row['nota'])) {
+                continue;
+            }
+            if (!isset($basePorBloco[$blocoId])) {
+                $basePorBloco[$blocoId] = (float) $row['nota'];
+            }
+        }
+        if ($basePorBloco === []) {
+            return $map;
+        }
+
+        $idsFiltro = array_values(array_unique(array_filter(array_map('intval', $materiasFiltro), static fn ($id) => $id > 0)));
+        if ($idsFiltro !== []) {
+            $idsFiltro = $this->expandirMateriasComFilhos($idsFiltro);
+        }
+        $setFiltro = $idsFiltro !== [] ? array_fill_keys($idsFiltro, true) : null;
+
+        if (!is_array($this->materiasDisponiveisCache)) {
+            $this->materiasDisponiveisCache = $this->boletimConfig->getAvailableSubjects(1000);
+        }
+        $nomesById = [];
+        foreach ($this->materiasDisponiveisCache as $materia) {
+            $mid = (int) ($materia['id'] ?? 0);
+            if ($mid > 0) {
+                $nomesById[$mid] = trim((string) ($materia['nome'] ?? ''));
+            }
+        }
+
+        $vinculos = $this->materiasIdsDosBlocosNotaUnica(array_keys($basePorBloco));
+        foreach ($basePorBloco as $blocoId => $notaBase) {
+            foreach ((array) ($vinculos[$blocoId] ?? []) as $mid) {
+                $mid = (int) $mid;
+                if ($mid <= 0) {
+                    continue;
+                }
+                if ($setFiltro !== null && !isset($setFiltro[$mid])) {
+                    continue;
+                }
+                if (array_key_exists($mid, $map) && $map[$mid] !== null && is_numeric($map[$mid])) {
+                    continue;
+                }
+                $map[$mid] = $notaBase;
+                if (!isset($materiaNomesPorId[$mid]) || trim((string) $materiaNomesPorId[$mid]) === '') {
+                    $nome = (string) ($nomesById[$mid] ?? '');
+                    if ($nome !== '') {
+                        $materiaNomesPorId[$mid] = $nome;
+                    }
+                }
+            }
+        }
+
+        return $map;
     }
 
     /**
