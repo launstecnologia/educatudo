@@ -224,53 +224,14 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
             include dirname(__DIR__, 4) . '/Views/partials/boletim_simulacao_vistas.php';
             ?>
         <?php else: ?>
-            <table class="min-w-full text-sm">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500">Matéria</th>
-                        <?php foreach ($matrizColunas as $col): ?>
-                        <th class="px-3 py-2 text-left font-medium text-gray-500"><?= htmlspecialchars((string) ($col['nome'] ?? $col['label'] ?? $col['codigo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></th>
-                        <?php endforeach; ?>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <?php foreach ($matrizLinhas as $linha): ?>
-                    <?php
-                    $ehPaiGrupo = !empty($linha['eh_grupo_pai']);
-                    $ehFilhoGrupo = !empty($linha['eh_grupo_filho']);
-                    $clsMat = 'px-3 py-2 text-gray-900';
-                    if ($ehPaiGrupo) {
-                        $clsMat .= ' font-bold';
-                    }
-                    if ($ehFilhoGrupo) {
-                        $clsMat .= ' pl-7 text-gray-800';
-                    }
-                    ?>
-                    <tr class="<?= $ehPaiGrupo ? 'bg-indigo-50/40' : '' ?>">
-                        <td class="<?= $clsMat ?>">
-                            <?php if ($ehFilhoGrupo): ?>
-                                <span class="text-gray-400 mr-1" aria-hidden="true">↳</span>
-                            <?php endif; ?>
-                            <?= htmlspecialchars((string) ($linha['materia_nome'] ?? $linha['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                        </td>
-                        <?php
-                        $notasLin = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
-                        foreach ($matrizColunas as $col):
-                            $codM = (string) ($col['codigo'] ?? '');
-                            $nv = $notasLin[$codM] ?? null;
-                            if (is_array($nv)) {
-                                $nv = $nv['texto'] ?? $nv['valor'] ?? '—';
-                            }
-                            if ($nv === null || $nv === '') {
-                                $nv = '—';
-                            }
-                        ?>
-                            <td class="px-3 py-2 text-gray-700"><?= htmlspecialchars((string) $nv, ENT_QUOTES, 'UTF-8') ?></td>
-                        <?php endforeach; ?>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <?php
+            $cols = $matrizColunas;
+            $linhas = $matrizLinhas;
+            $decimalPlaces = 1;
+            $tituloTabelaSimples = 'Matérias';
+            $ocultar_grupo_hierarquia = false;
+            include dirname(__DIR__, 4) . '/Views/partials/boletim_quadro_tabela_simples.php';
+            ?>
         <?php endif; ?>
     </div>
 </div>

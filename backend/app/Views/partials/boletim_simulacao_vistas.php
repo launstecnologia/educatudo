@@ -52,54 +52,15 @@ $colsResumo = BoletimQuadroLayoutHelper::filtrarColunasResumoBoletim($colsVista)
         <?php if ($colsResumo === []): ?>
             <p class="text-sm text-gray-500">Não há colunas de resultado ou faltas neste evento.</p>
         <?php else: ?>
-            <div class="overflow-x-auto border border-gray-200 rounded-lg">
-                <div class="px-3 py-1.5 text-sm font-semibold border-b"
-                     style="background: var(--sidebar-bg-color, #1e3a5f); color: var(--sidebar-text-color, #fff); border-color: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 75%, #000);">
-                    Boletim (resultado e faltas)
-                </div>
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead style="background: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 12%, #fff);">
-                        <tr>
-                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide sticky left-0 z-10 border-r border-gray-200"
-                                style="color: var(--sidebar-bg-color, #1e3a5f); background: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 12%, #fff);">Matéria</th>
-                            <?php foreach ($colsResumo as $mc): ?>
-                                <?php $isFaltasCab = BoletimQuadroLayoutHelper::colunaEhFaltas($mc); ?>
-                                <th class="px-3 py-2 text-center text-xs font-semibold min-w-[5.5rem]"
-                                    style="color: var(--sidebar-bg-color, #1e3a5f);"
-                                    title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?>">
-                                    <span class="block truncate max-w-[8rem] mx-auto"><?= htmlspecialchars((string) ($mc['nome'] ?? $mc['codigo'] ?? '')) ?></span>
-                                    <?php if (!$isFaltasCab): ?>
-                                        <span class="block text-[10px] font-normal opacity-70 normal-case">Valor 10</span>
-                                    <?php endif; ?>
-                                </th>
-                            <?php endforeach; ?>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
-                        <?php foreach ($linhasVistaBoletim as $lin): ?>
-                            <?php $notasLin = is_array($lin['notas'] ?? null) ? $lin['notas'] : []; ?>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-3 py-2 font-medium text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-200"><?= htmlspecialchars((string) ($lin['materia_nome'] ?? '-')) ?></td>
-                                <?php foreach ($colsResumo as $mc):
-                                    $codM = (string) ($mc['codigo'] ?? '');
-                                    $nv = $notasLin[$codM] ?? null;
-                                    $isFaltasCol = BoletimQuadroLayoutHelper::colunaEhFaltas($mc);
-                                ?>
-                                    <td class="px-3 py-2 text-center <?= is_numeric($nv) ? 'text-emerald-700 font-semibold' : (is_string($nv) && trim($nv) !== '' ? 'text-slate-700 font-medium' : 'text-gray-400') ?>">
-                                        <?php if (is_numeric($nv)): ?>
-                                            <?= $isFaltasCol ? number_format((float) round((float) $nv), 0, ',', '.') : $fmtVista($nv) ?>
-                                        <?php elseif (is_string($nv) && trim($nv) !== ''): ?>
-                                            <?= htmlspecialchars($nv) ?>
-                                        <?php else: ?>
-                                            —
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endforeach; ?>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+            <?php
+            $cols = $colsResumo;
+            $linhas = $linhasVistaBoletim;
+            $decimalPlaces = $decVista;
+            $tituloTabelaSimples = 'Matérias';
+            // Vista Boletim: sem semanas e sem hierarquia de filhas (só a linha agrupada).
+            $ocultar_grupo_hierarquia = false;
+            include __DIR__ . '/boletim_quadro_tabela_simples.php';
+            ?>
         <?php endif; ?>
     </div>
 </div>
