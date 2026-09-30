@@ -1063,7 +1063,10 @@ class ExamController extends BaseController
             return;
         }
         $turmaIdList = array_keys($turmasIds);
-        $alunosFlat = $this->turmaModel->getAlunosByTurmasIds($turmaIdList);
+        require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosTeste(
+            $this->turmaModel->getAlunosByTurmasIds($turmaIdList)
+        );
         $porTurma = [];
         foreach ($alunosFlat as $a) {
             $tid = (int) ($a['turma_id'] ?? 0);
@@ -1165,7 +1168,10 @@ class ExamController extends BaseController
             return;
         }
         $alunosPermitidos = [];
-        $alunosFlat = $this->turmaModel->getAlunosByTurmasIds(array_keys($turmasPermitidas));
+        require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosTeste(
+            $this->turmaModel->getAlunosByTurmasIds(array_keys($turmasPermitidas))
+        );
         foreach ($alunosFlat as $a) {
             $tid = (int) ($a['turma_id'] ?? 0);
             $aid = (int) ($a['id'] ?? 0);
@@ -1271,7 +1277,9 @@ class ExamController extends BaseController
             if (empty($idsTurma)) {
                 continue;
             }
-            $alunosMid = $this->turmaModel->getAlunosByTurmasIds($idsTurma);
+            $alunosMid = AlunoLancamentoNotaHelper::filtrarAlunosTeste(
+                $this->turmaModel->getAlunosByTurmasIds($idsTurma)
+            );
             $linhasMid = [];
             foreach ($alunosMid as $a) {
                 $aid = (int) ($a['id'] ?? 0);

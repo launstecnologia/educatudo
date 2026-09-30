@@ -2245,7 +2245,7 @@ class TeacherExamController extends BaseController
                               AND ma.turma_id = t.id
                               AND ma.status = 'ativa'
                               AND ma.data_saida IS NULL
-                        ) OR a.turma_id = t.id THEN 0
+                        ) THEN 0
                         WHEN EXISTS (
                             SELECT 1 FROM matricula mt
                             WHERE mt.aluno_id = a.id

@@ -127,9 +127,19 @@ if ($slugArquivo === '') {
                     </tr>
                     <?php else: ?>
                         <?php foreach ($linhas as $ln): ?>
-                        <tr>
-                            <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($ln['turma_nome'] ?? '') ?></td>
-                            <td class="px-4 py-3 text-sm text-gray-900"><?= htmlspecialchars($ln['aluno_nome'] ?? '') ?></td>
+                        <?php $transferido = !empty($ln['transferido']); ?>
+                        <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : '' ?>">
+                            <td class="px-4 py-3 text-sm <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>"><?= htmlspecialchars($ln['turma_nome'] ?? '') ?></td>
+                            <td class="px-4 py-3 text-sm <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>">
+                                <?php if ($transferido): ?>
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
+                                        <span><?= htmlspecialchars($ln['aluno_nome'] ?? '') ?></span>
+                                    </span>
+                                <?php else: ?>
+                                    <?= htmlspecialchars($ln['aluno_nome'] ?? '') ?>
+                                <?php endif; ?>
+                            </td>
                             <td class="px-4 py-3 text-sm">
                                 <?php if ($ln['nota'] === null || $ln['nota'] === ''): ?>
                                     <span class="text-amber-700">—</span>

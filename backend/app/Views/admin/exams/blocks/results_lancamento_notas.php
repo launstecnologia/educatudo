@@ -33,11 +33,27 @@
                 </tr>
                 <?php else: ?>
                     <?php foreach ($notas_linhas as $ln): ?>
-                    <tr class="<?= ($ln['nota'] !== null && $ln['nota'] !== '' && (float)$ln['nota'] < 6) ? 'bg-red-50' : '' ?>">
+                    <?php
+                    $transferido = !empty($ln['transferido']);
+                    $nomeAluno = (string) ($ln['aluno_nome'] ?? '');
+                    $classeLinha = $transferido
+                        ? 'bg-gray-100 text-gray-500'
+                        : (($ln['nota'] !== null && $ln['nota'] !== '' && (float)$ln['nota'] < 6) ? 'bg-red-50' : '');
+                    ?>
+                    <tr class="<?= $classeLinha ?>">
                         <td class="px-3 py-2"><?= htmlspecialchars($ln['materia_nome'] ?? '') ?></td>
                         <td class="px-3 py-2"><?= htmlspecialchars($ln['professor_nome'] ?? '') ?></td>
                         <td class="px-3 py-2"><?= htmlspecialchars($ln['turma_nome'] ?? '') ?></td>
-                        <td class="px-3 py-2 font-medium"><?= htmlspecialchars($ln['aluno_nome'] ?? '') ?></td>
+                        <td class="px-3 py-2 font-medium">
+                            <?php if ($transferido): ?>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
+                                    <span><?= htmlspecialchars($nomeAluno) ?></span>
+                                </span>
+                            <?php else: ?>
+                                <?= htmlspecialchars($nomeAluno) ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-3 py-2">
                             <?php if ($ln['nota'] === null || $ln['nota'] === ''): ?>
                                 —

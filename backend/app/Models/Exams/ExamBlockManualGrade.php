@@ -162,9 +162,26 @@ class ExamBlockManualGrade
             return [];
         }
 
-        return $this->db->fetchAll(
+        $temMatricula = $this->tabelaAuxiliarExiste('matricula');
+        $transferidoSelect = $temMatricula
+            ? ", CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM matricula ma
+                        WHERE ma.aluno_id = n.aluno_id AND ma.turma_id = n.turma_id
+                          AND ma.status = 'ativa' AND ma.data_saida IS NULL
+                    ) THEN 0
+                    WHEN EXISTS (
+                        SELECT 1 FROM matricula mt
+                        WHERE mt.aluno_id = n.aluno_id AND mt.turma_id = n.turma_id
+                          AND mt.status = 'transferido'
+                    ) THEN 1
+                    ELSE 0
+                 END AS transferido"
+            : ', 0 AS transferido';
+
+        $rows = $this->db->fetchAll(
             'SELECT n.turma_id, n.aluno_id, n.nota, n.observacao,
-                    t.nome AS turma_nome, a.nome AS aluno_nome
+                    t.nome AS turma_nome, a.nome AS aluno_nome' . $transferidoSelect . '
              FROM provas_blocos_notas_lancadas n
              INNER JOIN alunos a ON a.id = n.aluno_id
              INNER JOIN turmas t ON t.id = n.turma_id
@@ -176,6 +193,8 @@ class ExamBlockManualGrade
                 'mid' => $materiaId,
             ]
         ) ?: [];
+
+        return $this->filtrarAlunosTesteNasNotas($rows);
     }
 
     /**
@@ -189,10 +208,27 @@ class ExamBlockManualGrade
             return [];
         }
 
-        return $this->db->fetchAll(
+        $temMatricula = $this->tabelaAuxiliarExiste('matricula');
+        $transferidoSelect = $temMatricula
+            ? ", CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM matricula ma
+                        WHERE ma.aluno_id = n.aluno_id AND ma.turma_id = n.turma_id
+                          AND ma.status = 'ativa' AND ma.data_saida IS NULL
+                    ) THEN 0
+                    WHEN EXISTS (
+                        SELECT 1 FROM matricula mt
+                        WHERE mt.aluno_id = n.aluno_id AND mt.turma_id = n.turma_id
+                          AND mt.status = 'transferido'
+                    ) THEN 1
+                    ELSE 0
+                 END AS transferido"
+            : ', 0 AS transferido';
+
+        $rows = $this->db->fetchAll(
             'SELECT n.professor_id, n.materia_id, n.turma_id, n.aluno_id, n.nota, n.observacao, n.updated_at,
                     pr.nome AS professor_nome, m.nome AS materia_nome,
-                    a.nome AS aluno_nome, t.nome AS turma_nome
+                    a.nome AS aluno_nome, t.nome AS turma_nome' . $transferidoSelect . '
              FROM provas_blocos_notas_lancadas n
              LEFT JOIN professores pr ON pr.id = n.professor_id
              LEFT JOIN materias m ON m.id = n.materia_id
@@ -202,6 +238,40 @@ class ExamBlockManualGrade
              ORDER BY m.nome ASC, pr.nome ASC, t.nome ASC, a.nome ASC',
             ['bloco_id' => $blocoId]
         ) ?: [];
+
+        return $this->filtrarAlunosTesteNasNotas($rows);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarAlunosTesteNasNotas(array $rows): array
+    {
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
+
+        return AlunoLancamentoNotaHelper::filtrarAlunosTeste($rows, 'aluno_nome');
+    }
+
+    private function tabelaAuxiliarExiste(string $tabela): bool
+    {
+        static $cache = [];
+        if (array_key_exists($tabela, $cache)) {
+            return $cache[$tabela];
+        }
+        if (!preg_match('/^[a-z0-9_]+$/i', $tabela)) {
+            $cache[$tabela] = false;
+            return false;
+        }
+        try {
+            $cache[$tabela] = $this->db->fetch("SHOW TABLES LIKE '{$tabela}'") !== false;
+        } catch (Exception $e) {
+            $cache[$tabela] = false;
+        }
+
+        return $cache[$tabela];
     }
 
     /**
@@ -387,7 +457,7 @@ class ExamBlockManualGrade
             return [];
         }
         $limite = max(1, min(500, $limite));
-        return $this->db->fetchAll(
+        $rows = $this->db->fetchAll(
             "SELECT l.*,
                     COALESCE(u.nome, 'Sistema') AS alterado_por_nome,
                     COALESCE(a.nome, CONCAT('Aluno #', l.aluno_id)) AS aluno_nome,
@@ -403,6 +473,8 @@ class ExamBlockManualGrade
              LIMIT {$limite}",
             ['bloco' => $blocoId]
         ) ?: [];
+
+        return $this->filtrarAlunosTesteNasNotas($rows);
     }
 
     private function notasDiferentes(?float $a, ?float $b): bool

@@ -1,7 +1,4 @@
 <?php
-if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
-}
 $bloco = $bloco ?? [];
 $linhas = $linhas ?? [];
 $materiasFiltro = $materias_filtro ?? [];
@@ -166,10 +163,7 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                             $nChamada = (int) ($ln['numero_chamada'] ?? 0);
                             $bloqueada = $temNota && !$edicaoDesbloqueada;
                             $transferido = !empty($ln['transferido']);
-                            $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
-                                (string) ($ln['aluno_nome'] ?? ''),
-                                $transferido
-                            );
+                            $nomeAluno = (string) ($ln['aluno_nome'] ?? '');
                             ?>
                             <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>" data-tem-nota="<?= $temNota ? '1' : '0' ?>">
                                 <?php if (!$notaUnicaTodasMaterias): ?>
@@ -182,7 +176,7 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                                     <?php if ($transferido): ?>
                                         <span class="inline-flex items-center gap-1.5">
                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
-                                            <span><?= htmlspecialchars(preg_replace('/^TR\s+/iu', '', $nomeAluno) ?: $nomeAluno) ?></span>
+                                            <span><?= htmlspecialchars($nomeAluno) ?></span>
                                         </span>
                                     <?php else: ?>
                                         <?= htmlspecialchars($nomeAluno) ?>
