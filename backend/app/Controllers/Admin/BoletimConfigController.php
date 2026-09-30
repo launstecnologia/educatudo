@@ -10750,15 +10750,11 @@ class BoletimConfigController extends BaseController
      */
     private function grupoRegrasNotasIdDaRegra(array $regra): int
     {
-        $raw = $regra['extras_json'] ?? '';
-        if (!is_string($raw) || trim($raw) === '') {
-            return 0;
+        $regraId = (int) ($regra['id'] ?? 0);
+        if ($regraId > 0) {
+            return $this->boletimConfig->garantirQuadroNotasNaRegra($regraId);
         }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            return 0;
-        }
-        return (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
+        return $this->boletimConfig->resolverGrupoRegrasNotasId($regra, 0);
     }
 
     /**

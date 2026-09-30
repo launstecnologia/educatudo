@@ -541,6 +541,15 @@ class GeradorAvaliacoesAnualService
                 'default_data_fim' => $periodo['fim'] ?? null,
             ]);
             $this->boletimConfig->alinharComponentesAoBimestre($novoId, $bim);
+            $this->boletimConfig->garantirQuadroNotasNaRegra($novoId);
+            // Se o modelo tinha quadro, forçar cópia explícita (mesmo quando já veio no extras).
+            $quadroModelo = $this->boletimConfig->resolverGrupoRegrasNotasId($modelo, $modeloRegraId);
+            if ($quadroModelo > 0) {
+                $this->boletimConfig->mesclarExtrasJson($novoId, [
+                    'grupo_regras_notas_id' => $quadroModelo,
+                    'quadro_notas_id' => $quadroModelo,
+                ]);
+            }
 
             if ($jaExiste && $regraAntigaId > 0) {
                 $this->desativarEventoSubstituido($regraAntigaId, $boletimId, $novoId);

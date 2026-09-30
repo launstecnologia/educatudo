@@ -1801,6 +1801,129 @@ class BoletimConfig
         return $n > 0;
     }
 
+    /**
+     * Quadro de Notas da regra: extras_json, senão colunas dos componentes, senão outro evento do mesmo boletim.
+     *
+     * @param array<string,mixed>|null $regra
+     */
+    public function resolverGrupoRegrasNotasId(?array $regra, int $regraId = 0): int
+    {
+        if (!is_array($regra) && $regraId > 0) {
+            $regra = $this->getRuleById($regraId);
+        }
+        if (!is_array($regra)) {
+            return 0;
+        }
+        $rid = (int) ($regra['id'] ?? $regraId);
+        $direto = (int) ($regra['grupo_regras_notas_id'] ?? $regra['quadro_notas_id'] ?? 0);
+        if ($direto > 0) {
+            return $direto;
+        }
+        $raw = $regra['extras_json'] ?? '';
+        if (is_array($raw)) {
+            $direto = (int) ($raw['grupo_regras_notas_id'] ?? $raw['quadro_notas_id'] ?? 0);
+        } elseif (is_string($raw) && trim($raw) !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $direto = (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
+            }
+        }
+        if ($direto > 0) {
+            return $direto;
+        }
+
+        $componentes = $regra['componentes'] ?? null;
+        if (!is_array($componentes) && $rid > 0) {
+            $componentes = $this->db->fetchAll(
+                'SELECT config_json FROM boletim_componentes WHERE regra_id = :rid AND ativo = 1 ORDER BY ordem ASC, id ASC',
+                ['rid' => $rid]
+            ) ?: [];
+        }
+        if (is_array($componentes)) {
+            $helper = __DIR__ . '/../../Helpers/BoletimQuadroLayoutHelper.php';
+            if (is_file($helper)) {
+                require_once $helper;
+            }
+            if (class_exists('BoletimQuadroLayoutHelper')) {
+                $fromCols = (int) BoletimQuadroLayoutHelper::grupoIdDasColunas($componentes);
+                if ($fromCols > 0) {
+                    return $fromCols;
+                }
+            }
+        }
+
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId <= 0 && $this->hasColumn('boletim_regras', 'boletim_id') && $rid > 0) {
+            $rowB = $this->db->fetch(
+                'SELECT boletim_id FROM boletim_regras WHERE id = :id LIMIT 1',
+                ['id' => $rid]
+            );
+            $boletimId = (int) ($rowB['boletim_id'] ?? 0);
+        }
+        if ($boletimId > 0 && $this->hasColumn('boletim_regras', 'boletim_id')) {
+            $irmas = $this->db->fetchAll(
+                "SELECT extras_json FROM boletim_regras
+                 WHERE ativo = 1 AND exibir_em = 'notas' AND boletim_id = :bid AND id <> :rid
+                 ORDER BY bimestre ASC, id ASC",
+                ['bid' => $boletimId, 'rid' => max(0, $rid)]
+            ) ?: [];
+            foreach ($irmas as $irma) {
+                $ex = json_decode((string) ($irma['extras_json'] ?? ''), true);
+                if (!is_array($ex)) {
+                    continue;
+                }
+                $gid = (int) ($ex['grupo_regras_notas_id'] ?? $ex['quadro_notas_id'] ?? 0);
+                if ($gid > 0) {
+                    return $gid;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Alias usado pelo BoletimConfigController / telas de geração.
+     *
+     * @param array<string,mixed> $regra
+     */
+    public function resolverQuadroNotasIdDaRegra(array $regra): int
+    {
+        return $this->resolverGrupoRegrasNotasId($regra, (int) ($regra['id'] ?? 0));
+    }
+
+    /**
+     * Garante grupo_regras_notas_id / quadro_notas_id em extras_json (herda de colunas ou irmãos do boletim).
+     */
+    public function garantirQuadroNotasNaRegra(int $regraId): int
+    {
+        if ($regraId <= 0) {
+            return 0;
+        }
+        $regra = $this->getRuleById($regraId);
+        $quadroId = $this->resolverGrupoRegrasNotasId($regra, $regraId);
+        if ($quadroId <= 0) {
+            return 0;
+        }
+        $atual = 0;
+        if (is_array($regra)) {
+            $raw = $regra['extras_json'] ?? '';
+            if (is_string($raw) && trim($raw) !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $atual = (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
+                }
+            }
+        }
+        if ($atual !== $quadroId) {
+            $this->mesclarExtrasJson($regraId, [
+                'grupo_regras_notas_id' => $quadroId,
+                'quadro_notas_id' => $quadroId,
+            ]);
+        }
+        return $quadroId;
+    }
+
     public function getAvailableSeries(int $limit = 200): array
     {
         $limit = max(1, min($limit, 1000));
