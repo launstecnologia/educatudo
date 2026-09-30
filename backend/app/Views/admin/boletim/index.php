@@ -912,18 +912,21 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <label class="block text-sm font-medium text-gray-700 mb-2">Visível para</label>
                     <div class="flex flex-wrap gap-4">
                         <label class="inline-flex items-center gap-2 text-sm text-gray-800">
-                            <input type="checkbox" name="vis_aluno" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_aluno']) || (int) $regra['vis_aluno'] === 1 ? 'checked' : '' ?>>
+                            <input type="checkbox" name="vis_aluno" id="vis-aluno-regra" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_aluno']) || (int) $regra['vis_aluno'] === 1 ? 'checked' : '' ?>>
                             <span>Aluno</span>
                         </label>
                         <label class="inline-flex items-center gap-2 text-sm text-gray-800">
-                            <input type="checkbox" name="vis_pais" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_pais']) || (int) $regra['vis_pais'] === 1 ? 'checked' : '' ?>>
+                            <input type="checkbox" name="vis_pais" id="vis-pais-regra" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_pais']) || (int) $regra['vis_pais'] === 1 ? 'checked' : '' ?>>
                             <span>Pais</span>
                         </label>
                         <label class="inline-flex items-center gap-2 text-sm text-gray-800">
-                            <input type="checkbox" name="vis_coordenacao" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_coordenacao']) || (int) $regra['vis_coordenacao'] === 1 ? 'checked' : '' ?>>
+                            <input type="checkbox" name="vis_coordenacao" id="vis-coordenacao-regra" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_coordenacao']) || (int) $regra['vis_coordenacao'] === 1 ? 'checked' : '' ?>>
                             <span>Coordenação</span>
                         </label>
                     </div>
+                    <?php if ($modoArquivo && (int) ($regra['id'] ?? 0) > 0): ?>
+                    <p class="text-xs text-gray-500 mt-3">Use o botão <strong>Salvar visibilidade</strong> abaixo desta caixa (neste modo a fórmula não é editável).</p>
+                    <?php endif; ?>
                 </div>
 
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -958,6 +961,32 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 </div>
                 <?php endif; ?>
             </form>
+            <?php if ($modoArquivo && (int) ($regra['id'] ?? 0) > 0): ?>
+            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/visibilidade-regra" class="mt-3 p-4 bg-white rounded-xl border border-indigo-100 shadow-sm" id="form-salvar-visibilidade-arquivo">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="regra_id" value="<?= (int) $regra['id'] ?>">
+                <input type="hidden" name="retorno" value="<?= htmlspecialchars('/admin/boletim-configuracao?regra_id=' . (int) $regra['id'] . '&arquivo=1', ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="vis_aluno" id="vis-aluno-hidden" value="0">
+                <input type="hidden" name="vis_pais" id="vis-pais-hidden" value="0">
+                <input type="hidden" name="vis_coordenacao" id="vis-coordenacao-hidden" value="0">
+                <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Salvar visibilidade</button>
+                <p class="text-xs text-gray-500 mt-2">Grava só Aluno / Pais / Coordenação. A fórmula desta tela não é alterada.</p>
+            </form>
+            <script>
+            (function () {
+                var form = document.getElementById('form-salvar-visibilidade-arquivo');
+                if (!form) return;
+                form.addEventListener('submit', function () {
+                    var a = document.getElementById('vis-aluno-regra');
+                    var p = document.getElementById('vis-pais-regra');
+                    var c = document.getElementById('vis-coordenacao-regra');
+                    document.getElementById('vis-aluno-hidden').value = (a && a.checked) ? '1' : '0';
+                    document.getElementById('vis-pais-hidden').value = (p && p.checked) ? '1' : '0';
+                    document.getElementById('vis-coordenacao-hidden').value = (c && c.checked) ? '1' : '0';
+                });
+            })();
+            </script>
+            <?php endif; ?>
         </div>
 
         <div class="xl:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200">

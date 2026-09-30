@@ -1698,7 +1698,7 @@ class BoletimConfigController extends BaseController
         $this->assertCsrfOrRedirect();
 
         $regraId = isset($_POST['regra_id']) ? (int) $_POST['regra_id'] : 0;
-        $visivel = isset($_POST['visivel']) ? (int) $_POST['visivel'] : 0;
+        $retorno = trim((string) ($_POST['retorno'] ?? ''));
         if ($regraId <= 0) {
             $_SESSION['boletim_flash'] = 'Informe um evento válido para alterar a visibilidade.';
             $_SESSION['boletim_flash_type'] = 'error';
@@ -1706,15 +1706,43 @@ class BoletimConfigController extends BaseController
             return;
         }
 
-        $ok = $this->boletimConfig->updateRuleVisibility($regraId, $visivel, $visivel, null);
-        if ($ok) {
-            $_SESSION['boletim_flash'] = $visivel
-                ? 'Evento liberado para alunos e pais visualizarem.'
-                : 'Evento ocultado para alunos e pais.';
-            $_SESSION['boletim_flash_type'] = 'success';
+        $temVisDetalhada = array_key_exists('vis_aluno', $_POST)
+            || array_key_exists('vis_pais', $_POST)
+            || array_key_exists('vis_coordenacao', $_POST);
+
+        if ($temVisDetalhada) {
+            $visAluno = !empty($_POST['vis_aluno']) ? 1 : 0;
+            $visPais = !empty($_POST['vis_pais']) ? 1 : 0;
+            $visCoordenacao = !empty($_POST['vis_coordenacao']) ? 1 : 0;
+            $ok = $this->boletimConfig->updateRuleVisibility($regraId, $visAluno, $visPais, $visCoordenacao);
+            if ($ok) {
+                $_SESSION['boletim_flash'] = 'Visibilidade do evento atualizada.';
+                $_SESSION['boletim_flash_type'] = 'success';
+            } else {
+                $_SESSION['boletim_flash'] = 'Não foi possível alterar a visibilidade do evento.';
+                $_SESSION['boletim_flash_type'] = 'error';
+            }
         } else {
-            $_SESSION['boletim_flash'] = 'Não foi possível alterar a visibilidade do evento.';
-            $_SESSION['boletim_flash_type'] = 'error';
+            $visivel = isset($_POST['visivel']) ? (int) $_POST['visivel'] : 0;
+            $ok = $this->boletimConfig->updateRuleVisibility($regraId, $visivel, $visivel, null);
+            if ($ok) {
+                $_SESSION['boletim_flash'] = $visivel
+                    ? 'Evento liberado para alunos e pais visualizarem.'
+                    : 'Evento ocultado para alunos e pais.';
+                $_SESSION['boletim_flash_type'] = 'success';
+            } else {
+                $_SESSION['boletim_flash'] = 'Não foi possível alterar a visibilidade do evento.';
+                $_SESSION['boletim_flash_type'] = 'error';
+            }
+        }
+
+        if ($retorno !== '' && $retorno[0] === '/'
+            && !str_contains($retorno, '//')
+            && !str_contains($retorno, '..')
+            && preg_match('#^/admin/boletim-configuracao\?regra_id=[0-9]+&arquivo=1$#', $retorno)
+        ) {
+            $this->redirect($retorno);
+            return;
         }
 
         $this->redirect('/admin/boletim');
