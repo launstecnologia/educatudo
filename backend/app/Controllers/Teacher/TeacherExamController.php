@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../Models/Exams/TeacherExam.php';
 require_once __DIR__ . '/../../Models/Exams/Exam.php';
 require_once __DIR__ . '/../../Models/Exams/ExamBlock.php';
 require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
+require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
 
 class TeacherExamController extends BaseController
 {
@@ -1771,6 +1772,7 @@ class TeacherExamController extends BaseController
                     'sexo' => (string) ($al['sexo'] ?? ''),
                     'aluno_id' => $aid,
                     'aluno_nome' => (string) ($al['nome'] ?? ''),
+                    'transferido' => !empty($al['transferido']) ? 1 : 0,
                     'nota' => $ant['nota'],
                     'observacao' => $ant['observacao'],
                 ];
@@ -2235,8 +2237,25 @@ class TeacherExamController extends BaseController
         $temMatricula = $this->tabelaTenantExiste('matricula');
 
         if ($temMatricula) {
+            $camposComTransferido = $campos . ",
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM matricula ma
+                            WHERE ma.aluno_id = a.id
+                              AND ma.turma_id = t.id
+                              AND ma.status = 'ativa'
+                              AND ma.data_saida IS NULL
+                        ) OR a.turma_id = t.id THEN 0
+                        WHEN EXISTS (
+                            SELECT 1 FROM matricula mt
+                            WHERE mt.aluno_id = a.id
+                              AND mt.turma_id = t.id
+                              AND mt.status = 'transferido'
+                        ) THEN 1
+                        ELSE 0
+                    END AS transferido";
             $rows = $this->db->fetchAll(
-                "SELECT DISTINCT {$campos}
+                "SELECT DISTINCT {$camposComTransferido}
                  FROM turmas t
                  INNER JOIN alunos a ON (
                      a.turma_id = t.id
@@ -2244,22 +2263,30 @@ class TeacherExamController extends BaseController
                          SELECT 1 FROM matricula m
                          WHERE m.aluno_id = a.id
                            AND m.turma_id = t.id
-                           AND m.status = 'ativa'
-                           AND m.data_saida IS NULL
+                           AND m.status IN ('ativa', 'transferido')
+                           AND (m.status <> 'ativa' OR m.data_saida IS NULL)
                      )
                  )
                  {$serieJoin}
                  {$chamadaJoin}
                  WHERE t.id IN ($placeholders)
-                   AND (a.ativo = 1 OR a.ativo IS NULL)
+                   AND (
+                        a.ativo = 1 OR a.ativo IS NULL
+                        OR EXISTS (
+                            SELECT 1 FROM matricula mx
+                            WHERE mx.aluno_id = a.id
+                              AND mx.turma_id = t.id
+                              AND mx.status = 'transferido'
+                        )
+                   )
                  ORDER BY t.nome ASC, a.nome ASC",
                 $params
             );
-            return is_array($rows) ? $rows : [];
+            return $this->filtrarAlunosLancamentoNota(is_array($rows) ? $rows : []);
         }
 
         $rows = $this->db->fetchAll(
-            "SELECT {$campos}
+            "SELECT {$campos}, 0 AS transferido
              FROM alunos a
              INNER JOIN turmas t ON t.id = a.turma_id
              {$serieJoin}
@@ -2269,7 +2296,16 @@ class TeacherExamController extends BaseController
              ORDER BY t.nome ASC, a.nome ASC",
             $params
         );
-        return is_array($rows) ? $rows : [];
+        return $this->filtrarAlunosLancamentoNota(is_array($rows) ? $rows : []);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $alunos
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarAlunosLancamentoNota(array $alunos): array
+    {
+        return AlunoLancamentoNotaHelper::filtrarAlunosTeste($alunos, 'nome');
     }
 
     private function alunosTemColuna(string $coluna): bool

@@ -1,4 +1,7 @@
 <?php
+if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
+}
 $bloco = $bloco ?? [];
 $linhas = $linhas ?? [];
 $materiasFiltro = $materias_filtro ?? [];
@@ -162,15 +165,29 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                             $notaStr = $temNota ? number_format((float) $ln['nota'], 2, '.', '') : '';
                             $nChamada = (int) ($ln['numero_chamada'] ?? 0);
                             $bloqueada = $temNota && !$edicaoDesbloqueada;
+                            $transferido = !empty($ln['transferido']);
+                            $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                                (string) ($ln['aluno_nome'] ?? ''),
+                                $transferido
+                            );
                             ?>
-                            <tr class="hover:bg-gray-50" data-tem-nota="<?= $temNota ? '1' : '0' ?>">
+                            <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>" data-tem-nota="<?= $temNota ? '1' : '0' ?>">
                                 <?php if (!$notaUnicaTodasMaterias): ?>
-                                <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars((string) ($ln['materia_nome'] ?? '')) ?></td>
-                                <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars((string) ($ln['professor_nome'] ?? '')) ?></td>
+                                <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['materia_nome'] ?? '')) ?></td>
+                                <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['professor_nome'] ?? '')) ?></td>
                                 <?php endif; ?>
-                                <td class="px-4 py-3 text-gray-700"><?= htmlspecialchars((string) ($ln['turma_nome'] ?? '')) ?></td>
-                                <td class="px-4 py-3 text-center text-gray-700 font-semibold"><?= $nChamada > 0 ? $nChamada : '—' ?></td>
-                                <td class="px-4 py-3 text-gray-900 font-medium"><?= htmlspecialchars((string) ($ln['aluno_nome'] ?? '')) ?></td>
+                                <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['turma_nome'] ?? '')) ?></td>
+                                <td class="px-4 py-3 text-center <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?> font-semibold"><?= $nChamada > 0 ? $nChamada : '—' ?></td>
+                                <td class="px-4 py-3 font-medium <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>">
+                                    <?php if ($transferido): ?>
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
+                                            <span><?= htmlspecialchars(preg_replace('/^TR\s+/iu', '', $nomeAluno) ?: $nomeAluno) ?></span>
+                                        </span>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($nomeAluno) ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-1.5">
                                         <input type="text"
