@@ -27,9 +27,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
     <?php if ($eventosModelo === []): ?>
         <div class="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm mb-6">
-            Cadastre a primeira avaliação deste modelo em
-            <a href="<?= URL ?>/admin/boletim-configuracao?novo=1" class="underline">Avaliações</a>
-            para usá-la como modelo da duplicação.
+            Não há evento vigente de notas para usar como modelo. Gere um em
+            <a href="<?= URL ?>/admin/boletim-configuracao" class="underline">Notas da Coordenação</a>
+            ou cadastre a primeira avaliação em
+            <a href="<?= URL ?>/admin/boletim-configuracao?novo=1" class="underline">Avaliações</a>.
         </div>
     <?php endif; ?>
 
@@ -76,11 +77,11 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <select name="modelo_regra_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white" <?= $eventosModelo === [] ? 'disabled' : '' ?>>
                 <?php foreach ($eventosModelo as $ev): ?>
                     <option value="<?= (int) ($ev['id'] ?? 0) ?>" <?= $modeloRegraId === (int) ($ev['id'] ?? 0) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string) ($ev['nome'] ?? ('#' . (int) ($ev['id'] ?? 0))), ENT_QUOTES, 'UTF-8') ?>
-                        <?php if (!empty($ev['bimestre'])): ?> — <?= (int) $ev['bimestre'] ?>º bim.<?php endif; ?>
+                        <?= htmlspecialchars((string) ($ev['nome_exibicao'] ?? $ev['nome'] ?? ('#' . (int) ($ev['id'] ?? 0))), ENT_QUOTES, 'UTF-8') ?>
                     </option>
                 <?php endforeach; ?>
             </select>
+            <p class="text-xs text-gray-500 mt-1">Escolha o evento vigente (como em Notas da Coordenação) cuja estrutura deve ser copiada para os bimestres faltantes.</p>
         </div>
         <div class="flex items-center gap-3">
             <button type="submit" class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90" <?= $eventosModelo === [] ? 'disabled' : '' ?>>

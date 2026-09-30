@@ -154,8 +154,6 @@ class BoletimCadastroAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
-        require_once __DIR__ . '/../Services/GeradorAvaliacoesAnualService.php';
-        $id = (int) $id;
         $gerador = new \App\Modulos\Boletins\Services\GeradorAvaliacoesAnualService();
         $prev = $gerador->previsualizar($id, (int) ($_GET['ano_letivo'] ?? 0));
         if (empty($prev['ok'])) {
@@ -163,9 +161,17 @@ class BoletimCadastroAdminController extends AdminBaseController
             $this->redirect('/admin/boletins');
             return;
         }
-        $cfg = new BoletimConfig();
-        $eventos = $cfg->listarEventosNotasDoBoletim($id);
-        $modeloRegraId = (int) ($eventos[0]['id'] ?? 0);
+        $eventos = $gerador->listarEventosModelo($id, (int) ($prev['ano'] ?? 0));
+        $modeloRegraId = 0;
+        foreach ($eventos as $evModelo) {
+            if (!empty($evModelo['eh_vigente'])) {
+                $modeloRegraId = (int) ($evModelo['id'] ?? 0);
+                break;
+            }
+        }
+        if ($modeloRegraId <= 0) {
+            $modeloRegraId = (int) ($eventos[0]['id'] ?? 0);
+        }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/boletins/gerar-avaliacoes', [
             'title' => 'Gerar avaliações do ano — EducaTudo',

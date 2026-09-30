@@ -201,6 +201,208 @@ class GeradorAvaliacoesAnualService
     }
 
     /**
+     * Eventos que podem servir de modelo na duplicação anual.
+     * Inclui os já ligados ao boletim e também notas vigentes da mesma série/ano
+     * (como em Notas da Coordenação), para copiar exatamente aquele evento.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listarEventosModelo(int $boletimId, int $anoLetivo = 0): array
+    {
+        $boletim = $this->boletim->findById($boletimId);
+        if ($boletim === null) {
+            return [];
+        }
+        $ano = $anoLetivo > 0 ? $anoLetivo : (int) ($boletim['ano_letivo'] ?? date('Y'));
+        $seriesBoletim = array_values(array_filter(
+            array_map('intval', (array) ($boletim['series_ids'] ?? [])),
+            static fn ($id) => $id > 0
+        ));
+
+        $porId = [];
+        foreach ($this->boletimConfig->listarEventosNotasDoBoletim($boletimId) as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $rid = (int) ($ev['id'] ?? 0);
+            if ($rid <= 0) {
+                continue;
+            }
+            $porId[$rid] = $ev;
+            $porId[$rid]['_origem'] = 'boletim';
+        }
+
+        // Eventos com geração vigente (mesmo critério da coordenação).
+        try {
+            $temBoletimCol = (bool) $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'boletim_id'");
+            $selBoletim = $temBoletimCol ? 'r.boletim_id' : 'NULL AS boletim_id';
+            $groupBoletim = $temBoletimCol ? ', r.boletim_id' : '';
+            $temVigente = (bool) $this->db->fetch(
+                "SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'vigente'"
+            );
+            $filtroVigente = $temVigente ? ' AND g.vigente = 1' : '';
+            $rowsGerados = $this->db->fetchAll(
+                "SELECT r.id, r.nome, r.codigo, r.bimestre, r.ano_letivo, r.series_ids, {$selBoletim},
+                        r.default_data_inicio, r.default_data_fim,
+                        MAX(g.updated_at) AS gerado_em
+                 FROM boletim_resultados_gerados g
+                 INNER JOIN boletim_regras r ON r.id = g.regra_id
+                 WHERE g.preview = 0 AND r.ativo = 1 AND r.exibir_em = 'notas'{$filtroVigente}
+                 GROUP BY r.id, r.nome, r.codigo, r.bimestre, r.ano_letivo, r.series_ids{$groupBoletim},
+                          r.default_data_inicio, r.default_data_fim
+                 ORDER BY gerado_em DESC"
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('[GeradorAvaliacoesAnual] listarEventosModelo vigentes: ' . $e->getMessage());
+            $rowsGerados = [];
+        }
+
+        foreach ($rowsGerados as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $rid = (int) ($ev['id'] ?? 0);
+            if ($rid <= 0) {
+                continue;
+            }
+            $anoEv = (int) ($ev['ano_letivo'] ?? 0);
+            if ($ano > 0 && $anoEv > 0 && $anoEv !== $ano) {
+                continue;
+            }
+            $seriesEv = $this->parseIdsJson($ev['series_ids'] ?? '');
+            if ($seriesBoletim !== [] && $seriesEv !== [] && count(array_intersect($seriesBoletim, $seriesEv)) === 0) {
+                continue;
+            }
+            if (!isset($porId[$rid])) {
+                $porId[$rid] = $ev;
+                $porId[$rid]['_origem'] = 'vigente';
+            } else {
+                $porId[$rid]['gerado_em'] = $ev['gerado_em'] ?? ($porId[$rid]['gerado_em'] ?? null);
+                if (($porId[$rid]['_origem'] ?? '') === 'boletim') {
+                    $porId[$rid]['_origem'] = 'boletim_vigente';
+                }
+            }
+        }
+
+        $seriesById = $this->mapSeriesPorId();
+
+        $saida = [];
+        foreach ($porId as $ev) {
+            $nome = trim((string) ($ev['nome'] ?? 'Evento'));
+            $anoEv = (int) ($ev['ano_letivo'] ?? 0);
+            $bim = (int) ($ev['bimestre'] ?? 0);
+            $seriesEv = $this->parseIdsJson($ev['series_ids'] ?? '');
+            $nomesSerie = [];
+            foreach ($seriesEv as $sid) {
+                $nSerie = trim((string) ($seriesById[$sid] ?? ''));
+                if ($nSerie !== '') {
+                    $nomesSerie[] = $nSerie;
+                }
+            }
+            $seriesLabel = implode(' e ', $nomesSerie);
+            $titulo = 'Notas — ' . $nome;
+            if ($seriesLabel !== '' && mb_stripos($nome, $seriesLabel) === false) {
+                $titulo .= ' ' . $seriesLabel;
+            }
+            $partes = [$titulo];
+            if ($anoEv > 0) {
+                $partes[] = (string) $anoEv;
+            }
+            if ($bim > 0) {
+                $partes[] = self::nomeBimestre($bim, $anoEv > 0 ? $anoEv : $ano);
+            }
+            $geradoEm = trim((string) ($ev['gerado_em'] ?? ''));
+            if ($geradoEm !== '') {
+                $ts = strtotime($geradoEm);
+                if ($ts !== false) {
+                    $partes[] = 'Gerado em ' . date('d/m/Y H:i', $ts);
+                }
+            }
+            $origem = (string) ($ev['_origem'] ?? '');
+            if ($origem === 'vigente' || $origem === 'boletim_vigente') {
+                $partes[] = 'Vigente';
+                $ev['eh_vigente'] = true;
+            } else {
+                $ev['eh_vigente'] = false;
+            }
+            $ev['nome_exibicao'] = implode(' · ', $partes);
+            $ev['_ordem_vigente'] = !empty($ev['eh_vigente']) ? 0 : 1;
+            $saida[] = $ev;
+        }
+
+        usort($saida, static function (array $a, array $b): int {
+            $cmp = ((int) ($a['_ordem_vigente'] ?? 1)) <=> ((int) ($b['_ordem_vigente'] ?? 1));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $cmp = ((int) ($a['bimestre'] ?? 0)) <=> ((int) ($b['bimestre'] ?? 0));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcmp((string) ($b['gerado_em'] ?? ''), (string) ($a['gerado_em'] ?? ''));
+        });
+
+        return $saida;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<int>
+     */
+    private function parseIdsJson($raw): array
+    {
+        if (is_array($raw)) {
+            $out = [];
+            foreach ($raw as $v) {
+                $id = (int) $v;
+                if ($id > 0) {
+                    $out[$id] = $id;
+                }
+            }
+            return array_values($out);
+        }
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $v) {
+            $id = (int) $v;
+            if ($id > 0) {
+                $out[$id] = $id;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function mapSeriesPorId(): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT id, nome FROM serie WHERE ativo = 1 ORDER BY ordem ASC, nome ASC'
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $map = [];
+        foreach ($rows as $row) {
+            $sid = (int) ($row['id'] ?? 0);
+            if ($sid <= 0) {
+                continue;
+            }
+            $map[$sid] = trim((string) ($row['nome'] ?? ''));
+        }
+        return $map;
+    }
+
+    /**
      * @return array{success:bool,error?:string,criados?:list<int>,ignorados?:list<int>}
      */
     public function gerar(int $boletimId, int $modeloRegraId, int $anoLetivo = 0): array
@@ -209,12 +411,23 @@ class GeradorAvaliacoesAnualService
         if (!is_array($modelo) || (int) ($modelo['id'] ?? 0) <= 0) {
             return ['success' => false, 'error' => 'Escolha um evento modelo para duplicar (crie a primeira avaliação do modelo).'];
         }
-        $modeloBoletimId = (int) ($modelo['boletim_id'] ?? 0);
-        if ($modeloBoletimId !== $boletimId) {
-            return ['success' => false, 'error' => 'O evento modelo precisa pertencer a este modelo de boletim.'];
+        if (strtolower(trim((string) ($modelo['exibir_em'] ?? ''))) !== 'notas') {
+            return ['success' => false, 'error' => 'O evento modelo precisa ser do tipo Notas.'];
         }
+        // Permite copiar de evento vigente de outro cadastro; as cópias ligam a este boletim.
         if ($anoLetivo <= 0) {
             $anoLetivo = (int) ($modelo['ano_letivo'] ?? 0);
+        }
+        $permitidos = $this->listarEventosModelo($boletimId, $anoLetivo);
+        $idsPermitidos = [];
+        foreach ($permitidos as $evPermitido) {
+            $rid = (int) ($evPermitido['id'] ?? 0);
+            if ($rid > 0) {
+                $idsPermitidos[$rid] = true;
+            }
+        }
+        if (!isset($idsPermitidos[$modeloRegraId])) {
+            return ['success' => false, 'error' => 'O evento modelo escolhido não está disponível para este boletim.'];
         }
         $prev = $this->previsualizar($boletimId, $anoLetivo);
         if (empty($prev['ok'])) {
@@ -222,6 +435,12 @@ class GeradorAvaliacoesAnualService
         }
 
         $ano = (int) $prev['ano'];
+        $nomeBaseModelo = trim((string) ($modelo['nome'] ?? ''));
+        $nomeBaseModelo = preg_replace('/\s*[—\-]\s*\d+[ºoª]?\s*(bim|bimestre).*$/iu', '', $nomeBaseModelo) ?? $nomeBaseModelo;
+        $nomeBaseModelo = trim($nomeBaseModelo);
+        if ($nomeBaseModelo === '') {
+            $nomeBaseModelo = trim((string) ($prev['boletim']['nome'] ?? 'Avaliação'));
+        }
         $criados = [];
         $ignorados = [];
         foreach ($prev['periodos'] as $periodo) {
@@ -238,7 +457,7 @@ class GeradorAvaliacoesAnualService
                 return ['success' => false, 'error' => 'Não foi possível duplicar o evento modelo.'];
             }
             $this->boletimConfig->setBoletimId($novoId, $boletimId);
-            $nome = trim((string) ($prev['boletim']['nome'] ?? 'Avaliação')) . ' — ' . self::nomeBimestre($bim, $ano);
+            $nome = $nomeBaseModelo . ' — ' . self::nomeBimestre($bim, $ano);
             $codigo = $this->boletimConfig->codigoUnicoPara('avaliacao-' . $ano . '-b' . $bim);
             $this->boletimConfig->atualizarEventoGerado($novoId, [
                 'nome' => $nome,
