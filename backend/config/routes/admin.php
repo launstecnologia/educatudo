@@ -364,6 +364,7 @@ $router->post('/admin/boletim-configuracao/visibilidade-regra', 'Admin/BoletimCo
 $router->post('/admin/boletim-configuracao/notas-manuais', 'Admin/BoletimConfigController@salvarNotasManuais');
 $router->post('/admin/boletim-configuracao/nota-manual-materia-ajax', 'Admin/BoletimConfigController@salvarNotaManualMateriaAjax');
 $router->post('/admin/boletim-configuracao/gerar-boletins', 'Admin/BoletimConfigController@gerarBoletins');
+$router->post('/admin/boletim-configuracao/sincronizar-vida-escolar-salvos', 'Admin/BoletimConfigController@sincronizarVidaEscolarSalvos');
 $router->get('/admin/boletim-configuracao/checklist-pre-geracao', 'Admin/BoletimConfigController@checklistPreGeracao');
 $router->get('/admin/boletim-configuracao/logs-geracao', 'Admin/BoletimConfigController@logsGeracaoJson');
 $router->get('/admin/boletim-configuracao/geracao-detalhe', 'Admin/BoletimConfigController@geracaoDetalheJson');

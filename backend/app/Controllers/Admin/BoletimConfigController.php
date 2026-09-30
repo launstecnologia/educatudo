@@ -2042,6 +2042,67 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Empurra para a Vida Escolar os boletins já gravados (preview=0),
+     * sem recalcular nem gerar de novo.
+     */
+    public function sincronizarVidaEscolarSalvos(): void
+    {
+        $this->assertCsrfOrRedirect();
+
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        $periodoRef = trim((string) ($_POST['periodo_ref'] ?? ''));
+        if ($periodoRef === '') {
+            $dataInicio = $this->normalizarDataYmdOpcional((string) ($_POST['data_inicio'] ?? ''));
+            $dataFim = $this->normalizarDataYmdOpcional((string) ($_POST['data_fim'] ?? ''));
+            if ($dataInicio !== null && $dataFim !== null) {
+                if ($dataInicio > $dataFim) {
+                    [$dataInicio, $dataFim] = [$dataFim, $dataInicio];
+                }
+                $periodoRef = $this->buildPeriodoRefFromDateRange($dataInicio, $dataFim);
+            }
+        }
+        if (strlen($periodoRef) > 60) {
+            $periodoRef = substr($periodoRef, 0, 60);
+        }
+
+        $regra = $regraId > 0 ? $this->boletimConfig->getRuleById($regraId) : null;
+        if (!$regra || $regraId <= 0) {
+            $_SESSION['boletim_flash'] = 'Selecione um evento válido para sincronizar os boletins salvos.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim-configuracao');
+            return;
+        }
+
+        $alunoIds = [];
+        if ($periodoRef !== '') {
+            $alunoIds = $this->boletimConfig->listAlunoIdsWithOfficialBoletim($regraId, $periodoRef);
+        }
+        if ($alunoIds === []) {
+            // Fallback: periodo_ref da tela pode diferir do gravado na geração.
+            $alunoIds = $this->boletimConfig->listAlunoIdsWithOfficialBoletimNaRegra($regraId);
+        }
+        if ($alunoIds === []) {
+            $_SESSION['boletim_flash'] = 'Não há boletim oficial salvo neste evento para sincronizar. Gere o período antes ou confira o evento selecionado.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($this->urlRetornoGeracaoModelo() ?? ('/admin/boletim-configuracao?regra_id=' . $regraId));
+            return;
+        }
+
+        $usuarioVidaRaw = $this->auth->getUser();
+        $usuarioVida = is_array($usuarioVidaRaw) ? $usuarioVidaRaw : [];
+        // Sem filtrar por regra: aplica todos os eventos oficiais já salvos do aluno
+        // (1º/2º/3º), cada um só no próprio bimestre.
+        $this->sincronizarFichasVidaEscolarLote($alunoIds, $usuarioVida, null, null);
+
+        $qtd = count($alunoIds);
+        $_SESSION['boletim_flash'] = $qtd === 1
+            ? 'Vida Escolar sincronizada com o boletim já salvo de 1 aluno (sem regenerar).'
+            : ('Vida Escolar sincronizada com os boletins já salvos de ' . $qtd . ' alunos (sem regenerar).');
+        $_SESSION['boletim_flash_type'] = 'success';
+        $this->redirect($this->urlRetornoGeracaoModelo() ?? ('/admin/boletim-configuracao?regra_id=' . $regraId));
+    }
+
+    /**
      * Grava o boletim oficial (preview=0) só para o aluno da simulação atual,
      * sem percorrer todos os vinculados ao evento.
      */

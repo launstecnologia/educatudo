@@ -159,10 +159,26 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 Gerar boletins do período
             </button>
             <?php endif; ?>
-            <p class="text-xs text-gray-500">
+        </form>
+        <?php if (!$geracaoEmAndamento && $selectedRegraId > 0): ?>
+        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/sincronizar-vida-escolar-salvos" class="mt-3 space-y-2">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="regra_id" value="<?= $selectedRegraId ?>">
+            <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="retorno" value="<?= htmlspecialchars($retornoPath, ENT_QUOTES, 'UTF-8') ?>">
+            <button type="submit"
+                    class="inline-flex items-center justify-center w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold border border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100">
+                <i class="fa-solid fa-arrows-rotate mr-2" aria-hidden="true"></i>
+                Sincronizar salvos na Vida Escolar
+            </button>
+            <p class="text-xs text-gray-500">Copia para a Vida Escolar as notas já salvas desses alunos (sem recalcular). Inclui os outros bimestres oficiais já gerados de cada aluno.</p>
+        </form>
+        <?php endif; ?>
+            <p class="text-xs text-gray-500 mt-3">
                 <a href="<?= URL ?>/admin/boletim-configuracao/gerados" class="text-blue-700 hover:underline">Ver boletins gerados</a>
             </p>
-        </form>
     </div>
 </div>
 

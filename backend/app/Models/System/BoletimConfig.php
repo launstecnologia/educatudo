@@ -2245,6 +2245,40 @@ class BoletimConfig
     }
 
     /**
+     * IDs de alunos com boletim oficial vigente neste evento (qualquer periodo_ref).
+     *
+     * @return list<int>
+     */
+    public function listAlunoIdsWithOfficialBoletimNaRegra(int $regraId): array
+    {
+        if ($regraId <= 0) {
+            return [];
+        }
+        $vigenteSql = '';
+        if ($this->hasColumn('boletim_resultados_gerados', 'vigente')) {
+            $vigenteSql = ' AND vigente = 1';
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT aluno_id
+             FROM boletim_resultados_gerados
+             WHERE regra_id = :regra_id
+               AND preview = 0
+               {$vigenteSql}
+             ORDER BY aluno_id ASC",
+            ['regra_id' => $regraId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['aluno_id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Nome/id para exibir em mensagens ao processar um conjunto fixo de alunos.
      *
      * @param list<int> $ids
