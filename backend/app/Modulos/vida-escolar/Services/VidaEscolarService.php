@@ -1587,6 +1587,10 @@ class VidaEscolarService
     }
 
     /**
+     * Extrai nota/faltas por bimestre do resultado gerado.
+     * Evento com bimestre 1–4 só atualiza aquele bim (evita o JSON
+     * cumulativo do 3º sobrescrever o 1º/2º corretos da origem).
+     *
      * @param array<string,mixed> $row
      * @return array<int, array{nota:?float, faltas:?int}>
      */
@@ -1605,8 +1609,12 @@ class VidaEscolarService
         if ($bimEvento < 1 || $bimEvento > 4) {
             $bimEvento = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
         }
-        $aplicar = static function (int $periodo, ?float $nota, ?int $faltas) use (&$out): void {
+        $aplicar = static function (int $periodo, ?float $nota, ?int $faltas) use (&$out, $bimEvento): void {
             if ($periodo < 1 || $periodo > 4) {
+                return;
+            }
+            // Evento de um bimestre não pode alterar os demais.
+            if ($bimEvento >= 1 && $bimEvento <= 4 && $periodo !== $bimEvento) {
                 return;
             }
             if (!isset($out[$periodo])) {
@@ -1645,12 +1653,16 @@ class VidaEscolarService
             $cod = strtolower($codOrig);
             $tipo = strtolower(trim((string) ($col['layout_type'] ?? '')));
             $grupo = strtolower(trim((string) ($col['layout_group'] ?? '')));
-            if (in_array($tipo, ['rec', 'resultado', 'semana_nq', 'media_sem', 'n', 'q'], true)) {
+            if (in_array($tipo, ['rec', 'resultado', 'semana_nq', 'media_sem', 'n', 'q', 'other'], true)) {
                 continue;
             }
-            $ehFalta = $tipo === 'faltas' || str_contains($cod, 'falt');
+            $ehFalta = $tipo === 'faltas' || ($tipo === '' && str_contains($cod, 'falt'));
+            $ehMedia = $tipo === 'media' || ($tipo === '' && str_contains($cod, 'media'));
+            if (!$ehFalta && !$ehMedia) {
+                continue;
+            }
             $periodo = $periodoDe($grupo, $cod);
-            if ($periodo === null && $ehFalta && $bimEvento >= 1 && $bimEvento <= 4) {
+            if ($periodo === null && $bimEvento >= 1 && $bimEvento <= 4) {
                 $periodo = $bimEvento;
             }
             if ($periodo === null) {
@@ -1660,16 +1672,16 @@ class VidaEscolarService
             if (!is_numeric($val)) {
                 continue;
             }
-            $ehMedia = $tipo === 'media' || str_contains($cod, 'media');
             if ($ehFalta) {
                 $aplicar($periodo, null, (int) round((float) $val));
-            } elseif ($ehMedia || ($tipo === '' && !str_contains($cod, 'rec') && !str_contains($cod, 'result'))) {
+            } else {
                 $aplicar($periodo, (float) $val, null);
             }
         }
 
-        foreach ([1, 2, 3, 4] as $b) {
-            foreach (['b' . $b . '_media', 'media_b' . $b, 'b' . $b] as $k) {
+        $bimsAlvo = ($bimEvento >= 1 && $bimEvento <= 4) ? [$bimEvento] : [1, 2, 3, 4];
+        foreach ($bimsAlvo as $b) {
+            foreach (['b' . $b . '_media', 'media_b' . $b] as $k) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
                     $aplicar($b, (float) $notasLower[$k], null);
                 }
@@ -1690,14 +1702,14 @@ class VidaEscolarService
             }
         }
 
-        $temNotaBim = false;
-        foreach ($out as $vals) {
-            if (($vals['nota'] ?? null) !== null) {
-                $temNotaBim = true;
+        $temNotaNoAlvo = false;
+        foreach ($bimsAlvo as $b) {
+            if (($out[$b]['nota'] ?? null) !== null) {
+                $temNotaNoAlvo = true;
                 break;
             }
         }
-        if (!$temNotaBim) {
+        if (!$temNotaNoAlvo && $bimEvento >= 1 && $bimEvento <= 4) {
             $media = null;
             if (is_numeric($row['media_final'] ?? null)) {
                 $media = (float) $row['media_final'];
@@ -1709,7 +1721,7 @@ class VidaEscolarService
                     }
                 }
             }
-            if ($bimEvento >= 1 && $bimEvento <= 4 && $media !== null) {
+            if ($media !== null) {
                 $aplicar($bimEvento, $media, null);
             }
         }
