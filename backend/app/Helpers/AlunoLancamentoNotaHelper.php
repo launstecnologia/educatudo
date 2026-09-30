@@ -4,8 +4,6 @@
  */
 class AlunoLancamentoNotaHelper
 {
-    private const NOME_TESTE_OCULTAR = 'JOAO SILVA TESTE GERAL';
-
     public static function normalizarNome(string $nome): string
     {
         $n = trim(mb_strtoupper($nome, 'UTF-8'));
@@ -35,7 +33,12 @@ class AlunoLancamentoNotaHelper
 
     public static function ehAlunoTesteOcultar(?string $nome): bool
     {
-        return self::normalizarNome((string) $nome) === self::NOME_TESTE_OCULTAR;
+        $n = self::normalizarNome((string) $nome);
+        if ($n === '') {
+            return false;
+        }
+        // Cadastros de teste: "João Silva Teste Geral", "João Silva 2 Ano", "Joao silva 3 Ano"...
+        return (bool) preg_match('/^JOAO SILVA(?:\s+TESTE\b|\s+\d+\s*ANO\b)/u', $n);
     }
 
     /**
