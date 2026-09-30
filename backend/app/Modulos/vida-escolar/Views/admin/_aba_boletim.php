@@ -159,6 +159,16 @@ $fmtNota = static function ($c): string {
             </table>
         </div>
 
+        <?php
+        $obsPartial = dirname(__DIR__, 4) . '/Views/admin/students/_bloco_observacao_boletim.php';
+        if (!is_file($obsPartial)) {
+            $obsPartial = __DIR__ . '/../../../../Views/admin/students/_bloco_observacao_boletim.php';
+        }
+        if (is_file($obsPartial)) {
+            include $obsPartial;
+        }
+        ?>
+
         <?php if ($podeAlterarBoletim): ?>
         <div class="mt-6 grid grid-cols-1 <?= $editavelFicha ? 'lg:grid-cols-2' : '' ?> gap-4">
             <?php if ($editavelFicha): ?>

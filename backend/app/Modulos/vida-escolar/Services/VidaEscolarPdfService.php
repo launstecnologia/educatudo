@@ -304,13 +304,33 @@ class VidaEscolarPdfService
         );
         $vars['tabela_html'] = $vars['identidade_html'];
         $vars['historico_html'] = $vars['trajetoria_html'];
-        $vars['observacoes'] = htmlspecialchars(
-            'Ficha do ano: ' . (string) ($capa['status_ficha_label'] ?? $ficha['status'] ?? 'sem ficha')
-            . ' · Documentos: ' . (string) ($capa['docs_txt'] ?? '—')
-            . ' · SED: ' . (string) ($capa['sed_txt'] ?? '—'),
-            ENT_QUOTES,
-            'UTF-8'
-        );
+        $obsCoord = trim((string) ($prontuario['boletim_observacao'] ?? $prontuario['observacao_boletim'] ?? ''));
+        if ($obsCoord === '' && is_array($prontuario['boletim_observacao'] ?? null)) {
+            $obsCoord = trim((string) ($prontuario['boletim_observacao']['conteudo'] ?? ''));
+        }
+        if ($obsCoord === '') {
+            $alunoIdObs = (int) ($aluno['id'] ?? 0);
+            if ($alunoIdObs > 0) {
+                try {
+                    if (!class_exists('BoletimConfig', false)) {
+                        require_once dirname(__DIR__, 3) . '/Models/System/BoletimConfig.php';
+                    }
+                    $rowObs = (new \BoletimConfig())->getObservacaoCoordenacao($alunoIdObs);
+                    $obsCoord = is_array($rowObs) ? trim((string) ($rowObs['conteudo'] ?? '')) : '';
+                } catch (\Throwable $e) {
+                    $obsCoord = '';
+                }
+            }
+        }
+        $vars['observacoes'] = $obsCoord !== ''
+            ? htmlspecialchars($obsCoord, ENT_QUOTES, 'UTF-8')
+            : htmlspecialchars(
+                'Ficha do ano: ' . (string) ($capa['status_ficha_label'] ?? $ficha['status'] ?? 'sem ficha')
+                . ' · Documentos: ' . (string) ($capa['docs_txt'] ?? '—')
+                . ' · SED: ' . (string) ($capa['sed_txt'] ?? '—'),
+                ENT_QUOTES,
+                'UTF-8'
+            );
         return $vars;
     }
 
