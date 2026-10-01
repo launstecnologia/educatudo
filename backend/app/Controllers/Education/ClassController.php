@@ -1012,11 +1012,12 @@ class ClassController extends BaseController
             return;
         }
         fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        fputcsv($out, ['nome', 'ra', 'vinculo_tipo', 'ativo'], ';');
+        fputcsv($out, ['nome', 'codigo_aluno', 'ra', 'vinculo_tipo', 'ativo'], ';');
         foreach ($alunos as $a) {
             $vinculo = ($a['vinculo_tipo'] ?? 'principal') === 'principal' ? 'Principal' : 'Matriculado';
             fputcsv($out, [
                 StudentFormHelper::nomeExibicao($a),
+                (string) ($a['codigo_aluno'] ?? ''),
                 (string) ($a['ra'] ?? ''),
                 $vinculo,
                 !empty($a['ativo']) ? 'Sim' : 'Não',

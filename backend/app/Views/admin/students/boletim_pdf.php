@@ -258,6 +258,9 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
                 <?php if (!empty($aluno['turma_nome'])): ?>
                     &nbsp;|&nbsp; <?= htmlspecialchars((string) $aluno['turma_nome'], ENT_QUOTES, 'UTF-8') ?>
                 <?php endif; ?>
+                <?php if (!empty($aluno['codigo_aluno'])): ?>
+                    &nbsp;|&nbsp; Cód.: <?= htmlspecialchars((string) $aluno['codigo_aluno'], ENT_QUOTES, 'UTF-8') ?>
+                <?php endif; ?>
                 <?php if (!empty($aluno['ra'])): ?>
                     &nbsp;|&nbsp; RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?>
                 <?php endif; ?>

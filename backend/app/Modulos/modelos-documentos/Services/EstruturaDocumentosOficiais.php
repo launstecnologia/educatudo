@@ -38,7 +38,7 @@ class EstruturaDocumentosOficiais
         $est['body']['sections'] = [
             self::secaoHtml(
                 '<table class="dados">'
-                . '<tr><td class="label">Aluno</td><td>{{aluno_nome}}</td><td class="label">RA</td><td>{{aluno_codigo}}</td></tr>'
+                . '<tr><td class="label">Aluno</td><td>{{aluno_nome}}</td><td class="label">RA</td><td>{{aluno_ra}}</td></tr>'
                 . '<tr><td class="label">Ano letivo</td><td>{{ano_letivo}}</td><td class="label">Turma</td><td>{{turma_nome}}</td></tr>'
                 . '<tr><td class="label">Etapa</td><td>{{etapa}}</td><td class="label">Turno</td><td>{{turno}}</td></tr>'
                 . '</table>'
@@ -67,7 +67,7 @@ class EstruturaDocumentosOficiais
             self::secaoTitulo('IDENTIFICAÇÃO DO ALUNO'),
             self::secaoHtml(
                 '<table class="dados">'
-                . '<tr><td class="label">Nome</td><td>{{aluno_nome}}</td><td class="label">RA</td><td>{{aluno_codigo}}</td></tr>'
+                . '<tr><td class="label">Nome</td><td>{{aluno_nome}}</td><td class="label">RA</td><td>{{aluno_ra}}</td></tr>'
                 . '<tr><td class="label">Nascimento</td><td>{{aluno_data_nasc}}</td><td class="label">Naturalidade</td><td>{{aluno_naturalidade}}</td></tr>'
                 . '<tr><td class="label">Filiação</td><td>{{aluno_filiacao}}</td><td class="label">Ano letivo</td><td>{{ano_letivo}}</td></tr>'
                 . '<tr><td class="label">Curso/Etapa</td><td>{{etapa}}</td><td class="label">Turma</td><td>{{turma_nome}}</td></tr>'
@@ -124,7 +124,7 @@ class EstruturaDocumentosOficiais
             self::secaoTitulo('DADOS DO ALUNO'),
             self::secaoHtml(
                 '<table class="dados">'
-                . '<tr><td class="label">Nome</td><td>{{aluno_nome}}</td><td class="label">RA</td><td>{{aluno_codigo}}</td></tr>'
+                . '<tr><td class="label">Nome</td><td>{{aluno_nome}}</td><td class="label">RA</td><td>{{aluno_ra}}</td></tr>'
                 . '<tr><td class="label">Nascimento</td><td>{{aluno_data_nasc}}</td><td class="label">Naturalidade</td><td>{{aluno_naturalidade}}</td></tr>'
                 . '<tr><td class="label">Documento</td><td>CPF/CIN: {{aluno_cpf}}</td><td class="label">Nacionalidade</td><td>{{aluno_nacionalidade}}</td></tr>'
                 . '</table>'
@@ -147,7 +147,7 @@ class EstruturaDocumentosOficiais
         $est['body']['sections'] = [
             self::secaoHtml(
                 '<div class="corpo"><p>Declaramos, para os devidos fins, que '
-                . '<strong>{{aluno_nome}}</strong>, RA nº {{aluno_codigo}}, concluiu com aproveitamento '
+                . '<strong>{{aluno_nome}}</strong>, RA nº {{aluno_ra}}, concluiu com aproveitamento '
                 . 'a <strong>{{serie}}</strong>{{turma_frase}}, no ano letivo de <strong>{{ano_letivo}}</strong>, '
                 . 'nesta instituição de ensino, tendo sido considerado(a) <strong>{{situacao_final}}</strong> '
                 . 'ao final do período letivo.</p>'

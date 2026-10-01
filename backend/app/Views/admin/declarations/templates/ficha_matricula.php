@@ -29,7 +29,8 @@ $cpf = $val($aluno['cpf'] ?? '');
 $rg = $val($aluno['rg'] ?? '');
 $nasc = $fmtData($aluno['data_nasc'] ?? '');
 $sexo = $sexoLabels[(string) ($aluno['sexo'] ?? '')] ?? '—';
-$codigo = $val($pick($aluno, ['codigo_aluno', 'ra']));
+$codigo = $val($pick($aluno, ['codigo_aluno']));
+$raGov = $val($pick($aluno, ['ra']));
 $turma = $val($pick(array_merge($aluno, $mat), ['turma_nome']));
 $serie = $val($pick(array_merge($aluno, $mat), ['turma_serie', 'serie']));
 $anoLetivo = $val($mat['ano_letivo'] ?? date('Y'));
@@ -57,7 +58,8 @@ $endereco = $endereco !== '' ? $endereco : '—';
         <h2 style="font-size:11pt; color:#064e3b; margin:18px 0 6px 0;">1. Dados do(a) Aluno(a)</h2>
         <table class="dados">
             <tr><td class="label">Nome completo</td><td><?= \StudentFormHelper::nomeOficialHtml($aluno, $esc) ?></td></tr>
-            <tr><td class="label">Matrícula / Código</td><td><?= $esc($codigo) ?></td></tr>
+            <tr><td class="label">Código</td><td><?= $esc($codigo) ?></td></tr>
+            <tr><td class="label">RA</td><td><?= $esc($raGov) ?></td></tr>
             <tr><td class="label">Data de nascimento</td><td><?= $esc($nasc) ?></td></tr>
             <tr><td class="label">Sexo</td><td><?= $esc($sexo) ?></td></tr>
             <tr><td class="label">CPF</td><td><?= $esc($cpf) ?></td></tr>

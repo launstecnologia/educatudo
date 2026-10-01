@@ -11,7 +11,8 @@ $fmtData = static function ($d): string {
 };
 $nome = \StudentFormHelper::nomeOficialLinha($aluno);
 $cpf = trim((string) ($aluno['cpf'] ?? ''));
-$codigo = trim((string) ($aluno['codigo_aluno'] ?? $aluno['ra'] ?? ''));
+$codigo = trim((string) ($aluno['codigo_aluno'] ?? ''));
+$raGov = trim((string) ($aluno['ra'] ?? ''));
 $turma = trim((string) ($mat['turma_nome'] ?? $aluno['turma_nome'] ?? ''));
 $serie = trim((string) ($mat['turma_serie'] ?? $aluno['turma_serie'] ?? $aluno['serie'] ?? ''));
 $anoLetivo = trim((string) ($mat['ano_letivo'] ?? date('Y')));
@@ -32,7 +33,8 @@ $situacao = $status === 'concluido' ? 'Concluído' : ($status === 'transferido' 
 
         <table class="dados">
             <tr><td class="label">Aluno(a)</td><td><?= $esc($nome) ?></td></tr>
-            <?php if ($codigo !== ''): ?><tr><td class="label">Matrícula / Código</td><td><?= $esc($codigo) ?></td></tr><?php endif; ?>
+            <?php if ($codigo !== ''): ?><tr><td class="label">Código</td><td><?= $esc($codigo) ?></td></tr><?php endif; ?>
+            <?php if ($raGov !== ''): ?><tr><td class="label">RA</td><td><?= $esc($raGov) ?></td></tr><?php endif; ?>
             <?php if ($cpf !== ''): ?><tr><td class="label">CPF</td><td><?= $esc($cpf) ?></td></tr><?php endif; ?>
             <?php if ($turma !== ''): ?><tr><td class="label">Turma</td><td><?= $esc($turma) ?></td></tr><?php endif; ?>
             <?php if ($serie !== ''): ?><tr><td class="label">Série</td><td><?= $esc($serie) ?></td></tr><?php endif; ?>

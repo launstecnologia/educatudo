@@ -1,7 +1,10 @@
 <?php
 $alunoIdAcoes = (int) ($student['id'] ?? 0);
 $alunoNomeAcoes = (string) ($student['nome'] ?? 'Aluno');
-$alunoRaAcoes = (string) ($student['ra'] ?? '-');
+$alunoCodigoAcoes = trim((string) ($student['codigo_aluno'] ?? ''));
+$alunoRaAcoes = trim((string) ($student['ra'] ?? ''));
+$alunoIdentAcoes = 'Cód. ' . ($alunoCodigoAcoes !== '' ? $alunoCodigoAcoes : '—')
+    . ' · RA ' . ($alunoRaAcoes !== '' ? $alunoRaAcoes : '—');
 $inclusaoVisivel = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao');
 $alunoAtivoAcoes = (int) ($student['ativo'] ?? 0) === 1;
 $semResponsaveis = empty($responsaveis_aluno);
@@ -206,7 +209,7 @@ $gruposAcoesAluno = [
     <div class="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-200 flex-shrink-0">
         <div class="min-w-0">
             <h2 id="offcanvasAcoesAlunoTitulo" class="text-lg font-bold text-gray-900">Ações do aluno</h2>
-            <p class="text-sm text-gray-500 mt-0.5 truncate"><?= safe_htmlspecialchars($alunoNomeAcoes) ?> · RA <?= safe_htmlspecialchars($alunoRaAcoes) ?></p>
+            <p class="text-sm text-gray-500 mt-0.5 truncate"><?= safe_htmlspecialchars($alunoNomeAcoes) ?> · <?= safe_htmlspecialchars($alunoIdentAcoes) ?></p>
         </div>
         <button type="button"
                 onclick="fecharOffcanvasAcoesAluno()"

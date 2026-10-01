@@ -154,7 +154,8 @@ class DocumentoRenderer
             ], $css),
             'dados_aluno' => $this->tabelaChaveValor([
                 'Aluno(a)' => '{{aluno_nome}}',
-                'Matrícula / RA' => '{{aluno_codigo}}',
+                'Código' => '{{aluno_codigo}}',
+                'RA' => '{{aluno_ra}}',
                 'CPF' => '{{aluno_cpf}}',
                 'Nascimento' => '{{aluno_data_nasc}}',
                 'Turma' => '{{turma_nome}}',

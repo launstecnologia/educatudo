@@ -254,7 +254,9 @@ $anoLetivoFicha = (is_array($matriculaAtual) && !empty($matriculaAtual['ano_leti
 $turmaAnoLabel = $anoLetivoFicha !== '' ? ($turmaNomeCurto . ' • ' . $anoLetivoFicha) : $turmaNomeCurto;
 $serieDisplayFicha = trim((string) ($student['serie'] ?? $student['serie_nome'] ?? ''));
 $metaPartesAluno = [];
+$codigoAlunoFicha = trim((string) ($student['codigo_aluno'] ?? ''));
 $raAluno = trim((string) ($student['ra'] ?? ''));
+$metaPartesAluno[] = 'Cód. ' . ($codigoAlunoFicha !== '' ? $codigoAlunoFicha : '—');
 $metaPartesAluno[] = 'RA ' . ($raAluno !== '' ? $raAluno : '—');
 $turmaMeta = $matriculaEncerrada ? 'Encerrada' : ($matriculaPendente ? 'Pendente' : $turmaDisplay);
 if ($serieDisplayFicha !== '' && stripos($turmaMeta, $serieDisplayFicha) === false) {

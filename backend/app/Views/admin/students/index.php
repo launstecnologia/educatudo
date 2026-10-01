@@ -38,6 +38,7 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aluno</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RA</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -47,7 +48,7 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($students)): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                             <i class="fa-solid fa-user-graduate text-4xl text-gray-300 mb-4"></i>
                             <p>Nenhum aluno encontrado</p>
                             <?php if ($filtrosAtivos > 0): ?>
@@ -81,6 +82,9 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
                                     <div class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? '') ?></div>
                                 </div>
                             </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <?= htmlspecialchars($student['codigo_aluno'] ?? '') ?>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <?= htmlspecialchars($student['ra'] ?? '') ?>

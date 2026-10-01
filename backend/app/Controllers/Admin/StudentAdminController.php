@@ -1379,8 +1379,8 @@ class StudentAdminController extends AdminBaseController
         
         try {
             $nome = trim($_POST['nome'] ?? '');
-            $ra = trim($_POST['ra'] ?? '');
             $codigoAluno = trim($_POST['codigo_aluno'] ?? '');
+            $ra = trim($_POST['ra'] ?? '');
             $nickname = trim($_POST['nickname'] ?? '');
             $docEndereco = $this->extrairDocumentoEnderecoPost();
             $contato = $this->extrairContatoPost();
@@ -1404,12 +1404,12 @@ class StudentAdminController extends AdminBaseController
             $serie = 'Não informada';
             
             $studentModel = new Student();
-            
-            $codigoUnico = $codigoAluno !== '' ? $codigoAluno : $ra;
 
-            // Verifica se RA/código já existe
-            if (!empty($codigoUnico) && $studentModel->raExists($codigoUnico)) {
+            if ($codigoAluno !== '' && $studentModel->raExists($codigoAluno)) {
                 throw new Exception('Código do aluno já cadastrado');
+            }
+            if ($ra !== '' && $ra !== $codigoAluno && $studentModel->raExists($ra)) {
+                throw new Exception('RA já cadastrado');
             }
 
             if ($nickname !== '' && $studentModel->nicknameExists($nickname)) {
@@ -1423,8 +1423,8 @@ class StudentAdminController extends AdminBaseController
                 'nome' => $nome,
                 'email' => $email ?: null,
                 'senha' => $senha ?: null,
-                'ra' => $codigoUnico ?: null,
-                'codigo_aluno' => $codigoUnico ?: null,
+                'ra' => $ra !== '' ? $ra : null,
+                'codigo_aluno' => $codigoAluno !== '' ? $codigoAluno : null,
                 'cpf' => $docEndereco['cpf'],
                 'foto_url' => null,
                 'nickname' => $nickname ?: null,
@@ -1547,8 +1547,8 @@ class StudentAdminController extends AdminBaseController
         try {
             $nome = trim($_POST['nome'] ?? '');
             $nickname = trim($_POST['nickname'] ?? '');
-            $ra = trim($_POST['ra'] ?? '');
             $codigoAluno = trim($_POST['codigo_aluno'] ?? '');
+            $ra = trim($_POST['ra'] ?? '');
             $docEndereco = $this->extrairDocumentoEnderecoPost();
             $contato = $this->extrairContatoPost();
             $senha = $_POST['senha'] ?? '';
@@ -1580,11 +1580,11 @@ class StudentAdminController extends AdminBaseController
             $responsavel_id = $alunoAtual['responsavel_id'] ?? null;
             $serie = $alunoAtual['serie'] ?? 'Não informada';
             
-            $codigoUnico = $codigoAluno !== '' ? $codigoAluno : $ra;
-
-            // Verifica se código já existe (exceto para o próprio aluno)
-            if (!empty($codigoUnico) && $studentModel->raExists($codigoUnico, $id)) {
+            if ($codigoAluno !== '' && $studentModel->raExists($codigoAluno, $id)) {
                 throw new Exception('Código do aluno já cadastrado');
+            }
+            if ($ra !== '' && $ra !== $codigoAluno && $studentModel->raExists($ra, $id)) {
+                throw new Exception('RA já cadastrado');
             }
             
             // Verifica se nickname já existe para outro aluno
@@ -1604,8 +1604,8 @@ class StudentAdminController extends AdminBaseController
                 'nickname' => $nickname ?: null,
                 'email' => $email ?: null,
                 'senha' => $senha ?: null,
-                'ra' => $codigoUnico ?: null,
-                'codigo_aluno' => $codigoUnico ?: null,
+                'ra' => $ra !== '' ? $ra : null,
+                'codigo_aluno' => $codigoAluno !== '' ? $codigoAluno : null,
                 'cpf' => $docEndereco['cpf'],
                 'foto_url' => $alunoAtual['foto_url'] ?? null,
                 'turma_id' => $turma_id,

@@ -160,6 +160,7 @@ include __DIR__ . '/../_partials/page_header_list.php';
                                     <thead class="bg-gray-50">
                                         <tr>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aluno</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RA</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vínculo</th>
@@ -185,6 +186,9 @@ include __DIR__ . '/../_partials/page_header_list.php';
                                                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($nomeAluno) ?></div>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <?= htmlspecialchars($aluno['codigo_aluno'] ?? '') ?>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                 <?= htmlspecialchars($aluno['ra'] ?? '') ?>

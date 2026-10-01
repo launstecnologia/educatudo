@@ -24,8 +24,12 @@
                             </div>
                             <?php endif; ?>
                             <div>
-                                <span class="student-field-label">RA / Código</span>
-                                <p class="student-field-value"><?= safe_htmlspecialchars($student['ra'] ?? '', '') ?></p>
+                                <span class="student-field-label">Código do aluno</span>
+                                <p class="student-field-value"><?= safe_htmlspecialchars($student['codigo_aluno'] ?? null, 'Não informado') ?></p>
+                            </div>
+                            <div>
+                                <span class="student-field-label">RA</span>
+                                <p class="student-field-value"><?= safe_htmlspecialchars($student['ra'] ?? null, 'Não informado') ?></p>
                             </div>
                             <div>
                                 <span class="student-field-label">Nickname</span>

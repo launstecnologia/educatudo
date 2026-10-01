@@ -138,10 +138,8 @@ if ($validationUrl !== '') {
     $qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=' . rawurlencode($validationUrl);
 }
 
+$codigoAluno = trim((string) ($aluno['codigo_aluno'] ?? $aluno['codigo'] ?? ''));
 $raAluno = trim((string) ($aluno['ra'] ?? ''));
-if ($raAluno === '') {
-    $raAluno = trim((string) ($aluno['codigo_aluno'] ?? $aluno['codigo'] ?? ''));
-}
 $rgAluno = trim((string) ($aluno['rg'] ?? ''));
 $rneAluno = trim((string) ($aluno['rne'] ?? ''));
 $finalidade = (string) ($dados['finalidade'] ?? $documento['finalidade'] ?? 'Solicitacao');
@@ -322,7 +320,7 @@ if ($cidadeDataTxt === '') {
                 </tr>
                 <tr>
                     <td class="lab">RG / RNE:</td>
-                    <td><?php
+                    <td colspan="3"><?php
                         $docsId = array_filter([
                             $rgAluno !== '' ? 'RG ' . $rgAluno : '',
                             $rneAluno !== '' ? 'RNE ' . $rneAluno : '',
@@ -330,6 +328,10 @@ if ($cidadeDataTxt === '') {
                         ]);
                         echo $esc($docsId ? implode(' · ', $docsId) : '—');
                     ?></td>
+                </tr>
+                <tr>
+                    <td class="lab">Código:</td>
+                    <td><?= $esc($codigoAluno !== '' ? $codigoAluno : '—') ?></td>
                     <td class="lab">RA:</td>
                     <td><?= $esc($raAluno !== '' ? $raAluno : '—') ?></td>
                 </tr>

@@ -36,7 +36,8 @@ $linhaDocs = trim(implode(' • ', array_filter([
 ])));
 
 $alunoNome = \StudentFormHelper::nomeOficialLinha($aluno);
-$alunoRa = trim((string) ($aluno['codigo_aluno'] ?? $aluno['ra'] ?? ''));
+$codigoAluno = trim((string) ($aluno['codigo_aluno'] ?? ''));
+$alunoRa = trim((string) ($aluno['ra'] ?? ''));
 $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
 
 // Agrupa boletins por ano letivo.
@@ -166,7 +167,8 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
 
     <div class="aluno-info">
         <strong>Aluno(a):</strong> <?= $esc($alunoNome) ?>
-        <?php if ($alunoRa !== ''): ?> &nbsp;|&nbsp; <strong>Matrícula:</strong> <?= $esc($alunoRa) ?><?php endif; ?>
+        <?php if ($codigoAluno !== ''): ?> &nbsp;|&nbsp; <strong>Código:</strong> <?= $esc($codigoAluno) ?><?php endif; ?>
+        <?php if ($alunoRa !== ''): ?> &nbsp;|&nbsp; <strong>RA:</strong> <?= $esc($alunoRa) ?><?php endif; ?>
         <?php if ($alunoCpf !== ''): ?> &nbsp;|&nbsp; <strong>CPF:</strong> <?= $esc($alunoCpf) ?><?php endif; ?>
     </div>
 

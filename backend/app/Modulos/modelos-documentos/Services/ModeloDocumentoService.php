@@ -31,7 +31,8 @@ class ModeloDocumentoService
         'aluno_telefone' => 'Telefone do aluno',
         'aluno_endereco' => 'Endereço do aluno',
         'aluno_cidade' => 'Cidade do aluno',
-        'aluno_codigo' => 'RA / código',
+        'aluno_codigo' => 'Código do aluno',
+        'aluno_ra' => 'RA do aluno',
         'matricula_numero' => 'Número de matrícula',
         'curso_nome' => 'Curso / segmento',
         'resp_nome' => 'Nome do responsável',
@@ -846,7 +847,8 @@ class ModeloDocumentoService
             . $lab('Série') . '<td>{{serie}}</td>'
             . $lab('Ano') . '<td>{{ano_letivo}}</td>'
             . '</tr><tr>'
-            . $lab('RA') . '<td>{{aluno_codigo}}</td>'
+            . $lab('Código') . '<td>{{aluno_codigo}}</td>'
+            . $lab('RA') . '<td>{{aluno_ra}}</td>'
             . $lab('Situação') . '<td>{{situacao_final}}</td>'
             . $lab('Frequência') . '<td>{{frequencia_percentual}}</td>'
             . $lab('Período') . '<td>{{periodo_label}}</td>'
@@ -920,7 +922,7 @@ class ModeloDocumentoService
                 'chaves' => [
                     'aluno_nome', 'aluno_cpf', 'aluno_rg', 'aluno_cpf_frase', 'aluno_data_nasc',
                     'aluno_nasc_frase', 'aluno_email', 'aluno_telefone', 'aluno_endereco',
-                    'aluno_cidade', 'aluno_codigo', 'matricula_numero',
+                    'aluno_cidade', 'aluno_codigo', 'aluno_ra', 'matricula_numero',
                 ],
             ],
             'responsavel' => [
@@ -2655,7 +2657,8 @@ HTML;
             'aluno_telefone' => $esc($alunoTelefone !== '' ? $alunoTelefone : '—'),
             'aluno_endereco' => $esc($alunoEndereco !== '' ? $alunoEndereco : '—'),
             'aluno_cidade' => $esc($alunoCidade !== '' ? $alunoCidade : '—'),
-            'aluno_codigo' => $esc(trim((string) ($aluno['codigo_aluno'] ?? $aluno['ra'] ?? '')) ?: '—'),
+            'aluno_codigo' => $esc(trim((string) ($aluno['codigo_aluno'] ?? '')) ?: '—'),
+            'aluno_ra' => $esc(trim((string) ($aluno['ra'] ?? '')) ?: '—'),
             'resp_nome' => $esc($respNome !== '' ? $respNome : '________________________'),
             'resp_cpf' => $esc($resp0['cpf'] ?? '—'),
             'resp_email' => $esc($resp0['email'] ?? '—'),
@@ -2737,7 +2740,8 @@ HTML;
             'aluno_telefone' => '(16) 99999-0000',
             'aluno_endereco' => 'Rua das Flores, 100',
             'aluno_cidade' => 'Ribeirão Preto/SP',
-            'aluno_codigo' => '202600123',
+            'aluno_codigo' => '96067',
+            'aluno_ra' => '123456789',
             'matricula_numero' => '2026-0456',
             'curso_nome' => 'Ensino Fundamental',
             'resp_nome' => 'Ana Paula Silva',

@@ -80,7 +80,8 @@ include __DIR__ . '/../_partials/flash_message.php';
     <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Aluno e matrícula</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
         <div><span class="text-gray-500">Nome</span><div class="font-medium"><?= $esc($aluno['nome'] ?? '') ?></div></div>
-        <div><span class="text-gray-500">Matrícula / RA</span><div class="font-medium"><?= $esc($aluno['ra'] ?? $aluno['codigo_aluno'] ?? '—') ?></div></div>
+        <div><span class="text-gray-500">Código</span><div class="font-medium"><?= $esc($aluno['codigo_aluno'] ?? '—') ?></div></div>
+        <div><span class="text-gray-500">RA</span><div class="font-medium"><?= $esc($aluno['ra'] ?? '—') ?></div></div>
         <div><span class="text-gray-500">Nascimento</span><div class="font-medium"><?= $fmtData($aluno['data_nasc'] ?? '') ?></div></div>
         <div><span class="text-gray-500">Ano letivo</span><div class="font-medium"><?= $anoLetivo ?></div></div>
         <div><span class="text-gray-500">Curso / etapa</span><div class="font-medium"><?= $esc($turma['curso_nome'] ?? '—') ?></div></div>
