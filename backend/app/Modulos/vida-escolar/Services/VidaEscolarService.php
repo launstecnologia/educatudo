@@ -702,13 +702,14 @@ class VidaEscolarService
         $n = 0;
         $linhasTocadas = [];
         $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
+        $boletimOficialTurmaId = $this->idBoletimOficialDaTurma(is_array($ficha) ? $ficha : []);
         /** @var array<int, array<int, array{nota:?float, faltas:?int, prio:int}>> */
         $propostas = [];
         foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
             if (!$this->eventoPertenceAoAno($row, $ano)) {
                 continue;
             }
-            if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId)) {
+            if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId, $boletimOficialTurmaId)) {
                 continue;
             }
             $mid = (int) ($row['materia_id'] ?? 0);
@@ -747,10 +748,12 @@ class VidaEscolarService
                 $prioBase += 10;
             }
             $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
-            if ($exibir === 'notas') {
+            // O boletim já gerado é a nota oficial. O evento de notas não pode
+            // colocar a média parcial (6) no lugar da Média Bim Final (7).
+            if ($exibir === 'boletim') {
+                $prioBase += 40;
+            } elseif ($exibir === 'notas') {
                 $prioBase += 5;
-            } elseif ($exibir === 'boletim') {
-                $prioBase += 2;
             }
             $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
             if ($temMediaFinalRow) {
@@ -841,13 +844,17 @@ class VidaEscolarService
         }
 
         $linhas = $this->model->listarLinhas((int) $fichaId);
-        $n += $this->limparBimsSemEventoNaFicha(
-            $linhas,
-            $this->mapaCoberturaBimestresGerados($alunoId, $ano, $modeloBoletimId),
-            $linhasTocadas,
-            $incluirReabertas,
-            false
-        );
+        // Sincronizar eventos só copia a nota do boletim já gerado.
+        // Não apaga célula antiga nem o boletim gravado.
+        if (!$forcarEscrita) {
+            $n += $this->limparBimsSemEventoNaFicha(
+                $linhas,
+                $this->mapaCoberturaBimestresGerados($alunoId, $ano, $modeloBoletimId, $boletimOficialTurmaId),
+                $linhasTocadas,
+                $incluirReabertas,
+                false
+            );
+        }
 
         foreach (array_keys($linhasTocadas) as $linhaId) {
             $this->recalcularFinal((int) $linhaId, is_array($ficha) ? $ficha : null, $forcarEscrita);
@@ -972,6 +979,7 @@ class VidaEscolarService
                     }
                 }
                 $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
+                $boletimOficialTurmaId = $this->idBoletimOficialDaTurma($ficha);
                 /** @var array<string, int> */
                 $prioCelula = [];
                 $prefereCelula = [];
@@ -981,7 +989,7 @@ class VidaEscolarService
                     if (!$this->eventoPertenceAoAno($row, (int) $ano)) {
                         continue;
                     }
-                    if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId)) {
+                    if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId, $boletimOficialTurmaId)) {
                         continue;
                     }
                     $mid = (int) ($row['materia_id'] ?? 0);
@@ -1027,10 +1035,10 @@ class VidaEscolarService
                         $prioBase += 10;
                     }
                     $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
-                    if ($exibir === 'notas') {
+                    if ($exibir === 'boletim') {
+                        $prioBase += 40;
+                    } elseif ($exibir === 'notas') {
                         $prioBase += 5;
-                    } elseif ($exibir === 'boletim') {
-                        $prioBase += 2;
                     }
                     $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
                     if ($temMediaFinalRow) {
@@ -1516,7 +1524,7 @@ class VidaEscolarService
             }
             return;
         }
-        if (in_array($final['status'] ?? '', ['fechada'], true) && ($final['origem'] ?? '') === 'externa') {
+        if (($final['origem'] ?? '') === 'externa') {
             return;
         }
         if ($ficha === null) {
@@ -2885,17 +2893,33 @@ class VidaEscolarService
     /**
      * @param array<string,mixed> $row
      */
-    private function resultadoPertenceAoModelo(array $row, int $boletimId): bool
+    private function resultadoPertenceAoModelo(array $row, int $boletimId, int $boletimOficialTurmaId = 0): bool
     {
         if ($boletimId <= 0) {
             return true;
         }
         $rowBoletim = (int) ($row['boletim_id'] ?? 0);
-        if ($rowBoletim <= 0) {
+        if ($rowBoletim <= 0 || $rowBoletim === $boletimId) {
             return true;
         }
+        // Boletim já gerado do modelo oficial da turma, quando a dica da ficha veio do evento de notas.
+        return strtolower(trim((string) ($row['exibir_em'] ?? ''))) === 'boletim'
+            && $boletimOficialTurmaId > 0
+            && $rowBoletim === $boletimOficialTurmaId;
+    }
 
-        return $rowBoletim === $boletimId;
+    /**
+     * @param array<string,mixed> $ficha
+     */
+    private function idBoletimOficialDaTurma(array $ficha): int
+    {
+        $turmaId = (int) ($ficha['turma_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $serieId = (int) ($turma['serie_id'] ?? 0);
+        $modelo = $this->boletimCadastro()->encontrarOficialParaTurma($turmaId, $serieId, $ano, null);
+
+        return (int) ((is_array($modelo) ? ($modelo['id'] ?? 0) : 0));
     }
 
     /**
@@ -2904,7 +2928,7 @@ class VidaEscolarService
      *
      * @return array{materias: array<int, array<int, true>>, nomes: array<string, array<int, true>>}
      */
-    private function mapaCoberturaBimestresGerados(int $alunoId, int $anoLetivo, int $boletimId = 0): array
+    private function mapaCoberturaBimestresGerados(int $alunoId, int $anoLetivo, int $boletimId = 0, int $boletimOficialTurmaId = 0): array
     {
         $materias = [];
         $nomes = [];
@@ -2916,7 +2940,7 @@ class VidaEscolarService
             if (!$this->eventoPertenceAoAno($row, $anoLetivo)) {
                 continue;
             }
-            if (!$this->resultadoPertenceAoModelo($row, $boletimId)) {
+            if (!$this->resultadoPertenceAoModelo($row, $boletimId, $boletimOficialTurmaId)) {
                 continue;
             }
             $bimsLinha = [];
