@@ -250,10 +250,14 @@ class SchoolCalendarController extends AdminBaseController
             $this->json(['ok' => false, 'erro' => 'Sessão expirada. Recarregue a página.'], 403);
             return;
         }
+        $efeito = (string) ($_POST['efeito'] ?? '');
+        if (!in_array($efeito, ['neutro', 'nao_letivo', 'reposicao'], true)) {
+            $efeito = !empty($_POST['nao_letivo']) ? 'nao_letivo' : 'neutro';
+        }
         $result = (new SchoolCalendarService($this->db))->salvarTipo(
             (string) ($_POST['nome'] ?? ''),
             (string) ($_POST['cor'] ?? ''),
-            !empty($_POST['nao_letivo'])
+            $efeito
         );
         $this->json($result, !empty($result['ok']) ? 200 : 422);
     }
@@ -268,6 +272,22 @@ class SchoolCalendarController extends AdminBaseController
             return;
         }
         $result = (new SchoolCalendarService($this->db))->excluirTipo((string) ($_POST['slug'] ?? ''));
+        $this->json($result, !empty($result['ok']) ? 200 : 422);
+    }
+
+    public function atualizarEfeitoTipo(): void
+    {
+        if (!$this->enforceAdminPermissionKey('calendario_letivo', 'alterar')) {
+            return;
+        }
+        if (!$this->validateCsrf((string) ($_POST['csrf_token'] ?? ''))) {
+            $this->json(['ok' => false, 'erro' => 'Sessão expirada. Recarregue a página.'], 403);
+            return;
+        }
+        $result = (new SchoolCalendarService($this->db))->atualizarEfeitoTipo(
+            (string) ($_POST['slug'] ?? ''),
+            (string) ($_POST['efeito'] ?? '')
+        );
         $this->json($result, !empty($result['ok']) ? 200 : 422);
     }
 

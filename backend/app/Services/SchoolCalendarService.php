@@ -187,7 +187,7 @@ class SchoolCalendarService
     /**
      * @return array{ok:bool,erro?:string,tipo?:array<string,mixed>}
      */
-    public function salvarTipo(string $nome, string $cor, bool $naoLetivo): array
+    public function salvarTipo(string $nome, string $cor, string $efeito): array
     {
         if (!$this->tabelaTiposExiste()) {
             return ['ok' => false, 'erro' => 'Rode a migration 2026_09_01_calendario_letivo_tipos.sql no painel Master.'];
@@ -224,7 +224,9 @@ class SchoolCalendarService
             }
         }
         $fundo = $this->clarearHex($cor);
-        $efeito = $naoLetivo ? 'nao_letivo' : 'neutro';
+        if (!in_array($efeito, ['neutro', 'nao_letivo', 'reposicao'], true)) {
+            $efeito = 'neutro';
+        }
         try {
             $id = (int) $this->db->insert(
                 "INSERT INTO calendario_letivo_tipos (slug, nome, cor, cor_fundo, efeito, sistema, ordem)
@@ -292,6 +294,42 @@ class SchoolCalendarService
         }
         $this->tiposCache = null;
         return ['ok' => true];
+    }
+
+    /**
+     * Altera o efeito de um tipo criado pela escola.
+     * reposicao faz sábado e domingo daquele tipo entrarem nos dias letivos.
+     *
+     * @return array{ok:bool,erro?:string,efeito?:string}
+     */
+    public function atualizarEfeitoTipo(string $slug, string $efeito): array
+    {
+        if (!$this->tabelaTiposExiste()) {
+            return ['ok' => false, 'erro' => 'Cadastro de tipos ainda não está disponível.'];
+        }
+        if (!in_array($efeito, ['neutro', 'nao_letivo', 'reposicao'], true)) {
+            return ['ok' => false, 'erro' => 'Efeito inválido.'];
+        }
+        $slug = trim($slug);
+        $tipos = $this->tipos();
+        if (!isset($tipos[$slug])) {
+            return ['ok' => false, 'erro' => 'Tipo não encontrado.'];
+        }
+        if ((int) ($tipos[$slug]['sistema'] ?? 0) === 1) {
+            return ['ok' => false, 'erro' => 'Tipos padrão não podem ser alterados.'];
+        }
+        try {
+            $this->db->query(
+                "UPDATE calendario_letivo_tipos SET efeito = :efeito WHERE slug = :slug AND sistema = 0",
+                ['efeito' => $efeito, 'slug' => $slug]
+            );
+        } catch (Throwable $e) {
+            error_log('Calendário letivo: falha ao atualizar efeito do tipo: ' . $e->getMessage());
+            return ['ok' => false, 'erro' => 'Não foi possível atualizar o tipo.'];
+        }
+        $this->tiposCache = null;
+        $this->mapaEfeitosCache = [];
+        return ['ok' => true, 'efeito' => $efeito];
     }
 
     public function tipoValido(string $tipo): bool

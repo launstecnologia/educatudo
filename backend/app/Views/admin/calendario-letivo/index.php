@@ -501,10 +501,21 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                                     </div>
                                 </div>
                             </div>
-                            <label class="inline-flex items-start gap-2 cursor-pointer select-none">
-                                <input type="checkbox" id="novo_tipo_nao_letivo" class="mt-0.5 w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500" checked>
-                                <span class="text-xs text-gray-600">Descontar dos dias letivos <span class="text-gray-400">(como feriado ou recesso)</span></span>
-                            </label>
+                            <fieldset class="space-y-2">
+                                <legend class="text-xs font-medium text-gray-600 mb-1">O que este tipo faz com o dia</legend>
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="radio" name="efeito_novo_tipo" value="nao_letivo" class="mt-0.5" checked>
+                                    <span class="text-xs text-gray-600">Descontar dos dias letivos <span class="text-gray-400">(feriado ou recesso, de segunda a sexta)</span></span>
+                                </label>
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="radio" name="efeito_novo_tipo" value="reposicao" class="mt-0.5">
+                                    <span class="text-xs text-gray-600">Contar sábado e domingo como dia letivo <span class="text-gray-400">(entra na meta de dias)</span></span>
+                                </label>
+                                <label class="flex items-start gap-2 cursor-pointer select-none">
+                                    <input type="radio" name="efeito_novo_tipo" value="neutro" class="mt-0.5">
+                                    <span class="text-xs text-gray-600">Só marcar no calendário <span class="text-gray-400">(não altera a conta)</span></span>
+                                </label>
+                            </fieldset>
                             <p id="novoTipoErro" class="hidden text-xs text-red-600"></p>
                             <div class="flex justify-end gap-2">
                                 <button type="button" onclick="toggleNovoTipo(false)" class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">Cancelar</button>
@@ -512,6 +523,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                             </div>
                         </div>
                         <?php endif; ?>
+                        <p id="efeitoTipoHint" class="hidden mt-2 text-xs text-gray-600"></p>
                     </div>
                     <div class="sm:col-span-2">
                         <label for="evento_descricao" class="block text-sm font-medium text-gray-700 mb-1">Descrição <span class="text-red-500">*</span></label>
@@ -786,6 +798,8 @@ var calendarioAtualId = <?= $calendarioId ?>;
 var baseUrl   = <?= json_encode(defined('URL') ? URL : '', $jsonJs) ?>;
 var podeExcluirTipo = <?= $podeExcluirTipo ? 'true' : 'false' ?>;
 var podeAlterarEvento = <?= $podeAlterarEvento ? 'true' : 'false' ?>;
+var tipoEfeitos = <?= json_encode(array_map(static fn ($t) => (string) ($t['efeito'] ?? 'neutro'), is_array($tipos) ? $tipos : []), $jsonJs) ?>;
+var tipoSistema = <?= json_encode(array_map(static fn ($t) => (int) ($t['sistema'] ?? 1) === 1, is_array($tipos) ? $tipos : []), $jsonJs) ?>;
 var eventosPorId = {};
 Object.keys(eventData).forEach(function (k) {
     eventData[k].forEach(function (ev) { eventosPorId[ev.id] = ev; });
@@ -1021,6 +1035,8 @@ function toggleNovoTipo(show) {
         if (err) { err.classList.add('hidden'); err.textContent = ''; }
         var nome = document.getElementById('novo_tipo_nome');
         if (nome) { nome.value = ''; nome.focus(); }
+        var padrao = document.querySelector('input[name="efeito_novo_tipo"][value="nao_letivo"]');
+        if (padrao) padrao.checked = true;
     }
 }
 
@@ -1082,7 +1098,7 @@ function adicionarTipoNaLegenda(tipo) {
 function salvarNovoTipo() {
     var nomeInp = document.getElementById('novo_tipo_nome');
     var corInp = document.getElementById('novo_tipo_cor');
-    var naoLetivo = document.getElementById('novo_tipo_nao_letivo');
+    var efeitoInp = document.querySelector('input[name="efeito_novo_tipo"]:checked');
     var btn = document.getElementById('btnSalvarTipo');
     var nome = nomeInp ? nomeInp.value.trim() : '';
     if (nome.length < 2) {
@@ -1094,7 +1110,7 @@ function salvarNovoTipo() {
     body.append('csrf_token', csrfToken);
     body.append('nome', nome);
     body.append('cor', corInp ? corInp.value : '#0d9488');
-    if (naoLetivo && naoLetivo.checked) body.append('nao_letivo', '1');
+    body.append('efeito', efeitoInp ? efeitoInp.value : 'nao_letivo');
     fetch(baseUrl + '/admin/calendario-letivo/salvar-tipo', {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -1110,12 +1126,15 @@ function salvarNovoTipo() {
         tipoBg[tipo.slug] = tipo.cor_fundo;
         tipoText[tipo.slug] = tipo.cor;
         tipoLabelsMap[tipo.slug] = tipo.nome;
+        tipoEfeitos[tipo.slug] = tipo.efeito || 'neutro';
+        tipoSistema[tipo.slug] = false;
         var grid = document.getElementById('tipoGrid');
         if (grid) {
             grid.appendChild(montarBotaoTipo(tipo, true));
         }
         adicionarTipoNaLegenda(tipo);
         toggleNovoTipo(false);
+        atualizarHintEfeito();
     }).catch(function () {
         if (btn) { btn.disabled = false; btn.textContent = 'Salvar tipo'; }
         mostrarErroTipo('Falha de rede. Tente de novo.');
@@ -1142,6 +1161,60 @@ function excluirTipo(slug, labelEl) {
         if (leg && leg.parentNode) leg.parentNode.removeChild(leg);
         var feriado = document.querySelector('#tipoGrid input[name="tipo"][value="feriado"]');
         if (feriado) feriado.checked = true;
+        atualizarHintEfeito();
+    }).catch(function () {
+        alert('Falha de rede. Tente de novo.');
+    });
+}
+
+function atualizarHintEfeito() {
+    var hint = document.getElementById('efeitoTipoHint');
+    if (!hint) return;
+    var radio = document.querySelector('#tipoGrid input[name="tipo"]:checked');
+    var slug = radio ? radio.value : '';
+    var sistema = !!(tipoSistema[slug]);
+    var efeito = tipoEfeitos[slug] || 'neutro';
+    hint.replaceChildren();
+    if (!slug || sistema) {
+        hint.classList.add('hidden');
+        return;
+    }
+    hint.classList.remove('hidden');
+    if (efeito === 'reposicao') {
+        hint.textContent = 'Sábado e domingo marcados com este tipo entram nos dias letivos.';
+        return;
+    }
+    hint.appendChild(document.createTextNode(
+        efeito === 'nao_letivo'
+            ? 'Este tipo desconta dia útil. Sábado e domingo não entram na conta. '
+            : 'No fim de semana este tipo só aparece no calendário. '
+    ));
+    if (!podeAlterarEvento) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'font-semibold text-gray-900 underline';
+    btn.textContent = 'Contar como dia letivo';
+    btn.addEventListener('click', function () { definirEfeitoTipo(slug, 'reposicao'); });
+    hint.appendChild(btn);
+}
+
+function definirEfeitoTipo(slug, efeito) {
+    var body = new FormData();
+    body.append('csrf_token', csrfToken);
+    body.append('slug', slug);
+    body.append('efeito', efeito);
+    fetch(baseUrl + '/admin/calendario-letivo/efeito-tipo', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: body
+    }).then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+    .then(function (pack) {
+        if (!pack.data || !pack.data.ok) {
+            alert((pack.data && pack.data.erro) || 'Não foi possível atualizar o tipo.');
+            return;
+        }
+        tipoEfeitos[slug] = pack.data.efeito || efeito;
+        window.location.reload();
     }).catch(function () {
         alert('Falha de rede. Tente de novo.');
     });
@@ -1171,6 +1244,9 @@ if (novoTipoPanel) {
         }
     });
 }
+var tipoGrid = document.getElementById('tipoGrid');
+if (tipoGrid) tipoGrid.addEventListener('change', atualizarHintEfeito);
+atualizarHintEfeito();
 <?php if (!$config): ?>
 openConfigDrawer();
 <?php endif; ?>
