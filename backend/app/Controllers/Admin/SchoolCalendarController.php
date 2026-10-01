@@ -38,6 +38,7 @@ class SchoolCalendarController extends AdminBaseController
             'status' => $status,
             'schema_pronto' => $service->tableExists(),
             'pode_publicar_escolar' => $this->podePublicarCalendarioEscolar($service),
+            'pode_alterar_evento' => $this->podeAcaoCalendario('alterar'),
             'pode_cadastrar_tipo' => $service->tabelaTiposExiste() && $this->podeAcaoCalendario('cadastrar'),
             'pode_excluir_tipo' => $service->tabelaTiposExiste() && $this->podeAcaoCalendario('excluir'),
             'tipos' => $visuais['tipos'],
@@ -72,7 +73,9 @@ class SchoolCalendarController extends AdminBaseController
 
     public function salvarEvento(): void
     {
-        if (!$this->enforceAdminPermissionKey('calendario_letivo', 'cadastrar', false)) {
+        $eventoId = (int) ($_POST['id'] ?? 0);
+        $acao = $eventoId > 0 ? 'alterar' : 'cadastrar';
+        if (!$this->enforceAdminPermissionKey('calendario_letivo', $acao, false)) {
             return;
         }
         if (!$this->validateCsrf((string) ($_POST['csrf_token'] ?? ''))) {
@@ -83,7 +86,7 @@ class SchoolCalendarController extends AdminBaseController
         $ano = (int) ($_POST['ano'] ?? date('Y'));
         $service = new SchoolCalendarService($this->db);
         $cfg = $service->getAno($ano);
-        if (!$cfg) {
+        if (!$cfg && $eventoId <= 0) {
             $service->salvarAno($ano, 200, 800, '');
             $cfg = $service->getAno($ano);
         }
@@ -100,26 +103,52 @@ class SchoolCalendarController extends AdminBaseController
             $tipo = 'feriado';
         }
         $local = trim((string) ($_POST['local_evento'] ?? ''));
+        $link = trim((string) ($_POST['link_reuniao'] ?? ''));
         $publicarEscolar = !empty($_POST['publicar_calendario_escolar']) && $this->podePublicarCalendarioEscolar($service);
         $visivelPais = (isset($_POST['visivel_pais']) || $publicarEscolar) ? 1 : 0;
+        $visivelAluno = isset($_POST['visivel_aluno']) ? 1 : 0;
+        $visivelProfessor = isset($_POST['visivel_professor']) ? 1 : 0;
         if ($inicio === '' || $descricao === '') {
             $this->setFlashMessage('Informe data e descrição do evento.', 'error');
             $this->redirect('/admin/calendario-letivo?ano=' . $ano);
             return;
         }
-        $service->salvarEvento(
-            (int) $cfg['id'],
-            $inicio,
-            $fim,
-            $tipo,
-            $descricao,
-            trim((string) ($_POST['link_reuniao'] ?? '')),
-            $local,
-            isset($_POST['visivel_aluno']) ? 1 : 0,
-            isset($_POST['visivel_professor']) ? 1 : 0,
-            $visivelPais,
-        );
-        $msg = 'Evento adicionado ao calendário letivo.';
+        $atualizando = $eventoId > 0;
+        if ($atualizando) {
+            $ok = $service->atualizarEvento(
+                $eventoId,
+                (int) $cfg['id'],
+                $inicio,
+                $fim,
+                $tipo,
+                $descricao,
+                $link,
+                $local,
+                $visivelAluno,
+                $visivelProfessor,
+                $visivelPais,
+            );
+            if (!$ok) {
+                $this->setFlashMessage('Não foi possível atualizar o evento.', 'error');
+                $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+                return;
+            }
+            $msg = 'Evento atualizado no calendário letivo.';
+        } else {
+            $service->salvarEvento(
+                (int) $cfg['id'],
+                $inicio,
+                $fim,
+                $tipo,
+                $descricao,
+                $link,
+                $local,
+                $visivelAluno,
+                $visivelProfessor,
+                $visivelPais,
+            );
+            $msg = 'Evento adicionado ao calendário letivo.';
+        }
         $escolarId = 0;
         if ($publicarEscolar) {
             $user = $this->auth->getUser();
@@ -131,9 +160,10 @@ class SchoolCalendarController extends AdminBaseController
                 $local,
                 (int) ($user['id'] ?? 0)
             );
+            $verbo = $atualizando ? 'atualizado' : 'adicionado';
             $msg = $escolarId > 0
-                ? 'Evento adicionado ao calendário letivo e publicado no calendário escolar. Os responsáveis foram notificados.'
-                : 'Evento adicionado ao calendário letivo. Não foi possível publicar no calendário escolar.';
+                ? 'Evento ' . $verbo . ' no calendário letivo e publicado no calendário escolar. Os responsáveis foram notificados.'
+                : 'Evento ' . $verbo . ' no calendário letivo. Não foi possível publicar no calendário escolar.';
         }
         $this->setFlashMessage($msg, $publicarEscolar && $escolarId <= 0 ? 'error' : 'success');
         $this->redirect('/admin/calendario-letivo?ano=' . $ano);

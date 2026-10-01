@@ -24,6 +24,24 @@ if ($tipoLabels === []) {
 }
 $podeCadastrarTipo = !empty($pode_cadastrar_tipo);
 $podeExcluirTipo = !empty($pode_excluir_tipo);
+$podeAlterarEvento = !empty($pode_alterar_evento);
+$eventoParaJs = static function (array $e) use ($tipoLabels): array {
+    return [
+        'id' => (int) $e['id'],
+        'tipo' => $e['tipo'],
+        'label' => $tipoLabels[$e['tipo']] ?? $e['tipo'],
+        'descricao' => $e['descricao'],
+        'inicio' => date('d/m/Y', strtotime((string) $e['data_inicio'])),
+        'fim' => date('d/m/Y', strtotime((string) $e['data_fim'])),
+        'data_inicio' => date('Y-m-d', strtotime((string) $e['data_inicio'])),
+        'data_fim' => date('Y-m-d', strtotime((string) $e['data_fim'])),
+        'link_reuniao' => $e['link_reuniao'] ?? '',
+        'local_evento' => $e['local_evento'] ?? '',
+        'visivel_aluno' => (int) ($e['visivel_aluno'] ?? 0),
+        'visivel_professor' => (int) ($e['visivel_professor'] ?? 0),
+        'visivel_pais' => (int) ($e['visivel_pais'] ?? 0),
+    ];
+};
 $coresTipoPreset = ['#0d9488', '#db2777', '#ea580c', '#0891b2', '#65a30d', '#e11d48', '#7c3aed', '#ca8a04'];
 $jsonJs = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
@@ -209,16 +227,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                 if (!empty($evsDia)) {
                     $evPayload = htmlspecialchars(json_encode([
                         'date'   => date('d/m/Y', $timestamp),
-                        'events' => array_map(fn($e) => [
-                            'id'           => (int) $e['id'],
-                            'tipo'         => $e['tipo'],
-                            'label'        => $tipoLabels[$e['tipo']] ?? $e['tipo'],
-                            'descricao'    => $e['descricao'],
-                            'inicio'       => date('d/m/Y', strtotime($e['data_inicio'])),
-                            'fim'          => date('d/m/Y', strtotime($e['data_fim'])),
-                            'link_reuniao' => $e['link_reuniao'] ?? '',
-                            'local_evento' => $e['local_evento'] ?? '',
-                        ], array_values($evsDia)),
+                        'events' => array_map($eventoParaJs, array_values($evsDia)),
                     ], $jsonJs), ENT_QUOTES);
                 }
             ?>
@@ -254,6 +263,9 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                 <p class="text-xs text-gray-500"><?= $periodo ?></p>
             </div>
             <span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$t] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$t] ?? '#374151') ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
+            <?php if ($podeAlterarEvento): ?>
+            <button type="button" onclick="editarEvento(<?= (int) $ev['id'] ?>)" class="text-xs text-gray-500 hover:text-gray-800 font-medium" title="Editar"><i class="fa-solid fa-pen"></i></button>
+            <?php endif; ?>
             <form method="post" action="<?= URL ?>/admin/calendario-letivo/excluir-evento" onsubmit="return confirm('Remover este evento?');" class="inline">
                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                 <input type="hidden" name="ano" value="<?= $ano ?>">
@@ -359,6 +371,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
     <form id="evento-form" method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-evento" class="flex flex-col flex-1 overflow-hidden">
         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
         <input type="hidden" name="ano" value="<?= $ano ?>">
+        <input type="hidden" name="id" id="evento_id" value="">
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do evento</h3>
@@ -465,7 +478,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
             <button type="button" onclick="closeEventoDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
-            <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
+            <button type="submit" id="eventoSubmitBtn" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <i class="fa-solid fa-plus mr-2"></i>Adicionar
             </button>
         </div>
@@ -660,6 +673,15 @@ function renderMes(mes) {
             '<span class="w-2 h-2 rounded-full flex-shrink-0" style="background:' + (tipoText[ev.tipo]||'#6b7280') + '"></span>' +
             '<div class="flex-1"><p class="font-medium" style="color:' + (tipoText[ev.tipo]||'#111') + '">' + escHtml(ev.descricao) + '</p>' +
             '<p class="text-xs opacity-75" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + escHtml(ev.label) + ' · ' + (dtI === dtF ? dtI : dtI + ' – ' + dtF) + '</p></div>';
+        if (podeAlterarEvento) {
+            var btnMes = document.createElement('button');
+            btnMes.type = 'button';
+            btnMes.className = 'text-xs font-medium px-2 py-1 rounded-lg border border-current/20 hover:opacity-80';
+            btnMes.style.color = tipoText[ev.tipo] || '#374151';
+            btnMes.innerHTML = '<i class="fa-solid fa-pen mr-1"></i>Editar';
+            btnMes.addEventListener('click', function () { editarEvento(ev.id); });
+            div.appendChild(btnMes);
+        }
         list.appendChild(div);
     });
 }
@@ -668,16 +690,7 @@ function renderMes(mes) {
 var eventData = <?php
     $jsMap = [];
     foreach ($eventMap as $k => $evs) {
-        $jsMap[$k] = array_map(fn($e) => [
-            'id'           => (int) $e['id'],
-            'tipo'         => $e['tipo'],
-            'label'        => $tipoLabels[$e['tipo']] ?? $e['tipo'],
-            'descricao'    => $e['descricao'],
-            'inicio'       => date('d/m/Y', strtotime($e['data_inicio'])),
-            'fim'          => date('d/m/Y', strtotime($e['data_fim'])),
-            'link_reuniao' => $e['link_reuniao'] ?? '',
-            'local_evento' => $e['local_evento'] ?? '',
-        ], array_values($evs));
+        $jsMap[$k] = array_map($eventoParaJs, array_values($evs));
     }
     echo json_encode($jsMap, $jsonJs);
 ?>;
@@ -692,6 +705,11 @@ var csrfToken = <?= json_encode($csrf_token ?? '', $jsonJs) ?>;
 var anoAtual  = <?= $ano ?>;
 var baseUrl   = <?= json_encode(defined('URL') ? URL : '', $jsonJs) ?>;
 var podeExcluirTipo = <?= $podeExcluirTipo ? 'true' : 'false' ?>;
+var podeAlterarEvento = <?= $podeAlterarEvento ? 'true' : 'false' ?>;
+var eventosPorId = {};
+Object.keys(eventData).forEach(function (k) {
+    eventData[k].forEach(function (ev) { eventosPorId[ev.id] = ev; });
+});
 
 function openDayModal(payloadStr) {
     var data = JSON.parse(payloadStr);
@@ -717,18 +735,29 @@ function openDayModal(payloadStr) {
         var extras = '';
         if (ev.local_evento) extras += '<span class="inline-flex items-center gap-1 mr-2"><i class="fa-solid fa-location-dot text-xs"></i>' + escHtml(ev.local_evento) + '</span>';
         if (ev.link_reuniao) extras += '<a href="' + escHtml(ev.link_reuniao) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 underline hover:opacity-80"><i class="fa-solid fa-link text-xs"></i>Acessar link</a>';
+        var acoes = '';
+        if (podeAlterarEvento) {
+            acoes += '<button type="button" class="btn-editar-evento text-xs font-medium px-2 py-1 rounded-lg border hover:opacity-80" style="border-color:' + (tipoText[ev.tipo]||'#6b7280') + '; color:' + (tipoText[ev.tipo]||'#374151') + '; background:#fff;"><i class="fa-solid fa-pen mr-1"></i>Editar</button>';
+        }
         div.innerHTML =
             '<div class="flex-1 min-w-0">' +
                 '<p class="text-sm font-semibold" style="color:' + (tipoText[ev.tipo]||'#111') + '">' + escHtml(ev.descricao) + '</p>' +
                 '<p class="text-xs mt-0.5" style="color:' + (tipoText[ev.tipo]||'#666') + '; opacity:0.75">' + escHtml(ev.label) + ' · ' + escHtml(periodo) + '</p>' +
                 (extras ? '<p class="text-xs mt-1" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + extras + '</p>' : '') +
             '</div>' +
-            '<form method="post" action="' + baseUrl + '/admin/calendario-letivo/excluir-evento" onsubmit="return confirm(\'Remover este evento?\')">' +
-                '<input type="hidden" name="csrf_token" value="' + escHtml(csrfToken) + '">' +
-                '<input type="hidden" name="ano" value="' + anoAtual + '">' +
-                '<input type="hidden" name="id" value="' + ev.id + '">' +
-                '<button type="submit" class="text-xs font-medium px-2 py-1 rounded-lg hover:opacity-80 transition-opacity" style="background:' + (tipoText[ev.tipo]||'#ef4444') + '; color:#fff;"><i class="fa-solid fa-trash-can mr-1"></i>Remover</button>' +
-            '</form>';
+            '<div class="flex flex-col gap-1.5 flex-shrink-0">' +
+                acoes +
+                '<form method="post" action="' + baseUrl + '/admin/calendario-letivo/excluir-evento" onsubmit="return confirm(\'Remover este evento?\')">' +
+                    '<input type="hidden" name="csrf_token" value="' + escHtml(csrfToken) + '">' +
+                    '<input type="hidden" name="ano" value="' + anoAtual + '">' +
+                    '<input type="hidden" name="id" value="' + ev.id + '">' +
+                    '<button type="submit" class="text-xs font-medium px-2 py-1 rounded-lg hover:opacity-80 transition-opacity" style="background:' + (tipoText[ev.tipo]||'#ef4444') + '; color:#fff;"><i class="fa-solid fa-trash-can mr-1"></i>Remover</button>' +
+                '</form>' +
+            '</div>';
+        var btnEditar = div.querySelector('.btn-editar-evento');
+        if (btnEditar) {
+            btnEditar.addEventListener('click', function () { editarEvento(ev.id); });
+        }
         body.appendChild(div);
     });
 
@@ -769,6 +798,46 @@ function hideDrawer(backdropId, drawerId) {
 function openConfigDrawer() { showDrawer('configDrawerBackdrop', 'configDrawer'); }
 function closeConfigDrawer() { hideDrawer('configDrawerBackdrop', 'configDrawer'); }
 
+function definirModoEvento(editando) {
+    var titulo = document.getElementById('eventoDrawerTitle');
+    var btn = document.getElementById('eventoSubmitBtn');
+    if (titulo) titulo.textContent = editando ? 'Editar evento' : 'Adicionar evento';
+    if (btn) {
+        btn.innerHTML = editando
+            ? '<i class="fa-solid fa-check mr-2"></i>Salvar'
+            : '<i class="fa-solid fa-plus mr-2"></i>Adicionar';
+    }
+}
+
+function preencherFormEvento(ev) {
+    document.getElementById('evento_id').value = ev.id;
+    document.getElementById('evento_data_inicio').value = ev.data_inicio || '';
+    document.getElementById('evento_data_fim').value = ev.data_fim || '';
+    document.getElementById('evento_descricao').value = ev.descricao || '';
+    document.getElementById('evento_local').value = ev.local_evento || '';
+    document.getElementById('evento_link').value = ev.link_reuniao || '';
+    var radios = document.querySelectorAll('#evento-form input[name="tipo"]');
+    var marcado = false;
+    radios.forEach(function (radio) {
+        radio.checked = radio.value === ev.tipo;
+        if (radio.checked) marcado = true;
+    });
+    if (!marcado && radios.length) radios[0].checked = true;
+    document.getElementById('evento_visivel_aluno').checked = Number(ev.visivel_aluno) === 1;
+    document.getElementById('evento_visivel_professor').checked = Number(ev.visivel_professor) === 1;
+    document.getElementById('evento_visivel_pais').checked = Number(ev.visivel_pais) === 1;
+    var pub = document.getElementById('evento_publicar_escolar');
+    if (pub) pub.checked = false;
+    definirModoEvento(true);
+}
+
+function editarEvento(id) {
+    var ev = eventosPorId[id];
+    if (!ev) return;
+    closeDayModal();
+    openEventoDrawer({ evento: ev });
+}
+
 function openEventoDrawer(opts) {
     opts = opts || {};
     var form = document.getElementById('evento-form');
@@ -776,9 +845,12 @@ function openEventoDrawer(opts) {
     var savedFim = opts.keepDates ? document.getElementById('evento_data_fim').value : '';
     form.reset();
     toggleNovoTipo(false);
+    definirModoEvento(false);
     var feriado = form.querySelector('input[name="tipo"][value="feriado"]');
     if (feriado) feriado.checked = true;
-    if (opts.keepDates) {
+    if (opts.evento) {
+        preencherFormEvento(opts.evento);
+    } else if (opts.keepDates) {
         document.getElementById('evento_data_inicio').value = savedInicio;
         document.getElementById('evento_data_fim').value = savedFim;
     }

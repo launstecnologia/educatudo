@@ -374,6 +374,58 @@ class SchoolCalendarService
         );
     }
 
+    public function atualizarEvento(
+        int $eventoId,
+        int $calendarioId,
+        string $inicio,
+        string $fim,
+        string $tipo,
+        string $descricao,
+        string $linkReuniao = '',
+        string $localEvento = '',
+        int $visivelAluno = 0,
+        int $visivelProfessor = 0,
+        int $visivelPais = 0
+    ): bool {
+        if ($eventoId <= 0 || $calendarioId <= 0 || !$this->tableExists()) {
+            return false;
+        }
+        $existente = $this->db->fetch(
+            "SELECT id FROM calendario_letivo_eventos WHERE id = :id AND calendario_id = :c LIMIT 1",
+            ['id' => $eventoId, 'c' => $calendarioId]
+        );
+        if (!$existente) {
+            return false;
+        }
+        if (!$this->tipoValido($tipo)) {
+            $tipo = 'feriado';
+        }
+        if ($fim < $inicio) {
+            [$inicio, $fim] = [$fim, $inicio];
+        }
+        $this->db->update(
+            "UPDATE calendario_letivo_eventos
+                SET data_inicio = :i, data_fim = :f, tipo = :t, descricao = :d,
+                    link_reuniao = :lr, local_evento = :le,
+                    visivel_aluno = :va, visivel_professor = :vp, visivel_pais = :vpais
+              WHERE id = :id AND calendario_id = :c",
+            [
+                'id'    => $eventoId,
+                'c'     => $calendarioId,
+                'i'     => $inicio,
+                'f'     => $fim,
+                't'     => $tipo,
+                'd'     => mb_substr($descricao, 0, 255),
+                'lr'    => $linkReuniao !== '' ? mb_substr($linkReuniao, 0, 500) : null,
+                'le'    => $localEvento !== '' ? mb_substr($localEvento, 0, 255) : null,
+                'va'    => $visivelAluno ? 1 : 0,
+                'vp'    => $visivelProfessor ? 1 : 0,
+                'vpais' => $visivelPais ? 1 : 0,
+            ]
+        );
+        return true;
+    }
+
     public function excluirEvento(int $eventoId): void
     {
         if ($eventoId <= 0 || !$this->tableExists()) {
