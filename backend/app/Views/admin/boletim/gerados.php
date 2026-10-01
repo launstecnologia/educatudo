@@ -50,22 +50,6 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
     return URL . '/admin/boletim-configuracao/gerados' . ($qs !== '' ? ('?' . $qs) : '');
 };
 
-$formatData = static function ($value): string {
-    $v = trim((string) $value);
-    if ($v === '' || $v === '0000-00-00') {
-        return '—';
-    }
-    $ts = strtotime($v);
-    return $ts ? date('d/m/Y', $ts) : $v;
-};
-$formatDataHora = static function ($value): string {
-    $v = trim((string) $value);
-    if ($v === '' || $v === '0000-00-00 00:00:00') {
-        return '—';
-    }
-    $ts = strtotime($v);
-    return $ts ? date('d/m/Y H:i:s', $ts) : $v;
-};
 ?>
 <div class="space-y-6">
     <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -87,7 +71,7 @@ $formatDataHora = static function ($value): string {
         <div class="p-4 rounded-lg border <?= $bgClass ?>"><?= htmlspecialchars($flashMessage, ENT_QUOTES, 'UTF-8') ?></div>
     <?php endif; ?>
 
-    <form method="GET" action="<?= URL ?>/admin/boletim-configuracao/gerados"
+    <form method="GET" id="form-filtros-gerados" action="<?= URL ?>/admin/boletim-configuracao/gerados"
           class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Regra</label>
@@ -158,7 +142,13 @@ $formatDataHora = static function ($value): string {
                     <span id="qtd-selecionados">0</span> selecionado(s)
                 </span>
             </div>
-            <?php if (!empty($rows)): ?>
+            <div class="flex items-center gap-2 flex-wrap">
+                <?php if ($total > 0): ?>
+                    <span class="text-xs text-gray-500 mr-1">Exportar notas</span>
+                    <button type="button" class="btn-exportar-notas inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50" data-formato="json">JSON</button>
+                    <button type="button" class="btn-exportar-notas inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-50" data-formato="excel">Excel</button>
+                    <button type="button" class="btn-exportar-notas inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-300 text-indigo-800 bg-white hover:bg-indigo-50" data-formato="pdf">PDF</button>
+                <?php endif; ?>
                 <button type="button" id="btn-excluir-selecionados"
                         class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-red-300 text-red-700 bg-white hover:bg-red-50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -166,7 +156,7 @@ $formatDataHora = static function ($value): string {
                     </svg>
                     Excluir selecionados
                 </button>
-            <?php endif; ?>
+            </div>
         </div>
 
         <?php if (empty($rows)): ?>
@@ -182,8 +172,7 @@ $formatDataHora = static function ($value): string {
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Aluno</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Turma</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Regra</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Período</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Datas</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Bimestre</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Linhas</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tipo</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Histórico</th>
@@ -224,12 +213,11 @@ $formatDataHora = static function ($value): string {
                                         <span class="block text-[11px] font-normal text-gray-500"><?= htmlspecialchars((string) $row['regra_codigo'], ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-3 py-2 text-gray-700"><?= htmlspecialchars($periodoRef, ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
-                                <td class="px-3 py-2 text-gray-700 whitespace-nowrap">
-                                    <?= htmlspecialchars($formatData($row['data_inicio'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                                    <span class="text-gray-400 mx-1">→</span>
-                                    <?= htmlspecialchars($formatData($row['data_fim'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                                </td>
+                                <td class="px-3 py-2 text-gray-700 whitespace-nowrap"><?= htmlspecialchars(PeriodoLetivo::rotuloBoletim(
+                                    (int) ($row['regra_ano_letivo'] ?? 0),
+                                    (int) ($row['regra_bimestre'] ?? 0),
+                                    (string) ($row['regra_nome'] ?? '')
+                                ), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td class="px-3 py-2 text-gray-700"><?= $linhasQtd ?></td>
                                 <td class="px-3 py-2">
                                     <?php if ($previewFlag === 1): ?>
@@ -268,7 +256,7 @@ $formatDataHora = static function ($value): string {
                                 </td>
                             </tr>
                             <tr class="preview-row hidden">
-                                <td colspan="10" class="px-3 py-3 bg-indigo-50/40">
+                                <td colspan="9" class="px-3 py-3 bg-indigo-50/40">
                                     <div class="preview-content rounded-lg bg-white border border-indigo-100 p-3 text-sm text-gray-700">
                                         <div class="preview-placeholder text-gray-500">Carregando preview…</div>
                                     </div>
@@ -297,6 +285,17 @@ $formatDataHora = static function ($value): string {
 </div>
 
 <script>
+(function () {
+    var exportUrl = <?= json_encode(URL . '/admin/boletim-configuracao/gerados/exportar', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+    document.querySelectorAll('.btn-exportar-notas').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var form = document.getElementById('form-filtros-gerados');
+            var params = new URLSearchParams(form ? new FormData(form) : undefined);
+            params.set('formato', btn.getAttribute('data-formato') || 'json');
+            window.location = exportUrl + '?' + params.toString();
+        });
+    });
+})();
 (function () {
     var csrf = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     var baseUrl = <?= json_encode(rtrim((string) (defined('URL') ? URL : ''), '/'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;

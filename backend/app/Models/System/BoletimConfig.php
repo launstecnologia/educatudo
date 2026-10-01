@@ -271,11 +271,14 @@ class BoletimConfig
      *
      * @return array{rows: array<int, array<string, mixed>>, total: int}
      */
-    public function listGeneratedBoletinsAdmin(int $limit = 50, int $offset = 0, array $filters = []): array
+    /**
+     * Mesmos filtros da listagem de boletins gerados.
+     *
+     * @param array<string,mixed> $filters
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private function whereBoletinsGeradosAdmin(array $filters): array
     {
-        $limit = max(1, min(500, $limit));
-        $offset = max(0, $offset);
-
         $where = ['1=1'];
         $params = [];
 
@@ -310,15 +313,10 @@ class BoletimConfig
         }
         $alunoQ = trim((string) ($filters['aluno_q'] ?? ''));
         if ($alunoQ !== '') {
-            // O wrapper de Database desta aplicação exige nomes únicos por ocorrência
-            // do placeholder no SQL, então usamos duas chaves distintas com o mesmo valor.
             $where[] = '(a.nome LIKE :aluno_q_nome OR a.ra LIKE :aluno_q_ra)';
             $params['aluno_q_nome'] = '%' . $alunoQ . '%';
             $params['aluno_q_ra'] = '%' . $alunoQ . '%';
         }
-        // Filtros por intervalo de data/hora de atualização (updated_at). Aceita
-        // formato YYYY-MM-DD ou YYYY-MM-DDTHH:MM (datetime-local). Quando só a
-        // data é informada, expandimos para o início/fim do dia para incluir tudo.
         $atualizadoDe = trim((string) ($filters['atualizado_de'] ?? ''));
         if ($atualizadoDe !== '') {
             $atualizadoDe = $this->normalizarDataHoraIntervalo($atualizadoDe, false);
@@ -335,11 +333,33 @@ class BoletimConfig
                 $params['atualizado_ate'] = $atualizadoAte;
             }
         }
-        $whereSql = implode(' AND ', $where);
+
+        return [implode(' AND ', $where), $params];
+    }
+
+    public function listGeneratedBoletinsAdmin(int $limit = 50, int $offset = 0, array $filters = []): array
+    {
+        $limit = max(1, min(500, $limit));
+        $offset = max(0, $offset);
+
+        [$whereSql, $params] = $this->whereBoletinsGeradosAdmin($filters);
 
         $versaoSelect = $this->hasColumn('boletim_resultados_gerados', 'versao')
             ? 'MAX(g.versao) AS versao,'
             : '1 AS versao,';
+        $bimestreSelect = $this->hasColumn('boletim_regras', 'bimestre')
+            ? 'r.bimestre AS regra_bimestre,'
+            : 'NULL AS regra_bimestre,';
+        $anoSelect = $this->hasColumn('boletim_regras', 'ano_letivo')
+            ? 'r.ano_letivo AS regra_ano_letivo,'
+            : 'NULL AS regra_ano_letivo,';
+        $groupExtra = '';
+        if ($this->hasColumn('boletim_regras', 'bimestre')) {
+            $groupExtra .= ', r.bimestre';
+        }
+        if ($this->hasColumn('boletim_regras', 'ano_letivo')) {
+            $groupExtra .= ', r.ano_letivo';
+        }
         $rows = $this->db->fetchAll(
             "SELECT
                 g.regra_id,
@@ -350,6 +370,8 @@ class BoletimConfig
                 MAX(g.data_fim) AS data_fim,
                 COUNT(*) AS linhas_qtd,
                 {$versaoSelect}
+                {$bimestreSelect}
+                {$anoSelect}
                 MAX(g.updated_at) AS updated_at,
                 r.nome AS regra_nome,
                 r.codigo AS regra_codigo,
@@ -362,7 +384,7 @@ class BoletimConfig
              INNER JOIN alunos a ON a.id = g.aluno_id
              LEFT JOIN turmas t ON t.id = a.turma_id
              WHERE {$whereSql}
-             GROUP BY g.regra_id, g.aluno_id, g.periodo_ref, r.nome, r.codigo, r.exibir_em, a.nome, a.ra, t.nome
+             GROUP BY g.regra_id, g.aluno_id, g.periodo_ref, r.nome, r.codigo, r.exibir_em{$groupExtra}, a.nome, a.ra, t.nome
              ORDER BY updated_at DESC, g.aluno_id ASC, g.regra_id ASC, g.periodo_ref ASC
              LIMIT {$limit} OFFSET {$offset}",
             $params
@@ -382,6 +404,99 @@ class BoletimConfig
         $total = (int) ($totalRow['total'] ?? 0);
 
         return ['rows' => $this->anexarVersoesNasLinhas($rows), 'total' => $total];
+    }
+
+    /**
+     * Boletins do filtro, com todas as matérias e notas da versão listada.
+     *
+     * @param array<string,mixed> $filters
+     * @return list<array<string,mixed>>
+     */
+    public function listarNotasExportacaoGerados(array $filters): array
+    {
+        [$whereSql, $params] = $this->whereBoletinsGeradosAdmin($filters);
+        $versaoSel = $this->hasColumn('boletim_resultados_gerados', 'versao')
+            ? 'g.versao'
+            : '1 AS versao';
+        $rows = $this->db->fetchAll(
+            "SELECT
+                g.regra_id,
+                g.aluno_id,
+                g.periodo_ref,
+                {$versaoSel},
+                g.preview,
+                g.data_inicio,
+                g.data_fim,
+                g.materia_nome,
+                g.ordem_linha,
+                g.colunas_json,
+                g.notas_json,
+                r.nome AS regra_nome,
+                r.codigo AS regra_codigo,
+                r.bimestre AS regra_bimestre,
+                r.ano_letivo AS regra_ano_letivo,
+                r.exibir_em,
+                r.decimal_places,
+                a.nome AS aluno_nome,
+                a.ra AS aluno_ra,
+                t.nome AS turma_nome
+             FROM boletim_resultados_gerados g
+             INNER JOIN boletim_regras r ON r.id = g.regra_id
+             INNER JOIN alunos a ON a.id = g.aluno_id
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE {$whereSql}
+             ORDER BY a.nome ASC, r.nome ASC, g.periodo_ref ASC, g.ordem_linha ASC, g.id ASC
+             LIMIT 80001",
+            $params
+        ) ?: [];
+
+        $truncado = count($rows) > 80000;
+        if ($truncado) {
+            $rows = array_slice($rows, 0, 80000);
+        }
+
+        $boletins = [];
+        foreach ($rows as $r) {
+            $chave = (int) ($r['regra_id'] ?? 0) . '|' . (int) ($r['aluno_id'] ?? 0) . '|' . (string) ($r['periodo_ref'] ?? '') . '|' . (int) ($r['versao'] ?? 1);
+            if (!isset($boletins[$chave])) {
+                $colsRaw = trim((string) ($r['colunas_json'] ?? ''));
+                $decCols = $colsRaw !== '' ? json_decode($colsRaw, true) : [];
+                $boletins[$chave] = [
+                    'aluno' => (string) ($r['aluno_nome'] ?? ''),
+                    'ra' => (string) ($r['aluno_ra'] ?? ''),
+                    'turma' => (string) ($r['turma_nome'] ?? ''),
+                    'regra_id' => (int) ($r['regra_id'] ?? 0),
+                    'regra' => (string) ($r['regra_nome'] ?? ''),
+                    'regra_codigo' => (string) ($r['regra_codigo'] ?? ''),
+                    'bimestre' => isset($r['regra_bimestre']) && $r['regra_bimestre'] !== null && $r['regra_bimestre'] !== ''
+                        ? (int) $r['regra_bimestre']
+                        : null,
+                    'ano_letivo' => isset($r['regra_ano_letivo']) && $r['regra_ano_letivo'] !== null && $r['regra_ano_letivo'] !== ''
+                        ? (int) $r['regra_ano_letivo']
+                        : null,
+                    'periodo' => (string) ($r['periodo_ref'] ?? ''),
+                    'data_inicio' => (string) ($r['data_inicio'] ?? ''),
+                    'data_fim' => (string) ($r['data_fim'] ?? ''),
+                    'versao' => (int) ($r['versao'] ?? 1),
+                    'exibir_em' => (string) ($r['exibir_em'] ?? ''),
+                    'decimal_places' => $this->normalizeDecimalPlaces((int) ($r['decimal_places'] ?? 2)),
+                    'preview' => (int) ($r['preview'] ?? 0),
+                    'colunas' => is_array($decCols) ? $decCols : [],
+                    'linhas' => [],
+                ];
+            }
+            $notasRaw = trim((string) ($r['notas_json'] ?? ''));
+            $decNotas = $notasRaw !== '' ? json_decode($notasRaw, true) : [];
+            $boletins[$chave]['linhas'][] = [
+                'materia' => (string) ($r['materia_nome'] ?? 'Sem matéria'),
+                'notas' => is_array($decNotas) ? $decNotas : [],
+            ];
+        }
+
+        return [
+            'boletins' => array_values($boletins),
+            'truncado' => $truncado,
+        ];
     }
 
     /**
@@ -422,6 +537,7 @@ class BoletimConfig
 
         $rows = $this->db->fetchAll(
             "SELECT g.*, r.nome AS regra_nome, r.codigo AS regra_codigo, r.exibir_em, r.decimal_places,
+                    r.bimestre AS regra_bimestre, r.ano_letivo AS regra_ano_letivo,
                     a.nome AS aluno_nome, a.ra AS aluno_ra, t.nome AS turma_nome
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
@@ -457,6 +573,12 @@ class BoletimConfig
             'aluno_nome' => (string) ($first['aluno_nome'] ?? ''),
             'aluno_ra' => (string) ($first['aluno_ra'] ?? ''),
             'turma_nome' => (string) ($first['turma_nome'] ?? ''),
+            'bimestre' => isset($first['regra_bimestre']) && $first['regra_bimestre'] !== null && $first['regra_bimestre'] !== ''
+                ? (int) $first['regra_bimestre']
+                : null,
+            'ano_letivo' => isset($first['regra_ano_letivo']) && $first['regra_ano_letivo'] !== null && $first['regra_ano_letivo'] !== ''
+                ? (int) $first['regra_ano_letivo']
+                : null,
             'colunas' => [],
             'linhas' => [],
         ];

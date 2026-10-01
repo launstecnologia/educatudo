@@ -374,6 +374,7 @@ $router->post('/admin/boletim-configuracao/simular-lote', 'Admin/BoletimConfigCo
 $router->post('/admin/boletim-configuracao/publicar-boletim-aluno', 'Admin/BoletimConfigController@publicarBoletimAlunoSimulado');
 $router->post('/admin/boletim-configuracao/atualizar-boletins-gravados', 'Admin/BoletimConfigController@atualizarBoletinsGravados');
 $router->get('/admin/boletim-configuracao/gerados', 'Admin/BoletimConfigController@boletinsGerados');
+$router->get('/admin/boletim-configuracao/gerados/exportar', 'Admin/BoletimConfigController@exportarBoletinsGerados');
 $router->get('/admin/boletim-configuracao/gerados/preview', 'Admin/BoletimConfigController@boletimGeradoPreview');
 $router->post('/admin/boletim-configuracao/gerados/excluir', 'Admin/BoletimConfigController@excluirBoletimGeradoAdmin');
 $router->post('/admin/boletim-configuracao/gerados/excluir-lote', 'Admin/BoletimConfigController@excluirBoletimGeradoLote');

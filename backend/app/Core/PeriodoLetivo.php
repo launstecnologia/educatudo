@@ -187,6 +187,30 @@ class PeriodoLetivo
         return (string) ($info['rotulos'][$numero] ?? ($numero . 'º ' . $info['rotulo_campo']));
     }
 
+    /**
+     * Rótulo visível do boletim (ex.: "2º Bimestre"). Sem número na regra, tenta o nome.
+     */
+    public static function rotuloBoletim(int $ano, int $numero, string $nomeRegra = ''): string
+    {
+        if ($ano <= 0) {
+            $ano = (int) date('Y');
+        }
+        if ($numero > 0) {
+            $rotulo = self::rotulo($ano, $numero);
+            if ($rotulo !== '') {
+                return $rotulo;
+            }
+        }
+        if (preg_match('/(\d+)\s*[ºo°]\s*(bimestre|trimestre|semestre)/iu', $nomeRegra, $m)) {
+            $tipo = function_exists('mb_strtolower') ? mb_strtolower($m[2], 'UTF-8') : strtolower($m[2]);
+            $tipo = function_exists('mb_convert_case')
+                ? mb_convert_case($tipo, MB_CASE_TITLE, 'UTF-8')
+                : ucfirst($tipo);
+            return $m[1] . 'º ' . $tipo;
+        }
+        return '—';
+    }
+
     public static function mensagemNumeroInvalido(int $ano): string
     {
         $campo = strtolower((string) self::doAno($ano)['rotulo_campo']);

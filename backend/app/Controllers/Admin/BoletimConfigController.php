@@ -752,6 +752,49 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * GET /admin/boletim-configuracao/gerados/exportar?formato=json|excel|pdf
+     *
+     * Exporta todos os boletins do filtro atual, com uma linha por matéria e todas as notas.
+     */
+    public function exportarBoletinsGerados(): void
+    {
+        $formato = strtolower(trim((string) ($_GET['formato'] ?? '')));
+        if (!in_array($formato, ['json', 'excel', 'pdf'], true)) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Escolha JSON, Excel ou PDF.';
+            return;
+        }
+
+        $exibirEm = strtolower(trim((string) ($_GET['exibir_em'] ?? '')));
+        if (!in_array($exibirEm, ['boletim', 'notas'], true)) {
+            $exibirEm = '';
+        }
+        $previewFilter = strtolower(trim((string) ($_GET['preview'] ?? 'all')));
+        if (!in_array($previewFilter, ['0', '1', 'all'], true)) {
+            $previewFilter = 'all';
+        }
+        $filters = [
+            'regra_id' => isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0,
+            'aluno_id' => isset($_GET['aluno_id']) ? (int) $_GET['aluno_id'] : 0,
+            'aluno_q' => trim((string) ($_GET['aluno_q'] ?? '')),
+            'exibir_em' => $exibirEm,
+            'preview' => $previewFilter,
+            'atualizado_de' => trim((string) ($_GET['atualizado_de'] ?? '')),
+            'atualizado_ate' => trim((string) ($_GET['atualizado_ate'] ?? '')),
+        ];
+
+        $pacote = $this->boletimConfig->listarNotasExportacaoGerados($filters);
+        require_once __DIR__ . '/../../Services/BoletimGeradosExportacao.php';
+        BoletimGeradosExportacao::enviar(
+            $formato,
+            (array) ($pacote['boletins'] ?? []),
+            !empty($pacote['truncado'])
+        );
+        exit;
+    }
+
+    /**
      * GET /admin/boletim-configuracao/gerados/preview
      *
      * Retorna apenas o HTML do partial `boletins_gerados.php` para um par
@@ -784,12 +827,17 @@ class BoletimConfigController extends BaseController
             return;
         }
 
+        $rotuloBimestre = PeriodoLetivo::rotuloBoletim(
+            (int) ($evento['ano_letivo'] ?? 0),
+            (int) ($evento['bimestre'] ?? 0),
+            (string) ($evento['regra_nome'] ?? '')
+        );
         $cabecalho = sprintf(
-            '<div class="mb-3 text-sm text-gray-700"><strong>Aluno:</strong> %s%s &middot; <strong>Regra:</strong> %s &middot; <strong>Período:</strong> %s%s%s</div>',
+            '<div class="mb-3 text-sm text-gray-700"><strong>Aluno:</strong> %s%s &middot; <strong>Regra:</strong> %s &middot; <strong>Bimestre:</strong> %s%s%s</div>',
             htmlspecialchars((string) ($evento['aluno_nome'] ?? ''), ENT_QUOTES, 'UTF-8'),
             $evento['aluno_ra'] ? ' (RA ' . htmlspecialchars((string) $evento['aluno_ra'], ENT_QUOTES, 'UTF-8') . ')' : '',
             htmlspecialchars((string) ($evento['regra_nome'] ?? ''), ENT_QUOTES, 'UTF-8'),
-            htmlspecialchars((string) ($evento['periodo_ref'] ?? ''), ENT_QUOTES, 'UTF-8'),
+            htmlspecialchars($rotuloBimestre, ENT_QUOTES, 'UTF-8'),
             ((int) ($evento['preview'] ?? 0) === 1)
                 ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800">preview</span>'
                 : '',
