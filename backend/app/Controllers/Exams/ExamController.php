@@ -5740,12 +5740,6 @@ class ExamController extends BaseController
             $tiposAvaliacaoParaFiltro = [];
         }
 
-        if (!class_exists('LayoutHelper')) {
-            require_once __DIR__ . '/../../Core/LayoutHelper.php';
-        }
-        $primaryColor = LayoutHelper::get('primary_color', '#3b82f6');
-        $primaryTextColor = LayoutHelper::get('primary_text_color', '#ffffff');
-        
         $totalPages = $perPage > 0 ? (int)ceil($totalBlocos / $perPage) : 1;
         $pagination = [
             'page' => $page,
@@ -5764,8 +5758,6 @@ class ExamController extends BaseController
             'stats' => $stats,
             'provas_pendentes' => $provasPendentes,
             'canceladas_por_bloco' => $canceladasPorBloco,
-            'primary_color' => $primaryColor,
-            'primary_text_color' => $primaryTextColor,
             'current_page' => 'provas',
             'filters' => $filters,
             'turmas' => $turmas,

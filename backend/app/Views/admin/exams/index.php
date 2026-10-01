@@ -449,8 +449,8 @@ document.addEventListener('keydown', function(e) {
                             </td>
                             <td class="px-6 py-4 text-sm font-medium">
                                 <button type="button" 
-                                        class="btn-acoes-bloco inline-flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors text-white hover:opacity-90"
-                                        style="background-color: <?= htmlspecialchars($primary_color ?? '#3b82f6') ?>; color: <?= htmlspecialchars($primary_text_color ?? '#ffffff') ?>; border-color: <?= htmlspecialchars($primary_color ?? '#3b82f6') ?>"
+                                        class="btn-acoes-bloco btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors hover:opacity-90"
+                                        style="border-color: var(--button-primary-color)"
                                         title="Ações"
                                         data-bloco-id="<?= (int)$bloco['id'] ?>"
                                         data-status="<?= htmlspecialchars($st) ?>"
