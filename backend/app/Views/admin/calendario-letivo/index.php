@@ -154,7 +154,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 <!-- View mensal (gerada via JS) -->
 <div id="viewMes" class="hidden mb-8">
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div id="mesCabecalho" class="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style="background-color: var(--primary-color);">
+        <div id="mesCabecalho" class="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style="background-color: var(--button-primary-color);">
             <span id="mesTitulo" class="text-base font-bold" style="color: var(--primary-text-color);"></span>
             <span class="text-sm opacity-75" style="color: var(--primary-text-color);"><?= $ano ?></span>
         </div>
@@ -181,7 +181,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
     $offset = $inicioSemana % 7; // dom=0,seg=1..sab=6
 ?>
 <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between" style="background-color: var(--primary-color);">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between" style="background-color: var(--button-primary-color);">
         <span class="text-sm font-semibold" style="color: var(--primary-text-color);"><?= $mesesNomes[$mes-1] ?></span>
         <span class="text-xs opacity-75" style="color: var(--primary-text-color);"><?= $ano ?></span>
     </div>
