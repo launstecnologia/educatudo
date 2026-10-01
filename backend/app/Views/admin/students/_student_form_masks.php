@@ -106,6 +106,68 @@
         });
     }
 
+    var ufNascimento = document.getElementById('uf_nascimento');
+    var naturalidade = document.getElementById('naturalidade');
+    if (ufNascimento && naturalidade) {
+        var cidadeSalva = naturalidade.getAttribute('data-cidade') || '';
+        var pedidoCidades = 0;
+
+        function normalizarNome(valor) {
+            return (valor || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        }
+
+        function opcaoCidade(valor, texto, selecionada) {
+            var option = document.createElement('option');
+            option.value = valor;
+            option.textContent = texto;
+            if (selecionada) option.selected = true;
+            return option;
+        }
+
+        function carregarCidadesNascimento(uf, manter) {
+            var pedido = ++pedidoCidades;
+            naturalidade.innerHTML = '';
+            naturalidade.appendChild(opcaoCidade('', uf ? 'Carregando cidades...' : 'Selecione o estado', !manter));
+            if (manter) {
+                naturalidade.appendChild(opcaoCidade(manter, manter, true));
+            }
+            if (!uf) return;
+
+            fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/' + encodeURIComponent(uf) + '/municipios?orderBy=nome')
+                .then(function (response) { return response.json(); })
+                .then(function (lista) {
+                    if (pedido !== pedidoCidades) return;
+                    naturalidade.innerHTML = '';
+                    naturalidade.appendChild(opcaoCidade('', 'Selecione', false));
+                    var alvo = normalizarNome(manter);
+                    var achou = false;
+                    (lista || []).forEach(function (municipio) {
+                        var nome = (municipio && municipio.nome) ? municipio.nome : '';
+                        if (!nome) return;
+                        var selecionada = alvo !== '' && normalizarNome(nome) === alvo;
+                        if (selecionada) achou = true;
+                        naturalidade.appendChild(opcaoCidade(nome, nome, selecionada));
+                    });
+                    if (manter && !achou) {
+                        naturalidade.appendChild(opcaoCidade(manter, manter, true));
+                    }
+                })
+                .catch(function () {
+                    if (pedido !== pedidoCidades) return;
+                    naturalidade.innerHTML = '';
+                    naturalidade.appendChild(opcaoCidade('', 'Não foi possível carregar as cidades', !manter));
+                    if (manter) naturalidade.appendChild(opcaoCidade(manter, manter, true));
+                });
+        }
+
+        ufNascimento.addEventListener('change', function () {
+            carregarCidadesNascimento(ufNascimento.value, '');
+        });
+        if (ufNascimento.value) {
+            carregarCidadesNascimento(ufNascimento.value, cidadeSalva);
+        }
+    }
+
     window.studentFormNormalizeDocumentoEndereco = function (formData) {
         formData.set('cpf', onlyDigits(formData.get('cpf') || ''));
         formData.set('cep', onlyDigits(formData.get('cep') || ''));

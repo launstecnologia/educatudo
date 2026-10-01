@@ -1,9 +1,10 @@
 <?php
 require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
 $student = is_array($student ?? null) ? $student : [];
-$ufs = StudentFormHelper::ufsBrasil();
 $coresRaca = StudentFormHelper::corRacaOpcoes();
 $ufNascAtual = strtoupper(trim((string) ($student['uf_nascimento'] ?? '')));
+$naturalidadeAtual = trim((string) ($student['naturalidade'] ?? ''));
+$ufsPorNome = StudentFormHelper::ufsBrasilPorNome();
 $corRacaAtual = trim((string) ($student['cor_raca'] ?? ''));
 $zonaAtual = trim((string) ($student['zona'] ?? ''));
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
@@ -53,20 +54,23 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
             </select>
         </div>
         <div>
-            <label for="naturalidade" class="block text-sm font-medium text-gray-700 mb-2">Naturalidade (município de nascimento)</label>
-            <input type="text" id="naturalidade" name="naturalidade"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                   value="<?= $esc($student['naturalidade'] ?? '') ?>"
-                   placeholder="Cidade onde nasceu">
-        </div>
-        <div>
             <label for="uf_nascimento" class="block text-sm font-medium text-gray-700 mb-2">UF de nascimento</label>
             <select id="uf_nascimento" name="uf_nascimento"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                 <option value="">Selecione</option>
-                <?php foreach ($ufs as $uf): ?>
-                <option value="<?= $uf ?>" <?= $ufNascAtual === $uf ? 'selected' : '' ?>><?= $uf ?></option>
+                <?php foreach ($ufsPorNome as $sigla => $nomeUf): ?>
+                <option value="<?= $esc($sigla) ?>" <?= $ufNascAtual === $sigla ? 'selected' : '' ?>><?= $esc($nomeUf) ?></option>
                 <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label for="naturalidade" class="block text-sm font-medium text-gray-700 mb-2">Naturalidade (município de nascimento)</label>
+            <select id="naturalidade" name="naturalidade" data-cidade="<?= $esc($naturalidadeAtual) ?>"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                <option value=""><?= $ufNascAtual === '' ? 'Selecione o estado' : 'Carregando cidades...' ?></option>
+                <?php if ($naturalidadeAtual !== ''): ?>
+                <option value="<?= $esc($naturalidadeAtual) ?>" selected><?= $esc($naturalidadeAtual) ?></option>
+                <?php endif; ?>
             </select>
         </div>
         <div>
