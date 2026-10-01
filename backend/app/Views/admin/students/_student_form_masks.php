@@ -58,6 +58,54 @@
     bindMask('.js-mask-telefone', maskTelefone);
     bindMask('.js-mask-celular', maskCelular);
 
+    var cepInput = document.getElementById('cep');
+    var cepBtn = document.getElementById('btn-busca-cep');
+    var cepStatus = document.getElementById('cep-status');
+    if (cepInput && cepBtn) {
+        function preencherEnderecoPorCep() {
+            var digits = onlyDigits(cepInput.value);
+            if (digits.length !== 8) {
+                if (cepStatus) cepStatus.textContent = 'Informe um CEP com 8 dígitos.';
+                return;
+            }
+            cepBtn.disabled = true;
+            if (cepStatus) cepStatus.textContent = 'Buscando...';
+            fetch('https://viacep.com.br/ws/' + digits + '/json/')
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (!data || data.erro) {
+                        if (cepStatus) cepStatus.textContent = 'CEP não encontrado.';
+                        return;
+                    }
+                    var logradouro = document.getElementById('logradouro');
+                    var bairro = document.getElementById('bairro');
+                    var cidade = document.getElementById('cidade');
+                    var uf = document.getElementById('uf');
+                    if (logradouro && data.logradouro) logradouro.value = data.logradouro;
+                    if (bairro && data.bairro) bairro.value = data.bairro;
+                    if (cidade && data.localidade) cidade.value = data.localidade;
+                    if (uf && data.uf) uf.value = data.uf;
+                    if (cepStatus) cepStatus.textContent = 'Endereço preenchido.';
+                    var numero = document.getElementById('numero');
+                    if (numero) numero.focus();
+                })
+                .catch(function () {
+                    if (cepStatus) cepStatus.textContent = 'Não foi possível consultar o CEP.';
+                })
+                .finally(function () {
+                    cepBtn.disabled = false;
+                });
+        }
+
+        cepBtn.addEventListener('click', preencherEnderecoPorCep);
+        cepInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                preencherEnderecoPorCep();
+            }
+        });
+    }
+
     window.studentFormNormalizeDocumentoEndereco = function (formData) {
         formData.set('cpf', onlyDigits(formData.get('cpf') || ''));
         formData.set('cep', onlyDigits(formData.get('cep') || ''));

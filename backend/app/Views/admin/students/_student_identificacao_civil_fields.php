@@ -4,7 +4,6 @@ $student = is_array($student ?? null) ? $student : [];
 $ufs = StudentFormHelper::ufsBrasil();
 $coresRaca = StudentFormHelper::corRacaOpcoes();
 $ufNascAtual = strtoupper(trim((string) ($student['uf_nascimento'] ?? '')));
-$ufRgAtual = strtoupper(trim((string) ($student['uf_rg'] ?? '')));
 $corRacaAtual = trim((string) ($student['cor_raca'] ?? ''));
 $zonaAtual = trim((string) ($student['zona'] ?? ''));
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
@@ -67,23 +66,6 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
                 <option value="">Selecione</option>
                 <?php foreach ($ufs as $uf): ?>
                 <option value="<?= $uf ?>" <?= $ufNascAtual === $uf ? 'selected' : '' ?>><?= $uf ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label for="orgao_emissor" class="block text-sm font-medium text-gray-700 mb-2">Órgão emissor do RG</label>
-            <input type="text" id="orgao_emissor" name="orgao_emissor" maxlength="30"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                   value="<?= $esc($student['orgao_emissor'] ?? '') ?>"
-                   placeholder="Ex: SSP">
-        </div>
-        <div>
-            <label for="uf_rg" class="block text-sm font-medium text-gray-700 mb-2">UF do RG</label>
-            <select id="uf_rg" name="uf_rg"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                <option value="">Selecione</option>
-                <?php foreach ($ufs as $uf): ?>
-                <option value="<?= $uf ?>" <?= $ufRgAtual === $uf ? 'selected' : '' ?>><?= $uf ?></option>
                 <?php endforeach; ?>
             </select>
         </div>

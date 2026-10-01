@@ -7,6 +7,7 @@ $rgDisplay = StudentFormHelper::formatRgDisplay($student['rg'] ?? '');
 $cepDisplay = StudentFormHelper::formatCepDisplay($student['cep'] ?? '');
 $dataNasc = StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null);
 $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
+$ufRgAtual = strtoupper(trim((string) ($student['uf_rg'] ?? '')));
 ?>
 <div>
     <label for="cpf" class="block text-sm font-medium text-gray-700 mb-2">CPF / CIN</label>
@@ -23,6 +24,23 @@ $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
            placeholder="00.000.000-0">
 </div>
 <div>
+    <label for="orgao_emissor" class="block text-sm font-medium text-gray-700 mb-2">Órgão emissor do RG</label>
+    <input type="text" id="orgao_emissor" name="orgao_emissor" maxlength="30"
+           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+           value="<?= htmlspecialchars((string) ($student['orgao_emissor'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+           placeholder="Ex: SSP">
+</div>
+<div>
+    <label for="uf_rg" class="block text-sm font-medium text-gray-700 mb-2">UF do RG</label>
+    <select id="uf_rg" name="uf_rg"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+        <option value="">Selecione</option>
+        <?php foreach ($ufs as $uf): ?>
+        <option value="<?= $uf ?>" <?= $ufRgAtual === $uf ? 'selected' : '' ?>><?= $uf ?></option>
+        <?php endforeach; ?>
+    </select>
+</div>
+<div>
     <label for="data_nasc" class="block text-sm font-medium text-gray-700 mb-2">Data de nascimento</label>
     <input type="date" id="data_nasc" name="data_nasc"
            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -32,6 +50,20 @@ $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
 <div class="md:col-span-2 pt-2">
     <h4 class="text-base font-semibold text-gray-900 mb-4">Endereço</h4>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="md:col-span-2">
+            <label for="cep" class="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+            <div class="flex gap-2 items-center max-w-md">
+                <input type="text" id="cep" name="cep" inputmode="numeric" maxlength="9" autocomplete="off"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 js-mask-cep"
+                       value="<?= htmlspecialchars($cepDisplay, ENT_QUOTES, 'UTF-8') ?>"
+                       placeholder="00000-000">
+                <button type="button" id="btn-busca-cep"
+                        class="shrink-0 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Buscar
+                </button>
+            </div>
+            <p class="mt-1 text-xs text-gray-500" id="cep-status"></p>
+        </div>
         <div class="md:col-span-2">
             <label for="logradouro" class="block text-sm font-medium text-gray-700 mb-2">Logradouro</label>
             <input type="text" id="logradouro" name="logradouro"
@@ -76,13 +108,6 @@ $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
                 <option value="<?= $uf ?>" <?= $ufAtual === $uf ? 'selected' : '' ?>><?= $uf ?></option>
                 <?php endforeach; ?>
             </select>
-        </div>
-        <div>
-            <label for="cep" class="block text-sm font-medium text-gray-700 mb-2">CEP</label>
-            <input type="text" id="cep" name="cep" inputmode="numeric" maxlength="9" autocomplete="off"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 js-mask-cep"
-                   value="<?= htmlspecialchars($cepDisplay, ENT_QUOTES, 'UTF-8') ?>"
-                   placeholder="00000-000">
         </div>
     </div>
 </div>
