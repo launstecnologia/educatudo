@@ -1148,6 +1148,7 @@ class ReportAdminController extends AdminBaseController
         $fichasInfo = $this->contarFichasVidaEscolarBoletimCoordenacao($alunos, $anoLetivo);
         return [
             'fonte' => 'evento',
+            'regra_id' => $regraId,
             'evento_nome' => $this->nomeEventoBoletimCoordenacao(
                 (string) ($rows[0]['evento_nome'] ?? 'Boletim'),
                 $rows[0]['series_ids'] ?? null
@@ -1557,6 +1558,10 @@ class ReportAdminController extends AdminBaseController
         if ($incluirAssinatura) {
             $headers[] = 'Assinatura';
         }
+        $refEvento = (int) ($relatorio['regra_id'] ?? 0);
+        if ($refEvento > 0) {
+            $headers[] = 'Ref';
+        }
         $headers[] = 'RA';
         $headers[] = 'Turma';
         $headers[] = 'Matéria';
@@ -1572,6 +1577,9 @@ class ReportAdminController extends AdminBaseController
                 $row = [(string) ($aluno['nome'] ?? '')];
                 if ($incluirAssinatura) {
                     $row[] = '';
+                }
+                if ($refEvento > 0) {
+                    $row[] = $refEvento;
                 }
                 // RA deve permanecer texto para não perder zeros à esquerda.
                 $row[] = (string) ($aluno['ra'] ?? '');

@@ -184,6 +184,8 @@ include __DIR__ . '/../_partials/flash_message.php';
                 <strong class="text-gray-900"><?= htmlspecialchars((string) $aluno['nome']) ?></strong>
                 <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
                 <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) $aluno['turma']) ?></span>
+                <?php $refEvento = (int) ($relatorio['regra_id'] ?? 0); ?>
+                <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
                 <?php if ((string) $aluno['ra'] !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra']) ?></span><?php endif; ?>
             </div>
             <div class="overflow-x-auto">
