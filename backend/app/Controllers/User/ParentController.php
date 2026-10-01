@@ -1590,7 +1590,10 @@ class ParentController extends BaseController
         $ano = (int) ($_GET['ano'] ?? date('Y'));
         if ($ano < 2000 || $ano > 2100) $ano = (int) date('Y');
         $service = new SchoolCalendarService($this->db);
-        $cfg     = $service->getAno($ano);
+        $filho = $this->getFilhoSelecionado($this->getFilhos());
+        $turmaId = is_array($filho) ? (int) ($filho['turma_id'] ?? 0) : 0;
+        $escopo = $service->escopoDaTurma($turmaId);
+        $cfg = $service->resolver($ano, $escopo['serie_id'], $escopo['curso_id']);
         $todos   = $cfg ? $service->eventos((int) $cfg['id']) : [];
         $eventos = array_values(array_filter($todos, fn($e) => (int) ($e['visivel_pais'] ?? 0) === 1));
         $visuais = $service->visuaisTipos();
@@ -1602,6 +1605,8 @@ class ParentController extends BaseController
             'tipoLabels' => $visuais['labels'],
             'tipoBg' => $visuais['bg'],
             'tipoText' => $visuais['text'],
+            'calendario_nome' => (string) ($cfg['nome'] ?? ''),
+            'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
         ]);
     }
 

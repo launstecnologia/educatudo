@@ -448,6 +448,7 @@ $router->post('/admin/plano-curso/marcar-trabalhada', 'Admin/CoursePlanControlle
 // Calendário Letivo (dias letivos / carga horária anual)
 $router->get('/admin/calendario-letivo', 'Admin/SchoolCalendarController@index');
 $router->post('/admin/calendario-letivo/salvar-ano', 'Admin/SchoolCalendarController@salvarAno');
+$router->post('/admin/calendario-letivo/excluir', 'Admin/SchoolCalendarController@excluirCalendario');
 $router->post('/admin/calendario-letivo/salvar-evento', 'Admin/SchoolCalendarController@salvarEvento');
 $router->post('/admin/calendario-letivo/excluir-evento', 'Admin/SchoolCalendarController@excluirEvento');
 $router->post('/admin/calendario-letivo/salvar-tipo', 'Admin/SchoolCalendarController@salvarTipo');

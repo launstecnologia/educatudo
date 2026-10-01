@@ -19,7 +19,21 @@ class SchoolCalendarController extends AdminBaseController
         if ($ano < 2000 || $ano > 2100) {
             $ano = (int) date('Y');
         }
-        $cfg = $service->getAno($ano);
+        $calendarios = $service->listarDoAno($ano);
+        $pedidoId = (int) ($_GET['id'] ?? 0);
+        $cfg = null;
+        foreach ($calendarios as $cal) {
+            if ((int) ($cal['id'] ?? 0) === $pedidoId) {
+                $cfg = $cal;
+                break;
+            }
+        }
+        if (!$cfg) {
+            $cfg = $service->getAno($ano) ?: ($calendarios[0] ?? null);
+            if ($cfg && !isset($cfg['rotulo'])) {
+                $cfg = $service->getPorId((int) ($cfg['id'] ?? 0)) ?? $cfg;
+            }
+        }
         $eventos = $cfg ? $service->eventos((int) $cfg['id']) : [];
         $status = $cfg
             ? $service->status((int) $cfg['id'], $ano, (int) $cfg['dias_meta'], (int) $cfg['carga_horaria_meta'])
@@ -34,6 +48,9 @@ class SchoolCalendarController extends AdminBaseController
             'flash_type' => $flash['type'],
             'ano' => $ano,
             'config' => $cfg,
+            'calendarios' => $calendarios,
+            'varios_pronto' => $service->variosDisponivel(),
+            'cursos_series' => $service->variosDisponivel() ? $service->cursosComSeries() : [],
             'eventos' => $eventos,
             'status' => $status,
             'schema_pronto' => $service->tableExists(),
@@ -61,14 +78,48 @@ class SchoolCalendarController extends AdminBaseController
         }
         $ano = (int) ($_POST['ano'] ?? date('Y'));
         $service = new SchoolCalendarService($this->db);
-        $service->salvarAno(
-            $ano,
-            max(0, (int) ($_POST['dias_meta'] ?? 200)),
-            max(0, (int) ($_POST['carga_horaria_meta'] ?? 800)),
-            trim((string) ($_POST['observacao'] ?? ''))
-        );
+        $dias = max(0, (int) ($_POST['dias_meta'] ?? 200));
+        $carga = max(0, (int) ($_POST['carga_horaria_meta'] ?? 800));
+        $obs = trim((string) ($_POST['observacao'] ?? ''));
+        if ($service->variosDisponivel()) {
+            $resultado = $service->salvarCalendario(
+                (int) ($_POST['calendario_id'] ?? 0),
+                $ano,
+                trim((string) ($_POST['nome'] ?? 'Geral')),
+                $dias,
+                $carga,
+                $obs,
+                (array) ($_POST['curso_ids'] ?? []),
+                (array) ($_POST['serie_ids'] ?? [])
+            );
+            if (empty($resultado['ok'])) {
+                $this->setFlashMessage((string) ($resultado['erro'] ?? 'Não foi possível salvar o calendário.'), 'error');
+                $this->redirectCalendario($ano, (int) ($_POST['calendario_id'] ?? 0));
+                return;
+            }
+            $this->setFlashMessage('Calendário salvo.', 'success');
+            $this->redirectCalendario($ano, (int) ($resultado['id'] ?? 0));
+            return;
+        }
+        $service->salvarAno($ano, $dias, $carga, $obs);
         $this->setFlashMessage('Calendário do ano salvo.', 'success');
-        $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+        $this->redirectCalendario($ano);
+    }
+
+    public function excluirCalendario(): void
+    {
+        if (!$this->enforceAdminPermissionKey('calendario_letivo', 'excluir', false)) {
+            return;
+        }
+        if (!$this->validateCsrf((string) ($_POST['csrf_token'] ?? ''))) {
+            $this->setFlashMessage('Sessão expirada.', 'error');
+            $this->redirect('/admin/calendario-letivo');
+            return;
+        }
+        $ano = (int) ($_POST['ano'] ?? date('Y'));
+        (new SchoolCalendarService($this->db))->excluirCalendario((int) ($_POST['calendario_id'] ?? 0));
+        $this->setFlashMessage('Calendário removido.', 'success');
+        $this->redirectCalendario($ano);
     }
 
     public function salvarEvento(): void
@@ -85,16 +136,21 @@ class SchoolCalendarController extends AdminBaseController
         }
         $ano = (int) ($_POST['ano'] ?? date('Y'));
         $service = new SchoolCalendarService($this->db);
-        $cfg = $service->getAno($ano);
+        $calendarioId = (int) ($_POST['calendario_id'] ?? 0);
+        $cfg = $calendarioId > 0 ? $service->getPorId($calendarioId) : null;
+        if (!$cfg || (int) ($cfg['ano'] ?? 0) !== $ano) {
+            $cfg = $service->getAno($ano);
+        }
         if (!$cfg && $eventoId <= 0) {
             $service->salvarAno($ano, 200, 800, '');
             $cfg = $service->getAno($ano);
         }
         if (!$cfg) {
             $this->setFlashMessage('Não foi possível preparar o calendário do ano.', 'error');
-            $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+            $this->redirectCalendario($ano);
             return;
         }
+        $calendarioId = (int) $cfg['id'];
         $inicio = $this->sanitizeDate((string) ($_POST['data_inicio'] ?? ''));
         $fim = $this->sanitizeDate((string) ($_POST['data_fim'] ?? '')) ?: $inicio;
         $descricao = trim((string) ($_POST['descricao'] ?? ''));
@@ -110,7 +166,7 @@ class SchoolCalendarController extends AdminBaseController
         $visivelProfessor = isset($_POST['visivel_professor']) ? 1 : 0;
         if ($inicio === '' || $descricao === '') {
             $this->setFlashMessage('Informe data e descrição do evento.', 'error');
-            $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+            $this->redirectCalendario($ano, $calendarioId);
             return;
         }
         $atualizando = $eventoId > 0;
@@ -130,7 +186,7 @@ class SchoolCalendarController extends AdminBaseController
             );
             if (!$ok) {
                 $this->setFlashMessage('Não foi possível atualizar o evento.', 'error');
-                $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+                $this->redirectCalendario($ano, $calendarioId);
                 return;
             }
             $msg = 'Evento atualizado no calendário letivo.';
@@ -166,7 +222,7 @@ class SchoolCalendarController extends AdminBaseController
                 : 'Evento ' . $verbo . ' no calendário letivo. Não foi possível publicar no calendário escolar.';
         }
         $this->setFlashMessage($msg, $publicarEscolar && $escolarId <= 0 ? 'error' : 'success');
-        $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+        $this->redirectCalendario($ano, $calendarioId);
     }
 
     public function excluirEvento(): void
@@ -182,7 +238,7 @@ class SchoolCalendarController extends AdminBaseController
         $ano = (int) ($_POST['ano'] ?? date('Y'));
         (new SchoolCalendarService($this->db))->excluirEvento((int) ($_POST['id'] ?? 0));
         $this->setFlashMessage('Evento removido.', 'success');
-        $this->redirect('/admin/calendario-letivo?ano=' . $ano);
+        $this->redirectCalendario($ano, (int) ($_POST['calendario_id'] ?? 0));
     }
 
     public function salvarTipo(): void
@@ -244,6 +300,15 @@ class SchoolCalendarController extends AdminBaseController
         }
         $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $this->auth->getUser() ?? []);
         return AdminPermissionMatrix::can($permissions, 'calendario_letivo', $acao);
+    }
+
+    private function redirectCalendario(int $ano, int $id = 0): void
+    {
+        $url = '/admin/calendario-letivo?ano=' . $ano;
+        if ($id > 0) {
+            $url .= '&id=' . $id;
+        }
+        $this->redirect($url);
     }
 }
 }

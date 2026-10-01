@@ -179,7 +179,11 @@ class GeradorAvaliacoesAnualService
             $ano = (int) date('Y');
         }
         $datasAno = $this->datasDoAnoLetivo($ano);
-        $eventos = $this->eventosAvaliacaoDoAno($ano);
+        $seriesBoletim = array_values(array_filter(
+            array_map('intval', (array) ($boletim['series_ids'] ?? [])),
+            static fn ($id) => $id > 0
+        ));
+        $eventos = $this->eventosAvaliacaoDoAno($ano, $seriesBoletim);
         $periodos = self::periodosPrevistos($ano, $eventos, $datasAno['inicio'], $datasAno['fim']);
         $existentes = $this->boletimConfig->fontesBimestresDoBoletim($boletimId);
         foreach ($periodos as &$p) {
@@ -641,9 +645,11 @@ class GeradorAvaliacoesAnualService
     /**
      * @return list<array<string,mixed>>
      */
-    public function eventosAvaliacaoDoAno(int $ano): array
+    public function eventosAvaliacaoDoAno(int $ano, array $serieIds = []): array
     {
-        $cal = $this->calendario->getAno($ano);
+        $cal = $serieIds === []
+            ? $this->calendario->getAno($ano)
+            : $this->calendario->resolverParaSeries($ano, $serieIds);
         if (!is_array($cal)) {
             return [];
         }

@@ -57,6 +57,12 @@ class SchoolCalendarService
     /** @var bool|null */
     private $tiposTabelaCache = null;
 
+    /** @var array<string,bool> */
+    private $colunasCache = [];
+
+    /** @var array<string,bool> */
+    private $tabelasCache = [];
+
     public function __construct(?Database $db = null)
     {
         $this->db = $db ?? Database::getInstance();
@@ -293,14 +299,356 @@ class SchoolCalendarService
         return isset($this->tipos()[$tipo]);
     }
 
+    public function variosDisponivel(): bool
+    {
+        return $this->tableExists()
+            && $this->colunaExiste('calendario_letivo', 'nome')
+            && $this->tabelaExiste('calendario_letivo_vinculos');
+    }
+
     /** @return array<string,mixed>|null */
     public function getAno(int $ano): ?array
     {
         if (!$this->tableExists()) {
             return null;
         }
-        $row = $this->db->fetch("SELECT * FROM calendario_letivo WHERE ano = :ano LIMIT 1", ['ano' => $ano]);
+        if ($this->variosDisponivel()) {
+            $geral = $this->db->fetch(
+                "SELECT c.* FROM calendario_letivo c
+                 WHERE c.ano = :ano
+                   AND NOT EXISTS (
+                       SELECT 1 FROM calendario_letivo_vinculos v WHERE v.calendario_id = c.id
+                   )
+                 ORDER BY c.id ASC
+                 LIMIT 1",
+                ['ano' => $ano]
+            );
+            return $geral ?: null;
+        }
+        $row = $this->db->fetch(
+            "SELECT * FROM calendario_letivo WHERE ano = :ano ORDER BY id ASC LIMIT 1",
+            ['ano' => $ano]
+        );
         return $row ?: null;
+    }
+
+    /** @return array<string,mixed>|null */
+    public function getPorId(int $id): ?array
+    {
+        if ($id <= 0 || !$this->tableExists()) {
+            return null;
+        }
+        $row = $this->db->fetch("SELECT * FROM calendario_letivo WHERE id = :id LIMIT 1", ['id' => $id]);
+        if (!$row) {
+            return null;
+        }
+        return $this->comAbrangencia($row);
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    public function listarDoAno(int $ano): array
+    {
+        if (!$this->tableExists() || $ano <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT * FROM calendario_letivo WHERE ano = :ano ORDER BY id ASC",
+            ['ano' => $ano]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = $this->comAbrangencia($row);
+        }
+        return $out;
+    }
+
+    /**
+     * Calendário da série, senão do curso, senão o geral da escola.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function resolver(int $ano, int $serieId, int $cursoId): ?array
+    {
+        $lista = $this->listarDoAno($ano);
+        if ($lista === []) {
+            return null;
+        }
+        $porSerie = null;
+        $porCurso = null;
+        $geral = null;
+        foreach ($lista as $cal) {
+            $cursos = $cal['curso_ids'] ?? [];
+            $series = $cal['serie_ids'] ?? [];
+            if ($cursos === [] && $series === []) {
+                if ($geral === null) {
+                    $geral = $cal;
+                }
+                continue;
+            }
+            if ($serieId > 0 && in_array($serieId, $series, true) && $porSerie === null) {
+                $porSerie = $cal;
+            }
+            if ($cursoId > 0 && in_array($cursoId, $cursos, true) && $porCurso === null) {
+                $porCurso = $cal;
+            }
+        }
+        return $porSerie ?? $porCurso ?? $geral;
+    }
+
+    /**
+     * @return array{serie_id:int,curso_id:int}
+     */
+    public function escopoDaTurma(int $turmaId): array
+    {
+        $vazio = ['serie_id' => 0, 'curso_id' => 0];
+        if ($turmaId <= 0) {
+            return $vazio;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT t.serie_id, t.curso_novo_id, s.curso_id AS serie_curso_id
+                 FROM turmas t
+                 LEFT JOIN serie s ON s.id = t.serie_id
+                 WHERE t.id = :id
+                 LIMIT 1",
+                ['id' => $turmaId]
+            );
+        } catch (Throwable $e) {
+            try {
+                $row = $this->db->fetch(
+                    "SELECT serie_id, curso_novo_id FROM turmas WHERE id = :id LIMIT 1",
+                    ['id' => $turmaId]
+                );
+            } catch (Throwable $e2) {
+                return $vazio;
+            }
+        }
+        if (!$row) {
+            return $vazio;
+        }
+        $serieId = (int) ($row['serie_id'] ?? 0);
+        $cursoId = (int) ($row['curso_novo_id'] ?? 0);
+        if ($cursoId <= 0) {
+            $cursoId = (int) ($row['serie_curso_id'] ?? 0);
+        }
+        return ['serie_id' => $serieId, 'curso_id' => $cursoId];
+    }
+
+    /**
+     * @return list<array{serie_id:int,curso_id:int}>
+     */
+    public function escoposDoProfessor(int $professorId): array
+    {
+        if ($professorId <= 0) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT DISTINCT t.serie_id, COALESCE(NULLIF(t.curso_novo_id, 0), s.curso_id) AS curso_id
+                 FROM grade_horaria gh
+                 INNER JOIN turmas t ON t.id = gh.turma_id
+                 LEFT JOIN serie s ON s.id = t.serie_id
+                 WHERE gh.professor_id = :id",
+                ['id' => $professorId]
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $serieId = (int) ($row['serie_id'] ?? 0);
+            $cursoId = (int) ($row['curso_id'] ?? 0);
+            if ($serieId <= 0 && $cursoId <= 0) {
+                continue;
+            }
+            $out[] = ['serie_id' => $serieId, 'curso_id' => $cursoId];
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<array{serie_id:int,curso_id:int}> $escopos
+     * @return array<string,mixed>|null
+     */
+    public function resolverEscopos(int $ano, array $escopos): ?array
+    {
+        foreach ($escopos as $escopo) {
+            $cal = $this->resolver($ano, (int) ($escopo['serie_id'] ?? 0), (int) ($escopo['curso_id'] ?? 0));
+            if ($cal && (($cal['serie_ids'] ?? []) !== [] || ($cal['curso_ids'] ?? []) !== [])) {
+                return $cal;
+            }
+        }
+        return $this->resolver($ano, 0, 0);
+    }
+
+    /**
+     * Calendário comum às séries. Se cada série cair em um calendário diferente, fica o geral.
+     *
+     * @param list<int> $serieIds
+     * @return array<string,mixed>|null
+     */
+    public function resolverParaSeries(int $ano, array $serieIds): ?array
+    {
+        $serieIds = $this->idsPositivos($serieIds);
+        if ($serieIds === []) {
+            return $this->getAno($ano);
+        }
+        $escolhido = null;
+        foreach ($serieIds as $serieId) {
+            $cal = $this->resolver($ano, $serieId, $this->cursoDaSerie($serieId));
+            if (!$cal) {
+                return null;
+            }
+            if ($escolhido !== null && (int) $escolhido['id'] !== (int) $cal['id']) {
+                return $this->getAno($ano);
+            }
+            $escolhido = $cal;
+        }
+        return $escolhido ?? $this->getAno($ano);
+    }
+
+    private function cursoDaSerie(int $serieId): int
+    {
+        if ($serieId <= 0 || !$this->tabelaExiste('serie')) {
+            return 0;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT curso_id FROM serie WHERE id = :id LIMIT 1",
+                ['id' => $serieId]
+            );
+        } catch (Throwable $e) {
+            return 0;
+        }
+        return (int) ($row['curso_id'] ?? 0);
+    }
+
+    /**
+     * Cursos ativos com as séries de cada um, para o cadastro do calendário.
+     *
+     * @return list<array{id:int,nome:string,series:list<array{id:int,nome:string}>}>
+     */
+    public function cursosComSeries(): array
+    {
+        if (!$this->tabelaExiste('curso') || !$this->tabelaExiste('serie')) {
+            return [];
+        }
+        try {
+            $cursos = $this->db->fetchAll(
+                "SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC"
+            ) ?: [];
+            $series = $this->db->fetchAll(
+                "SELECT id, curso_id, nome FROM serie WHERE ativo = 1 ORDER BY ordem ASC, nome ASC"
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $porCurso = [];
+        foreach ($series as $serie) {
+            $cursoId = (int) ($serie['curso_id'] ?? 0);
+            $porCurso[$cursoId][] = [
+                'id' => (int) ($serie['id'] ?? 0),
+                'nome' => (string) ($serie['nome'] ?? ''),
+            ];
+        }
+        $out = [];
+        foreach ($cursos as $curso) {
+            $id = (int) ($curso['id'] ?? 0);
+            $out[] = [
+                'id' => $id,
+                'nome' => (string) ($curso['nome'] ?? ''),
+                'series' => $porCurso[$id] ?? [],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<int> $cursoIds
+     * @param list<int> $serieIds
+     * @return array{ok:bool,erro?:string,id?:int}
+     */
+    public function salvarCalendario(
+        int $id,
+        int $ano,
+        string $nome,
+        int $diasMeta,
+        int $cargaMeta,
+        string $obs,
+        array $cursoIds,
+        array $serieIds
+    ): array {
+        if (!$this->variosDisponivel() || $ano <= 0) {
+            return ['ok' => false, 'erro' => 'Rode a migration 2026_10_01_calendario_letivo_varios.sql no painel Master.'];
+        }
+        $nome = trim($nome);
+        if ($nome === '' || mb_strlen($nome) > 120) {
+            return ['ok' => false, 'erro' => 'Informe o nome do calendário (até 120 caracteres).'];
+        }
+        $cursoIds = $this->idsPositivos($cursoIds);
+        $serieIds = $this->idsPositivos($serieIds);
+        $serieIds = $this->seriesForaDosCursos($serieIds, $cursoIds);
+        $conflito = $this->vinculoOcupado($ano, $id, $cursoIds, $serieIds);
+        if ($conflito !== '') {
+            return ['ok' => false, 'erro' => $conflito];
+        }
+        $dup = $this->db->fetch(
+            "SELECT id FROM calendario_letivo WHERE ano = :ano AND nome = :nome AND id <> :id LIMIT 1",
+            ['ano' => $ano, 'nome' => $nome, 'id' => $id]
+        );
+        if ($dup) {
+            return ['ok' => false, 'erro' => 'Já existe um calendário com esse nome em ' . $ano . '.'];
+        }
+        $obsValor = $obs !== '' ? mb_substr($obs, 0, 255) : null;
+        if ($id > 0) {
+            $atual = $this->db->fetch(
+                "SELECT id FROM calendario_letivo WHERE id = :id AND ano = :ano LIMIT 1",
+                ['id' => $id, 'ano' => $ano]
+            );
+            if (!$atual) {
+                return ['ok' => false, 'erro' => 'Calendário não encontrado neste ano.'];
+            }
+            $this->db->update(
+                "UPDATE calendario_letivo
+                 SET nome = :nome, dias_meta = :d, carga_horaria_meta = :c, observacao = :o, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = :id",
+                ['nome' => $nome, 'd' => $diasMeta, 'c' => $cargaMeta, 'o' => $obsValor, 'id' => $id]
+            );
+        } else {
+            $id = (int) $this->db->insert(
+                "INSERT INTO calendario_letivo (ano, nome, dias_meta, carga_horaria_meta, observacao)
+                 VALUES (:ano, :nome, :d, :c, :o)",
+                ['ano' => $ano, 'nome' => $nome, 'd' => $diasMeta, 'c' => $cargaMeta, 'o' => $obsValor]
+            );
+        }
+        if ($id <= 0) {
+            return ['ok' => false, 'erro' => 'Não foi possível salvar o calendário.'];
+        }
+        $this->db->query("DELETE FROM calendario_letivo_vinculos WHERE calendario_id = :id", ['id' => $id]);
+        foreach ($cursoIds as $cursoId) {
+            $this->db->insert(
+                "INSERT INTO calendario_letivo_vinculos (calendario_id, curso_id, serie_id) VALUES (:c, :curso, NULL)",
+                ['c' => $id, 'curso' => $cursoId]
+            );
+        }
+        foreach ($serieIds as $serieId) {
+            $this->db->insert(
+                "INSERT INTO calendario_letivo_vinculos (calendario_id, curso_id, serie_id) VALUES (:c, NULL, :serie)",
+                ['c' => $id, 'serie' => $serieId]
+            );
+        }
+        return ['ok' => true, 'id' => $id];
+    }
+
+    public function excluirCalendario(int $id): bool
+    {
+        if ($id <= 0 || !$this->tableExists()) {
+            return false;
+        }
+        $this->db->query("DELETE FROM calendario_letivo WHERE id = :id", ['id' => $id]);
+        return true;
     }
 
     public function salvarAno(int $ano, int $diasMeta, int $cargaMeta, string $obs = ''): int
@@ -316,10 +664,264 @@ class SchoolCalendarService
             );
             return (int) $existente['id'];
         }
+        if ($this->colunaExiste('calendario_letivo', 'nome')) {
+            return (int) $this->db->insert(
+                "INSERT INTO calendario_letivo (ano, nome, dias_meta, carga_horaria_meta, observacao) VALUES (:ano, 'Geral', :d, :c, :o)",
+                ['ano' => $ano, 'd' => $diasMeta, 'c' => $cargaMeta, 'o' => $obs !== '' ? $obs : null]
+            );
+        }
         return (int) $this->db->insert(
             "INSERT INTO calendario_letivo (ano, dias_meta, carga_horaria_meta, observacao) VALUES (:ano, :d, :c, :o)",
             ['ano' => $ano, 'd' => $diasMeta, 'c' => $cargaMeta, 'o' => $obs !== '' ? $obs : null]
         );
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private function comAbrangencia(array $row): array
+    {
+        $id = (int) ($row['id'] ?? 0);
+        $cursoIds = [];
+        $serieIds = [];
+        if ($id > 0 && $this->variosDisponivel()) {
+            $vinculos = $this->db->fetchAll(
+                "SELECT curso_id, serie_id FROM calendario_letivo_vinculos WHERE calendario_id = :id",
+                ['id' => $id]
+            ) ?: [];
+            foreach ($vinculos as $vinculo) {
+                $serieId = (int) ($vinculo['serie_id'] ?? 0);
+                $cursoId = (int) ($vinculo['curso_id'] ?? 0);
+                if ($serieId > 0) {
+                    $serieIds[] = $serieId;
+                } elseif ($cursoId > 0) {
+                    $cursoIds[] = $cursoId;
+                }
+            }
+        }
+        $row['curso_ids'] = array_values(array_unique($cursoIds));
+        $row['serie_ids'] = array_values(array_unique($serieIds));
+        $row['nome'] = trim((string) ($row['nome'] ?? 'Geral'));
+        if ($row['nome'] === '') {
+            $row['nome'] = 'Geral';
+        }
+        $row['rotulo'] = $this->rotuloAbrangencia($row['curso_ids'], $row['serie_ids']);
+        return $row;
+    }
+
+    /**
+     * @param list<int> $cursoIds
+     * @param list<int> $serieIds
+     */
+    private function rotuloAbrangencia(array $cursoIds, array $serieIds): string
+    {
+        if ($cursoIds === [] && $serieIds === []) {
+            return 'Toda a escola';
+        }
+        $nomes = [];
+        if ($cursoIds !== [] && $this->tabelaExiste('curso')) {
+            [$in, $params] = $this->inNomeado('curso', $cursoIds);
+            try {
+                $rows = $this->db->fetchAll(
+                    "SELECT nome FROM curso WHERE id IN ($in) ORDER BY ordem ASC, nome ASC",
+                    $params
+                ) ?: [];
+                foreach ($rows as $row) {
+                    $nomes[] = (string) ($row['nome'] ?? '');
+                }
+            } catch (Throwable $e) {
+                $nomes = [];
+            }
+        }
+        if ($serieIds !== [] && $this->tabelaExiste('serie')) {
+            [$in, $params] = $this->inNomeado('serie', $serieIds);
+            try {
+                $rows = $this->db->fetchAll(
+                    "SELECT nome FROM serie WHERE id IN ($in) ORDER BY ordem ASC, nome ASC",
+                    $params
+                ) ?: [];
+                foreach ($rows as $row) {
+                    $nomes[] = (string) ($row['nome'] ?? '');
+                }
+            } catch (Throwable $e) {
+                // série indisponível
+            }
+        }
+        $nomes = array_values(array_filter($nomes, static fn ($n) => $n !== ''));
+        return $nomes === [] ? 'Toda a escola' : implode(' · ', $nomes);
+    }
+
+    /**
+     * @param list<int|string> $ids
+     * @return list<int>
+     */
+    private function idsPositivos(array $ids): array
+    {
+        $out = [];
+        foreach ($ids as $id) {
+            $n = (int) $id;
+            if ($n > 0) {
+                $out[$n] = $n;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * Série ou curso já ligado a outro calendário do mesmo ano.
+     *
+     * @param list<int> $cursoIds
+     * @param list<int> $serieIds
+     */
+    private function vinculoOcupado(int $ano, int $calendarioId, array $cursoIds, array $serieIds): string
+    {
+        $temSerie = $this->tabelaExiste('serie');
+        foreach ($cursoIds as $cursoId) {
+            $row = $this->db->fetch(
+                "SELECT c.nome
+                 FROM calendario_letivo_vinculos v
+                 INNER JOIN calendario_letivo c ON c.id = v.calendario_id
+                 WHERE c.ano = :ano AND c.id <> :id AND v.curso_id = :curso AND v.serie_id IS NULL
+                 LIMIT 1",
+                ['ano' => $ano, 'id' => $calendarioId, 'curso' => $cursoId]
+            );
+            if ($row) {
+                return 'Esse curso já está no calendário ' . (string) ($row['nome'] ?? '') . '.';
+            }
+            if (!$temSerie) {
+                continue;
+            }
+            $serieOcupada = $this->db->fetch(
+                "SELECT c.nome
+                 FROM calendario_letivo_vinculos v
+                 INNER JOIN calendario_letivo c ON c.id = v.calendario_id
+                 INNER JOIN serie s ON s.id = v.serie_id
+                 WHERE c.ano = :ano AND c.id <> :id AND s.curso_id = :curso
+                 LIMIT 1",
+                ['ano' => $ano, 'id' => $calendarioId, 'curso' => $cursoId]
+            );
+            if ($serieOcupada) {
+                return 'Uma série desse curso já está no calendário ' . (string) ($serieOcupada['nome'] ?? '') . '.';
+            }
+        }
+        foreach ($serieIds as $serieId) {
+            $row = $this->db->fetch(
+                "SELECT c.nome
+                 FROM calendario_letivo_vinculos v
+                 INNER JOIN calendario_letivo c ON c.id = v.calendario_id
+                 WHERE c.ano = :ano AND c.id <> :id AND v.serie_id = :serie
+                 LIMIT 1",
+                ['ano' => $ano, 'id' => $calendarioId, 'serie' => $serieId]
+            );
+            if ($row) {
+                return 'Essa série já está no calendário ' . (string) ($row['nome'] ?? '') . '.';
+            }
+            if (!$temSerie) {
+                continue;
+            }
+            $cursoOcupado = $this->db->fetch(
+                "SELECT c.nome
+                 FROM calendario_letivo_vinculos v
+                 INNER JOIN calendario_letivo c ON c.id = v.calendario_id
+                 INNER JOIN serie s ON s.curso_id = v.curso_id AND s.id = :serie
+                 WHERE c.ano = :ano AND c.id <> :id AND v.serie_id IS NULL
+                 LIMIT 1",
+                ['ano' => $ano, 'id' => $calendarioId, 'serie' => $serieId]
+            );
+            if ($cursoOcupado) {
+                return 'O curso dessa série já está no calendário ' . (string) ($cursoOcupado['nome'] ?? '') . '.';
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Série já coberta pelo curso inteiro não precisa de vínculo próprio.
+     *
+     * @param list<int> $serieIds
+     * @param list<int> $cursoIds
+     * @return list<int>
+     */
+    private function seriesForaDosCursos(array $serieIds, array $cursoIds): array
+    {
+        if ($serieIds === [] || $cursoIds === [] || !$this->tabelaExiste('serie')) {
+            return $serieIds;
+        }
+        [$in, $params] = $this->inNomeado('serie', $serieIds);
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, curso_id FROM serie WHERE id IN ($in)",
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            return $serieIds;
+        }
+        $cursoSet = array_fill_keys($cursoIds, true);
+        $out = [];
+        foreach ($rows as $row) {
+            $serieId = (int) ($row['id'] ?? 0);
+            $cursoId = (int) ($row['curso_id'] ?? 0);
+            if ($serieId > 0 && !isset($cursoSet[$cursoId])) {
+                $out[] = $serieId;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array{0:string,1:array<string,int>}
+     */
+    private function inNomeado(string $prefixo, array $ids): array
+    {
+        $trechos = [];
+        $params = [];
+        foreach (array_values($ids) as $i => $id) {
+            $chave = $prefixo . $i;
+            $trechos[] = ':' . $chave;
+            $params[$chave] = (int) $id;
+        }
+        return [implode(', ', $trechos), $params];
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool
+    {
+        $chave = $tabela . '.' . $coluna;
+        if (array_key_exists($chave, $this->colunasCache)) {
+            return $this->colunasCache[$chave];
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :tabela AND COLUMN_NAME = :coluna
+                 LIMIT 1",
+                ['tabela' => $tabela, 'coluna' => $coluna]
+            );
+            $this->colunasCache[$chave] = $row !== false && !empty($row);
+        } catch (Throwable $e) {
+            $this->colunasCache[$chave] = false;
+        }
+        return $this->colunasCache[$chave];
+    }
+
+    private function tabelaExiste(string $tabela): bool
+    {
+        if (array_key_exists($tabela, $this->tabelasCache)) {
+            return $this->tabelasCache[$tabela];
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :tabela
+                 LIMIT 1",
+                ['tabela' => $tabela]
+            );
+            $this->tabelasCache[$tabela] = $row !== false && !empty($row);
+        } catch (Throwable $e) {
+            $this->tabelasCache[$tabela] = false;
+        }
+        return $this->tabelasCache[$tabela];
     }
 
     /** @return list<array<string,mixed>> */

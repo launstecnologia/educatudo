@@ -30,7 +30,7 @@ class StudentAgendaService
             $this->eventosProvas($alunoId, $turmaId, $inicio, $fim),
             $this->eventosJornadas($turmaId, $inicio, $fim),
             $this->eventosRedacao($alunoId, $turmaId, $inicio, $fim),
-            $this->eventosEscola($ano, $inicio, $fim),
+            $this->eventosEscola($ano, $inicio, $fim, $turmaId),
             $this->eventosAulasOnline($alunoId, $turmaId, $inicio, $fim),
             $this->eventosPessoais($alunoId, $inicio, $fim)
         );
@@ -274,12 +274,13 @@ class StudentAgendaService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function eventosEscola(int $ano, string $inicio, string $fim): array
+    private function eventosEscola(int $ano, string $inicio, string $fim, int $turmaId = 0): array
     {
         try {
             require_once __DIR__ . '/SchoolCalendarService.php';
             $service = new SchoolCalendarService($this->db);
-            $cfg = $service->getAno($ano);
+            $escopo = $service->escopoDaTurma($turmaId);
+            $cfg = $service->resolver($ano, $escopo['serie_id'], $escopo['curso_id']);
             if (!$cfg) {
                 return [];
             }

@@ -46,6 +46,20 @@ $tipoLabelsLegenda = $tiposUsados === [] ? $tipoLabels : array_intersect_key($ti
 <div class="mb-6">
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-bold text-gray-900 flex-1">Calendário Letivo <?= $ano ?></h1>
+        <?php
+        $calendariosVisao = $calendarios ?? [];
+        $calendarioIdVisao = (int) ($calendario_id ?? 0);
+        $calendarioNome = trim((string) ($calendario_nome ?? ''));
+        $calendarioRotulo = trim((string) ($calendario_rotulo ?? ''));
+        ?>
+        <?php if (count($calendariosVisao) > 1): ?>
+        <select aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
+                class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white max-w-[16rem]">
+            <?php foreach ($calendariosVisao as $cal): ?>
+            <option value="?ano=<?= $ano ?>&id=<?= (int) ($cal['id'] ?? 0) ?>" <?= (int) ($cal['id'] ?? 0) === $calendarioIdVisao ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <?php endif; ?>
         <a href="?ano=<?= $ano - 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
         <a href="?ano=<?= $ano + 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
         <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
@@ -58,7 +72,7 @@ $tipoLabelsLegenda = $tiposUsados === [] ? $tipoLabels : array_intersect_key($ti
             <button onclick="navMes(+1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mt-1">Feriados, recessos, avaliações e eventos do ano letivo.</p>
+    <p class="text-sm text-gray-500 mt-1">Feriados, recessos, avaliações e eventos do ano letivo.<?php if ($calendarioNome !== ''): ?> <?= htmlspecialchars($calendarioNome) ?><?= $calendarioRotulo !== '' ? ' · ' . htmlspecialchars($calendarioRotulo) : '' ?><?php endif; ?></p>
 </div>
 
 <!-- Legenda -->

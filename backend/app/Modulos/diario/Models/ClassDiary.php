@@ -548,11 +548,14 @@ class ClassDiary
         $end = new DateTime($fim);
         if ($end < $start) return [];
         if ((int) $start->diff($end)->days > 100) $end = (clone $start)->modify('+100 days');
-        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'));
+        $naoLetivos = $turmaId > 0
+            ? $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'), $turmaId)
+            : [];
+        $mapasTurma = [];
         $out = [];
         for ($date = clone $start; $date <= $end; $date->modify('+1 day')) {
             $data = $date->format('Y-m-d');
-            if (isset($naoLetivos[$data])) {
+            if ($turmaId > 0 && isset($naoLetivos[$data])) {
                 continue;
             }
             $params = ['dia_semana' => (int) $date->format('N'), 'data_aula' => $data];
@@ -574,6 +577,19 @@ class ClassDiary
                 $params
             ) ?: [];
             foreach ($rows as $row) {
+                if ($turmaId <= 0) {
+                    $tid = (int) ($row['turma_id'] ?? 0);
+                    if (!isset($mapasTurma[$tid])) {
+                        $mapasTurma[$tid] = $this->datasNaoLetivas(
+                            $start->format('Y-m-d'),
+                            $end->format('Y-m-d'),
+                            $tid
+                        );
+                    }
+                    if (isset($mapasTurma[$tid][$data])) {
+                        continue;
+                    }
+                }
                 $row['data_aula'] = $data;
                 $row['status'] = 'pendente';
                 $row['faltas'] = 0;
@@ -627,7 +643,7 @@ class ClassDiary
         foreach ($existentes as $row) {
             $tem[(int) ($row['grade_horaria_id'] ?? 0) . '|' . (string) ($row['data_aula'] ?? '')] = true;
         }
-        $naoLetivos = $this->datasNaoLetivas($inicio, $fim);
+        $naoLetivos = $this->datasNaoLetivas($inicio, $fim, $turmaId);
         $out = [];
         $start = new DateTime($inicio);
         $end = new DateTime($fim);
@@ -739,12 +755,8 @@ class ClassDiary
         }
         $today = new DateTime(date('Y-m-d'));
         $endAteHoje = $end < $today ? $end : $today;
-        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'));
-
-        $weekdaysTotal = $this->contarDiasLetivosPorIso($start, $end, $naoLetivos);
-        $weekdaysAteHoje = ($endAteHoje >= $start)
-            ? $this->contarDiasLetivosPorIso($start, $endAteHoje, $naoLetivos)
-            : [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0];
+        $cacheTotais = [];
+        $cacheAteHoje = [];
 
         $params = [];
         $profSql = '';
@@ -782,9 +794,17 @@ class ClassDiary
 
         $out = [];
         foreach ($grades as $g) {
+            $tid = (int) $g['turma_id'];
+            if (!isset($cacheTotais[$tid])) {
+                $mapa = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'), $tid);
+                $cacheTotais[$tid] = $this->contarDiasLetivosPorIso($start, $end, $mapa);
+                $cacheAteHoje[$tid] = ($endAteHoje >= $start)
+                    ? $this->contarDiasLetivosPorIso($start, $endAteHoje, $mapa)
+                    : [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0];
+            }
             $iso = (int) $g['dia_semana'];
-            $previstasTotal = $weekdaysTotal[$iso] ?? 0;
-            $previstasAteHoje = $weekdaysAteHoje[$iso] ?? 0;
+            $previstasTotal = $cacheTotais[$tid][$iso] ?? 0;
+            $previstasAteHoje = $cacheAteHoje[$tid][$iso] ?? 0;
             $reg = $regMap[(int) $g['grade_horaria_id']] ?? null;
             $registradas = $reg ? (int) $reg['registradas'] : 0;
             $ministradas = $reg ? (int) $reg['ministradas'] : 0;
@@ -885,7 +905,7 @@ class ClassDiary
             $end = (clone $start)->modify('+200 days');
         }
         $today = new DateTime(date('Y-m-d'));
-        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'));
+        $naoLetivos = $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'), $turmaId);
 
         $placeholders = implode(',', array_fill(0, count($gradeIds), '?'));
         $registradas = $this->db->fetchAll(
@@ -1212,11 +1232,150 @@ class ClassDiary
     }
 
     /**
+     * Escopo do calendário da turma. Null se a escola ainda não tem vários calendários.
+     *
+     * @return array{serie_id:int,curso_id:int}|null
+     */
+    private function escopoTurmaCalendario(int $turmaId): ?array
+    {
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'calendario_letivo_vinculos'");
+            if (!$tem) {
+                return null;
+            }
+        } catch (Throwable $e) {
+            return null;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT t.serie_id, COALESCE(NULLIF(t.curso_novo_id, 0), s.curso_id, 0) AS curso_id
+                 FROM turmas t
+                 LEFT JOIN serie s ON s.id = t.serie_id
+                 WHERE t.id = :id
+                 LIMIT 1",
+                ['id' => $turmaId]
+            );
+        } catch (Throwable $e) {
+            try {
+                $row = $this->db->fetch(
+                    "SELECT serie_id, curso_novo_id FROM turmas WHERE id = :id LIMIT 1",
+                    ['id' => $turmaId]
+                );
+            } catch (Throwable $e2) {
+                return null;
+            }
+            if (!$row) {
+                return ['serie_id' => 0, 'curso_id' => 0];
+            }
+            return [
+                'serie_id' => (int) ($row['serie_id'] ?? 0),
+                'curso_id' => (int) ($row['curso_novo_id'] ?? 0),
+            ];
+        }
+        if (!$row) {
+            return ['serie_id' => 0, 'curso_id' => 0];
+        }
+        return [
+            'serie_id' => (int) ($row['serie_id'] ?? 0),
+            'curso_id' => (int) ($row['curso_id'] ?? 0),
+        ];
+    }
+
+    /**
+     * Um calendário por ano do intervalo: série, senão curso, senão o geral.
+     * Null se a escola ainda não tem vários calendários (consulta antiga).
+     * Lista vazia: não aplicar feriado nenhum.
+     *
+     * @return array<int,int>|null ano => calendario_id
+     */
+    private function idsCalendarioAplicavel(string $inicio, string $fim, int $turmaId): ?array
+    {
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'calendario_letivo_vinculos'");
+        } catch (Throwable $e) {
+            return null;
+        }
+        if (!$tem) {
+            return null;
+        }
+        $serieId = 0;
+        $cursoId = 0;
+        if ($turmaId > 0) {
+            $escopo = $this->escopoTurmaCalendario($turmaId);
+            if ($escopo === null) {
+                return [];
+            }
+            $serieId = (int) $escopo['serie_id'];
+            $cursoId = (int) $escopo['curso_id'];
+        }
+        $anos = array_values(array_unique(array_filter([
+            (int) substr($inicio, 0, 4),
+            (int) substr($fim, 0, 4),
+        ])));
+        $porAno = [];
+        foreach ($anos as $ano) {
+            $id = $this->idCalendarioDoAno($ano, $serieId, $cursoId);
+            if ($id > 0) {
+                $porAno[$ano] = $id;
+            }
+        }
+        return $porAno;
+    }
+
+    private function idCalendarioDoAno(int $ano, int $serieId, int $cursoId): int
+    {
+        if ($ano <= 0) {
+            return 0;
+        }
+        if ($serieId > 0) {
+            $porSerie = $this->db->fetch(
+                "SELECT c.id
+                 FROM calendario_letivo c
+                 INNER JOIN calendario_letivo_vinculos v ON v.calendario_id = c.id AND v.serie_id = :serie
+                 WHERE c.ano = :ano
+                 ORDER BY c.id ASC
+                 LIMIT 1",
+                ['ano' => $ano, 'serie' => $serieId]
+            );
+            if ($porSerie) {
+                return (int) $porSerie['id'];
+            }
+        }
+        if ($cursoId > 0) {
+            $porCurso = $this->db->fetch(
+                "SELECT c.id
+                 FROM calendario_letivo c
+                 INNER JOIN calendario_letivo_vinculos v
+                    ON v.calendario_id = c.id AND v.curso_id = :curso AND v.serie_id IS NULL
+                 WHERE c.ano = :ano
+                 ORDER BY c.id ASC
+                 LIMIT 1",
+                ['ano' => $ano, 'curso' => $cursoId]
+            );
+            if ($porCurso) {
+                return (int) $porCurso['id'];
+            }
+        }
+        $geral = $this->db->fetch(
+            "SELECT c.id
+             FROM calendario_letivo c
+             WHERE c.ano = :ano
+               AND NOT EXISTS (
+                   SELECT 1 FROM calendario_letivo_vinculos v WHERE v.calendario_id = c.id
+               )
+             ORDER BY c.id ASC
+             LIMIT 1",
+            ['ano' => $ano]
+        );
+        return $geral ? (int) $geral['id'] : 0;
+    }
+
+    /**
      * Datas de feriado, recesso ou suspensão no intervalo (inclusive).
      *
      * @return array<string,true> mapa Y-m-d => true
      */
-    private function datasNaoLetivas(string $inicio, string $fim): array
+    private function datasNaoLetivas(string $inicio, string $fim, int $turmaId = 0): array
     {
         $slugs = ['feriado', 'recesso', 'suspensao'];
         try {
@@ -1242,14 +1401,33 @@ class ClassDiary
             $placeholders[] = ':' . $key;
             $params[$key] = $slug;
         }
+        $porAno = $this->idsCalendarioAplicavel($inicio, $fim, $turmaId);
+        if ($porAno === []) {
+            return [];
+        }
+        $filtroCalendario = '';
+        if (is_array($porAno)) {
+            $phCal = [];
+            $i = 0;
+            foreach (array_unique($porAno) as $calendarioId) {
+                $key = 'cal_' . $i;
+                $phCal[] = ':' . $key;
+                $params[$key] = $calendarioId;
+                $i++;
+            }
+            if ($phCal === []) {
+                return [];
+            }
+            $filtroCalendario = ' AND e.calendario_id IN (' . implode(',', $phCal) . ')';
+        }
         try {
             $rows = $this->db->fetchAll(
-                "SELECT e.data_inicio, e.data_fim
+                "SELECT e.data_inicio, e.data_fim, e.calendario_id
                  FROM calendario_letivo_eventos e
                  INNER JOIN calendario_letivo c ON c.id = e.calendario_id
                  WHERE e.tipo IN (" . implode(',', $placeholders) . ")
                    AND e.data_inicio <= :fim
-                   AND e.data_fim >= :inicio",
+                   AND e.data_fim >= :inicio" . $filtroCalendario,
                 $params
             ) ?: [];
         } catch (Throwable $e) {
@@ -1266,9 +1444,13 @@ class ClassDiary
             if ($limite < $d) {
                 continue;
             }
+            $calendarioId = (int) ($row['calendario_id'] ?? 0);
             for (; $d <= $limite; $d->modify('+1 day')) {
                 $key = $d->format('Y-m-d');
                 if ($key < $inicio || $key > $fim) {
+                    continue;
+                }
+                if (is_array($porAno) && ($porAno[(int) $d->format('Y')] ?? 0) !== $calendarioId) {
                     continue;
                 }
                 $out[$key] = true;

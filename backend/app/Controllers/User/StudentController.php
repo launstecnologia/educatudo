@@ -8206,18 +8206,22 @@ if (!class_exists('StudentController')) {
         $ano = (int) ($_GET['ano'] ?? date('Y'));
         if ($ano < 2000 || $ano > 2100) $ano = (int) date('Y');
         $service = new SchoolCalendarService($this->db);
-        $cfg     = $service->getAno($ano);
+        $user = $this->authManager->getUser();
+        $escopo = $service->escopoDaTurma((int) ($user['turma_id'] ?? 0));
+        $cfg = $service->resolver($ano, $escopo['serie_id'], $escopo['curso_id']);
         $todos   = $cfg ? $service->eventos((int) $cfg['id']) : [];
         $eventos = array_values(array_filter($todos, fn($e) => (int) ($e['visivel_aluno'] ?? 0) === 1));
         $visuais = $service->visuaisTipos();
         $this->viewWithLayout('student', 'student/calendario-letivo', [
             'title'   => 'Calendário Letivo - EducaTudo',
-            'user'    => $this->auth->getUser(),
+            'user'    => $user,
             'ano'     => $ano,
             'eventos' => $eventos,
             'tipoLabels' => $visuais['labels'],
             'tipoBg' => $visuais['bg'],
             'tipoText' => $visuais['text'],
+            'calendario_nome' => (string) ($cfg['nome'] ?? ''),
+            'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
         ]);
     }
 }

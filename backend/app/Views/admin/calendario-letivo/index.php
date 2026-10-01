@@ -47,6 +47,14 @@ $jsonJs = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS |
 
 $pct  = $status['percentual'] ?? null;
 $csrf = htmlspecialchars((string) ($csrf_token ?? ''));
+$variosPronto = !empty($varios_pronto);
+$calendarios = $calendarios ?? [];
+$cursosSeries = $cursos_series ?? [];
+$calendarioId = (int) ($config['id'] ?? 0);
+$cursoIdsSel = array_fill_keys(array_map('intval', (array) ($config['curso_ids'] ?? [])), true);
+$serieIdsSel = array_fill_keys(array_map('intval', (array) ($config['serie_ids'] ?? [])), true);
+$nomeCal = trim((string) ($config['nome'] ?? ''));
+$rotuloCal = trim((string) ($config['rotulo'] ?? ''));
 
 // Monta mapa de datas com eventos: ['2026-04-21'] = [['tipo'=>..,'descricao'=>..], ...]
 $eventMap = [];
@@ -61,8 +69,10 @@ foreach ($eventos as $ev) {
 
 $mesesNomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 $mesAtual   = (int) date('m'); // mês atual para view mensal
-$page_header_title    = 'Calendário Letivo ' . $ano;
-$page_header_subtitle = 'Visualize feriados, recessos, reposições e eventos do ano letivo.';
+$page_header_title    = 'Calendário Letivo ' . $ano . ($variosPronto && $nomeCal !== '' ? ' · ' . $nomeCal : '');
+$page_header_subtitle = $rotuloCal !== ''
+    ? $rotuloCal . '. Feriados, recessos, reposições e eventos deste calendário.'
+    : 'Visualize feriados, recessos, reposições e eventos do ano letivo.';
 
 ob_start();
 ?>
@@ -70,6 +80,17 @@ ob_start();
     <a href="?ano=<?= $ano - 1 ?>" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
     <span class="text-sm font-semibold text-gray-700"><?= $ano ?></span>
     <a href="?ano=<?= $ano + 1 ?>" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
+    <?php if ($variosPronto): ?>
+    <select id="selCalendario" aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
+            class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white max-w-[16rem]">
+        <?php foreach ($calendarios as $cal): ?>
+        <option value="?ano=<?= $ano ?>&id=<?= (int) $cal['id'] ?>" <?= (int) $cal['id'] === $calendarioId ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <button type="button" onclick="openNovoCalendario()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
+        <i class="fa-solid fa-plus mr-2"></i>Novo calendário
+    </button>
+    <?php endif; ?>
     <!-- Toggle de visualização -->
     <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
         <button id="btnViewYear" onclick="setView('year')" class="px-3 py-2 text-sm font-medium transition-colors" title="Ano inteiro"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
@@ -93,6 +114,10 @@ include __DIR__ . '/../_partials/page_header_list.php';
 if (!($schema_pronto ?? false)): ?>
     <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-6">
         <i class="fa-solid fa-triangle-exclamation mr-2"></i> Rode a migration <code>2026_06_25_calendario_letivo.sql</code> no painel Master para habilitar este módulo.
+    </div>
+<?php elseif (!$variosPronto): ?>
+    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-6">
+        <i class="fa-solid fa-triangle-exclamation mr-2"></i> Para cadastrar um calendário por curso ou série, rode a migration <code>2026_10_01_calendario_letivo_varios.sql</code> no painel Master.
     </div>
 <?php endif; ?>
 
@@ -269,6 +294,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             <form method="post" action="<?= URL ?>/admin/calendario-letivo/excluir-evento" onsubmit="return confirm('Remover este evento?');" class="inline">
                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                 <input type="hidden" name="ano" value="<?= $ano ?>">
+                <input type="hidden" name="calendario_id" value="<?= $calendarioId ?>">
                 <input type="hidden" name="id" value="<?= (int) $ev['id'] ?>">
                 <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium"><i class="fa-solid fa-trash-can"></i></button>
             </form>
@@ -289,17 +315,28 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
-        <h2 class="text-xl font-bold text-gray-900">Configurar ano letivo</h2>
+        <h2 id="configDrawerTitle" class="text-xl font-bold text-gray-900">Configurar calendário</h2>
         <button type="button" onclick="closeConfigDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
-    <form method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-ano" class="flex flex-col flex-1 overflow-hidden">
+    <form id="form-calendario" method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-ano" class="flex flex-col flex-1 overflow-hidden">
         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+        <input type="hidden" name="calendario_id" id="calendario_id" value="<?= $calendarioId ?>">
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Metas do ano</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                    <?php if ($variosPronto): ?>
+                    <div class="sm:col-span-2">
+                        <label for="calendario_nome" class="block text-sm font-medium text-gray-700 mb-1">Nome do calendário *</label>
+                        <input type="text" name="nome" id="calendario_nome" required maxlength="120" value="<?= htmlspecialchars($nomeCal !== '' ? $nomeCal : 'Geral') ?>"
+                               data-original="<?= htmlspecialchars($nomeCal !== '' ? $nomeCal : 'Geral') ?>"
+                               placeholder="Ex.: Fundamental, Ensino Médio, 6º Ano"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <p class="text-xs text-gray-500 mt-1">Use um nome para cada calendário do ano. Marque o curso inteiro ou só as séries que seguem este calendário. Sem marcação, vale para toda a escola.</p>
+                    </div>
+                    <?php endif; ?>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Ano</label>
                         <input type="number" name="ano" value="<?= $ano ?>" min="2000" max="2100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
@@ -318,8 +355,38 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     </div>
                 </div>
             </section>
+            <?php if ($variosPronto && $cursosSeries !== []): ?>
+            <section id="secaoAbrangencia">
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Para quem vale</h3>
+                <div class="space-y-4">
+                    <?php foreach ($cursosSeries as $curso):
+                        $cursoMarcado = isset($cursoIdsSel[(int) $curso['id']]);
+                    ?>
+                    <div class="rounded-lg border border-gray-200 p-3">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                            <input type="checkbox" class="cal-curso rounded border-gray-300" name="curso_ids[]" value="<?= (int) $curso['id'] ?>" data-curso="<?= (int) $curso['id'] ?>" data-original="<?= $cursoMarcado ? '1' : '0' ?>" <?= $cursoMarcado ? 'checked' : '' ?> onchange="sincronizarCursoCalendario(this)">
+                            <?= htmlspecialchars((string) $curso['nome']) ?>
+                            <span class="font-normal text-gray-500">curso inteiro</span>
+                        </label>
+                        <?php if (($curso['series'] ?? []) !== []): ?>
+                        <div class="mt-2 pl-6 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                            <?php foreach ($curso['series'] as $serie):
+                                $serieMarcada = $cursoMarcado || isset($serieIdsSel[(int) $serie['id']]);
+                            ?>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" class="cal-serie rounded border-gray-300" name="serie_ids[]" value="<?= (int) $serie['id'] ?>" data-curso="<?= (int) $curso['id'] ?>" data-original="<?= $serieMarcada ? '1' : '0' ?>" data-bloqueada="<?= $cursoMarcado ? '1' : '0' ?>" <?= $serieMarcada ? 'checked' : '' ?> <?= $cursoMarcado ? 'disabled' : '' ?>>
+                                <?= htmlspecialchars((string) $serie['nome']) ?>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+            <?php endif; ?>
             <?php if ($status): ?>
-            <section>
+            <section id="secaoSituacaoCalendario">
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Situação prevista</h3>
                 <div class="rounded-lg bg-gray-50 border border-gray-200 p-4">
                     <div class="flex items-center justify-between mb-2">
@@ -333,12 +400,23 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             </section>
             <?php endif; ?>
         </div>
-        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3">
+            <?php if ($variosPronto && $calendarioId > 0): ?>
+            <button type="submit" form="form-excluir-calendario" id="btnExcluirCalendario" onclick="return confirm('Remover este calendário e os eventos dele?');"
+                    class="sm:mr-auto px-6 py-2.5 border border-red-200 rounded-lg text-red-700 hover:bg-red-50 transition-colors">Excluir</button>
+            <?php endif; ?>
             <button type="button" onclick="closeConfigDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Salvar</button>
         </div>
     </form>
 </aside>
+<?php if ($variosPronto && $calendarioId > 0): ?>
+<form id="form-excluir-calendario" method="post" action="<?= URL ?>/admin/calendario-letivo/excluir" class="hidden">
+    <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+    <input type="hidden" name="ano" value="<?= $ano ?>">
+    <input type="hidden" name="calendario_id" value="<?= $calendarioId ?>">
+</form>
+<?php endif; ?>
 
 <!-- Modal: Detalhe do dia -->
 <div id="modalDia" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
@@ -371,6 +449,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
     <form id="evento-form" method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-evento" class="flex flex-col flex-1 overflow-hidden">
         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
         <input type="hidden" name="ano" value="<?= $ano ?>">
+        <input type="hidden" name="calendario_id" value="<?= $calendarioId ?>">
         <input type="hidden" name="id" id="evento_id" value="">
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
@@ -703,6 +782,7 @@ var tipoText = <?= json_encode($tipoText, $jsonJs) ?>;
 var tipoLabelsMap = <?= json_encode($tipoLabels, $jsonJs) ?>;
 var csrfToken = <?= json_encode($csrf_token ?? '', $jsonJs) ?>;
 var anoAtual  = <?= $ano ?>;
+var calendarioAtualId = <?= $calendarioId ?>;
 var baseUrl   = <?= json_encode(defined('URL') ? URL : '', $jsonJs) ?>;
 var podeExcluirTipo = <?= $podeExcluirTipo ? 'true' : 'false' ?>;
 var podeAlterarEvento = <?= $podeAlterarEvento ? 'true' : 'false' ?>;
@@ -750,6 +830,7 @@ function openDayModal(payloadStr) {
                 '<form method="post" action="' + baseUrl + '/admin/calendario-letivo/excluir-evento" onsubmit="return confirm(\'Remover este evento?\')">' +
                     '<input type="hidden" name="csrf_token" value="' + escHtml(csrfToken) + '">' +
                     '<input type="hidden" name="ano" value="' + anoAtual + '">' +
+                    '<input type="hidden" name="calendario_id" value="' + calendarioAtualId + '">' +
                     '<input type="hidden" name="id" value="' + ev.id + '">' +
                     '<button type="submit" class="text-xs font-medium px-2 py-1 rounded-lg hover:opacity-80 transition-opacity" style="background:' + (tipoText[ev.tipo]||'#ef4444') + '; color:#fff;"><i class="fa-solid fa-trash-can mr-1"></i>Remover</button>' +
                 '</form>' +
@@ -795,8 +876,55 @@ function hideDrawer(backdropId, drawerId) {
     document.body.style.overflow = '';
 }
 
-function openConfigDrawer() { showDrawer('configDrawerBackdrop', 'configDrawer'); }
+function restaurarFormularioCalendario() {
+    var idEl = document.getElementById('calendario_id');
+    if (idEl) idEl.value = String(calendarioAtualId || '');
+    var nomeEl = document.getElementById('calendario_nome');
+    if (nomeEl) nomeEl.value = nomeEl.getAttribute('data-original') || '';
+    document.querySelectorAll('.cal-curso').forEach(function (el) {
+        el.checked = el.getAttribute('data-original') === '1';
+    });
+    document.querySelectorAll('.cal-serie').forEach(function (el) {
+        el.checked = el.getAttribute('data-original') === '1';
+        el.disabled = el.getAttribute('data-bloqueada') === '1';
+    });
+    var situacao = document.getElementById('secaoSituacaoCalendario');
+    if (situacao) situacao.classList.remove('hidden');
+    var excluir = document.getElementById('btnExcluirCalendario');
+    if (excluir) excluir.classList.remove('hidden');
+}
+
+function openConfigDrawer() {
+    restaurarFormularioCalendario();
+    document.getElementById('configDrawerTitle').textContent = 'Configurar calendário';
+    showDrawer('configDrawerBackdrop', 'configDrawer');
+}
 function closeConfigDrawer() { hideDrawer('configDrawerBackdrop', 'configDrawer'); }
+
+function sincronizarCursoCalendario(cursoEl) {
+    var cursoId = cursoEl.getAttribute('data-curso');
+    document.querySelectorAll('.cal-serie[data-curso="' + cursoId + '"]').forEach(function (el) {
+        el.disabled = cursoEl.checked;
+        if (cursoEl.checked) el.checked = true;
+    });
+}
+
+function openNovoCalendario() {
+    var idEl = document.getElementById('calendario_id');
+    var nomeEl = document.getElementById('calendario_nome');
+    if (idEl) idEl.value = '';
+    if (nomeEl) nomeEl.value = '';
+    document.querySelectorAll('.cal-curso, .cal-serie').forEach(function (el) {
+        el.checked = false;
+        el.disabled = false;
+    });
+    var situacao = document.getElementById('secaoSituacaoCalendario');
+    if (situacao) situacao.classList.add('hidden');
+    var excluir = document.getElementById('btnExcluirCalendario');
+    if (excluir) excluir.classList.add('hidden');
+    document.getElementById('configDrawerTitle').textContent = 'Novo calendário';
+    showDrawer('configDrawerBackdrop', 'configDrawer');
+}
 
 function definirModoEvento(editando) {
     var titulo = document.getElementById('eventoDrawerTitle');

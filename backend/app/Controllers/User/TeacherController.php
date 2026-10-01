@@ -2390,18 +2390,50 @@ if (!class_exists('TeacherController')) {
         $ano = (int) ($_GET['ano'] ?? date('Y'));
         if ($ano < 2000 || $ano > 2100) $ano = (int) date('Y');
         $service = new SchoolCalendarService($this->db);
-        $cfg     = $service->getAno($ano);
+        $user = $this->authManager->getUser();
+        $lista = $service->listarDoAno($ano);
+        $escopos = $service->escoposDoProfessor((int) ($user['id'] ?? 0));
+        $idsPermitidos = [];
+        foreach ($escopos as $escopo) {
+            $compativel = $service->resolver($ano, (int) $escopo['serie_id'], (int) $escopo['curso_id']);
+            if ($compativel) {
+                $idsPermitidos[(int) $compativel['id']] = true;
+            }
+        }
+        $geral = $service->getAno($ano);
+        if ($geral) {
+            $idsPermitidos[(int) $geral['id']] = true;
+        }
+        $lista = array_values(array_filter(
+            $lista,
+            static fn ($cal) => isset($idsPermitidos[(int) ($cal['id'] ?? 0)])
+        ));
+        $pedidoId = (int) ($_GET['id'] ?? 0);
+        $cfg = null;
+        foreach ($lista as $cal) {
+            if ((int) ($cal['id'] ?? 0) === $pedidoId) {
+                $cfg = $cal;
+                break;
+            }
+        }
+        if (!$cfg) {
+            $cfg = $service->resolverEscopos($ano, $escopos);
+        }
         $todos   = $cfg ? $service->eventos((int) $cfg['id']) : [];
         $eventos = array_values(array_filter($todos, fn($e) => (int) ($e['visivel_professor'] ?? 0) === 1));
         $visuais = $service->visuaisTipos();
         $this->viewWithLayout('professor', 'teacher/calendario-letivo', [
             'title'   => 'Calendário Letivo - EducaTudo',
-            'user'    => $this->auth->getUser(),
+            'user'    => $user,
             'ano'     => $ano,
             'eventos' => $eventos,
             'tipoLabels' => $visuais['labels'],
             'tipoBg' => $visuais['bg'],
             'tipoText' => $visuais['text'],
+            'calendarios' => $lista,
+            'calendario_id' => (int) ($cfg['id'] ?? 0),
+            'calendario_nome' => (string) ($cfg['nome'] ?? ''),
+            'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
         ]);
     }
 }
