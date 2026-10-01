@@ -959,6 +959,120 @@ class TeacherExamController extends BaseController
     }
 
     /**
+     * Exporta CSV (Excel) com todas as notas do evento, em todas as matérias.
+     * Formato matriz: uma linha por aluno e uma coluna por matéria.
+     */
+    public function exportarNotasLancamentoExcel($blocoId)
+    {
+        $user = $this->authManager->getUser();
+        if (!in_array($user['tipo'], ['admin', 'admin_escola'], true)) {
+            $this->redirectToCorrectDashboard($user['tipo']);
+            return;
+        }
+
+        $blocoId = (int) $blocoId;
+        $bloco = $this->blocoModel->findById($blocoId);
+        if (!$bloco || (($bloco['formato_evento'] ?? '') !== 'lancamento_nota')) {
+            $this->setFlashMessage('Evento de lançamento de notas não encontrado.', 'error');
+            $this->redirect('/admin/provas');
+            return;
+        }
+
+        $relatorio = $this->montarRelatorioLancamentoNotasAdmin($bloco, []);
+        $linhas = $relatorio['linhas'] ?? [];
+
+        $materias = [];
+        foreach ($linhas as $ln) {
+            $mid = (int) ($ln['materia_id'] ?? 0);
+            $nome = trim((string) ($ln['materia_nome'] ?? ''));
+            if ($mid <= 0) {
+                continue;
+            }
+            if ($nome === '') {
+                $nome = 'Matéria #' . $mid;
+            }
+            $materias[$mid] = $nome;
+        }
+        asort($materias, SORT_NATURAL | SORT_FLAG_CASE);
+
+        $porAluno = [];
+        foreach ($linhas as $ln) {
+            $tid = (int) ($ln['turma_id'] ?? 0);
+            $aid = (int) ($ln['aluno_id'] ?? 0);
+            if ($tid <= 0 || $aid <= 0) {
+                continue;
+            }
+            $chave = $tid . '_' . $aid;
+            if (!isset($porAluno[$chave])) {
+                $porAluno[$chave] = [
+                    'turma' => (string) ($ln['turma_nome'] ?? ''),
+                    'aluno' => (string) ($ln['aluno_nome'] ?? ''),
+                    'transferido' => !empty($ln['transferido']),
+                    'notas' => [],
+                ];
+            }
+            $mid = (int) ($ln['materia_id'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
+            $notaRaw = $ln['nota'] ?? null;
+            $notaFmt = ($notaRaw === null || $notaRaw === '')
+                ? ''
+                : number_format((float) $notaRaw, 2, ',', '.');
+            // Se houver mais de um vínculo na mesma matéria, mantém a primeira nota preenchida.
+            if (!isset($porAluno[$chave]['notas'][$mid]) || $porAluno[$chave]['notas'][$mid] === '') {
+                $porAluno[$chave]['notas'][$mid] = $notaFmt;
+            }
+        }
+
+        uasort($porAluno, static function (array $a, array $b): int {
+            $cmp = strcasecmp((string) ($a['turma'] ?? ''), (string) ($b['turma'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            return strcasecmp((string) ($a['aluno'] ?? ''), (string) ($b['aluno'] ?? ''));
+        });
+
+        $csvCell = static function ($value): string {
+            $text = str_replace('"', '""', (string) ($value ?? ''));
+            return '"' . $text . '"';
+        };
+
+        $cabecalho = ['Turma', 'Aluno', 'Transferido'];
+        foreach ($materias as $nomeMateria) {
+            $cabecalho[] = $nomeMateria;
+        }
+
+        $linhasCsv = [];
+        $linhasCsv[] = implode(';', array_map($csvCell, $cabecalho));
+        foreach ($porAluno as $aluno) {
+            $row = [
+                $aluno['turma'],
+                $aluno['aluno'],
+                !empty($aluno['transferido']) ? 'Sim' : 'Não',
+            ];
+            foreach (array_keys($materias) as $mid) {
+                $row[] = (string) ($aluno['notas'][$mid] ?? '');
+            }
+            $linhasCsv[] = implode(';', array_map($csvCell, $row));
+        }
+
+        $titulo = (string) ($bloco['titulo'] ?? 'notas');
+        $slug = preg_replace('/[^a-zA-Z0-9_-]+/', '-', $titulo);
+        $slug = trim((string) $slug, '-');
+        if ($slug === '') {
+            $slug = 'notas-evento';
+        }
+        $filename = 'notas-todas-materias-' . $slug . '.csv';
+
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        echo "\xEF\xBB\xBF" . implode("\n", $linhasCsv);
+        exit;
+    }
+
+    /**
      * Dashboard pedagógico de resultados do bloco.
      */
     public function resultadosBlocoAdminNovo($blocoId)
@@ -1528,8 +1642,52 @@ class TeacherExamController extends BaseController
             $this->redirect('/admin/provas/blocos/' . (int) $blocoId . '/gerenciar');
             return;
         }
+        $filtros = $this->filtrosLancamentoNotasCoordenacao($_GET);
+        $turmaIdFiltro = $filtros['turma_id'];
+        $serieIdFiltro = $filtros['serie_id'];
+        $ordenarFiltro = $filtros['ordenar'];
+        $pagina = $filtros['pagina'];
+        $porPagina = $filtros['por_pagina'];
+
         $notasModel = new ExamBlockManualGrade();
         $linhas = $notasModel->fetchNotasDetalheAdmin((int) $blocoId, $professorId, $materiaId);
+        $linhas = $this->enriquecerLinhasNotasLancadas($linhas, (int) ($bloco['ano_letivo'] ?? 0));
+
+        $turmasFiltro = [];
+        $seriesFiltro = [];
+        foreach ($linhas as $ln) {
+            $tidOpt = (int) ($ln['turma_id'] ?? 0);
+            if ($tidOpt > 0) {
+                $turmasFiltro[$tidOpt] = (string) ($ln['turma_nome'] ?? ('Turma #' . $tidOpt));
+            }
+            $sidOpt = (int) ($ln['serie_id'] ?? 0);
+            if ($sidOpt > 0) {
+                $seriesFiltro[$sidOpt] = (string) ($ln['serie_nome'] ?? ('Série #' . $sidOpt));
+            }
+        }
+        asort($turmasFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+        asort($seriesFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+
+        if ($turmaIdFiltro > 0 || $serieIdFiltro > 0) {
+            $linhas = array_values(array_filter($linhas, static function (array $ln) use ($turmaIdFiltro, $serieIdFiltro): bool {
+                if ($turmaIdFiltro > 0 && (int) ($ln['turma_id'] ?? 0) !== $turmaIdFiltro) {
+                    return false;
+                }
+                if ($serieIdFiltro > 0 && (int) ($ln['serie_id'] ?? 0) !== $serieIdFiltro) {
+                    return false;
+                }
+                return true;
+            }));
+        }
+
+        $linhas = $this->ordenarLinhasLancamentoCoordenacao($linhas, $ordenarFiltro, true);
+        $totalLinhas = count($linhas);
+        $totalPaginas = max(1, (int) ceil($totalLinhas / max(1, $porPagina)));
+        if ($pagina > $totalPaginas) {
+            $pagina = $totalPaginas;
+        }
+        $linhasPagina = array_slice($linhas, ($pagina - 1) * $porPagina, $porPagina);
+
         $profNome = $this->db->fetch('SELECT nome FROM professores WHERE id = :id', ['id' => $professorId]);
         $matNome = $this->db->fetch('SELECT nome FROM materias WHERE id = :id', ['id' => $materiaId]);
 
@@ -1541,7 +1699,17 @@ class TeacherExamController extends BaseController
             'materia_id' => $materiaId,
             'professor_nome' => $profNome['nome'] ?? '',
             'materia_nome' => $matNome['nome'] ?? '',
-            'linhas' => $linhas,
+            'linhas' => $linhasPagina,
+            'linhas_export' => $linhas,
+            'turmas_filtro' => $turmasFiltro,
+            'series_filtro' => $seriesFiltro,
+            'turma_id_filtro' => $turmaIdFiltro,
+            'serie_id_filtro' => $serieIdFiltro,
+            'ordenar_filtro' => $ordenarFiltro,
+            'pagina' => $pagina,
+            'por_pagina' => $porPagina,
+            'total_linhas' => $totalLinhas,
+            'total_paginas' => $totalPaginas,
             'current_page' => 'provas_blocos',
         ]);
     }
@@ -2550,6 +2718,86 @@ class TeacherExamController extends BaseController
             $params
         );
         return $this->filtrarAlunosLancamentoNota(is_array($rows) ? $rows : []);
+    }
+
+    /**
+     * Completa as notas já lançadas com série, número de chamada e sexo para filtro e ordenação.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function enriquecerLinhasNotasLancadas(array $linhas, int $anoLetivoEvento): array
+    {
+        $turmaIds = [];
+        foreach ($linhas as $ln) {
+            $tid = (int) ($ln['turma_id'] ?? 0);
+            if ($tid > 0) {
+                $turmaIds[$tid] = $tid;
+            }
+        }
+        $ids = array_values($turmaIds);
+        $metaPorAluno = [];
+        foreach ($this->alunosAtivosPorTurmas($ids, $anoLetivoEvento) as $al) {
+            $k = (int) ($al['turma_id'] ?? 0) . '_' . (int) ($al['id'] ?? 0);
+            $metaPorAluno[$k] = $al;
+        }
+        $seriePorTurma = $this->seriesPorTurma($ids);
+        foreach ($linhas as &$ln) {
+            $tid = (int) ($ln['turma_id'] ?? 0);
+            $k = $tid . '_' . (int) ($ln['aluno_id'] ?? 0);
+            $meta = $metaPorAluno[$k] ?? [];
+            $serieTurma = $seriePorTurma[$tid] ?? ['serie_id' => 0, 'serie_nome' => ''];
+            $serieId = (int) ($meta['serie_id'] ?? 0);
+            $serieNome = (string) ($meta['serie_nome'] ?? '');
+            if ($serieId <= 0) {
+                $serieId = (int) ($serieTurma['serie_id'] ?? 0);
+                $serieNome = (string) ($serieTurma['serie_nome'] ?? '');
+            }
+            $ln['serie_id'] = $serieId;
+            $ln['serie_nome'] = $serieNome;
+            $ln['numero_chamada'] = (int) ($meta['numero_chamada'] ?? 0);
+            $ln['sexo'] = (string) ($meta['sexo'] ?? '');
+        }
+        unset($ln);
+
+        return $linhas;
+    }
+
+    /**
+     * Série de cada turma, para o filtro continuar valendo mesmo se o aluno saiu da lista de ativos.
+     *
+     * @param list<int> $turmaIds
+     * @return array<int, array{serie_id:int,serie_nome:string}>
+     */
+    private function seriesPorTurma(array $turmaIds): array
+    {
+        $turmaIds = array_values(array_filter(array_map('intval', $turmaIds), static function (int $id): bool {
+            return $id > 0;
+        }));
+        if ($turmaIds === [] || !$this->tabelaTenantExiste('serie')) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($turmaIds), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT t.id AS turma_id, t.serie_id, s.nome AS serie_nome
+             FROM turmas t
+             LEFT JOIN serie s ON s.id = t.serie_id
+             WHERE t.id IN ($placeholders)",
+            $turmaIds
+        );
+        $out = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $tid = (int) ($row['turma_id'] ?? 0);
+            if ($tid <= 0) {
+                continue;
+            }
+            $out[$tid] = [
+                'serie_id' => (int) ($row['serie_id'] ?? 0),
+                'serie_nome' => (string) ($row['serie_nome'] ?? ''),
+            ];
+        }
+
+        return $out;
     }
 
     /**

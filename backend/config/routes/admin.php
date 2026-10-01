@@ -859,6 +859,7 @@ $router->get('/admin/provas/blocos/{id}/imprimir', 'Exams/ExamController@verImpr
 $router->get('/admin/provas/blocos/{id}/pdf-completo', 'Exams/ExamController@gerarPdfBlocoCompleto');
 $router->get('/admin/provas/blocos/{id}/prova-aluno-pdf', 'Exams/ExamController@gerarPdfProvaAluno');
 $router->get('/admin/provas/blocos/{id}/resultados', 'Teacher/TeacherExamController@resultadosBlocoAdmin');
+$router->get('/admin/provas/blocos/{id}/exportar-notas-excel', 'Teacher/TeacherExamController@exportarNotasLancamentoExcel');
 $router->get('/admin/provas/blocos/{id}/resultados-novos', 'Teacher/TeacherExamController@resultadosBlocoAdminNovo');
 $router->get('/admin/provas/blocos/{id}/canceladas', 'Teacher/TeacherExamController@canceladasBlocoAdmin');
 $router->post('/admin/provas/blocos/{id}/liberar-tentativas', 'Teacher/TeacherExamController@liberarTentativasBlocoAdmin');

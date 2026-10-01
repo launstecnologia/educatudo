@@ -37,6 +37,11 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
             </a>
             <?php endif; ?>
             <?php if ($modoLancamentoNota): ?>
+            <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/exportar-notas-excel"
+               class="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+                Exportar Excel
+            </a>
             <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/resultados"
                class="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
                 <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
