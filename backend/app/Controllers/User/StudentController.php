@@ -1459,11 +1459,7 @@ if (!class_exists('StudentController')) {
             $this->redirect('/logout');
         }
 
-        $secao = strtolower(trim((string) ($_GET['secao'] ?? 'boletim')));
-        if (!in_array($secao, ['boletim', 'notas', 'provas'], true)) {
-            $secao = 'boletim';
-        }
-
+        // Boletim e notas não entram no acesso do aluno. A rota só exibe provas.
         try {
             $provasRealizadas = $this->getProvasRealizadasAlunoComBloco((int) $aluno['id']);
         } catch (\Throwable $e) {
@@ -1476,91 +1472,26 @@ if (!class_exists('StudentController')) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
 
-        $notasLancamentoEventos = [];
-        try {
-            require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
-            $notasLancamentoEventos = (new ExamBlockManualGrade())->fetchNotasPorAluno((int) $aluno['id']);
-        } catch (\Throwable $e) {
-            $notasLancamentoEventos = [];
-        }
-
-        $boletinsGerados = [];
-        $boletinsGeradosNotas = [];
-        $boletinsGeradosNotasExtra = [];
-        $boletinsGeradosBoletim = [];
-        $boletinsGeradosComplementar = [];
-        try {
-            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
-            $boletimCfg = new BoletimConfig();
-            $boletimCfg->ensureSchema();
-            $boletinsGerados = $boletimCfg->getGeneratedBoletinsByAluno((int) $aluno['id'], 'aluno');
-            $classificados = BoletimConfig::classificarEventosGerados($boletinsGerados);
-            $boletinsGeradosNotas = $classificados['notas'];
-            $boletinsGeradosNotasExtra = $classificados['notas_extra'] ?? [];
-            $boletinsGeradosBoletim = $classificados['boletim'];
-            $boletinsGeradosComplementar = $classificados['complementar'];
-        } catch (\Throwable $e) {
-            $boletinsGerados = [];
-            $boletinsGeradosNotas = [];
-            $boletinsGeradosNotasExtra = [];
-            $boletinsGeradosBoletim = [];
-            $boletinsGeradosComplementar = [];
-        }
-
-        $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
-        try {
-            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
-            $boletimObsRow = (new BoletimConfig())->getObservacaoCoordenacao((int) $aluno['id']);
-            if ($boletimObsRow) {
-                $boletimObservacao = [
-                    'conteudo' => (string) ($boletimObsRow['conteudo'] ?? ''),
-                    'updated_at' => $boletimObsRow['updated_at'] ?? null,
-                ];
-            }
-        } catch (\Throwable $e) {
-            $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
-        }
-
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
-        $quadroOficial = null;
-        try {
-            if (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('vida_escolar')) {
-                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
-                $quadroOficial = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadroDoAluno((int) $aluno['id']);
-            }
-        } catch (\Throwable $e) {
-            $quadroOficial = null;
-        }
-
-        // TEMPORÁRIO: portal não exibe notas (semanais/blocos e eventos) até estabilizar a média final.
-        $portalNotasOcultas = true;
-        $paineisNotas = [];
-        if ($portalNotasOcultas) {
-            $notasLancamentoEventos = [];
-            $boletinsGeradosNotas = [];
-            $boletinsGeradosNotasExtra = [];
-        } else {
-            $paineisNotas = $this->paineisNotasDoAluno((int) $aluno['id']);
-        }
 
         $data = [
-            'title' => 'Notas/Boletins - EducaTudo',
+            'title' => 'Provas - EducaTudo',
             'user' => $user,
             'aluno' => $aluno,
-            'secao_notas' => $secao,
+            'secao_notas' => 'provas',
             'provas_realizadas' => $provasRealizadas,
             'provas_matriz_blocos' => $provasMatrizBlocos,
-            'notas_lancamento_eventos' => $notasLancamentoEventos,
-            'boletins_gerados' => $boletinsGerados,
-            'boletins_gerados_notas' => $boletinsGeradosNotas,
-            'boletins_gerados_notas_extra' => $boletinsGeradosNotasExtra ?? [],
-            'boletins_gerados_boletim' => $boletinsGeradosBoletim,
-            'boletins_gerados_complementar' => $boletinsGeradosComplementar,
-            'boletim_observacao' => $boletimObservacao,
-            'quadro_oficial' => $quadroOficial,
-            'paineis_notas' => $paineisNotas,
-            'portal_notas_ocultas' => $portalNotasOcultas,
+            'notas_lancamento_eventos' => [],
+            'boletins_gerados' => [],
+            'boletins_gerados_notas' => [],
+            'boletins_gerados_notas_extra' => [],
+            'boletins_gerados_boletim' => [],
+            'boletins_gerados_complementar' => [],
+            'boletim_observacao' => ['conteudo' => '', 'updated_at' => null],
+            'quadro_oficial' => null,
+            'paineis_notas' => [],
+            'portal_notas_ocultas' => true,
             'primary_color' => $primaryColor,
             'current_page' => 'notas_boletins',
             'csrf_token' => $this->generateCsrfToken(),
@@ -1571,191 +1502,12 @@ if (!class_exists('StudentController')) {
 
     public function notas()
     {
-        $user = $this->authManager->getUser();
-        $aluno = $this->db->fetch(
-            "SELECT a.*, t.nome as turma_nome FROM alunos a LEFT JOIN turmas t ON a.turma_id = t.id WHERE a.id = :user_id",
-            ['user_id' => $user['id']]
-        );
-        if (!$aluno) {
-            $this->redirect('/logout');
-        }
-
-        try {
-            $provasRealizadas = $this->getProvasRealizadasAlunoComBloco((int) $aluno['id']);
-        } catch (\Throwable $e) {
-            $provasRealizadas = [];
-        }
-
-        try {
-            $provasMatrizBlocos = $this->buildProvasMatrizPorBlocoAplicado($provasRealizadas);
-        } catch (\Throwable $e) {
-            $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
-        }
-
-        $notasLancamentoEventos = [];
-        try {
-            require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
-            $notasLancamentoEventos = (new ExamBlockManualGrade())->fetchNotasPorAluno((int) $aluno['id']);
-        } catch (\Throwable $e) {
-            $notasLancamentoEventos = [];
-        }
-
-        $boletinsGerados = [];
-        $boletinsGeradosNotas = [];
-        $boletinsGeradosNotasExtra = [];
-        $boletinsGeradosBoletim = [];
-        $boletinsGeradosComplementar = [];
-        try {
-            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
-            $boletimCfg = new BoletimConfig();
-            $boletimCfg->ensureSchema();
-            $boletinsGerados = $boletimCfg->getGeneratedBoletinsByAluno((int) $aluno['id'], 'aluno', 'notas');
-            $classificados = BoletimConfig::classificarEventosGerados($boletinsGerados);
-            $boletinsGeradosNotas = $classificados['notas'];
-            $boletinsGeradosNotasExtra = $classificados['notas_extra'] ?? [];
-            $boletinsGeradosBoletim = $classificados['boletim'];
-            $boletinsGeradosComplementar = $classificados['complementar'];
-        } catch (\Throwable $e) {
-            $boletinsGerados = [];
-            $boletinsGeradosNotas = [];
-            $boletinsGeradosNotasExtra = [];
-            $boletinsGeradosBoletim = [];
-            $boletinsGeradosComplementar = [];
-        }
-
-        require_once __DIR__ . '/../../Core/LayoutHelper.php';
-        $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
-        $quadroOficial = null;
-        try {
-            if (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('vida_escolar')) {
-                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
-                $quadroOficial = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadroDoAluno((int) $aluno['id']);
-            }
-        } catch (\Throwable $e) {
-            $quadroOficial = null;
-        }
-
-        // TEMPORÁRIO: portal não exibe notas (semanais/blocos e eventos) até estabilizar a média final.
-        $portalNotasOcultas = true;
-        $paineisNotas = [];
-        if ($portalNotasOcultas) {
-            $notasLancamentoEventos = [];
-            $boletinsGeradosNotas = [];
-            $boletinsGeradosNotasExtra = [];
-        } else {
-            $paineisNotas = $this->paineisNotasDoAluno((int) $aluno['id']);
-        }
-
-        $data = [
-            'title' => 'Notas - EducaTudo',
-            'user' => $user,
-            'aluno' => $aluno,
-            'provas_realizadas' => $provasRealizadas,
-            'provas_matriz_blocos' => $provasMatrizBlocos,
-            'notas_lancamento_eventos' => $notasLancamentoEventos,
-            'boletins_gerados' => $boletinsGerados,
-            'boletins_gerados_notas' => $boletinsGeradosNotas,
-            'boletins_gerados_notas_extra' => $boletinsGeradosNotasExtra ?? [],
-            'boletins_gerados_boletim' => $boletinsGeradosBoletim,
-            'boletins_gerados_complementar' => $boletinsGeradosComplementar,
-            'quadro_oficial' => $quadroOficial,
-            'default_notas_tab' => 'notas',
-            'paineis_notas' => $paineisNotas,
-            'portal_notas_ocultas' => $portalNotasOcultas,
-            'primary_color' => $primaryColor,
-            'current_page' => 'notas',
-            'csrf_token' => $this->generateCsrfToken(),
-        ];
-
-        $this->viewWithLayout('student', 'student/notas', $data);
-    }
-
-    /**
-     * @return list<array<string,mixed>>
-     */
-    private function paineisNotasDoAluno(int $alunoId): array
-    {
-        try {
-            require_once __DIR__ . '/../../Modulos/grupos-regras-notas/Services/PainelNotasService.php';
-            return PainelNotasService::paraAluno($alunoId, ['portal' => true]);
-        } catch (\Throwable $e) {
-            return [];
-        }
+        $this->redirect('/notas-boletins');
     }
 
     public function boletim()
     {
-        $user = $this->authManager->getUser();
-        $aluno = $this->db->fetch(
-            "SELECT a.*, t.nome as turma_nome FROM alunos a LEFT JOIN turmas t ON a.turma_id = t.id WHERE a.id = :user_id",
-            ['user_id' => $user['id']]
-        );
-        if (!$aluno) {
-            $this->redirect('/logout');
-        }
-
-        $notasLancamentoEventos = [];
-        try {
-            require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
-            $notasLancamentoEventos = (new ExamBlockManualGrade())->fetchNotasPorAluno((int) $aluno['id']);
-        } catch (\Throwable $e) {
-            $notasLancamentoEventos = [];
-        }
-
-        $boletinsGerados = [];
-        $boletinsGeradosNotas = [];
-        $boletinsGeradosNotasExtra = [];
-        $boletinsGeradosBoletim = [];
-        $boletinsGeradosComplementar = [];
-        try {
-            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
-            $boletimCfg = new BoletimConfig();
-            $boletimCfg->ensureSchema();
-            $boletinsGerados = $boletimCfg->getGeneratedBoletinsByAluno((int) $aluno['id'], 'aluno', 'boletim');
-            $classificados = BoletimConfig::classificarEventosGerados($boletinsGerados);
-            $boletinsGeradosNotas = $classificados['notas'];
-            $boletinsGeradosNotasExtra = $classificados['notas_extra'] ?? [];
-            $boletinsGeradosBoletim = $classificados['boletim'];
-            $boletinsGeradosComplementar = $classificados['complementar'];
-        } catch (\Throwable $e) {
-            $boletinsGerados = [];
-            $boletinsGeradosNotas = [];
-            $boletinsGeradosNotasExtra = [];
-            $boletinsGeradosBoletim = [];
-            $boletinsGeradosComplementar = [];
-        }
-
-        require_once __DIR__ . '/../../Core/LayoutHelper.php';
-        $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
-        $quadroOficial = null;
-        try {
-            if (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('vida_escolar')) {
-                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
-                $quadroOficial = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadroDoAluno((int) $aluno['id']);
-            }
-        } catch (\Throwable $e) {
-            $quadroOficial = null;
-        }
-        $data = [
-            'title' => 'Boletim - EducaTudo',
-            'user' => $user,
-            'aluno' => $aluno,
-            'provas_realizadas' => [],
-            'provas_matriz_blocos' => ['tabelas' => [], 'tem_dados' => false],
-            'notas_lancamento_eventos' => $notasLancamentoEventos,
-            'boletins_gerados' => $boletinsGerados,
-            'boletins_gerados_notas' => $boletinsGeradosNotas,
-            'boletins_gerados_notas_extra' => $boletinsGeradosNotasExtra ?? [],
-            'boletins_gerados_boletim' => $boletinsGeradosBoletim,
-            'boletins_gerados_complementar' => $boletinsGeradosComplementar,
-            'quadro_oficial' => $quadroOficial,
-            'default_notas_tab' => 'boletim',
-            'primary_color' => $primaryColor,
-            'current_page' => 'boletim',
-            'csrf_token' => $this->generateCsrfToken(),
-        ];
-
-        $this->viewWithLayout('student', 'student/notas', $data);
+        $this->redirect('/notas-boletins');
     }
 
     /**

@@ -14,7 +14,9 @@ $totalRegistrosNotas = count($provas_realizadas) + count($notas_lancamento_event
         <h3 class="text-xl font-bold text-gray-900">Provas realizadas</h3>
         <p class="text-sm text-gray-500 mt-1">
             <strong>Provas online:</strong> tabelas por bloco com <strong>✓</strong> acertos, <strong>✗</strong> erros e <strong>Q</strong> questões.
-            <strong>Eventos só com nota:</strong> quando a escola usa lançamento de nota (sem questões no sistema), a nota (0 a 10) aparece na seção abaixo.
+            <?php if ($temNotasLancamento): ?>
+                <strong>Eventos só com nota:</strong> quando a escola usa lançamento de nota (sem questões no sistema), a nota (0 a 10) aparece na seção abaixo.
+            <?php endif; ?>
         </p>
     </div>
     <span class="text-sm text-gray-500 whitespace-nowrap"><?= (int) $totalRegistrosNotas ?> lançamentos</span>

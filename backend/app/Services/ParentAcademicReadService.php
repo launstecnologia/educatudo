@@ -104,28 +104,8 @@ class ParentAcademicReadService
 
     public function reportCard(int $studentId): array
     {
-        $events = [];
-        if ($this->db->tableExists('boletim_resultados_gerados') && $this->db->tableExists('boletim_regras')) {
-            require_once __DIR__ . '/../Models/System/BoletimConfig.php';
-            try {
-                $cfg = new BoletimConfig();
-                $cfg->ensureSchema();
-                $events = $cfg->getGeneratedBoletinsByAluno($studentId, 'pais', 'boletim');
-                $events = BoletimConfig::classificarEventosGerados($events)['boletim'];
-            } catch (Throwable $e) {
-                $events = [];
-            }
-        }
-        return array_map(function(array $event): array {
-            return [
-                'rule_id'=>(int)$event['regra_id'],'title'=>$event['regra_nome'],'period'=>$event['periodo_ref'],
-                'school_year'=>$event['ano_letivo'],'term'=>$event['bimestre'],'starts_on'=>$event['data_inicio']?:null,'ends_on'=>$event['data_fim']?:null,
-                'purpose'=>'oficial',
-                'columns'=>$event['colunas']??[],
-                'subjects'=>array_map(fn($line)=>['subject_id'=>(int)($line['materia_id']??0),'subject_name'=>$line['materia_nome']??'Sem matéria','grades'=>$line['notas']??[]],$event['linhas']??[]),
-                'updated_at'=>$this->isoDate($event['updated_at']??null),
-            ];
-        }, $events);
+        // Boletim e notas ficam fora do acesso dos pais (portal e app).
+        return [];
     }
 
     private function recentActivity(int $studentId): array

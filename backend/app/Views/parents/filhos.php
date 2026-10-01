@@ -35,7 +35,7 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>" class="flex-1 min-w-[100px] bg-purple-600 text-white text-center py-2 rounded text-sm hover:bg-purple-700 transition-colors">Ver Detalhes</a>
-                    <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>/notas" class="flex-1 min-w-[100px] bg-blue-600 text-white text-center py-2 rounded text-sm hover:bg-blue-700 transition-colors">Notas</a>
+                    <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>/notas" class="flex-1 min-w-[100px] bg-blue-600 text-white text-center py-2 rounded text-sm hover:bg-blue-700 transition-colors">Provas</a>
                     <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>/jornadas" class="flex-1 min-w-[100px] bg-indigo-600 text-white text-center py-2 rounded text-sm hover:bg-indigo-700 transition-colors">Jornadas</a>
                     <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>/plano-aula" class="flex-1 min-w-[100px] bg-gray-600 text-white text-center py-2 rounded text-sm hover:bg-gray-700 transition-colors">Plano de Aula</a>
                 </div>

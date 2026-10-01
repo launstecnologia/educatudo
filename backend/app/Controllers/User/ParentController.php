@@ -795,10 +795,8 @@ class ParentController extends BaseController
             $this->redirect('/pais/filhos');
         }
 
-        $secao = strtolower(trim((string) ($_GET['secao'] ?? 'boletim')));
-        if (!in_array($secao, ['boletim', 'notas', 'provas'], true)) {
-            $secao = 'boletim';
-        }
+        // Boletim e notas não entram no acesso dos pais. A rota só exibe provas.
+        $secao = 'provas';
         $anoLetivo = isset($_GET['ano_letivo']) && $_GET['ano_letivo'] !== '' ? (int) $_GET['ano_letivo'] : null;
         $bimestre = isset($_GET['bimestre']) && $_GET['bimestre'] !== '' ? (int) $_GET['bimestre'] : null;
         if ($bimestre !== null && ($bimestre < 1 || $bimestre > 4)) {
@@ -839,119 +837,18 @@ class ParentController extends BaseController
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
 
+        // Boletim, quadro oficial e notas de eventos não são carregados para o responsável.
         $notasLancamentoEventos = [];
-        try {
-            require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
-            $notasLancamentoEventosBase = (new ExamBlockManualGrade())->fetchNotasPorAluno((int) $filho['id']);
-        } catch (\Throwable $e) {
-            $notasLancamentoEventosBase = [];
-        }
-        $notasLancamentoEventos = array_values(array_filter($notasLancamentoEventosBase, function ($row) use ($anoLetivo, $bimestre) {
-            $dataRef = $row['bloco_data_prova'] ?? $row['updated_at'] ?? null;
-            if (empty($dataRef)) {
-                return $anoLetivo === null && $bimestre === null;
-            }
-            $ts = strtotime((string) $dataRef);
-            if ($ts <= 0) {
-                return $anoLetivo === null && $bimestre === null;
-            }
-            if ($anoLetivo !== null && (int) date('Y', $ts) !== $anoLetivo) {
-                return false;
-            }
-            if ($bimestre !== null) {
-                $mes = (int) date('n', $ts);
-                $bim = (int) floor(($mes - 1) / 3) + 1;
-                if ($bim !== $bimestre) {
-                    return false;
-                }
-            }
-            return true;
-        }));
-
+        $notasLancamentoEventosBase = [];
         $boletinsGerados = [];
+        $boletinsNotas = [];
+        $boletinsNotasExtra = [];
+        $boletinsBoletim = [];
+        $boletinsComplementar = [];
         $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
         $quadroOficial = null;
-        try {
-            if (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('vida_escolar')) {
-                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
-                $quadroOficial = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadroDoAluno((int) $filho['id']);
-            }
-        } catch (\Throwable $e) {
-            $quadroOficial = null;
-        }
-        try {
-            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
-            $boletimCfg = new BoletimConfig();
-            $boletimCfg->ensureSchema();
-            $boletinsGerados = $boletimCfg->getGeneratedBoletinsByAluno((int) $filho['id'], 'pais');
-            $boletimObsRow = $boletimCfg->getObservacaoCoordenacao((int) $filho['id']);
-            if ($boletimObsRow) {
-                $boletimObservacao = [
-                    'conteudo' => (string) ($boletimObsRow['conteudo'] ?? ''),
-                    'updated_at' => $boletimObsRow['updated_at'] ?? null,
-                ];
-            }
-        } catch (\Throwable $e) {
-            $boletinsGerados = [];
-        }
-
-        $boletinsFiltrados = [];
-        foreach ((array) $boletinsGerados as $ev) {
-            $exibirEm = strtolower((string) ($ev['exibir_em'] ?? 'boletim'));
-            if (!in_array($exibirEm, ['boletim', 'notas'], true)) {
-                $exibirEm = 'boletim';
-            }
-
-            // Filtro para boletins de notas/provas: usa data_fim/data_inicio; fallback em periodo_ref b1..b4.
-            if ($anoLetivo !== null || $bimestre !== null) {
-                $pass = false;
-                $dataRef = $ev['data_fim'] ?? $ev['data_inicio'] ?? null;
-                if (!empty($dataRef)) {
-                    $ts = strtotime((string) $dataRef);
-                    if ($ts > 0) {
-                        $pass = true;
-                        if ($anoLetivo !== null && (int) date('Y', $ts) !== $anoLetivo) {
-                            $pass = false;
-                        }
-                        if ($pass && $bimestre !== null) {
-                            $mes = (int) date('n', $ts);
-                            $bim = (int) floor(($mes - 1) / 3) + 1;
-                            if ($bim !== $bimestre) {
-                                $pass = false;
-                            }
-                        }
-                    }
-                }
-                if (!$pass && $bimestre !== null) {
-                    $periodoRef = strtolower(trim((string) ($ev['periodo_ref'] ?? '')));
-                    if (preg_match('/\bb([1-4])\b/', $periodoRef, $m)) {
-                        $pass = ((int) $m[1] === $bimestre);
-                    }
-                }
-                if (!$pass && ($anoLetivo !== null || $bimestre !== null)) {
-                    continue;
-                }
-            }
-
-            $boletinsFiltrados[] = $ev;
-        }
-        $classificados = BoletimConfig::classificarEventosGerados($boletinsFiltrados);
-        $boletinsNotas = $classificados['notas'];
-        $boletinsNotasExtra = $classificados['notas_extra'] ?? [];
-        $boletinsBoletim = $classificados['boletim'];
-        $boletinsComplementar = $classificados['complementar'];
-
-        // TEMPORÁRIO: portal dos pais não exibe notas (semanais/blocos e eventos).
-        $portalNotasOcultas = true;
         $paineisNotas = [];
-        $notasLancamentoEventos = is_array($notasLancamentoEventos ?? null) ? $notasLancamentoEventos : [];
-        if ($portalNotasOcultas) {
-            $notasLancamentoEventos = [];
-            $boletinsNotas = [];
-            $boletinsNotasExtra = [];
-        } else {
-            $paineisNotas = $this->paineisNotasDoAluno((int) $filho['id'], $anoLetivo, $bimestre);
-        }
+        $portalNotasOcultas = true;
 
         $anosDisponiveis = [];
         foreach ((array) $provasRealizadasBase as $pr) {
@@ -979,8 +876,8 @@ class ParentController extends BaseController
         rsort($anosDisponiveis);
 
         $data = [
-            'title' => 'Notas do Filho - EducaTudo',
-            'page_title' => 'Notas',
+            'title' => 'Provas do Filho - EducaTudo',
+            'page_title' => 'Provas',
             'current_page' => 'notas',
             'filhos' => $filhos,
             'filho' => $filho,
