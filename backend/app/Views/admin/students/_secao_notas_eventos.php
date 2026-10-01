@@ -397,6 +397,7 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano letivo</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><?= $esc($cabPeriodo) ?></th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
@@ -408,12 +409,14 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
                         <?php
                         $anoP = (int) $linhaP['ano'];
                         $bimP = (int) $linhaP['numero'];
+                        $refP = (int) ($linhaP['regra_id'] ?? 0);
                         $descricao = trim((string) $linhaP['descricao']);
                         $tituloModal = $descricao !== ''
                             ? $descricao
                             : ($anoP > 0 && $bimP > 0 ? PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
                         ?>
                         <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $refP > 0 ? $refP : '—' ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $anoP > 0 ? $anoP : '—' ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800"><?= $esc($celulaPeriodo($anoP, $bimP, $cabPeriodo)) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-800"><?= $esc($descricao !== '' ? $descricao : '—') ?></td>

@@ -192,6 +192,13 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
     <input type="hidden" name="regra_id" id="duplicar-evento-regra-id" value="">
 </form>
 
+<!-- Bloquear exibição fora desta lista (form compartilhado) -->
+<form id="form-bloquear-exibicao-evento" method="POST" action="<?= URL ?>/admin/boletim-configuracao/visibilidade-regra" class="hidden" aria-hidden="true">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+    <input type="hidden" name="regra_id" id="bloquear-exibicao-regra-id" value="">
+    <input type="hidden" name="bloquear_exibicao" id="bloquear-exibicao-valor" value="">
+</form>
+
 <!-- Visibilidade para aluno/pais (form compartilhado) -->
 <form id="form-visibilidade-evento-boletim" method="POST" action="<?= URL ?>/admin/boletim-configuracao/visibilidade-regra" class="hidden" aria-hidden="true">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
@@ -205,6 +212,7 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Boletim</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Séries</th>
@@ -217,7 +225,7 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($eventos)): ?>
                 <tr>
-                    <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-file-lines text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum evento de notas cadastrado</p>
                         <p class="text-sm mt-1">Cadastre o modelo em Acadêmico → Modelo de Boletim e depois crie a avaliação do bimestre.</p>
@@ -232,6 +240,7 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 <?php foreach ($eventos as $evento): ?>
                 <?php $eventoId = (int) ($evento['id'] ?? 0); ?>
                 <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $eventoId > 0 ? $eventoId : '—' ?></td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($evento['nome'] ?? '')) ?></div>
                         <?php if (!empty($evento['codigo'])): ?>
@@ -267,6 +276,10 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                             <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full <?= $liberadoAlunoPais ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>">
                                 <?= $liberadoAlunoPais ? 'Aluno/pais liberado' : 'Aluno/pais oculto' ?>
                             </span>
+                            <?php $exibicaoBloqueada = (int) ($evento['vis_coordenacao'] ?? 1) !== 1; ?>
+                            <?php if ($exibicaoBloqueada): ?>
+                            <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800">Exibição bloqueada</span>
+                            <?php endif; ?>
                         </div>
                     </td>
                     <td class="px-6 py-4">
@@ -323,7 +336,15 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-copy text-gray-400 w-4 text-center"></i> Duplicar
                         </button>
-                        <?php $liberadoAlunoPaisMenu = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1); ?>
+                        <?php
+                        $liberadoAlunoPaisMenu = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1);
+                        $exibicaoBloqueadaMenu = (int) ($evento['vis_coordenacao'] ?? 1) !== 1;
+                        ?>
+                        <button type="button" onclick="bloquearExibicaoEventoBoletim(<?= $eventoId ?>, <?= $exibicaoBloqueadaMenu ? 0 : 1 ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid <?= $exibicaoBloqueadaMenu ? 'fa-lock-open' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
+                            <?= $exibicaoBloqueadaMenu ? 'Liberar exibição' : 'Bloquear exibição' ?>
+                        </button>
                         <button type="button" onclick="alterarVisibilidadeEventoBoletim(<?= $eventoId ?>, <?= $liberadoAlunoPaisMenu ? 0 : 1 ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
@@ -426,6 +447,18 @@ function excluirEventoBoletim(id) {
     }
     document.getElementById('excluir-evento-regra-id').value = id;
     document.getElementById('form-excluir-evento-boletim').submit();
+}
+
+function bloquearExibicaoEventoBoletim(id, bloquear) {
+    const acao = Number(bloquear) === 1
+        ? 'Bloquear a exibição deste evento? Ele continua nesta lista, mas deixa de aparecer na ficha do aluno, no boletim e na sincronização.'
+        : 'Liberar a exibição deste evento de novo na ficha do aluno e no boletim?';
+    if (!confirm(acao)) {
+        return;
+    }
+    document.getElementById('bloquear-exibicao-regra-id').value = id;
+    document.getElementById('bloquear-exibicao-valor').value = Number(bloquear) === 1 ? '1' : '0';
+    document.getElementById('form-bloquear-exibicao-evento').submit();
 }
 
 function alterarVisibilidadeEventoBoletim(id, visivel) {

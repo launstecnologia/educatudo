@@ -1706,6 +1706,22 @@ class BoletimConfigController extends BaseController
             return;
         }
 
+        if (array_key_exists('bloquear_exibicao', $_POST)) {
+            $bloquear = (int) ($_POST['bloquear_exibicao'] ?? 0) === 1;
+            $ok = $this->boletimConfig->atualizarVisibilidadeCoordenacao($regraId, $bloquear ? 0 : 1);
+            if ($ok) {
+                $_SESSION['boletim_flash'] = $bloquear
+                    ? 'Evento bloqueado. Continua nesta lista e deixa de aparecer na ficha do aluno, no boletim e na sincronização.'
+                    : 'Exibição do evento liberada de novo.';
+                $_SESSION['boletim_flash_type'] = 'success';
+            } else {
+                $_SESSION['boletim_flash'] = 'Não foi possível alterar a exibição do evento.';
+                $_SESSION['boletim_flash_type'] = 'error';
+            }
+            $this->redirect('/admin/boletim');
+            return;
+        }
+
         $temVisDetalhada = array_key_exists('vis_aluno', $_POST)
             || array_key_exists('vis_pais', $_POST)
             || array_key_exists('vis_coordenacao', $_POST);

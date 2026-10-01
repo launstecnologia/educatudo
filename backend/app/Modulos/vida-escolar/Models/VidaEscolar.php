@@ -296,6 +296,23 @@ class VidaEscolar
     }
 
     /**
+     * Evento bloqueado na lista de Avaliações (vis_coordenacao = 0) não entra na ficha.
+     */
+    private function sqlFiltroExibicaoCoordenacao(): string
+    {
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'vis_coordenacao'");
+            if ($col) {
+                return ' AND r.vis_coordenacao = 1';
+            }
+        } catch (\Throwable $e) {
+            // coluna ainda não migrada
+        }
+
+        return '';
+    }
+
+    /**
      * Eventos oficiais (preview=0) já gravados para o aluno.
      *
      * @return list<array<string,mixed>>
@@ -324,7 +341,7 @@ class VidaEscolar
                     g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo{$this->sqlSelectBoletimId()}
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}
+             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}{$this->sqlFiltroExibicaoCoordenacao()}
              ORDER BY g.id ASC",
             ['aid' => $alunoId]
         );
@@ -358,7 +375,7 @@ class VidaEscolar
                     g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo{$this->sqlSelectBoletimId()}
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}";
+             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}{$this->sqlFiltroExibicaoCoordenacao()}";
         $regraId = (int) $regraId;
         if ($regraId > 0) {
             $sql .= ' AND g.regra_id = :regra_id';

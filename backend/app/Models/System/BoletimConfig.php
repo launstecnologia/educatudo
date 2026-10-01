@@ -1617,6 +1617,26 @@ class BoletimConfig
     }
 
     /**
+     * Esconde o evento da ficha, do boletim e da sincronização.
+     * A lista de Avaliações continua mostrando a linha.
+     */
+    public function atualizarVisibilidadeCoordenacao(int $ruleId, int $visCoordenacao): bool
+    {
+        if ($ruleId <= 0) {
+            return false;
+        }
+        $n = (int) $this->db->update(
+            'UPDATE boletim_regras SET vis_coordenacao = :vis WHERE id = :id AND ativo = 1',
+            [
+                'id' => $ruleId,
+                'vis' => $visCoordenacao ? 1 : 0,
+            ]
+        );
+
+        return $n > 0;
+    }
+
+    /**
      * Duplica um evento de boletim (regra + componentes) gerando um novo código único.
      * Retorna o id do novo evento, ou null se o evento original não existir.
      */
