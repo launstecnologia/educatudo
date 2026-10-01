@@ -9,9 +9,16 @@ $anoSelecionado = (int) ($ano_letivo ?? 0);
 if ($anoSelecionado <= 0) {
     $anoSelecionado = (int) $anosLetivos[0];
 }
+$eventosSelecionados = [];
+foreach ((array) ($eventos_selecionados ?? []) as $valorSelecionado) {
+    $valorSelecionado = (string) $valorSelecionado;
+    if ($valorSelecionado !== '') {
+        $eventosSelecionados[$valorSelecionado] = true;
+    }
+}
+$selecionarTodos = !empty($selecionar_todos);
 $queryExport = [
     'fonte' => $fonte,
-    'evento' => $evento_selecionado ?? '',
     'ano_letivo' => $anoSelecionado,
     'turma_id' => (int) ($turma_id ?? 0),
     'nota_abaixo_de' => $nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '',
@@ -19,6 +26,16 @@ $queryExport = [
     'assinatura' => !empty($incluir_assinatura) ? 1 : 0,
     'incluir_antigas' => !empty($incluir_antigas) ? 1 : 0,
 ];
+if ($selecionarTodos) {
+    $queryExport['evento'] = 'todos';
+} elseif (count($eventosSelecionados) === 1) {
+    $queryExport['evento'] = (string) array_key_first($eventosSelecionados);
+} elseif ($eventosSelecionados !== []) {
+    $queryExport['eventos'] = array_keys($eventosSelecionados);
+}
+if (is_array($relatorio) && (int) ($relatorio['evento_idx'] ?? 0) > 1) {
+    $queryExport['evento_idx'] = (int) $relatorio['evento_idx'];
+}
 $incluirAntigas = !empty($incluir_antigas);
 $formatNota = static function ($value, int $places): string {
     return is_numeric($value) ? number_format((float) $value, $places, ',', '.') : ((string) $value !== '' ? (string) $value : '—');
@@ -62,33 +79,45 @@ include __DIR__ . '/../_partials/flash_message.php';
             </select>
             </span>
         </label>
-        <label class="block xl:col-span-4 campo-fonte campo-fonte-evento <?= $fonte === 'evento' ? '' : 'hidden' ?>">
+        <label class="block xl:col-span-8 campo-fonte campo-fonte-evento <?= $fonte === 'evento' ? '' : 'hidden' ?>">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Evento de notas</span>
-            <span class="relative block">
-            <select name="evento" id="evento-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'evento' ? 'required' : '' ?>>
-                <option value="">Selecione...</option>
-                <?php foreach ((array) ($eventos ?? []) as $evento):
-                    $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
-                    ?>
-                    <option value="<?= htmlspecialchars($value) ?>" <?= ($evento_selecionado ?? '') === $value ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string) ($evento['nome_exibicao'] ?? $evento['nome'])) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            </span>
+            <div id="lista-eventos-coord" class="rounded-xl border border-gray-300 bg-white">
+                <label class="flex items-center gap-2 px-3 py-2 border-b border-gray-200 text-sm font-medium text-gray-800 cursor-pointer">
+                    <input type="checkbox" id="eventos-selecionar-todos" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $selecionarTodos ? 'checked' : '' ?>>
+                    Selecionar todos
+                </label>
+                <div id="eventos-itens">
+                    <?php if (empty($eventos)): ?>
+                        <p class="px-3 py-3 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
+                    <?php endif; ?>
+                    <?php foreach ((array) ($eventos ?? []) as $indiceEvento => $evento):
+                        $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
+                        $marcado = $selecionarTodos || isset($eventosSelecionados[$value]);
+                        ?>
+                        <label class="evento-item flex items-start gap-2 px-3 py-2 text-sm text-gray-800 border-b border-gray-100 cursor-pointer" data-idx="<?= (int) $indiceEvento ?>">
+                            <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check mt-0.5 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
+                            <span><?= htmlspecialchars((string) ($evento['nome_exibicao'] ?? $evento['nome'])) ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+                <div class="flex items-center justify-between gap-2 px-3 py-2 text-xs text-gray-600">
+                    <button type="button" id="eventos-pagina-anterior" class="px-2 py-1 rounded-md border border-gray-300 bg-white hover:bg-gray-50">Anterior</button>
+                    <span id="eventos-pagina-info">Página 1</span>
+                    <button type="button" id="eventos-pagina-proxima" class="px-2 py-1 rounded-md border border-gray-300 bg-white hover:bg-gray-50">Próxima</button>
+                </div>
+            </div>
+            <input type="hidden" name="evento" id="evento-boletim-coord" value="<?= $selecionarTodos ? 'todos' : '' ?>">
             <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
                 <input type="checkbox" name="incluir_antigas" value="1" id="incluir-antigas-boletim-coord"
                        class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                        <?= $incluirAntigas ? 'checked' : '' ?>
-                       onchange="this.form.submit()">
+                       onchange="if (window.sincronizarEventosCoordenacao) { window.sincronizarEventosCoordenacao(); } this.form.submit();">
                 Incluir versões anteriores
             </label>
             <?php if ($incluirAntigas): ?>
                 <span class="block text-xs text-gray-500 mt-1">Vigente = oficial (aluno/pais/ficha). Anterior = histórico da mesma regra.</span>
             <?php endif; ?>
-            <?php if (empty($eventos)): ?>
-                <span class="block text-xs text-gray-500 mt-1">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</span>
-            <?php endif; ?>
+            <span class="block text-xs text-gray-500 mt-1">A lista mostra 8 eventos por página. Selecionar todos inclui também os das outras páginas.</span>
         </label>
         <label class="block xl:col-span-2">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Turma</span>
@@ -151,23 +180,66 @@ include __DIR__ . '/../_partials/flash_message.php';
 <?php endif; ?>
 
 <?php if (!empty($executar) && $relatorio): ?>
+    <?php
+    $paginaAtual = max(1, (int) ($relatorio['pagina'] ?? 1));
+    $totalPaginas = max(1, (int) ($relatorio['total_paginas'] ?? 1));
+    $eventoIdx = max(1, (int) ($relatorio['evento_idx'] ?? 1));
+    $eventosTotal = max(1, (int) ($relatorio['eventos_total'] ?? 1));
+    $linkRelatorio = static function (int $paginaLink, int $idxEvento) use ($queryExport): string {
+        $params = $queryExport;
+        unset($params['pagina'], $params['evento_idx']);
+        if ($idxEvento > 1) {
+            $params['evento_idx'] = $idxEvento;
+        }
+        if ($paginaLink > 1) {
+            $params['pagina'] = $paginaLink;
+        }
+        $params['executar'] = 1;
+        return URL . '/admin/reports/boletim-coordenacao?' . http_build_query($params);
+    };
+    $queryJson = $queryExport;
+    unset($queryJson['pagina'], $queryJson['evento_idx']);
+    $queryArquivo = $queryExport;
+    if ($eventosTotal > 1 && !empty($relatorio['evento_valor'])) {
+        unset($queryArquivo['eventos'], $queryArquivo['evento_idx']);
+        $queryArquivo['evento'] = (string) $relatorio['evento_valor'];
+    }
+    ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?><?php if ($fonteRelatorio === 'vida_escolar' && !empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?></span></div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             <?php if ($fonteRelatorio === 'vida_escolar'): ?>
                 <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && !$zipGerando): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</a>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryArquivo + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</a>
                 <?php elseif ($zipGerando): ?>
                 <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Aguarde o ZIP atual terminar"><i class="fa-solid fa-file-zipper mr-2"></i>Gerando ZIP...</span>
                 <?php else: ?>
                 <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Nenhum aluno com ficha na Vida Escolar"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</span>
                 <?php endif; ?>
-            <?php elseif (!empty($relatorio['alunos'])): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
+            <?php elseif (!empty($relatorio['total_alunos'])): ?>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryArquivo + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
             <?php endif; ?>
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExport + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryArquivo + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryJson + ['formato' => 'json'])) ?>" class="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900"><i class="fa-solid fa-file-code mr-2"></i>Exportar JSON</a>
         </div>
     </div>
+    <p class="text-sm text-gray-500 mb-4">O JSON traz todos os alunos e todas as notas do filtro, sem a paginação da tela, para conferência.<?php if ($eventosTotal > 1): ?> Excel e PDF saem do evento que está aberto.<?php endif; ?></p>
+    <?php if ($eventosTotal > 1): ?>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 py-3 rounded-xl border border-gray-200 bg-white">
+            <div class="text-sm text-gray-700">
+                <strong>Evento <?= $eventoIdx ?> de <?= $eventosTotal ?></strong>
+                <span class="text-gray-500">· <?= htmlspecialchars((string) ($relatorio['evento_rotulo'] ?? $relatorio['evento_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+            </div>
+            <div class="flex gap-2">
+                <?php if ($eventoIdx > 1): ?>
+                    <a href="<?= htmlspecialchars($linkRelatorio(1, $eventoIdx - 1), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50">‹ Evento anterior</a>
+                <?php endif; ?>
+                <?php if ($eventoIdx < $eventosTotal): ?>
+                    <a href="<?= htmlspecialchars($linkRelatorio(1, $eventoIdx + 1), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50">Próximo evento ›</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
     <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_com_ficha'] ?? 0) > 0): ?>
         <p class="text-sm text-gray-500 mb-4">Um PDF por aluno, gerado em segundo plano e empacotado em ZIP. Com a escola inteira pode levar vários minutos.</p>
     <?php endif; ?>
@@ -226,29 +298,117 @@ include __DIR__ . '/../_partials/flash_message.php';
             </div>
         </section>
     <?php endforeach; ?>
+    <?php if ($totalPaginas > 1): ?>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6 px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm">
+            <div class="text-gray-600">Alunos: página <?= $paginaAtual ?> de <?= $totalPaginas ?> · 20 por página</div>
+            <div class="flex gap-2">
+                <?php if ($paginaAtual > 1): ?>
+                    <a href="<?= htmlspecialchars($linkRelatorio($paginaAtual - 1, $eventoIdx), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">‹ Anterior</a>
+                <?php endif; ?>
+                <?php if ($paginaAtual < $totalPaginas): ?>
+                    <a href="<?= htmlspecialchars($linkRelatorio($paginaAtual + 1, $eventoIdx), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Próxima ›</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
 <?php endif; ?>
 
 <script>
 (function () {
     var fonteSelect = document.getElementById('fonte-boletim-coord');
-    var eventoSelect = document.getElementById('evento-boletim-coord');
+    var eventoHidden = document.getElementById('evento-boletim-coord');
     var anoSelect = document.getElementById('ano-letivo-boletim-coord');
+    var form = document.getElementById('form-boletim-coordenacao');
+    var checks = Array.prototype.slice.call(document.querySelectorAll('.evento-check'));
+    var selecionarTodos = document.getElementById('eventos-selecionar-todos');
+    var itens = Array.prototype.slice.call(document.querySelectorAll('.evento-item'));
+    var info = document.getElementById('eventos-pagina-info');
+    var btnAnterior = document.getElementById('eventos-pagina-anterior');
+    var btnProxima = document.getElementById('eventos-pagina-proxima');
+    var porPagina = 8;
+    var pagina = 0;
+    var primeiroMarcado = -1;
+    checks.forEach(function (check, idx) {
+        if (primeiroMarcado < 0 && check.checked) primeiroMarcado = idx;
+    });
+    if (primeiroMarcado >= 0) {
+        pagina = Math.floor(primeiroMarcado / porPagina);
+    }
+
     function aplicarFonte() {
         var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
         document.querySelectorAll('.campo-fonte').forEach(function (el) {
             el.classList.toggle('hidden', !el.classList.contains('campo-fonte-' + fonte));
         });
-        if (eventoSelect) {
-            eventoSelect.required = fonte === 'evento';
-        }
         if (anoSelect) {
             anoSelect.required = fonte === 'vida_escolar';
         }
+    }
+    function desenharPagina() {
+        var total = itens.length;
+        var paginas = Math.max(1, Math.ceil(total / porPagina));
+        if (pagina > paginas - 1) pagina = paginas - 1;
+        if (pagina < 0) pagina = 0;
+        itens.forEach(function (item, idx) {
+            var visivel = idx >= pagina * porPagina && idx < (pagina + 1) * porPagina;
+            item.classList.toggle('hidden', !visivel);
+        });
+        if (info) {
+            info.textContent = total === 0 ? 'Nenhum evento' : ('Página ' + (pagina + 1) + ' de ' + paginas);
+        }
+        if (btnAnterior) btnAnterior.disabled = pagina <= 0;
+        if (btnProxima) btnProxima.disabled = pagina >= paginas - 1;
+    }
+    function atualizarSelecionarTodos() {
+        if (!selecionarTodos) return;
+        var marcados = checks.filter(function (check) { return check.checked; }).length;
+        selecionarTodos.checked = checks.length > 0 && marcados === checks.length;
+        selecionarTodos.indeterminate = marcados > 0 && marcados < checks.length;
+    }
+    window.sincronizarEventosCoordenacao = function () {
+        var todos = checks.length > 0 && checks.every(function (check) { return check.checked; });
+        if (eventoHidden) {
+            eventoHidden.disabled = false;
+            eventoHidden.value = todos ? 'todos' : '';
+        }
+        checks.forEach(function (check) {
+            check.disabled = todos;
+        });
+    };
+    if (selecionarTodos) {
+        selecionarTodos.addEventListener('change', function () {
+            checks.forEach(function (check) { check.checked = selecionarTodos.checked; });
+            atualizarSelecionarTodos();
+        });
+    }
+    checks.forEach(function (check) {
+        check.addEventListener('change', atualizarSelecionarTodos);
+    });
+    if (btnAnterior) {
+        btnAnterior.addEventListener('click', function () { pagina -= 1; desenharPagina(); });
+    }
+    if (btnProxima) {
+        btnProxima.addEventListener('click', function () { pagina += 1; desenharPagina(); });
+    }
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            window.sincronizarEventosCoordenacao();
+            var submitter = event.submitter;
+            var gerar = submitter && submitter.name === 'executar';
+            var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
+            if (gerar && fonte === 'evento' && checks.length > 0 && !checks.some(function (check) { return check.checked; })) {
+                event.preventDefault();
+                checks.forEach(function (check) { check.disabled = false; });
+                window.alert('Selecione ao menos um evento de notas.');
+            }
+        });
     }
     if (fonteSelect) {
         fonteSelect.addEventListener('change', aplicarFonte);
         aplicarFonte();
     }
+    atualizarSelecionarTodos();
+    desenharPagina();
 })();
 </script>
 <?php if (!empty($pode_editar_observacao)): ?>
