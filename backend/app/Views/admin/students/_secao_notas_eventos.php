@@ -256,6 +256,52 @@ $renderQuadroDemonstrativo = static function (
     }
 };
 
+$renderNotasComoCoordenacao = static function (array $ev): string {
+    $cols = BoletimQuadroLayoutHelper::colunasDetalheCoordenacao(
+        is_array($ev['colunas'] ?? null) ? $ev['colunas'] : []
+    );
+    $linhasEv = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
+    if ($cols === [] || $linhasEv === []) {
+        return '';
+    }
+    $dec = max(0, min(2, (int) ($ev['decimal_places'] ?? 1)));
+    $fmt = static function ($value) use ($dec): string {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+        return is_numeric($value)
+            ? number_format((float) $value, $dec, ',', '.')
+            : (string) $value;
+    };
+    ob_start();
+    ?>
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left">Matéria</th>
+                    <?php foreach ($cols as $column): ?>
+                        <th class="px-4 py-2 text-center whitespace-nowrap"><?= htmlspecialchars((string) $column['label'], ENT_QUOTES, 'UTF-8') ?></th>
+                    <?php endforeach; ?>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                <?php foreach ($linhasEv as $linhaEv): ?>
+                    <?php $notasEv = is_array($linhaEv['notas'] ?? null) ? $linhaEv['notas'] : []; ?>
+                    <tr>
+                        <td class="px-4 py-2"><?= htmlspecialchars((string) ($linhaEv['materia_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                        <?php foreach ($cols as $column): ?>
+                            <td class="px-4 py-2 text-center font-medium"><?= htmlspecialchars($fmt($notasEv[$column['codigo']] ?? null), ENT_QUOTES, 'UTF-8') ?></td>
+                        <?php endforeach; ?>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+};
+
 $fontesNotas = [];
 $htmlQuadroPorChave = [];
 $idxLinha = 0;
@@ -267,7 +313,25 @@ foreach ($linhasPeriodo as &$linhaP) {
     $idResumo = 'fonte-notas-resumo-' . $idxLinha;
     $idQuadro = 'fonte-notas-quadro-' . $anoP . '-' . $bimP . '-' . $ridP . '-' . $idxLinha;
     $htmlResumo = '';
-    if (is_array($linhaP['resumo'] ?? null)) {
+    $chaveEv = $ridP . ':' . $anoP . ':' . $bimP;
+    $evNotas = $geradoPorChave[$chaveEv] ?? null;
+    if (!is_array($evNotas) && $ridP > 0) {
+        foreach ($geradosNotasLista as $evCand) {
+            if (!is_array($evCand) || (int) ($evCand['regra_id'] ?? 0) !== $ridP) {
+                continue;
+            }
+            $bimCand = (int) ($evCand['bimestre'] ?? 0);
+            if ($bimP > 0 && $bimCand > 0 && $bimCand !== $bimP) {
+                continue;
+            }
+            $evNotas = $evCand;
+            break;
+        }
+    }
+    if (is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
+        $htmlResumo = $renderNotasComoCoordenacao($evNotas);
+    }
+    if ($htmlResumo === '' && is_array($linhaP['resumo'] ?? null)) {
         $resumos_notas = [$linhaP['resumo']];
         ob_start();
         require dirname(__DIR__, 2) . '/partials/resumo_notas_tabelas.php';

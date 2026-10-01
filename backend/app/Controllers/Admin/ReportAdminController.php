@@ -1388,6 +1388,13 @@ class ReportAdminController extends AdminBaseController
 
     private function selecionarColunasNotasBoletim(array $columnsRaw, bool $detalhado = false): array
     {
+        if ($detalhado) {
+            if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+            }
+
+            return BoletimQuadroLayoutHelper::colunasDetalheCoordenacao($columnsRaw);
+        }
         $selected = [];
         foreach ($columnsRaw as $column) {
             if (!is_array($column)) {
@@ -1401,17 +1408,6 @@ class ReportAdminController extends AdminBaseController
             $group = strtolower(trim((string) ($column['layout_group'] ?? '')));
             $haystack = strtolower((string) (($column['nome'] ?? '') . ' ' . $codigo));
             if ($type === 'resultado' || strpos($haystack, 'result') !== false) {
-                continue;
-            }
-            if ($detalhado) {
-                if (in_array($type, ['semana_nq', 'n', 'q'], true)) {
-                    continue;
-                }
-                $selected[] = [
-                    'codigo' => $codigo,
-                    'label' => (string) ($column['nome'] ?? $codigo),
-                    'group' => $group,
-                ];
                 continue;
             }
             if (in_array($type, ['faltas', 'rec'], true)

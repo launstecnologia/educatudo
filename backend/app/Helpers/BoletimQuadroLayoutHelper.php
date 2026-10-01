@@ -882,6 +882,40 @@ class BoletimQuadroLayoutHelper
         return $out !== [] ? $out : $fallback;
     }
 
+    /**
+     * Colunas da tela Notas da Coordenação (modo detalhado): nomes gravados no evento.
+     *
+     * @param list<array<string,mixed>> $columnsRaw
+     * @return list<array{codigo:string,label:string}>
+     */
+    public static function colunasDetalheCoordenacao(array $columnsRaw): array
+    {
+        $selected = [];
+        foreach ($columnsRaw as $column) {
+            if (!is_array($column)) {
+                continue;
+            }
+            $codigo = trim((string) ($column['codigo'] ?? ''));
+            if ($codigo === '') {
+                continue;
+            }
+            $type = strtolower(trim((string) ($column['layout_type'] ?? '')));
+            $haystack = strtolower((string) (($column['nome'] ?? '') . ' ' . $codigo));
+            if ($type === 'resultado' || strpos($haystack, 'result') !== false) {
+                continue;
+            }
+            if (in_array($type, ['semana_nq', 'n', 'q'], true)) {
+                continue;
+            }
+            $selected[] = [
+                'codigo' => $codigo,
+                'label' => (string) ($column['nome'] ?? $codigo),
+            ];
+        }
+
+        return $selected;
+    }
+
     /** @return list<string> */
     public static function chavesResumoNotas(): array
     {
