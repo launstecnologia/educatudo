@@ -381,7 +381,7 @@ class BoletimConfig
         );
         $total = (int) ($totalRow['total'] ?? 0);
 
-        return ['rows' => $rows, 'total' => $total];
+        return ['rows' => $this->anexarVersoesNasLinhas($rows), 'total' => $total];
     }
 
     /**
@@ -1380,19 +1380,81 @@ class BoletimConfig
 
         return $this->db->fetchAll(
             "SELECT g.versao, MAX(g.vigente) AS vigente, MAX(g.geracao_id) AS geracao_id,
-                    MAX(g.created_at) AS created_at {$selectExtra}
+                    MIN(g.created_at) AS created_at {$selectExtra}
              FROM boletim_resultados_gerados g
              {$joinGeracao}
              WHERE g.regra_id = :regra_id AND g.aluno_id = :aluno_id
                AND g.periodo_ref = :periodo_ref AND g.preview = 0
              GROUP BY g.versao
-             ORDER BY g.versao DESC",
+             ORDER BY g.versao ASC",
             [
                 'regra_id' => $regraId,
                 'aluno_id' => $alunoId,
                 'periodo_ref' => $periodoRef,
             ]
         ) ?: [];
+    }
+
+    /**
+     * Anexa, em cada linha da listagem, as versões daquele aluno/período
+     * com data e usuário de quem gravou.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function anexarVersoesNasLinhas(array $rows): array
+    {
+        if ($rows === [] || !$this->hasColumn('boletim_resultados_gerados', 'versao')) {
+            foreach ($rows as &$row) {
+                $row['versoes'] = [];
+            }
+            unset($row);
+            return $rows;
+        }
+
+        $conds = [];
+        $params = [];
+        $i = 0;
+        foreach ($rows as $row) {
+            $i++;
+            $conds[] = "(g.regra_id = :r{$i} AND g.aluno_id = :a{$i} AND g.periodo_ref = :p{$i})";
+            $params["r{$i}"] = (int) ($row['regra_id'] ?? 0);
+            $params["a{$i}"] = (int) ($row['aluno_id'] ?? 0);
+            $params["p{$i}"] = (string) ($row['periodo_ref'] ?? '');
+        }
+
+        $joinGeracao = $this->hasTable('boletim_geracoes')
+            ? 'LEFT JOIN boletim_geracoes ge ON ge.id = g.geracao_id'
+            : '';
+        $selectUsuario = $this->hasTable('boletim_geracoes')
+            ? 'MAX(ge.usuario_nome) AS usuario_nome'
+            : 'NULL AS usuario_nome';
+
+        $eventos = $this->db->fetchAll(
+            "SELECT g.regra_id, g.aluno_id, g.periodo_ref, g.versao,
+                    MAX(g.vigente) AS vigente,
+                    MIN(g.created_at) AS created_at,
+                    {$selectUsuario}
+             FROM boletim_resultados_gerados g
+             {$joinGeracao}
+             WHERE g.preview = 0 AND (" . implode(' OR ', $conds) . ")
+             GROUP BY g.regra_id, g.aluno_id, g.periodo_ref, g.versao
+             ORDER BY g.versao ASC",
+            $params
+        ) ?: [];
+
+        $porChave = [];
+        foreach ($eventos as $ev) {
+            $chave = (int) ($ev['regra_id'] ?? 0) . '|' . (int) ($ev['aluno_id'] ?? 0) . '|' . (string) ($ev['periodo_ref'] ?? '');
+            $porChave[$chave][] = $ev;
+        }
+        foreach ($rows as &$row) {
+            $chave = (int) ($row['regra_id'] ?? 0) . '|' . (int) ($row['aluno_id'] ?? 0) . '|' . (string) ($row['periodo_ref'] ?? '');
+            $row['versoes'] = $porChave[$chave] ?? [];
+        }
+        unset($row);
+
+        return $rows;
     }
 
     /**

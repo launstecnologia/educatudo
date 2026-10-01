@@ -71,7 +71,7 @@ $formatDataHora = static function ($value): string {
     <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Boletins Gerados</h1>
-            <p class="text-sm text-gray-500 mt-1">Lista a <strong>versão vigente</strong> de cada aluno. O histórico completo fica na configuração do evento. Remover aqui apaga todas as versões daquele aluno neste período.</p>
+            <p class="text-sm text-gray-500 mt-1">Cada boletim mostra quem criou, a data de criação e cada versão seguinte, com usuário e horário.</p>
         </div>
         <a href="<?= URL ?>/admin/boletim-configuracao"
            class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium">
@@ -186,7 +186,7 @@ $formatDataHora = static function ($value): string {
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Datas</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Linhas</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tipo</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Atualizado</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Histórico</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Ações</th>
                         </tr>
                     </thead>
@@ -241,7 +241,14 @@ $formatDataHora = static function ($value): string {
                                         <span class="inline-block ml-1 px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-700"><?= htmlspecialchars($exibirEmRow, ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-3 py-2 text-gray-600 whitespace-nowrap"><?= htmlspecialchars($formatDataHora($row['updated_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="px-3 py-2 text-gray-600 align-top">
+                                    <?php
+                                    $boletim_versoes = is_array($row['versoes'] ?? null) ? $row['versoes'] : [];
+                                    $boletim_versoes_fallback = (string) ($row['updated_at'] ?? '');
+                                    $boletim_versoes_compact = true;
+                                    require __DIR__ . '/../../partials/boletim_versoes_historico.php';
+                                    ?>
+                                </td>
                                 <td class="px-3 py-2 text-right whitespace-nowrap">
                                     <button type="button"
                                             class="btn-preview-boletim inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50">

@@ -798,12 +798,21 @@ class BoletimConfigController extends BaseController
                 : ''
         );
 
+        $boletim_versoes = ((int) ($evento['preview'] ?? 0) === 1)
+            ? []
+            : $this->boletimConfig->listarVersoesAluno($regraId, $alunoId, $periodoRef);
+        $boletim_versoes_fallback = (string) ($evento['updated_at'] ?? '');
+        $boletim_versoes_compact = false;
+
         // Reusa o partial existente, sem botão de remover (a tela já tem o seu próprio).
         $boletins_gerados = [$evento];
         $boletim_pode_excluir = false;
         $boletim_aluno_id = 0;
 
         echo $cabecalho;
+        if ((int) ($evento['preview'] ?? 0) !== 1) {
+            require __DIR__ . '/../../Views/partials/boletim_versoes_historico.php';
+        }
         require __DIR__ . '/../../Views/partials/boletins_gerados.php';
     }
 
