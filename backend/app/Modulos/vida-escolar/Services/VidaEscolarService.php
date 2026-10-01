@@ -748,12 +748,10 @@ class VidaEscolarService
                 $prioBase += 10;
             }
             $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
-            // O boletim já gerado é a nota oficial. O evento de notas não pode
-            // colocar a média parcial (6) no lugar da Média Bim Final (7).
-            if ($exibir === 'boletim') {
-                $prioBase += 40;
-            } elseif ($exibir === 'notas') {
+            if ($exibir === 'notas') {
                 $prioBase += 5;
+            } elseif ($exibir === 'boletim') {
+                $prioBase += 2;
             }
             $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
             if ($temMediaFinalRow) {
@@ -789,6 +787,10 @@ class VidaEscolarService
                 $prefere = 0;
                 if ($qualidade >= 4) {
                     $prefere = $notaIgualMediaFinal ? 1 : 2;
+                }
+                // Média Bim Final diferente da coluna Média (6 → 7) vence qualquer outra linha.
+                if (!empty($vals['diverge_media'])) {
+                    $prio += 200;
                 }
                 $atual = $propostas[$linhaId][$periodo] ?? null;
                 // Empate: mantém a primeira (id menor) — mesmo critério do DocumentoOficialService.
@@ -1035,10 +1037,10 @@ class VidaEscolarService
                         $prioBase += 10;
                     }
                     $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
-                    if ($exibir === 'boletim') {
-                        $prioBase += 40;
-                    } elseif ($exibir === 'notas') {
+                    if ($exibir === 'notas') {
                         $prioBase += 5;
+                    } elseif ($exibir === 'boletim') {
+                        $prioBase += 2;
                     }
                     $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
                     if ($temMediaFinalRow) {
@@ -1086,6 +1088,9 @@ class VidaEscolarService
                             $prio += 30;
                         }
                         $prefere = $qualidade >= 4 ? ($notaIgualMediaFinal ? 1 : 2) : 0;
+                        if (!empty($vals['diverge_media'])) {
+                            $prio += 200;
+                        }
                         $prioAtual = $prioCelula[$chaveCel] ?? null;
                         $prefereAtual = $prefereCelula[$chaveCel] ?? 0;
                         // Empate: primeira geração (id menor) vence — igual ao documento oficial.
@@ -1957,6 +1962,39 @@ class VidaEscolarService
             }
             if ($media !== null) {
                 $aplicar($bimEvento, $media, null, false, $qualidade);
+            }
+        }
+
+        // A coluna do relatório "Média Bim Final" é a nota da ficha.
+        // Não cede para a coluna "Média" (6,00) nem para media_final gravado.
+        if ($bimEvento >= 1 && $bimEvento <= 4) {
+            $notaBimFinal = null;
+            $notaMedia = null;
+            foreach ($colunas as $col) {
+                if (!is_array($col)) {
+                    continue;
+                }
+                $nomeFold = strtr(mb_strtolower(trim((string) ($col['nome'] ?? ''))), [
+                    'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a', 'é' => 'e', 'ê' => 'e',
+                    'í' => 'i', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c',
+                ]);
+                $nomeFold = trim((string) preg_replace('/[^a-z0-9]+/', ' ', $nomeFold));
+                $val = $valorColuna($col);
+                if ($val === null) {
+                    continue;
+                }
+                if (str_contains($nomeFold, 'media bim final')) {
+                    $notaBimFinal = $val;
+                } elseif ($nomeFold === 'media') {
+                    $notaMedia = $val;
+                }
+            }
+            if ($notaBimFinal !== null) {
+                $aplicar($bimEvento, $notaBimFinal, null, false, 4);
+                $out[$bimEvento]['coluna_bim_final'] = true;
+                if ($notaMedia !== null && abs($notaBimFinal - $notaMedia) >= 0.001) {
+                    $out[$bimEvento]['diverge_media'] = true;
+                }
             }
         }
 
