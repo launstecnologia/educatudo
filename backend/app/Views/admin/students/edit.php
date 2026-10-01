@@ -45,28 +45,30 @@
         <div class="p-6 space-y-6">
             <h3 class="text-lg font-semibold text-gray-900">Identificação</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label for="nome" class="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
-                    <input type="text" id="nome" name="nome" required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                           value="<?= htmlspecialchars($student['nome_civil'] ?? $student['nome'] ?? '') ?>"
-                           placeholder="Nome civil / de registro">
-                </div>
-                <div>
-                    <label for="codigo_aluno" class="block text-sm font-medium text-gray-700 mb-2">Código do Aluno</label>
-                    <input type="text" id="codigo_aluno" name="codigo_aluno"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                           value="<?= htmlspecialchars($student['codigo_aluno'] ?? '') ?>"
-                           placeholder="Código interno da escola">
-                    <p class="mt-1 text-xs text-gray-500">Código interno da escola.</p>
-                </div>
-                <div>
-                    <label for="ra" class="block text-sm font-medium text-gray-700 mb-2">RA</label>
-                    <input type="text" id="ra" name="ra"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                           value="<?= htmlspecialchars($student['ra'] ?? '') ?>"
-                           placeholder="RA do governo">
-                    <p class="mt-1 text-xs text-gray-500">Registro do aluno no governo.</p>
+                <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <div class="md:col-span-6">
+                        <label for="nome" class="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
+                        <input type="text" id="nome" name="nome" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               value="<?= htmlspecialchars($student['nome_civil'] ?? $student['nome'] ?? '') ?>"
+                               placeholder="Nome civil / de registro">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label for="codigo_aluno" class="block text-sm font-medium text-gray-700 mb-2">Código do Aluno</label>
+                        <input type="text" id="codigo_aluno" name="codigo_aluno"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               value="<?= htmlspecialchars($student['codigo_aluno'] ?? '') ?>"
+                               placeholder="Código interno da escola">
+                        <p class="mt-1 text-xs text-gray-500">Código interno da escola.</p>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label for="ra" class="block text-sm font-medium text-gray-700 mb-2">RA</label>
+                        <input type="text" id="ra" name="ra"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                               value="<?= htmlspecialchars($student['ra'] ?? '') ?>"
+                               placeholder="RA do governo">
+                        <p class="mt-1 text-xs text-gray-500">Registro do aluno no governo.</p>
+                    </div>
                 </div>
                 <div class="md:col-span-2">
                     <label for="nome_social" class="block text-sm font-medium text-gray-700 mb-2">Nome social <span class="text-gray-400 font-normal">(opcional)</span></label>
