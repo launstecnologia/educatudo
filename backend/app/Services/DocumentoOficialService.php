@@ -34,13 +34,13 @@ class DocumentoOficialService
     /**
      * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array}
      */
-    public function emitirFicha(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null): array
+    public function emitirFicha(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, bool $registrarEmissao = true): array
     {
         $payload = $this->montarFicha($alunoId, $turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if ($payload === null) {
             throw new RuntimeException('Não foi possível montar a ficha deste aluno.');
         }
-        return $this->emitirDocumento('ficha_individual', $payload, $usuarioId, $configApp, $alunoId, $turmaId);
+        return $this->emitirDocumento('ficha_individual', $payload, $usuarioId, $configApp, $alunoId, $turmaId, $registrarEmissao);
     }
 
     /**
@@ -120,7 +120,7 @@ class DocumentoOficialService
      * @param array<string,mixed> $filtros
      * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array,linhas:list}
      */
-    public function emitirRelatorio(string $tipoRelatorio, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, array $filtros = []): array
+    public function emitirRelatorio(string $tipoRelatorio, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, array $filtros = [], bool $registrarEmissao = true): array
     {
         if (!isset(ResultadoAcademico::DOCUMENTO_TIPOS[$tipoRelatorio])) {
             $tipoRelatorio = 'relatorio_fechamento';
@@ -144,7 +144,7 @@ class DocumentoOficialService
             'linhas' => $linhas,
             'tabela_html' => $this->tabelaRelatorioHtml($linhas, $tipoRelatorio),
         ];
-        $out = $this->emitirDocumento($tipoRelatorio, $payload, $usuarioId, $configApp, null, $turmaId);
+        $out = $this->emitirDocumento($tipoRelatorio, $payload, $usuarioId, $configApp, null, $turmaId, $registrarEmissao);
         $out['linhas'] = $linhas;
         return $out;
     }
@@ -181,14 +181,26 @@ class DocumentoOficialService
      * @param array<string,mixed> $payload
      * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array}
      */
-    private function emitirDocumento(string $tipo, array $payload, ?int $usuarioId, ?array $configApp, ?int $alunoId, ?int $turmaId): array
+    private function emitirDocumento(string $tipo, array $payload, ?int $usuarioId, ?array $configApp, ?int $alunoId, ?int $turmaId, bool $registrarEmissao = true): array
     {
         $periodo = $payload['periodo'] ?? [];
         $anoLetivo = (int) ($periodo['ano_letivo'] ?? date('Y'));
         $modeloCodigo = $this->model->getLayoutCodigo($tipo);
+        $turmaEmissao = is_array($payload['turma'] ?? null) ? $payload['turma'] : [];
+        $codigoEtapa = $this->codigoModeloDaEtapa(
+            $tipo,
+            (int) ($turmaEmissao['curso_novo_id'] ?? 0),
+            (int) ($turmaEmissao['serie_id'] ?? 0)
+        );
+        if ($codigoEtapa !== null && $codigoEtapa !== '') {
+            $modeloCodigo = $codigoEtapa;
+        }
         $oficial = $this->ehEmissaoOficial($tipo, $payload);
-        $numero = $oficial ? $this->model->proximoNumeroEmissao($tipo, $anoLetivo) : 0;
+        $numero = ($oficial && $registrarEmissao) ? $this->model->proximoNumeroEmissao($tipo, $anoLetivo) : 0;
         $vars = $this->varsDoPayload($payload, $tipo, $numero, $anoLetivo);
+        if ($oficial && !$registrarEmissao) {
+            $vars['numero'] = '—';
+        }
         $render = $this->renderComModelo($modeloCodigo, $vars, $tipo, $payload, $configApp);
 
         $canonical = json_encode([
@@ -199,7 +211,7 @@ class DocumentoOficialService
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $hash = is_string($canonical) ? hash('sha256', $canonical) : null;
 
-        if ($oficial) {
+        if ($oficial && $registrarEmissao) {
             $this->model->registrarEmissao([
                 'tipo' => $tipo,
                 'modelo_codigo' => $modeloCodigo,
@@ -261,6 +273,17 @@ class DocumentoOficialService
                 : 'portrait',
             'papel' => 'A4',
         ];
+    }
+
+    private function codigoModeloDaEtapa(string $tipo, int $cursoId, int $serieId): ?string
+    {
+        try {
+            require_once __DIR__ . '/../Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
+            $svc = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
+            return $svc->codigoParaEmissao($tipo, $cursoId, $serieId);
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     private function buscarModelo(string $codigo): ?array
@@ -350,6 +373,10 @@ class DocumentoOficialService
             'escola_inep' => !empty($unidade['inep']) ? $esc('Código INEP ' . $unidade['inep']) : '',
             'escola_unidade' => $esc($unidade['nome'] ?? $unidade['nome_fantasia'] ?? ''),
             'escola_endereco' => $esc($unidade['endereco_completo'] ?? $unidade['endereco'] ?? ''),
+            'escola_telefone' => $esc(trim((string) ($unidade['telefone'] ?? '')) ?: '—'),
+            'escola_municipio' => $esc(trim((string) ($unidade['cidade'] ?? $unidade['municipio'] ?? '')) ?: '—'),
+            'escola_nre' => $esc(trim((string) ($unidade['nre'] ?? '')) ?: '—'),
+            'entidade_mantenedora' => $esc(trim((string) ($unidade['mantenedora'] ?? $unidade['razao_social'] ?? '')) ?: '—'),
             'escola_docs' => $esc(trim(implode(' | ', array_filter([
                 !empty($unidade['cnpj']) ? 'CNPJ ' . $unidade['cnpj'] : '',
                 !empty($unidade['inep']) ? 'Código INEP ' . $unidade['inep'] : '',
@@ -357,6 +384,9 @@ class DocumentoOficialService
             'aluno_nome' => $esc($aluno['nome'] ?? ''),
             'aluno_codigo' => $esc(trim((string) ($aluno['codigo_aluno'] ?? '')) ?: '—'),
             'aluno_ra' => $esc(trim((string) ($aluno['ra'] ?? '')) ?: '—'),
+            'aluno_rg' => $esc(trim((string) ($aluno['rg'] ?? '')) ?: '—'),
+            'aluno_sexo' => $esc($this->rotuloSexoDocumento((string) ($aluno['sexo'] ?? ''))),
+            'aluno_pais' => $esc(trim((string) ($aluno['pais'] ?? $aluno['pais_origem'] ?? '')) ?: 'Brasil'),
             'aluno_cpf' => $esc($aluno['cpf'] ?? '—'),
             'aluno_data_nasc' => $this->fmtData($aluno['data_nasc'] ?? null),
             'aluno_filiacao' => $esc($filiacao !== '' ? $filiacao : '—'),
@@ -368,6 +398,8 @@ class DocumentoOficialService
             'curso_nome' => $esc($turma['curso_nome'] ?? ''),
             'etapa' => $esc($etapa !== '' ? $etapa : ($turma['serie_nome'] ?? $turma['serie'] ?? '—')),
             'turno' => $esc($turma['turno_label'] ?? $this->rotuloTurno((string) ($turma['turno'] ?? ''))),
+            'organizacao' => $esc($etapa !== '' ? $etapa : ($turma['serie_nome'] ?? $turma['serie'] ?? '—')),
+            'numero_chamada' => $esc(trim((string) ($payload['numero_chamada'] ?? $aluno['numero_chamada'] ?? '')) ?: '—'),
             'situacao_matricula' => $esc($payload['situacao_matricula_label'] ?? '—'),
             'ano_letivo' => (string) $anoLetivo,
             'periodo_label' => $esc($periodo['label'] ?? 'Ano letivo'),
@@ -398,6 +430,7 @@ class DocumentoOficialService
             'conselho_label' => $esc((string) ($payload['conselho_label'] ?? (!empty($payload['_homologado']) ? 'Homologado' : '—'))),
             'codigo_validacao' => $esc($codigoValidacao),
             'logo_html' => '',
+            '_grade_fonte' => $this->fonteGrade($payload),
         ];
     }
 
@@ -971,6 +1004,16 @@ class DocumentoOficialService
         return $map[$k] ?? ($turno !== '' ? $turno : '—');
     }
 
+    private function rotuloSexoDocumento(string $sexo): string
+    {
+        return match (strtoupper(trim($sexo))) {
+            'F' => 'Feminino',
+            'M' => 'Masculino',
+            'N' => 'Neutro / outro',
+            default => $sexo !== '' ? $sexo : '—',
+        };
+    }
+
     private function rotuloMatricula(string $status): string
     {
         $map = [
@@ -1096,6 +1139,45 @@ class DocumentoOficialService
             $html .= '<tr><td colspan="6">Nenhum aluno neste recorte.</td></tr>';
         }
         return $html . '</table>';
+    }
+
+    /**
+     * Notas por componente (b1–b4) e alunos da turma, para os tokens soltos da grade.
+     *
+     * @param array<string,mixed> $payload
+     * @return array{componentes:list<array<string,mixed>>,alunos:list<array<string,mixed>>}
+     */
+    private function fonteGrade(array $payload): array
+    {
+        $componentes = [];
+        foreach ($payload['componentes_ficha'] ?? [] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $componentes[] = [
+                'nome' => (string) ($linha['materia_nome'] ?? ''),
+                'b1' => $linha['b1'] ?? null,
+                'b2' => $linha['b2'] ?? null,
+                'b3' => $linha['b3'] ?? null,
+                'b4' => $linha['b4'] ?? null,
+                'faltas' => $linha['faltas'] ?? null,
+                'media_final' => $linha['media_final'] ?? $linha['media'] ?? null,
+            ];
+        }
+        $alunos = [];
+        foreach ($payload['linhas'] ?? [] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $aluno = is_array($linha['aluno'] ?? null) ? $linha['aluno'] : [];
+            $alunos[] = [
+                'nome' => (string) ($aluno['nome'] ?? $linha['aluno_nome'] ?? ''),
+                'sexo' => (string) ($aluno['sexo'] ?? ''),
+                'resultado' => (string) ($linha['rotulo'] ?? ''),
+                'notas' => [],
+            ];
+        }
+        return ['componentes' => $componentes, 'alunos' => $alunos];
     }
 
     /**

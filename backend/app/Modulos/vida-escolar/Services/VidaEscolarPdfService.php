@@ -3,7 +3,9 @@
 namespace App\Modulos\VidaEscolar\Services;
 
 require_once __DIR__ . '/../../../Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
+require_once __DIR__ . '/../../../Modulos/modelos-documentos/Services/GeradorPdfFolhaService.php';
 
+use App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 use Database;
 
@@ -146,6 +148,22 @@ class VidaEscolarPdfService
      */
     public function emitirHistorico(array $dadosPdf, ?array $config, string $filename): void
     {
+        $html = $this->htmlHistorico($dadosPdf, $config);
+        $modelo = $this->modelos->findByCodigo(self::CODIGO_HISTORICO);
+        if (!$modelo) {
+            throw new \RuntimeException('Modelo vida_escolar_historico indisponível. Cadastre-o em Layout de documentos.');
+        }
+        $this->enviarPdf($html, $filename, $modelo);
+    }
+
+    /**
+     * HTML do histórico, sem enviar o PDF. Usado na impressão em lote.
+     *
+     * @param array<string,mixed> $dadosPdf
+     * @param array<string,mixed>|null $config
+     */
+    public function htmlHistorico(array $dadosPdf, ?array $config): string
+    {
         $this->garantirModelos();
         $modelo = $this->modelos->findByCodigo(self::CODIGO_HISTORICO);
         if (!$modelo) {
@@ -178,8 +196,8 @@ class VidaEscolarPdfService
             ENT_QUOTES,
             'UTF-8'
         );
-        $html = $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config);
-        $this->enviarPdf($html, $filename, $modelo);
+
+        return $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config);
     }
 
     /**
@@ -198,6 +216,10 @@ class VidaEscolarPdfService
         $chroot = defined('BASE_PATH') ? (BASE_PATH . '/storage') : null;
         if (is_string($chroot) && is_dir($chroot)) {
             $options->setChroot($chroot);
+        }
+        $pdfFolha = (new GeradorPdfFolhaService())->gerarSeFolhaOficial($html);
+        if (is_string($pdfFolha)) {
+            return $pdfFolha;
         }
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');

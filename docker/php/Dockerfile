@@ -3,6 +3,9 @@ FROM php:8.4-fpm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         $PHPIZE_DEPS \
+        chromium \
+        fonts-dejavu-core \
+        fonts-liberation \
         libfreetype6-dev libjpeg62-turbo-dev libpng-dev libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \

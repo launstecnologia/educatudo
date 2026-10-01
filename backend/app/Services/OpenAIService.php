@@ -2573,6 +2573,48 @@ Revise: você inventou alguma palavra? Se sim, substitua por [Não Entendi].
         }
     }
 
+    public function reproduzirModeloDocumentoImagem(string $imageData, string $mimeType, string $systemPrompt, string $prompt): string
+    {
+        try {
+            $response = $this->fazerRequisicao([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $systemPrompt,
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => $prompt,
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => 'data:' . $mimeType . ';base64,' . $imageData,
+                                    'detail' => 'high',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'max_tokens' => 16000,
+                'temperature' => 0,
+            ]);
+
+            if (!isset($response['choices'][0]['message']['content'])) {
+                throw new \Exception('Resposta inválida da OpenAI');
+            }
+
+            return (string) $response['choices'][0]['message']['content'];
+        } catch (\Exception $e) {
+            error_log('ERRO em OpenAIService::reproduzirModeloDocumentoImagem: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
     private function usarGPT4VisionDireto($imageData, $prompt)
     {
         return $this->extrairTextoImagemOpenAI($imageData, $prompt, 'image/jpeg');

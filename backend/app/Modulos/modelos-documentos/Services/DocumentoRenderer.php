@@ -243,10 +243,13 @@ class DocumentoRenderer
         $html = strip_tags($html, '<p><br><strong><b><em><i><u><span><div><table><thead><tbody><tr><td><th><colgroup><col><h1><h2><h3><ul><ol><li><hr><img>');
         $html = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? $html;
         $html = preg_replace('/javascript:/i', '', $html) ?? $html;
-        $html = (string) preg_replace('/page-break[^;\"\']*;?/i', '', $html);
-        $html = (string) preg_replace('/break-(before|after|inside)\s*:[^;\"\']*;?/i', '', $html);
-        $html = (string) preg_replace('/min-height\s*:\s*[^;\"\']+;?/i', '', $html);
-        $html = (string) preg_replace('/(?:^|[;\"\'])\s*height\s*:\s*100%\s*;?/i', '', $html);
+        $html = preg_replace_callback('/style\s*=\s*("|\')(.*?)\1/i', static function (array $m): string {
+            $css = (string) preg_replace('/page-break[^;]*;?/i', '', $m[2]);
+            $css = (string) preg_replace('/break-(before|after|inside)\s*:[^;]*;?/i', '', $css);
+            $css = (string) preg_replace('/min-height\s*:\s*[^;]+;?/i', '', $css);
+            $css = (string) preg_replace('/(?:^|[;])\s*height\s*:\s*100%\s*;?/i', '', $css);
+            return 'style=' . $m[1] . trim($css) . $m[1];
+        }, $html) ?? $html;
         $html = preg_replace_callback('/<img\b([^>]*)>/i', static function (array $m): string {
             $attrs = $m[1] ?? '';
             $src = '';
@@ -281,15 +284,26 @@ class DocumentoRenderer
      */
     private function blocoTitulo(array $props, string $css): string
     {
-        $txt = $this->textoComPlaceholders((string) ($props['text'] ?? 'TÍTULO'));
         $tag = in_array((string) ($props['tag'] ?? 'h1'), ['h1', 'h2', 'h3'], true) ? (string) $props['tag'] : 'h1';
+        $raw = (string) ($props['html'] ?? $props['text'] ?? 'TÍTULO');
+        if (str_contains($raw, '<')) {
+            $txt = self::htmlPermitido($raw);
+            $txt = preg_replace_callback('/\{\{\s*([a-z0-9_]+)\s*\}\}/i', static function (array $m): string {
+                return '{{' . strtolower($m[1]) . '}}';
+            }, $txt) ?? $txt;
+        } else {
+            $txt = $this->textoComPlaceholders($raw !== '' ? $raw : 'TÍTULO');
+        }
         $size = match ($tag) {
             'h2' => '13pt',
             'h3' => '11pt',
             default => '16pt',
         };
-        return '<' . $tag . ' style="margin:0 0 8px;font-size:' . $size . ';' . $css . '">'
-            . $txt . '</' . $tag . '>';
+        $style = 'margin:0;';
+        if (!preg_match('/font-size\s*:/i', $css)) {
+            $style .= 'font-size:' . $size . ';';
+        }
+        return '<' . $tag . ' style="' . $style . $css . '">' . $txt . '</' . $tag . '>';
     }
 
     /**
@@ -304,7 +318,7 @@ class DocumentoRenderer
         if (str_contains($raw, '<')) {
             $txt = self::htmlPermitido($raw);
         } else {
-            $txt = '<p>' . nl2br($this->textoComPlaceholders($raw), false) . '</p>';
+            $txt = '<p style="margin:0;">' . nl2br($this->textoComPlaceholders($raw), false) . '</p>';
         }
         return '<div style="' . $css . '">' . $txt . '</div>';
     }
@@ -457,7 +471,7 @@ class DocumentoRenderer
     {
         $out = '';
         $size = (int) ($est['fontSize'] ?? 0);
-        if ($size >= 8 && $size <= 48) {
+        if ($size >= 8 && $size <= 72) {
             $out .= 'font-size:' . $size . 'pt;';
         }
         $weight = (string) ($est['fontWeight'] ?? '');

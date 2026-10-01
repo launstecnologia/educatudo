@@ -1,0 +1,29 @@
+/* Folha oficial: a mesma regra vale no editor e no PDF. Medida em mm/pt, sem encolher. */
+table.seed-folha {
+  margin: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: "DejaVu Sans", sans-serif;
+  font-size: 6.5pt;
+  line-height: 1.05;
+  color: #222;
+}
+table.seed-folha td,
+table.seed-folha th {
+  border: 0.3pt solid #222;
+  padding: 0.3mm 0.4mm;
+  font-size: 6.5pt;
+  line-height: 1.05;
+  font-family: "DejaVu Sans", sans-serif;
+  vertical-align: middle;
+  overflow: hidden;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+}
+img.folha-fundo {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}

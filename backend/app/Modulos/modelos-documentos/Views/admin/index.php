@@ -15,8 +15,12 @@ ob_start(); ?>
 <a href="<?= URL ?>/admin/modelos-documentos/layout" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
     <i class="fa-solid fa-stamp mr-1.5"></i> Papel timbrado
 </a>
-<a href="<?= URL ?>/admin/modelos-documentos/editor?categoria=<?= $esc($categoria === 'todos' ? 'outro' : $categoria) ?>" class="btn-primary text-sm">
-    <i class="fa-solid fa-plus mr-1.5"></i> Novo modelo
+<a href="<?= URL ?>/admin/modelos-documentos/importar" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+    <i class="fa-solid fa-file-import mr-1.5"></i> Importar planilha
+</a>
+<a href="<?= URL ?>/admin/modelos-documentos/editor?categoria=<?= $esc($categoria === 'todos' ? 'outro' : $categoria) ?>"
+   class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+    <i class="fa-solid fa-plus mr-2"></i> Novo modelo
 </a>
 <?php $page_header_actions = ob_get_clean();
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';

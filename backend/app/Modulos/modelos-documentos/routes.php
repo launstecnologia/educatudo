@@ -6,9 +6,16 @@
  */
 
 $router->get('/admin/modelos-documentos', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@index');
+$router->get('/admin/modelos-documentos/importar', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@importar');
+$router->post('/admin/modelos-documentos/importar', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@processarImportacao');
+$router->post('/admin/modelos-documentos/importar/catalogo', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@aplicarCatalogo');
+$router->get('/admin/modelos-documentos/importar/conferir', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@conferirImportacao');
+$router->post('/admin/modelos-documentos/importar/conferir', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@confirmarImportacao');
 $router->get('/admin/modelos-documentos/layout', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@layout');
 $router->post('/admin/modelos-documentos/layout', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@salvarLayout');
 $router->get('/admin/modelos-documentos/editor', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@editor');
+$router->get('/admin/modelos-documentos/demonstracao', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@demonstracao');
+$router->post('/admin/modelos-documentos/reproduzir-imagem', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@reproduzirImagem');
 $router->post('/admin/modelos-documentos/estrutura', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@salvarEstruturaNovo');
 $router->get('/admin/modelos-documentos/create', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@create');
 $router->post('/admin/modelos-documentos', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@store');

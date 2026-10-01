@@ -148,6 +148,7 @@ class ModeloDocumentoService
         'assinante_nome' => 'Nome de quem assina (layout padrão)',
         'assinante_cargo' => 'Cargo de quem assina (Direção, Coordenação…)',
         'quadro_notas_html' => 'Quadro de notas/componentes (HTML)',
+        'componentes_serie_html' => 'Componentes curriculares da série (HTML)',
         'identidade_html' => 'Tabela de identidade do aluno (HTML)',
         'trajetoria_html' => 'Trajetória escolar por ano (HTML)',
         'documentos_html' => 'Checklist de documentos (HTML)',
@@ -178,6 +179,14 @@ class ModeloDocumentoService
         'assunto' => 'Assunto do ofício',
         'data_oficio' => 'Data do ofício',
         'corpo_oficio_html' => 'Corpo do ofício (HTML)',
+        'aluno_sexo' => 'Sexo do aluno',
+        'aluno_pais' => 'País de origem',
+        'escola_telefone' => 'Telefone do estabelecimento',
+        'escola_municipio' => 'Município do estabelecimento',
+        'escola_nre' => 'NRE',
+        'entidade_mantenedora' => 'Entidade mantenedora',
+        'organizacao' => 'Organização (série/etapa)',
+        'numero_chamada' => 'Número na chamada',
     ];
 
     /** Cargos disponíveis na assinatura do layout padrão. */
@@ -588,6 +597,7 @@ class ModeloDocumentoService
                 $item('texto_rico', 'Texto rico', 'fa-pen-to-square'),
                 $item('logo', 'Logo', 'fa-image', 'Logo da unidade ou da escola'),
                 $item('imagem', 'Imagem', 'fa-photo-film'),
+                $item('tabela', 'Tabela', 'fa-border-all', 'Grade editável: linhas, colunas e mesclas'),
             ],
             'dados' => [
                 $item('dados_escola', 'Dados da escola', 'fa-building-columns'),
@@ -891,6 +901,16 @@ class ModeloDocumentoService
         return $prefixo . '_' . $rand;
     }
 
+    public static function rotuloSexo(string $sexo): string
+    {
+        return match (strtoupper(trim($sexo))) {
+            'F' => 'Feminino',
+            'M' => 'Masculino',
+            'N' => 'Neutro / outro',
+            default => $sexo !== '' ? $sexo : '—',
+        };
+    }
+
     /**
      * Todos os placeholders, agrupados. Chaves que ainda não estiverem em nenhum
      * grupo entram em “Outros” — a lista da lateral nunca fica incompleta.
@@ -914,7 +934,8 @@ class ModeloDocumentoService
                 'chaves' => [
                     'escola_nome', 'escola_cnpj', 'escola_cnpj_numero', 'escola_endereco',
                     'escola_docs', 'escola_origem', 'logo_html', 'razao_social', 'cnpj_layout',
-                    'rodape_unidades',
+                    'rodape_unidades', 'escola_telefone', 'escola_municipio', 'escola_nre',
+                    'entidade_mantenedora',
                 ],
             ],
             'aluno' => [
@@ -922,7 +943,7 @@ class ModeloDocumentoService
                 'chaves' => [
                     'aluno_nome', 'aluno_cpf', 'aluno_rg', 'aluno_cpf_frase', 'aluno_data_nasc',
                     'aluno_nasc_frase', 'aluno_email', 'aluno_telefone', 'aluno_endereco',
-                    'aluno_cidade', 'aluno_codigo', 'aluno_ra', 'matricula_numero',
+                    'aluno_cidade', 'aluno_codigo', 'aluno_ra', 'matricula_numero', 'aluno_sexo', 'aluno_pais',
                 ],
             ],
             'responsavel' => [
@@ -943,6 +964,7 @@ class ModeloDocumentoService
                 'label' => 'Turma / matrícula',
                 'chaves' => [
                     'turma_nome', 'turma_frase', 'serie', 'ano_letivo', 'curso_nome',
+                    'organizacao', 'numero_chamada',
                     'situacao_matricula', 'data_entrada', 'data_saida', 'tipo_matricula',
                     'periodo_label', 'periodo_nome', 'periodo_inicio', 'periodo_fim',
                 ],
@@ -958,7 +980,7 @@ class ModeloDocumentoService
             'academico' => [
                 'label' => 'Notas / frequência / resultados',
                 'chaves' => [
-                    'quadro_notas_html', 'frequencia_html', 'frequencia_percentual', 'historico_html',
+                    'quadro_notas_html', 'componentes_serie_html', 'frequencia_html', 'frequencia_percentual', 'historico_html',
                     'tabela_html', 'situacao_final', 'titulo_relatorio', 'total_alunos',
                     'total_homologados', 'total_pendencias', 'etapa', 'turno',
                     'aluno_filiacao', 'aluno_naturalidade', 'aluno_nacionalidade',
@@ -1429,6 +1451,14 @@ class ModeloDocumentoService
             }
         }
         $base['version'] = 1;
+        $base['page'] = $this->sanitizarPagina(is_array($base['page'] ?? null) ? $base['page'] : []);
+        if (isset($estrutura['grade']) && is_array($estrutura['grade'])) {
+            $base['grade'] = $estrutura['grade'];
+        }
+        $emissao = self::emissaoValida($estrutura['emissao'] ?? null);
+        if ($emissao !== null) {
+            $base['emissao'] = $emissao;
+        }
         return $this->estruturaSemLogoDuplicado($base);
     }
 
@@ -1656,7 +1686,154 @@ class ModeloDocumentoService
                 [$json, $saved]
             );
         }
+        if (isset($estrutura['emissao']) && is_array($estrutura['emissao'])) {
+            $this->liberarEmissaoDuplicada($saved, $estrutura['emissao']);
+        }
         return $saved;
+    }
+
+    /**
+     * @return array{tipo:string,curso_id:int,serie_id:int}|null
+     */
+    public static function emissaoValida(mixed $emissao): ?array
+    {
+        if (!is_array($emissao)) {
+            return null;
+        }
+        $tipo = (string) ($emissao['tipo'] ?? '');
+        if (!in_array($tipo, ['ficha_individual', 'relatorio'], true)) {
+            return null;
+        }
+        return [
+            'tipo' => $tipo,
+            'curso_id' => max(0, (int) ($emissao['curso_id'] ?? 0)),
+            'serie_id' => max(0, (int) ($emissao['serie_id'] ?? 0)),
+        ];
+    }
+
+    /**
+     * @return list<array{id:int,nome:string}>
+     */
+    public function listarCursosParaEmissao(): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC'
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows ?: [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $out[] = ['id' => (int) ($row['id'] ?? 0), 'nome' => (string) ($row['nome'] ?? '')];
+        }
+        return $out;
+    }
+
+    /**
+     * @return list<array{id:int,curso_id:int,nome:string}>
+     */
+    public function listarSeriesParaEmissao(): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT id, curso_id, nome FROM serie WHERE ativo = 1 ORDER BY ordem ASC, nome ASC'
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows ?: [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $out[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'curso_id' => (int) ($row['curso_id'] ?? 0),
+                'nome' => (string) ($row['nome'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
+    public function codigoParaEmissao(string $tipo, int $cursoId, int $serieId): ?string
+    {
+        $chave = str_starts_with($tipo, 'relatorio_') ? 'relatorio' : $tipo;
+        if (!in_array($chave, ['ficha_individual', 'relatorio'], true) || !$this->temColuna('estrutura_json')) {
+            return null;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, codigo, estrutura_json FROM secretaria_modelos_documentos
+             WHERE ativo = 1 AND estrutura_json LIKE ? ORDER BY id DESC',
+            ['%"emissao"%']
+        );
+        $melhor = null;
+        $pontos = -1;
+        foreach ($rows ?: [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $est = json_decode((string) ($row['estrutura_json'] ?? ''), true);
+            $em = self::emissaoValida(is_array($est) ? ($est['emissao'] ?? null) : null);
+            if ($em === null || $em['tipo'] !== $chave) {
+                continue;
+            }
+            if ($em['curso_id'] > 0 && $em['curso_id'] !== $cursoId) {
+                continue;
+            }
+            if ($em['serie_id'] > 0 && $em['serie_id'] !== $serieId) {
+                continue;
+            }
+            $peso = ($em['serie_id'] > 0 ? 4 : 0) + ($em['curso_id'] > 0 ? 2 : 0);
+            if ($peso > $pontos) {
+                $pontos = $peso;
+                $melhor = (string) ($row['codigo'] ?? '');
+            }
+        }
+        return $melhor !== null && $melhor !== '' ? $melhor : null;
+    }
+
+    /**
+     * @param array{tipo?:string,curso_id?:int,serie_id?:int} $emissao
+     */
+    private function liberarEmissaoDuplicada(int $idMantido, array $emissao): void
+    {
+        $tipo = (string) ($emissao['tipo'] ?? '');
+        $curso = (int) ($emissao['curso_id'] ?? 0);
+        $serie = (int) ($emissao['serie_id'] ?? 0);
+        if ($tipo === '' || $idMantido <= 0 || !$this->temColuna('estrutura_json')) {
+            return;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, estrutura_json FROM secretaria_modelos_documentos
+             WHERE id <> ? AND estrutura_json LIKE ?',
+            [$idMantido, '%"emissao"%']
+        );
+        foreach ($rows ?: [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $est = json_decode((string) ($row['estrutura_json'] ?? ''), true);
+            if (!is_array($est)) {
+                continue;
+            }
+            $em = self::emissaoValida($est['emissao'] ?? null);
+            if ($em === null || $em['tipo'] !== $tipo || $em['curso_id'] !== $curso || $em['serie_id'] !== $serie) {
+                continue;
+            }
+            unset($est['emissao']);
+            $json = json_encode($est, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (!is_string($json) || $json === '') {
+                continue;
+            }
+            $this->db->update(
+                'UPDATE secretaria_modelos_documentos SET estrutura_json = ? WHERE id = ?',
+                [$json, (int) $row['id']]
+            );
+        }
     }
 
     public function findById(int $id): ?array
@@ -1665,6 +1842,19 @@ class ModeloDocumentoService
             return null;
         }
         $row = $this->db->fetch('SELECT * FROM secretaria_modelos_documentos WHERE id = ? LIMIT 1', [$id]);
+        return $row ?: null;
+    }
+
+    public function findPorCodigo(string $codigo): ?array
+    {
+        $codigo = trim($codigo);
+        if ($codigo === '' || !$this->schemaReady()) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            'SELECT * FROM secretaria_modelos_documentos WHERE codigo = ? LIMIT 1',
+            [$codigo]
+        );
         return $row ?: null;
     }
 
@@ -1941,6 +2131,19 @@ class ModeloDocumentoService
             $partes = $this->htmlDaEstrutura($estruturaVisual, $vars);
             $htmlBrutoCab = $partes['cabecalho'];
             $htmlBrutoCorpo = $partes['corpo'];
+            if (is_array($estruturaVisual['grade'] ?? null)) {
+                require_once __DIR__ . '/GradeSoltaService.php';
+                $vars = GradeSoltaService::completar($estruturaVisual['grade'], $vars);
+            }
+            if (!empty($vars['_pdf_teste']) && !isset($vars['_grade_fonte'])) {
+                require_once __DIR__ . '/GradeSoltaService.php';
+                $vars = GradeSoltaService::amostraDosTokens(
+                    $partes['cabecalho'] . $partes['corpo'] . $partes['rodape'],
+                    $vars
+                );
+            }
+            $vars = $this->garantirComponentesSerieHtml($vars);
+            unset($vars['_pdf_teste']);
             $cab = $this->aplicarPlaceholders($partes['cabecalho'], $vars);
             $corpo = $this->aplicarPlaceholders($partes['corpo'], $vars);
             $rodape = $this->aplicarPlaceholders($partes['rodape'], $vars);
@@ -1959,9 +2162,19 @@ class ModeloDocumentoService
         $css = $estilo === 'declaracao' ? $this->cssDeclaracao($modelo) : $this->cssSimples($modelo);
         if ($estruturaVisual !== null) {
             $css = $this->cssSimples($modelo);
+            $css .= "\n" . $this->cssPaginaDaEstrutura($estruturaVisual, $modelo);
         }
         $css .= "\n" . $this->cssEstrutura();
         $css .= "\n" . $this->cssBanners($modelo);
+        $htmlAll = $cab . $corpo . $rodape;
+        $temFolhaSeed = str_contains($htmlAll, 'seed-folha');
+        $temGradeCompacta = str_contains($htmlAll, 'seed-compacta');
+        if ($temFolhaSeed || $temGradeCompacta) {
+            $css .= "\n" . $this->cssGradeSolta();
+        }
+        if ($estruturaVisual !== null) {
+            $css .= "\n" . $this->cssFolhaImpressa($estruturaVisual);
+        }
 
         $imgCabHtml = '';
         $imgRodHtml = '';
@@ -2007,6 +2220,9 @@ class ModeloDocumentoService
             }
         }
 
+        $fundoHtml = $this->htmlFundoImpresso(is_array($estruturaVisual) ? $estruturaVisual : null);
+        $classeBody = $estruturaVisual !== null ? ' class="folha-impressa"' : '';
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -2016,7 +2232,8 @@ class ModeloDocumentoService
 {$css}
 </style>
 </head>
-<body>
+<body{$classeBody}>
+{$fundoHtml}
 {$imgCabHtml}
 {$cab}
 {$corpo}
@@ -2479,6 +2696,25 @@ HTML;
     }
 
     /**
+     * Preenche a lista de componentes quando o modelo usa {{componentes_serie_html}}.
+     *
+     * @param array<string, mixed> $vars
+     * @return array<string, mixed>
+     */
+    private function garantirComponentesSerieHtml(array $vars): array
+    {
+        if (trim((string) ($vars['componentes_serie_html'] ?? '')) !== '') {
+            return $vars;
+        }
+        $fonte = is_array($vars['_grade_fonte']['componentes'] ?? null)
+            ? $vars['_grade_fonte']['componentes']
+            : [];
+        require_once __DIR__ . '/DemonstracaoDocumentoService.php';
+        $vars['componentes_serie_html'] = DemonstracaoDocumentoService::htmlListaComponentes($fonte);
+        return $vars;
+    }
+
+    /**
      * Variáveis escapadas a partir do \$viewData de AdminDeclarationController.
      *
      * @param array<string,mixed> $viewData
@@ -2645,6 +2881,10 @@ HTML;
                 ? $esc('CNPJ: ' . $unidade['cnpj']) : '',
             'escola_endereco' => $esc($linhaEndereco),
             'escola_docs' => $esc($linhaDocs),
+            'escola_telefone' => $esc(trim((string) ($unidade['telefone'] ?? '')) ?: '—'),
+            'escola_municipio' => $esc(trim((string) ($unidade['cidade'] ?? $unidade['municipio'] ?? '')) ?: '—'),
+            'escola_nre' => $esc(trim((string) ($unidade['nre'] ?? '')) ?: '—'),
+            'entidade_mantenedora' => $esc(trim((string) ($unidade['mantenedora'] ?? $unidade['razao_social'] ?? '')) ?: '—'),
             'logo_html' => $logoHtml,
             'aluno_nome' => $esc($alunoNome),
             'aluno_nome_civil' => $esc($alunoNomeCivil !== '' ? $alunoNomeCivil : '—'),
@@ -2659,6 +2899,8 @@ HTML;
             'aluno_cidade' => $esc($alunoCidade !== '' ? $alunoCidade : '—'),
             'aluno_codigo' => $esc(trim((string) ($aluno['codigo_aluno'] ?? '')) ?: '—'),
             'aluno_ra' => $esc(trim((string) ($aluno['ra'] ?? '')) ?: '—'),
+            'aluno_sexo' => $esc(self::rotuloSexo((string) ($aluno['sexo'] ?? ''))),
+            'aluno_pais' => $esc(trim((string) ($aluno['pais'] ?? $aluno['pais_origem'] ?? '')) ?: 'Brasil'),
             'resp_nome' => $esc($respNome !== '' ? $respNome : '________________________'),
             'resp_cpf' => $esc($resp0['cpf'] ?? '—'),
             'resp_email' => $esc($resp0['email'] ?? '—'),
@@ -2671,6 +2913,8 @@ HTML;
                     . ($serie !== '' ? ' (' . $esc($serie) . ')' : '')
                 : '',
             'serie' => $esc($serie !== '' ? $serie : '—'),
+            'organizacao' => $esc($serie !== '' ? $serie : '—'),
+            'numero_chamada' => $esc(trim((string) ($mat['numero_chamada'] ?? $aluno['numero_chamada'] ?? '')) ?: '—'),
             'ano_letivo' => $esc($anoLetivo),
             'situacao_matricula' => $esc($situacao),
             'data_entrada' => $fmt($mat['data_entrada'] ?? ''),
@@ -2728,6 +2972,10 @@ HTML;
             'escola_cnpj_numero' => '00.000.000/0001-00',
             'escola_endereco' => 'Rua Marquês de Pombal, 415 — Ribeirão Preto/SP',
             'escola_docs' => 'CNPJ 00.000.000/0001-00 · Tel. (16) 3941-5257',
+            'escola_telefone' => '(16) 3941-5257',
+            'escola_municipio' => 'Ribeirão Preto',
+            'escola_nre' => 'NRE exemplo',
+            'entidade_mantenedora' => 'Mantenedora exemplo',
             'escola_origem' => 'Escola Municipal Exemplo',
             'aluno_nome' => 'Maria Eduarda Silva',
             'aluno_nome_civil' => 'Maria Eduarda Silva',
@@ -2742,6 +2990,8 @@ HTML;
             'aluno_cidade' => 'Ribeirão Preto/SP',
             'aluno_codigo' => '96067',
             'aluno_ra' => '123456789',
+            'aluno_sexo' => 'Feminino',
+            'aluno_pais' => 'Brasil',
             'matricula_numero' => '2026-0456',
             'curso_nome' => 'Ensino Fundamental',
             'resp_nome' => 'Ana Paula Silva',
@@ -2812,6 +3062,8 @@ HTML;
             'turma_nome' => '5º Ano A',
             'turma_frase' => 'na turma 5º Ano A',
             'serie' => '5º Ano',
+            'organizacao' => 'Ensino Médio',
+            'numero_chamada' => '12',
             'ano_letivo' => date('Y'),
             'situacao_matricula' => 'Ativa',
             'data_entrada' => '01/02/' . date('Y'),
@@ -3014,14 +3266,44 @@ CSS;
     }
 
     /**
+     * Margem e corpo do PDF iguais aos da folha do editor.
+     *
+     * @param array<string,mixed> $estrutura
+     * @param array<string,mixed> $modelo
+     */
+    private function cssPaginaDaEstrutura(array $estrutura, array $modelo): string
+    {
+        $page = is_array($estrutura['page'] ?? null) ? $estrutura['page'] : [];
+        $m = is_array($page['margin'] ?? null) ? $page['margin'] : [];
+        $padrao = $this->margemMm($modelo);
+        $top = $this->margemDaPagina($m['top'] ?? $padrao);
+        $right = $this->margemDaPagina($m['right'] ?? $padrao);
+        $bottom = $this->margemDaPagina($m['bottom'] ?? $padrao);
+        $left = $this->margemDaPagina($m['left'] ?? $padrao);
+        [$largura, $altura] = $this->medidasPaginaMm($estrutura);
+        $lh = number_format($this->espacamentoLinha($modelo), 2, '.', '');
+        $topCss = number_format($top, 1, '.', '');
+        $rightCss = number_format($right, 1, '.', '');
+        $bottomCss = number_format($bottom, 1, '.', '');
+        $leftCss = number_format($left, 1, '.', '');
+
+        return <<<CSS
+  @page { size: {$largura}mm {$altura}mm; margin: {$topCss}mm {$rightCss}mm {$bottomCss}mm {$leftCss}mm; }
+  body { font-size: 11pt; line-height: {$lh}; margin: 0; }
+CSS;
+    }
+
+    /**
      * Colunas tipo Elementor: sem borda no PDF, vertical-align via style inline.
      */
     private function cssEstrutura(): string
     {
         return <<<CSS
   table.doc-linha { width: 100% !important; border-collapse: collapse; table-layout: fixed; margin: 0 0 8px 0; border: none !important; page-break-inside: auto; }
-  table.doc-linha > tbody > tr > td { border: none !important; background: transparent !important; padding: 4px 8px; vertical-align: middle; }
-  table.doc-linha table { width: 100%; margin: 0 !important; border-collapse: collapse; height: auto !important; }
+  table.doc-linha > tbody > tr > td { border: none !important; background: transparent !important; padding: 0 2px; }
+  table.doc-linha p, table.doc-linha h1, table.doc-linha h2, table.doc-linha h3 { margin: 0; }
+  table.doc-linha table:not(.seed-folha) { width: 100%; margin: 0 !important; border-collapse: collapse; height: auto !important; }
+  table.doc-linha table.seed-folha { margin: 0; border-collapse: collapse; }
   figure.table { width: 100%; margin: 0 0 10px 0; }
   figure.table table { width: 100%; }
   table.dados { margin: 8px 0; }
@@ -3037,8 +3319,9 @@ CSS;
   table.quadro-notas td.final, table.quadro-notas th.final { font-weight: 600; }
   .quadro-notas-wrap { font-size: inherit; }
   .doc-logo-el { max-width: 100%; }
-  .doc-logo-el img, .doc-logo img {
-    max-height: 56px; max-width: 100%; width: auto !important; height: auto !important;
+  .doc-logo-el img {
+    max-width: 100% !important; max-height: none !important;
+    width: auto !important; height: auto !important;
     display: inline-block; vertical-align: middle; object-fit: contain;
   }
   table.doc-linha img { max-width: 100%; }
@@ -3048,9 +3331,153 @@ CSS;
   .image-style-align-right { float: right; margin: 0 0 8px 10px; }
   .image-style-align-center, .image-style-block-align-center { display: table; margin: 0 auto; }
   .doc-secao { page-break-inside: auto; }
-  h1 { margin: 0 0 4px; font-size: 16pt; }
+  h1 { margin: 0; font-size: 16pt; }
 CSS;
     }
+
+    private function cssGradeSolta(): string
+    {
+        $fiel = $this->cssFolhaOficialArquivo();
+
+        return $fiel . <<<CSS
+  table.seed-compacta {
+    width: 100%; margin: 0; table-layout: fixed; border-collapse: collapse;
+  }
+  table.seed-compacta td, table.seed-compacta th {
+    padding: 0 1px; font-size: 6.5pt; line-height: 1.05;
+    vertical-align: middle; overflow: hidden;
+  }
+  table.seed-folha, table.seed-compacta { page-break-inside: auto; break-inside: auto; }
+  table.seed-folha tr, table.seed-compacta tr { page-break-inside: auto; break-inside: auto; }
+CSS;
+    }
+
+    private function cssFolhaOficialArquivo(): string
+    {
+        $caminho = dirname(__DIR__, 4) . '/public/static/css/folha-oficial.css';
+        if (!is_file($caminho)) {
+            return '';
+        }
+        $css = file_get_contents($caminho);
+
+        return is_string($css) ? $css . "\n" : '';
+    }
+
+    /**
+     * A folha impressa usa a mesma caixa do editor: página sem margem do navegador
+     * e o recuo desenhado como preenchimento interno.
+     *
+     * @param array<string,mixed> $estrutura
+     */
+    private function cssFolhaImpressa(array $estrutura): string
+    {
+        $page = is_array($estrutura['page'] ?? null) ? $estrutura['page'] : [];
+        $m = is_array($page['margin'] ?? null) ? $page['margin'] : [];
+        $top = number_format($this->margemDaPagina($m['top'] ?? 15), 1, '.', '');
+        $right = number_format($this->margemDaPagina($m['right'] ?? 15), 1, '.', '');
+        $bottom = number_format($this->margemDaPagina($m['bottom'] ?? 15), 1, '.', '');
+        $left = number_format($this->margemDaPagina($m['left'] ?? 15), 1, '.', '');
+        [$largura, $altura] = $this->medidasPaginaMm($estrutura);
+
+        return <<<CSS
+  @page { size: {$largura}mm {$altura}mm; margin: 0; }
+  html, body.folha-impressa { margin: 0; padding: 0; background: #fff; }
+  body.folha-impressa {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: {$top}mm {$right}mm {$bottom}mm {$left}mm;
+    font-family: "DejaVu Sans", Arial, Helvetica, sans-serif;
+  }
+  body.folha-impressa table.doc-linha { margin: 0 !important; }
+  body.folha-impressa table.doc-linha > tbody > tr > td { padding: 0 !important; border: none !important; }
+  body.folha-impressa table:not(.doc-linha):not(.seed-folha) { width: 100%; margin: 0 0 8px; border-collapse: collapse; }
+  body.folha-impressa table:not(.doc-linha):not(.seed-folha) td,
+  body.folha-impressa table:not(.doc-linha):not(.seed-folha) th {
+    border: 1px solid #d1d5db;
+    font-size: 8pt;
+    line-height: 1.25;
+    padding: 3px 5px;
+    vertical-align: middle;
+    overflow-wrap: break-word;
+  }
+CSS;
+    }
+
+    /**
+     * Margem da folha desenhada no editor, em mm, com um decimal.
+     * A ficha oficial usa 2 mm; o mínimo de 8 mm fica só no campo legado do modelo.
+     */
+    private function margemDaPagina(mixed $valor): float
+    {
+        $m = round((float) str_replace(',', '.', (string) $valor), 1);
+        if ($m < 0) {
+            return 0.0;
+        }
+        if ($m > 40) {
+            return 40.0;
+        }
+
+        return $m;
+    }
+
+    /**
+     * @param array<string,mixed> $estrutura
+     * @return array{0:int,1:int}
+     */
+    private function medidasPaginaMm(array $estrutura): array
+    {
+        $page = is_array($estrutura['page'] ?? null) ? $estrutura['page'] : [];
+        $a5 = strtoupper((string) ($page['size'] ?? 'A4')) === 'A5';
+        $paisagem = strtolower((string) ($page['orientation'] ?? 'portrait')) === 'landscape';
+        $largura = $a5 ? ($paisagem ? 210 : 148) : ($paisagem ? 297 : 210);
+        $altura = $a5 ? ($paisagem ? 148 : 210) : ($paisagem ? 210 : 297);
+
+        return [$largura, $altura];
+    }
+
+    private function fundoImagemValido(string $fundo): bool
+    {
+        return preg_match('#^data:image/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$#i', $fundo) === 1
+            && strlen($fundo) <= 1500000;
+    }
+
+    /**
+     * @param array<string,mixed> $page
+     * @return array<string,mixed>
+     */
+    private function sanitizarPagina(array $page): array
+    {
+        $fundo = (string) ($page['fundo'] ?? '');
+        $fundoOk = $this->fundoImagemValido($fundo);
+        if (!$fundoOk) {
+            unset($page['fundo']);
+            $page['imprimirFundo'] = false;
+        } else {
+            $page['imprimirFundo'] = !empty($page['imprimirFundo']);
+        }
+
+        return $page;
+    }
+
+    /**
+     * @param array<string,mixed>|null $estrutura
+     */
+    private function htmlFundoImpresso(?array $estrutura): string
+    {
+        if ($estrutura === null || empty($estrutura['page']['imprimirFundo'])) {
+            return '';
+        }
+        $fundo = (string) ($estrutura['page']['fundo'] ?? '');
+        if (!$this->fundoImagemValido($fundo)) {
+            return '';
+        }
+        [$largura, $altura] = $this->medidasPaginaMm($estrutura);
+        $src = htmlspecialchars($fundo, ENT_QUOTES, 'UTF-8');
+
+        return '<img class="folha-fundo" alt="" src="' . $src . '" style="width:' . $largura . 'mm;height:' . $altura . 'mm;">';
+    }
+
     private function cssBanners(array $modelo): string
     {
         [$cabMax, $rodMax] = $this->alturasFaixa($modelo);
@@ -3105,6 +3532,20 @@ CSS;
   table.dados { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: inherit; }
   table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; font-size: inherit; }
   table.dados td.label { background: #f3f4f6; font-weight: bold; width: 38%; }
+  table.seed-compacta, table.dados[style*="font-size:8px"], table.dados[style*="font-size:9px"] {
+    width: 100% !important; table-layout: fixed; border-collapse: collapse; margin: 2px 0;
+    page-break-inside: avoid;
+  }
+  table.seed-compacta td, table.seed-compacta th,
+  table.dados[style*="font-size:8px"] td, table.dados[style*="font-size:8px"] th,
+  table.dados[style*="font-size:9px"] td, table.dados[style*="font-size:9px"] th {
+    padding: 0 1px !important; font-size: 6pt !important; line-height: 1.05;
+    word-wrap: break-word; overflow-wrap: anywhere; width: auto; vertical-align: middle;
+  }
+  table.seed-compacta td.label, table.dados[style*="font-size:9px"] td.label { width: auto; }
+  p[style*="font-size:8px"], p[style*="font-size:9px"] { margin: 0 !important; line-height: 1.1; }
+  table[style*="margin-top:16px"] { margin-top: 2px !important; }
+  table[style*="margin-top:16px"] td { padding: 0 2px !important; font-size: 7pt !important; border: none !important; line-height: 1.1; }
   table.ident-boletim td.label { width: 12%; }
   .fecho { margin-top: 36px; text-align: right; font-size: 11pt; }
   .assinaturas { margin-top: 60px; width: 100%; display: table; }

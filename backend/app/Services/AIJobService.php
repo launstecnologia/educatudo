@@ -535,6 +535,9 @@ class AIJobService
             case 'grade_horaria_importar_imagem':
                 return self::dispatchGradeHorariaImportarImagem($payload);
 
+            case 'modelo_documento_reproduzir_imagem':
+                return self::dispatchModeloDocumentoReproduzirImagem($payload);
+
             case 'vida_escolar_ler_historico':
                 return self::dispatchVidaEscolarLerHistorico($payload);
 
@@ -730,6 +733,74 @@ class AIJobService
         }
 
         return self::montarPreviewGradeHoraria($itens);
+    }
+
+    private static function dispatchModeloDocumentoReproduzirImagem(array $payload): array
+    {
+        $path = (string) ($payload['arquivo']['path'] ?? '');
+        $mime = (string) ($payload['arquivo']['mime'] ?? 'image/jpeg');
+        $slug = strtolower((string) ($payload['arquivo']['slug'] ?? ''));
+        if (defined('TENANT_SLUG')) {
+            $slugTenant = strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG));
+            if ($slugTenant !== '' && $slug !== $slugTenant) {
+                throw new \RuntimeException('Arquivo da imagem não encontrado.');
+            }
+        }
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            throw new \RuntimeException('Arquivo da imagem não encontrado.');
+        }
+        $base = realpath(dirname(__DIR__, 2) . '/storage/tmp/modelos_documentos_ia/' . $slug);
+        $real = $path !== '' ? realpath($path) : false;
+        if ($base === false || $real === false || !is_file($real) || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+            throw new \RuntimeException('Arquivo da imagem não encontrado.');
+        }
+
+        $bytes = file_get_contents($real);
+        if ($bytes === false || $bytes === '') {
+            throw new \RuntimeException('Não foi possível ler a imagem do documento.');
+        }
+
+        require_once __DIR__ . '/OpenAIService.php';
+        require_once __DIR__ . '/../Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
+        require_once __DIR__ . '/../Modulos/modelos-documentos/Services/ReprodutorLayoutDocumentoService.php';
+        $openai = new OpenAIService();
+        $apagar = false;
+        try {
+            try {
+                $resposta = trim($openai->reproduzirModeloDocumentoImagem(
+                    base64_encode($bytes),
+                    $mime,
+                    \App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService::promptSistema(),
+                    \App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService::promptUsuario()
+                ));
+                $estrutura = \App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService::estruturaDaResposta($resposta);
+                $apagar = true;
+            } catch (\RuntimeException $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                error_log('modelo_documento_reproduzir_imagem: ' . $e->getMessage());
+                throw new \RuntimeException('A IA não conseguiu ler esta imagem. Tente uma foto da página inteira, mais nítida.');
+            }
+        } finally {
+            if (!$apagar) {
+                $jobId = (int) ($payload['_job_id'] ?? 0);
+                if ($jobId > 0) {
+                    $row = \Database::getInstance()->fetch(
+                        'SELECT attempts FROM ai_jobs WHERE id = ?',
+                        [$jobId]
+                    );
+                    $apagar = (int) ($row['attempts'] ?? 0) >= self::MAX_ATTEMPTS;
+                }
+            }
+            if ($apagar) {
+                @unlink($real);
+            }
+        }
+
+        return [
+            'success' => true,
+            'estrutura' => $estrutura,
+        ];
     }
 
     private static function dispatchGerarPlanoAulaCopiloto(array $payload): array
