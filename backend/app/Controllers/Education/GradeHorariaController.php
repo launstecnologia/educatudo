@@ -143,7 +143,7 @@ class GradeHorariaController extends BaseController
         $turmas = $this->db->fetchAll(
             "SELECT id, nome, serie, tipo_ensino FROM turmas WHERE ativo = 1 ORDER BY nome"
         ) ?: [];
-        $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
+        $professores = $this->professoresComMaterias();
         $materias = $this->materiasOperacionais();
 
         $tiposEnsino = [];
@@ -643,6 +643,27 @@ class GradeHorariaController extends BaseController
         } finally {
             ini_set('display_errors', (string) $old);
         }
+    }
+
+    /**
+     * Professores ativos com a lista de matérias que lecionam (nomes no JSON).
+     *
+     * @return list<array{id:int,nome:string,materias:list<mixed>}>
+     */
+    private function professoresComMaterias(): array
+    {
+        $professores = $this->db->fetchAll(
+            "SELECT id, nome, materias FROM professores WHERE ativo = 1 ORDER BY nome"
+        ) ?: [];
+        foreach ($professores as &$professor) {
+            $lista = json_decode((string) ($professor['materias'] ?? '[]'), true);
+            $professor['id'] = (int) ($professor['id'] ?? 0);
+            $professor['nome'] = (string) ($professor['nome'] ?? '');
+            $professor['materias'] = is_array($lista) ? array_values($lista) : [];
+        }
+        unset($professor);
+
+        return $professores;
     }
 
     /**

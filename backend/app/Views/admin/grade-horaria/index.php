@@ -240,6 +240,19 @@ var materiasIA = [];
 var csrfTokenIA = '<?= htmlspecialchars($csrf_token) ?>';
 var urlBase = '<?= URL ?>';
 var pollingGradeIA = null;
+var professoresAula = <?= json_encode(array_map(static function ($professor) {
+    return [
+        'id' => (int) ($professor['id'] ?? 0),
+        'nome' => (string) ($professor['nome'] ?? ''),
+        'materias' => is_array($professor['materias'] ?? null) ? array_values($professor['materias']) : [],
+    ];
+}, $professores), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>;
+var materiasAula = <?= json_encode(array_map(static function ($materia) {
+    return [
+        'id' => (int) ($materia['id'] ?? 0),
+        'nome' => (string) ($materia['nome'] ?? ''),
+    ];
+}, $materias), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>;
 
 // ---- Criar/Editar aula (drawer) ----
 function showAulaDrawer() {
@@ -257,9 +270,106 @@ function closeAulaDrawer() {
     document.body.style.overflow = '';
 }
 
+function chaveNomeAula(nome) {
+    return String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+}
+
+function professorEnsinaMateriaAula(professor, materia) {
+    var lista = Array.isArray(professor.materias) ? professor.materias : [];
+    var idAlvo = Number(materia.id);
+    var nomeAlvo = chaveNomeAula(materia.nome);
+    return lista.some(function (item) {
+        if (item && typeof item === 'object') {
+            var id = Number(item.id || item.materia_id || 0);
+            if (id > 0 && id === idAlvo) {
+                return true;
+            }
+            return chaveNomeAula(item.nome) === nomeAlvo;
+        }
+        if (typeof item === 'number' || /^\d+$/.test(String(item))) {
+            return Number(item) === idAlvo;
+        }
+        return chaveNomeAula(item) === nomeAlvo;
+    });
+}
+
+function acharPorId(lista, id) {
+    var alvo = String(id || '');
+    if (alvo === '') {
+        return null;
+    }
+    for (var i = 0; i < lista.length; i++) {
+        if (String(lista[i].id) === alvo) {
+            return lista[i];
+        }
+    }
+    return null;
+}
+
+function preencherSelectAula(select, lista, placeholder, valorAtual, manterForaDaLista) {
+    var atual = valorAtual === null || valorAtual === undefined ? '' : String(valorAtual);
+    var catalogo = select.id === 'aula_professor_id' ? professoresAula : materiasAula;
+    select.innerHTML = '';
+    var vazio = document.createElement('option');
+    vazio.value = '';
+    vazio.textContent = placeholder;
+    select.appendChild(vazio);
+    var achou = false;
+    lista.forEach(function (item) {
+        var option = document.createElement('option');
+        option.value = String(item.id);
+        option.textContent = item.nome || '';
+        if (atual !== '' && option.value === atual) {
+            option.selected = true;
+            achou = true;
+        }
+        select.appendChild(option);
+    });
+    if (atual !== '' && !achou && manterForaDaLista) {
+        var extra = acharPorId(catalogo, atual);
+        if (extra) {
+            var optionExtra = document.createElement('option');
+            optionExtra.value = String(extra.id);
+            optionExtra.textContent = extra.nome || '';
+            optionExtra.selected = true;
+            select.appendChild(optionExtra);
+        }
+    }
+}
+
+function aplicarFiltroAula(origem) {
+    var profSel = document.getElementById('aula_professor_id');
+    var matSel = document.getElementById('aula_materia_id');
+    var professorId = origem === 'reset' ? '' : profSel.value;
+    var materiaId = origem === 'reset' ? '' : matSel.value;
+    var professor = acharPorId(professoresAula, professorId);
+    var materia = acharPorId(materiasAula, materiaId);
+
+    if (origem !== 'carregar' && professor && materia && !professorEnsinaMateriaAula(professor, materia)) {
+        if (origem === 'materia') {
+            professor = null;
+            professorId = '';
+        } else {
+            materia = null;
+            materiaId = '';
+        }
+    }
+
+    var listaProf = materia
+        ? professoresAula.filter(function (item) { return professorEnsinaMateriaAula(item, materia); })
+        : professoresAula.slice();
+    var listaMat = professor
+        ? materiasAula.filter(function (item) { return professorEnsinaMateriaAula(professor, item); })
+        : materiasAula.slice();
+    var manter = origem === 'carregar';
+    preencherSelectAula(profSel, listaProf, 'Selecione o professor', professorId, manter);
+    preencherSelectAula(matSel, listaMat, 'Selecione a matéria', materiaId, manter);
+}
+
 function openAulaDrawer(id) {
     var form = document.getElementById('aula-form');
     form.reset();
+    aplicarFiltroAula('reset');
     document.getElementById('aula_id').value = '';
     document.getElementById('aula-form-erro').classList.add('hidden');
 
@@ -293,12 +403,20 @@ function openAulaDrawer(id) {
             document.getElementById('aula_turma_id').value = item.turma_id;
             document.getElementById('aula_professor_id').value = item.professor_id;
             document.getElementById('aula_materia_id').value = item.materia_id;
+            aplicarFiltroAula('carregar');
         })
         .catch(function() {
             alert('Erro de conexão.');
             closeAulaDrawer();
         });
 }
+
+document.getElementById('aula_materia_id').addEventListener('change', function () {
+    aplicarFiltroAula('materia');
+});
+document.getElementById('aula_professor_id').addEventListener('change', function () {
+    aplicarFiltroAula('professor');
+});
 
 document.getElementById('aula-form').addEventListener('submit', function(e) {
     e.preventDefault();
