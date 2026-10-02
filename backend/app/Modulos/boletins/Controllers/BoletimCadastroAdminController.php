@@ -57,6 +57,7 @@ class BoletimCadastroAdminController extends AdminBaseController
 
         $this->viewWithLayout('admin', 'admin/boletins/index', [
             'title' => 'Modelo de Boletim — EducaTudo',
+            'page_title' => 'Painel Administrativo',
             'user' => $this->auth->getUser(),
             'current_page' => 'boletins',
             'itens' => $itens,

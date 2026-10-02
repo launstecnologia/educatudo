@@ -353,6 +353,9 @@ class BoletimConfig
         $anoSelect = $this->hasColumn('boletim_regras', 'ano_letivo')
             ? 'r.ano_letivo AS regra_ano_letivo,'
             : 'NULL AS regra_ano_letivo,';
+        $vigenteSelect = $this->hasColumn('boletim_resultados_gerados', 'vigente')
+            ? 'MAX(CASE WHEN g.preview = 0 THEN g.vigente ELSE 0 END) AS vigente,'
+            : '1 AS vigente,';
         $groupExtra = '';
         if ($this->hasColumn('boletim_regras', 'bimestre')) {
             $groupExtra .= ', r.bimestre';
@@ -370,6 +373,7 @@ class BoletimConfig
                 MAX(g.data_fim) AS data_fim,
                 COUNT(*) AS linhas_qtd,
                 {$versaoSelect}
+                {$vigenteSelect}
                 {$bimestreSelect}
                 {$anoSelect}
                 MAX(g.updated_at) AS updated_at,

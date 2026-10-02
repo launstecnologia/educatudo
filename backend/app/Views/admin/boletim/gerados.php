@@ -1,6 +1,5 @@
 <?php
 $user = $user ?? [];
-$csrfToken = (string) ($csrf_token ?? '');
 $regrasCatalogo = is_array($regras_catalogo ?? null) ? $regras_catalogo : [];
 $rows = is_array($rows ?? null) ? $rows : [];
 $filters = is_array($filters ?? null) ? $filters : [];
@@ -179,9 +178,6 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                 <?php if ($totalPages > 1): ?>
                     &middot; página <strong><?= (int) $page ?></strong> de <strong><?= (int) $totalPages ?></strong>
                 <?php endif; ?>
-                <span id="contador-selecionados" class="ml-3 hidden text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5">
-                    <span id="qtd-selecionados">0</span> selecionado(s)
-                </span>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
                 <?php if ($total > 0): ?>
@@ -190,13 +186,6 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                     <button type="button" class="btn-exportar-notas inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-50" data-formato="excel">Excel</button>
                     <button type="button" class="btn-exportar-notas inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-300 text-indigo-800 bg-white hover:bg-indigo-50" data-formato="pdf">PDF</button>
                 <?php endif; ?>
-                <button type="button" id="btn-excluir-selecionados"
-                        class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-red-300 text-red-700 bg-white hover:bg-red-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-                    </svg>
-                    Excluir selecionados
-                </button>
             </div>
         </div>
 
@@ -207,16 +196,9 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                 <table class="min-w-full divide-y divide-gray-200 text-sm" id="tabela-boletins-gerados">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600 uppercase tracking-wide w-8">
-                                <input type="checkbox" id="chk-todos" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" title="Selecionar todos da página">
-                            </th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Aluno</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Turma</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Regra</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Bimestre</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Linhas</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tipo</th>
-                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Histórico</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Vigente</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Ações</th>
                         </tr>
                     </thead>
@@ -226,9 +208,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                             $alunoId = (int) ($row['aluno_id'] ?? 0);
                             $regraId = (int) ($row['regra_id'] ?? 0);
                             $periodoRef = (string) ($row['periodo_ref'] ?? '');
-                            $linhasQtd = (int) ($row['linhas_qtd'] ?? 0);
-                            $previewFlag = (int) ($row['preview'] ?? 0);
-                            $exibirEmRow = (string) ($row['exibir_em'] ?? '');
+                            $vigenteFlag = (int) ($row['vigente'] ?? 0) === 1;
                             $rowKey = $alunoId . '-' . $regraId . '-' . md5($periodoRef);
                             ?>
                             <tr class="boletim-gerado-row <?= $idx % 2 === 0 ? 'bg-white' : 'bg-gray-50' ?>"
@@ -238,66 +218,36 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                 data-aluno-nome="<?= htmlspecialchars((string) ($row['aluno_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                                 data-regra-nome="<?= htmlspecialchars((string) ($row['regra_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                                 data-key="<?= htmlspecialchars($rowKey, ENT_QUOTES, 'UTF-8') ?>">
-                                <td class="px-3 py-2 text-center align-top">
-                                    <input type="checkbox" class="chk-boletim rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                </td>
                                 <td class="px-3 py-2 font-medium text-gray-900">
                                     <?= htmlspecialchars((string) ($row['aluno_nome'] ?? 'Aluno #' . $alunoId), ENT_QUOTES, 'UTF-8') ?>
+                                    <span class="block text-xs font-normal text-gray-500"><?= htmlspecialchars((string) ($row['regra_nome'] ?? 'Regra #' . $regraId), ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php if (!empty($row['aluno_ra'])): ?>
-                                        <span class="block text-[11px] font-normal text-gray-500">RA <?= htmlspecialchars((string) $row['aluno_ra'], ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span class="block text-[11px] font-normal text-gray-400">RA <?= htmlspecialchars((string) $row['aluno_ra'], ENT_QUOTES, 'UTF-8') ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-3 py-2 text-gray-700"><?= htmlspecialchars((string) ($row['turma_nome'] ?? '—'), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
-                                <td class="px-3 py-2 text-gray-700">
-                                    <?= htmlspecialchars((string) ($row['regra_nome'] ?? 'Regra #' . $regraId), ENT_QUOTES, 'UTF-8') ?>
-                                    <?php if (!empty($row['regra_codigo'])): ?>
-                                        <span class="block text-[11px] font-normal text-gray-500"><?= htmlspecialchars((string) $row['regra_codigo'], ENT_QUOTES, 'UTF-8') ?></span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="px-3 py-2 text-gray-700 whitespace-nowrap"><?= htmlspecialchars(PeriodoLetivo::rotuloBoletim(
-                                    (int) ($row['regra_ano_letivo'] ?? 0),
-                                    (int) ($row['regra_bimestre'] ?? 0),
-                                    (string) ($row['regra_nome'] ?? '')
-                                ), ENT_QUOTES, 'UTF-8') ?></td>
-                                <td class="px-3 py-2 text-gray-700"><?= $linhasQtd ?></td>
-                                <td class="px-3 py-2">
-                                    <?php if ($previewFlag === 1): ?>
-                                        <span class="inline-block px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800">preview</span>
+                                <td class="px-3 py-2 text-gray-700 align-top"><?= htmlspecialchars((string) ($row['turma_nome'] ?? '—'), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
+                                <td class="px-3 py-2 align-top">
+                                    <?php if ($vigenteFlag): ?>
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Sim</span>
                                     <?php else: ?>
-                                        <span class="inline-block px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-800">oficial v<?= (int) ($row['versao'] ?? 1) ?></span>
-                                    <?php endif; ?>
-                                    <?php if ($exibirEmRow !== ''): ?>
-                                        <span class="inline-block ml-1 px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-700"><?= htmlspecialchars($exibirEmRow, ENT_QUOTES, 'UTF-8') ?></span>
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Não</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-3 py-2 text-gray-600 align-top">
+                                <td class="px-3 py-2 text-right whitespace-nowrap align-top">
+                                    <?php ob_start(); ?>
+                                    <button type="button"
+                                            class="btn-preview-boletim flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+                                        <i class="fa-solid fa-eye text-gray-400 w-4 text-center shrink-0"></i> Preview
+                                    </button>
                                     <?php
-                                    $boletim_versoes = is_array($row['versoes'] ?? null) ? $row['versoes'] : [];
-                                    $boletim_versoes_fallback = (string) ($row['updated_at'] ?? '');
-                                    $boletim_versoes_compact = true;
-                                    require __DIR__ . '/../../partials/boletim_versoes_historico.php';
+                                    $row_actions_dropdown_items = ob_get_clean();
+                                    $row_actions_dropdown_id = 'boletim-gerado-' . $rowKey;
+                                    include __DIR__ . '/../_partials/row_actions_dropdown.php';
                                     ?>
-                                </td>
-                                <td class="px-3 py-2 text-right whitespace-nowrap">
-                                    <button type="button"
-                                            class="btn-preview-boletim inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        Preview
-                                    </button>
-                                    <button type="button"
-                                            class="btn-remover-boletim ml-1 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-red-200 text-red-700 bg-white hover:bg-red-50">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
-                                        </svg>
-                                        Remover
-                                    </button>
                                 </td>
                             </tr>
                             <tr class="preview-row hidden">
-                                <td colspan="9" class="px-3 py-3 bg-indigo-50/40">
+                                <td colspan="4" class="px-3 py-3 bg-indigo-50/40">
                                     <div class="preview-content rounded-lg bg-white border border-indigo-100 p-3 text-sm text-gray-700">
                                         <div class="preview-placeholder text-gray-500">Carregando preview…</div>
                                     </div>
@@ -357,129 +307,9 @@ document.addEventListener('keydown', function (e) {
     });
 })();
 (function () {
-    var csrf = <?= json_encode($csrfToken, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     var baseUrl = <?= json_encode(rtrim((string) (defined('URL') ? URL : ''), '/'), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     var tabela = document.getElementById('tabela-boletins-gerados');
     if (!tabela) return;
-
-    var chkTodos = document.getElementById('chk-todos');
-    var btnExcluirLote = document.getElementById('btn-excluir-selecionados');
-    var contadorWrap = document.getElementById('contador-selecionados');
-    var contadorQtd = document.getElementById('qtd-selecionados');
-
-    function rowFromCheckbox(chk) {
-        var tr = chk.closest('tr.boletim-gerado-row');
-        if (!tr) return null;
-        return {
-            row: tr,
-            previewRow: tr.nextElementSibling && tr.nextElementSibling.classList.contains('preview-row') ? tr.nextElementSibling : null,
-            alunoId: parseInt(tr.getAttribute('data-aluno-id') || '0', 10),
-            regraId: parseInt(tr.getAttribute('data-regra-id') || '0', 10),
-            periodoRef: tr.getAttribute('data-periodo-ref') || '',
-        };
-    }
-
-    function refreshSelecaoUI() {
-        var todas = tabela.querySelectorAll('.chk-boletim');
-        var marcadas = tabela.querySelectorAll('.chk-boletim:checked');
-        var qtd = marcadas.length;
-        if (contadorQtd) contadorQtd.textContent = String(qtd);
-        if (contadorWrap) contadorWrap.classList.toggle('hidden', qtd === 0);
-        if (btnExcluirLote) btnExcluirLote.classList.toggle('hidden', qtd === 0);
-        if (chkTodos) {
-            if (qtd === 0) {
-                chkTodos.checked = false;
-                chkTodos.indeterminate = false;
-            } else if (qtd === todas.length && todas.length > 0) {
-                chkTodos.checked = true;
-                chkTodos.indeterminate = false;
-            } else {
-                chkTodos.checked = false;
-                chkTodos.indeterminate = true;
-            }
-        }
-    }
-
-    if (chkTodos) {
-        chkTodos.addEventListener('change', function () {
-            var marcar = !!chkTodos.checked;
-            tabela.querySelectorAll('.chk-boletim').forEach(function (chk) {
-                chk.checked = marcar;
-            });
-            refreshSelecaoUI();
-        });
-    }
-
-    tabela.addEventListener('change', function (e) {
-        if (e.target && e.target.classList && e.target.classList.contains('chk-boletim')) {
-            refreshSelecaoUI();
-        }
-    });
-
-    if (btnExcluirLote) {
-        btnExcluirLote.addEventListener('click', function () {
-            var marcadas = tabela.querySelectorAll('.chk-boletim:checked');
-            if (marcadas.length === 0) return;
-            var itens = [];
-            marcadas.forEach(function (chk) {
-                var d = rowFromCheckbox(chk);
-                if (!d || !d.alunoId || !d.regraId || !d.periodoRef) return;
-                itens.push({
-                    aluno_id: d.alunoId,
-                    regra_id: d.regraId,
-                    periodo_ref: d.periodoRef,
-                });
-            });
-            if (itens.length === 0) {
-                window.alert('Nenhum item válido selecionado.');
-                return;
-            }
-            var ok = window.confirm('Remover ' + itens.length + ' boletim(ns) gerado(s)?\n\nEsta ação não pode ser desfeita.');
-            if (!ok) return;
-
-            btnExcluirLote.disabled = true;
-            btnExcluirLote.classList.add('opacity-60');
-
-            var form = new FormData();
-            form.append('_token', csrf);
-            form.append('itens', JSON.stringify(itens));
-
-            fetch(baseUrl + '/admin/boletim-configuracao/gerados/excluir-lote', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'X-CSRF-Token': csrf, 'Accept': 'application/json' },
-                body: form,
-            }).then(function (resp) {
-                return resp.json().then(function (data) { return { ok: resp.ok, data: data }; });
-            }).then(function (res) {
-                if (!res.ok || !res.data || res.data.success !== true) {
-                    var msg = (res.data && res.data.error) ? res.data.error : 'Falha ao remover.';
-                    window.alert(msg);
-                    btnExcluirLote.disabled = false;
-                    btnExcluirLote.classList.remove('opacity-60');
-                    return;
-                }
-                marcadas.forEach(function (chk) {
-                    var d = rowFromCheckbox(chk);
-                    if (!d) return;
-                    if (d.previewRow && d.previewRow.parentNode) {
-                        d.previewRow.parentNode.removeChild(d.previewRow);
-                    }
-                    if (d.row && d.row.parentNode) {
-                        d.row.parentNode.removeChild(d.row);
-                    }
-                });
-                refreshSelecaoUI();
-                if (!document.querySelector('tr.boletim-gerado-row')) {
-                    window.location.reload();
-                }
-            }).catch(function () {
-                window.alert('Erro de rede ao remover boletins.');
-                btnExcluirLote.disabled = false;
-                btnExcluirLote.classList.remove('opacity-60');
-            });
-        });
-    }
 
     function getRowData(btn) {
         var row = btn.closest('tr.boletim-gerado-row');
@@ -490,103 +320,46 @@ document.addEventListener('keydown', function (e) {
             alunoId: parseInt(row.getAttribute('data-aluno-id') || '0', 10),
             regraId: parseInt(row.getAttribute('data-regra-id') || '0', 10),
             periodoRef: row.getAttribute('data-periodo-ref') || '',
-            alunoNome: row.getAttribute('data-aluno-nome') || '',
-            regraNome: row.getAttribute('data-regra-nome') || '',
         };
     }
 
     tabela.addEventListener('click', function (e) {
         var btnPreview = e.target.closest('.btn-preview-boletim');
-        if (btnPreview) {
-            e.preventDefault();
-            var d = getRowData(btnPreview);
-            if (!d || !d.previewRow) return;
-            var content = d.previewRow.querySelector('.preview-content');
-            if (!content) return;
+        if (!btnPreview) return;
+        e.preventDefault();
+        document.querySelectorAll('[data-dropdown-menu]').forEach(function (m) { m.classList.add('hidden'); });
+        var d = getRowData(btnPreview);
+        if (!d || !d.previewRow) return;
+        var content = d.previewRow.querySelector('.preview-content');
+        if (!content) return;
 
-            if (!d.previewRow.classList.contains('hidden') && d.previewRow.dataset.loaded === '1') {
-                d.previewRow.classList.add('hidden');
-                return;
-            }
-            d.previewRow.classList.remove('hidden');
-            if (d.previewRow.dataset.loaded === '1') return;
-
-            content.innerHTML = '<div class="preview-placeholder text-gray-500">Carregando preview…</div>';
-            var params = new URLSearchParams();
-            params.set('aluno_id', String(d.alunoId));
-            params.set('regra_id', String(d.regraId));
-            params.set('periodo_ref', d.periodoRef);
-            fetch(baseUrl + '/admin/boletim-configuracao/gerados/preview?' + params.toString(), {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'text/html' },
-            }).then(function (resp) {
-                return resp.text().then(function (text) { return { ok: resp.ok, text: text }; });
-            }).then(function (res) {
-                if (!res.ok) {
-                    content.innerHTML = '<div class="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">Falha ao carregar preview.</div>';
-                    return;
-                }
-                content.innerHTML = res.text || '<div class="text-sm text-gray-500">Sem conteúdo para exibir.</div>';
-                d.previewRow.dataset.loaded = '1';
-            }).catch(function () {
-                content.innerHTML = '<div class="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">Erro de rede ao carregar preview.</div>';
-            });
+        if (!d.previewRow.classList.contains('hidden') && d.previewRow.dataset.loaded === '1') {
+            d.previewRow.classList.add('hidden');
             return;
         }
+        d.previewRow.classList.remove('hidden');
+        if (d.previewRow.dataset.loaded === '1') return;
 
-        var btnRemover = e.target.closest('.btn-remover-boletim');
-        if (btnRemover) {
-            e.preventDefault();
-            var d2 = getRowData(btnRemover);
-            if (!d2) return;
-            var nome = d2.alunoNome || ('aluno #' + d2.alunoId);
-            var regra = d2.regraNome || ('regra #' + d2.regraId);
-            var periodo = d2.periodoRef || '(sem período)';
-            var ok = window.confirm('Remover o boletim de "' + nome + '" da regra "' + regra + '" no período "' + periodo + '"?\n\nEsta ação não pode ser desfeita.');
-            if (!ok) return;
-
-            btnRemover.disabled = true;
-            btnRemover.classList.add('opacity-60');
-
-            var form = new FormData();
-            form.append('_token', csrf);
-            form.append('aluno_id', String(d2.alunoId));
-            form.append('regra_id', String(d2.regraId));
-            form.append('periodo_ref', d2.periodoRef);
-
-            fetch(baseUrl + '/admin/boletim-configuracao/gerados/excluir', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'X-CSRF-Token': csrf, 'Accept': 'application/json' },
-                body: form,
-            }).then(function (resp) {
-                return resp.json().then(function (data) { return { ok: resp.ok, data: data }; });
-            }).then(function (res) {
-                if (!res.ok || !res.data || res.data.success !== true) {
-                    var msg = (res.data && res.data.error) ? res.data.error : 'Falha ao remover.';
-                    window.alert(msg);
-                    btnRemover.disabled = false;
-                    btnRemover.classList.remove('opacity-60');
-                    return;
-                }
-                if (d2.previewRow && d2.previewRow.parentNode) {
-                    d2.previewRow.parentNode.removeChild(d2.previewRow);
-                }
-                if (d2.row && d2.row.parentNode) {
-                    d2.row.parentNode.removeChild(d2.row);
-                }
-                refreshSelecaoUI();
-                if (!document.querySelector('tr.boletim-gerado-row')) {
-                    window.location.reload();
-                }
-            }).catch(function () {
-                window.alert('Erro de rede ao remover boletim.');
-                btnRemover.disabled = false;
-                btnRemover.classList.remove('opacity-60');
-            });
-        }
+        content.innerHTML = '<div class="preview-placeholder text-gray-500">Carregando preview…</div>';
+        var params = new URLSearchParams();
+        params.set('aluno_id', String(d.alunoId));
+        params.set('regra_id', String(d.regraId));
+        params.set('periodo_ref', d.periodoRef);
+        fetch(baseUrl + '/admin/boletim-configuracao/gerados/preview?' + params.toString(), {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'text/html' },
+        }).then(function (resp) {
+            return resp.text().then(function (text) { return { ok: resp.ok, text: text }; });
+        }).then(function (res) {
+            if (!res.ok) {
+                content.innerHTML = '<div class="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">Falha ao carregar preview.</div>';
+                return;
+            }
+            content.innerHTML = res.text || '<div class="text-sm text-gray-500">Sem conteúdo para exibir.</div>';
+            d.previewRow.dataset.loaded = '1';
+        }).catch(function () {
+            content.innerHTML = '<div class="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">Erro de rede ao carregar preview.</div>';
+        });
     });
-
-    refreshSelecaoUI();
 })();
 </script>
