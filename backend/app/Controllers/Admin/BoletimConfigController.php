@@ -1250,8 +1250,7 @@ class BoletimConfigController extends BaseController
         }
         unset($log);
 
-        $periodoRef = trim((string) ($_GET['periodo_ref'] ?? ''));
-        $geracoes = $this->boletimConfig->listarGeracoesPorRegra($regraId, $periodoRef, 20);
+        $geracoes = $this->boletimConfig->listarGeracoesPorRegra($regraId, '', 30);
         foreach ($geracoes as &$g) {
             $g['created_at_fmt'] = !empty($g['created_at']) ? date('d/m/Y H:i', strtotime((string) $g['created_at'])) : '';
         }
@@ -1283,6 +1282,68 @@ class BoletimConfigController extends BaseController
             'travados' => $travados,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
+    }
+
+    public function restaurarGeracao(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $geracaoId = (int) ($_POST['geracao_id'] ?? 0);
+        $regraIdPost = (int) ($_POST['regra_id'] ?? 0);
+        $geracao = $geracaoId > 0 ? $this->boletimConfig->findGeracao($geracaoId) : null;
+        $regraId = (int) ($geracao['regra_id'] ?? $regraIdPost);
+        $periodoRef = trim((string) ($geracao['periodo_ref'] ?? ''));
+        $qs = ['regra_id' => $regraId];
+        if ($periodoRef !== '') {
+            $qs['periodo_ref'] = $periodoRef;
+        }
+
+        if ($geracao === null || $regraId <= 0 || ($regraIdPost > 0 && $regraIdPost !== $regraId)) {
+            $_SESSION['boletim_flash'] = 'Não foi possível voltar para essa versão.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+            return;
+        }
+        if ((int) ($geracao['vigente'] ?? 0) === 1) {
+            $_SESSION['boletim_flash'] = 'Essa versão já é a vigente.';
+            $_SESSION['boletim_flash_type'] = 'info';
+            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+            return;
+        }
+
+        try {
+            $ok = $this->boletimConfig->restaurarGeracaoComoVigente($geracaoId);
+        } catch (Throwable $e) {
+            error_log('restaurarGeracao: ' . $e->getMessage());
+            $ok = false;
+        }
+        if (!$ok) {
+            $_SESSION['boletim_flash'] = 'Não foi possível voltar para essa versão. Ela não tem boletins gravados.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
+            return;
+        }
+
+        $alunoIds = [];
+        foreach ($this->boletimConfig->listarAlunosDaGeracao($geracaoId) as $alunoGeracao) {
+            $alunoId = (int) ($alunoGeracao['aluno_id'] ?? 0);
+            if ($alunoId > 0) {
+                $alunoIds[] = $alunoId;
+            }
+        }
+        $usuario = $this->auth->getUser();
+        if ($alunoIds !== []) {
+            $this->sincronizarFichasVidaEscolarLote(
+                $alunoIds,
+                is_array($usuario) ? $usuario : [],
+                $periodoRef,
+                $regraId
+            );
+        }
+
+        $versao = (int) ($geracao['versao'] ?? 0);
+        $_SESSION['boletim_flash'] = 'Versão ' . ($versao > 0 ? $versao : $geracaoId) . ' voltou a ser a vigente. As notas antigas não foram alteradas.';
+        $_SESSION['boletim_flash_type'] = 'success';
+        $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
     }
 
     public function travarAluno(): void

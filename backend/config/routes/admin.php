@@ -370,6 +370,7 @@ $router->post('/admin/boletim-configuracao/sincronizar-vida-escolar-salvos', 'Ad
 $router->get('/admin/boletim-configuracao/checklist-pre-geracao', 'Admin/BoletimConfigController@checklistPreGeracao');
 $router->get('/admin/boletim-configuracao/logs-geracao', 'Admin/BoletimConfigController@logsGeracaoJson');
 $router->get('/admin/boletim-configuracao/geracao-detalhe', 'Admin/BoletimConfigController@geracaoDetalheJson');
+$router->post('/admin/boletim-configuracao/restaurar-geracao', 'Admin/BoletimConfigController@restaurarGeracao');
 $router->post('/admin/boletim-configuracao/travar-aluno', 'Admin/BoletimConfigController@travarAluno');
 $router->post('/admin/boletim-configuracao/destravar-aluno', 'Admin/BoletimConfigController@destravarAluno');
 $router->post('/admin/boletim-configuracao/simular-lote', 'Admin/BoletimConfigController@simularLote');

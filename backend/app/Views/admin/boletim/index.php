@@ -1096,7 +1096,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         <input type="checkbox" id="incluir-novos-boletim" name="incluir_novos" value="1" class="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
                         <span>Incluir alunos que ainda não têm boletim neste período</span>
                     </label>
-                    <p class="text-xs text-gray-500">Nova versão vigente; o histórico fica guardado. Roda em segundo plano.</p>
+                    <p class="text-xs text-gray-500">Cada geração cria um boletim novo. As notas já gravadas não são substituídas. Roda em segundo plano.</p>
                     <?php if ($geracaoEmAndamento): ?>
                     <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
                     <?php endif; ?>
@@ -1135,7 +1135,12 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         <p class="text-sm font-semibold text-gray-900">Histórico de versões</p>
                         <button type="button" id="btn-ver-logs-geracao" class="text-xs text-gray-600 hover:underline">Ver gerações</button>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">A vigente é a que vale para aluno, pais e ficha.</p>
+                    <p class="text-xs text-gray-500 mt-1">A vigente é a que vale para aluno, pais e ficha. Dá para voltar para qualquer versão.</p>
+                    <form id="form-restaurar-geracao" method="POST" action="<?= URL ?>/admin/boletim-configuracao/restaurar-geracao" class="hidden">
+                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                        <input type="hidden" name="geracao_id" id="restaurar-geracao-id" value="">
+                        <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                    </form>
                     <div id="logs-geracao-resultado" class="hidden mt-2 text-sm space-y-1.5"></div>
                     <div id="geracao-detalhe-resultado" class="hidden mt-3 text-sm border-t border-gray-100 pt-2"></div>
                 </div>
@@ -5290,8 +5295,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         btnVerLogs.addEventListener('click', function () {
             var logsBox = document.getElementById('logs-geracao-resultado');
             var detalheBox = document.getElementById('geracao-detalhe-resultado');
-            var url = LOGS_GERACAO_URL + '?regra_id=' + encodeURIComponent(REGRA_ATUAL_ID)
-                + '&periodo_ref=' + encodeURIComponent(PERIODO_REF_ATUAL);
+            var url = LOGS_GERACAO_URL + '?regra_id=' + encodeURIComponent(REGRA_ATUAL_ID);
             fetch(url, { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
@@ -5309,15 +5313,18 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                                 ? ' <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>'
                                 : '';
                             var preservados = parseInt(g.alunos_preservados, 10) || 0;
+                            var voltar = parseInt(g.vigente, 10) === 1
+                                ? ''
+                                : ' <button type="button" class="btn-restaurar-geracao ml-2 text-indigo-600 hover:underline" data-geracao-id="' + g.id + '" data-versao="' + g.versao + '">Usar esta versão</button>';
                             html += '<div class="border-b border-gray-100 pb-1.5">'
-                                + '<button type="button" class="btn-geracao-detalhe text-left w-full" data-geracao-id="' + g.id + '">'
+                                + '<button type="button" class="btn-geracao-detalhe text-left" data-geracao-id="' + g.id + '">'
                                 + '<span class="text-gray-900 font-medium">Versão ' + g.versao + vigente + '</span>'
                                 + ' — ' + (g.created_at_fmt || '')
                                 + ' · ' + (g.usuario_nome || 'usuário desconhecido')
                                 + ' · ' + g.alunos_processados + ' aluno(s)'
                                 + (preservados > 0 ? ', ' + preservados + ' travado(s)' : '')
                                 + (parseInt(g.erros, 10) > 0 ? ', <span class="text-red-700">' + g.erros + ' erro(s)</span>' : '')
-                                + '</button></div>';
+                                + '</button>' + voltar + '</div>';
                         });
                     } else {
                         logs.forEach(function (l) {
@@ -5330,6 +5337,21 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         });
                     }
                     logsBox.innerHTML = html;
+                    logsBox.querySelectorAll('.btn-restaurar-geracao').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            var gid = btn.getAttribute('data-geracao-id');
+                            var versao = btn.getAttribute('data-versao') || '';
+                            if (!gid) return;
+                            if (!window.confirm('Voltar para a versão ' + versao + '? Ela passa a valer para aluno, pais e ficha. As notas gravadas não são apagadas.')) {
+                                return;
+                            }
+                            var form = document.getElementById('form-restaurar-geracao');
+                            var input = document.getElementById('restaurar-geracao-id');
+                            if (!form || !input) return;
+                            input.value = gid;
+                            form.submit();
+                        });
+                    });
                     logsBox.querySelectorAll('.btn-geracao-detalhe').forEach(function (btn) {
                         btn.addEventListener('click', function () {
                             var gid = btn.getAttribute('data-geracao-id');

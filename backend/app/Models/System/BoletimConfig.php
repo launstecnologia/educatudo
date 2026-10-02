@@ -1471,6 +1471,71 @@ class BoletimConfig
     }
 
     /**
+     * A versão escolhida volta a valer para aluno, pais e ficha.
+     * As notas gravadas não são alteradas: só muda qual geração está vigente.
+     */
+    public function restaurarGeracaoComoVigente(int $geracaoId): bool
+    {
+        if ($geracaoId <= 0 || !$this->hasTable('boletim_geracoes') || !$this->hasColumn('boletim_resultados_gerados', 'vigente')) {
+            return false;
+        }
+        $geracao = $this->findGeracao($geracaoId);
+        if ($geracao === null) {
+            return false;
+        }
+        $regraId = (int) ($geracao['regra_id'] ?? 0);
+        if ($regraId <= 0 || !$this->hasColumn('boletim_resultados_gerados', 'geracao_id')) {
+            return false;
+        }
+        $existe = $this->db->fetch(
+            "SELECT 1 AS ok
+             FROM boletim_resultados_gerados
+             WHERE geracao_id = :geracao_id AND regra_id = :regra_id AND preview = 0
+             LIMIT 1",
+            ['geracao_id' => $geracaoId, 'regra_id' => $regraId]
+        );
+        if (!is_array($existe) || $existe === []) {
+            return false;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->update(
+                "UPDATE boletim_resultados_gerados
+                 SET vigente = 0
+                 WHERE regra_id = :regra_id AND preview = 0 AND vigente = 1",
+                ['regra_id' => $regraId]
+            );
+            $this->db->update(
+                "UPDATE boletim_resultados_gerados
+                 SET vigente = 1
+                 WHERE geracao_id = :geracao_id AND regra_id = :regra_id AND preview = 0",
+                ['geracao_id' => $geracaoId, 'regra_id' => $regraId]
+            );
+            if ($this->hasColumn('boletim_geracoes', 'vigente')) {
+                $this->db->update(
+                    "UPDATE boletim_geracoes
+                     SET vigente = 0
+                     WHERE regra_id = :regra_id AND vigente = 1",
+                    ['regra_id' => $regraId]
+                );
+                $this->db->update(
+                    "UPDATE boletim_geracoes
+                     SET vigente = 1
+                     WHERE id = :id AND regra_id = :regra_id",
+                    ['id' => $geracaoId, 'regra_id' => $regraId]
+                );
+            }
+            $this->db->commit();
+        } catch (Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+
+        return true;
+    }
+
+    /**
      * Alunos que participaram de uma geração (linhas gravadas naquele geracao_id).
      *
      * @return list<array{aluno_id:int,nome:string,versao:int,preservado:int}>
