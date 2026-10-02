@@ -415,7 +415,7 @@ foreach ($linhasLancamento as $rowMat) {
 }
 ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
 $totalLinhasLn = count($linhasLancamento);
-$perPageLn = 10;
+$perPageLn = 15;
 ?>
 <div class="bg-white rounded-xl border border-[#E5EAF1] overflow-hidden mb-6">
     <div class="px-4 sm:px-5 py-4 border-b border-[#E5EAF1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -613,7 +613,7 @@ foreach ($linhasProvasOnline as $provaMat) {
 ksort($materiasFiltroOnline, SORT_NATURAL | SORT_FLAG_CASE);
 $btnSecundario = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5EAF1] bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
 $totalLinhasOnline = count($linhasProvasOnline);
-$perPageOnline = 8;
+$perPageOnline = 15;
 ?>
 <div class="bg-white rounded-xl border border-[#E5EAF1] overflow-hidden mb-6">
     <div class="px-4 sm:px-5 py-4 border-b border-[#E5EAF1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
@@ -1070,7 +1070,7 @@ document.addEventListener('click', function (e) {
         var materia = document.getElementById(opts.materiaId);
         var contador = document.getElementById(opts.contadorId);
         var paginacao = opts.paginacaoId ? document.getElementById(opts.paginacaoId) : null;
-        var perPage = paginacao ? (parseInt(paginacao.getAttribute('data-per-page'), 10) || 8) : 0;
+        var perPage = paginacao ? (parseInt(paginacao.getAttribute('data-per-page'), 10) || 15) : 0;
         var paginaAtual = 1;
         var statusAtivo = '';
         var total = rows.length;
