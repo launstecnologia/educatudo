@@ -152,25 +152,30 @@ $obterCfgBoletim = static function () use (&$cfgBoletimNotas, $appDirNotas) {
     $cfgBoletimNotas = new BoletimConfig();
     return $cfgBoletimNotas;
 };
-$renderQuadroDemonstrativo = static function (
+$simulacaoQuadroCache = [];
+$simularQuadroAluno = static function (
     int $alunoId,
     int $regraId,
     string $dataInicio,
-    string $dataFim,
-    string $simVistaId
-) use ($obterMotorDemonstrativo, $obterCfgBoletim, $normalizarDataYmd): string {
+    string $dataFim
+) use (&$simulacaoQuadroCache, $obterMotorDemonstrativo, $obterCfgBoletim, $normalizarDataYmd): ?array {
     if ($alunoId <= 0 || $regraId <= 0) {
-        return '';
+        return null;
     }
+    $chaveSim = $alunoId . ':' . $regraId . ':' . $dataInicio . ':' . $dataFim;
+    if (array_key_exists($chaveSim, $simulacaoQuadroCache)) {
+        return $simulacaoQuadroCache[$chaveSim];
+    }
+    $simulacaoQuadroCache[$chaveSim] = null;
     try {
         $motor = $obterMotorDemonstrativo();
         $cfg = $obterCfgBoletim();
         if ($motor === null || $cfg === null) {
-            return '';
+            return null;
         }
         $regra = $cfg->getRuleById($regraId);
         if (!is_array($regra) || empty($regra['componentes'])) {
-            return '';
+            return null;
         }
         $ini = $normalizarDataYmd($dataInicio);
         $fim = $normalizarDataYmd($dataFim);
@@ -182,7 +187,7 @@ $renderQuadroDemonstrativo = static function (
         }
         if ($ini === null || $fim === null) {
             error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': datas do período ausentes.');
-            return '';
+            return null;
         }
         if ($ini > $fim) {
             [$ini, $fim] = [$fim, $ini];
@@ -216,9 +221,32 @@ $renderQuadroDemonstrativo = static function (
             // Vista Boletim opcional; Demonstrativo segue.
         }
         if (!is_array($simulacao)) {
-            return '';
+            return null;
         }
         $simulacao = $motor->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
+        $simulacao['_regra_nome'] = (string) ($regra['nome'] ?? '');
+        $simulacao['_decimal_places'] = (int) ($regra['decimal_places'] ?? 2);
+        $simulacaoQuadroCache[$chaveSim] = $simulacao;
+
+        return $simulacao;
+    } catch (Throwable $e) {
+        error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
+
+        return null;
+    }
+};
+$renderQuadroDemonstrativo = static function (
+    int $alunoId,
+    int $regraId,
+    string $dataInicio,
+    string $dataFim,
+    string $simVistaId
+) use ($simularQuadroAluno): string {
+    $simulacao = $simularQuadroAluno($alunoId, $regraId, $dataInicio, $dataFim);
+    if (!is_array($simulacao)) {
+        return '';
+    }
+    try {
         $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : [];
         $cols = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
         $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
@@ -229,11 +257,11 @@ $renderQuadroDemonstrativo = static function (
             // Sem layout de quadro: usa tabela gerada padrão.
             $evRender = [
                 'regra_id' => $regraId,
-                'regra_nome' => (string) ($regra['nome'] ?? ''),
+                'regra_nome' => (string) ($simulacao['_regra_nome'] ?? ''),
                 'exibir_em' => 'notas',
                 'colunas' => $cols,
                 'linhas' => $linhas,
-                'decimal_places' => (int) ($regra['decimal_places'] ?? 2),
+                'decimal_places' => (int) ($simulacao['_decimal_places'] ?? 2),
             ];
             ob_start();
             $boletins_gerados = [$evRender];
@@ -245,7 +273,7 @@ $renderQuadroDemonstrativo = static function (
         $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
             ? $simulacao['matriz_materias_boletim']['linhas']
             : $linhas;
-        $decimalPlaces = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $decimalPlaces = ((int) ($simulacao['_decimal_places'] ?? 2) === 1) ? 1 : 2;
         ob_start();
         $simVistaId = $simVistaId;
         include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
@@ -254,6 +282,31 @@ $renderQuadroDemonstrativo = static function (
         error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
         return '';
     }
+};
+
+$renderNotasAoVivo = static function (
+    int $alunoId,
+    int $regraId,
+    string $dataInicio,
+    string $dataFim
+) use ($simularQuadroAluno): string {
+    $simulacao = $simularQuadroAluno($alunoId, $regraId, $dataInicio, $dataFim);
+    if (!is_array($simulacao)) {
+        return '';
+    }
+    $matriz = is_array($simulacao['matriz_materias'] ?? null) ? $simulacao['matriz_materias'] : [];
+    $cols = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
+    $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+    if ($cols === [] || $linhas === []) {
+        return '';
+    }
+    $decimalPlaces = ((int) ($simulacao['_decimal_places'] ?? 2) === 1) ? 1 : 2;
+    $tituloTabelaSimples = 'Matéria';
+    $ocultar_grupo_hierarquia = false;
+    ob_start();
+    include dirname(__DIR__, 2) . '/partials/boletim_quadro_tabela_simples.php';
+
+    return (string) ob_get_clean();
 };
 
 $renderNotasComoCoordenacao = static function (array $ev): string {
@@ -334,6 +387,14 @@ foreach ($linhasPeriodo as &$linhaP) {
     $idResumo = 'fonte-notas-resumo-' . $idxLinha;
     $idQuadro = 'fonte-notas-quadro-' . $anoP . '-' . $bimP . '-' . $ridP . '-' . $idxLinha;
     $htmlResumo = '';
+    if ($ridP > 0 && $alunoIdNotas > 0) {
+        $htmlResumo = $renderNotasAoVivo(
+            $alunoIdNotas,
+            $ridP,
+            (string) ($linhaP['data_inicio'] ?? ''),
+            (string) ($linhaP['data_fim'] ?? '')
+        );
+    }
     $chaveEv = $ridP . ':' . $anoP . ':' . $bimP;
     $evNotas = $geradoPorChave[$chaveEv] ?? null;
     if (!is_array($evNotas) && $ridP > 0) {
@@ -349,7 +410,7 @@ foreach ($linhasPeriodo as &$linhaP) {
             break;
         }
     }
-    if (is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
+    if ($htmlResumo === '' && is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
         $evNotas = $semFilhasExcluidas($evNotas);
         if (!empty($evNotas['linhas'])) {
             $htmlResumo = $renderNotasComoCoordenacao($evNotas);
