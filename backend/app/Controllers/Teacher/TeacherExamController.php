@@ -959,8 +959,9 @@ class TeacherExamController extends BaseController
     }
 
     /**
-     * Exporta CSV (Excel) com todas as notas do evento, em todas as matérias.
-     * Formato matriz: uma linha por aluno e uma coluna por matéria.
+     * Exporta CSV (Excel) com todas as notas do evento.
+     * Uma linha por aluno e uma coluna por matéria e professor.
+     * A mesma matéria com dois professores vira duas colunas.
      */
     public function exportarNotasLancamentoExcel($blocoId)
     {
@@ -981,19 +982,39 @@ class TeacherExamController extends BaseController
         $relatorio = $this->montarRelatorioLancamentoNotasAdmin($bloco, []);
         $linhas = $relatorio['linhas'] ?? [];
 
-        $materias = [];
+        $colunas = [];
         foreach ($linhas as $ln) {
             $mid = (int) ($ln['materia_id'] ?? 0);
-            $nome = trim((string) ($ln['materia_nome'] ?? ''));
+            $pid = (int) ($ln['professor_id'] ?? 0);
             if ($mid <= 0) {
                 continue;
             }
-            if ($nome === '') {
-                $nome = 'Matéria #' . $mid;
+            $chaveCol = $pid . '_' . $mid;
+            if (isset($colunas[$chaveCol])) {
+                continue;
             }
-            $materias[$mid] = $nome;
+            $nomeMateria = trim((string) ($ln['materia_nome'] ?? ''));
+            if ($nomeMateria === '') {
+                $nomeMateria = 'Matéria #' . $mid;
+            }
+            $nomeProfessor = trim((string) ($ln['professor_nome'] ?? ''));
+            if ($nomeProfessor === '') {
+                $nomeProfessor = $pid > 0 ? ('Professor #' . $pid) : 'Coordenação';
+            }
+            $colunas[$chaveCol] = [
+                'materia' => $nomeMateria,
+                'professor' => $nomeProfessor,
+                'rotulo' => $nomeMateria . ' — ' . $nomeProfessor,
+            ];
         }
-        asort($materias, SORT_NATURAL | SORT_FLAG_CASE);
+        uasort($colunas, static function (array $a, array $b): int {
+            $cmp = strnatcasecmp((string) ($a['materia'] ?? ''), (string) ($b['materia'] ?? ''));
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return strnatcasecmp((string) ($a['professor'] ?? ''), (string) ($b['professor'] ?? ''));
+        });
 
         $porAluno = [];
         foreach ($linhas as $ln) {
@@ -1012,16 +1033,17 @@ class TeacherExamController extends BaseController
                 ];
             }
             $mid = (int) ($ln['materia_id'] ?? 0);
+            $pid = (int) ($ln['professor_id'] ?? 0);
             if ($mid <= 0) {
                 continue;
             }
+            $chaveCol = $pid . '_' . $mid;
             $notaRaw = $ln['nota'] ?? null;
             $notaFmt = ($notaRaw === null || $notaRaw === '')
                 ? ''
                 : number_format((float) $notaRaw, 2, ',', '.');
-            // Se houver mais de um vínculo na mesma matéria, mantém a primeira nota preenchida.
-            if (!isset($porAluno[$chave]['notas'][$mid]) || $porAluno[$chave]['notas'][$mid] === '') {
-                $porAluno[$chave]['notas'][$mid] = $notaFmt;
+            if (!isset($porAluno[$chave]['notas'][$chaveCol]) || $porAluno[$chave]['notas'][$chaveCol] === '') {
+                $porAluno[$chave]['notas'][$chaveCol] = $notaFmt;
             }
         }
 
@@ -1039,8 +1061,8 @@ class TeacherExamController extends BaseController
         };
 
         $cabecalho = ['Turma', 'Aluno', 'Transferido'];
-        foreach ($materias as $nomeMateria) {
-            $cabecalho[] = $nomeMateria;
+        foreach ($colunas as $coluna) {
+            $cabecalho[] = (string) ($coluna['rotulo'] ?? '');
         }
 
         $linhasCsv = [];
@@ -1051,8 +1073,8 @@ class TeacherExamController extends BaseController
                 $aluno['aluno'],
                 !empty($aluno['transferido']) ? 'Sim' : 'Não',
             ];
-            foreach (array_keys($materias) as $mid) {
-                $row[] = (string) ($aluno['notas'][$mid] ?? '');
+            foreach (array_keys($colunas) as $chaveCol) {
+                $row[] = (string) ($aluno['notas'][$chaveCol] ?? '');
             }
             $linhasCsv[] = implode(';', array_map($csvCell, $row));
         }
