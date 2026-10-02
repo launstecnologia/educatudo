@@ -374,6 +374,13 @@ class BoletimAssistenteController extends BaseController
                 $cfgWizard = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                 $grupoLinha = $cfgWizard['group_line'] ?? null;
                 $usarPercWizard = array_key_exists('usar_percentual', $comp) ? $comp['usar_percentual'] : null;
+                $blocosWizard = [];
+                foreach ((array) ($comp['blocos_ids'] ?? []) as $bidWizard) {
+                    $bidWizard = (int) $bidWizard;
+                    if ($bidWizard > 0) {
+                        $blocosWizard[$bidWizard] = $bidWizard;
+                    }
+                }
                 $comp = $salvaComp;
                 if ($nome !== '') {
                     $comp['nome'] = $nome;
@@ -385,6 +392,15 @@ class BoletimAssistenteController extends BaseController
                 $cfgSalva = is_array($comp['config'] ?? null) ? $comp['config'] : [];
                 if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
                     $cfgSalva['group_line'] = $grupoLinha;
+                }
+                if ($origem === 'provas_sistema' && $blocosWizard !== []) {
+                    $comp['blocos_ids'] = array_values($blocosWizard);
+                    if (!empty($cfgWizard['blocos_ids_manual'])) {
+                        $cfgSalva['blocos_ids_manual'] = 1;
+                    }
+                    if (!empty($cfgWizard['prova_bimestres']) && is_array($cfgWizard['prova_bimestres'])) {
+                        $cfgSalva['prova_bimestres'] = $cfgWizard['prova_bimestres'];
+                    }
                 }
                 // Mantém opções da peça Jornada escolhidas no assistente (ainda não salvas).
                 if ($origem === 'jornadas') {

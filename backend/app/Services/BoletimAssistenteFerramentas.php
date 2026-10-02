@@ -655,11 +655,13 @@ class BoletimAssistenteFerramentas
         }
         $ini = $this->normalizarData($dataInicio);
         $fim = $this->normalizarData($dataFim);
-        if ($ini !== null && $fim !== null) {
+        // Com bimestre marcado, a peça usa os eventos daquele bimestre (os que aparecem marcados).
+        // A janela de datas do evento de notas não pode tirar a prova de 21/06 só porque o período não cobre esse dia.
+        if ($ini !== null && $fim !== null && $bimestres === []) {
             $eventos = array_values(array_filter($eventos, static function ($ev) use ($ini, $fim) {
                 $d = substr((string) ($ev['data_prova'] ?? ''), 0, 10);
                 if ($d === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
-                    return true; // sem data: mantém (pode estar no bimestre)
+                    return true;
                 }
                 return $d >= $ini && $d <= $fim;
             }));

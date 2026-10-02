@@ -9821,16 +9821,24 @@ class BoletimConfigController extends BaseController
                 $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
             }
             if ($blocoIds === [] && $tipoAvaliacaoComp > 0) {
-                return [
-                    'bloco_ids' => $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                $buscados = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
+                    $tipoAvaliacaoComp,
+                    0,
+                    $inicio,
+                    $fim,
+                    $bimestresComp
+                );
+                if ($buscados === [] && ($inicio !== null || $fim !== null)) {
+                    $buscados = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
                         $tipoAvaliacaoComp,
                         0,
-                        $inicio,
-                        $fim,
+                        null,
+                        null,
                         $bimestresComp
-                    ),
-                    'forcada' => true,
-                ];
+                    );
+                }
+
+                return ['bloco_ids' => $buscados, 'forcada' => true];
             }
 
             return ['bloco_ids' => $blocoIds, 'forcada' => $blocoIds !== []];

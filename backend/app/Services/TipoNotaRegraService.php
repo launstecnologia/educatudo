@@ -379,21 +379,21 @@ class TipoNotaRegraService
         $out = [];
 
         try {
-            // Só conta lançamento com vínculo real no bloco (igual ao progresso do manage).
-            // Notas órfãs (professor/matéria fora da pauta) geravam Prova Bim fantasma
-            // — ex.: Português = 4 com manage 0/181.
+            // A matéria precisa estar na pauta do evento. O professor da nota pode ser um vínculo antigo:
+            // a tela de lançamento ainda mostra essa nota, e o boletim precisa dela também.
             $manuais = $this->db->fetchAll(
                 "SELECT n.bloco_id, n.professor_id, n.materia_id, n.nota,
                         COALESCE(n.updated_at, n.created_at) AS quando
                  FROM provas_blocos_notas_lancadas n
-                 INNER JOIN provas_blocos_professores pbp
-                   ON pbp.bloco_id = n.bloco_id
-                  AND pbp.professor_id = n.professor_id
-                  AND pbp.materia_id = n.materia_id
                  WHERE n.aluno_id = :aluno
                    AND n.bloco_id IN ($in)
                    AND n.nota IS NOT NULL
-                   AND n.materia_id > 0",
+                   AND n.materia_id > 0
+                   AND EXISTS (
+                     SELECT 1 FROM provas_blocos_professores pbp
+                     WHERE pbp.bloco_id = n.bloco_id
+                       AND pbp.materia_id = n.materia_id
+                   )",
                 $params
             ) ?: [];
             foreach ($manuais as $row) {

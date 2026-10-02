@@ -3712,15 +3712,16 @@ class BoletimConfig
                     0 AS acertos
                 FROM provas_blocos_notas_lancadas n
                 INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
-                INNER JOIN provas_blocos_professores pbp_ok
-                  ON pbp_ok.bloco_id = n.bloco_id
-                 AND pbp_ok.professor_id = n.professor_id
-                 AND pbp_ok.materia_id = n.materia_id
                 LEFT JOIN materias m ON m.id = n.materia_id
                 WHERE n.aluno_id = ?
                   AND n.bloco_id IN ($placeholders)
                   AND n.nota IS NOT NULL
-                  AND n.materia_id > 0";
+                  AND n.materia_id > 0
+                  AND EXISTS (
+                    SELECT 1 FROM provas_blocos_professores pbp_ok
+                    WHERE pbp_ok.bloco_id = n.bloco_id
+                      AND pbp_ok.materia_id = n.materia_id
+                  )";
 
         $params = array_merge([$alunoId], $blocoIds);
         if ($inicio !== null && $fim !== null) {
@@ -3793,24 +3794,24 @@ class BoletimConfig
                     m.nome AS nota_materia_nome,
                     n.materia_id AS materia_id,
                     m.nome AS materia_nome,
-                    pbp.materia_id AS professor_materia_id,
-                    m2.nome AS professor_materia_nome,
+                    n.materia_id AS professor_materia_id,
+                    m.nome AS professor_materia_nome,
                     CONCAT(COALESCE(pb.titulo, 'Bloco'), ' (pauta)') AS titulo,
                     10 AS valor_total,
                     0 AS total_questoes,
                     0 AS acertos
                 FROM provas_blocos_notas_lancadas n
                 INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
-                INNER JOIN provas_blocos_professores pbp
-                  ON pbp.bloco_id = n.bloco_id
-                 AND pbp.professor_id = n.professor_id
-                 AND pbp.materia_id = n.materia_id
                 LEFT JOIN materias m ON m.id = n.materia_id
-                LEFT JOIN materias m2 ON m2.id = pbp.materia_id
                 WHERE n.aluno_id IN ($phAlunos)
                   AND n.bloco_id IN ($phBlocos)
                   AND n.nota IS NOT NULL
-                  AND n.materia_id > 0";
+                  AND n.materia_id > 0
+                  AND EXISTS (
+                    SELECT 1 FROM provas_blocos_professores pbp_ok
+                    WHERE pbp_ok.bloco_id = n.bloco_id
+                      AND pbp_ok.materia_id = n.materia_id
+                  )";
 
         $params = array_merge($alunoIds, $blocoIds);
         if ($inicio !== null && $fim !== null) {
