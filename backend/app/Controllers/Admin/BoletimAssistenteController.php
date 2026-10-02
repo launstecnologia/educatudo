@@ -255,6 +255,8 @@ class BoletimAssistenteController extends BaseController
             }
 
             $simulacao = $configController->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $rascunho);
+            $exibirEmPreview = strtolower(trim((string) ($rascunho['exibir_em'] ?? $estado['exibir_em'] ?? '')));
+            $simulacao['exibir_em'] = $exibirEmPreview;
             $previewReal = $this->montarPreviewRealDaSimulacao($simulacao);
             if ($previewReal !== null) {
                 $grupoId = (int) ($rascunho['grupo_regras_notas_id'] ?? $estado['grupo_regras_notas_id'] ?? 0);
@@ -273,6 +275,7 @@ class BoletimAssistenteController extends BaseController
                     $simulacaoQuadro['matriz_materias_boletim'] = $simulacao['matriz_materias_boletim'];
                 }
                 $simulacaoQuadro = $configController->montarMatrizDemonstrativoComGrupoHierarquico($simulacaoQuadro, $rascunho);
+                $simulacaoQuadro['exibir_em'] = $exibirEmPreview;
                 $previewQuadro = $this->montarPreviewRealDaSimulacao($simulacaoQuadro);
                 if (is_array($previewQuadro)) {
                     $previewQuadro = $this->aplicarMateriasDoQuadro($previewQuadro, $grupoId);
@@ -499,6 +502,12 @@ class BoletimAssistenteController extends BaseController
         $gruposBoletim = [];
         $temQuadro = false;
         $temBoletim = false;
+        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+            require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+        }
+        $exibirEm = strtolower(trim((string) ($simulacao['exibir_em'] ?? '')));
+        $agruparCabecalhoOficial = $exibirEm === ''
+            || BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEm);
 
         foreach ($colunasRaw as $colRaw) {
             if (!is_array($colRaw)) {
@@ -529,7 +538,7 @@ class BoletimAssistenteController extends BaseController
                 continue;
             }
 
-            if ($this->colunaPreviewEhBoletim($col)) {
+            if ($agruparCabecalhoOficial && $this->colunaPreviewEhBoletim($col)) {
                 $temBoletim = true;
                 $grupoKey = $col['layout_group'] !== '' ? $col['layout_group'] : 'outros';
                 if (!isset($gruposBoletim[$grupoKey])) {
