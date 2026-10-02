@@ -2262,6 +2262,14 @@ $boletimWizardSteps = [
         return Math.abs(h);
     }
 
+    function colunaEhCalculadaFormula(col) {
+        if (!col || colunaEhFaltas(col)) return false;
+        var cod = String(col.codigo || '').toLowerCase();
+        if (!cod || cod === 'media_sem') return false;
+        if (String(col.source_type || '') === 'calculado' || String(col.tipo || '') === 'calculado') return true;
+        return cod === 'media_bim' || cod === 'media_final' || cod === 'media_parcial' || cod === 'media_etapa' || /^media_[ms]\d+$/.test(cod);
+    }
+
     function colunaEhFaltas(col) {
         if (!col) return false;
         if ((col.layout_type || '') === 'faltas') return true;
@@ -2730,6 +2738,8 @@ $boletimWizardSteps = [
         }
         (outras || []).forEach(function (col) {
             if (!col || !col.codigo) return;
+            // Média Bim e as colunas seguintes saem da fórmula, não da soma das filhas.
+            if (colunaEhCalculadaFormula(col)) return;
             agregarCodigo(col.codigo, colunaEhFaltas(col));
         });
         (semanas || []).forEach(function (s) {
@@ -2749,6 +2759,94 @@ $boletimWizardSteps = [
                 notas[cq] = sumQ;
             }
         });
+        return notas;
+    }
+
+    function expressoesCalculadasDoGrupo() {
+        var lista = [];
+        var visto = {};
+        function push(cod, exp) {
+            cod = String(cod || '').toLowerCase();
+            exp = String(exp || '').trim();
+            if (!cod || !exp || cod === 'media_sem' || visto[cod]) return;
+            visto[cod] = true;
+            lista.push({ codigo: cod, expressao: exp });
+        }
+        Object.keys((estado && estado.formulas_blocos) || {}).forEach(function (cod) {
+            var toks = estado.formulas_blocos[cod];
+            if (!Array.isArray(toks) || !toks.length) return;
+            push(cod, compilarTokensPreview(toks.map(function (t) {
+                if (!t || t.type !== 'peca') return t;
+                return { type: 'peca', value: pecaCodigoQuadro(t.value), label: t.label || '' };
+            })));
+        });
+        ((rascunhoAtual && rascunhoAtual.componentes) || []).forEach(function (c) {
+            if (!c || String(c.source_type || '') !== 'calculado') return;
+            var cfg = c.config || {};
+            if (typeof cfg === 'string') {
+                try { cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
+            }
+            if (cfg.agregar_nq && cfg.agregar_nq.length) return;
+            push(c.codigo, cfg.expressao || c.expressao);
+        });
+        return lista;
+    }
+
+    function notaFormulaGrupo(notas, codigo) {
+        var aliases = {
+            semanal: 'media_sem',
+            media_sem: 'semanal',
+            bimestral: 'prova_bim',
+            prova_bim: 'bimestral',
+            recuperacao: 'rec',
+            rec: 'recuperacao',
+            trabalho: 'trab',
+            trab: 'trabalho',
+            participacao: 'part',
+            part: 'participacao'
+        };
+        var direto = notaDaLinhaPreview(notas, codigo);
+        if (direto == null || direto === '' || !isFinite(Number(direto))) {
+            var outro = aliases[String(codigo || '').toLowerCase()];
+            if (outro) direto = notaDaLinhaPreview(notas, outro);
+        }
+        if (direto == null || direto === '' || !isFinite(Number(direto))) return null;
+        return Number(direto);
+    }
+
+    function avaliarExpressaoGrupo(exp, notas) {
+        var src = String(exp || '').trim();
+        if (!src) return null;
+        src = src.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function (nome) {
+            var baixo = nome.toLowerCase();
+            if (baixo === 'max' || baixo === 'min') return baixo;
+            var v = notaFormulaGrupo(notas, nome);
+            if (v == null || !isFinite(v)) return '0';
+            return String(v);
+        });
+        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min)\b/g, ''))) return null;
+        src = src.replace(/\bmax\b/g, 'Math.max').replace(/\bmin\b/g, 'Math.min');
+        try {
+            var n = Function('"use strict"; return (' + src + ');')();
+            if (!isFinite(n)) return null;
+            return roundPreviewValor(n);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function aplicarFormulasNaLinhaGrupo(notas) {
+        var exprs = expressoesCalculadasDoGrupo();
+        if (!exprs.length) return notas;
+        var i;
+        var j;
+        for (i = 0; i < exprs.length; i++) {
+            for (j = 0; j < exprs.length; j++) {
+                var valor = avaliarExpressaoGrupo(exprs[j].expressao, notas);
+                if (valor == null) continue;
+                notas[exprs[j].codigo] = valor;
+            }
+        }
         return notas;
     }
 
@@ -2864,6 +2962,7 @@ $boletimWizardSteps = [
                 }
             });
         }
+        aplicarFormulasNaLinhaGrupo(notasPai);
         var pai = {
             materia_id: 0,
             materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
@@ -2983,7 +3082,7 @@ $boletimWizardSteps = [
         out[pos] = {
             materia_id: 0,
             materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
-            notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', [], gl)
+            notas: aplicarFormulasNaLinhaGrupo(agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', [], gl))
         };
         return ordenarLinhasPorNome(out);
     }

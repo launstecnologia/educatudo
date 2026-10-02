@@ -6697,6 +6697,8 @@ class BoletimConfigController extends BaseController
                     }
                 }
             }
+            // Média Bim e as colunas seguintes saem da fórmula, com as notas já juntadas da área.
+            $paiNotas = $this->aplicarFormulasCalculadasNaLinhaGrupo($paiNotas, $regra);
             $pai = [
                 'materia_id' => 0,
                 'materia_nome' => $g['label'],
@@ -7036,6 +7038,97 @@ class BoletimConfigController extends BaseController
         }
 
         return '';
+    }
+
+    /**
+     * Colunas calculadas da mãe (Média Bim, média com ENAC, média final) usam a fórmula
+     * sobre as peças já juntadas. Não somam o resultado que cada filha já calculou.
+     *
+     * @param array<string,mixed> $notas
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function aplicarFormulasCalculadasNaLinhaGrupo(array $notas, array $regra): array
+    {
+        $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'half'));
+        $exprs = [];
+        foreach ((array) ($regra['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            if (strtolower(trim((string) ($comp['source_type'] ?? ''))) !== 'calculado') {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            if ($cod === '' || $cod === 'media_sem') {
+                continue;
+            }
+            $expr = $this->parseExpressaoColunaCalculada($comp);
+            if ($expr === '') {
+                continue;
+            }
+            $exprs[] = ['codigo' => $cod, 'expr' => $expr, 'comp' => $comp];
+        }
+        if ($exprs === []) {
+            return $notas;
+        }
+        $passos = count($exprs);
+        for ($passo = 0; $passo < $passos; $passo++) {
+            foreach ($exprs as $item) {
+                $refs = $this->codigosReferenciadosNaExpressao($item['expr'], array_keys($notas));
+                $vars = [];
+                foreach ($refs as $ref) {
+                    $vars[(string) $ref] = $this->valorNotaGrupoPorCodigo($notas, (string) $ref);
+                }
+                $resultado = $this->avaliarFormula($item['expr'], $vars);
+                if (empty($resultado['ok']) || !isset($resultado['valor']) || !is_numeric($resultado['valor'])) {
+                    continue;
+                }
+                $modoCol = $this->resolveRoundModeComponente($item['comp'], $roundMode);
+                $arred = $this->applyRoundMode((float) $resultado['valor'], $modoCol);
+                if ($arred === null) {
+                    continue;
+                }
+                $notas[$item['codigo']] = $arred;
+            }
+        }
+
+        return $notas;
+    }
+
+    /**
+     * A fórmula cita o código da peça (prova_bim) e a coluna pode estar com o outro nome (bimestral).
+     *
+     * @param array<string,mixed> $notas
+     */
+    private function valorNotaGrupoPorCodigo(array $notas, string $codigo): float
+    {
+        $baixo = strtolower(trim($codigo));
+        $aliases = [
+            'semanal' => 'media_sem',
+            'media_sem' => 'semanal',
+            'bimestral' => 'prova_bim',
+            'prova_bim' => 'bimestral',
+            'recuperacao' => 'rec',
+            'rec' => 'recuperacao',
+            'trabalho' => 'trab',
+            'trab' => 'trabalho',
+            'participacao' => 'part',
+            'part' => 'participacao',
+        ];
+        $candidatos = [$codigo];
+        if (isset($aliases[$baixo])) {
+            $candidatos[] = $aliases[$baixo];
+        }
+        foreach ($candidatos as $cand) {
+            foreach ($notas as $chave => $valor) {
+                if (strcasecmp((string) $chave, (string) $cand) === 0 && is_numeric($valor)) {
+                    return (float) $valor;
+                }
+            }
+        }
+
+        return 0.0;
     }
 
     /**
