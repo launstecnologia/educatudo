@@ -32,23 +32,23 @@ class BoletimCadastroAdminController extends AdminBaseController
         $cfg->ensureSchema();
         $itens = $this->service->model()->listar();
         $qtdNotasPorBoletim = $cfg->contarEventosNotasPorBoletim();
-        $primeiroEventoPorBoletim = [];
+        $eventosPorBoletim = [];
         foreach ($qtdNotasPorBoletim as $boletimId => $qtd) {
             if ((int) $qtd <= 0) {
                 continue;
             }
             $lista = $cfg->listarEventosNotasDoBoletim((int) $boletimId);
-            if ($lista !== []) {
-                $primeiroEventoPorBoletim[(int) $boletimId] = (int) ($lista[0]['id'] ?? 0);
-            }
+            $eventosPorBoletim[(int) $boletimId] = is_array($lista) ? $lista : [];
         }
         $nomesRegra = [];
         foreach ($this->service->listarRegrasAcademicas() as $ra) {
             $nomesRegra[(int) ($ra['id'] ?? 0)] = (string) ($ra['nome'] ?? '');
         }
         foreach ($itens as &$item) {
-            $item['eventos_notas_qtd'] = (int) ($qtdNotasPorBoletim[(int) $item['id']] ?? 0);
-            $item['evento_notas_id'] = (int) ($primeiroEventoPorBoletim[(int) $item['id']] ?? 0);
+            $eventosDoItem = $eventosPorBoletim[(int) $item['id']] ?? [];
+            $item['eventos_notas'] = $eventosDoItem;
+            $item['eventos_notas_qtd'] = count($eventosDoItem);
+            $item['evento_notas_id'] = (int) ($eventosDoItem[0]['id'] ?? 0);
             $rid = (int) ($item['regra_academica_id'] ?? 0);
             $item['regra_academica_nome'] = $rid > 0 ? ($nomesRegra[$rid] ?? '') : '';
             $item['criterios'] = $this->service->criteriosDoBoletim($item);
