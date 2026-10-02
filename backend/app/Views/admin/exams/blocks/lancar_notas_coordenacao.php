@@ -5,6 +5,8 @@ $materiasFiltro = $materias_filtro ?? [];
 $turmasFiltro = $turmas_filtro ?? [];
 $seriesFiltro = $series_filtro ?? [];
 $materiaIdFiltro = (int) ($materia_id_filtro ?? 0);
+$professorIdFiltro = (int) ($professor_id_filtro ?? 0);
+$professorNomeFiltro = trim((string) ($professor_nome_filtro ?? ''));
 $turmaIdFiltro = (int) ($turma_id_filtro ?? 0);
 $serieIdFiltro = (int) ($serie_id_filtro ?? 0);
 $ordenarFiltro = (string) ($ordenar_filtro ?? 'nome');
@@ -33,6 +35,9 @@ $filtrosAtivos = [];
 if (!$notaUnicaTodasMaterias && $materiaIdFiltro > 0) {
     $filtrosAtivos[] = 'Matéria: ' . ($materiasFiltro[$materiaIdFiltro] ?? ('#' . $materiaIdFiltro));
 }
+if (!$notaUnicaTodasMaterias && $professorIdFiltro > 0) {
+    $filtrosAtivos[] = 'Professor: ' . ($professorNomeFiltro !== '' ? $professorNomeFiltro : ('#' . $professorIdFiltro));
+}
 if ($serieIdFiltro > 0) {
     $filtrosAtivos[] = 'Série: ' . ($seriesFiltro[$serieIdFiltro] ?? ('#' . $serieIdFiltro));
 }
@@ -50,6 +55,7 @@ $filtrosAtivos[] = 'Ordem: ' . ($rotulosOrdenar[$ordenarFiltro] ?? $ordenarFiltr
 
 $qsBase = array_filter([
     'materia_id' => $materiaIdFiltro > 0 ? $materiaIdFiltro : null,
+    'professor_id' => $professorIdFiltro > 0 ? $professorIdFiltro : null,
     'turma_id' => $turmaIdFiltro > 0 ? $turmaIdFiltro : null,
     'serie_id' => $serieIdFiltro > 0 ? $serieIdFiltro : null,
     'ordenar' => $ordenarFiltro !== 'nome' ? $ordenarFiltro : null,
@@ -123,6 +129,7 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
 <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/lancar-notas-coordenacao" class="space-y-4" id="formLancamentoNotas">
     <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken) ?>">
     <input type="hidden" name="materia_id_filtro" value="<?= $materiaIdFiltro ?>">
+    <input type="hidden" name="professor_id_filtro" value="<?= $professorIdFiltro ?>">
     <input type="hidden" name="turma_id_filtro" value="<?= $turmaIdFiltro ?>">
     <input type="hidden" name="serie_id_filtro" value="<?= $serieIdFiltro ?>">
     <input type="hidden" name="ordenar_filtro" value="<?= htmlspecialchars($ordenarFiltro) ?>">
@@ -269,6 +276,9 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
         </button>
     </div>
     <form method="get" action="<?= htmlspecialchars($actionFiltro) ?>" class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <?php if ($professorIdFiltro > 0): ?>
+        <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
+        <?php endif; ?>
         <?php if (!$notaUnicaTodasMaterias): ?>
         <div>
             <label for="materia_id" class="block text-sm font-medium text-gray-700 mb-1">Matéria</label>

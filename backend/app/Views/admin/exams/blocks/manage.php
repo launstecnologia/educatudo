@@ -347,7 +347,8 @@ $statusMapLancamento = [
                 $pair = $statusMapLancamento[$st] ?? ['bg-gray-100 text-gray-800', $st];
                 if ($lancamentoPorCoordenacao) {
                     $urlLancar = URL . '/admin/provas/blocos/' . (int) $bloco['id']
-                        . '/lancar-notas-coordenacao?materia_id=' . (int) ($row['materia_id'] ?? 0);
+                        . '/lancar-notas-coordenacao?materia_id=' . (int) ($row['materia_id'] ?? 0)
+                        . '&professor_id=' . (int) ($row['professor_id'] ?? 0);
                 } else {
                     $urlLancar = URL . '/admin/provas/blocos/' . (int) $bloco['id']
                         . '/notas-lancadas?professor_id=' . (int) ($row['professor_id'] ?? 0)

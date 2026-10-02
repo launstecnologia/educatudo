@@ -1907,6 +1907,7 @@ class TeacherExamController extends BaseController
         $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
         $filtros = $this->filtrosLancamentoNotasCoordenacao($_GET);
         $materiaIdFiltro = $notaUnicaTodasMaterias ? 0 : $filtros['materia_id'];
+        $professorIdFiltro = $notaUnicaTodasMaterias ? 0 : (int) ($filtros['professor_id'] ?? 0);
         $turmaIdFiltro = $filtros['turma_id'];
         $serieIdFiltro = $filtros['serie_id'];
         $ordenarFiltro = $filtros['ordenar'];
@@ -1914,6 +1915,23 @@ class TeacherExamController extends BaseController
         $porPagina = $filtros['por_pagina'];
         $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
+        if ($professorIdFiltro > 0) {
+            $combos = array_values(array_filter($combos, static function (array $combo) use ($professorIdFiltro): bool {
+                return (int) ($combo['professor_id'] ?? 0) === $professorIdFiltro;
+            }));
+        }
+        $professorNomeFiltro = '';
+        if ($professorIdFiltro > 0) {
+            foreach ($bloco['professores'] ?? [] as $pe) {
+                if ((int) ($pe['professor_id'] ?? 0) !== $professorIdFiltro) {
+                    continue;
+                }
+                $professorNomeFiltro = trim((string) ($pe['professor_nome'] ?? ''));
+                if ($professorNomeFiltro !== '') {
+                    break;
+                }
+            }
+        }
 
         $materiasFiltro = [];
         foreach ($bloco['professores'] ?? [] as $pe) {
@@ -2041,6 +2059,8 @@ class TeacherExamController extends BaseController
             'turmas_filtro' => $turmasFiltro,
             'series_filtro' => $seriesFiltro,
             'materia_id_filtro' => $materiaIdFiltro,
+            'professor_id_filtro' => $professorIdFiltro,
+            'professor_nome_filtro' => $professorNomeFiltro,
             'turma_id_filtro' => $turmaIdFiltro,
             'serie_id_filtro' => $serieIdFiltro,
             'ordenar_filtro' => $ordenarFiltro,
@@ -2089,8 +2109,10 @@ class TeacherExamController extends BaseController
         $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
         $filtros = $this->filtrosLancamentoNotasCoordenacao($_POST);
         $materiaIdFiltro = $notaUnicaTodasMaterias ? 0 : $filtros['materia_id'];
+        $professorIdFiltro = $notaUnicaTodasMaterias ? 0 : (int) ($filtros['professor_id'] ?? 0);
         $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, [
             'materia_id' => $materiaIdFiltro,
+            'professor_id' => $professorIdFiltro,
             'turma_id' => $filtros['turma_id'],
             'serie_id' => $filtros['serie_id'],
             'ordenar' => $filtros['ordenar'],
@@ -2098,6 +2120,11 @@ class TeacherExamController extends BaseController
             'por_pagina' => $filtros['por_pagina'],
         ]);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
+        if ($professorIdFiltro > 0) {
+            $combos = array_values(array_filter($combos, static function (array $combo) use ($professorIdFiltro): bool {
+                return (int) ($combo['professor_id'] ?? 0) === $professorIdFiltro;
+            }));
+        }
 
         require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
         $notasModel = new ExamBlockManualGrade();
@@ -2935,11 +2962,12 @@ class TeacherExamController extends BaseController
 
     /**
      * @param array<string, mixed> $origem
-     * @return array{materia_id:int,turma_id:int,serie_id:int,ordenar:string}
+     * @return array{materia_id:int,professor_id:int,turma_id:int,serie_id:int,ordenar:string,pagina:int,por_pagina:int}
      */
     private function filtrosLancamentoNotasCoordenacao(array $origem): array
     {
         $materiaId = (int) ($origem['materia_id'] ?? $origem['materia_id_filtro'] ?? 0);
+        $professorId = (int) ($origem['professor_id'] ?? $origem['professor_id_filtro'] ?? 0);
         $turmaId = (int) ($origem['turma_id'] ?? $origem['turma_id_filtro'] ?? 0);
         $serieId = (int) ($origem['serie_id'] ?? $origem['serie_id_filtro'] ?? 0);
         $ordenar = (string) ($origem['ordenar'] ?? $origem['ordenar_filtro'] ?? 'nome');
@@ -2954,6 +2982,7 @@ class TeacherExamController extends BaseController
         }
         return [
             'materia_id' => max(0, $materiaId),
+            'professor_id' => max(0, $professorId),
             'turma_id' => max(0, $turmaId),
             'serie_id' => max(0, $serieId),
             'ordenar' => $ordenar,
@@ -2963,12 +2992,13 @@ class TeacherExamController extends BaseController
     }
 
     /**
-     * @param array{materia_id?:int,turma_id?:int,serie_id?:int,ordenar?:string,pagina?:int,por_pagina?:int} $filtros
+     * @param array{materia_id?:int,professor_id?:int,turma_id?:int,serie_id?:int,ordenar?:string,pagina?:int,por_pagina?:int} $filtros
      */
     private function urlLancamentoNotasCoordenacao(int $blocoId, array $filtros = []): string
     {
         $qs = http_build_query(array_filter([
             'materia_id' => !empty($filtros['materia_id']) ? (int) $filtros['materia_id'] : null,
+            'professor_id' => !empty($filtros['professor_id']) ? (int) $filtros['professor_id'] : null,
             'turma_id' => !empty($filtros['turma_id']) ? (int) $filtros['turma_id'] : null,
             'serie_id' => !empty($filtros['serie_id']) ? (int) $filtros['serie_id'] : null,
             'ordenar' => (($filtros['ordenar'] ?? 'nome') !== 'nome') ? (string) $filtros['ordenar'] : null,
