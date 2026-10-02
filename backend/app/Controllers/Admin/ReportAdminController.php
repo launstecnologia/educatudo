@@ -940,7 +940,25 @@ class ReportAdminController extends AdminBaseController
 
     private function listarEventosBoletimCoordenacao(bool $incluirAntigas = false): array
     {
+        $selExtras = '';
+        $groupExtras = '';
+        try {
+            $colExtras = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'extras_json'");
+            if (is_array($colExtras) && $colExtras !== []) {
+                $selExtras = 'r.extras_json,';
+                $groupExtras = ', r.extras_json';
+            }
+            $colVis = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'vis_coordenacao'");
+            if (is_array($colVis) && $colVis !== []) {
+                $selExtras .= 'r.vis_coordenacao,';
+                $groupExtras .= ', r.vis_coordenacao';
+            }
+        } catch (\Throwable $eExtras) {
+            $selExtras = '';
+            $groupExtras = '';
+        }
         $sqlBase = "SELECT g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em,
+                    {$selExtras}
                     COUNT(DISTINCT g.aluno_id) AS total_alunos,
                     GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome ASC SEPARATOR ', ') AS turmas_nomes,
                     MAX(g.updated_at) AS updated_at,
@@ -952,7 +970,7 @@ class ReportAdminController extends AdminBaseController
              LEFT JOIN turmas t ON t.id = a.turma_id
              WHERE g.preview = 0 AND r.ativo = 1
                AND r.exibir_em IN ('boletim', 'notas') AND a.ativo = 1
-             GROUP BY g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em
+             GROUP BY g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em{$groupExtras}
              ORDER BY COALESCE(r.ano_letivo, 0) DESC, COALESCE(r.bimestre, 0) ASC, updated_at DESC, r.nome ASC";
         $eventos = [];
         try {
@@ -1020,6 +1038,9 @@ class ReportAdminController extends AdminBaseController
 
         $saida = [];
         foreach ($eventos as $evento) {
+            if ($this->eventoOcultoNaListaAvaliacoes($evento) || $this->eventoBloqueadoNaExibicao($evento)) {
+                continue;
+            }
             $rid = (int) ($evento['regra_id'] ?? 0);
             $periodoRef = trim((string) ($evento['periodo_ref'] ?? ''));
             $principal = $principalPorRegra[$rid] ?? null;
@@ -1102,6 +1123,33 @@ class ReportAdminController extends AdminBaseController
             return strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
         });
         return $saida;
+    }
+
+    /**
+     * Evento desabilitado na lista de Avaliações também sai de Notas da Coordenação.
+     *
+     * @param array<string,mixed> $evento
+     */
+    private function eventoOcultoNaListaAvaliacoes(array $evento): bool
+    {
+        $raw = $evento['extras_json'] ?? '';
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        return is_array($decoded) && !empty($decoded['oculto_lista_avaliacoes']);
+    }
+
+    /**
+     * Bloquear exibição (vis_coordenacao = 0) tira o evento de Notas da Coordenação.
+     *
+     * @param array<string,mixed> $evento
+     */
+    private function eventoBloqueadoNaExibicao(array $evento): bool
+    {
+        if (!array_key_exists('vis_coordenacao', $evento)) {
+            return false;
+        }
+
+        return (int) $evento['vis_coordenacao'] === 0;
     }
 
     /**

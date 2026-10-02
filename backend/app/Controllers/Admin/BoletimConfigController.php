@@ -1793,8 +1793,8 @@ class BoletimConfigController extends BaseController
         ]);
         if ($ok) {
             $_SESSION['boletim_flash'] = $oculto
-                ? 'Evento desabilitado. Ele saiu desta lista. As notas já geradas continuam no aluno.'
-                : 'Evento habilitado de novo nesta lista.';
+                ? 'Evento desabilitado. Ele saiu desta lista e de Notas da Coordenação. As notas já geradas continuam no aluno.'
+                : 'Evento habilitado de novo nesta lista e em Notas da Coordenação.';
             $_SESSION['boletim_flash_type'] = 'success';
         } else {
             $_SESSION['boletim_flash'] = 'Não foi possível alterar o evento.';
@@ -1832,7 +1832,7 @@ class BoletimConfigController extends BaseController
             $ok = $this->boletimConfig->atualizarVisibilidadeCoordenacao($regraId, $bloquear ? 0 : 1);
             if ($ok) {
                 $_SESSION['boletim_flash'] = $bloquear
-                    ? 'Evento bloqueado. Continua nesta lista e deixa de aparecer na ficha do aluno, no boletim e na sincronização.'
+                    ? 'Evento bloqueado. Continua nesta lista e deixa de aparecer na ficha do aluno, no boletim, em Notas da Coordenação e na sincronização.'
                     : 'Exibição do evento liberada de novo.';
                 $_SESSION['boletim_flash_type'] = 'success';
             } else {

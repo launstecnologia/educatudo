@@ -469,7 +469,7 @@ function excluirEventoBoletim(id) {
 
 function bloquearExibicaoEventoBoletim(id, bloquear) {
     const acao = Number(bloquear) === 1
-        ? 'Bloquear a exibição deste evento? Ele continua nesta lista, mas deixa de aparecer na ficha do aluno, no boletim e na sincronização.'
+        ? 'Bloquear a exibição deste evento? Ele continua nesta lista, mas deixa de aparecer na ficha do aluno, no boletim, em Notas da Coordenação e na sincronização.'
         : 'Liberar a exibição deste evento de novo na ficha do aluno e no boletim?';
     if (!confirm(acao)) {
         return;
@@ -481,8 +481,8 @@ function bloquearExibicaoEventoBoletim(id, bloquear) {
 
 function desabilitarEventoLista(id, oculto) {
     const acao = Number(oculto) === 1
-        ? 'Desabilitar este evento? Ele sai desta lista de avaliações. As notas já geradas continuam no aluno.'
-        : 'Habilitar este evento de novo nesta lista?';
+        ? 'Desabilitar este evento? Ele sai desta lista de avaliações e de Notas da Coordenação. As notas já geradas continuam no aluno.'
+        : 'Habilitar este evento de novo nesta lista e em Notas da Coordenação?';
     if (!confirm(acao)) {
         return;
     }
