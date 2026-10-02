@@ -37,6 +37,11 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
             </a>
             <?php endif; ?>
             <?php if ($modoLancamentoNota): ?>
+            <button type="button" onclick="openDetalhesEventoDrawer()"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                Detalhes
+            </button>
             <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/exportar-notas-excel"
                class="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
                 <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
@@ -135,117 +140,146 @@ $tipoTxt = trim((string) ($desc['tipo_nota'] ?? ''));
 $periodoTxt = trim((string) ($desc['periodo_texto'] ?? ''));
 $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
 ?>
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
-    <div class="flex items-start gap-3 mb-4">
-        <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 shrink-0">
-            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-        </span>
-        <div>
-            <h3 class="text-lg font-semibold text-gray-900">Detalhes do evento</h3>
-            <p class="text-sm text-gray-600 mt-0.5">Resumo completo do lançamento: período, tipo de nota, destino no quadro e turmas.</p>
-        </div>
-    </div>
-    <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Ano letivo</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= $anoTxt > 0 ? (int) $anoTxt : '—' ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Período / bimestre</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= $periodoTxt !== '' ? htmlspecialchars($periodoTxt) : '—' ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo de nota</dt>
-            <dd class="mt-1 font-semibold text-gray-900">
-                <?= $tipoTxt !== '' ? htmlspecialchars($tipoTxt) : '—' ?>
-                <?php if (!empty($desc['tipo_chave'])): ?>
-                    <span class="ml-1 text-xs font-normal text-gray-500">(<?= htmlspecialchars((string) $desc['tipo_chave']) ?>)</span>
-                <?php endif; ?>
-            </dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 sm:col-span-2 lg:col-span-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Destino no quadro (bloco / semana)</dt>
-            <dd class="mt-2 flex flex-wrap gap-1.5">
-                <?php if ($destinosQuadro === []): ?>
-                    <span class="text-gray-500">Sem vínculo de quadro (S1, Bloco A/B etc.).</span>
-                <?php else: ?>
-                    <?php foreach ($destinosQuadro as $destino): ?>
-                        <?php if (trim((string) ($destino['bloco'] ?? '')) !== ''): ?>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
-                        <?php endif; ?>
-                        <?php if (trim((string) ($destino['semana'] ?? '')) !== ''): ?>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Formato</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars((string) ($desc['formato'] ?? 'Lançamento de notas')) ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Quem lança a nota</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars((string) ($desc['quem_lanca'] ?? 'Professor')) ?> <span class="font-normal text-gray-600">(0 a 10)</span></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nota única para todas as matérias</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= !empty($desc['nota_unica']) ? 'Sim' : 'Não' ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars($statusTexto) ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Data / horário</dt>
-            <dd class="mt-1 font-semibold text-gray-900">
-                <?= $dataTxt !== '' ? htmlspecialchars($dataTxt) : '—' ?>
-                <?php if ($horarioTxt !== ''): ?>
-                    <span class="font-normal text-gray-600"> · <?= htmlspecialchars($horarioTxt) ?></span>
-                <?php endif; ?>
-            </dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Prazo do professor</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= $prazoTxt !== '' ? htmlspecialchars($prazoTxt) : '—' ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 sm:col-span-2">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Turmas</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars($turmasTxt) ?></dd>
-        </div>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 sm:col-span-2 lg:col-span-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Matérias deste evento</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars($materiasTxt) ?></dd>
-        </div>
-        <?php if (!empty($desc['criado_por'])): ?>
-        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Criado por</dt>
-            <dd class="mt-1 font-semibold text-gray-900"><?= htmlspecialchars((string) $desc['criado_por']) ?></dd>
-        </div>
-        <?php endif; ?>
-    </dl>
-</div>
 
 <?php if (isset($contagem)): ?>
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-gray-400">
-        <p class="text-sm text-gray-600">Professor sem notas lançadas</p>
-        <p class="text-3xl font-bold text-gray-900"><?= (int)($contagem['ln_nao_iniciado'] ?? 0) ?></p>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-gray-400 px-4 py-3">
+        <p class="text-xs text-gray-500">Sem notas lançadas</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_nao_iniciado'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-amber-500">
-        <p class="text-sm text-gray-600">Em andamento (parcial)</p>
-        <p class="text-3xl font-bold text-gray-900"><?= (int)($contagem['ln_em_andamento'] ?? 0) ?></p>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-amber-500 px-4 py-3">
+        <p class="text-xs text-gray-500">Em andamento</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_em_andamento'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-        <p class="text-sm text-gray-600">Concluído (todos os alunos)</p>
-        <p class="text-3xl font-bold text-gray-900"><?= (int)($contagem['ln_concluido'] ?? 0) ?></p>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-green-500 px-4 py-3">
+        <p class="text-xs text-gray-500">Concluído</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_concluido'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
-        <p class="text-sm text-gray-600">Notas abaixo de 6 (linhas)</p>
-        <p class="text-3xl font-bold text-gray-900"><?= (int)($contagem['ln_abaixo_seis'] ?? 0) ?></p>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-red-500 px-4 py-3">
+        <p class="text-xs text-gray-500">Notas abaixo de 6</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_abaixo_seis'] ?? 0) ?></p>
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Offcanvas detalhes do evento -->
+<div id="detalhesEventoBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeDetalhesEventoDrawer()"></div>
+<aside id="detalhesEventoDrawer"
+       class="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
+       aria-hidden="true">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Detalhes do evento</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Período, tipo de nota, destino no quadro e turmas</p>
+        </div>
+        <button type="button" onclick="closeDetalhesEventoDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto px-6 py-5">
+        <dl class="space-y-3 text-sm">
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Ano letivo</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= $anoTxt > 0 ? (int) $anoTxt : '—' ?></dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Período / bimestre</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= $periodoTxt !== '' ? htmlspecialchars($periodoTxt) : '—' ?></dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Tipo de nota</dt>
+                <dd class="font-medium text-gray-900 text-right">
+                    <?= $tipoTxt !== '' ? htmlspecialchars($tipoTxt) : '—' ?>
+                    <?php if (!empty($desc['tipo_chave'])): ?>
+                        <span class="text-xs font-normal text-gray-500">(<?= htmlspecialchars((string) $desc['tipo_chave']) ?>)</span>
+                    <?php endif; ?>
+                </dd>
+            </div>
+            <div class="py-2 border-b border-gray-100">
+                <dt class="text-gray-500 mb-1.5">Destino no quadro</dt>
+                <dd class="flex flex-wrap gap-1.5">
+                    <?php if ($destinosQuadro === []): ?>
+                        <span class="text-gray-600">Sem vínculo de quadro</span>
+                    <?php else: ?>
+                        <?php foreach ($destinosQuadro as $destino): ?>
+                            <?php if (trim((string) ($destino['bloco'] ?? '')) !== ''): ?>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
+                            <?php endif; ?>
+                            <?php if (trim((string) ($destino['semana'] ?? '')) !== ''): ?>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Formato</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= htmlspecialchars((string) ($desc['formato'] ?? 'Lançamento de notas')) ?></dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Quem lança</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= htmlspecialchars((string) ($desc['quem_lanca'] ?? 'Professor')) ?> <span class="font-normal text-gray-500">(0 a 10)</span></dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Nota única (todas matérias)</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= !empty($desc['nota_unica']) ? 'Sim' : 'Não' ?></dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Status</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= htmlspecialchars($statusTexto) ?></dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Data / horário</dt>
+                <dd class="font-medium text-gray-900 text-right">
+                    <?= $dataTxt !== '' ? htmlspecialchars($dataTxt) : '—' ?>
+                    <?php if ($horarioTxt !== ''): ?>
+                        <span class="font-normal text-gray-600"> · <?= htmlspecialchars($horarioTxt) ?></span>
+                    <?php endif; ?>
+                </dd>
+            </div>
+            <div class="flex justify-between gap-4 py-2 border-b border-gray-100">
+                <dt class="text-gray-500 shrink-0">Prazo do professor</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= $prazoTxt !== '' ? htmlspecialchars($prazoTxt) : '—' ?></dd>
+            </div>
+            <div class="py-2 border-b border-gray-100">
+                <dt class="text-gray-500 mb-1">Turmas</dt>
+                <dd class="font-medium text-gray-900"><?= htmlspecialchars($turmasTxt) ?></dd>
+            </div>
+            <div class="py-2 border-b border-gray-100">
+                <dt class="text-gray-500 mb-1">Matérias</dt>
+                <dd class="font-medium text-gray-900"><?= htmlspecialchars($materiasTxt) ?></dd>
+            </div>
+            <?php if (!empty($desc['criado_por'])): ?>
+            <div class="flex justify-between gap-4 py-2">
+                <dt class="text-gray-500 shrink-0">Criado por</dt>
+                <dd class="font-medium text-gray-900 text-right"><?= htmlspecialchars((string) $desc['criado_por']) ?></dd>
+            </div>
+            <?php endif; ?>
+        </dl>
+    </div>
+</aside>
+
+<script>
+window.openDetalhesEventoDrawer = function () {
+    document.getElementById('detalhesEventoBackdrop').classList.remove('hidden');
+    var d = document.getElementById('detalhesEventoDrawer');
+    d.classList.remove('translate-x-full');
+    d.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+};
+window.closeDetalhesEventoDrawer = function () {
+    document.getElementById('detalhesEventoBackdrop').classList.add('hidden');
+    var d = document.getElementById('detalhesEventoDrawer');
+    d.classList.add('translate-x-full');
+    d.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+};
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeDetalhesEventoDrawer();
+    }
+});
+</script>
 
 <?php if ($notaUnicaTodasMaterias): ?>
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-violet-500">
@@ -354,86 +388,32 @@ $statusMapLancamento = [
 
 <?php else: ?>
 
-<!-- Cards de Indicador (padrão: borda esquerda, label, valor, ícone circular) -->
+<!-- Cards de indicador compactos -->
 <?php if (isset($contagem)): ?>
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Em Andamento</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $contagem['em_andamento'] ?? 0 ?></p>
-            </div>
-            <div class="bg-blue-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-        </div>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-blue-500 px-3 py-2.5">
+        <p class="text-xs text-gray-500">Em andamento</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['em_andamento'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-yellow-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Enviadas</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $contagem['enviada'] ?? 0 ?></p>
-            </div>
-            <div class="bg-yellow-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-            </div>
-        </div>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-yellow-500 px-3 py-2.5">
+        <p class="text-xs text-gray-500">Enviadas</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['enviada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Não Enviadas</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $contagem['nao_enviada'] ?? 0 ?></p>
-            </div>
-            <div class="bg-red-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-            </div>
-        </div>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-red-500 px-3 py-2.5">
+        <p class="text-xs text-gray-500">Não enviadas</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['nao_enviada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Aprovadas</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $contagem['aprovada'] ?? 0 ?></p>
-            </div>
-            <div class="bg-green-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-            </div>
-        </div>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-green-500 px-3 py-2.5">
+        <p class="text-xs text-gray-500">Aprovadas</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['aprovada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-amber-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Retornado Professor</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $contagem['retornada'] ?? 0 ?></p>
-            </div>
-            <div class="bg-amber-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
-                </svg>
-            </div>
-        </div>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-amber-500 px-3 py-2.5">
+        <p class="text-xs text-gray-500">Retornado professor</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['retornada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Provas Excluídas</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $contagem['reprovada'] ?? 0 ?></p>
-            </div>
-            <div class="bg-orange-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                </svg>
-            </div>
-        </div>
+    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-orange-500 px-3 py-2.5">
+        <p class="text-xs text-gray-500">Provas excluídas</p>
+        <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['reprovada'] ?? 0) ?></p>
     </div>
 </div>
 <?php endif; ?>
@@ -535,20 +515,17 @@ $statusLabelsOnline = [
                     && !empty($prova['prova_id']);
                 ?>
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                    <td class="px-6 py-3 text-sm font-medium text-gray-900">
                         <?= htmlspecialchars((string) ($prova['professor_nome'] ?? '')) ?>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-800">
+                    <td class="px-6 py-3 text-sm text-gray-800">
                         <?= htmlspecialchars((string) ($prova['materia_nome'] ?? '')) ?>
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-3">
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="px-2 py-1 text-xs font-semibold rounded-full <?= $statusClass ?>">
                                 <?= htmlspecialchars($statusLabel) ?>
                             </span>
-                            <?php if (!empty($prova['travada'])): ?>
-                                <span class="text-red-600" title="Travada"><i class="fa-solid fa-lock text-xs" aria-hidden="true"></i></span>
-                            <?php endif; ?>
                         </div>
                         <?php if (($prova['status'] ?? '') === 'retornada' && !empty($prova['observacao_coordenacao'])): ?>
                         <div class="text-xs text-amber-700 mt-1 max-w-md" title="<?= htmlspecialchars((string) $prova['observacao_coordenacao']) ?>">
@@ -556,13 +533,13 @@ $statusLabelsOnline = [
                         </div>
                         <?php endif; ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
                         <?= !empty($prova['data_envio']) ? date('d/m/Y H:i', strtotime((string) $prova['data_envio'])) : '—' ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-600">
                         <?= (int) ($prova['numero_questoes'] ?? 0) ?>
                     </td>
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-3 text-right">
                         <div class="inline-flex flex-wrap justify-end gap-2">
                             <?php if (!empty($prova['prova_id'])): ?>
                                 <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
