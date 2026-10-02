@@ -269,9 +269,11 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                         </th>
                         <?php
                     };
+                    $thOrdenavel('ref', 'Ref');
                     ?>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modelo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Liberado</th>
                     <?php $thOrdenavel('serie', 'Série'); ?>
                     <?php $thOrdenavel('bimestre', 'Bimestre'); ?>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano letivo</th>
@@ -281,7 +283,7 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($eventos)): ?>
                 <tr>
-                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-file-lines text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum evento de notas cadastrado</p>
                         <p class="text-sm mt-1">Cadastre o modelo em Acadêmico → Modelo de Boletim e depois crie a avaliação do bimestre.</p>
@@ -305,6 +307,7 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                 $exibicaoBloqueada = (int) ($evento['vis_coordenacao'] ?? 1) !== 1;
                 ?>
                 <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $eventoId > 0 ? $eventoId : '—' ?></td>
                     <td class="px-6 py-4">
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($evento['nome'] ?? '')) ?></div>
                         <?php if ($nomeBol !== ''): ?>
@@ -328,19 +331,16 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $ehExtra ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' ?>">
                                 <?= $ehExtra ? 'Modelo Extra' : 'Modelo Oficial' ?>
                             </span>
-                            <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full <?= $liberadoAlunoPais ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>">
-                                <?= $liberadoAlunoPais ? 'Aluno/pais liberado' : 'Aluno/pais oculto' ?>
-                            </span>
                             <?php if ($exibicaoBloqueada): ?>
                             <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800">Exibição bloqueada</span>
                             <?php endif; ?>
-                            <?php if (!empty($evento['boletim_desatualizado'])): ?>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300"
-                                  title="A configuração foi alterada depois da última geração em massa. Os boletins já visíveis para alunos/pais podem estar com a regra antiga.">
-                                <i class="fa-solid fa-triangle-exclamation"></i> Desatualizado
-                            </span>
-                            <?php endif; ?>
                         </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $liberadoAlunoPais ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600' ?>"
+                              title="<?= $liberadoAlunoPais ? 'Visível para aluno e pais' : 'Oculto para aluno e pais' ?>">
+                            <?= $liberadoAlunoPais ? 'Sim' : 'Não' ?>
+                        </span>
                     </td>
                     <td class="px-6 py-4">
                         <?php $seriesNomes = $evento['series_nomes'] ?? []; ?>
