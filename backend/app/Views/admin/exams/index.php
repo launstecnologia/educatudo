@@ -105,7 +105,6 @@ $cardsStats = [
         'desc' => 'Todos os eventos',
         'icon' => 'fa-file-lines',
         'tone' => 'bg-[#EAF3FF] text-[#1769C2]',
-        'cardBg' => 'bg-[#EAF3FF]/50',
     ],
     [
         'label' => 'Aguardando',
@@ -113,15 +112,6 @@ $cardsStats = [
         'desc' => 'Em lançamento ou revisão',
         'icon' => 'fa-clock',
         'tone' => 'bg-[#FFF5D9] text-[#B76A00]',
-        'cardBg' => 'bg-[#FFF5D9]/60',
-    ],
-    [
-        'label' => 'Aprovado',
-        'valor' => (int) ($stats['blocos_aprovados'] ?? 0),
-        'desc' => 'Eventos finalizados',
-        'icon' => 'fa-circle-check',
-        'tone' => 'bg-[#E8F8EF] text-[#16834A]',
-        'cardBg' => 'bg-[#E8F8EF]/60',
     ],
     [
         'label' => 'Liberado',
@@ -129,37 +119,34 @@ $cardsStats = [
         'desc' => 'Disponível para visualização',
         'icon' => 'fa-lock-open',
         'tone' => 'bg-[#F3EAFE] text-[#7541C8]',
-        'cardBg' => 'bg-[#F3EAFE]/60',
     ],
     [
         'label' => 'Concluído',
         'valor' => (int) ($stats['blocos_concluidos'] ?? 0),
         'desc' => 'Notas lançadas e encerradas',
         'icon' => 'fa-flag-checkered',
-        'tone' => 'bg-slate-100 text-slate-700',
-        'cardBg' => 'bg-slate-50',
+        'tone' => 'bg-slate-100 text-slate-600',
     ],
     [
         'label' => 'Provas Pendentes',
         'valor' => count($provas_pendentes ?? []),
         'desc' => 'Aguardando agrupamento',
-        'icon' => 'fa-triangle-exclamation',
+        'icon' => 'fa-clock',
         'tone' => 'bg-[#FDECEC] text-[#C93636]',
-        'cardBg' => 'bg-[#FDECEC]/60',
     ],
 ];
 ?>
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-5">
     <?php foreach ($cardsStats as $card): ?>
-    <div class="<?= $card['cardBg'] ?> rounded-xl border border-[#E5EAF1] px-3.5 py-3">
-        <div class="flex items-start gap-2.5">
-            <div class="w-8 h-8 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
-                <i class="fa-solid <?= $card['icon'] ?> text-sm" aria-hidden="true"></i>
+    <div class="bg-white rounded-xl border border-[#E5EAF1] shadow-sm px-4 py-3.5">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full <?= $card['tone'] ?> flex items-center justify-center shrink-0">
+                <i class="fa-solid <?= $card['icon'] ?>" aria-hidden="true"></i>
             </div>
             <div class="min-w-0">
                 <p class="text-xs text-[#667085] truncate"><?= htmlspecialchars($card['label']) ?></p>
-                <p class="text-2xl font-bold text-[#172033] leading-tight mt-0.5"><?= $card['valor'] ?></p>
-                <p class="text-[11px] text-[#667085] mt-0.5 truncate"><?= htmlspecialchars($card['desc']) ?></p>
+                <p class="text-2xl font-bold text-[#172033] leading-none mt-1"><?= $card['valor'] ?></p>
+                <p class="text-[11px] text-[#667085] mt-1 truncate"><?= htmlspecialchars($card['desc']) ?></p>
             </div>
         </div>
     </div>
@@ -169,13 +156,11 @@ $cardsStats = [
 
 <!-- Provas Pendentes Alert -->
 <?php if (!empty($provas_pendentes)): ?>
-<div class="bg-[#FFF5D9] border border-[#F5D98A] border-l-4 border-l-[#B76A00] p-3.5 mb-5 rounded-xl flex items-start gap-3">
-    <div class="w-8 h-8 rounded-lg bg-[#FFF0C2] text-[#B76A00] flex items-center justify-center shrink-0">
-        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-    </div>
-    <p class="text-sm text-[#8A5200] pt-1.5">
+<div class="bg-white border border-[#E5EAF1] shadow-sm rounded-xl px-4 py-3 mb-5 flex items-center gap-3">
+    <i class="fa-solid fa-triangle-exclamation text-[#172033] shrink-0" aria-hidden="true"></i>
+    <p class="text-sm text-[#172033]">
         <strong><?= count($provas_pendentes) ?> prova(s) pendente(s)</strong> aguardando agrupamento em blocos.
-        <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>" class="font-semibold underline ml-1 text-[#B76A00] hover:text-[#8A5200]">Criar novo bloco</a>
+        <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>" class="font-semibold underline ml-1 hover:opacity-80">Criar novo bloco</a>
     </p>
 </div>
 <?php endif; ?>
