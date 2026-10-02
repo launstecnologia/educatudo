@@ -43,29 +43,28 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                 Detalhes
             </button>
             <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/exportar-notas-excel"
-               class="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
                 Exportar Excel
             </a>
             <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/resultados"
-               class="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
                 Relatório de notas
             </a>
             <?php else: ?>
             <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/resultados-novos"
-               class="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+               class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg hover:opacity-90">
                 <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
                 Resultados
             </a>
             <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/canceladas"
-               class="inline-flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 <?= !empty($total_canceladas) ? 'ring-2 ring-amber-300' : '' ?>">
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 <?= !empty($total_canceladas) ? 'ring-2 ring-gray-300' : '' ?>">
                 <i class="fa-solid fa-ban" aria-hidden="true"></i>
                 Cancelados<?= !empty($total_canceladas) ? ' (' . (int)$total_canceladas . ')' : '' ?>
             </a>
             <?php if (!empty($bloco['gabarito_liberado'])): ?>
-            <span class="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 px-4 py-2 rounded-lg font-medium">
-                <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+            <span class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm font-medium">
                 Gabarito liberado
             </span>
             <?php else: ?>
@@ -73,8 +72,7 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                   onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
                 <input type="hidden" name="origem" value="gerenciar">
-                <button type="submit" class="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700">
-                    <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                     Liberar gabarito
                 </button>
             </form>
@@ -82,20 +80,20 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
             <?php endif; ?>
             <?php if (!$modoLancamentoNota): ?>
             <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/visualizar-completo"
-               class="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                 Prova Completa
             </a>
             <?php endif; ?>
             <?php if (!$modoLancamentoNota && isset($mostrarBotaoAprovacaoFinal) && $mostrarBotaoAprovacaoFinal): ?>
-            <button onclick="aprovarBlocoFinal(<?= $bloco['id'] ?>)" 
-                    class="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+            <button onclick="aprovarBlocoFinal(<?= $bloco['id'] ?>)"
+                    class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg hover:opacity-90">
                 <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                 Aprovação Final
             </button>
             <?php endif; ?>
             <a href="<?= URL ?>/admin/provas"
-               class="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 ← Voltar
             </a>
         </div>
@@ -143,19 +141,19 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
 
 <?php if (isset($contagem)): ?>
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-gray-400 px-4 py-3">
+    <div class="bg-white rounded-lg border border-gray-200 px-4 py-3">
         <p class="text-xs text-gray-500">Sem notas lançadas</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_nao_iniciado'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-amber-500 px-4 py-3">
+    <div class="bg-white rounded-lg border border-gray-200 px-4 py-3">
         <p class="text-xs text-gray-500">Em andamento</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_em_andamento'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-green-500 px-4 py-3">
+    <div class="bg-white rounded-lg border border-gray-200 px-4 py-3">
         <p class="text-xs text-gray-500">Concluído</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_concluido'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-red-500 px-4 py-3">
+    <div class="bg-white rounded-lg border border-gray-200 px-4 py-3">
         <p class="text-xs text-gray-500">Notas abaixo de 6</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int)($contagem['ln_abaixo_seis'] ?? 0) ?></p>
     </div>
@@ -203,10 +201,10 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
                     <?php else: ?>
                         <?php foreach ($destinosQuadro as $destino): ?>
                             <?php if (trim((string) ($destino['bloco'] ?? '')) !== ''): ?>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
                             <?php endif; ?>
                             <?php if (trim((string) ($destino['semana'] ?? '')) !== ''): ?>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
                             <?php endif; ?>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -282,7 +280,7 @@ document.addEventListener('keydown', function (e) {
 </script>
 
 <?php if ($notaUnicaTodasMaterias): ?>
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border-l-4 border-violet-500">
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
     <h3 class="text-lg font-semibold text-gray-900">Nota única para todas as matérias</h3>
     <p class="text-sm text-gray-600 mt-2">Neste evento, a coordenação lança uma única nota por aluno e o sistema replica automaticamente para todas as matérias.</p>
     <div class="mt-4">
@@ -309,10 +307,10 @@ usort($linhasLancamento, static function (array $a, array $b): int {
     return strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
 });
 $statusMapLancamento = [
-    'nao_iniciado' => ['bg-red-100 text-red-800', 'Não iniciou'],
-    'em_andamento' => ['bg-amber-100 text-amber-800', 'Em andamento'],
-    'concluido' => ['bg-green-100 text-green-800', 'Concluído'],
-    'sem_alunos' => ['bg-gray-100 text-gray-700', 'Sem alunos nas turmas'],
+    'nao_iniciado' => ['bg-gray-100 text-gray-700', 'Não iniciou'],
+    'em_andamento' => ['bg-slate-100 text-slate-800', 'Em andamento'],
+    'concluido' => ['bg-gray-800 text-white', 'Concluído'],
+    'sem_alunos' => ['bg-gray-50 text-gray-500', 'Sem alunos nas turmas'],
 ];
 ?>
 <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
@@ -325,7 +323,7 @@ $statusMapLancamento = [
         </p>
     </div>
     <?php if ($linhasLancamento === []): ?>
-    <div class="px-6 py-8 text-amber-900 bg-amber-50 border-t border-amber-100">
+    <div class="px-6 py-8 text-gray-600 bg-gray-50 border-t border-gray-100">
         Nenhum professor/matéria vinculado a este evento. Edite o bloco e adicione professores com turmas.
     </div>
     <?php else: ?>
@@ -391,59 +389,32 @@ $statusMapLancamento = [
 <!-- Cards de indicador compactos -->
 <?php if (isset($contagem)): ?>
 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-blue-500 px-3 py-2.5">
+    <div class="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
         <p class="text-xs text-gray-500">Em andamento</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['em_andamento'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-yellow-500 px-3 py-2.5">
+    <div class="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
         <p class="text-xs text-gray-500">Enviadas</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['enviada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-red-500 px-3 py-2.5">
+    <div class="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
         <p class="text-xs text-gray-500">Não enviadas</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['nao_enviada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-green-500 px-3 py-2.5">
+    <div class="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
         <p class="text-xs text-gray-500">Aprovadas</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['aprovada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-amber-500 px-3 py-2.5">
+    <div class="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
         <p class="text-xs text-gray-500">Retornado professor</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['retornada'] ?? 0) ?></p>
     </div>
-    <div class="bg-white rounded-lg border border-gray-200 border-l-4 border-l-orange-500 px-3 py-2.5">
+    <div class="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
         <p class="text-xs text-gray-500">Provas excluídas</p>
         <p class="text-xl font-bold text-gray-900 mt-0.5"><?= (int) ($contagem['reprovada'] ?? 0) ?></p>
     </div>
 </div>
 <?php endif; ?>
-
-<!-- Filtros -->
-<?php $statusFiltro = $status_filtro ?? $_GET['status'] ?? ''; ?>
-<div class="bg-white rounded-xl shadow-lg p-4 mb-6">
-    <div class="flex flex-wrap gap-2">
-        <a href="?" 
-           class="px-4 py-2 <?= $statusFiltro === '' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?> rounded-lg transition-colors">
-            Todas
-        </a>
-        <a href="?status=enviada" 
-           class="px-4 py-2 <?= $statusFiltro === 'enviada' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-600 hover:text-white' ?> rounded-lg transition-colors">
-            Enviadas
-        </a>
-        <a href="?status=nao_enviada" 
-           class="px-4 py-2 <?= $statusFiltro === 'nao_enviada' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-red-600 hover:text-white' ?> rounded-lg transition-colors">
-            Não Enviadas
-        </a>
-        <a href="?status=retornada" 
-           class="px-4 py-2 <?= $statusFiltro === 'retornada' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-600 hover:text-white' ?> rounded-lg transition-colors">
-            Retornado Professor
-        </a>
-        <a href="?status=excluido" 
-           class="px-4 py-2 <?= $statusFiltro === 'excluido' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-orange-600 hover:text-white' ?> rounded-lg transition-colors">
-            Excluído
-        </a>
-    </div>
-</div>
 
 <!-- Provas: tabela unificada (Professor × Matéria) -->
 <?php
@@ -464,14 +435,14 @@ usort($linhasProvasOnline, static function (array $a, array $b): int {
     return strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
 });
 $statusClassesOnline = [
-    'nao_avaliada' => 'bg-yellow-100 text-yellow-800',
-    'aprovado' => 'bg-green-100 text-green-800',
-    'em_andamento' => 'bg-blue-100 text-blue-800',
-    'concluido' => 'bg-purple-100 text-purple-800',
-    'reprovada' => 'bg-orange-100 text-orange-800',
-    'nao_enviada' => 'bg-red-100 text-red-800',
-    'retornada' => 'bg-amber-100 text-amber-800',
-    'pendente' => 'bg-amber-100 text-amber-800',
+    'nao_avaliada' => 'bg-slate-100 text-slate-700',
+    'aprovado' => 'bg-gray-800 text-white',
+    'em_andamento' => 'bg-slate-100 text-slate-800',
+    'concluido' => 'bg-slate-100 text-slate-800',
+    'reprovada' => 'bg-gray-100 text-gray-600',
+    'nao_enviada' => 'bg-gray-100 text-gray-600',
+    'retornada' => 'bg-slate-100 text-slate-700',
+    'pendente' => 'bg-gray-100 text-gray-600',
 ];
 $statusLabelsOnline = [
     'nao_avaliada' => 'Enviada',
@@ -483,6 +454,7 @@ $statusLabelsOnline = [
     'retornada' => 'Retornada ao professor',
     'pendente' => 'Aguardando envio',
 ];
+$btnSecundario = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
 ?>
 <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
     <div class="px-6 py-4 border-b border-gray-200">
@@ -528,7 +500,7 @@ $statusLabelsOnline = [
                             </span>
                         </div>
                         <?php if (($prova['status'] ?? '') === 'retornada' && !empty($prova['observacao_coordenacao'])): ?>
-                        <div class="text-xs text-amber-700 mt-1 max-w-md" title="<?= htmlspecialchars((string) $prova['observacao_coordenacao']) ?>">
+                        <div class="text-xs text-gray-600 mt-1 max-w-md" title="<?= htmlspecialchars((string) $prova['observacao_coordenacao']) ?>">
                             <?= htmlspecialchars(mb_substr((string) $prova['observacao_coordenacao'], 0, 60)) ?><?= mb_strlen((string) $prova['observacao_coordenacao']) > 60 ? '...' : '' ?>
                         </div>
                         <?php endif; ?>
@@ -543,14 +515,14 @@ $statusLabelsOnline = [
                         <div class="inline-flex flex-wrap justify-end gap-2">
                             <?php if (!empty($prova['prova_id'])): ?>
                                 <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
-                                   class="inline-flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700">
+                                   class="btn-primary-custom inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">
                                     <i class="fa-solid fa-eye" aria-hidden="true"></i>
                                     Ver prova
                                 </a>
                                 <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
                                 <button type="button"
                                         onclick="abrirModalTrocar(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>', <?= (int) $prova['prova_id'] ?>)"
-                                        class="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700">
+                                        class="<?= $btnSecundario ?>">
                                     <i class="fa-solid fa-right-left" aria-hidden="true"></i>
                                     Trocar
                                 </button>
@@ -559,12 +531,12 @@ $statusLabelsOnline = [
 
                             <?php if ($podeAprovarReprovar): ?>
                                 <button type="button" onclick="aprovarProva(<?= (int) $prova['prova_id'] ?>)"
-                                        class="inline-flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700">
+                                        class="<?= $btnSecundario ?>">
                                     <i class="fa-solid fa-check" aria-hidden="true"></i>
                                     Aprovar
                                 </button>
                                 <button type="button" onclick="reprovarProva(<?= (int) $prova['prova_id'] ?>)"
-                                        class="inline-flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700">
+                                        class="<?= $btnSecundario ?>">
                                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                                     Reprovar
                                 </button>
@@ -604,7 +576,7 @@ $statusLabelsOnline = [
                 <p class="text-gray-500">Carregando...</p>
             </div>
             <div id="modalVincularVazio" class="mt-4 hidden">
-                <p class="text-amber-700">Nenhuma prova disponível para vincular (provas do professor nesta matéria que ainda não estão em outro bloco).</p>
+                <p class="text-gray-600">Nenhuma prova disponível para vincular (provas do professor nesta matéria que ainda não estão em outro bloco).</p>
             </div>
             <div class="flex justify-end gap-2 mt-4">
                 <button type="button" onclick="fecharModalVincular()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
@@ -667,14 +639,14 @@ function abrirModalVincularOuTrocar(blocoId, professorId, materiaId, professorNo
                 html += '</div>';
                 html += '<div class="flex items-center gap-2 shrink-0">';
                 html += '<a href="' + urlVer + '" target="_blank" rel="noopener" class="px-3 py-1 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Visualizar</a>';
-                html += '<button type="button" onclick="' + btnOnclick + '" class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">' + btnLabel + '</button>';
+                html += '<button type="button" onclick="' + btnOnclick + '" class="btn-primary-custom px-3 py-1 text-sm rounded hover:opacity-90">' + btnLabel + '</button>';
                 html += '</div></li>';
             });
             html += '</ul>';
             lista.innerHTML = html;
         })
         .catch(function() {
-            document.getElementById('modalVincularLista').innerHTML = '<p class="text-red-600">Erro ao carregar provas.</p>';
+            document.getElementById('modalVincularLista').innerHTML = '<p class="text-gray-600">Erro ao carregar provas.</p>';
         });
 }
 
