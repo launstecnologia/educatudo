@@ -99,7 +99,7 @@ class BoletimAssistenteWizard
 
         $alunos = [];
         try {
-            $alunos = $this->ferramentas->listarAlunos(400);
+            $alunos = $this->ferramentas->listarAlunos(10000);
         } catch (Throwable $e) {
             error_log('BoletimAssistenteWizard catalogo alunos: ' . $e->getMessage());
         }

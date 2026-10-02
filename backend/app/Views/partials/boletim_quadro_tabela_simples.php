@@ -21,6 +21,7 @@ if ($tituloSimples === '') {
     $tituloSimples = 'Matérias';
 }
 $ocultarGrupo = !empty($ocultar_grupo_hierarquia);
+$edicaoSimples = is_array($edicaoSimulacao ?? null) ? $edicaoSimulacao : null;
 
 $colsVisiveis = [];
 foreach ($colsSimples as $col) {
@@ -112,9 +113,34 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                             $nv = $nv['texto'] ?? $nv['valor'] ?? null;
                         }
                         $isFaltas = BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
+                        $stCol = (string) ($oc['source_type'] ?? '');
+                        $isManualCol = $stCol === 'manual';
+                        $isPorMateriaCol = $edicaoSimples !== null
+                            && in_array($stCol, ['provas_sistema', 'jornadas', 'calculado'], true)
+                            && (int) ($linS['materia_id'] ?? 0) !== 0;
+                        $isCalcEditavel = $edicaoSimples !== null
+                            && (int) ($oc['id'] ?? 0) > 0
+                            && ($isManualCol || $isPorMateriaCol);
+                        $materiaIdEdicao = $isManualCol ? 0 : (int) ($linS['materia_id'] ?? 0);
+                        $colGlobal = !empty($oc['valor_global']);
+                        $mostrarIdem = $edicaoSimples !== null && is_numeric($nv) && $colGlobal && $iS > 1;
                     ?>
-                        <td class="border border-gray-300 px-1 py-1 <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?>">
-                            <?php if (is_numeric($nv)): ?>
+                        <td class="border border-gray-300 px-1 py-1 <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?><?= $isCalcEditavel ? ' boletim-cell-editavel cursor-pointer' : '' ?>"
+                            <?php if ($isCalcEditavel): ?>
+                            data-cell-editavel="1"
+                            data-componente-id="<?= (int) ($oc['id'] ?? 0) ?>"
+                            data-materia-id="<?= $materiaIdEdicao ?>"
+                            data-regra-id="<?= (int) ($edicaoSimples['regra_id'] ?? 0) ?>"
+                            data-aluno-id="<?= (int) ($edicaoSimples['aluno_id'] ?? 0) ?>"
+                            data-periodo-ref="<?= htmlspecialchars((string) ($edicaoSimples['periodo_ref'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                            data-escala-max="<?= htmlspecialchars(number_format((float) ($oc['escala_max'] ?? 10), 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>"
+                            title="<?= $isManualCol ? 'Clique para editar (vale para todas as matérias deste bloco)' : 'Clique para sobrescrever só essa matéria, só para este aluno' ?>"
+                            <?php endif; ?>
+                        >
+                            <span class="boletim-cell-valor">
+                            <?php if ($mostrarIdem): ?>
+                                <span class="text-xs font-medium text-slate-500" title="Nota única, igual em todas as matérias.">idem</span>
+                            <?php elseif (is_numeric($nv)): ?>
                                 <?= $isFaltas
                                     ? htmlspecialchars(number_format((float) round((float) $nv), 0, ',', '.'), ENT_QUOTES, 'UTF-8')
                                     : htmlspecialchars($fmtNotaSimples($nv), ENT_QUOTES, 'UTF-8') ?>
@@ -122,6 +148,10 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                                 <?= htmlspecialchars($nv, ENT_QUOTES, 'UTF-8') ?>
                             <?php else: ?>
                                 —
+                            <?php endif; ?>
+                            </span>
+                            <?php if ($isCalcEditavel): ?>
+                                <i class="fa-solid fa-pen text-[10px] text-indigo-400 ml-1 align-middle"></i>
                             <?php endif; ?>
                         </td>
                     <?php endforeach; ?>

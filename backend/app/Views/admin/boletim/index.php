@@ -446,104 +446,19 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     if (!class_exists('BoletimQuadroLayoutHelper', false)) {
                         require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
                     }
-                    $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial((string) $exibirEm)
-                        ? $buildGroupedBoletimHeader((array) $matrizColunas)
-                        : ['enabled' => false, 'groups' => []];
                     ?>
-                    <?php if (!empty($matrizLinhas) && !empty($matrizColunas)): ?>
-                        <?php
-                        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-                            require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
-                        }
-                        if (BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas)) {
-                            $cols = $matrizColunas;
-                            $linhas = $matrizLinhas;
-                            $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
-                                ? $simulacao['matriz_materias_boletim']['linhas']
-                                : $matrizLinhas;
-                            $decimalPlaces = $decimalPlacesSelected ?? 2;
-                            $simVistaId = 'sim-compacta';
-                            include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
-                        } else {
-                        ?>
-                        <div class="overflow-x-auto border border-gray-200 rounded-lg">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead class="bg-slate-50">
-                                    <?php if (!empty($groupedHeader['enabled'])): ?>
-                                        <tr>
-                                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-700 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 border-r border-gray-200" rowspan="2">Matérias</th>
-                                            <?php foreach ($groupedHeader['groups'] as $grp): ?>
-                                                <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 uppercase border-l border-gray-200" colspan="<?= (int) count((array) ($grp['cols'] ?? [])) ?>">
-                                                    <?= htmlspecialchars((string) ($grp['label'] ?? '')) ?>
-                                                </th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                        <tr>
-                                            <?php foreach ($groupedHeader['groups'] as $grp): ?>
-                                                <?php foreach ((array) ($grp['cols'] ?? []) as $mc): ?>
-                                                    <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 bg-amber-100/70 min-w-[5.5rem]" title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?> (<?= htmlspecialchars((string) ($mc['codigo'] ?? '')) ?>)">
-                                                        <span class="block truncate max-w-[7rem] mx-auto"><?= htmlspecialchars((string) ($mc['_sublabel'] ?? $mc['nome'] ?? $mc['codigo'] ?? '')) ?></span>
-                                                    </th>
-                                                <?php endforeach; ?>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php else: ?>
-                                        <tr>
-                                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-700 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 border-r border-gray-200">Matéria</th>
-                                            <?php foreach ($matrizColunas as $mc): ?>
-                                                <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 min-w-[5.5rem]" title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?> (<?= htmlspecialchars((string) ($mc['codigo'] ?? '')) ?>)">
-                                                    <span class="block truncate max-w-[7rem] mx-auto"><?= htmlspecialchars((string) ($mc['nome'] ?? $mc['codigo'] ?? '')) ?></span>
-                                                    <span class="block text-[10px] font-normal text-slate-400 normal-case">(<?= htmlspecialchars((string) ($mc['codigo'] ?? '')) ?>)</span>
-                                                </th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php endif; ?>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 bg-white">
-                                    <?php foreach ($matrizLinhas as $idxLin => $lin): ?>
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-3 py-2 font-medium text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-200"><?= htmlspecialchars((string) ($lin['materia_nome'] ?? '-')) ?></td>
-                                            <?php
-                                            $notasLin = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
-                                            $iterCols = $matrizColunas;
-                                            if (!empty($groupedHeader['enabled'])) {
-                                                $iterCols = [];
-                                                foreach ((array) ($groupedHeader['groups'] ?? []) as $g) {
-                                                    foreach ((array) ($g['cols'] ?? []) as $gc) {
-                                                        $iterCols[] = $gc;
-                                                    }
-                                                }
-                                            }
-                                            foreach ($iterCols as $mc):
-                                                $codM = (string) ($mc['codigo'] ?? '');
-                                                $nv = $notasLin[$codM] ?? null;
-                                                $colGlobal = !empty($mc['valor_global']);
-                                                // Colunas de faltas devem mostrar inteiros tanto em bimestre (source_type='faltas_evento')
-                                                // quanto na linha FINAL (calculado/evento_boletim com layout_type='faltas').
-                                                $isFaltasCol = ((string) ($mc['source_type'] ?? '')) === 'faltas_evento'
-                                                    || strtolower((string) ($mc['layout_type'] ?? '')) === 'faltas';
-                                            ?>
-                                                <td class="px-3 py-2 text-center <?= is_numeric($nv) ? 'text-emerald-700 font-semibold' : (is_string($nv) && trim($nv) !== '' ? 'text-slate-700 font-medium' : 'text-gray-400') ?>">
-                                                    <?php if (is_numeric($nv) && $colGlobal && $idxLin > 0): ?>
-                                                        <span class="text-xs font-medium text-slate-500">idem</span>
-                                                    <?php elseif (is_numeric($nv)): ?>
-                                                        <?= $isFaltasCol ? number_format((float) round((float) $nv), 0, ',', '.') : $formatNotaBoletim($nv) ?>
-                                                    <?php elseif (is_string($nv) && trim($nv) !== ''): ?>
-                                                        <?= htmlspecialchars($nv) ?>
-                                                    <?php else: ?>
-                                                        —
-                                                    <?php endif; ?>
-                                                </td>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        <?php } ?>
-                    <?php else: ?>
-                        <div class="text-sm text-gray-500">Sem dados de simulação para o aluno/evento selecionado.</div>
-                    <?php endif; ?>
+                    <?php
+                    $cols = $matrizColunas;
+                    $linhas = $matrizLinhas;
+                    $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                        ? $simulacao['matriz_materias_boletim']['linhas']
+                        : $matrizLinhas;
+                    $decimalPlaces = $decimalPlacesSelected ?? 2;
+                    $simVistaId = 'sim-compacta';
+                    $edicaoSimulacao = null;
+                    include dirname(__DIR__, 2) . '/partials/boletim_resultado_simulacao.php';
+                    unset($edicaoSimulacao);
+                    ?>
                     <?php if ($podeGravarBoletimOficialAluno): ?>
                         <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/publicar-boletim-aluno" class="mt-4 pt-4 border-t border-gray-200 space-y-2">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
@@ -1209,7 +1124,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-200">
                 <h2 class="text-lg font-semibold text-gray-900">Resultado da Simulação</h2>
-                <p class="text-xs text-gray-500 mt-1">A leitura principal é a <strong>tabela por matéria</strong> (cada disciplina em uma linha). A nota final em destaque no rodapé usa a <strong>visão global</strong> (componentes já agregados entre matérias).</p>
+                <p class="text-xs text-gray-500 mt-1">A tabela <strong>Notas</strong> é a mesma da coordenação no detalhe do aluno. Se o evento tiver quadro, o <strong>Quadro de notas</strong> aparece em seguida.</p>
                 <p class="text-sm text-gray-500 mt-1">
                     Aluno: <strong><?= htmlspecialchars((string) (($simulacao['aluno']['nome'] ?? '-') )) ?></strong>
                 </p>
@@ -1223,132 +1138,23 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
                     require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
                 }
-                $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial((string) $exibirEm)
-                    ? $buildGroupedBoletimHeader((array) $matrizColunas)
-                    : ['enabled' => false, 'groups' => []];
                 ?>
-                <?php if (!empty($matrizLinhas) && !empty($matrizColunas)): ?>
-                    <?php
-                    if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-                        require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
-                    }
-                    if (BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas)) {
-                        $cols = $matrizColunas;
-                        $linhas = $matrizLinhas;
-                        $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
-                            ? $simulacao['matriz_materias_boletim']['linhas']
-                            : $matrizLinhas;
-                        $decimalPlaces = $decimalPlacesSelected ?? 2;
-                        $simVistaId = 'sim-principal';
-                        include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
-                    } else {
-                    ?>
-                    <div class="mb-8">
-                        <h3 class="text-base font-semibold text-gray-900 mb-1">Notas por matéria</h3>
-                        <div class="overflow-x-auto border border-gray-200 rounded-lg">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead class="bg-slate-50">
-                                    <?php if (!empty($groupedHeader['enabled'])): ?>
-                                        <tr>
-                                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-700 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 border-r border-gray-200" rowspan="2">Matérias</th>
-                                            <?php foreach ($groupedHeader['groups'] as $grp): ?>
-                                                <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 uppercase border-l border-gray-200" colspan="<?= (int) count((array) ($grp['cols'] ?? [])) ?>">
-                                                    <?= htmlspecialchars((string) ($grp['label'] ?? '')) ?>
-                                                </th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                        <tr>
-                                            <?php foreach ($groupedHeader['groups'] as $grp): ?>
-                                                <?php foreach ((array) ($grp['cols'] ?? []) as $mc): ?>
-                                                    <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 bg-amber-100/70 min-w-[5.5rem]" title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?> (<?= htmlspecialchars((string) ($mc['codigo'] ?? '')) ?>)">
-                                                        <span class="block truncate max-w-[7rem] mx-auto"><?= htmlspecialchars((string) ($mc['_sublabel'] ?? $mc['nome'] ?? $mc['codigo'] ?? '')) ?></span>
-                                                    </th>
-                                                <?php endforeach; ?>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php else: ?>
-                                        <tr>
-                                            <th class="px-3 py-2 text-left text-xs font-semibold text-slate-700 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 border-r border-gray-200">Matéria</th>
-                                            <?php foreach ($matrizColunas as $mc): ?>
-                                                <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 min-w-[5.5rem]" title="<?= htmlspecialchars((string) ($mc['nome'] ?? '')) ?> (<?= htmlspecialchars((string) ($mc['codigo'] ?? '')) ?>)">
-                                                    <span class="block truncate max-w-[7rem] mx-auto"><?= htmlspecialchars((string) ($mc['nome'] ?? $mc['codigo'] ?? '')) ?></span>
-                                                    <span class="block text-[10px] font-normal text-slate-400 normal-case">(<?= htmlspecialchars((string) ($mc['codigo'] ?? '')) ?>)</span>
-                                                </th>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php endif; ?>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 bg-white">
-                                    <?php foreach ($matrizLinhas as $idxLin => $lin): ?>
-                                        <tr class="hover:bg-gray-50">
-                                            <td class="px-3 py-2 font-medium text-gray-900 sticky left-0 bg-white z-10 border-r border-gray-200"><?= htmlspecialchars((string) ($lin['materia_nome'] ?? '-')) ?></td>
-                                            <?php
-                                            $notasLin = is_array($lin['notas'] ?? null) ? $lin['notas'] : [];
-                                            $iterCols = $matrizColunas;
-                                            if (!empty($groupedHeader['enabled'])) {
-                                                $iterCols = [];
-                                                foreach ((array) ($groupedHeader['groups'] ?? []) as $g) {
-                                                    foreach ((array) ($g['cols'] ?? []) as $gc) {
-                                                        $iterCols[] = $gc;
-                                                    }
-                                                }
-                                            }
-                                            foreach ($iterCols as $mc):
-                                                $codM = (string) ($mc['codigo'] ?? '');
-                                                $nv = $notasLin[$codM] ?? null;
-                                                $colGlobal = !empty($mc['valor_global']);
-                                                // Colunas de faltas devem mostrar inteiros tanto em bimestre (source_type='faltas_evento')
-                                                // quanto na linha FINAL (calculado/evento_boletim com layout_type='faltas').
-                                                $isFaltasCol = ((string) ($mc['source_type'] ?? '')) === 'faltas_evento'
-                                                    || strtolower((string) ($mc['layout_type'] ?? '')) === 'faltas';
-                                                $stColM = (string) ($mc['source_type'] ?? '');
-                                                $isManualCol = ($stColM === 'manual');
-                                                $isPorMateriaCol = in_array($stColM, ['provas_sistema', 'jornadas', 'calculado'], true)
-                                                    && (int) ($lin['materia_id'] ?? 0) !== 0;
-                                                $isCalcEditavel = (int) ($mc['id'] ?? 0) > 0 && ($isManualCol || $isPorMateriaCol);
-                                                $materiaIdEdicao = $isManualCol ? 0 : (int) ($lin['materia_id'] ?? 0);
-                                            ?>
-                                                <td
-                                                    class="px-3 py-2 text-center <?= is_numeric($nv) ? 'text-emerald-700 font-semibold' : (is_string($nv) && trim($nv) !== '' ? 'text-slate-700 font-medium' : 'text-gray-400') ?> <?= $isCalcEditavel ? 'boletim-cell-editavel cursor-pointer hover:bg-indigo-50' : '' ?>"
-                                                    <?php if ($isCalcEditavel): ?>
-                                                    data-cell-editavel="1"
-                                                    data-componente-id="<?= (int) $mc['id'] ?>"
-                                                    data-materia-id="<?= $materiaIdEdicao ?>"
-                                                    data-regra-id="<?= (int) ($regra['id'] ?? 0) ?>"
-                                                    data-aluno-id="<?= $selectedAlunoId ?>"
-                                                    data-periodo-ref="<?= htmlspecialchars($periodoRef, ENT_QUOTES, 'UTF-8') ?>"
-                                                    data-escala-max="<?= htmlspecialchars(number_format((float) ($mc['escala_max'] ?? 10), 2, '.', '')) ?>"
-                                                    title="<?= $isManualCol ? 'Clique para editar (vale para todas as matérias deste bloco)' : 'Clique para sobrescrever só essa matéria, só para este aluno' ?>"
-                                                    <?php endif; ?>
-                                                >
-                                                    <span class="boletim-cell-valor">
-                                                    <?php if (is_numeric($nv) && $colGlobal && $idxLin > 0): ?>
-                                                        <?php
-                                                        $nvFmt = $formatNotaBoletim($nv);
-                                                        $tip = 'Nota única do componente manual: ' . $nvFmt . ' (igual em todas as matérias; ver primeira linha).';
-                                                        ?>
-                                                        <span class="text-xs font-medium text-slate-500 cursor-help border-b border-dotted border-slate-300" title="<?= htmlspecialchars($tip, ENT_QUOTES, 'UTF-8') ?>">idem</span>
-                                                    <?php elseif (is_numeric($nv)): ?>
-                                                        <?= $isFaltasCol ? number_format((float) round((float) $nv), 0, ',', '.') : $formatNotaBoletim($nv) ?>
-                                                    <?php elseif (is_string($nv) && trim($nv) !== ''): ?>
-                                                        <?= htmlspecialchars($nv) ?>
-                                                    <?php else: ?>
-                                                        —
-                                                    <?php endif; ?>
-                                                    </span>
-                                                    <?php if ($isCalcEditavel): ?>
-                                                        <i class="fa-solid fa-pen text-[10px] text-indigo-400 ml-1 align-middle"></i>
-                                                    <?php endif; ?>
-                                                </td>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <?php } ?>
-                <?php endif; ?>
+                <?php
+                $cols = $matrizColunas;
+                $linhas = $matrizLinhas;
+                $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                    ? $simulacao['matriz_materias_boletim']['linhas']
+                    : $matrizLinhas;
+                $decimalPlaces = $decimalPlacesSelected ?? 2;
+                $simVistaId = 'sim-principal';
+                $edicaoSimulacao = [
+                    'regra_id' => (int) ($regra['id'] ?? 0),
+                    'aluno_id' => (int) $selectedAlunoId,
+                    'periodo_ref' => (string) $periodoRef,
+                ];
+                include dirname(__DIR__, 2) . '/partials/boletim_resultado_simulacao.php';
+                unset($edicaoSimulacao);
+                ?>
 
                 <?php if ($podeGravarBoletimOficialAluno): ?>
                     <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/publicar-boletim-aluno" class="mt-6 pt-5 border-t border-gray-200 space-y-3">

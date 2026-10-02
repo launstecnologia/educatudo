@@ -2145,7 +2145,7 @@ $boletimWizardSteps = [
         var casas = casasDecimaisPreview();
         var fator = Math.pow(10, casas);
         n = Math.round(n * fator) / fator;
-        return n.toFixed(casas);
+        return n.toFixed(casas).replace('.', ',');
     }
 
     function notaDaLinhaPreview(notas, codigo) {
@@ -2281,28 +2281,6 @@ $boletimWizardSteps = [
         return out.normalize ? out.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : out;
     }
 
-    function alunosPreviewFiltrados() {
-        var alunos = (catalogo && catalogo.alunos) || [];
-        if (!estado) return alunos;
-        var turmas = {};
-        (Array.isArray(estado.turmas_ids) ? estado.turmas_ids : []).forEach(function (id) {
-            id = Number(id || 0);
-            if (id > 0) turmas[id] = true;
-        });
-        var series = {};
-        (Array.isArray(estado.series_ids) ? estado.series_ids : []).forEach(function (id) {
-            id = Number(id || 0);
-            if (id > 0) series[id] = true;
-        });
-        var filtraTurma = Object.keys(turmas).length > 0;
-        var filtraSerie = !filtraTurma && Object.keys(series).length > 0;
-        if (!filtraTurma && !filtraSerie) return alunos;
-        return alunos.filter(function (a) {
-            if (filtraTurma) return !!turmas[Number(a.turma_id || 0)];
-            return !!series[Number(a.serie_id || 0)];
-        });
-    }
-
     function labelAlunoPreview(a) {
         var label = String((a && a.nome) || ('Aluno #' + ((a && a.id) || '')));
         if (a && a.turma_nome) label += ' · ' + a.turma_nome;
@@ -2310,16 +2288,25 @@ $boletimWizardSteps = [
         return label;
     }
 
-    function idAlunoPorLabelPreview(label) {
-        var alvo = textoNormalizadoBusca(label);
-        if (!alvo) return 0;
-        var alunos = alunosPreviewFiltrados();
-        for (var i = 0; i < alunos.length; i++) {
-            if (textoNormalizadoBusca(labelAlunoPreview(alunos[i])) === alvo) {
-                return Number(alunos[i].id || 0) || 0;
-            }
+    function abrirListaAlunosPreview(mostrarTodos) {
+        var box = document.getElementById('bw-preview-aluno-lista');
+        var input = document.getElementById('bw-preview-aluno-busca');
+        if (!box || !input) return;
+        var q = mostrarTodos ? '' : textoNormalizadoBusca(input.value || '');
+        var alunos = (catalogo && catalogo.alunos) || [];
+        var html = '';
+        var n = 0;
+        alunos.forEach(function (a) {
+            var label = labelAlunoPreview(a);
+            if (q && textoNormalizadoBusca(label).indexOf(q) < 0) return;
+            n += 1;
+            html += '<button type="button" class="bw-preview-aluno-item block w-full text-left px-3 py-1.5 text-sm text-gray-900 hover:bg-indigo-50" data-preview-aluno-id="' + Number(a.id || 0) + '">' + esc(label) + '</button>';
+        });
+        if (!n) {
+            html = '<p class="px-3 py-2 text-xs text-gray-500">Nenhum aluno encontrado.</p>';
         }
-        return 0;
+        box.innerHTML = html;
+        box.classList.remove('hidden');
     }
 
     function hashPreviewAluno() {
@@ -2328,25 +2315,19 @@ $boletimWizardSteps = [
     }
 
     function htmlAlunoPreviewSelect() {
-        var alunosTodos = (catalogo && catalogo.alunos) || [];
-        var alunos = alunosPreviewFiltrados();
+        var alunos = (catalogo && catalogo.alunos) || [];
         if (!alunos.length) return '';
         var atual = Number((estado && estado.aluno_preview_id) || 0);
         var atualObj = alunoPreviewSelecionado();
         var atualLabel = atualObj ? labelAlunoPreview(atualObj) : '';
-        var datalistId = 'bw-preview-alunos-lista';
         var html = '<div class="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">';
-        html += '<label class="text-xs font-medium text-slate-700 flex-1 min-w-[16rem]">Simular notas com aluno';
-        html += '<input id="bw-preview-aluno-busca" list="' + datalistId + '" class="mt-1 block w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm" placeholder="Pesquisar aluno pelo nome" value="' + esc(atualLabel) + '">';
-        html += '<datalist id="' + datalistId + '">';
-        alunos.forEach(function (a) {
-            html += '<option value="' + esc(labelAlunoPreview(a)) + '" data-id="' + Number(a.id || 0) + '"></option>';
-        });
-        html += '</datalist>';
+        html += '<label class="text-xs font-medium text-slate-700 flex-1 min-w-[16rem] relative">Simular notas com aluno';
+        html += '<input id="bw-preview-aluno-busca" autocomplete="off" class="mt-1 block w-full h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm" placeholder="Pesquisar aluno pelo nome" value="' + esc(atualLabel) + '">';
+        html += '<div id="bw-preview-aluno-lista" class="hidden absolute left-0 right-0 top-full z-40 mt-1 max-h-96 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"></div>';
         html += '<input type="hidden" id="bw-preview-aluno" value="' + (atual > 0 ? atual : 0) + '">';
         html += '</label>';
         html += '<button type="button" id="bw-preview-aluno-limpar" class="h-9 px-3 text-xs rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Sem aluno</button>';
-        html += '<p class="text-xs text-slate-500 max-w-md">Lista filtrada pelo escopo marcado: ' + alunos.length + ' de ' + alunosTodos.length + ' aluno(s). Ao escolher um aluno, a tabela usa as notas lançadas dele.</p>';
+        html += '<p class="text-xs text-slate-500 max-w-md">' + alunos.length + ' aluno(s) ativos. Clique no campo para ver a lista inteira, ou digite para achar pelo nome.</p>';
         html += '</div>';
         return html;
     }
@@ -2629,10 +2610,10 @@ $boletimWizardSteps = [
             var totQ = 0;
             var clsMat = 'mat';
             if (lin.eh_grupo_pai) clsMat += ' font-bold';
-            if (lin.eh_grupo_filho) clsMat += ' pl-4 text-gray-700';
+            if (lin.eh_grupo_filho) clsMat += ' pl-7 text-gray-800';
             var nomeMat = esc(lin.materia_nome);
             if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
-            html += '<tr' + (lin.eh_grupo_pai ? ' class="bg-indigo-50/40"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
+            html += '<tr' + (lin.eh_grupo_pai ? ' class="font-semibold"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
             semanas.forEach(function (s) {
                 var nq = notaNqPreview(notas, s.codigo);
                 var n = nq.n;
@@ -2643,7 +2624,7 @@ $boletimWizardSteps = [
             });
             if (semanas.length) html += '<td><strong>' + totN + '</strong></td><td><strong>' + totQ + '</strong></td>';
             outras.forEach(function (o) {
-                html += '<td>' + fmtPreviewCelula(notaDaLinhaPreview(notas, o.codigo), o) + '</td>';
+                html += htmlCelulaOficial(notaDaLinhaPreview(notas, o.codigo), o);
             });
             html += '</tr>';
         });
@@ -2930,15 +2911,184 @@ $boletimWizardSteps = [
         return html;
     }
 
+    function ehEventoNotasPreview() {
+        return !!(estado && estado.exibir_em === 'notas' && !ehBoletimComposto());
+    }
+
+    function htmlCelulaOficial(v, col) {
+        var texto = fmtPreviewCelula(v, col);
+        var numerica = v != null && v !== '' && v !== '—' && v !== '-' && isFinite(Number(v));
+        var cls = numerica ? ' class="text-emerald-800 font-semibold"' : '';
+        return '<td' + cls + '>' + texto + '</td>';
+    }
+
+    function colunasNotasOficiais(pv) {
+        var outras = [];
+        var visto = {};
+        (pv.tabelas || []).forEach(function (t) {
+            (t.outras || []).forEach(function (o) {
+                if (!o || !o.codigo || visto[o.codigo]) return;
+                visto[o.codigo] = true;
+                outras.push(o);
+            });
+        });
+        return outras;
+    }
+
+    function chaveGrupoLinha(lin, ehPai) {
+        var gk = String((lin && lin.grupo_key) || '').trim();
+        if (gk) return gk;
+        if (ehPai) return 'nome:' + chaveNomeMateria(lin && lin.materia_nome);
+        var paiNome = String((lin && lin.grupo_pai_nome) || '').trim();
+        if (paiNome) return 'nome:' + chaveNomeMateria(paiNome);
+        return '';
+    }
+
+    function reagruparHierarquiaNotas(lista) {
+        var linhas = (lista || []).filter(Boolean);
+        if (!linhas.some(function (l) { return l.eh_grupo_pai || l.eh_grupo_filho; })) {
+            return linhas;
+        }
+        var pais = {};
+        var filhos = {};
+        linhas.forEach(function (lin) {
+            if (lin.eh_grupo_pai) {
+                var key = chaveGrupoLinha(lin, true);
+                if (!pais[key]) pais[key] = lin;
+                return;
+            }
+            if (!lin.eh_grupo_filho) return;
+            var fk = chaveGrupoLinha(lin, false);
+            if (!fk) return;
+            if (!filhos[fk]) filhos[fk] = [];
+            filhos[fk].push(lin);
+        });
+        var vistoFilho = {};
+        var vistoPai = {};
+        var out = [];
+        function emitirFilhos(key) {
+            (filhos[key] || []).forEach(function (f) {
+                var id = Number(f.materia_id || 0);
+                var marca = id > 0 ? ('id:' + id) : ('nome:' + chaveNomeMateria(f.materia_nome));
+                if (vistoFilho[marca]) return;
+                vistoFilho[marca] = true;
+                out.push(f);
+            });
+        }
+        linhas.forEach(function (lin) {
+            if (lin.eh_grupo_filho) return;
+            if (lin.eh_grupo_pai) {
+                var key = chaveGrupoLinha(lin, true);
+                if (vistoPai[key]) return;
+                vistoPai[key] = true;
+                out.push(pais[key] || lin);
+                emitirFilhos(key);
+                return;
+            }
+            out.push(lin);
+        });
+        Object.keys(filhos).forEach(function (key) {
+            if (vistoPai[key]) return;
+            emitirFilhos(key);
+        });
+        return out;
+    }
+
+    function linhasNotasOficiais(pv, outras) {
+        if (pv && Array.isArray(pv.linhas_completas) && pv.linhas_completas.length) {
+            return pv.linhas_completas.filter(Boolean);
+        }
+        var linhas = [];
+        var visto = {};
+        (pv.tabelas || []).forEach(function (t) {
+            (t.linhas || []).forEach(function (lin) {
+                if (!lin) return;
+                var chave = Number(lin.materia_id || 0) > 0
+                    ? ('id:' + Number(lin.materia_id))
+                    : ('nome:' + chaveNomeMateria(lin.materia_nome));
+                if (lin.eh_grupo_pai) chave = 'pai:' + chaveGrupoLinha(lin, true);
+                if (visto[chave]) return;
+                visto[chave] = true;
+                linhas.push(lin);
+            });
+        });
+        if (linhas.some(function (l) { return l && l.eh_grupo_pai; })) {
+            return reagruparHierarquiaNotas(linhas);
+        }
+        return linhasDoDemonstrativo(linhas, outras, []);
+    }
+
+    function htmlTabelaNotasOficial(pv) {
+        var outras = colunasNotasOficiais(pv);
+        var linhas = linhasNotasOficiais(pv, outras);
+        var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white">';
+        html += '<table class="bw-preview-table"><thead><tr>';
+        html += '<th rowspan="1" class="text-left">Matéria</th>';
+        outras.forEach(function (o) {
+            var extra = (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
+            html += '<th>' + esc(o.nome || o.codigo) + extra + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        if (!outras.length || !linhas.length) {
+            html += '<tr><td class="mat" colspan="' + Math.max(outras.length + 1, 1) + '">Sem colunas de notas neste evento.</td></tr>';
+            html += '</tbody></table></div>';
+            return html;
+        }
+        linhas.forEach(function (lin) {
+            var notas = lin.notas || {};
+            var clsMat = 'mat';
+            if (lin.eh_grupo_pai) clsMat += ' font-bold';
+            if (lin.eh_grupo_filho) clsMat += ' pl-7 text-gray-700';
+            var nomeMat = esc(lin.materia_nome);
+            if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
+            html += '<tr' + (lin.eh_grupo_pai ? ' class="font-semibold"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
+            outras.forEach(function (o) {
+                html += htmlCelulaOficial(notaDaLinhaPreview(notas, o.codigo), o);
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        return html;
+    }
+
+    function htmlBlocoVistaOficial(titulo, texto, corpo) {
+        return '<section class="mb-6">'
+            + '<h4 class="text-sm font-semibold text-gray-900">' + esc(titulo) + '</h4>'
+            + '<p class="text-xs text-gray-500 mt-0.5 mb-2">' + texto + '</p>'
+            + corpo
+            + '</section>';
+    }
+
     function htmlPreview(pv) {
         var html = htmlAlunoPreviewSelect();
         if (!pv || !(pv.tabelas || []).length) {
             return html + '<p class="text-xs text-gray-600 mt-2">' + esc((pv && pv.aviso) || 'Monte as peças para ver o exemplo.') + '</p>';
         }
         var avisoCls = pv.dados_reais
-            ? 'text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 mb-2'
-            : 'text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-2';
+            ? 'text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1 mb-3'
+            : 'text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-3';
         html += '<p class="' + avisoCls + '">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
+        if (ehEventoNotasPreview()) {
+            html += htmlBlocoVistaOficial(
+                'Notas',
+                'Como a coordenação abre em Notas, no detalhe do aluno.',
+                htmlTabelaNotasOficial(pv)
+            );
+            var quadro = '';
+            (pv.tabelas || []).forEach(function (t) {
+                var tab = Object.assign({}, t, {
+                    subtitulo: t.subtitulo === 'Exemplo' ? '' : (t.subtitulo || ''),
+                    linhas: linhasDoDemonstrativo(t.linhas || [], t.outras || [], t.semanas || [])
+                });
+                quadro += htmlTabelaPreview(tab);
+            });
+            html += htmlBlocoVistaOficial(
+                'Quadro de notas',
+                'Como a coordenação abre em Quadro de notas, no detalhe do aluno.',
+                quadro
+            );
+            return html;
+        }
         if (previewTemQuadro(pv)) {
             html += '<div class="flex flex-wrap gap-2 mb-3">';
             html += '<button type="button" data-vista-preview="quadro" class="px-3 py-1.5 text-xs font-medium rounded-lg border ' + (vistaPreview === 'quadro' ? 'text-white' : 'bg-white text-gray-700 border-gray-300') + '"' + (vistaPreview === 'quadro' ? ' style="background:var(--sidebar-bg-color,#1e3a5f);border-color:var(--sidebar-bg-color,#1e3a5f);color:var(--sidebar-text-color,#fff)"' : '') + '>Demonstrativo de Notas</button>';
@@ -3069,21 +3219,39 @@ $boletimWizardSteps = [
                 }
             }
         });
-        bodyEl.addEventListener('change', function (e) {
-            if (!e.target || e.target.id !== 'bw-preview-aluno-busca' || !estado) return;
-            estado.aluno_preview_id = idAlunoPorLabelPreview(e.target.value || '');
+        bodyEl.addEventListener('focusin', function (e) {
+            if (!e.target || e.target.id !== 'bw-preview-aluno-busca') return;
+            if (typeof e.target.select === 'function') e.target.select();
+            abrirListaAlunosPreview(true);
+        });
+        bodyEl.addEventListener('click', function (e) {
+            var item = e.target.closest('[data-preview-aluno-id]');
+            if (!item || !estado) return;
+            var idItem = Number(item.getAttribute('data-preview-aluno-id') || 0);
+            if (idItem <= 0) return;
+            estado.aluno_preview_id = idItem;
             previewAtual = null;
             renderRevisarDinamico();
             agendarMontar();
         });
+        document.addEventListener('click', function (e) {
+            var box = document.getElementById('bw-preview-aluno-lista');
+            if (!box || box.classList.contains('hidden')) return;
+            if (e.target.closest('#bw-preview-aluno-busca') || e.target.closest('#bw-preview-aluno-lista')) return;
+            box.classList.add('hidden');
+        });
         bodyEl.addEventListener('input', function (e) {
             if (!e.target || e.target.id !== 'bw-preview-aluno-busca' || !estado) return;
-            var id = idAlunoPorLabelPreview(e.target.value || '');
-            if (id <= 0 || id === Number(estado.aluno_preview_id || 0)) return;
-            estado.aluno_preview_id = id;
-            previewAtual = null;
-            renderRevisarDinamico();
-            agendarMontar();
+            if (String(e.target.value || '').trim() === '' && Number(estado.aluno_preview_id || 0) > 0) {
+                estado.aluno_preview_id = 0;
+                previewAtual = null;
+                renderRevisarDinamico();
+                agendarMontar();
+                var campo = document.getElementById('bw-preview-aluno-busca');
+                if (campo) campo.focus();
+                return;
+            }
+            abrirListaAlunosPreview(false);
         });
         bodyEl.addEventListener('click', function (e) {
             if (!e.target || e.target.id !== 'bw-preview-aluno-limpar' || !estado) return;
@@ -3839,10 +4007,14 @@ $boletimWizardSteps = [
         }
 
         if (passo === 'revisar') {
-            html += '<p class="text-sm text-gray-700">Confira o <strong>exemplo</strong> do boletim</p>';
+            html += '<p class="text-sm text-gray-700">' + (ehEventoNotasPreview()
+                ? 'Confira como fica <strong>oficialmente</strong> no detalhe do aluno'
+                : 'Confira o <strong>exemplo</strong> do boletim') + '</p>';
             html += '<p class="text-xs text-gray-500 mt-1">' + (ehBoletimComposto()
                 ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
-                : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.') + '</p>';
+                : (ehEventoNotasPreview()
+                    ? 'As duas visões são as mesmas da coordenação: <strong>Notas</strong> e <strong>Quadro de notas</strong>. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.'
+                    : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.')) + '</p>';
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
             html += '<p class="text-xs text-indigo-700 mt-4">Se estiver certo, clique em <strong>Concluir e aplicar</strong> e depois em <strong>Salvar evento</strong>.</p>';
