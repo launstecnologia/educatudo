@@ -347,7 +347,7 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php ob_start(); ?>
-                        <a href="<?= URL ?>/admin/boletim-configuracao?regra_id=<?= $eventoId ?>"
+                        <a href="<?= URL ?>/admin/boletim-configuracao/assistente?regra_id=<?= $eventoId ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </a>

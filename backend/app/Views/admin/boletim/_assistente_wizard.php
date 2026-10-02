@@ -20,6 +20,7 @@ $boletimAssistenteDadosIniciais = [
     'aviso' => isset($boletim_assistente_aviso_inicial) ? (string) $boletim_assistente_aviso_inicial : null,
 ];
 $ui = __DIR__ . '/../_partials/ui';
+$boletimConfigVersoes = is_array($boletim_config_versoes ?? null) ? $boletim_config_versoes : [];
 $boletimWizardSteps = [
     ['label' => 'Começar', 'sub' => 'Origem'],
     ['label' => 'Identidade', 'sub' => 'Evento'],
@@ -39,7 +40,8 @@ $boletimWizardSteps = [
      data-url-wizard-montar="<?= htmlspecialchars(URL . '/admin/boletim-configuracao/assistente/wizard/montar', ENT_QUOTES, 'UTF-8') ?>"
      data-url-salvar="<?= htmlspecialchars(URL . '/admin/boletim-configuracao/salvar', ENT_QUOTES, 'UTF-8') ?>"
      data-csrf="<?= htmlspecialchars((string) $csrfToken, ENT_QUOTES, 'UTF-8') ?>"
-     data-regra-id="<?= $assistenteRegraId ?>">
+     data-regra-id="<?= $assistenteRegraId ?>"
+     data-config-versoes="<?= htmlspecialchars(json_encode($boletimConfigVersoes, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
 
     <!-- Overlay wizard -->
     <div id="boletim-wizard-overlay" class="<?= $boletimAssistentePageMode ? 'block' : 'hidden fixed inset-0 z-[10000] bg-slate-900/50 backdrop-blur-[1px] p-2 sm:p-5' ?>">
@@ -109,6 +111,12 @@ $boletimWizardSteps = [
             <?php endif; ?>
         </div>
     </div>
+
+    <form id="form-restaurar-config-versao" method="POST" action="<?= URL ?>/admin/boletim-configuracao/restaurar-config-versao" class="hidden" aria-hidden="true">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="regra_id" value="<?= $assistenteRegraId ?>">
+        <input type="hidden" name="versao_id" id="restaurar-config-versao-id" value="">
+    </form>
 
     <?php if (!$boletimAssistentePageMode): ?>
     <button type="button" id="boletim-assistente-toggle"
@@ -745,6 +753,30 @@ $boletimWizardSteps = [
             html += '<span>' + esc(labelEventoProva(ev)) + '</span></label>';
         });
         html += '</div></div>';
+        return html;
+    }
+
+    function htmlVersoesConfiguracao() {
+        var lista = [];
+        try {
+            lista = JSON.parse(root.getAttribute('data-config-versoes') || '[]');
+        } catch (e) {
+            lista = [];
+        }
+        if (!Array.isArray(lista) || !lista.length) {
+            return '<p class="text-xs text-gray-500">Ainda não há versão salva desta configuração.</p>';
+        }
+        var html = '<div class="space-y-1">';
+        html += '<p class="text-xs font-medium text-gray-700">Versões da configuração</p>';
+        lista.forEach(function (v) {
+            var id = Number(v.id || 0);
+            if (id <= 0) return;
+            html += '<div class="flex items-center justify-between gap-2 text-xs text-gray-700">';
+            html += '<span>Versão ' + Number(v.versao || 0) + (v.criado_em ? ' · ' + esc(v.criado_em) : '') + (v.usuario_nome ? ' · ' + esc(v.usuario_nome) : '') + '</span>';
+            html += '<button type="button" class="js-restaurar-config text-indigo-700 hover:underline" data-versao-id="' + id + '">Recuperar</button>';
+            html += '</div>';
+        });
+        html += '</div>';
         return html;
     }
 
@@ -2737,8 +2769,14 @@ $boletimWizardSteps = [
         lista.forEach(function (lin) {
             if (!lin) return;
             if (lin.eh_grupo_pai) temPai = true;
+            if (lin.eh_grupo_pai) return;
             if (idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)]) filhosNaLista++;
         });
+        // Cada bloco do quadro chama esta função. Sem filha neste bloco, não inventa
+        // outra Língua Portuguesa vazia no bloco ao lado.
+        if (filhosNaLista === 0) {
+            return lista;
+        }
         if (temPai && filhosNaLista >= 2) {
             return lista;
         }
@@ -3947,7 +3985,14 @@ $boletimWizardSteps = [
                     : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.')) + '</p>';
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
-            html += '<p class="text-xs text-indigo-700 mt-4">Se estiver certo, clique em <strong>Concluir e aplicar</strong> e depois em <strong>Salvar evento</strong>.</p>';
+            html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
+            html += '<label class="flex items-start gap-2 text-sm text-gray-800">';
+            html += '<input type="checkbox" id="bw-gerar-versao-notas" class="mt-0.5 rounded border-gray-300 text-indigo-600">';
+            html += '<span><strong>Gerar nova versão das notas</strong><span class="block text-xs text-gray-600 font-normal">Ao salvar, gera as notas de novo. A versão anterior continua guardada e não é substituída.</span></span></label>';
+            html += '<p class="text-xs text-gray-600">Salvar a configuração também cria uma versão, para recuperar se precisar.</p>';
+            html += htmlVersoesConfiguracao();
+            html += '</div>';
+            html += '<p class="text-xs text-indigo-700 mt-4">Se estiver certo, clique em <strong>Concluir e aplicar</strong>.</p>';
         }
 
         bodyEl.innerHTML = html;
@@ -3962,6 +4007,19 @@ $boletimWizardSteps = [
     }
 
     function bindBodyEvents() {
+        bodyEl.querySelectorAll('.js-restaurar-config').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = btn.getAttribute('data-versao-id');
+                if (!confirm('Recuperar esta versão da configuração? A configuração atual continua no histórico.')) {
+                    return;
+                }
+                var input = document.getElementById('restaurar-config-versao-id');
+                var form = document.getElementById('form-restaurar-config-versao');
+                if (!input || !form) return;
+                input.value = id;
+                form.submit();
+            });
+        });
         bodyEl.querySelectorAll('[data-origem]').forEach(function (el) {
             el.addEventListener('click', function () {
                 estado.origem = el.getAttribute('data-origem');
@@ -4684,6 +4742,8 @@ $boletimWizardSteps = [
             add('componentes_json', JSON.stringify(comps));
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
+            var gerarNotas = document.getElementById('bw-gerar-versao-notas');
+            if (gerarNotas && gerarNotas.checked) add('gerar_nova_versao', '1');
             document.body.appendChild(form);
             form.submit();
             return 'submit';

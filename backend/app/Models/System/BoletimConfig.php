@@ -801,6 +801,181 @@ class BoletimConfig
         } catch (Throwable $e) {
             error_log('BoletimConfig fk geracao: ' . $e->getMessage());
         }
+
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS boletim_config_versoes (
+                id INT NOT NULL AUTO_INCREMENT,
+                regra_id INT NOT NULL,
+                versao INT NOT NULL,
+                snapshot_json MEDIUMTEXT NOT NULL,
+                usuario_id INT NULL,
+                usuario_nome VARCHAR(150) NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY uk_boletim_config_versoes (regra_id, versao),
+                KEY idx_boletim_config_versoes_regra (regra_id, id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+    }
+
+    /**
+     * Guarda a configuração atual da regra. Cada salvamento vira uma versão nova.
+     */
+    public function gravarVersaoConfiguracao(int $regraId, int $usuarioId = 0, string $usuarioNome = ''): int
+    {
+        if ($regraId <= 0) {
+            return 0;
+        }
+        $this->ensureSchemaVersionamento();
+        $regra = $this->getRuleById($regraId);
+        if (!is_array($regra)) {
+            return 0;
+        }
+        $json = json_encode($this->montarSnapshotConfiguracao($regra), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($json) || $json === '') {
+            return 0;
+        }
+        $row = $this->db->fetch(
+            'SELECT COALESCE(MAX(versao), 0) AS versao FROM boletim_config_versoes WHERE regra_id = :regra_id',
+            ['regra_id' => $regraId]
+        );
+        $versao = (int) ($row['versao'] ?? 0) + 1;
+        $this->db->insert(
+            'INSERT INTO boletim_config_versoes (regra_id, versao, snapshot_json, usuario_id, usuario_nome)
+             VALUES (:regra_id, :versao, :snapshot_json, :usuario_id, :usuario_nome)',
+            [
+                'regra_id' => $regraId,
+                'versao' => $versao,
+                'snapshot_json' => $json,
+                'usuario_id' => $usuarioId > 0 ? $usuarioId : null,
+                'usuario_nome' => $usuarioNome !== '' ? mb_substr($usuarioNome, 0, 150) : null,
+            ]
+        );
+
+        return $versao;
+    }
+
+    /**
+     * @return list<array{id:int,versao:int,criado_em:string,usuario_nome:string}>
+     */
+    public function listarVersoesConfiguracao(int $regraId, int $limite = 12): array
+    {
+        if ($regraId <= 0) {
+            return [];
+        }
+        $this->ensureSchemaVersionamento();
+        $limite = max(1, min($limite, 30));
+        $rows = $this->db->fetchAll(
+            'SELECT id, versao, usuario_nome, created_at
+             FROM boletim_config_versoes
+             WHERE regra_id = :regra_id
+             ORDER BY versao DESC, id DESC
+             LIMIT ' . $limite,
+            ['regra_id' => $regraId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $ts = strtotime((string) ($row['created_at'] ?? ''));
+            $out[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'versao' => (int) ($row['versao'] ?? 0),
+                'criado_em' => $ts !== false ? date('d/m/Y H:i', $ts) : '',
+                'usuario_nome' => trim((string) ($row['usuario_nome'] ?? '')),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    public function obterSnapshotConfiguracao(int $regraId, int $versaoId): ?array
+    {
+        if ($regraId <= 0 || $versaoId <= 0) {
+            return null;
+        }
+        $this->ensureSchemaVersionamento();
+        $row = $this->db->fetch(
+            'SELECT snapshot_json, versao FROM boletim_config_versoes WHERE id = :id AND regra_id = :regra_id LIMIT 1',
+            ['id' => $versaoId, 'regra_id' => $regraId]
+        );
+        if (!is_array($row)) {
+            return null;
+        }
+        $snap = json_decode((string) ($row['snapshot_json'] ?? ''), true);
+        if (!is_array($snap)) {
+            return null;
+        }
+        $snap['versao'] = (int) ($row['versao'] ?? 0);
+
+        return $snap;
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function montarSnapshotConfiguracao(array $regra): array
+    {
+        $componentes = [];
+        foreach ((array) ($regra['componentes'] ?? []) as $componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $cfg = $componente['config_json'] ?? null;
+            if (is_array($cfg)) {
+                $cfg = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            $componentes[] = [
+                'codigo' => (string) ($componente['codigo'] ?? ''),
+                'nome' => (string) ($componente['nome'] ?? ''),
+                'source_type' => (string) ($componente['source_type'] ?? 'provas_sistema'),
+                'calc_type' => (string) ($componente['calc_type'] ?? 'media'),
+                'peso' => (float) ($componente['peso'] ?? 1),
+                'filtro_titulo' => (string) ($componente['filtro_titulo'] ?? ''),
+                'bloco_id' => !empty($componente['bloco_id']) ? (int) $componente['bloco_id'] : null,
+                'blocos_ids' => $componente['blocos_ids'] ?? null,
+                'config_json' => is_string($cfg) ? $cfg : null,
+                'materia_id' => !empty($componente['materia_id']) ? (int) $componente['materia_id'] : null,
+                'materias_ids' => $componente['materias_ids'] ?? null,
+                'materia_unica' => !empty($componente['materia_unica']) ? 1 : 0,
+                'materia_unica_modo' => (string) ($componente['materia_unica_modo'] ?? 'soma'),
+                'usar_percentual' => !empty($componente['usar_percentual']) ? 1 : 0,
+                'escala_max' => (float) ($componente['escala_max'] ?? 10),
+                'obrigatorio' => !empty($componente['obrigatorio']) ? 1 : 0,
+            ];
+        }
+
+        return [
+            'nome' => (string) ($regra['nome'] ?? ''),
+            'codigo' => (string) ($regra['codigo'] ?? ''),
+            'descricao_curta' => (string) ($regra['descricao_curta'] ?? ''),
+            'formula_final' => (string) ($regra['formula_final'] ?? ''),
+            'formula_materias_json' => (string) ($regra['formula_materias_json'] ?? ''),
+            'extras_json' => is_string($regra['extras_json'] ?? null) ? (string) $regra['extras_json'] : null,
+            'materias_ids' => (string) ($regra['materias_ids'] ?? '[]'),
+            'series_ids' => (string) ($regra['series_ids'] ?? '[]'),
+            'turmas_ids' => (string) ($regra['turmas_ids'] ?? '[]'),
+            'exibir_em' => (string) ($regra['exibir_em'] ?? 'notas'),
+            'finalidade' => (string) ($regra['finalidade'] ?? 'oficial'),
+            'boletim_id' => (int) ($regra['boletim_id'] ?? 0),
+            'ano_letivo' => (int) ($regra['ano_letivo'] ?? 0),
+            'bimestre' => (int) ($regra['bimestre'] ?? 0),
+            'vis_aluno' => (int) ($regra['vis_aluno'] ?? 1),
+            'vis_pais' => (int) ($regra['vis_pais'] ?? 1),
+            'vis_coordenacao' => (int) ($regra['vis_coordenacao'] ?? 1),
+            'round_mode' => (string) ($regra['round_mode'] ?? 'none'),
+            'decimal_places' => (int) ($regra['decimal_places'] ?? 2) === 1 ? 1 : 2,
+            'default_data_inicio' => (string) ($regra['default_data_inicio'] ?? ''),
+            'default_data_fim' => (string) ($regra['default_data_fim'] ?? ''),
+            'nota_minima_aprovacao' => $regra['nota_minima_aprovacao'] ?? null,
+            'usar_resultado_aprovacao' => (int) ($regra['usar_resultado_aprovacao'] ?? 1),
+            'componentes' => $componentes,
+        ];
     }
 
     private function ensureBoletimResultadoPreviewIndex(): void

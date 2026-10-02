@@ -358,6 +358,7 @@ $router->get('/admin/boletim-configuracao/jornadas', 'Admin/BoletimConfigControl
 $router->get('/admin/boletim-configuracao/evento-componentes', 'Admin/BoletimConfigController@eventoComponentesJson');
 $router->get('/admin/boletim-configuracao/keepalive', 'Admin/BoletimConfigController@keepalive');
 $router->post('/admin/boletim-configuracao/salvar', 'Admin/BoletimConfigController@salvarRegra');
+$router->post('/admin/boletim-configuracao/restaurar-config-versao', 'Admin/BoletimConfigController@restaurarConfigVersao');
 $router->post('/admin/boletim-configuracao/renomear', 'Admin/BoletimConfigController@renomearRegra');
 $router->post('/admin/boletim-configuracao/excluir-regra', 'Admin/BoletimConfigController@excluirRegra');
 $router->post('/admin/boletim-configuracao/duplicar-regra', 'Admin/BoletimConfigController@duplicarRegra');

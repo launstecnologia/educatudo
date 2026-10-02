@@ -749,6 +749,9 @@ class BoletimConfigController extends BaseController
             'boletim_assistente_formulas_iniciais' => $formulasIniciais,
             'boletim_assistente_preview_inicial' => $previewInicial,
             'boletim_assistente_aviso_inicial' => $avisoInicial,
+            'boletim_config_versoes' => $selectedRegraId > 0
+                ? $this->boletimConfig->listarVersoesConfiguracao($selectedRegraId, 8)
+                : [],
         ];
 
         $this->viewWithLayout('admin', 'admin/boletim/assistente', $data);
@@ -1836,14 +1839,25 @@ class BoletimConfigController extends BaseController
                     }
                 }
             }
-            $_SESSION['boletim_flash'] = !empty($_POST['origem_assistente'])
-                ? 'Evento salvo pelo assistente. Revise os blocos e clique em Gerar boletins para gravar as notas.'
-                : 'Evento de notas salvo com sucesso.';
-            $_SESSION['boletim_flash_type'] = 'success';
+            $versaoConfig = 0;
             if ($savedId > 0) {
+                $usuario = $this->auth->getUser();
+                $versaoConfig = $this->boletimConfig->gravarVersaoConfiguracao(
+                    (int) $savedId,
+                    (int) (is_array($usuario) ? ($usuario['id'] ?? 0) : 0),
+                    trim((string) (is_array($usuario) ? ($usuario['nome'] ?? '') : ''))
+                );
                 $regraId = $savedId;
                 unset($_SESSION['boletim_assistente_rascunho']);
             }
+            $gerarNotas = (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
+            if ($savedId > 0 && $gerarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
+                return;
+            }
+            $_SESSION['boletim_flash'] = $versaoConfig > 0
+                ? ('Configuração salva na versão ' . $versaoConfig . '. Dá para recuperar esta versão no final do Configurar Notas.')
+                : 'Evento de notas salvo com sucesso.';
+            $_SESSION['boletim_flash_type'] = 'success';
         } catch (Throwable $e) {
             error_log('Erro ao salvar regra de boletim: ' . $e->getMessage());
             $_SESSION['boletim_flash'] = 'Erro ao salvar regra: ' . $e->getMessage();
@@ -1855,7 +1869,120 @@ class BoletimConfigController extends BaseController
             $saved = $this->boletimConfig->getRuleByCode($codigoRegra);
             $redirId = (int) ($saved['id'] ?? 0);
         }
+        if (!empty($_POST['origem_assistente']) && $redirId > 0) {
+            $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $redirId);
+        }
         $this->redirect('/admin/boletim-configuracao' . ($redirId > 0 ? ('?regra_id=' . $redirId) : ''));
+    }
+
+    public function restaurarConfigVersao(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        $versaoId = (int) ($_POST['versao_id'] ?? 0);
+        $snap = $this->boletimConfig->obterSnapshotConfiguracao($regraId, $versaoId);
+        if (!is_array($snap) || trim((string) ($snap['nome'] ?? '')) === '' || !is_array($snap['componentes'] ?? null)) {
+            $_SESSION['boletim_flash'] = 'Não encontrei essa versão da configuração.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($regraId > 0 ? ('/admin/boletim-configuracao/assistente?regra_id=' . $regraId) : '/admin/boletim');
+        }
+        $notaMin = $snap['nota_minima_aprovacao'] ?? null;
+        $notaMin = ($notaMin === null || $notaMin === '') ? null : (float) $notaMin;
+        try {
+            $savedId = $this->boletimConfig->saveRule(
+                (string) $snap['nome'],
+                (string) ($snap['formula_final'] ?? ''),
+                (array) $snap['componentes'],
+                $regraId,
+                (string) ($snap['descricao_curta'] ?? ''),
+                (string) ($snap['materias_ids'] ?? '[]'),
+                (string) ($snap['formula_materias_json'] ?? ''),
+                (string) ($snap['codigo'] ?? ''),
+                (string) ($snap['series_ids'] ?? '[]'),
+                (string) ($snap['turmas_ids'] ?? '[]'),
+                (string) ($snap['exibir_em'] ?? 'notas'),
+                (int) ($snap['ano_letivo'] ?? 0) > 0 ? (int) $snap['ano_letivo'] : null,
+                (int) ($snap['bimestre'] ?? 0) > 0 ? (int) $snap['bimestre'] : null,
+                (int) ($snap['vis_aluno'] ?? 1),
+                (int) ($snap['vis_pais'] ?? 1),
+                (int) ($snap['vis_coordenacao'] ?? 1),
+                (string) ($snap['round_mode'] ?? 'none'),
+                (int) ($snap['decimal_places'] ?? 2) === 1 ? 1 : 2,
+                $this->normalizarDataYmdOpcional((string) ($snap['default_data_inicio'] ?? '')),
+                $this->normalizarDataYmdOpcional((string) ($snap['default_data_fim'] ?? '')),
+                $notaMin,
+                (int) ($snap['usar_resultado_aprovacao'] ?? 1),
+                is_string($snap['extras_json'] ?? null) ? (string) $snap['extras_json'] : null,
+                (string) ($snap['finalidade'] ?? 'oficial')
+            );
+            if ($savedId > 0) {
+                $boletimId = (int) ($snap['boletim_id'] ?? 0);
+                $this->boletimConfig->setBoletimId($savedId, $boletimId > 0 ? $boletimId : null);
+                $usuario = $this->auth->getUser();
+                $nova = $this->boletimConfig->gravarVersaoConfiguracao(
+                    $savedId,
+                    (int) (is_array($usuario) ? ($usuario['id'] ?? 0) : 0),
+                    trim((string) (is_array($usuario) ? ($usuario['nome'] ?? '') : ''))
+                );
+                $_SESSION['boletim_flash'] = 'Configuração da versão ' . (int) ($snap['versao'] ?? 0) . ' recuperada'
+                    . ($nova > 0 ? (' e salva como versão ' . $nova . '.') : '.');
+                $_SESSION['boletim_flash_type'] = 'success';
+            }
+        } catch (Throwable $e) {
+            error_log('restaurarConfigVersao: ' . $e->getMessage());
+            $_SESSION['boletim_flash'] = 'Não foi possível recuperar essa versão.';
+            $_SESSION['boletim_flash_type'] = 'error';
+        }
+        $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $regraId);
+    }
+
+    private function iniciarNovaVersaoNotas(int $regraId, int $versaoConfig): bool
+    {
+        $regra = $this->boletimConfig->getRuleById($regraId);
+        if (!is_array($regra)) {
+            return false;
+        }
+        $dataInicio = $this->normalizarDataYmdOpcional((string) ($regra['default_data_inicio'] ?? ''));
+        $dataFim = $this->normalizarDataYmdOpcional((string) ($regra['default_data_fim'] ?? ''));
+        if ($dataInicio === null || $dataFim === null) {
+            $rangePadrao = $this->periodoToRange($this->periodoDefault());
+            $dataInicio = substr((string) ($rangePadrao['inicio'] ?? ''), 0, 10) ?: date('Y-01-01');
+            $dataFim = substr((string) ($rangePadrao['fim'] ?? ''), 0, 10) ?: date('Y-m-d');
+        }
+        if ($dataInicio > $dataFim) {
+            [$dataInicio, $dataFim] = [$dataFim, $dataInicio];
+        }
+        $periodoRef = $this->buildPeriodoRefFromDateRange($dataInicio, $dataFim);
+        if (strlen($periodoRef) > 60) {
+            $periodoRef = substr($periodoRef, 0, 60);
+        }
+        $gates = $this->diagnosticarGatesFechamentoRegra($regra);
+        if (!empty($gates['bloqueios'])) {
+            $_SESSION['boletim_flash'] = 'Configuração salva'
+                . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
+                . '. A nova versão das notas não foi gerada: ' . implode(' ', $gates['bloqueios']);
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $regraId);
+        }
+        $alunos = $this->resolveAlunosVinculadosRegra($regra);
+        if ($alunos === []) {
+            $_SESSION['boletim_flash'] = 'Configuração salva'
+                . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
+                . '. Não há aluno ativo nestas séries para gerar as notas.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $regraId);
+        }
+        $mensagem = 'Configuração salva'
+            . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
+            . '. A nova versão das notas está sendo gerada e não substitui a anterior.';
+        if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar', $mensagem)) {
+            return true;
+        }
+        $resultado = $this->executarGeracaoMassaInterna($regra, $regraId, $periodoRef, $dataInicio, $dataFim, $alunos, 'gerar');
+        $_SESSION['boletim_flash'] = $mensagem . ' ' . (string) ($resultado['mensagem'] ?? '');
+        $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
+        $this->redirect('/admin/boletim');
+        return true;
     }
 
     public function duplicarRegra()
@@ -2702,7 +2829,8 @@ class BoletimConfigController extends BaseController
         string $periodoRef,
         ?string $dataInicio,
         ?string $dataFim,
-        string $modo
+        string $modo,
+        string $mensagem = ''
     ): bool {
         if ($this->boletimConfig->temGeracaoEmAndamento($regraId)) {
             $_SESSION['boletim_flash'] = 'Já existe uma geração em andamento para este evento. Aguarde terminar para gerar de novo.';
@@ -2734,7 +2862,9 @@ class BoletimConfigController extends BaseController
             return false;
         }
 
-        $_SESSION['boletim_flash'] = 'Geração iniciada em segundo plano. Acompanhe o status na listagem — a página atualiza sozinha quando terminar.';
+        $_SESSION['boletim_flash'] = $mensagem !== ''
+            ? $mensagem
+            : 'Geração iniciada em segundo plano. Acompanhe o status na listagem — a página atualiza sozinha quando terminar.';
         $_SESSION['boletim_flash_type'] = 'info';
         $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
         return true;
