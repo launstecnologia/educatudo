@@ -2922,135 +2922,6 @@ $boletimWizardSteps = [
         return '<td' + cls + '>' + texto + '</td>';
     }
 
-    function colunasNotasOficiais(pv) {
-        var outras = [];
-        var visto = {};
-        (pv.tabelas || []).forEach(function (t) {
-            (t.outras || []).forEach(function (o) {
-                if (!o || !o.codigo || visto[o.codigo]) return;
-                visto[o.codigo] = true;
-                outras.push(o);
-            });
-        });
-        return outras;
-    }
-
-    function chaveGrupoLinha(lin, ehPai) {
-        var gk = String((lin && lin.grupo_key) || '').trim();
-        if (gk) return gk;
-        if (ehPai) return 'nome:' + chaveNomeMateria(lin && lin.materia_nome);
-        var paiNome = String((lin && lin.grupo_pai_nome) || '').trim();
-        if (paiNome) return 'nome:' + chaveNomeMateria(paiNome);
-        return '';
-    }
-
-    function reagruparHierarquiaNotas(lista) {
-        var linhas = (lista || []).filter(Boolean);
-        if (!linhas.some(function (l) { return l.eh_grupo_pai || l.eh_grupo_filho; })) {
-            return linhas;
-        }
-        var pais = {};
-        var filhos = {};
-        linhas.forEach(function (lin) {
-            if (lin.eh_grupo_pai) {
-                var key = chaveGrupoLinha(lin, true);
-                if (!pais[key]) pais[key] = lin;
-                return;
-            }
-            if (!lin.eh_grupo_filho) return;
-            var fk = chaveGrupoLinha(lin, false);
-            if (!fk) return;
-            if (!filhos[fk]) filhos[fk] = [];
-            filhos[fk].push(lin);
-        });
-        var vistoFilho = {};
-        var vistoPai = {};
-        var out = [];
-        function emitirFilhos(key) {
-            (filhos[key] || []).forEach(function (f) {
-                var id = Number(f.materia_id || 0);
-                var marca = id > 0 ? ('id:' + id) : ('nome:' + chaveNomeMateria(f.materia_nome));
-                if (vistoFilho[marca]) return;
-                vistoFilho[marca] = true;
-                out.push(f);
-            });
-        }
-        linhas.forEach(function (lin) {
-            if (lin.eh_grupo_filho) return;
-            if (lin.eh_grupo_pai) {
-                var key = chaveGrupoLinha(lin, true);
-                if (vistoPai[key]) return;
-                vistoPai[key] = true;
-                out.push(pais[key] || lin);
-                emitirFilhos(key);
-                return;
-            }
-            out.push(lin);
-        });
-        Object.keys(filhos).forEach(function (key) {
-            if (vistoPai[key]) return;
-            emitirFilhos(key);
-        });
-        return out;
-    }
-
-    function linhasNotasOficiais(pv, outras) {
-        if (pv && Array.isArray(pv.linhas_completas) && pv.linhas_completas.length) {
-            return pv.linhas_completas.filter(Boolean);
-        }
-        var linhas = [];
-        var visto = {};
-        (pv.tabelas || []).forEach(function (t) {
-            (t.linhas || []).forEach(function (lin) {
-                if (!lin) return;
-                var chave = Number(lin.materia_id || 0) > 0
-                    ? ('id:' + Number(lin.materia_id))
-                    : ('nome:' + chaveNomeMateria(lin.materia_nome));
-                if (lin.eh_grupo_pai) chave = 'pai:' + chaveGrupoLinha(lin, true);
-                if (visto[chave]) return;
-                visto[chave] = true;
-                linhas.push(lin);
-            });
-        });
-        if (linhas.some(function (l) { return l && l.eh_grupo_pai; })) {
-            return reagruparHierarquiaNotas(linhas);
-        }
-        return linhasDoDemonstrativo(linhas, outras, []);
-    }
-
-    function htmlTabelaNotasOficial(pv) {
-        var outras = colunasNotasOficiais(pv);
-        var linhas = linhasNotasOficiais(pv, outras);
-        var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white">';
-        html += '<table class="bw-preview-table"><thead><tr>';
-        html += '<th rowspan="1" class="text-left">Matéria</th>';
-        outras.forEach(function (o) {
-            var extra = (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
-            html += '<th>' + esc(o.nome || o.codigo) + extra + '</th>';
-        });
-        html += '</tr></thead><tbody>';
-        if (!outras.length || !linhas.length) {
-            html += '<tr><td class="mat" colspan="' + Math.max(outras.length + 1, 1) + '">Sem colunas de notas neste evento.</td></tr>';
-            html += '</tbody></table></div>';
-            return html;
-        }
-        linhas.forEach(function (lin) {
-            var notas = lin.notas || {};
-            var clsMat = 'mat';
-            if (lin.eh_grupo_pai) clsMat += ' font-bold';
-            if (lin.eh_grupo_filho) clsMat += ' pl-7 text-gray-700';
-            var nomeMat = esc(lin.materia_nome);
-            if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
-            html += '<tr' + (lin.eh_grupo_pai ? ' class="font-semibold"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
-            outras.forEach(function (o) {
-                html += htmlCelulaOficial(notaDaLinhaPreview(notas, o.codigo), o);
-            });
-            html += '</tr>';
-        });
-        html += '</tbody></table></div>';
-        return html;
-    }
-
     function htmlBlocoVistaOficial(titulo, texto, corpo) {
         return '<section class="mb-6">'
             + '<h4 class="text-sm font-semibold text-gray-900">' + esc(titulo) + '</h4>'
@@ -3069,11 +2940,6 @@ $boletimWizardSteps = [
             : 'text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2 py-1 mb-3';
         html += '<p class="' + avisoCls + '">' + esc(pv.aviso || 'Exemplo com dados fictícios.') + '</p>';
         if (ehEventoNotasPreview()) {
-            html += htmlBlocoVistaOficial(
-                'Notas',
-                'Como a coordenação abre em Notas, no detalhe do aluno.',
-                htmlTabelaNotasOficial(pv)
-            );
             var quadro = '';
             (pv.tabelas || []).forEach(function (t) {
                 var tab = Object.assign({}, t, {
@@ -3083,8 +2949,8 @@ $boletimWizardSteps = [
                 quadro += htmlTabelaPreview(tab);
             });
             html += htmlBlocoVistaOficial(
-                'Quadro de notas',
-                'Como a coordenação abre em Quadro de notas, no detalhe do aluno.',
+                'Demonstrativo de Notas',
+                'Blocos, semanas e médias.',
                 quadro
             );
             return html;
@@ -4008,12 +3874,12 @@ $boletimWizardSteps = [
 
         if (passo === 'revisar') {
             html += '<p class="text-sm text-gray-700">' + (ehEventoNotasPreview()
-                ? 'Confira como fica <strong>oficialmente</strong> no detalhe do aluno'
+                ? 'Confira o <strong>demonstrativo de notas</strong>'
                 : 'Confira o <strong>exemplo</strong> do boletim') + '</p>';
             html += '<p class="text-xs text-gray-500 mt-1">' + (ehBoletimComposto()
                 ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
                 : (ehEventoNotasPreview()
-                    ? 'As duas visões são as mesmas da coordenação: <strong>Notas</strong> e <strong>Quadro de notas</strong>. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.'
+                    ? 'É o quadro com blocos e semanas. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.'
                     : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.')) + '</p>';
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';

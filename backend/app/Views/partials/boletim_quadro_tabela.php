@@ -212,9 +212,33 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                                 $nv = $notasQ[$codO] ?? null;
                                 $isFaltas = ((string) ($oc['source_type'] ?? '')) === 'faltas_evento'
                                     || strtolower((string) ($oc['layout_type'] ?? '')) === 'faltas';
+                                $edicaoQuadro = is_array($edicaoSimulacao ?? null) ? $edicaoSimulacao : null;
+                                $stColQ = (string) ($oc['source_type'] ?? '');
+                                $isManualColQ = $stColQ === 'manual';
+                                $isPorMateriaColQ = $edicaoQuadro !== null
+                                    && in_array($stColQ, ['provas_sistema', 'jornadas', 'calculado'], true)
+                                    && (int) ($linQ['materia_id'] ?? 0) !== 0;
+                                $isCalcEditavelQ = $edicaoQuadro !== null
+                                    && (int) ($oc['id'] ?? 0) > 0
+                                    && ($isManualColQ || $isPorMateriaColQ);
+                                $mostrarIdemQ = $edicaoQuadro !== null && is_numeric($nv) && !empty($oc['valor_global']) && $iQ > 1;
                             ?>
-                                <td class="border border-gray-300 px-1 py-1 <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?>">
-                                    <?php if (is_numeric($nv)): ?>
+                                <td class="border border-gray-300 px-1 py-1 <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?><?= $isCalcEditavelQ ? ' boletim-cell-editavel cursor-pointer' : '' ?>"
+                                    <?php if ($isCalcEditavelQ): ?>
+                                    data-cell-editavel="1"
+                                    data-componente-id="<?= (int) ($oc['id'] ?? 0) ?>"
+                                    data-materia-id="<?= $isManualColQ ? 0 : (int) ($linQ['materia_id'] ?? 0) ?>"
+                                    data-regra-id="<?= (int) ($edicaoQuadro['regra_id'] ?? 0) ?>"
+                                    data-aluno-id="<?= (int) ($edicaoQuadro['aluno_id'] ?? 0) ?>"
+                                    data-periodo-ref="<?= htmlspecialchars((string) ($edicaoQuadro['periodo_ref'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                    data-escala-max="<?= htmlspecialchars(number_format((float) ($oc['escala_max'] ?? 10), 2, '.', ''), ENT_QUOTES, 'UTF-8') ?>"
+                                    title="<?= $isManualColQ ? 'Clique para editar (vale para todas as matérias deste bloco)' : 'Clique para sobrescrever só essa matéria, só para este aluno' ?>"
+                                    <?php endif; ?>
+                                >
+                                    <span class="boletim-cell-valor">
+                                    <?php if ($mostrarIdemQ): ?>
+                                        <span class="text-xs font-medium text-slate-500" title="Nota única, igual em todas as matérias.">idem</span>
+                                    <?php elseif (is_numeric($nv)): ?>
                                         <?= $isFaltas
                                             ? htmlspecialchars(number_format((float) round((float) $nv), 0, ',', '.'), ENT_QUOTES, 'UTF-8')
                                             : htmlspecialchars($fmtNotaQuadro($nv), ENT_QUOTES, 'UTF-8') ?>
@@ -222,6 +246,10 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                                         <?= htmlspecialchars($nv, ENT_QUOTES, 'UTF-8') ?>
                                     <?php else: ?>
                                         —
+                                    <?php endif; ?>
+                                    </span>
+                                    <?php if ($isCalcEditavelQ): ?>
+                                        <i class="fa-solid fa-pen text-[10px] text-indigo-400 ml-1 align-middle"></i>
                                     <?php endif; ?>
                                 </td>
                             <?php endforeach; ?>

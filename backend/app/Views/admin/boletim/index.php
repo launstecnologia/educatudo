@@ -1124,7 +1124,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-200">
                 <h2 class="text-lg font-semibold text-gray-900">Resultado da Simulação</h2>
-                <p class="text-xs text-gray-500 mt-1">A tabela <strong>Notas</strong> é a mesma da coordenação no detalhe do aluno. Se o evento tiver quadro, o <strong>Quadro de notas</strong> aparece em seguida.</p>
+                <p class="text-xs text-gray-500 mt-1">Somente o <strong>Demonstrativo de Notas</strong>, com blocos, semanas e médias.</p>
                 <p class="text-sm text-gray-500 mt-1">
                     Aluno: <strong><?= htmlspecialchars((string) (($simulacao['aluno']['nome'] ?? '-') )) ?></strong>
                 </p>

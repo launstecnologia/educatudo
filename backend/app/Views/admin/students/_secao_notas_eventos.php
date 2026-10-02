@@ -253,31 +253,39 @@ $renderQuadroDemonstrativo = static function (
         if ($cols === [] || $linhas === []) {
             return '';
         }
-        if (!BoletimQuadroLayoutHelper::ehLayoutQuadro($cols)) {
-            // Sem layout de quadro: usa tabela gerada padrão.
-            $evRender = [
-                'regra_id' => $regraId,
-                'regra_nome' => (string) ($simulacao['_regra_nome'] ?? ''),
-                'exibir_em' => 'notas',
-                'colunas' => $cols,
-                'linhas' => $linhas,
-                'decimal_places' => (int) ($simulacao['_decimal_places'] ?? 2),
-            ];
-            ob_start();
-            $boletins_gerados = [$evRender];
-            $boletim_pode_excluir = false;
-            $boletim_aluno_id = 0;
-            require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
-            return (string) ob_get_clean();
-        }
-        $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
-            ? $simulacao['matriz_materias_boletim']['linhas']
-            : $linhas;
         $decimalPlaces = ((int) ($simulacao['_decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $edicaoSimulacao = null;
+        $htmlQuadroVivo = '';
+        if (BoletimQuadroLayoutHelper::partirTabelas($cols) !== []) {
+            ob_start();
+            include dirname(__DIR__, 2) . '/partials/boletim_quadro_tabela.php';
+            $htmlQuadroVivo = (string) ob_get_clean();
+        }
+        if (stripos($htmlQuadroVivo, '<table') === false) {
+            $tituloTabelaSimples = 'Matéria';
+            $ocultar_grupo_hierarquia = false;
+            ob_start();
+            include dirname(__DIR__, 2) . '/partials/boletim_quadro_tabela_simples.php';
+            $htmlQuadroVivo = (string) ob_get_clean();
+        }
+        if (stripos($htmlQuadroVivo, '<table') !== false) {
+            return $htmlQuadroVivo;
+        }
+        $evRender = [
+            'regra_id' => $regraId,
+            'regra_nome' => (string) ($simulacao['_regra_nome'] ?? ''),
+            'exibir_em' => 'notas',
+            'colunas' => $cols,
+            'linhas' => $linhas,
+            'decimal_places' => (int) ($simulacao['_decimal_places'] ?? 2),
+        ];
         ob_start();
-        $simVistaId = $simVistaId;
-        include dirname(__DIR__, 2) . '/partials/boletim_simulacao_vistas.php';
-        return (string) ob_get_clean();
+        $boletins_gerados = [$evRender];
+        $boletim_pode_excluir = false;
+        $boletim_aluno_id = 0;
+        require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
+        $htmlGerado = (string) ob_get_clean();
+        return stripos($htmlGerado, '<table') === false ? '' : $htmlGerado;
     } catch (Throwable $e) {
         error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
         return '';
@@ -470,7 +478,8 @@ foreach ($linhasPeriodo as &$linhaP) {
                     $boletim_pode_excluir = false;
                     $boletim_aluno_id = 0;
                     require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
-                    $htmlQuadroPorChave[$chaveQuadro] = (string) ob_get_clean();
+                    $htmlGeradoLista = (string) ob_get_clean();
+                    $htmlQuadroPorChave[$chaveQuadro] = stripos($htmlGeradoLista, '<table') === false ? '' : $htmlGeradoLista;
                     $boletins_gerados = $boletinsGeradosBackup;
                     $boletim_pode_excluir = $boletimPodeExcluirBackup;
                     $boletim_aluno_id = $boletimAlunoIdBackup;
@@ -574,32 +583,18 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
                             <td class="px-6 py-4 text-sm text-gray-800"><?= $esc($descricao !== '' ? $descricao : '—') ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">
                                 <div class="flex flex-wrap items-center justify-end gap-2">
-                                    <?php if (!empty($linhaP['tem_resumo'])): ?>
-                                        <?php
-                                        $ui_btn_variant = 'complementar';
-                                        $ui_btn_label = 'Notas';
-                                        $ui_btn_icon = 'fa-solid fa-list-ol';
-                                        $ui_btn_class = 'px-3 py-1.5';
-                                        $ui_btn_onclick = $jsAbrir((string) $linhaP['id_resumo'], 'Notas — ' . $tituloModal);
-                                        require $btnNotasPartial;
-                                        ?>
-                                    <?php else: ?>
-                                        <button type="button" disabled class="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
-                                            <i class="fa-solid fa-list-ol mr-2"></i> Notas
-                                        </button>
-                                    <?php endif; ?>
                                     <?php if (!empty($linhaP['tem_quadro'])): ?>
                                         <?php
                                         $ui_btn_variant = 'primary';
-                                        $ui_btn_label = 'Quadro de notas';
+                                        $ui_btn_label = 'Demonstrativo de Notas';
                                         $ui_btn_icon = 'fa-solid fa-table-cells';
                                         $ui_btn_class = 'px-3 py-1.5';
-                                        $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], 'Quadro de notas — ' . $tituloModal);
+                                        $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], 'Demonstrativo de Notas — ' . $tituloModal);
                                         require $btnNotasPartial;
                                         ?>
                                     <?php else: ?>
                                         <button type="button" disabled class="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
-                                            <i class="fa-solid fa-table-cells mr-2"></i> Quadro de notas
+                                            <i class="fa-solid fa-table-cells mr-2"></i> Demonstrativo de Notas
                                         </button>
                                     <?php endif; ?>
                                 </div>
