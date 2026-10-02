@@ -5611,6 +5611,22 @@ class BoletimConfigController extends BaseController
                 $materiaNomesPorId[$midLimpeza] = $nomeLimpeza;
             }
         }
+        // Filha da área desmarcada neste evento (ex.: Literatura fora de Língua
+        // Portuguesa só neste bimestre) não vira linha, nem no quadro nem no gravado.
+        $excluidosGroupLine = $this->materiaIdsExcluidosGroupLineDosComponentes($componentesRegra);
+        if ($excluidosGroupLine !== []) {
+            foreach (array_keys($excluidosGroupLine) as $midExcluido) {
+                unset($allMids[(int) $midExcluido]);
+            }
+            if ($materiasSelecionadas !== []) {
+                $materiasSelecionadas = array_values(array_filter(
+                    $materiasSelecionadas,
+                    static function ($id) use ($excluidosGroupLine): bool {
+                        return !isset($excluidosGroupLine[(int) $id]);
+                    }
+                ));
+            }
+        }
         if ($allMids === []) {
             return null;
         }
@@ -6052,6 +6068,76 @@ class BoletimConfigController extends BaseController
         $simulacao['matriz_materias'] = $matriz;
 
         return $simulacao;
+    }
+
+    /**
+     * Tira do quadro já gravado as filhas desmarcadas neste evento
+     * (ex.: Literatura fora de Língua Portuguesa só neste bimestre).
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @param array<string,mixed> $regra
+     * @return list<array<string,mixed>>
+     */
+    public function filtrarLinhasSemFilhasExcluidasDoEvento(array $linhas, array $regra): array
+    {
+        if ($linhas === []) {
+            return [];
+        }
+        $excluidos = $this->materiaIdsExcluidosGroupLineDosComponentes((array) ($regra['componentes'] ?? []));
+        if ($excluidos === []) {
+            return $linhas;
+        }
+        $out = [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $mid = (int) ($linha['materia_id'] ?? 0);
+            if ($mid > 0 && isset($excluidos[$mid])) {
+                continue;
+            }
+            $out[] = $linha;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $componentes
+     * @return array<int, true>
+     */
+    private function materiaIdsExcluidosGroupLineDosComponentes(array $componentes): array
+    {
+        $grupos = [];
+        foreach ($componentes as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $grp = $this->parseGroupLineConfigFromComponente($comp);
+            if ($grp === null) {
+                continue;
+            }
+            $gk = (string) ($grp['key'] ?? '');
+            if ($gk === '' || isset($grupos[$gk])) {
+                continue;
+            }
+            $filhosIds = [];
+            foreach ((array) ($grp['materias_ids'] ?? []) as $midF) {
+                $midF = (int) $midF;
+                if ($midF > 0) {
+                    $filhosIds[$midF] = $midF;
+                }
+            }
+            if (count($filhosIds) < 2) {
+                continue;
+            }
+            $grupos[$gk] = [
+                'filhos_ids' => $filhosIds,
+                'agrupamento_id' => (int) ($grp['agrupamento_id'] ?? 0),
+            ];
+        }
+
+        return $this->materiasExcluidasDoGroupLineNoEvento($grupos);
     }
 
     /**

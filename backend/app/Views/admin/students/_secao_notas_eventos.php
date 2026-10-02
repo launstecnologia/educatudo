@@ -302,6 +302,27 @@ $renderNotasComoCoordenacao = static function (array $ev): string {
     return (string) ob_get_clean();
 };
 
+$regrasFiltroNotas = [];
+$semFilhasExcluidas = static function (array $ev) use (&$regrasFiltroNotas, $obterMotorDemonstrativo, $obterCfgBoletim): array {
+    $rid = (int) ($ev['regra_id'] ?? 0);
+    $linhas = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
+    if ($rid <= 0 || $linhas === []) {
+        return $ev;
+    }
+    if (!array_key_exists($rid, $regrasFiltroNotas)) {
+        $cfg = $obterCfgBoletim();
+        $regrasFiltroNotas[$rid] = $cfg !== null ? $cfg->getRuleById($rid) : null;
+    }
+    $regra = $regrasFiltroNotas[$rid];
+    $motor = $obterMotorDemonstrativo();
+    if (!is_array($regra) || $motor === null) {
+        return $ev;
+    }
+    $ev['linhas'] = $motor->filtrarLinhasSemFilhasExcluidasDoEvento($linhas, $regra);
+
+    return $ev;
+};
+
 $fontesNotas = [];
 $htmlQuadroPorChave = [];
 $idxLinha = 0;
@@ -329,7 +350,10 @@ foreach ($linhasPeriodo as &$linhaP) {
         }
     }
     if (is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
-        $htmlResumo = $renderNotasComoCoordenacao($evNotas);
+        $evNotas = $semFilhasExcluidas($evNotas);
+        if (!empty($evNotas['linhas'])) {
+            $htmlResumo = $renderNotasComoCoordenacao($evNotas);
+        }
     }
     if ($htmlResumo === '' && is_array($linhaP['resumo'] ?? null)) {
         $resumos_notas = [$linhaP['resumo']];
@@ -370,6 +394,9 @@ foreach ($linhasPeriodo as &$linhaP) {
                     $evGerado = $evCand;
                     break;
                 }
+            }
+            if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+                $evGerado = $semFilhasExcluidas($evGerado);
             }
             if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
                 $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
