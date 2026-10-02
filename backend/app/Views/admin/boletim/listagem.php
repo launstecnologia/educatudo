@@ -9,6 +9,7 @@ $flashType = (string) ($flash_type ?? 'success');
 $temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
 $geracaoJobIds = array_values(array_filter(array_map('intval', $geracao_job_ids ?? [])));
 $geracaoConcluidaMsg = trim((string) ($geracao_concluida_msg ?? ''));
+$verDesabilitados = !empty($ver_desabilitados);
 $filtrosAtivosCount = 0;
 foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     if ($fv !== '') {
@@ -78,6 +79,11 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-clipboard-list mr-2 text-gray-500"></i>
                 Modelo de Boletim
+            </a>
+            <a href="<?= URL ?>/admin/boletim<?= $verDesabilitados ? '' : '?desabilitados=1' ?>"
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid <?= $verDesabilitados ? 'fa-list' : 'fa-eye-slash' ?> mr-2 text-gray-500"></i>
+                <?= $verDesabilitados ? 'Avaliações ativas' : 'Desabilitados' ?>
             </a>
             <a href="<?= URL ?>/admin/boletim/arquivo"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -184,6 +190,13 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
 <form id="form-excluir-evento-boletim" method="POST" action="<?= URL ?>/admin/boletim-configuracao/excluir-regra" class="hidden" aria-hidden="true">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
     <input type="hidden" name="regra_id" id="excluir-evento-regra-id" value="">
+</form>
+
+<!-- Desabilitar na lista de avaliações (form compartilhado) -->
+<form id="form-desabilitar-lista-avaliacoes" method="POST" action="<?= URL ?>/admin/boletim-configuracao/desabilitar-lista" class="hidden" aria-hidden="true">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+    <input type="hidden" name="regra_id" id="desabilitar-lista-regra-id" value="">
+    <input type="hidden" name="oculto" id="desabilitar-lista-oculto" value="1">
 </form>
 
 <!-- Duplicar evento (form compartilhado) -->
@@ -350,6 +363,11 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                             <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
                             <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Liberar para alunos/pais' ?>
                         </button>
+                        <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $verDesabilitados ? 0 : 1 ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid <?= $verDesabilitados ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
+                            <?= $verDesabilitados ? 'Habilitar nesta lista' : 'Desabilitar' ?>
+                        </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <?php if ($geracaoEmAndamento): ?>
                         <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="block"
@@ -459,6 +477,18 @@ function bloquearExibicaoEventoBoletim(id, bloquear) {
     document.getElementById('bloquear-exibicao-regra-id').value = id;
     document.getElementById('bloquear-exibicao-valor').value = Number(bloquear) === 1 ? '1' : '0';
     document.getElementById('form-bloquear-exibicao-evento').submit();
+}
+
+function desabilitarEventoLista(id, oculto) {
+    const acao = Number(oculto) === 1
+        ? 'Desabilitar este evento? Ele sai desta lista de avaliações. As notas já geradas continuam no aluno.'
+        : 'Habilitar este evento de novo nesta lista?';
+    if (!confirm(acao)) {
+        return;
+    }
+    document.getElementById('desabilitar-lista-regra-id').value = id;
+    document.getElementById('desabilitar-lista-oculto').value = Number(oculto) === 1 ? '1' : '0';
+    document.getElementById('form-desabilitar-lista-avaliacoes').submit();
 }
 
 function alterarVisibilidadeEventoBoletim(id, visivel) {

@@ -119,6 +119,11 @@ class BoletimConfigController extends BaseController
         $eventos = array_values(array_filter($eventos, static function ($ev) {
             return strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim'))) === 'notas';
         }));
+        $verDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
+        $eventos = array_values(array_filter($eventos, function ($ev) use ($verDesabilitados) {
+            $oculto = $this->eventoOcultoNaListaAvaliacoes(is_array($ev) ? $ev : []);
+            return $verDesabilitados ? $oculto : !$oculto;
+        }));
 
         $nomesBoletim = [];
         try {
@@ -216,6 +221,7 @@ class BoletimConfigController extends BaseController
             'filtro_nome' => $filtroNome,
             'filtro_ano' => $filtroAno,
             'filtro_bimestre' => $filtroBimestre,
+            'ver_desabilitados' => $verDesabilitados,
             'pagination' => [
                 'total' => $total,
                 'per_page' => $perPage,
@@ -1770,6 +1776,42 @@ class BoletimConfigController extends BaseController
         }
 
         $this->redirect('/admin/boletim-configuracao?novo=1');
+    }
+
+    public function desabilitarListaAvaliacoes(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        $oculto = (int) ($_POST['oculto'] ?? 1) === 1;
+        if ($regraId <= 0 || $this->boletimConfig->getRuleById($regraId) === null) {
+            $_SESSION['boletim_flash'] = 'Evento não encontrado.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim');
+        }
+        $ok = $this->boletimConfig->mesclarExtrasJson($regraId, [
+            'oculto_lista_avaliacoes' => $oculto ? 1 : 0,
+        ]);
+        if ($ok) {
+            $_SESSION['boletim_flash'] = $oculto
+                ? 'Evento desabilitado. Ele saiu desta lista. As notas já geradas continuam no aluno.'
+                : 'Evento habilitado de novo nesta lista.';
+            $_SESSION['boletim_flash_type'] = 'success';
+        } else {
+            $_SESSION['boletim_flash'] = 'Não foi possível alterar o evento.';
+            $_SESSION['boletim_flash_type'] = 'error';
+        }
+        $this->redirect($oculto ? '/admin/boletim' : '/admin/boletim?desabilitados=1');
+    }
+
+    /**
+     * @param array<string,mixed> $evento
+     */
+    private function eventoOcultoNaListaAvaliacoes(array $evento): bool
+    {
+        $raw = $evento['extras_json'] ?? '';
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        return is_array($decoded) && !empty($decoded['oculto_lista_avaliacoes']);
     }
 
     public function alternarVisibilidadeRegra()

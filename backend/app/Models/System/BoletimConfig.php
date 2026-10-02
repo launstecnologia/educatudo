@@ -1076,8 +1076,11 @@ class BoletimConfig
         $selBoletimId = $this->hasColumn('boletim_regras', 'boletim_id')
             ? 'boletim_id'
             : 'NULL AS boletim_id';
+        $selExtras = $this->hasColumn('boletim_regras', 'extras_json')
+            ? 'extras_json'
+            : 'NULL AS extras_json';
         return $this->db->fetchAll(
-            "SELECT id, nome, codigo, descricao_curta, exibir_em, {$selFinalidade}, {$selBoletimId}, ano_letivo, bimestre, series_ids, turmas_ids, vis_aluno, vis_pais, vis_coordenacao, updated_at
+            "SELECT id, nome, codigo, descricao_curta, exibir_em, {$selFinalidade}, {$selBoletimId}, {$selExtras}, ano_letivo, bimestre, series_ids, turmas_ids, vis_aluno, vis_pais, vis_coordenacao, updated_at
              FROM boletim_regras
              WHERE ativo = 1
              ORDER BY updated_at DESC, id DESC

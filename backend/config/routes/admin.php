@@ -362,6 +362,7 @@ $router->post('/admin/boletim-configuracao/renomear', 'Admin/BoletimConfigContro
 $router->post('/admin/boletim-configuracao/excluir-regra', 'Admin/BoletimConfigController@excluirRegra');
 $router->post('/admin/boletim-configuracao/duplicar-regra', 'Admin/BoletimConfigController@duplicarRegra');
 $router->post('/admin/boletim-configuracao/visibilidade-regra', 'Admin/BoletimConfigController@alternarVisibilidadeRegra');
+$router->post('/admin/boletim-configuracao/desabilitar-lista', 'Admin/BoletimConfigController@desabilitarListaAvaliacoes');
 $router->post('/admin/boletim-configuracao/notas-manuais', 'Admin/BoletimConfigController@salvarNotasManuais');
 $router->post('/admin/boletim-configuracao/nota-manual-materia-ajax', 'Admin/BoletimConfigController@salvarNotaManualMateriaAjax');
 $router->post('/admin/boletim-configuracao/gerar-boletins', 'Admin/BoletimConfigController@gerarBoletins');
