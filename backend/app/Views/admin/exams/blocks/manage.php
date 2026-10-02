@@ -198,19 +198,58 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
 
 <?php if (isset($contagem)): ?>
 <?php
+$totalLnBase = max(1, (int) ($contagem['ln_nao_iniciado'] ?? 0) + (int) ($contagem['ln_em_andamento'] ?? 0) + (int) ($contagem['ln_concluido'] ?? 0));
 $cardsLn = [
-    ['label' => 'Sem notas', 'valor' => (int) ($contagem['ln_nao_iniciado'] ?? 0)],
-    ['label' => 'Em andamento', 'valor' => (int) ($contagem['ln_em_andamento'] ?? 0)],
-    ['label' => 'Concluído', 'valor' => (int) ($contagem['ln_concluido'] ?? 0)],
-    ['label' => 'Abaixo de 6', 'valor' => (int) ($contagem['ln_abaixo_seis'] ?? 0)],
+    ['key' => 'nao_iniciado', 'label' => 'Sem notas', 'valor' => (int) ($contagem['ln_nao_iniciado'] ?? 0), 'icon' => 'fa-file', 'tone' => 'bg-slate-100 text-slate-600', 'cardBg' => 'bg-slate-50', 'bar' => 'bg-slate-400', 'den' => $totalLnBase],
+    ['key' => 'em_andamento', 'label' => 'Em andamento', 'valor' => (int) ($contagem['ln_em_andamento'] ?? 0), 'icon' => 'fa-hourglass-half', 'tone' => 'bg-amber-50 text-amber-600', 'cardBg' => 'bg-amber-50/40', 'bar' => 'bg-amber-400', 'den' => $totalLnBase],
+    ['key' => 'concluido', 'label' => 'Concluído', 'valor' => (int) ($contagem['ln_concluido'] ?? 0), 'icon' => 'fa-circle-check', 'tone' => 'bg-emerald-50 text-emerald-600', 'cardBg' => 'bg-emerald-50/40', 'bar' => 'bg-emerald-500', 'den' => $totalLnBase],
+    ['key' => 'abaixo_seis', 'label' => 'Abaixo de 6', 'valor' => (int) ($contagem['ln_abaixo_seis'] ?? 0), 'icon' => 'fa-triangle-exclamation', 'tone' => 'bg-rose-50 text-rose-600', 'cardBg' => 'bg-rose-50/40', 'bar' => 'bg-rose-400', 'den' => max(1, (int) ($contagem['ln_abaixo_seis'] ?? 0))],
 ];
 ?>
-<div class="bg-white rounded-xl border border-gray-200 px-4 py-2.5 mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-    <?php foreach ($cardsLn as $i => $card): ?>
-    <div class="flex items-baseline gap-2 <?= $i > 0 ? 'lg:border-l lg:border-gray-200 lg:pl-6' : '' ?>">
-        <span class="text-sm text-gray-500"><?= htmlspecialchars($card['label']) ?></span>
-        <span class="text-base font-bold text-gray-900"><?= $card['valor'] ?></span>
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5" id="cardsFiltroStatusLn">
+    <?php foreach ($cardsLn as $card): ?>
+    <?php
+    $percCard = $card['key'] === 'abaixo_seis'
+        ? null
+        : (int) round(($card['valor'] / $card['den']) * 100);
+    ?>
+    <?php if ($card['key'] === 'abaixo_seis'): ?>
+    <div class="text-left <?= $card['cardBg'] ?> rounded-xl border border-[#E5EAF1] px-3.5 py-3">
+        <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 truncate"><?= htmlspecialchars($card['label']) ?></p>
+                <p class="text-2xl font-bold text-gray-900 leading-tight mt-0.5"><?= $card['valor'] ?></p>
+                <p class="text-[11px] text-gray-400 mt-0.5">notas &lt; 6</p>
+            </div>
+            <div class="w-8 h-8 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
+                <i class="fa-solid <?= $card['icon'] ?> text-sm" aria-hidden="true"></i>
+            </div>
+        </div>
     </div>
+    <?php else: ?>
+    <button type="button"
+            class="card-filtro-status-ln text-left <?= $card['cardBg'] ?> rounded-xl border border-[#E5EAF1] px-3.5 py-3 relative overflow-hidden hover:border-gray-300 transition-colors"
+            data-status="<?= htmlspecialchars($card['key']) ?>"
+            aria-pressed="false">
+        <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <p class="text-xs text-gray-500 truncate"><?= htmlspecialchars($card['label']) ?></p>
+                <p class="text-2xl font-bold text-gray-900 leading-tight mt-0.5"><?= $card['valor'] ?></p>
+                <p class="text-[11px] text-gray-400 mt-0.5"><?= $percCard ?>% do total</p>
+            </div>
+            <div class="w-8 h-8 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
+                <i class="fa-solid <?= $card['icon'] ?> text-sm" aria-hidden="true"></i>
+            </div>
+        </div>
+        <?php if ($card['key'] === 'concluido'): ?>
+        <div class="mt-2.5 h-1 rounded-full bg-emerald-100 overflow-hidden">
+            <div class="h-full <?= $card['bar'] ?> rounded-full" style="width: <?= (int) $percCard ?>%"></div>
+        </div>
+        <?php else: ?>
+        <span class="card-filtro-bar absolute bottom-0 left-0 right-0 h-1 <?= $card['bar'] ?> opacity-0"></span>
+        <?php endif; ?>
+    </button>
+    <?php endif; ?>
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
@@ -362,41 +401,43 @@ usort($linhasLancamento, static function (array $a, array $b): int {
     return strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
 });
 $statusMapLancamento = [
-    'nao_iniciado' => ['bg-gray-100 text-gray-700', 'Não iniciou'],
-    'em_andamento' => ['bg-amber-50 text-amber-800', 'Em andamento'],
-    'concluido' => ['bg-emerald-50 text-emerald-800', 'Concluído'],
-    'sem_alunos' => ['bg-gray-50 text-gray-500', 'Sem alunos nas turmas'],
+    'nao_iniciado' => ['bg-slate-100 text-slate-700', 'fa-file', 'Não iniciou'],
+    'em_andamento' => ['bg-amber-50 text-amber-800', 'fa-hourglass-half', 'Em andamento'],
+    'concluido' => ['bg-emerald-50 text-emerald-800', 'fa-check', 'Concluído'],
+    'sem_alunos' => ['bg-gray-50 text-gray-500', 'fa-user-slash', 'Sem alunos nas turmas'],
 ];
-$mostrarFiltrosLn = count($linhasLancamento) > 3;
+$materiasFiltroLn = [];
+foreach ($linhasLancamento as $rowMat) {
+    $mn = trim((string) ($rowMat['materia_nome'] ?? ''));
+    if ($mn !== '') {
+        $materiasFiltroLn[$mn] = true;
+    }
+}
+ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
+$totalLinhasLn = count($linhasLancamento);
+$perPageLn = 10;
 ?>
-<div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-    <div class="px-4 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+<div class="bg-white rounded-xl border border-[#E5EAF1] overflow-hidden mb-6">
+    <div class="px-4 sm:px-5 py-4 border-b border-[#E5EAF1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div class="min-w-0">
-            <h3 class="text-base font-semibold text-gray-900">Por professor e matéria</h3>
-            <p class="text-xs text-gray-500 mt-0.5">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900">Lançamento por professor e matéria</h3>
+            <p class="text-sm text-gray-500 mt-0.5">
                 <?= $lancamentoPorCoordenacao
                     ? 'Coordenação lança as notas deste evento.'
                     : 'Acompanhe o progresso e acesse o lançamento de cada matéria.' ?>
             </p>
         </div>
-        <?php if ($mostrarFiltrosLn): ?>
+        <?php if ($linhasLancamento !== []): ?>
         <div class="flex flex-wrap items-center gap-2">
-            <input type="search" id="buscaLancamentoTabela" placeholder="Buscar..."
-                   class="px-3 py-1.5 w-44 rounded-lg border border-gray-300 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" aria-hidden="true"></i>
+                <input type="search" id="buscaLancamentoTabela" placeholder="Buscar por professor, matéria..."
+                       class="pl-9 pr-3 py-2 w-52 sm:w-64 rounded-lg border border-[#E5EAF1] text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white">
+            </div>
             <select id="filtroMateriaLancamento"
-                    class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                    class="px-3 py-2 rounded-lg border border-[#E5EAF1] text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
                 <option value="">Todas as matérias</option>
-                <?php
-                $materiasFiltroLn = [];
-                foreach ($linhasLancamento as $rowMat) {
-                    $mn = trim((string) ($rowMat['materia_nome'] ?? ''));
-                    if ($mn !== '') {
-                        $materiasFiltroLn[$mn] = true;
-                    }
-                }
-                ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
-                foreach (array_keys($materiasFiltroLn) as $matOpt):
-                ?>
+                <?php foreach (array_keys($materiasFiltroLn) as $matOpt): ?>
                 <option value="<?= htmlspecialchars($matOpt) ?>"><?= htmlspecialchars($matOpt) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -410,22 +451,26 @@ $mostrarFiltrosLn = count($linhasLancamento) > 3;
     <?php else: ?>
     <div class="overflow-x-auto">
         <table class="min-w-full" id="tabelaLancamento">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Matéria</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Progresso</th>
-                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
-                    <th class="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+            <thead class="bg-[#F7F9FC]">
+                <tr class="border-b border-[#E5EAF1]">
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Professor</th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Matéria</th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Progresso</th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Situação</th>
+                    <th class="px-4 sm:px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ações</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-[#E5EAF1]">
                 <?php foreach ($linhasLancamento as $row): ?>
                 <?php
                 $st = (string) ($row['status'] ?? '');
-                $pair = $statusMapLancamento[$st] ?? ['bg-gray-100 text-gray-800', $st];
+                $pair = $statusMapLancamento[$st] ?? ['bg-gray-100 text-gray-800', 'fa-circle', $st];
                 $profNome = (string) ($row['professor_nome'] ?? '');
                 $matNome = (string) ($row['materia_nome'] ?? '');
+                $matCls = $estiloMateria($matNome);
+                $comNota = (int) ($row['com_nota'] ?? 0);
+                $totalEsp = (int) ($row['total_esperado'] ?? 0);
+                $percRow = $totalEsp > 0 ? (int) round(($comNota / $totalEsp) * 100) : (int) ($row['perc'] ?? 0);
                 if ($lancamentoPorCoordenacao) {
                     $urlLancar = URL . '/admin/provas/blocos/' . (int) $bloco['id']
                         . '/lancar-notas-coordenacao?materia_id=' . (int) ($row['materia_id'] ?? 0);
@@ -435,27 +480,38 @@ $mostrarFiltrosLn = count($linhasLancamento) > 3;
                         . '&materia_id=' . (int) ($row['materia_id'] ?? 0);
                 }
                 ?>
-                <tr class="hover:bg-gray-50 linha-tabela-filtravel"
+                <tr class="hover:bg-[#F7F9FC]/80 linha-tabela-filtravel"
                     data-professor="<?= htmlspecialchars(mb_strtolower($profNome)) ?>"
-                    data-materia="<?= htmlspecialchars(mb_strtolower($matNome)) ?>">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                    data-materia="<?= htmlspecialchars(mb_strtolower($matNome)) ?>"
+                    data-status="<?= htmlspecialchars($st) ?>">
+                    <td class="px-4 sm:px-5 py-3.5 text-sm font-medium text-gray-900 whitespace-nowrap">
                         <?= htmlspecialchars($profNome) ?>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
-                        <?= htmlspecialchars($matNome) ?>
-                    </td>
-                    <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                        <?= (int) ($row['com_nota'] ?? 0) ?> / <?= (int) ($row['total_esperado'] ?? 0) ?>
-                        <?php if ((int) ($row['total_esperado'] ?? 0) > 0): ?>
-                            <span class="text-gray-400">(<?= htmlspecialchars((string) ($row['perc'] ?? '')) ?>%)</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="px-4 py-3 whitespace-nowrap">
-                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium <?= $pair[0] ?>">
-                            <?= htmlspecialchars($pair[1]) ?>
+                    <td class="px-4 sm:px-5 py-3.5">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?= $matCls ?>">
+                            <?= htmlspecialchars($matNome) ?>
                         </span>
                     </td>
-                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                    <td class="px-4 sm:px-5 py-3.5 text-sm text-gray-700 whitespace-nowrap min-w-[140px]">
+                        <div class="flex items-center gap-2">
+                            <span><?= $comNota ?> / <?= $totalEsp ?></span>
+                            <?php if ($totalEsp > 0): ?>
+                            <span class="text-gray-400">(<?= $percRow ?>%)</span>
+                            <?php endif; ?>
+                        </div>
+                        <?php if ($totalEsp > 0): ?>
+                        <div class="mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden max-w-[120px]">
+                            <div class="h-full rounded-full <?= $percRow >= 100 ? 'bg-emerald-500' : ($percRow > 0 ? 'bg-amber-400' : 'bg-slate-300') ?>" style="width: <?= min(100, $percRow) ?>%"></div>
+                        </div>
+                        <?php endif; ?>
+                    </td>
+                    <td class="px-4 sm:px-5 py-3.5 whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold <?= $pair[0] ?>">
+                            <i class="fa-solid <?= $pair[1] ?> text-[10px]" aria-hidden="true"></i>
+                            <?= htmlspecialchars($pair[2]) ?>
+                        </span>
+                    </td>
+                    <td class="px-4 sm:px-5 py-3.5 text-right whitespace-nowrap">
                         <a href="<?= htmlspecialchars($urlLancar) ?>"
                            class="btn-primary-custom inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
@@ -467,11 +523,10 @@ $mostrarFiltrosLn = count($linhasLancamento) > 3;
             </tbody>
         </table>
     </div>
-    <?php if ($mostrarFiltrosLn): ?>
-    <div class="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500">
-        <span id="contadorLancamentoTabela">Mostrando <?= count($linhasLancamento) ?> de <?= count($linhasLancamento) ?> registros</span>
+    <div class="px-4 sm:px-5 py-3 border-t border-[#E5EAF1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-500">
+        <span id="contadorLancamentoTabela">Mostrando <?= min($perPageLn, $totalLinhasLn) ?> de <?= $totalLinhasLn ?> registros</span>
+        <div id="paginacaoLancamentoTabela" class="flex items-center gap-1" data-per-page="<?= (int) $perPageLn ?>"></div>
     </div>
-    <?php endif; ?>
     <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -1144,17 +1199,20 @@ document.addEventListener('click', function (e) {
         buscaId: 'buscaLancamentoTabela',
         materiaId: 'filtroMateriaLancamento',
         contadorId: 'contadorLancamentoTabela',
-        cardSelector: ''
+        paginacaoId: 'paginacaoLancamentoTabela',
+        cardSelector: '.card-filtro-status-ln'
     });
 })();
 </script>
 
 <style>
-.card-filtro-status.is-active {
+.card-filtro-status.is-active,
+.card-filtro-status-ln.is-active {
     border-color: #93c5fd;
     box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15);
 }
-.card-filtro-status.is-active .card-filtro-bar {
+.card-filtro-status.is-active .card-filtro-bar,
+.card-filtro-status-ln.is-active .card-filtro-bar {
     opacity: 1;
 }
 </style>
