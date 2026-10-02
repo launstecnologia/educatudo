@@ -253,68 +253,103 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
     <p class="text-sm text-gray-600 mt-2">Neste evento, a coordenação lança uma única nota por aluno e o sistema replica automaticamente para todas as matérias.</p>
     <div class="mt-4">
         <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/lancar-notas-coordenacao"
-           class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg hover:opacity-90">
-            Lançar/editar nota única dos alunos
+           class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg hover:opacity-90">
+            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+            Lançar
         </a>
     </div>
 </div>
-<?php elseif (empty($lancamentoPorMateria)): ?>
-<div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-900 mb-6">
-    Nenhum professor/matéria vinculado a este evento. Edite o bloco e adicione professores com turmas.
-</div>
 <?php else: ?>
-<?php foreach ($lancamentoPorMateria as $materiaNome => $linhas): ?>
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4"><?= htmlspecialchars($materiaNome) ?></h3>
+<?php
+$linhasLancamento = [];
+foreach ($lancamentoPorMateria ?? [] as $materiaNome => $linhasMat) {
+    foreach ($linhasMat as $row) {
+        $linhasLancamento[] = $row;
+    }
+}
+usort($linhasLancamento, static function (array $a, array $b): int {
+    $cmp = strcasecmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    return strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
+});
+$statusMapLancamento = [
+    'nao_iniciado' => ['bg-red-100 text-red-800', 'Não iniciou'],
+    'em_andamento' => ['bg-amber-100 text-amber-800', 'Em andamento'],
+    'concluido' => ['bg-green-100 text-green-800', 'Concluído'],
+    'sem_alunos' => ['bg-gray-100 text-gray-700', 'Sem alunos nas turmas'],
+];
+?>
+<div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Lançamento por professor e matéria</h3>
+        <p class="text-sm text-gray-600 mt-0.5">
+            <?= $lancamentoPorCoordenacao
+                ? 'Coordenação lança as notas deste evento.'
+                : 'Acompanhe o progresso dos professores e acesse o lançamento de cada matéria.' ?>
+        </p>
+    </div>
+    <?php if ($linhasLancamento === []): ?>
+    <div class="px-6 py-8 text-amber-900 bg-amber-50 border-t border-amber-100">
+        Nenhum professor/matéria vinculado a este evento. Edite o bloco e adicione professores com turmas.
+    </div>
+    <?php else: ?>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matéria</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progresso</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                <?php foreach ($linhas as $row): ?>
-                <tr>
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars($row['professor_nome'] ?? '') ?></td>
-                    <td class="px-6 py-4 text-sm text-gray-700">
-                        <?= (int)($row['com_nota'] ?? 0) ?> / <?= (int)($row['total_esperado'] ?? 0) ?>
-                        <?php if (($row['total_esperado'] ?? 0) > 0): ?>
-                            <span class="text-gray-500">(<?= htmlspecialchars((string)($row['perc'] ?? '')) ?>%)</span>
+                <?php foreach ($linhasLancamento as $row): ?>
+                <?php
+                $st = (string) ($row['status'] ?? '');
+                $pair = $statusMapLancamento[$st] ?? ['bg-gray-100 text-gray-800', $st];
+                if ($lancamentoPorCoordenacao) {
+                    $urlLancar = URL . '/admin/provas/blocos/' . (int) $bloco['id']
+                        . '/lancar-notas-coordenacao?materia_id=' . (int) ($row['materia_id'] ?? 0);
+                } else {
+                    $urlLancar = URL . '/admin/provas/blocos/' . (int) $bloco['id']
+                        . '/notas-lancadas?professor_id=' . (int) ($row['professor_id'] ?? 0)
+                        . '&materia_id=' . (int) ($row['materia_id'] ?? 0);
+                }
+                ?>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                        <?= htmlspecialchars((string) ($row['professor_nome'] ?? '')) ?>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-800">
+                        <?= htmlspecialchars((string) ($row['materia_nome'] ?? '')) ?>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">
+                        <?= (int) ($row['com_nota'] ?? 0) ?> / <?= (int) ($row['total_esperado'] ?? 0) ?>
+                        <?php if ((int) ($row['total_esperado'] ?? 0) > 0): ?>
+                            <span class="text-gray-500">(<?= htmlspecialchars((string) ($row['perc'] ?? '')) ?>%)</span>
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <?php
-                        $st = $row['status'] ?? '';
-                        $map = [
-                            'nao_iniciado' => ['bg-red-100 text-red-800', 'Não iniciou'],
-                            'em_andamento' => ['bg-amber-100 text-amber-800', 'Em andamento'],
-                            'concluido' => ['bg-green-100 text-green-800', 'Concluído'],
-                            'sem_alunos' => ['bg-gray-100 text-gray-700', 'Sem alunos nas turmas'],
-                        ];
-                        $pair = $map[$st] ?? ['bg-gray-100 text-gray-800', $st];
-                        ?>
                         <span class="px-2 py-1 text-xs font-semibold rounded-full <?= $pair[0] ?>"><?= htmlspecialchars($pair[1]) ?></span>
                     </td>
-                    <td class="px-6 py-4 text-sm">
-                        <?php if ($lancamentoPorCoordenacao): ?>
-                            <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/lancar-notas-coordenacao?materia_id=<?= (int)($row['materia_id'] ?? 0) ?>"
-                               class="text-violet-700 hover:text-violet-900 font-medium">Lançar/editar notas</a>
-                        <?php else: ?>
-                            <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/notas-lancadas?professor_id=<?= (int)($row['professor_id'] ?? 0) ?>&materia_id=<?= (int)($row['materia_id'] ?? 0) ?>"
-                               class="text-indigo-600 hover:text-indigo-900 font-medium">Ver notas dos alunos</a>
-                        <?php endif; ?>
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <a href="<?= htmlspecialchars($urlLancar) ?>"
+                           class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            Lançar
+                        </a>
                     </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+    <?php endif; ?>
 </div>
-<?php endforeach; ?>
 <?php endif; ?>
 
 <?php else: ?>

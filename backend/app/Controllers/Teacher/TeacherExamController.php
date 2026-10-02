@@ -1906,17 +1906,7 @@ class TeacherExamController extends BaseController
         require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
         $notasModel = new ExamBlockManualGrade();
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $mapExistente = [];
-        foreach ($existentes as $ln) {
-            $k = (int) ($ln['professor_id'] ?? 0) . '_'
-                . (int) ($ln['materia_id'] ?? 0) . '_'
-                . (int) ($ln['turma_id'] ?? 0) . '_'
-                . (int) ($ln['aluno_id'] ?? 0);
-            $mapExistente[$k] = [
-                'nota' => $ln['nota'],
-                'observacao' => (string) ($ln['observacao'] ?? ''),
-            ];
-        }
+        $indexNotas = $this->indexarNotasLancadasBloco($existentes);
 
         $linhas = [];
         foreach ($combos as $combo) {
@@ -1927,8 +1917,14 @@ class TeacherExamController extends BaseController
                 if ($tid <= 0 || $aid <= 0) {
                     continue;
                 }
-                $k = $combo['professor_id'] . '_' . $combo['materia_id'] . '_' . $tid . '_' . $aid;
-                $ant = $mapExistente[$k] ?? ['nota' => null, 'observacao' => ''];
+                $ant = $this->buscarNotaLancadaIndex(
+                    $indexNotas,
+                    (int) $combo['professor_id'],
+                    (int) $combo['materia_id'],
+                    $tid,
+                    $aid,
+                    false
+                ) ?? ['nota' => null, 'observacao' => ''];
                 $linhas[] = [
                     'professor_id' => $combo['professor_id'],
                     'professor_nome' => $combo['professor_nome'],
@@ -1943,8 +1939,8 @@ class TeacherExamController extends BaseController
                     'aluno_id' => $aid,
                     'aluno_nome' => (string) ($al['nome'] ?? ''),
                     'transferido' => !empty($al['transferido']) ? 1 : 0,
-                    'nota' => $ant['nota'],
-                    'observacao' => $ant['observacao'],
+                    'nota' => $ant['nota'] ?? null,
+                    'observacao' => (string) ($ant['observacao'] ?? ''),
                 ];
             }
         }
@@ -2099,25 +2095,20 @@ class TeacherExamController extends BaseController
         }
 
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $mapExistente = [];
-        foreach ($existentes as $ln) {
-            $k = (int) ($ln['professor_id'] ?? 0) . '_'
-                . (int) ($ln['materia_id'] ?? 0) . '_'
-                . (int) ($ln['turma_id'] ?? 0) . '_'
-                . (int) ($ln['aluno_id'] ?? 0);
-            $mapExistente[$k] = [
-                'nota' => isset($ln['nota']) && $ln['nota'] !== null && $ln['nota'] !== '' ? (float) $ln['nota'] : null,
-                'observacao' => trim((string) ($ln['observacao'] ?? '')),
-            ];
-        }
+        $indexExistente = $this->indexarNotasLancadasBloco($existentes);
 
         $alteraExistente = false;
-        $coletarAlteracao = static function (int $pid, int $mid, int $tid, int $aid, $valorRaw, string $obs) use (&$alteraExistente, $mapExistente): void {
-            $k = $pid . '_' . $mid . '_' . $tid . '_' . $aid;
-            if (!isset($mapExistente[$k])) {
+        $coletarAlteracao = function (int $pid, int $mid, int $tid, int $aid, $valorRaw, string $obs) use (&$alteraExistente, &$indexExistente): void {
+            $antRaw = $this->buscarNotaLancadaIndex($indexExistente, $pid, $mid, $tid, $aid, false);
+            if ($antRaw === null) {
                 return;
             }
-            $ant = $mapExistente[$k];
+            $ant = [
+                'nota' => isset($antRaw['nota']) && $antRaw['nota'] !== null && $antRaw['nota'] !== ''
+                    ? (float) $antRaw['nota']
+                    : null,
+                'observacao' => trim((string) ($antRaw['observacao'] ?? '')),
+            ];
             $valorStr = is_string($valorRaw) ? trim(str_replace(',', '.', $valorRaw)) : '';
             $notaNova = null;
             if ($valorStr !== '' && is_numeric($valorStr)) {
@@ -2367,14 +2358,7 @@ class TeacherExamController extends BaseController
         require_once __DIR__ . '/../../Models/Exams/ExamBlockManualGrade.php';
         $notasModel = new ExamBlockManualGrade();
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
-        $mapExistente = [];
-        foreach ($existentes as $ln) {
-            $k = (int) ($ln['professor_id'] ?? 0) . '_'
-                . (int) ($ln['materia_id'] ?? 0) . '_'
-                . (int) ($ln['turma_id'] ?? 0) . '_'
-                . (int) ($ln['aluno_id'] ?? 0);
-            $mapExistente[$k] = $ln;
-        }
+        $indexNotas = $this->indexarNotasLancadasBloco($existentes);
 
         $combos = $this->combosLancamentoNotaBloco($bloco, 0);
         $comboKeys = [];
@@ -2429,7 +2413,7 @@ class TeacherExamController extends BaseController
                     continue;
                 }
                 $vistos[$k] = true;
-                $ant = $mapExistente[$k] ?? null;
+                $ant = $this->buscarNotaLancadaIndex($indexNotas, $pid, $mid, $tid, $aid, true);
                 $linhas[] = [
                     'professor_id' => $pid,
                     'professor_nome' => (string) ($combo['professor_nome'] ?? ($ant['professor_nome'] ?? '')),
@@ -2444,12 +2428,11 @@ class TeacherExamController extends BaseController
                     'observacao' => (string) ($ant['observacao'] ?? ''),
                     'updated_at' => $ant['updated_at'] ?? null,
                 ];
-                unset($mapExistente[$k]);
             }
         }
 
         // Notas órfãs (aluno saiu da turma, mas a nota permanece no relatório).
-        foreach ($mapExistente as $ln) {
+        foreach ($indexNotas['por_chave'] as $ln) {
             $linhas[] = [
                 'professor_id' => (int) ($ln['professor_id'] ?? 0),
                 'professor_nome' => (string) ($ln['professor_nome'] ?? ''),
@@ -2718,6 +2701,87 @@ class TeacherExamController extends BaseController
             $params
         );
         return $this->filtrarAlunosLancamentoNota(is_array($rows) ? $rows : []);
+    }
+
+    /**
+     * Indexa notas por chave completa e por matéria+turma+aluno.
+     * O índice por matéria cobre notas gravadas com professor_id antigo/zerado após troca de vínculo.
+     *
+     * @param list<array<string,mixed>> $existentes
+     * @return array{por_chave:array<string,array<string,mixed>>,por_materia_aluno:array<string,array<string,mixed>>}
+     */
+    private function indexarNotasLancadasBloco(array $existentes): array
+    {
+        $porChave = [];
+        $porMateriaAluno = [];
+        foreach ($existentes as $ln) {
+            $pid = (int) ($ln['professor_id'] ?? 0);
+            $mid = (int) ($ln['materia_id'] ?? 0);
+            $tid = (int) ($ln['turma_id'] ?? 0);
+            $aid = (int) ($ln['aluno_id'] ?? 0);
+            if ($mid <= 0 || $tid <= 0 || $aid <= 0) {
+                continue;
+            }
+            $k = $pid . '_' . $mid . '_' . $tid . '_' . $aid;
+            $porChave[$k] = $ln;
+            $km = $mid . '_' . $tid . '_' . $aid;
+            $temNota = (($ln['nota'] ?? null) !== null && ($ln['nota'] ?? '') !== '');
+            if (!isset($porMateriaAluno[$km])) {
+                $porMateriaAluno[$km] = $ln;
+                continue;
+            }
+            $atualTem = (($porMateriaAluno[$km]['nota'] ?? null) !== null && ($porMateriaAluno[$km]['nota'] ?? '') !== '');
+            if ($temNota && !$atualTem) {
+                $porMateriaAluno[$km] = $ln;
+            }
+        }
+
+        return [
+            'por_chave' => $porChave,
+            'por_materia_aluno' => $porMateriaAluno,
+        ];
+    }
+
+    /**
+     * Busca nota do vínculo; se não achar pela chave exata, usa matéria+turma+aluno.
+     *
+     * @param array{por_chave:array<string,array<string,mixed>>,por_materia_aluno:array<string,array<string,mixed>>} $index
+     * @return array<string,mixed>|null
+     */
+    private function buscarNotaLancadaIndex(array &$index, int $pid, int $mid, int $tid, int $aid, bool $consumir = false): ?array
+    {
+        if ($mid <= 0 || $tid <= 0 || $aid <= 0) {
+            return null;
+        }
+        $k = $pid . '_' . $mid . '_' . $tid . '_' . $aid;
+        $ln = $index['por_chave'][$k] ?? null;
+        if ($ln === null) {
+            $km = $mid . '_' . $tid . '_' . $aid;
+            $ln = $index['por_materia_aluno'][$km] ?? null;
+        }
+        if ($ln === null) {
+            return null;
+        }
+        if ($consumir) {
+            $pidReal = (int) ($ln['professor_id'] ?? 0);
+            $midReal = (int) ($ln['materia_id'] ?? 0);
+            $tidReal = (int) ($ln['turma_id'] ?? 0);
+            $aidReal = (int) ($ln['aluno_id'] ?? 0);
+            unset($index['por_chave'][$pidReal . '_' . $midReal . '_' . $tidReal . '_' . $aidReal]);
+            $kmReal = $midReal . '_' . $tidReal . '_' . $aidReal;
+            if (isset($index['por_materia_aluno'][$kmReal])) {
+                $cur = $index['por_materia_aluno'][$kmReal];
+                if ((int) ($cur['professor_id'] ?? 0) === $pidReal
+                    && (int) ($cur['materia_id'] ?? 0) === $midReal
+                    && (int) ($cur['turma_id'] ?? 0) === $tidReal
+                    && (int) ($cur['aluno_id'] ?? 0) === $aidReal
+                ) {
+                    unset($index['por_materia_aluno'][$kmReal]);
+                }
+            }
+        }
+
+        return $ln;
     }
 
     /**
@@ -3066,6 +3130,9 @@ class TeacherExamController extends BaseController
         $notasModel = new ExamBlockManualGrade();
         $agregados = $notasModel->fetchAgregadosPorBloco($blocoId);
         $profRows = $this->blocoModel->getProfessores($blocoId);
+        $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
+        // Progresso usa matéria+aluno com fallback: notas podem ter professor_id antigo após troca de vínculo.
+        $indexNotas = $this->indexarNotasLancadasBloco($notasModel->fetchTodasNotasBlocoAdmin($blocoId));
 
         $lancamentoPorMateria = [];
         $cntNaoIniciado = 0;
@@ -3083,15 +3150,42 @@ class TeacherExamController extends BaseController
                 return (int) ($t['id'] ?? 0);
             }, $pr['turmas'] ?? [])));
 
-            $totalEsp = 0;
-            if (!empty($turmaIds)) {
-                // Conta alunos por turma incluindo vínculos por matrícula (turmas extra/paralelas).
-                $totalEsp = count($this->alunosAtivosPorTurmas($turmaIds));
+            $alunos = !empty($turmaIds) ? $this->alunosAtivosPorTurmas($turmaIds, $anoLetivoEvento) : [];
+            $totalEsp = count($alunos);
+
+            $com = 0;
+            $abaixo = 0;
+            $soma = 0.0;
+            foreach ($alunos as $al) {
+                $tid = (int) ($al['turma_id'] ?? 0);
+                $aid = (int) ($al['id'] ?? 0);
+                $ant = $this->buscarNotaLancadaIndex($indexNotas, $pid, $mid, $tid, $aid, false);
+                if ($ant === null || ($ant['nota'] ?? null) === null || ($ant['nota'] ?? '') === '') {
+                    continue;
+                }
+                $com++;
+                $notaVal = (float) $ant['nota'];
+                $soma += $notaVal;
+                if ($notaVal < 6) {
+                    $abaixo++;
+                }
+            }
+            $agg = [
+                'com_nota' => $com,
+                'media_nota' => $com > 0 ? round($soma / $com, 2) : null,
+                'abaixo_seis' => $abaixo,
+            ];
+            // Mantém agregados SQL como referência se o fallback não achar nada e o SQL tiver contagem
+            // (ex.: notas órfãs fora da lista de alunos ativos).
+            if ($com <= 0) {
+                $key = $pid . '_' . $mid;
+                $aggSql = $agregados[$key] ?? null;
+                if ($aggSql && (int) ($aggSql['com_nota'] ?? 0) > 0) {
+                    $agg = $aggSql;
+                    $com = (int) $agg['com_nota'];
+                }
             }
 
-            $key = $pid . '_' . $mid;
-            $agg = $agregados[$key] ?? ['com_nota' => 0, 'media_nota' => null, 'abaixo_seis' => 0];
-            $com = (int) $agg['com_nota'];
             $totalAbaixoSeis += (int) $agg['abaixo_seis'];
 
             if ($totalEsp <= 0) {

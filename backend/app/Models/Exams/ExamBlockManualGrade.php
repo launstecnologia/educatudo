@@ -382,6 +382,15 @@ class ExamBlockManualGrade
             return;
         }
         $this->assertPeriodoEditavel($blocoId, $linhas);
+        foreach ($linhas as $linha) {
+            $tid = (int) ($linha['turma_id'] ?? 0);
+            $aid = (int) ($linha['aluno_id'] ?? 0);
+            if ($tid <= 0 || $aid <= 0) {
+                continue;
+            }
+            // Se a nota da matéria/aluno ficou com outro professor_id (vínculo antigo), realinha.
+            $this->realinharProfessorNotaMateriaAluno($blocoId, $professorId, $materiaId, $tid, $aid);
+        }
         $atuais = $this->fetchMap($blocoId, $professorId, $materiaId);
         $alunosFechar = [];
         foreach ($linhas as $linha) {
@@ -437,6 +446,68 @@ class ExamBlockManualGrade
             $alunosFechar[$aid] = $tid;
         }
         $this->atualizarNotaFinalDoTipo($blocoId, $alunosFechar, $materiaId);
+    }
+
+    /**
+     * Move nota da mesma matéria/turma/aluno para o professor do vínculo atual,
+     * quando ainda não existe linha nesse professor (evita progresso 0% após troca de vínculo).
+     */
+    private function realinharProfessorNotaMateriaAluno(
+        int $blocoId,
+        int $professorId,
+        int $materiaId,
+        int $turmaId,
+        int $alunoId
+    ): void {
+        if ($blocoId <= 0 || $professorId <= 0 || $materiaId <= 0 || $turmaId <= 0 || $alunoId <= 0) {
+            return;
+        }
+        try {
+            $destino = $this->db->fetch(
+                'SELECT id FROM provas_blocos_notas_lancadas
+                 WHERE bloco_id = :bid AND professor_id = :pid AND materia_id = :mid
+                   AND turma_id = :tid AND aluno_id = :aid
+                 LIMIT 1',
+                [
+                    'bid' => $blocoId,
+                    'pid' => $professorId,
+                    'mid' => $materiaId,
+                    'tid' => $turmaId,
+                    'aid' => $alunoId,
+                ]
+            );
+            if ($destino) {
+                return;
+            }
+            $origem = $this->db->fetch(
+                'SELECT id FROM provas_blocos_notas_lancadas
+                 WHERE bloco_id = :bid AND materia_id = :mid
+                   AND turma_id = :tid AND aluno_id = :aid AND professor_id <> :pid
+                 ORDER BY CASE WHEN nota IS NOT NULL THEN 0 ELSE 1 END, updated_at DESC
+                 LIMIT 1',
+                [
+                    'bid' => $blocoId,
+                    'mid' => $materiaId,
+                    'tid' => $turmaId,
+                    'aid' => $alunoId,
+                    'pid' => $professorId,
+                ]
+            );
+            if (!$origem || empty($origem['id'])) {
+                return;
+            }
+            $this->db->query(
+                'UPDATE provas_blocos_notas_lancadas
+                 SET professor_id = :pid, updated_at = NOW()
+                 WHERE id = :id',
+                [
+                    'pid' => $professorId,
+                    'id' => (int) $origem['id'],
+                ]
+            );
+        } catch (Exception $e) {
+            error_log('ExamBlockManualGrade::realinharProfessorNotaMateriaAluno: ' . $e->getMessage());
+        }
     }
 
     public function logTableExists(): bool
