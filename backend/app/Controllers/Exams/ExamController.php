@@ -5677,11 +5677,8 @@ class ExamController extends BaseController
         if (!isset($filters['status']) && !empty($filters['excluir_status'])) {
             $filters['status'] = '';
         }
-        // Paginação (permite 10/15/25/50 via GET; padrão 10)
-        $perPage = (int) ($_GET['per_page'] ?? 10);
-        if (!in_array($perPage, [10, 15, 25, 50], true)) {
-            $perPage = 10;
-        }
+        // Paginação: 10 por página
+        $perPage = 10;
         $page = max(1, (int)($_GET['page'] ?? 1));
         $offset = ($page - 1) * $perPage;
         
