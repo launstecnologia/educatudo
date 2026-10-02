@@ -199,6 +199,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                 <table class="min-w-full divide-y divide-gray-200 text-sm" id="tabela-boletins-gerados">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Ref</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Aluno</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Turma</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Bimestre</th>
@@ -229,6 +230,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                 data-aluno-nome="<?= htmlspecialchars((string) ($row['aluno_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                                 data-regra-nome="<?= htmlspecialchars((string) ($row['regra_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                                 data-key="<?= htmlspecialchars($rowKey, ENT_QUOTES, 'UTF-8') ?>">
+                                <td class="px-3 py-2 text-gray-900 align-top whitespace-nowrap"><?= $regraId > 0 ? $regraId : '—' ?></td>
                                 <td class="px-3 py-2 font-medium text-gray-900">
                                     <?= htmlspecialchars((string) ($row['aluno_nome'] ?? 'Aluno #' . $alunoId), ENT_QUOTES, 'UTF-8') ?>
                                     <span class="block text-xs font-normal text-gray-500"><?= htmlspecialchars((string) ($row['regra_nome'] ?? 'Regra #' . $regraId), ENT_QUOTES, 'UTF-8') ?></span>
@@ -268,7 +270,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                 </td>
                             </tr>
                             <tr class="preview-row hidden">
-                                <td colspan="7" class="px-3 py-3 bg-indigo-50/40">
+                                <td colspan="8" class="px-3 py-3 bg-indigo-50/40">
                                     <div class="preview-content rounded-lg bg-white border border-indigo-100 p-3 text-sm text-gray-700">
                                         <div class="preview-placeholder text-gray-500">Carregando preview…</div>
                                     </div>
