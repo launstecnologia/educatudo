@@ -56,8 +56,7 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
 <div class="mb-8">
     <div class="flex justify-between items-center flex-wrap gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Avaliações</h2>
-            <p class="text-gray-600">Configure as fórmulas do bimestre e escolha em qual modelo de boletim a média entra. O cadastro do documento (oficial / extra) fica em <a href="<?= URL ?>/admin/boletins" class="text-indigo-600 underline">Acadêmico → Modelo de Boletim</a>.</p>
+            <h2 class="text-2xl font-bold text-gray-900">Avaliações</h2>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
             <button type="button" onclick="openFilterDrawer()"

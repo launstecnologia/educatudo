@@ -281,7 +281,7 @@ class BoletimConfigController extends BaseController
 
         $data = [
             'title' => 'Avaliações - EducaTudo',
-            'page_title' => 'Avaliações',
+            'page_title' => 'Painel Administrativo',
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
