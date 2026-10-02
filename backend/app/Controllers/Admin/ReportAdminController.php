@@ -1285,6 +1285,8 @@ class ReportAdminController extends AdminBaseController
                 'nome' => (string) ($relatorio['evento_nome'] ?? ''),
                 'periodo' => (string) ($relatorio['periodo_ref'] ?? ''),
                 'ano_letivo' => (int) ($relatorio['ano_letivo'] ?? 0),
+                'bimestre' => (string) ($relatorio['bimestre_rotulo'] ?? ''),
+                'criado_em' => (string) ($relatorio['evento_criado_em'] ?? ''),
                 'colunas' => $colunas,
                 'total_alunos' => count($alunos),
                 'alunos' => $alunos,
@@ -1324,7 +1326,8 @@ class ReportAdminController extends AdminBaseController
             $rows = $this->db->fetchAll(
                 "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
                         a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
-                        r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo,
+                        r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo, r.bimestre,
+                        r.created_at AS regra_created_at,
                         o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
                  FROM boletim_resultados_gerados g
                  INNER JOIN boletim_regras r ON r.id = g.regra_id
@@ -1352,7 +1355,8 @@ class ReportAdminController extends AdminBaseController
             $rows = $this->db->fetchAll(
                 "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
                         a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
-                        r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo,
+                        r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo, r.bimestre,
+                        r.created_at AS regra_created_at,
                         o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
                  FROM boletim_resultados_gerados g
                  INNER JOIN boletim_regras r ON r.id = g.regra_id
@@ -1369,6 +1373,40 @@ class ReportAdminController extends AdminBaseController
                  ORDER BY t.nome ASC, a.nome ASC, g.ordem_linha ASC, g.id ASC",
                 $params
             ) ?: [];
+        }
+
+        if ($rows === []) {
+            $regraMeta = $this->db->fetch(
+                'SELECT nome AS evento_nome, series_ids, decimal_places, ano_letivo, bimestre, created_at AS regra_created_at
+                 FROM boletim_regras WHERE id = :id LIMIT 1',
+                ['id' => $regraId]
+            ) ?: [];
+            $anoLetivo = (int) ($regraMeta['ano_letivo'] ?? 0);
+            $bimestre = (int) ($regraMeta['bimestre'] ?? 0);
+            $bimestreRotulo = $this->rotuloBimestreBoletimCoordenacao($anoLetivo, $bimestre);
+            return [
+                'fonte' => 'evento',
+                'regra_id' => $regraId,
+                'evento_nome' => $this->nomeEventoBoletimCoordenacao(
+                    (string) ($regraMeta['evento_nome'] ?? 'Boletim'),
+                    $regraMeta['series_ids'] ?? null
+                ),
+                'periodo_ref' => $periodoRef,
+                'ano_letivo' => $anoLetivo,
+                'bimestre' => $bimestre > 0 ? $bimestre : null,
+                'bimestre_rotulo' => $bimestreRotulo,
+                'evento_criado_em' => $this->formatarDataGeracaoBoletimCoordenacao((string) ($regraMeta['regra_created_at'] ?? '')),
+                'decimal_places' => max(0, min(2, (int) ($regraMeta['decimal_places'] ?? 1))),
+                'columns' => [],
+                'alunos' => [],
+                'total_alunos' => 0,
+                'total_linhas' => 0,
+                'nota_abaixo_de' => $notaAbaixoDe,
+                'materias_exibicao' => $materiasExibicao,
+                'codigo_media_final' => '',
+                'alunos_com_ficha' => 0,
+                'alunos_sem_ficha' => 0,
+            ];
         }
 
         $columnsRaw = [];
@@ -1436,6 +1474,9 @@ class ReportAdminController extends AdminBaseController
             $totalLinhasFiltradas += count((array) ($aluno['materias'] ?? []));
         }
         $anoLetivo = (int) ($rows[0]['ano_letivo'] ?? 0);
+        $bimestre = (int) ($rows[0]['bimestre'] ?? 0);
+        $bimestreRotulo = $this->rotuloBimestreBoletimCoordenacao($anoLetivo, $bimestre);
+        $eventoCriadoEm = $this->formatarDataGeracaoBoletimCoordenacao((string) ($rows[0]['regra_created_at'] ?? ''));
         $fichasInfo = $this->contarFichasVidaEscolarBoletimCoordenacao($alunos, $anoLetivo);
         return [
             'fonte' => 'evento',
@@ -1446,6 +1487,9 @@ class ReportAdminController extends AdminBaseController
             ),
             'periodo_ref' => $periodoRef,
             'ano_letivo' => $anoLetivo,
+            'bimestre' => $bimestre > 0 ? $bimestre : null,
+            'bimestre_rotulo' => $bimestreRotulo,
+            'evento_criado_em' => $eventoCriadoEm,
             'decimal_places' => $decimalPlaces,
             'columns' => $columns,
             'alunos' => $alunos,
@@ -1457,6 +1501,24 @@ class ReportAdminController extends AdminBaseController
             'alunos_com_ficha' => $fichasInfo['com'],
             'alunos_sem_ficha' => $fichasInfo['sem'],
         ];
+    }
+
+    private function rotuloBimestreBoletimCoordenacao(int $anoLetivo, int $bimestre): string
+    {
+        if ($bimestre <= 0) {
+            return '';
+        }
+        $pathPeriodo = __DIR__ . '/../../Core/PeriodoLetivo.php';
+        if (is_file($pathPeriodo)) {
+            require_once $pathPeriodo;
+        }
+        if (class_exists('PeriodoLetivo', false)) {
+            $rotulo = PeriodoLetivo::rotulo($anoLetivo > 0 ? $anoLetivo : (int) date('Y'), $bimestre);
+            if ($rotulo !== '') {
+                return $rotulo;
+            }
+        }
+        return $bimestre . 'º Bimestre';
     }
 
     /**
@@ -1878,7 +1940,7 @@ class ReportAdminController extends AdminBaseController
             }
             $usados[$colunasUniao[$codigo]] = true;
         }
-        $headers = ['Boletim', 'Aluno'];
+        $headers = ['Boletim', 'Bimestre', 'Ano', 'Criado em', 'Aluno'];
         if ($incluirAssinatura) {
             $headers[] = 'Assinatura';
         }
@@ -1893,6 +1955,9 @@ class ReportAdminController extends AdminBaseController
         $rows = [];
         foreach ($relatorios as $relatorio) {
             $nomeEvento = (string) ($relatorio['evento_nome'] ?? 'Boletim');
+            $bimestre = (string) ($relatorio['bimestre_rotulo'] ?? '');
+            $ano = (int) ($relatorio['ano_letivo'] ?? 0);
+            $criadoEm = (string) ($relatorio['evento_criado_em'] ?? '');
             foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
                 if (!is_array($aluno)) {
                     continue;
@@ -1902,7 +1967,13 @@ class ReportAdminController extends AdminBaseController
                     if (!is_array($materia)) {
                         continue;
                     }
-                    $row = [$nomeEvento, (string) ($aluno['nome'] ?? '')];
+                    $row = [
+                        $nomeEvento,
+                        $bimestre,
+                        $ano > 0 ? (string) $ano : '',
+                        $criadoEm,
+                        (string) ($aluno['nome'] ?? ''),
+                    ];
                     if ($incluirAssinatura) {
                         $row[] = '';
                     }
@@ -1939,6 +2010,9 @@ class ReportAdminController extends AdminBaseController
         if ($refEvento > 0) {
             $headers[] = 'Ref';
         }
+        $headers[] = 'Bimestre';
+        $headers[] = 'Ano';
+        $headers[] = 'Criado em';
         $headers[] = 'RA';
         $headers[] = 'Turma';
         $headers[] = 'Matéria';
@@ -1947,6 +2021,9 @@ class ReportAdminController extends AdminBaseController
         }
         $headers[] = 'Observação da coordenação';
 
+        $bimestre = (string) ($relatorio['bimestre_rotulo'] ?? '');
+        $ano = (int) ($relatorio['ano_letivo'] ?? 0);
+        $criadoEm = (string) ($relatorio['evento_criado_em'] ?? '');
         $rows = [];
         foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
             $primeiraMateria = true;
@@ -1958,6 +2035,9 @@ class ReportAdminController extends AdminBaseController
                 if ($refEvento > 0) {
                     $row[] = $refEvento;
                 }
+                $row[] = $bimestre;
+                $row[] = $ano > 0 ? (string) $ano : '';
+                $row[] = $criadoEm;
                 // RA deve permanecer texto para não perder zeros à esquerda.
                 $row[] = (string) ($aluno['ra'] ?? '');
                 $row[] = (string) ($aluno['turma'] ?? '');
