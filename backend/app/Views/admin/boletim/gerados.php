@@ -10,6 +10,9 @@ $totalPages = (int) ($total_pages ?? 1);
 
 $flashMessage = trim((string) ($flash_message ?? ''));
 $flashType = (string) ($flash_type ?? 'success');
+if (!class_exists('PeriodoLetivo')) {
+    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+}
 
 $selectedRegraId = (int) ($filters['regra_id'] ?? 0);
 $alunoQ = (string) ($filters['aluno_q'] ?? '');
@@ -198,6 +201,8 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Aluno</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Turma</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Bimestre</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Ano</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Vigente</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Ações</th>
                         </tr>
@@ -209,6 +214,11 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                             $regraId = (int) ($row['regra_id'] ?? 0);
                             $periodoRef = (string) ($row['periodo_ref'] ?? '');
                             $vigenteFlag = (int) ($row['vigente'] ?? 0) === 1;
+                            $anoLinha = (int) ($row['regra_ano_letivo'] ?? 0);
+                            $bimestreLinha = (int) ($row['regra_bimestre'] ?? 0);
+                            $rotuloBimestre = $bimestreLinha > 0
+                                ? PeriodoLetivo::rotulo($anoLinha > 0 ? $anoLinha : (int) date('Y'), $bimestreLinha)
+                                : '';
                             $rowKey = $alunoId . '-' . $regraId . '-' . md5($periodoRef);
                             ?>
                             <tr class="boletim-gerado-row <?= $idx % 2 === 0 ? 'bg-white' : 'bg-gray-50' ?>"
@@ -226,6 +236,8 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-3 py-2 text-gray-700 align-top"><?= htmlspecialchars((string) ($row['turma_nome'] ?? '—'), ENT_QUOTES, 'UTF-8') ?: '—' ?></td>
+                                <td class="px-3 py-2 text-gray-700 align-top whitespace-nowrap"><?= htmlspecialchars($rotuloBimestre !== '' ? $rotuloBimestre : '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="px-3 py-2 text-gray-700 align-top whitespace-nowrap"><?= $anoLinha > 0 ? $anoLinha : '—' ?></td>
                                 <td class="px-3 py-2 align-top">
                                     <?php if ($vigenteFlag): ?>
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">Sim</span>
@@ -247,7 +259,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                 </td>
                             </tr>
                             <tr class="preview-row hidden">
-                                <td colspan="4" class="px-3 py-3 bg-indigo-50/40">
+                                <td colspan="6" class="px-3 py-3 bg-indigo-50/40">
                                     <div class="preview-content rounded-lg bg-white border border-indigo-100 p-3 text-sm text-gray-700">
                                         <div class="preview-placeholder text-gray-500">Carregando preview…</div>
                                     </div>
