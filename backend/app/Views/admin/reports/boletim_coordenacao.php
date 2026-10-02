@@ -59,7 +59,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     <p class="text-gray-600 mt-1">Escolha o boletim da Vida Escolar ou as notas do evento (provas, trabalhos e médias).</p>
 </div>
 
-$form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
+<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
     <?php $alunoQFiltro = trim((string) ($aluno_q ?? '')); ?>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <label class="block md:col-span-2">
