@@ -122,29 +122,59 @@ include __DIR__ . '/../_partials/flash_message.php';
             <span id="eventos-qtd" class="text-xs text-gray-500"></span>
         </div>
         <div id="lista-eventos-coord" class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/40">
-            <?php if (empty($eventos)): ?>
+            <?php
+            $eventosLista = array_values((array) ($eventos ?? []));
+            usort($eventosLista, static function (array $a, array $b): int {
+                $serieA = mb_strtolower(trim((string) ($a['series_nomes'] ?? '')));
+                $serieB = mb_strtolower(trim((string) ($b['series_nomes'] ?? '')));
+                $cmp = $serieA <=> $serieB;
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                $tipoA = (($a['exibir_em'] ?? '') === 'notas') ? 0 : 1;
+                $tipoB = (($b['exibir_em'] ?? '') === 'notas') ? 0 : 1;
+                if ($tipoA !== $tipoB) {
+                    return $tipoA <=> $tipoB;
+                }
+                $cmp = ((int) ($a['bimestre'] ?? 0)) <=> ((int) ($b['bimestre'] ?? 0));
+                if ($cmp !== 0) {
+                    return $cmp;
+                }
+                return ((int) ($a['regra_id'] ?? 0)) <=> ((int) ($b['regra_id'] ?? 0));
+            });
+            ?>
+            <?php if ($eventosLista === []): ?>
                 <p class="px-4 py-6 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
+            <?php else: ?>
+                <div class="grid gap-x-3 items-center px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200" style="grid-template-columns: 1.25rem 5.5rem 5.75rem 8.5rem minmax(0,1fr) auto;">
+                    <span></span>
+                    <span>Tipo</span>
+                    <span>Ref</span>
+                    <span>Bimestre</span>
+                    <span>Série</span>
+                    <span></span>
+                </div>
             <?php endif; ?>
-            <?php foreach ((array) ($eventos ?? []) as $evento):
+            <?php foreach ($eventosLista as $evento):
                 $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
                 $marcado = $selecionarTodos || isset($eventosSelecionados[$value]);
                 $vigente = !empty($evento['eh_vigente']);
+                $refLista = (int) ($evento['regra_id'] ?? 0);
+                $bimLista = trim((string) ($evento['rotulo_bimestre'] ?? ''));
+                $serieLista = trim((string) ($evento['series_nomes'] ?? ''));
+                $tipoLista = (($evento['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
                 ?>
-                <label class="evento-item flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-purple-50/40">
+                <label class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 5.5rem 5.75rem 8.5rem minmax(0,1fr) auto;">
                     <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
-                    <?php
-                    $refLista = (int) ($evento['regra_id'] ?? 0);
-                    $bimLista = trim((string) ($evento['rotulo_bimestre'] ?? ''));
-                    $serieLista = trim((string) ($evento['series_nomes'] ?? ''));
-                    $tipoLista = (($evento['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
-                    ?>
-                    <span class="min-w-0 flex-1 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-sm text-gray-900">
-                        <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
-                        <span><span class="text-gray-500">Ref</span> <?= $refLista > 0 ? $refLista : '—' ?></span>
-                        <span><span class="text-gray-500">Bimestre</span> <?= htmlspecialchars($bimLista !== '' ? $bimLista : '—', ENT_QUOTES, 'UTF-8') ?></span>
-                        <span class="min-w-0"><span class="text-gray-500">Série</span> <?= htmlspecialchars($serieLista !== '' ? $serieLista : 'Todas', ENT_QUOTES, 'UTF-8') ?></span>
-                    </span>
-                    <span class="shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full <?= $vigente ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>"><?= $vigente ? 'Vigente' : 'Anterior' ?></span>
+                    <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
+                    <span>Ref: <?= $refLista > 0 ? $refLista : '—' ?></span>
+                    <span><?= $bimLista !== '' ? htmlspecialchars($bimLista, ENT_QUOTES, 'UTF-8') : '' ?></span>
+                    <span class="min-w-0 truncate"><?= htmlspecialchars($serieLista !== '' ? $serieLista : 'Todas', ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php if (!$vigente): ?>
+                        <span class="shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Anterior</span>
+                    <?php else: ?>
+                        <span></span>
+                    <?php endif; ?>
                 </label>
             <?php endforeach; ?>
         </div>
