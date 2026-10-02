@@ -121,8 +121,9 @@ class BoletimConfigController extends BaseController
         }));
         $verDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
         $eventos = array_values(array_filter($eventos, function ($ev) use ($verDesabilitados) {
-            $oculto = $this->eventoOcultoNaListaAvaliacoes(is_array($ev) ? $ev : []);
-            return $verDesabilitados ? $oculto : !$oculto;
+            $ev = is_array($ev) ? $ev : [];
+            $foraDaLista = $this->eventoOcultoNaListaAvaliacoes($ev) || $this->eventoBloqueadoNaExibicao($ev);
+            return $verDesabilitados ? $foraDaLista : !$foraDaLista;
         }));
 
         $nomesBoletim = [];
@@ -170,6 +171,7 @@ class BoletimConfigController extends BaseController
                 return $seriesNomesPorId[(int) $sid] ?? null;
             }, $seriesIds));
             $ev['series_nomes'] = $nomes;
+            $ev['oculto_lista_avaliacoes'] = $this->eventoOcultoNaListaAvaliacoes($ev) ? 1 : 0;
             $bid = (int) ($ev['boletim_id'] ?? 0);
             $ev['boletim_cadastro_nome'] = $bid > 0 ? ($nomesBoletim[$bid] ?? '') : '';
 
@@ -1814,6 +1816,16 @@ class BoletimConfigController extends BaseController
         return is_array($decoded) && !empty($decoded['oculto_lista_avaliacoes']);
     }
 
+    /**
+     * Bloquear exibição tira o evento da lista de Avaliações e de Notas da Coordenação.
+     *
+     * @param array<string,mixed> $evento
+     */
+    private function eventoBloqueadoNaExibicao(array $evento): bool
+    {
+        return (int) ($evento['vis_coordenacao'] ?? 1) === 0;
+    }
+
     public function alternarVisibilidadeRegra()
     {
         $this->assertCsrfOrRedirect();
@@ -1832,8 +1844,8 @@ class BoletimConfigController extends BaseController
             $ok = $this->boletimConfig->atualizarVisibilidadeCoordenacao($regraId, $bloquear ? 0 : 1);
             if ($ok) {
                 $_SESSION['boletim_flash'] = $bloquear
-                    ? 'Evento bloqueado. Continua nesta lista e deixa de aparecer na ficha do aluno, no boletim, em Notas da Coordenação e na sincronização.'
-                    : 'Exibição do evento liberada de novo.';
+                    ? 'Evento bloqueado. Ele saiu desta lista e de Notas da Coordenação. As notas já geradas continuam no aluno.'
+                    : 'Exibição liberada. O evento voltou para esta lista e para Notas da Coordenação.';
                 $_SESSION['boletim_flash_type'] = 'success';
             } else {
                 $_SESSION['boletim_flash'] = 'Não foi possível alterar a exibição do evento.';

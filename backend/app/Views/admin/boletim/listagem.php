@@ -363,11 +363,13 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                             <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
                             <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Liberar para alunos/pais' ?>
                         </button>
+                        <?php if (!$verDesabilitados || !empty($evento['oculto_lista_avaliacoes'])): ?>
                         <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $verDesabilitados ? 0 : 1 ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid <?= $verDesabilitados ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
                             <?= $verDesabilitados ? 'Habilitar nesta lista' : 'Desabilitar' ?>
                         </button>
+                        <?php endif; ?>
                         <div class="border-t border-gray-100 my-1"></div>
                         <?php if ($geracaoEmAndamento): ?>
                         <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="block"
@@ -469,8 +471,8 @@ function excluirEventoBoletim(id) {
 
 function bloquearExibicaoEventoBoletim(id, bloquear) {
     const acao = Number(bloquear) === 1
-        ? 'Bloquear a exibição deste evento? Ele continua nesta lista, mas deixa de aparecer na ficha do aluno, no boletim, em Notas da Coordenação e na sincronização.'
-        : 'Liberar a exibição deste evento de novo na ficha do aluno e no boletim?';
+        ? 'Bloquear a exibição deste evento? Ele sai desta lista de avaliações e de Notas da Coordenação. As notas já geradas continuam no aluno.'
+        : 'Liberar a exibição deste evento? Ele volta para esta lista e para Notas da Coordenação.';
     if (!confirm(acao)) {
         return;
     }
