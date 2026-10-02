@@ -804,8 +804,8 @@ class BoletimConfigController extends BaseController
         if ($totalPages < 1) { $totalPages = 1; }
 
         $data = [
-            'title' => 'Boletins Gerados - EducaTudo',
-            'page_title' => 'Boletins Gerados',
+            'title' => 'Versão de Notas - EducaTudo',
+            'page_title' => 'Painel Administrativo',
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),

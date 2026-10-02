@@ -30,6 +30,25 @@ $toDatetimeLocal = static function (string $v): string {
 };
 $atualizadoDeInput = $toDatetimeLocal($atualizadoDe);
 $atualizadoAteInput = $toDatetimeLocal($atualizadoAte);
+$filtrosAtivosCount = 0;
+if ($selectedRegraId > 0) {
+    $filtrosAtivosCount++;
+}
+if ($alunoQ !== '') {
+    $filtrosAtivosCount++;
+}
+if ($exibirEmFilter !== '') {
+    $filtrosAtivosCount++;
+}
+if ($previewFilter !== 'all') {
+    $filtrosAtivosCount++;
+}
+if ($atualizadoDe !== '') {
+    $filtrosAtivosCount++;
+}
+if ($atualizadoAte !== '') {
+    $filtrosAtivosCount++;
+}
 
 $queryBaseParams = array_filter([
     'regra_id' => $selectedRegraId > 0 ? $selectedRegraId : null,
@@ -52,29 +71,40 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
 
 ?>
 <div class="space-y-6">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Boletins Gerados</h1>
-            <p class="text-sm text-gray-500 mt-1">Cada boletim mostra quem criou, a data de criação e cada versão seguinte, com usuário e horário.</p>
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">Versão de Notas</h1>
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <a href="<?= URL ?>/admin/boletim"
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-arrow-left mr-2 text-gray-500"></i>
+                Voltar
+            </a>
+            <button type="button" onclick="openFilterDrawer()"
+                    class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+                Filtros
+                <?php if ($filtrosAtivosCount > 0): ?>
+                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
+                <?php endif; ?>
+            </button>
         </div>
-        <a href="<?= URL ?>/admin/boletim-configuracao"
-           class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Voltar para Configuração
-        </a>
     </div>
 
-    <?php if ($flashMessage !== ''): ?>
-        <?php $bgClass = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
-        <div class="p-4 rounded-lg border <?= $bgClass ?>"><?= htmlspecialchars($flashMessage, ENT_QUOTES, 'UTF-8') ?></div>
-    <?php endif; ?>
+    <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+    <aside id="filterDrawer"
+           class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+           aria-hidden="true">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Filtrar versões</h3>
+            <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
 
-    <form method="GET" id="form-filtros-gerados" action="<?= URL ?>/admin/boletim-configuracao/gerados"
-          class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <form method="GET" id="form-filtros-gerados" action="<?= URL ?>/admin/boletim-configuracao/gerados" class="flex flex-col flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
         <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Regra</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Regra</label>
             <select name="regra_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 <option value="0">Todas as regras</option>
                 <?php foreach ($regrasCatalogo as $regCat): ?>
@@ -92,11 +122,11 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
             </select>
         </div>
         <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Aluno (nome ou RA)</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Aluno (nome ou RA)</label>
             <input type="text" name="aluno_q" value="<?= htmlspecialchars($alunoQ, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: João, 2026..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
         </div>
         <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Exibido em</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Exibido em</label>
             <select name="exibir_em" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 <option value="">Todos</option>
                 <option value="boletim" <?= $exibirEmFilter === 'boletim' ? 'selected' : '' ?>>Boletim</option>
@@ -104,7 +134,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
             </select>
         </div>
         <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
             <select name="preview" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                 <option value="all" <?= $previewFilter === 'all' ? 'selected' : '' ?>>Todos</option>
                 <option value="0" <?= $previewFilter === '0' ? 'selected' : '' ?>>Oficial</option>
@@ -112,24 +142,35 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
             </select>
         </div>
         <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Atualizado de</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Atualizado de</label>
             <input type="datetime-local" name="atualizado_de"
                    value="<?= htmlspecialchars($atualizadoDeInput, ENT_QUOTES, 'UTF-8') ?>"
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
         </div>
         <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1">Atualizado até</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Atualizado até</label>
             <input type="datetime-local" name="atualizado_ate"
                    value="<?= htmlspecialchars($atualizadoAteInput, ENT_QUOTES, 'UTF-8') ?>"
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
         </div>
-        <div class="lg:col-span-2 flex items-center gap-2">
-            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">
-                Filtrar
-            </button>
-            <a href="<?= URL ?>/admin/boletim-configuracao/gerados" class="text-sm text-gray-600 hover:text-gray-800">Limpar</a>
         </div>
-    </form>
+        <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
+            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
+               class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors text-center">
+                Limpar
+            </a>
+            <button type="submit"
+                    class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                Aplicar filtros
+            </button>
+        </div>
+        </form>
+    </aside>
+
+    <?php if ($flashMessage !== ''): ?>
+        <?php $bgClass = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
+        <div class="p-4 rounded-lg border <?= $bgClass ?>"><?= htmlspecialchars($flashMessage, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200">
         <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
@@ -285,6 +326,25 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
 </div>
 
 <script>
+function openFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+function closeFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.add('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        closeFilterDrawer();
+    }
+});
 (function () {
     var exportUrl = <?= json_encode(URL . '/admin/boletim-configuracao/gerados/exportar', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     document.querySelectorAll('.btn-exportar-notas').forEach(function (btn) {
