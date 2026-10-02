@@ -21,11 +21,15 @@ $queryExport = [
     'fonte' => $fonte,
     'ano_letivo' => $anoSelecionado,
     'turma_id' => (int) ($turma_id ?? 0),
+    'aluno_q' => trim((string) ($aluno_q ?? '')),
     'nota_abaixo_de' => $nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '',
     'materias_exibicao' => $materias_exibicao ?? 'todas',
     'assinatura' => !empty($incluir_assinatura) ? 1 : 0,
     'incluir_antigas' => !empty($incluir_antigas) ? 1 : 0,
 ];
+if ($queryExport['aluno_q'] === '') {
+    unset($queryExport['aluno_q']);
+}
 if ($selecionarTodos) {
     $queryExport['evento'] = 'todos';
 } elseif (count($eventosSelecionados) === 1) {
@@ -55,8 +59,17 @@ include __DIR__ . '/../_partials/flash_message.php';
     <p class="text-gray-600 mt-1">Escolha o boletim da Vida Escolar ou as notas do evento (provas, trabalhos e médias).</p>
 </div>
 
-<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
+$form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
+    <?php $alunoQFiltro = trim((string) ($aluno_q ?? '')); ?>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <label class="block md:col-span-2">
+            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Aluno</span>
+            <input type="text" name="aluno_q" value="<?= htmlspecialchars($alunoQFiltro, ENT_QUOTES, 'UTF-8') ?>"
+                   placeholder="Nome, RA ou código do aluno"
+                   class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100"
+                   autocomplete="off">
+            <span class="block text-xs text-gray-500 mt-1">Traz todos os boletins e notas desse aluno no filtro atual.</span>
+        </label>
         <label class="block">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir</span>
             <select name="fonte" id="fonte-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
@@ -409,10 +422,22 @@ include __DIR__ . '/../_partials/flash_message.php';
             var submitter = event.submitter;
             var gerar = submitter && submitter.name === 'executar';
             var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
+            var alunoInput = form.querySelector('input[name="aluno_q"]');
+            var alunoBusca = alunoInput ? String(alunoInput.value || '').trim() : '';
             if (gerar && fonte === 'evento' && checks.length > 0 && !checks.some(function (check) { return check.checked; })) {
-                event.preventDefault();
-                checks.forEach(function (check) { check.disabled = false; });
-                window.alert('Selecione ao menos um boletim.');
+                if (alunoBusca !== '') {
+                    checks.forEach(function (check) { check.checked = true; check.disabled = false; });
+                    if (eventoHidden) {
+                        eventoHidden.disabled = false;
+                        eventoHidden.value = 'todos';
+                    }
+                    atualizarContagem();
+                    window.sincronizarEventosCoordenacao();
+                } else {
+                    event.preventDefault();
+                    checks.forEach(function (check) { check.disabled = false; });
+                    window.alert('Selecione ao menos um boletim ou informe o aluno.');
+                }
             }
         });
     }
