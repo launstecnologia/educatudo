@@ -29,39 +29,65 @@ if (!empty($filterStatus)) {
 $qsListaAtual = http_build_query($_GET ?? []);
 $voltarListaPath = '/admin/provas' . ($qsListaAtual !== '' ? ('?' . $qsListaAtual) : '');
 $editarVoltarQs = $qsListaAtual !== '' ? ('?voltar=' . rawurlencode($voltarListaPath)) : '';
+$btnSecundario = 'inline-flex items-center px-4 py-2.5 border border-[#E5EAF1] rounded-lg text-sm font-medium text-[#172033] bg-white hover:bg-gray-50 transition-colors';
+
+$formatarTurmasChip = static function (string $turmasTexto): array {
+    $turmasTexto = trim($turmasTexto);
+    if ($turmasTexto === '') {
+        return ['Todas', 'Todas'];
+    }
+    $partes = array_values(array_filter(array_map('trim', preg_split('/\s*,\s*/', $turmasTexto) ?: [])));
+    if (count($partes) <= 2) {
+        $txt = implode(', ', $partes);
+        return [$txt, $txt];
+    }
+    $visiveis = array_slice($partes, 0, 2);
+    $resto = count($partes) - 2;
+    return [implode(', ', $visiveis) . ' +' . $resto, implode(', ', $partes)];
+};
 ?>
+
+<!-- Breadcrumb -->
+<nav class="mb-3 text-sm text-[#667085]" aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1.5">
+        <li><a href="<?= URL ?>/admin/dashboard" class="hover:text-[#172033]">Dashboard</a></li>
+        <li aria-hidden="true">›</li>
+        <li><span>Acadêmico</span></li>
+        <li aria-hidden="true">›</li>
+        <li class="font-medium text-[#172033]">Lançamento de Notas</li>
+    </ol>
+</nav>
+
 <!-- Header Section -->
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                Avaliações e Notas
+<div class="mb-5">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+        <div class="min-w-0">
+            <h2 class="text-xl sm:text-2xl font-bold text-[#172033] leading-tight">
+                Lançamento de Notas
             </h2>
-            <p class="text-gray-600">
-                Gerencie todos os blocos de provas online do sistema
+            <p class="text-sm text-[#667085] mt-1">
+                Eventos de prova por bloco, semana, bimestre e turma
             </p>
         </div>
-        <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2 flex-wrap lg:justify-end shrink-0">
             <button type="button" onclick="openFilterDrawer()"
-                    class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+                    class="relative <?= $btnSecundario ?>">
+                <i class="fa-solid fa-filter mr-2 text-[#667085]"></i>
                 Filtros
                 <?php if ($filtrosAtivosCount > 0): ?>
-                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
+                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-[#0B6EDC] text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
                 <?php endif; ?>
             </button>
-            <a href="<?= URL ?>/admin/provas/tipos-avaliacao"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-layer-group mr-2 text-gray-500"></i>
+            <a href="<?= URL ?>/admin/provas/tipos-avaliacao" class="<?= $btnSecundario ?>">
+                <i class="fa-solid fa-layer-group mr-2 text-[#667085]"></i>
                 Tipo de Nota
             </a>
-            <a href="<?= URL ?>/admin/blocos-modelo"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-table-cells mr-2 text-gray-500"></i>
+            <a href="<?= URL ?>/admin/blocos-modelo" class="<?= $btnSecundario ?>">
+                <i class="fa-solid fa-table-cells mr-2 text-[#667085]"></i>
                 Bloco Professor
             </a>
             <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>"
-               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm">
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo Evento
             </a>
@@ -71,104 +97,86 @@ $editarVoltarQs = $qsListaAtual !== '' ? ('?voltar=' . rawurlencode($voltarLista
 
 <!-- Stats Cards -->
 <?php if (isset($stats)): ?>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Total de Blocos</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $stats['total_blocos'] ?? 0 ?></p>
+<?php
+$cardsStats = [
+    [
+        'label' => 'Total de Blocos',
+        'valor' => (int) ($stats['total_blocos'] ?? 0),
+        'desc' => 'Todos os eventos',
+        'icon' => 'fa-file-lines',
+        'tone' => 'bg-[#EAF3FF] text-[#1769C2]',
+        'cardBg' => 'bg-[#EAF3FF]/50',
+    ],
+    [
+        'label' => 'Aguardando',
+        'valor' => (int) ($stats['blocos_aguardando'] ?? 0),
+        'desc' => 'Em lançamento ou revisão',
+        'icon' => 'fa-clock',
+        'tone' => 'bg-[#FFF5D9] text-[#B76A00]',
+        'cardBg' => 'bg-[#FFF5D9]/60',
+    ],
+    [
+        'label' => 'Aprovado',
+        'valor' => (int) ($stats['blocos_aprovados'] ?? 0),
+        'desc' => 'Eventos finalizados',
+        'icon' => 'fa-circle-check',
+        'tone' => 'bg-[#E8F8EF] text-[#16834A]',
+        'cardBg' => 'bg-[#E8F8EF]/60',
+    ],
+    [
+        'label' => 'Liberado',
+        'valor' => (int) ($stats['blocos_liberados'] ?? 0),
+        'desc' => 'Disponível para visualização',
+        'icon' => 'fa-lock-open',
+        'tone' => 'bg-[#F3EAFE] text-[#7541C8]',
+        'cardBg' => 'bg-[#F3EAFE]/60',
+    ],
+    [
+        'label' => 'Concluído',
+        'valor' => (int) ($stats['blocos_concluidos'] ?? 0),
+        'desc' => 'Notas lançadas e encerradas',
+        'icon' => 'fa-flag-checkered',
+        'tone' => 'bg-slate-100 text-slate-700',
+        'cardBg' => 'bg-slate-50',
+    ],
+    [
+        'label' => 'Provas Pendentes',
+        'valor' => count($provas_pendentes ?? []),
+        'desc' => 'Aguardando agrupamento',
+        'icon' => 'fa-triangle-exclamation',
+        'tone' => 'bg-[#FDECEC] text-[#C93636]',
+        'cardBg' => 'bg-[#FDECEC]/60',
+    ],
+];
+?>
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5">
+    <?php foreach ($cardsStats as $card): ?>
+    <div class="<?= $card['cardBg'] ?> rounded-xl border border-[#E5EAF1] px-3.5 py-3">
+        <div class="flex items-start gap-2.5">
+            <div class="w-8 h-8 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
+                <i class="fa-solid <?= $card['icon'] ?> text-sm" aria-hidden="true"></i>
             </div>
-            <div class="bg-blue-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-            </div>
-        </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-amber-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Aguardando</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $stats['blocos_aguardando'] ?? 0 ?></p>
-            </div>
-            <div class="bg-amber-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-        </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Aprovado</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $stats['blocos_aprovados'] ?? 0 ?></p>
-            </div>
-            <div class="bg-indigo-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-        </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Liberado</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $stats['blocos_liberados'] ?? 0 ?></p>
-            </div>
-            <div class="bg-green-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-            </div>
-        </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-gray-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Concluído</p>
-                <p class="text-3xl font-bold text-gray-900"><?= $stats['blocos_concluidos'] ?? 0 ?></p>
-            </div>
-            <div class="bg-gray-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-            </div>
-        </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-600">Provas Pendentes</p>
-                <p class="text-3xl font-bold text-gray-900"><?= count($provas_pendentes ?? []) ?></p>
-            </div>
-            <div class="bg-purple-100 rounded-full p-3">
-                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
+            <div class="min-w-0">
+                <p class="text-xs text-[#667085] truncate"><?= htmlspecialchars($card['label']) ?></p>
+                <p class="text-2xl font-bold text-[#172033] leading-tight mt-0.5"><?= $card['valor'] ?></p>
+                <p class="text-[11px] text-[#667085] mt-0.5 truncate"><?= htmlspecialchars($card['desc']) ?></p>
             </div>
         </div>
     </div>
+    <?php endforeach; ?>
 </div>
 <?php endif; ?>
 
 <!-- Provas Pendentes Alert -->
 <?php if (!empty($provas_pendentes)): ?>
-<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
-    <div class="flex">
-        <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-            </svg>
-        </div>
-        <div class="ml-3">
-            <p class="text-sm text-yellow-700">
-                <strong><?= count($provas_pendentes) ?> prova(s) pendente(s)</strong> aguardando agrupamento em blocos.
-                <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>" class="font-medium underline ml-1">Criar novo bloco</a>
-            </p>
-        </div>
+<div class="bg-[#FFF5D9] border border-[#F5D98A] border-l-4 border-l-[#B76A00] p-3.5 mb-5 rounded-xl flex items-start gap-3">
+    <div class="w-8 h-8 rounded-lg bg-[#FFF0C2] text-[#B76A00] flex items-center justify-center shrink-0">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
     </div>
+    <p class="text-sm text-[#8A5200] pt-1.5">
+        <strong><?= count($provas_pendentes) ?> prova(s) pendente(s)</strong> aguardando agrupamento em blocos.
+        <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>" class="font-semibold underline ml-1 text-[#B76A00] hover:text-[#8A5200]">Criar novo bloco</a>
+    </p>
 </div>
 <?php endif; ?>
 
@@ -301,156 +309,205 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <!-- Blocos Table -->
-<div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-purple-200">
-    <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
-        <h3 class="text-lg font-semibold text-gray-900">Evento de Provas</h3>
-        <div id="barraAcoesLote" class="hidden flex-wrap items-center gap-2">
-            <span id="contadorSelecionados" class="text-sm text-gray-600 mr-1">0 selecionado(s)</span>
-            <button type="button" onclick="marcarSelecionadosConcluidos()"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 text-white hover:bg-gray-900">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Marcar como concluído
-            </button>
-            <button type="button" onclick="excluirSelecionados()"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                Excluir
-            </button>
+<?php
+$statusGetAtual = isset($_GET['status']) ? (string) $_GET['status'] : '';
+?>
+<div class="bg-white rounded-xl border border-[#E5EAF1] overflow-hidden">
+    <div class="px-4 sm:px-5 py-4 border-b border-[#E5EAF1] flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+        <div class="min-w-0">
+            <h3 class="text-base sm:text-lg font-semibold text-[#172033]">Evento de Provas</h3>
+            <p class="text-sm text-[#667085] mt-0.5">Gerencie e acompanhe todos os eventos de avaliação cadastrados no sistema.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+            <form method="GET" action="<?= URL ?>/admin/provas" class="flex flex-wrap items-center gap-2" id="formBuscaRapidaProvas">
+                <?php if ($statusGetAtual !== ''): ?>
+                <input type="hidden" name="status" value="<?= htmlspecialchars($statusGetAtual) ?>">
+                <?php endif; ?>
+                <?php if ($filterData !== ''): ?>
+                <input type="hidden" name="data_prova" value="<?= htmlspecialchars($filterData) ?>">
+                <?php endif; ?>
+                <?php if ($filterTipoAvaliacaoId > 0): ?>
+                <input type="hidden" name="tipo_avaliacao_id" value="<?= (int) $filterTipoAvaliacaoId ?>">
+                <?php endif; ?>
+                <?php if ($filterBlocoModeloId > 0): ?>
+                <input type="hidden" name="bloco_modelo_id" value="<?= (int) $filterBlocoModeloId ?>">
+                <?php endif; ?>
+                <?php if ($filterMateriaId > 0): ?>
+                <input type="hidden" name="materia_id" value="<?= (int) $filterMateriaId ?>">
+                <?php endif; ?>
+                <?php if ($filterTurmaId > 0): ?>
+                <input type="hidden" name="turma_id" value="<?= (int) $filterTurmaId ?>">
+                <?php endif; ?>
+                <?php if (!empty($pagination['per_page'])): ?>
+                <input type="hidden" name="per_page" value="<?= (int) $pagination['per_page'] ?>">
+                <?php endif; ?>
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#667085] text-sm" aria-hidden="true"></i>
+                    <input type="search" name="titulo" value="<?= htmlspecialchars($filterTitulo, ENT_QUOTES, 'UTF-8') ?>"
+                           placeholder="Buscar por título, bloco ou turma..."
+                           class="pl-9 pr-3 py-2 w-64 sm:w-72 rounded-lg border border-[#E5EAF1] text-sm text-[#172033] placeholder:text-[#667085] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white">
+                </div>
+                <div class="relative">
+                    <i class="fa-regular fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-[#667085] text-sm" aria-hidden="true"></i>
+                    <select name="bimestre" onchange="this.form.submit()"
+                            class="appearance-none pl-9 pr-8 py-2 rounded-lg border border-[#E5EAF1] text-sm text-[#172033] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                        <?= PeriodoLetivo::optionsHtml((int) date('Y'), $filterBimestre, ['todos' => true, 'todos_label' => 'Todos os períodos']) ?>
+                    </select>
+                </div>
+            </form>
+            <div id="barraAcoesLote" class="hidden flex-wrap items-center gap-2">
+                <span id="contadorSelecionados" class="text-sm text-[#667085] mr-1">0 selecionado(s)</span>
+                <button type="button" onclick="marcarSelecionadosConcluidos()"
+                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 text-white hover:bg-gray-900">
+                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    Marcar como concluído
+                </button>
+                <button type="button" onclick="excluirSelecionados()"
+                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    Excluir
+                </button>
+            </div>
         </div>
     </div>
     
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-3 text-left w-10">
+        <table class="min-w-full">
+            <thead class="bg-[#F7F9FC]">
+                <tr class="border-b border-[#E5EAF1]">
+                    <th class="px-3 py-2.5 text-left w-10">
                         <input type="checkbox" id="selecionarTodosBlocos" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" title="Selecionar todos" onchange="toggleSelecionarTodos(this)">
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Horário</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de Nota</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provas</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                    <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-[#667085] uppercase tracking-wide">Título</th>
+                    <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-[#667085] uppercase tracking-wide whitespace-nowrap">Data/Horário</th>
+                    <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-[#667085] uppercase tracking-wide whitespace-nowrap"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></th>
+                    <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-[#667085] uppercase tracking-wide">Tipo de Nota</th>
+                    <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-[#667085] uppercase tracking-wide">Provas</th>
+                    <th class="px-3 py-2.5 text-left text-[11px] font-semibold text-[#667085] uppercase tracking-wide">Status</th>
+                    <th class="px-3 py-2.5 text-right text-[11px] font-semibold text-[#667085] uppercase tracking-wide">Ações</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+            <tbody class="divide-y divide-[#E5EAF1]">
                 <?php if (empty($blocos)): ?>
                     <tr>
                         <td colspan="8" class="px-6 py-12 text-center">
-                            <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
+                            <i class="fa-solid fa-file-lines text-4xl text-gray-300 mb-3" aria-hidden="true"></i>
                             <p class="text-gray-500 text-lg mb-2">Nenhum bloco criado ainda</p>
                             <p class="text-sm text-gray-400 mb-4">Comece criando um novo bloco de provas</p>
                             <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>"
                                class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg hover:opacity-90">
-                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                                </svg>
+                                <i class="fa-solid fa-plus mr-2" aria-hidden="true"></i>
                                 Criar Primeiro Bloco
                             </a>
                         </td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($blocos as $bloco): ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-4 whitespace-nowrap">
+                        <?php
+                        $turmasTexto = trim($bloco['turmas_demarcadas'] ?? '');
+                        if ($turmasTexto === '' && !empty(trim($bloco['turmas_por_professor'] ?? ''))) {
+                            $turmasTexto = trim($bloco['turmas_por_professor']);
+                        }
+                        if ($turmasTexto === '') {
+                            $turmasTexto = !empty($bloco['turma_nome']) ? (string)$bloco['turma_nome'] : 'Todas';
+                        }
+                        [$turmasChip, $turmasTitle] = $formatarTurmasChip($turmasTexto);
+                        $bimestreNumero = (int)($bloco['bimestre'] ?? 0);
+                        $anoBloco = (int)($bloco['ano_letivo'] ?? 0);
+                        $bimestreTexto = $bimestreNumero > 0 ? PeriodoLetivo::rotulo($anoBloco, $bimestreNumero) : '';
+                        $destinosQuadro = $rotulos_quadro[(int) ($bloco['id'] ?? 0)] ?? [];
+                        if ($destinosQuadro === []) {
+                            $semanaNum = (int) ($bloco['semana'] ?? 0);
+                            $nomeBlocoLegado = trim((string) ($bloco['bloco_modelo_nome'] ?? ''));
+                            if ($nomeBlocoLegado !== '' || ($semanaNum >= 1 && $semanaNum <= 20)) {
+                                $destinosQuadro = [[
+                                    'bloco' => $nomeBlocoLegado,
+                                    'semana' => ($semanaNum >= 1 && $semanaNum <= 20) ? ('S' . $semanaNum) : '',
+                                ]];
+                            }
+                        }
+                        $st = $bloco['status'] ?? 'aguardando';
+                        $statusMeta = [
+                            'aguardando' => ['Aguardando', 'bg-[#FFF5D9] text-[#B76A00]', 'fa-clock'],
+                            'aprovado' => ['Aprovado', 'bg-[#E8F8EF] text-[#16834A]', 'fa-check'],
+                            'liberado' => ['Liberado', 'bg-[#EAF3FF] text-[#1769C2]', 'fa-check'],
+                            'concluido' => ['Concluído', 'bg-slate-100 text-slate-700', 'fa-flag-checkered'],
+                        ];
+                        $lb = $statusMeta[$st] ?? $statusMeta['aguardando'];
+                        $entregues = (int)($bloco['total_provas_entregues'] ?? 0);
+                        $esperadas = (int)($bloco['total_provas_esperadas'] ?? 0);
+                        $textoProvas = $esperadas > 0 ? "{$entregues}/{$esperadas}" : (string) ($bloco['total_provas'] ?? 0);
+                        $qtdCanceladasBloco = (int)(($canceladas_por_bloco ?? [])[(int)$bloco['id']] ?? 0);
+                        ?>
+                        <tr class="hover:bg-[#F7F9FC]/80">
+                            <td class="px-3 py-2.5 whitespace-nowrap">
                                 <input type="checkbox"
                                        class="checkbox-bloco-lote rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                        value="<?= (int) $bloco['id'] ?>"
                                        onchange="atualizarBarraAcoesLote()">
                             </td>
-                            <td class="px-6 py-4">
-                                <?php
-                                $turmasTexto = trim($bloco['turmas_demarcadas'] ?? '');
-                                if ($turmasTexto === '' && !empty(trim($bloco['turmas_por_professor'] ?? ''))) {
-                                    $turmasTexto = trim($bloco['turmas_por_professor']);
-                                }
-                                if ($turmasTexto === '') {
-                                    $turmasTexto = !empty($bloco['turma_nome']) ? (string)$bloco['turma_nome'] : 'Todas';
-                                }
-                                $bimestreNumero = (int)($bloco['bimestre'] ?? 0);
-                                $anoBloco = (int)($bloco['ano_letivo'] ?? 0);
-                                $bimestreTexto = $bimestreNumero > 0 ? PeriodoLetivo::rotulo($anoBloco, $bimestreNumero) : '';
-                                $destinosQuadro = $rotulos_quadro[(int) ($bloco['id'] ?? 0)] ?? [];
-                                if ($destinosQuadro === []) {
-                                    $semanaNum = (int) ($bloco['semana'] ?? 0);
-                                    $nomeBlocoLegado = trim((string) ($bloco['bloco_modelo_nome'] ?? ''));
-                                    if ($nomeBlocoLegado !== '' || ($semanaNum >= 1 && $semanaNum <= 20)) {
-                                        $destinosQuadro = [[
-                                            'bloco' => $nomeBlocoLegado,
-                                            'semana' => ($semanaNum >= 1 && $semanaNum <= 20) ? ('S' . $semanaNum) : '',
-                                        ]];
-                                    }
-                                }
-                                ?>
-                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($bloco['titulo']) ?></div>
-                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                            <td class="px-3 py-2.5 min-w-[220px] max-w-[340px]">
+                                <div class="text-sm font-semibold text-[#172033] leading-snug"><?= htmlspecialchars($bloco['titulo']) ?></div>
+                                <div class="mt-1 flex flex-wrap items-center gap-1">
                                     <?php foreach ($destinosQuadro as $destino): ?>
                                         <?php if (trim((string) ($destino['bloco'] ?? '')) !== ''): ?>
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-[#EAF3FF] text-[#1769C2]"><?= htmlspecialchars((string) $destino['bloco']) ?></span>
                                         <?php endif; ?>
                                         <?php if (trim((string) ($destino['semana'] ?? '')) !== ''): ?>
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800"><?= htmlspecialchars((string) $destino['semana']) ?></span>
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-sky-50 text-sky-700"><?= htmlspecialchars((string) $destino['semana']) ?></span>
                                         <?php endif; ?>
                                     <?php endforeach; ?>
                                     <?php if ($bimestreTexto !== ''): ?>
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><?= htmlspecialchars($bimestreTexto) ?></span>
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700"><?= htmlspecialchars($bimestreTexto) ?></span>
                                     <?php endif; ?>
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800" title="Turma"><?= htmlspecialchars($turmasTexto) ?></span>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-[#E8F8EF] text-[#16834A] max-w-[220px] truncate" title="<?= htmlspecialchars($turmasTitle) ?>"><?= htmlspecialchars($turmasChip) ?></span>
                                 </div>
-                                <?php $qtdCanceladasBloco = (int)(($canceladas_por_bloco ?? [])[(int)$bloco['id']] ?? 0); ?>
                                 <?php if ($qtdCanceladasBloco > 0): ?>
                                 <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/canceladas"
-                                   class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-200"
+                                   class="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200"
                                    title="Provas canceladas aguardando ação do coordenador">
                                     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                                     <?= $qtdCanceladasBloco ?> cancelada(s)
                                 </a>
                                 <?php endif; ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    <?= !empty($bloco['data_prova']) ? date('d/m/Y', strtotime($bloco['data_prova'])) : (!empty($bloco['created_at']) ? date('d/m/Y', strtotime($bloco['created_at'])) : '—') ?>
-                                </div>
-                                <div class="text-sm text-gray-500">
-                                    <?= date('H:i', strtotime($bloco['hora_inicio'])) ?> - <?= date('H:i', strtotime($bloco['hora_fim'])) ?>
+                            <td class="px-3 py-2.5 whitespace-nowrap">
+                                <div class="flex items-start gap-1.5">
+                                    <i class="fa-regular fa-calendar text-[#667085] mt-0.5 text-xs" aria-hidden="true"></i>
+                                    <div>
+                                        <div class="text-sm font-medium text-[#172033]">
+                                            <?= !empty($bloco['data_prova']) ? date('d/m/Y', strtotime($bloco['data_prova'])) : (!empty($bloco['created_at']) ? date('d/m/Y', strtotime($bloco['created_at'])) : '—') ?>
+                                        </div>
+                                        <div class="text-xs text-[#667085]">
+                                            <?= date('H:i', strtotime($bloco['hora_inicio'])) ?> - <?= date('H:i', strtotime($bloco['hora_fim'])) ?>
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-3 py-2.5 text-sm text-[#172033] whitespace-nowrap">
                                 <?php
                                 $bim = (int)($bloco['bimestre'] ?? 0);
                                 $labBim = $bim > 0 ? PeriodoLetivo::rotulo((int)($bloco['ano_letivo'] ?? 0), $bim) : '';
                                 echo $labBim !== '' ? htmlspecialchars($labBim) : '<span class="text-gray-400">—</span>';
                                 ?>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700">
+                            <td class="px-3 py-2.5 text-sm text-[#172033]">
                                 <?= !empty($bloco['tipo_avaliacao_nome']) ? htmlspecialchars($bloco['tipo_avaliacao_nome']) : '<span class="text-gray-400">—</span>' ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <?php
-                                $entregues = (int)($bloco['total_provas_entregues'] ?? 0);
-                                $esperadas = (int)($bloco['total_provas_esperadas'] ?? 0);
-                                $textoProvas = $esperadas > 0 ? "{$entregues}/{$esperadas}" : ($bloco['total_provas'] ?? 0);
-                                ?>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                    <?= $textoProvas ?> <?= $esperadas > 0 ? '' : 'prova(s)' ?>
+                            <td class="px-3 py-2.5 whitespace-nowrap">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#F3EAFE] text-[#7541C8]">
+                                    <?= htmlspecialchars($textoProvas) ?><?= $esperadas > 0 ? '' : ' prova(s)' ?>
                                 </span>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <?php
-                                $st = $bloco['status'] ?? 'aguardando';
-                                $labels = ['aguardando' => ['Aguardando', 'bg-amber-100 text-amber-800'], 'aprovado' => ['Aprovado', 'bg-indigo-100 text-indigo-800'], 'liberado' => ['Liberado', 'bg-green-100 text-green-800'], 'concluido' => ['Concluído', 'bg-gray-100 text-gray-800']];
-                                $lb = $labels[$st] ?? ['Aguardando', 'bg-amber-100 text-amber-800'];
-                                ?>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?= $lb[1] ?>"><?= $lb[0] ?></span>
+                            <td class="px-3 py-2.5 whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold <?= $lb[1] ?>">
+                                    <i class="fa-solid <?= $lb[2] ?> text-[10px]" aria-hidden="true"></i>
+                                    <?= htmlspecialchars($lb[0]) ?>
+                                </span>
                             </td>
-                            <td class="px-6 py-4 text-sm font-medium">
-                                <button type="button" 
-                                        class="btn-acoes-bloco btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors hover:opacity-90"
-                                        style="border-color: var(--button-primary-color)"
+                            <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                                <button type="button"
+                                        class="btn-acoes-bloco btn-primary-custom inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90"
                                         title="Ações"
                                         data-bloco-id="<?= (int)$bloco['id'] ?>"
                                         data-status="<?= htmlspecialchars($st) ?>"
@@ -459,7 +516,7 @@ document.addEventListener('keydown', function(e) {
                                         data-duplicar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/duplicar') ?>"
                                         onclick="abrirDropdownAcoes(this)">
                                     <span>Ações</span>
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                    <i class="fa-solid fa-chevron-down text-[10px]" aria-hidden="true"></i>
                                 </button>
                             </td>
                         </tr>
@@ -478,25 +535,53 @@ document.addEventListener('keydown', function(e) {
     unset($queryParams['page']);
     $baseQuery = empty($queryParams) ? '' : ('?' . http_build_query($queryParams));
     $sep = $baseQuery === '' ? '?' : '&';
+    $inicio = $total > 0 ? min(($page - 1) * $perPage + 1, $total) : 0;
+    $fim = $total > 0 ? min($page * $perPage, $total) : 0;
     ?>
     <?php if ($total > 0): ?>
-    <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
-        <p class="text-sm text-gray-600">
-            Exibindo <?= min(($page - 1) * $perPage + 1, $total) ?>–<?= min($page * $perPage, $total) ?> de <?= $total ?> bloco(s)
+    <div class="px-4 sm:px-5 py-3 border-t border-[#E5EAF1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <p class="text-sm text-[#667085]">
+            Mostrando <?= $inicio ?> a <?= $fim ?> de <?= $total ?> registros
         </p>
-        <?php if ($totalPages > 1): ?>
-        <div class="flex items-center gap-1">
-            <?php if ($page > 1): ?>
-                <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $page - 1 ?>" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Anterior</a>
-            <?php endif; ?>
-            <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $i ?>" class="px-3 py-1.5 text-sm font-medium rounded-lg <?= $i === $page ? 'bg-primary text-white' : 'text-gray-700 bg-gray-100 hover:bg-gray-200' ?>"><?= $i ?></a>
-            <?php endfor; ?>
-            <?php if ($page < $totalPages): ?>
-                <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $page + 1 ?>" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Próxima</a>
+        <div class="flex flex-wrap items-center gap-2">
+            <form method="GET" action="<?= URL ?>/admin/provas" class="inline-flex items-center gap-1.5">
+                <?php foreach ($_GET as $gk => $gv): ?>
+                    <?php if ($gk === 'page' || $gk === 'per_page' || is_array($gv)) continue; ?>
+                    <input type="hidden" name="<?= htmlspecialchars((string) $gk) ?>" value="<?= htmlspecialchars((string) $gv) ?>">
+                <?php endforeach; ?>
+                <select name="per_page" onchange="this.form.submit()"
+                        class="px-2.5 py-1.5 rounded-lg border border-[#E5EAF1] text-sm text-[#172033] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                    <?php foreach ([10, 15, 25, 50] as $pp): ?>
+                    <option value="<?= $pp ?>" <?= $perPage === $pp ? 'selected' : '' ?>><?= $pp ?> por página</option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+            <?php if ($totalPages > 1): ?>
+            <div class="flex items-center gap-1">
+                <?php if ($page > 1): ?>
+                    <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $page - 1 ?>" class="w-8 h-8 inline-flex items-center justify-center text-sm text-[#667085] border border-[#E5EAF1] rounded-lg hover:bg-gray-50" aria-label="Anterior"><i class="fa-solid fa-chevron-left text-xs"></i></a>
+                <?php endif; ?>
+                <?php
+                $windowStart = max(1, $page - 2);
+                $windowEnd = min($totalPages, $page + 2);
+                if ($windowStart > 1): ?>
+                    <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=1" class="w-8 h-8 inline-flex items-center justify-center text-sm font-medium rounded-lg border border-[#E5EAF1] text-[#172033] hover:bg-gray-50">1</a>
+                    <?php if ($windowStart > 2): ?><span class="px-1 text-[#667085]">…</span><?php endif; ?>
+                <?php endif; ?>
+                <?php for ($i = $windowStart; $i <= $windowEnd; $i++): ?>
+                    <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $i ?>"
+                       class="w-8 h-8 inline-flex items-center justify-center text-sm font-medium rounded-lg <?= $i === $page ? 'btn-primary-custom' : 'border border-[#E5EAF1] text-[#172033] hover:bg-gray-50' ?>"><?= $i ?></a>
+                <?php endfor; ?>
+                <?php if ($windowEnd < $totalPages): ?>
+                    <?php if ($windowEnd < $totalPages - 1): ?><span class="px-1 text-[#667085]">…</span><?php endif; ?>
+                    <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $totalPages ?>" class="w-8 h-8 inline-flex items-center justify-center text-sm font-medium rounded-lg border border-[#E5EAF1] text-[#172033] hover:bg-gray-50"><?= $totalPages ?></a>
+                <?php endif; ?>
+                <?php if ($page < $totalPages): ?>
+                    <a href="<?= URL ?>/admin/provas<?= $baseQuery . $sep ?>page=<?= $page + 1 ?>" class="w-8 h-8 inline-flex items-center justify-center text-sm text-[#667085] border border-[#E5EAF1] rounded-lg hover:bg-gray-50" aria-label="Próxima"><i class="fa-solid fa-chevron-right text-xs"></i></a>
+                <?php endif; ?>
+            </div>
             <?php endif; ?>
         </div>
-        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
