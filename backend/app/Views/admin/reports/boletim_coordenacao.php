@@ -123,72 +123,122 @@ include __DIR__ . '/../_partials/flash_message.php';
         </div>
         <div id="lista-eventos-coord" class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/40">
             <?php
-            $eventosLista = array_values((array) ($eventos ?? []));
-            usort($eventosLista, static function (array $a, array $b): int {
-                $serieA = mb_strtolower(trim((string) ($a['series_nomes'] ?? '')));
-                $serieB = mb_strtolower(trim((string) ($b['series_nomes'] ?? '')));
+            $valorEventoLista = static function (array $ev): string {
+                return (int) ($ev['regra_id'] ?? 0) . ':' . base64_encode((string) ($ev['periodo_ref'] ?? ''));
+            };
+            $rotuloVersaoLista = static function (array $ev): string {
+                if (!empty($ev['eh_vigente'])) {
+                    return 'Vigente';
+                }
+                $partes = ['Anterior'];
+                $numero = (int) ($ev['versao'] ?? 0);
+                if ($numero > 0) {
+                    $partes[] = 'v' . $numero;
+                }
+                $ts = strtotime((string) ($ev['updated_at'] ?? ''));
+                if ($ts !== false) {
+                    $partes[] = date('d/m/Y', $ts);
+                }
+                return implode(' · ', $partes);
+            };
+            $gruposVersao = [];
+            foreach ((array) ($eventos ?? []) as $eventoGrupo) {
+                if (!is_array($eventoGrupo)) {
+                    continue;
+                }
+                $ridGrupo = (int) ($eventoGrupo['regra_id'] ?? 0);
+                if ($ridGrupo <= 0) {
+                    continue;
+                }
+                $gruposVersao[$ridGrupo][] = $eventoGrupo;
+            }
+            $linhasEvento = [];
+            foreach ($gruposVersao as $versoesGrupo) {
+                usort($versoesGrupo, static function (array $a, array $b): int {
+                    $vigA = !empty($a['eh_vigente']) ? 0 : 1;
+                    $vigB = !empty($b['eh_vigente']) ? 0 : 1;
+                    if ($vigA !== $vigB) {
+                        return $vigA <=> $vigB;
+                    }
+                    return strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
+                });
+                $linhasEvento[] = $versoesGrupo;
+            }
+            usort($linhasEvento, static function (array $a, array $b): int {
+                $baseA = $a[0];
+                $baseB = $b[0];
+                $serieA = mb_strtolower(trim((string) ($baseA['series_nomes'] ?? '')));
+                $serieB = mb_strtolower(trim((string) ($baseB['series_nomes'] ?? '')));
                 $cmp = $serieA <=> $serieB;
                 if ($cmp !== 0) {
                     return $cmp;
                 }
-                $tipoA = (($a['exibir_em'] ?? '') === 'notas') ? 0 : 1;
-                $tipoB = (($b['exibir_em'] ?? '') === 'notas') ? 0 : 1;
+                $tipoA = (($baseA['exibir_em'] ?? '') === 'notas') ? 0 : 1;
+                $tipoB = (($baseB['exibir_em'] ?? '') === 'notas') ? 0 : 1;
                 if ($tipoA !== $tipoB) {
                     return $tipoA <=> $tipoB;
                 }
-                $cmp = ((int) ($a['bimestre'] ?? 0)) <=> ((int) ($b['bimestre'] ?? 0));
+                $cmp = ((int) ($baseA['bimestre'] ?? 0)) <=> ((int) ($baseB['bimestre'] ?? 0));
                 if ($cmp !== 0) {
                     return $cmp;
                 }
-                return ((int) ($a['regra_id'] ?? 0)) <=> ((int) ($b['regra_id'] ?? 0));
+                return ((int) ($baseA['regra_id'] ?? 0)) <=> ((int) ($baseB['regra_id'] ?? 0));
             });
             ?>
-            <?php if ($eventosLista === []): ?>
+            <?php if ($linhasEvento === []): ?>
                 <p class="px-4 py-6 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
             <?php else: ?>
-                <div class="grid gap-x-3 items-center px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200" style="grid-template-columns: 1.25rem 5.5rem 5.75rem 8.5rem minmax(0,1fr) auto;">
+                <div class="grid gap-x-3 items-center px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 11.5rem;">
                     <span></span>
                     <span>Tipo</span>
                     <span>Ref</span>
                     <span>Bimestre</span>
                     <span>Série</span>
-                    <span></span>
+                    <span>Versões</span>
                 </div>
             <?php endif; ?>
-            <?php foreach ($eventosLista as $evento):
-                $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
-                $marcado = $selecionarTodos || isset($eventosSelecionados[$value]);
-                $vigente = !empty($evento['eh_vigente']);
-                $refLista = (int) ($evento['regra_id'] ?? 0);
-                $bimLista = trim((string) ($evento['rotulo_bimestre'] ?? ''));
-                $serieLista = trim((string) ($evento['series_nomes'] ?? ''));
-                $tipoLista = (($evento['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
+            <?php foreach ($linhasEvento as $versoesLinha):
+                $escolhida = $versoesLinha[0];
+                $marcado = $selecionarTodos;
+                foreach ($versoesLinha as $versaoEv) {
+                    if (isset($eventosSelecionados[$valorEventoLista($versaoEv)])) {
+                        $escolhida = $versaoEv;
+                        $marcado = true;
+                        break;
+                    }
+                }
+                $value = $valorEventoLista($escolhida);
+                $refLista = (int) ($escolhida['regra_id'] ?? 0);
+                $bimLista = trim((string) ($escolhida['rotulo_bimestre'] ?? ''));
+                $serieLista = trim((string) ($escolhida['series_nomes'] ?? ''));
+                $tipoLista = (($escolhida['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
+                $totalVersoes = count($versoesLinha);
                 ?>
-                <label class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 5.5rem 5.75rem 8.5rem minmax(0,1fr) auto;">
+                <div class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 11.5rem;">
                     <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
                     <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
                     <span>Ref: <?= $refLista > 0 ? $refLista : '—' ?></span>
                     <span><?= $bimLista !== '' ? htmlspecialchars($bimLista, ENT_QUOTES, 'UTF-8') : '' ?></span>
                     <span class="min-w-0 truncate"><?= htmlspecialchars($serieLista !== '' ? $serieLista : 'Todas', ENT_QUOTES, 'UTF-8') ?></span>
-                    <?php if (!$vigente): ?>
-                        <span class="shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Anterior</span>
-                    <?php else: ?>
-                        <span></span>
-                    <?php endif; ?>
-                </label>
+                    <div class="min-w-0">
+                        <?php if ($totalVersoes > 1): ?>
+                            <select class="evento-versao w-full text-xs border border-gray-300 rounded-md bg-white py-1 pl-2 text-gray-800">
+                                <?php foreach ($versoesLinha as $versaoEv):
+                                    $valorVersao = $valorEventoLista($versaoEv);
+                                    ?>
+                                    <option value="<?= htmlspecialchars($valorVersao, ENT_QUOTES, 'UTF-8') ?>" <?= $valorVersao === $value ? 'selected' : '' ?>><?= htmlspecialchars($rotuloVersaoLista($versaoEv), ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <span class="block text-[10px] text-gray-500 mt-0.5"><?= $totalVersoes ?> versões</span>
+                        <?php else: ?>
+                            <span class="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-800">Vigente</span>
+                            <span class="block text-[10px] text-gray-500 mt-0.5">1 versão</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
             <?php endforeach; ?>
         </div>
-        <input type="hidden" name="evento" id="evento-boletim-coord" value="<?= $selecionarTodos ? 'todos' : '' ?>">
-        <label class="mt-3 inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-            <input type="checkbox" name="incluir_antigas" value="1" id="incluir-antigas-boletim-coord"
-                   class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                   <?= $incluirAntigas ? 'checked' : '' ?>
-                   onchange="if (window.sincronizarEventosCoordenacao) { window.sincronizarEventosCoordenacao(); } this.form.submit();">
-            Incluir versões anteriores
-        </label>
-        <?php if ($incluirAntigas): ?>
-            <span class="block text-xs text-gray-500 mt-1">Vigente = oficial. Anterior = histórico da mesma regra.</span>
-        <?php endif; ?>
+        <input type="hidden" name="evento" id="evento-boletim-coord" value="">
     </div>
 
     <label class="inline-flex items-center gap-2.5 mt-5 text-sm text-gray-700 cursor-pointer">
@@ -451,16 +501,30 @@ include __DIR__ . '/../_partials/flash_message.php';
                 : (marcados + ' de ' + checks.length + ' selecionado(s)');
         }
     }
-    window.sincronizarEventosCoordenacao = function () {
-        var todos = checks.length > 0 && checks.every(function (check) { return check.checked; });
-        if (eventoHidden) {
-            eventoHidden.disabled = false;
-            eventoHidden.value = todos ? 'todos' : '';
-        }
-        checks.forEach(function (check) {
-            check.disabled = todos;
+    function aplicarVersaoNosChecks() {
+        document.querySelectorAll('.evento-versao').forEach(function (sel) {
+            var item = sel.closest('.evento-item');
+            var check = item ? item.querySelector('.evento-check') : null;
+            if (check) {
+                check.value = sel.value;
+            }
         });
+    }
+    window.sincronizarEventosCoordenacao = function () {
+        aplicarVersaoNosChecks();
     };
+    document.querySelectorAll('.evento-versao').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            var item = sel.closest('.evento-item');
+            var check = item ? item.querySelector('.evento-check') : null;
+            if (!check) {
+                return;
+            }
+            check.value = sel.value;
+            check.checked = true;
+            atualizarContagem();
+        });
+    });
     function fecharSugestoes() {
         if (!alunoLista) return;
         alunoLista.classList.add('hidden');
@@ -544,7 +608,8 @@ include __DIR__ . '/../_partials/flash_message.php';
             var gerar = submitter && submitter.name === 'executar';
             var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
             var alunoBusca = alunoInput ? String(alunoInput.value || '').trim() : '';
-            if (gerar && fonte === 'evento' && checks.length > 0 && !checks.some(function (check) { return check.checked; })) {
+            var nenhum = checks.length > 0 && !checks.some(function (check) { return check.checked; });
+            if (gerar && fonte === 'evento' && nenhum) {
                 if (alunoBusca !== '') {
                     checks.forEach(function (check) { check.checked = true; check.disabled = false; });
                     if (eventoHidden) {
@@ -552,12 +617,12 @@ include __DIR__ . '/../_partials/flash_message.php';
                         eventoHidden.value = 'todos';
                     }
                     atualizarContagem();
-                    window.sincronizarEventosCoordenacao();
                 } else {
                     event.preventDefault();
-                    checks.forEach(function (check) { check.disabled = false; });
                     window.alert('Selecione ao menos um boletim ou informe o aluno.');
                 }
+            } else if (eventoHidden) {
+                eventoHidden.value = '';
             }
         });
     }

@@ -312,23 +312,9 @@ class ReportAdminController extends AdminBaseController
         $notaAbaixoDe = $this->parseNotaAbaixoDeBoletim($_GET['nota_abaixo_de'] ?? null);
         $materiasExibicao = $this->parseMateriasExibicaoBoletim($_GET['materias_exibicao'] ?? 'todas');
         $incluirAssinatura = !empty($_GET['assinatura']);
-        $incluirAntigas = !empty($_GET['incluir_antigas']);
+        $incluirAntigas = false;
         $selecionarTodos = (string) ($_GET['evento'] ?? '') === 'todos';
-        $eventos = $this->listarEventosBoletimCoordenacao($incluirAntigas);
-        if (!$incluirAntigas && !$selecionarTodos) {
-            $pedidos = $this->valoresEventosPedidosBoletimCoordenacao();
-            $presentes = [];
-            foreach ($eventos as $evLista) {
-                $presentes[(int) ($evLista['regra_id'] ?? 0) . ':' . base64_encode((string) ($evLista['periodo_ref'] ?? ''))] = true;
-            }
-            foreach ($pedidos as $pedido) {
-                if ($pedido !== '' && !isset($presentes[$pedido])) {
-                    $incluirAntigas = true;
-                    $eventos = $this->listarEventosBoletimCoordenacao(true);
-                    break;
-                }
-            }
-        }
+        $eventos = $this->listarEventosBoletimCoordenacao(true);
         $selecionados = $this->resolverEventosSelecionadosBoletimCoordenacao($eventos);
         if ($fonte === 'evento' && $selecionados === [] && $alunoQ !== '') {
             $selecionados = $this->resolverEventosSelecionadosBoletimCoordenacao($eventos, true);
@@ -427,8 +413,7 @@ class ReportAdminController extends AdminBaseController
             }
             $relatorios = [$this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ)];
         } else {
-            $incluirAntigas = !empty($_GET['incluir_antigas']);
-            $catalogo = $this->listarEventosBoletimCoordenacao($incluirAntigas);
+            $catalogo = $this->listarEventosBoletimCoordenacao(true);
             $selecionados = $this->resolverEventosSelecionadosBoletimCoordenacao($catalogo);
             if ($selecionados === [] && $alunoQ !== '') {
                 $selecionados = $this->resolverEventosSelecionadosBoletimCoordenacao($catalogo, true);
@@ -1232,10 +1217,18 @@ class ReportAdminController extends AdminBaseController
                 'nome_exibicao' => (string) ($evento['nome_exibicao'] ?? $evento['nome'] ?? 'Evento'),
                 'nome_detalhe' => (string) ($evento['nome_detalhe'] ?? ''),
                 'valor' => $valor,
+                'eh_vigente' => !empty($evento['eh_vigente']),
             ];
         }
         if ($forcarTodos || (string) ($_GET['evento'] ?? '') === 'todos') {
-            return array_values($porValor);
+            $vigentes = [];
+            foreach ($porValor as $valor => $item) {
+                if (!empty($item['eh_vigente'])) {
+                    $vigentes[$valor] = $item;
+                }
+            }
+
+            return array_values($vigentes !== [] ? $vigentes : $porValor);
         }
         $saida = [];
         foreach ($this->valoresEventosPedidosBoletimCoordenacao() as $valor) {
