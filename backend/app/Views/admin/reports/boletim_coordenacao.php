@@ -126,20 +126,14 @@ include __DIR__ . '/../_partials/flash_message.php';
             $valorEventoLista = static function (array $ev): string {
                 return (int) ($ev['regra_id'] ?? 0) . ':' . base64_encode((string) ($ev['periodo_ref'] ?? ''));
             };
-            $rotuloVersaoLista = static function (array $ev): string {
-                if (!empty($ev['eh_vigente'])) {
-                    return 'Vigente';
+            $dataVersaoLista = static function (array $ev): string {
+                $raw = trim((string) ($ev['criado_em'] ?? ''));
+                if ($raw === '') {
+                    $raw = trim((string) ($ev['updated_at'] ?? ''));
                 }
-                $partes = ['Anterior'];
-                $numero = (int) ($ev['versao'] ?? 0);
-                if ($numero > 0) {
-                    $partes[] = 'v' . $numero;
-                }
-                $ts = strtotime((string) ($ev['updated_at'] ?? ''));
-                if ($ts !== false) {
-                    $partes[] = date('d/m/Y', $ts);
-                }
-                return implode(' · ', $partes);
+                $ts = strtotime($raw);
+
+                return $ts !== false ? date('d/m/Y', $ts) : '';
             };
             $gruposVersao = [];
             foreach ((array) ($eventos ?? []) as $eventoGrupo) {
@@ -188,7 +182,7 @@ include __DIR__ . '/../_partials/flash_message.php';
             <?php if ($linhasEvento === []): ?>
                 <p class="px-4 py-6 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
             <?php else: ?>
-                <div class="grid gap-x-3 items-center px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 11.5rem;">
+                <div class="grid gap-x-3 items-center px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 12.5rem;">
                     <span></span>
                     <span>Tipo</span>
                     <span>Ref</span>
@@ -214,26 +208,47 @@ include __DIR__ . '/../_partials/flash_message.php';
                 $tipoLista = (($escolhida['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
                 $totalVersoes = count($versoesLinha);
                 ?>
-                <div class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 11.5rem;">
+                <div class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 12.5rem;">
                     <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
                     <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
                     <span>Ref: <?= $refLista > 0 ? $refLista : '—' ?></span>
                     <span><?= $bimLista !== '' ? htmlspecialchars($bimLista, ENT_QUOTES, 'UTF-8') : '' ?></span>
                     <span class="min-w-0 truncate"><?= htmlspecialchars($serieLista !== '' ? $serieLista : 'Todas', ENT_QUOTES, 'UTF-8') ?></span>
                     <div class="min-w-0">
-                        <?php if ($totalVersoes > 1): ?>
-                            <select class="evento-versao w-full text-xs border border-gray-300 rounded-md bg-white py-1 pl-2 text-gray-800">
-                                <?php foreach ($versoesLinha as $versaoEv):
-                                    $valorVersao = $valorEventoLista($versaoEv);
-                                    ?>
-                                    <option value="<?= htmlspecialchars($valorVersao, ENT_QUOTES, 'UTF-8') ?>" <?= $valorVersao === $value ? 'selected' : '' ?>><?= htmlspecialchars($rotuloVersaoLista($versaoEv), ENT_QUOTES, 'UTF-8') ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <span class="block text-[10px] text-gray-500 mt-0.5"><?= $totalVersoes ?> versões</span>
-                        <?php else: ?>
-                            <span class="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-800">Vigente</span>
-                            <span class="block text-[10px] text-gray-500 mt-0.5">1 versão</span>
-                        <?php endif; ?>
+                        <span class="block text-[10px] text-gray-500 mb-1"><?= $totalVersoes ?> <?= $totalVersoes === 1 ? 'versão' : 'versões' ?></span>
+                        <div class="flex flex-col gap-1">
+                            <?php foreach ($versoesLinha as $versaoEv):
+                                $valorVersao = $valorEventoLista($versaoEv);
+                                $ativa = $valorVersao === $value;
+                                $ehVigenteVersao = !empty($versaoEv['eh_vigente']);
+                                $dataVersao = $dataVersaoLista($versaoEv);
+                                $classeVersao = $ativa
+                                    ? ($ehVigenteVersao
+                                        ? 'border-green-400 bg-green-50 text-green-900'
+                                        : 'border-gray-400 bg-gray-50 text-gray-900')
+                                    : 'border-gray-200 bg-white text-gray-600';
+                                ?>
+                                <?php if ($totalVersoes > 1): ?>
+                                    <button type="button"
+                                            class="evento-versao w-full text-left rounded-md border px-2 py-1 leading-tight <?= $classeVersao ?>"
+                                            data-value="<?= htmlspecialchars($valorVersao, ENT_QUOTES, 'UTF-8') ?>"
+                                            data-vigente="<?= $ehVigenteVersao ? '1' : '0' ?>"
+                                            aria-pressed="<?= $ativa ? 'true' : 'false' ?>">
+                                        <span class="block text-[11px] font-semibold"><?= $ehVigenteVersao ? 'Vigente' : 'Anterior' ?></span>
+                                        <?php if ($dataVersao !== ''): ?>
+                                            <span class="block text-[10px] opacity-80"><?= htmlspecialchars($dataVersao, ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php endif; ?>
+                                    </button>
+                                <?php else: ?>
+                                    <span class="inline-flex flex-col rounded-md border border-green-200 bg-green-50 px-2 py-1 leading-tight text-green-900">
+                                        <span class="text-[11px] font-semibold">Vigente</span>
+                                        <?php if ($dataVersao !== ''): ?>
+                                            <span class="text-[10px] opacity-80"><?= htmlspecialchars($dataVersao, ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -502,27 +517,39 @@ include __DIR__ . '/../_partials/flash_message.php';
         }
     }
     function aplicarVersaoNosChecks() {
-        document.querySelectorAll('.evento-versao').forEach(function (sel) {
-            var item = sel.closest('.evento-item');
-            var check = item ? item.querySelector('.evento-check') : null;
-            if (check) {
-                check.value = sel.value;
+        document.querySelectorAll('.evento-item').forEach(function (item) {
+            var ativo = item.querySelector('.evento-versao[aria-pressed="true"]');
+            var check = item.querySelector('.evento-check');
+            if (ativo && check) {
+                check.value = ativo.getAttribute('data-value') || check.value;
             }
         });
+    }
+    function marcarVersao(btn) {
+        var grupo = btn.parentElement;
+        if (!grupo) return;
+        grupo.querySelectorAll('.evento-versao').forEach(function (el) {
+            var ativo = el === btn;
+            var vigente = el.getAttribute('data-vigente') === '1';
+            el.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+            el.className = 'evento-versao w-full text-left rounded-md border px-2 py-1 leading-tight '
+                + (ativo
+                    ? (vigente ? 'border-green-400 bg-green-50 text-green-900' : 'border-gray-400 bg-gray-50 text-gray-900')
+                    : 'border-gray-200 bg-white text-gray-600');
+        });
+        var item = btn.closest('.evento-item');
+        var check = item ? item.querySelector('.evento-check') : null;
+        if (!check) return;
+        check.value = btn.getAttribute('data-value') || check.value;
+        check.checked = true;
+        atualizarContagem();
     }
     window.sincronizarEventosCoordenacao = function () {
         aplicarVersaoNosChecks();
     };
-    document.querySelectorAll('.evento-versao').forEach(function (sel) {
-        sel.addEventListener('change', function () {
-            var item = sel.closest('.evento-item');
-            var check = item ? item.querySelector('.evento-check') : null;
-            if (!check) {
-                return;
-            }
-            check.value = sel.value;
-            check.checked = true;
-            atualizarContagem();
+    document.querySelectorAll('.evento-versao').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            marcarVersao(btn);
         });
     });
     function fecharSugestoes() {

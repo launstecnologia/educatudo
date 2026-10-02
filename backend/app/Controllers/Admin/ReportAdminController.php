@@ -942,8 +942,18 @@ class ReportAdminController extends AdminBaseController
             $selExtras = '';
             $groupExtras = '';
         }
+        $selCriado = '';
+        try {
+            $colCriado = $this->db->fetch("SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'created_at'");
+            if (is_array($colCriado) && $colCriado !== []) {
+                $selCriado = 'MIN(g.created_at) AS criado_em,';
+            }
+        } catch (\Throwable $eCriado) {
+            $selCriado = '';
+        }
         $sqlBase = "SELECT g.regra_id, g.periodo_ref, r.nome, r.ano_letivo, r.bimestre, r.series_ids, r.exibir_em,
                     {$selExtras}
+                    {$selCriado}
                     COUNT(DISTINCT g.aluno_id) AS total_alunos,
                     GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome ASC SEPARATOR ', ') AS turmas_nomes,
                     MAX(g.updated_at) AS updated_at,
