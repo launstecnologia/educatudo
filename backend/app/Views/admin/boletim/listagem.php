@@ -6,6 +6,19 @@ $filtroAno = (string) ($filtro_ano ?? '');
 $filtroBimestre = (string) ($filtro_bimestre ?? '');
 $filtroSerieId = (int) ($filtro_serie_id ?? 0);
 $seriesCatalogo = is_array($series_catalogo ?? null) ? $series_catalogo : [];
+$ordemLista = (string) ($ordem_lista ?? '');
+if (!in_array($ordemLista, ['ref', 'serie', 'bimestre'], true)) {
+    $ordemLista = '';
+}
+$dirLista = ((string) ($dir_lista ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+$linkOrdenarLista = static function (string $campo) use ($ordemLista, $dirLista): string {
+    $params = $_GET ?? [];
+    unset($params['page']);
+    $params['ordem'] = $campo;
+    $params['dir'] = ($ordemLista === $campo && $dirLista !== 'desc') ? 'desc' : 'asc';
+
+    return URL . '/admin/boletim?' . http_build_query($params);
+};
 $flashMessage = (string) ($flash_message ?? '');
 $flashType = (string) ($flash_type ?? 'success');
 $temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
@@ -40,34 +53,6 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
     }
     $lab = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
     return $lab !== '' ? $lab : 'N/A';
-};
-$dataHoraGeracao = static function (?string $valor): ?string {
-    $valor = trim((string) $valor);
-    if ($valor === '') {
-        return null;
-    }
-    $ts = strtotime($valor);
-    return $ts !== false ? date('d/m/Y H:i', $ts) : null;
-};
-$duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
-    $a = strtotime(trim((string) $inicio));
-    $b = strtotime(trim((string) $fim));
-    if ($a === false || $b === false || $b < $a) {
-        return null;
-    }
-    $seg = $b - $a;
-    if ($seg < 60) {
-        return $seg . 's';
-    }
-    $min = intdiv($seg, 60);
-    $resto = $seg % 60;
-    if ($min < 60) {
-        return $resto > 0 ? $min . ' min ' . $resto . 's' : $min . ' min';
-    }
-    $horas = intdiv($min, 60);
-    $min = $min % 60;
-
-    return $min > 0 ? $horas . 'h ' . $min . ' min' : $horas . 'h';
 };
 ?>
 
@@ -160,6 +145,10 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
         </button>
     </div>
     <form method="GET" action="<?= URL ?>/admin/boletim" class="flex flex-col flex-1 overflow-hidden">
+        <?php if ($ordemLista !== ''): ?>
+        <input type="hidden" name="ordem" value="<?= htmlspecialchars($ordemLista) ?>">
+        <input type="hidden" name="dir" value="<?= htmlspecialchars($dirLista) ?>">
+        <?php endif; ?>
         <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <div>
                 <label for="filtro_nome" class="block text-sm font-medium text-gray-700 mb-1.5">Nome ou código</label>
@@ -259,20 +248,40 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref</th>
+                    <?php
+                    $thOrdenavel = static function (string $campo, string $rotulo) use ($ordemLista, $dirLista, $linkOrdenarLista): void {
+                        $ativo = $ordemLista === $campo;
+                        $proximaDir = ($ativo && $dirLista !== 'desc') ? 'desc' : 'asc';
+                        $icone = 'fa-sort';
+                        if ($ativo) {
+                            $icone = $dirLista === 'desc' ? 'fa-sort-down' : 'fa-sort-up';
+                        }
+                        ?>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <a href="<?= htmlspecialchars($linkOrdenarLista($campo)) ?>"
+                               data-ordem="<?= htmlspecialchars($campo) ?>"
+                               data-dir="<?= htmlspecialchars($proximaDir) ?>"
+                               class="js-ordem-avaliacoes inline-flex items-center gap-1 hover:text-gray-800"
+                               title="Ordenar por <?= htmlspecialchars($rotulo) ?>">
+                                <?= htmlspecialchars($rotulo) ?>
+                                <i class="fa-solid <?= $icone ?> <?= $ativo ? 'text-gray-700' : 'text-gray-300' ?>"></i>
+                            </a>
+                        </th>
+                        <?php
+                    };
+                    ?>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Boletim</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Séries</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano Letivo</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Geração</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modelo</th>
+                    <?php $thOrdenavel('serie', 'Série'); ?>
+                    <?php $thOrdenavel('bimestre', 'Bimestre'); ?>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano letivo</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 <?php if (empty($eventos)): ?>
                 <tr>
-                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-file-lines text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum evento de notas cadastrado</p>
                         <p class="text-sm mt-1">Cadastre o modelo em Acadêmico → Modelo de Boletim e depois crie a avaliação do bimestre.</p>
@@ -285,19 +294,25 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 </tr>
                 <?php else: ?>
                 <?php foreach ($eventos as $evento): ?>
-                <?php $eventoId = (int) ($evento['id'] ?? 0); ?>
+                <?php
+                $eventoId = (int) ($evento['id'] ?? 0);
+                $stGeracao = (string) ($evento['geracao_status'] ?? '');
+                $erroGeracao = trim((string) ($evento['geracao_erro'] ?? ''));
+                $geracaoEmAndamento = in_array($stGeracao, ['pending', 'processing'], true);
+                $nomeBol = trim((string) ($evento['boletim_cadastro_nome'] ?? ''));
+                $ehExtra = (($evento['finalidade'] ?? 'oficial') === 'complementar');
+                $liberadoAlunoPais = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1);
+                $exibicaoBloqueada = (int) ($evento['vis_coordenacao'] ?? 1) !== 1;
+                ?>
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $eventoId > 0 ? $eventoId : '—' ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-4">
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($evento['nome'] ?? '')) ?></div>
-                        <?php if (!empty($evento['codigo'])): ?>
-                        <div class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars((string) $evento['codigo']) ?></div>
+                        <?php if ($nomeBol !== ''): ?>
+                        <div class="text-xs text-gray-500 mt-1">Vida do estudante · <?= htmlspecialchars($nomeBol) ?></div>
+                        <?php else: ?>
+                        <div class="text-xs text-gray-400 mt-1">Sem boletim na vida do estudante</div>
                         <?php endif; ?>
-                        <?php
-                        $stGeracao = (string) ($evento['geracao_status'] ?? '');
-                        $erroGeracao = trim((string) ($evento['geracao_erro'] ?? ''));
-                        ?>
-                        <?php if (in_array($stGeracao, ['pending', 'processing'], true)): ?>
+                        <?php if ($geracaoEmAndamento): ?>
                         <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
                             <i class="fa-solid fa-spinner fa-spin"></i> Gerando…
                         </span>
@@ -310,22 +325,20 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex flex-col items-start gap-1">
-                            <?php $nomeBol = trim((string) ($evento['boletim_cadastro_nome'] ?? '')); ?>
-                            <?php if ($nomeBol !== ''): ?>
-                            <span class="text-sm text-gray-900"><?= htmlspecialchars($nomeBol) ?></span>
-                            <?php else: ?>
-                            <span class="text-sm text-gray-400">—</span>
-                            <?php endif; ?>
-                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= (($evento['finalidade'] ?? 'oficial') === 'complementar') ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' ?>">
-                                <?= (($evento['finalidade'] ?? 'oficial') === 'complementar') ? 'Extra' : 'Oficial' ?>
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $ehExtra ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' ?>">
+                                <?= $ehExtra ? 'Modelo Extra' : 'Modelo Oficial' ?>
                             </span>
-                            <?php $liberadoAlunoPais = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1); ?>
                             <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full <?= $liberadoAlunoPais ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>">
                                 <?= $liberadoAlunoPais ? 'Aluno/pais liberado' : 'Aluno/pais oculto' ?>
                             </span>
-                            <?php $exibicaoBloqueada = (int) ($evento['vis_coordenacao'] ?? 1) !== 1; ?>
                             <?php if ($exibicaoBloqueada): ?>
                             <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800">Exibição bloqueada</span>
+                            <?php endif; ?>
+                            <?php if (!empty($evento['boletim_desatualizado'])): ?>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                                  title="A configuração foi alterada depois da última geração em massa. Os boletins já visíveis para alunos/pais podem estar com a regra antiga.">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Desatualizado
+                            </span>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -342,36 +355,10 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <?= !empty($evento['ano_letivo']) ? (int) $evento['ano_letivo'] : 'N/A' ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <?= $bimestreLabel($evento['bimestre'] ?? null, $evento['ano_letivo'] ?? 0) ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?php
-                        $geracaoEmAndamento = in_array($stGeracao, ['pending', 'processing'], true);
-                        $inicioBruto = trim((string) ($evento['geracao_iniciada_em'] ?? ''));
-                        $fimBruto = trim((string) ($evento['geracao_completed_at'] ?? ''));
-                        if ($fimBruto === '' && !$geracaoEmAndamento) {
-                            $fimBruto = trim((string) ($evento['ultima_geracao'] ?? ''));
-                        }
-                        $inicioGeracao = $dataHoraGeracao($inicioBruto !== '' ? $inicioBruto : null);
-                        $fimGeracao = $dataHoraGeracao($fimBruto !== '' ? $fimBruto : null);
-                        $duracaoTxt = $geracaoEmAndamento
-                            ? $duracaoGeracao($inicioBruto !== '' ? $inicioBruto : null, date('Y-m-d H:i:s'))
-                            : $duracaoGeracao($inicioBruto !== '' ? $inicioBruto : null, $fimBruto !== '' ? $fimBruto : null);
-                        ?>
-                        <div>Início <?= $inicioGeracao ?? '—' ?></div>
-                        <div class="mt-0.5">Término <?= $geracaoEmAndamento ? 'em andamento' : ($fimGeracao ?? '—') ?></div>
-                        <?php if ($duracaoTxt !== null): ?>
-                        <div class="mt-0.5 text-xs text-gray-400">Duração <?= htmlspecialchars($duracaoTxt) ?><?= $geracaoEmAndamento ? ' até agora' : '' ?></div>
-                        <?php endif; ?>
-                        <?php if (!empty($evento['boletim_desatualizado'])): ?>
-                            <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300"
-                                  title="A configuração foi alterada depois da última geração em massa. Os boletins já visíveis para alunos/pais podem estar com a regra antiga.">
-                                <i class="fa-solid fa-triangle-exclamation"></i> Desatualizado
-                            </span>
-                        <?php endif; ?>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <?= !empty($evento['ano_letivo']) ? (int) $evento['ano_letivo'] : 'N/A' ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php ob_start(); ?>
@@ -466,6 +453,37 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
 </div>
 
 <script>
+(function restaurarOrdemAvaliacoes() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('ordem')) {
+        return;
+    }
+    var salvo = null;
+    try {
+        salvo = JSON.parse(localStorage.getItem('educatudo.avaliacoes.ordem') || '');
+    } catch (e) {
+        salvo = null;
+    }
+    if (!salvo || ['ref', 'serie', 'bimestre'].indexOf(salvo.ordem) < 0) {
+        return;
+    }
+    params.set('ordem', salvo.ordem);
+    params.set('dir', salvo.dir === 'desc' ? 'desc' : 'asc');
+    params.delete('page');
+    window.location.replace(window.location.pathname + '?' + params.toString());
+})();
+
+document.querySelectorAll('.js-ordem-avaliacoes').forEach(function (link) {
+    link.addEventListener('click', function () {
+        try {
+            localStorage.setItem('educatudo.avaliacoes.ordem', JSON.stringify({
+                ordem: link.getAttribute('data-ordem'),
+                dir: link.getAttribute('data-dir')
+            }));
+        } catch (e) {}
+    });
+});
+
 function openFilterDrawer() {
     document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
     const drawer = document.getElementById('filterDrawer');

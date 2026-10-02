@@ -115,6 +115,11 @@ class BoletimConfigController extends BaseController
         $filtroAno = trim((string) ($_GET['ano_letivo'] ?? ''));
         $filtroBimestre = trim((string) ($_GET['bimestre'] ?? ''));
         $filtroSerieId = (int) ($_GET['serie_id'] ?? 0);
+        $ordemLista = strtolower(trim((string) ($_GET['ordem'] ?? '')));
+        if (!in_array($ordemLista, ['ref', 'serie', 'bimestre'], true)) {
+            $ordemLista = '';
+        }
+        $dirLista = strtolower(trim((string) ($_GET['dir'] ?? 'asc'))) === 'desc' ? 'desc' : 'asc';
         $exibirBloqueados = (string) ($_GET['bloqueados'] ?? '') === '1';
         $exibirDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
 
@@ -169,6 +174,7 @@ class BoletimConfigController extends BaseController
         }
 
         $seriesNomesPorId = [];
+        $seriesOrdemPorId = [];
         $seriesCatalogo = [];
         foreach ($this->boletimConfig->getAvailableSeries(300) as $serie) {
             $sid = (int) ($serie['id'] ?? 0);
@@ -177,6 +183,7 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             $seriesNomesPorId[$sid] = $nomeSerie;
+            $seriesOrdemPorId[$sid] = (int) ($serie['ordem'] ?? 0);
             $seriesCatalogo[] = ['id' => $sid, 'nome' => $nomeSerie];
         }
         if ($filtroSerieId > 0 && !isset($seriesNomesPorId[$filtroSerieId])) {
@@ -204,6 +211,15 @@ class BoletimConfigController extends BaseController
                 return $seriesNomesPorId[(int) $sid] ?? null;
             }, $seriesIds));
             $ev['series_nomes'] = $nomes;
+            $ordensSerie = [];
+            foreach ($seriesIds as $sidOrdem) {
+                $sidOrdem = (int) $sidOrdem;
+                if (isset($seriesOrdemPorId[$sidOrdem])) {
+                    $ordensSerie[] = $seriesOrdemPorId[$sidOrdem];
+                }
+            }
+            $ev['serie_ordem'] = $ordensSerie === [] ? 999999 : min($ordensSerie);
+            $ev['serie_rotulo'] = $nomes === [] ? '' : implode(' ', $nomes);
             $ev['oculto_lista_avaliacoes'] = $this->eventoOcultoNaListaAvaliacoes($ev) ? 1 : 0;
             $bid = (int) ($ev['boletim_id'] ?? 0);
             $ev['boletim_cadastro_nome'] = $bid > 0 ? ($nomesBoletim[$bid] ?? '') : '';
@@ -239,6 +255,30 @@ class BoletimConfigController extends BaseController
         }
         unset($ev);
 
+        if ($ordemLista !== '') {
+            $multiplicador = $dirLista === 'desc' ? -1 : 1;
+            usort($eventos, static function (array $a, array $b) use ($ordemLista, $multiplicador): int {
+                if ($ordemLista === 'ref') {
+                    $cmp = ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+                } elseif ($ordemLista === 'bimestre') {
+                    $cmp = ((int) ($a['bimestre'] ?? 0)) <=> ((int) ($b['bimestre'] ?? 0));
+                    if ($cmp === 0) {
+                        $cmp = ((int) ($a['ano_letivo'] ?? 0)) <=> ((int) ($b['ano_letivo'] ?? 0));
+                    }
+                } else {
+                    $cmp = ((int) ($a['serie_ordem'] ?? 999999)) <=> ((int) ($b['serie_ordem'] ?? 999999));
+                    if ($cmp === 0) {
+                        $cmp = strnatcasecmp((string) ($a['serie_rotulo'] ?? ''), (string) ($b['serie_rotulo'] ?? ''));
+                    }
+                }
+                if ($cmp === 0) {
+                    $cmp = ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+                }
+
+                return $cmp * $multiplicador;
+            });
+        }
+
         $perPage = 10;
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $total = count($eventos);
@@ -258,6 +298,8 @@ class BoletimConfigController extends BaseController
             'filtro_bimestre' => $filtroBimestre,
             'filtro_serie_id' => $filtroSerieId,
             'series_catalogo' => $seriesCatalogo,
+            'ordem_lista' => $ordemLista,
+            'dir_lista' => $dirLista,
             'exibir_bloqueados' => $exibirBloqueados,
             'exibir_desabilitados' => $exibirDesabilitados,
             'pagination' => [

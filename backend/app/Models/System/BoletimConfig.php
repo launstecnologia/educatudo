@@ -2218,7 +2218,7 @@ class BoletimConfig
     {
         $limit = max(1, min($limit, 1000));
         return $this->db->fetchAll(
-            "SELECT s.id, s.nome, s.curso_id, c.nome AS curso_nome
+            "SELECT s.id, s.nome, s.ordem, s.curso_id, c.nome AS curso_nome
              FROM serie s
              LEFT JOIN curso c ON c.id = s.curso_id
              WHERE s.ativo = 1
