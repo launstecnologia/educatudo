@@ -54,11 +54,19 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
 
 <!-- Header Section -->
 <div class="mb-8">
-    <div class="flex justify-between items-center flex-wrap gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900">Avaliações</h2>
-        </div>
+    <h2 class="text-2xl font-bold text-gray-900 mb-4">Configurações de Notas</h2>
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <a href="<?= URL ?>/admin/avaliacoes"
+           class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-arrow-left mr-2 text-gray-500"></i>
+            Voltar
+        </a>
         <div class="flex items-center gap-3 flex-wrap">
+            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-file-lines mr-2 text-gray-500"></i>
+                Boletins Gerados
+            </a>
             <button type="button" onclick="openFilterDrawer()"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
@@ -67,21 +75,6 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                 <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
                 <?php endif; ?>
             </button>
-            <a href="<?= URL ?>/admin/boletins"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-clipboard-list mr-2 text-gray-500"></i>
-                Modelo de Boletim
-            </a>
-            <a href="<?= URL ?>/admin/boletim/arquivo"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-box-archive mr-2 text-gray-500"></i>
-                Arquivo de fórmulas
-            </a>
-            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-file-lines mr-2 text-gray-500"></i>
-                Boletins Gerados
-            </a>
             <a href="<?= URL ?>/admin/boletim-configuracao?novo=1"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <i class="fa-solid fa-plus mr-2"></i>
