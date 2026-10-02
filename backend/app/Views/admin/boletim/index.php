@@ -622,16 +622,35 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 : ($bimCab > 0 ? ($bimCab . 'º') : '—');
             $detalheCab = trim((string) ($regra['descricao_curta'] ?? ''));
             $nomeBoletimVinculado = '';
+            $seriesIdsCab = $seriesSelecionadasRegra;
             foreach ($boletinsCadastro as $bolOptCab) {
                 if ((int) ($bolOptCab['id'] ?? 0) !== $boletimIdSelecionado) {
                     continue;
                 }
                 $nomeBoletimVinculado = trim((string) ($bolOptCab['nome'] ?? ''));
+                if ($seriesIdsCab === []) {
+                    $seriesIdsCab = array_values(array_map('intval', (array) ($bolOptCab['series_ids'] ?? [])));
+                }
                 break;
             }
             if ($nomeBoletimVinculado === '' && $boletimIdSelecionado > 0) {
                 $nomeBoletimVinculado = 'Boletim #' . $boletimIdSelecionado;
             }
+            $nomesSeriesCab = [];
+            $idsSeriesCab = array_fill_keys(array_filter($seriesIdsCab, static fn ($id) => (int) $id > 0), true);
+            foreach ($series as $serieCab) {
+                $sidCab = (int) ($serieCab['id'] ?? 0);
+                if ($sidCab <= 0 || !isset($idsSeriesCab[$sidCab])) {
+                    continue;
+                }
+                $nomeSerieCab = trim((string) ($serieCab['nome'] ?? ''));
+                $cursoSerieCab = trim((string) ($serieCab['curso_nome'] ?? ''));
+                if ($nomeSerieCab === '') {
+                    $nomeSerieCab = 'Série #' . $sidCab;
+                }
+                $nomesSeriesCab[] = $cursoSerieCab !== '' ? ($nomeSerieCab . ' - ' . $cursoSerieCab) : $nomeSerieCab;
+            }
+            $rotuloSeriesCab = $nomesSeriesCab !== [] ? implode(', ', $nomesSeriesCab) : 'Todas';
             ?>
             <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <div>
@@ -645,6 +664,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 <div>
                     <dt class="text-gray-500">Ano</dt>
                     <dd class="text-gray-900"><?= $anoCab > 0 ? $anoCab : '—' ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Série</dt>
+                    <dd class="text-gray-900"><?= htmlspecialchars($rotuloSeriesCab) ?></dd>
                 </div>
                 <div>
                     <dt class="text-gray-500">Boletim vinculado</dt>
