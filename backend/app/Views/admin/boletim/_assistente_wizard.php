@@ -2220,6 +2220,22 @@ $boletimWizardSteps = [
         return base + 1;
     }
 
+    function pecaDoCodigoGrupo(codigo) {
+        var cod = String(codigo || '').toLowerCase();
+        if (!cod || /__(?:n|q)$/.test(cod)) return '';
+        if (cod === 'media_sem' || cod === 'semanal' || /^s[1-8]$/.test(cod)) return 'semanal';
+        if (cod === 'media_bim' || cod === 'media_final' || cod === 'media_parcial' || cod === 'media_etapa' || cod === 'faltas' || cod === 'resultado') return '';
+        if (/^media_[ms]\d+$/.test(cod)) return '';
+        if (cod === 'prova_bim' || cod === 'bimestral') return 'bimestral';
+        if (cod === 'jornada' || cod.indexOf('jornada') >= 0) return 'jornada';
+        if (cod === 'enac' || cod.indexOf('enac') >= 0) return 'enac';
+        if (cod === 'trab' || cod === 'trabalho') return 'trabalho';
+        if (cod === 'part' || cod === 'participacao') return 'participacao';
+        if (cod === 'rec' || cod === 'recuperacao' || cod.indexOf('recup') >= 0) return 'recuperacao';
+        if (/^[a-z][a-z0-9_]{0,40}$/.test(cod)) return cod;
+        return '';
+    }
+
     function pecaCodigoQuadro(key) {
         var m = {
             semanal: 'media_sem',
@@ -2684,7 +2700,7 @@ $boletimWizardSteps = [
         return String(nome || '').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
     }
 
-    function agregarNotasLinhas(membros, outras, modo, semanas) {
+    function agregarNotasLinhas(membros, outras, modo, semanas, gl) {
         var notas = {};
         function agregarCodigo(codigo, forcarSoma) {
             if (!codigo) return;
@@ -2701,7 +2717,12 @@ $boletimWizardSteps = [
                 return;
             }
             var total = vals.reduce(function (a, b) { return a + b; }, 0);
-            if (forcarSoma || modo === 'soma') {
+            var modoCol = modo === 'soma' ? 'soma' : 'media';
+            if (!forcarSoma && gl) {
+                var peca = pecaDoCodigoGrupo(codigo);
+                if (peca) modoCol = modoEfetivoPecaGrupo(gl, peca);
+            }
+            if (forcarSoma || modoCol === 'soma') {
                 notas[codigo] = Math.round(total * 100) / 100;
             } else {
                 notas[codigo] = Math.round((total / vals.length) * 100) / 100;
@@ -2789,9 +2810,6 @@ $boletimWizardSteps = [
         if (filhosNaLista === 0) {
             return lista;
         }
-        if (temPai && filhosNaLista >= 2) {
-            return lista;
-        }
         Object.keys(idsGrupo).forEach(function (id) {
             id = Number(id);
             var nome = nomePorId[id] || '';
@@ -2837,7 +2855,7 @@ $boletimWizardSteps = [
         membros.sort(function (a, b) {
             return chaveNomeMateria(a.materia_nome).localeCompare(chaveNomeMateria(b.materia_nome));
         });
-        var notasPai = agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', semanas);
+        var notasPai = agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', semanas, gl);
         if (notasMae) {
             Object.keys(notasMae).forEach(function (cod) {
                 var atual = notasPai[cod];
@@ -2965,7 +2983,7 @@ $boletimWizardSteps = [
         out[pos] = {
             materia_id: 0,
             materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
-            notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media')
+            notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', [], gl)
         };
         return ordenarLinhasPorNome(out);
     }
@@ -3787,9 +3805,12 @@ $boletimWizardSteps = [
                     + htmlOpcoesPeriodo(estado.ano_letivo, estado.bimestre)
                     + '</select></div></div>';
             }
-            html += '<div><label class="text-sm font-medium text-gray-700">Boletim</label>'
+            var boletimOpcional = estado.exibir_em === 'notas';
+            html += '<div><label class="text-sm font-medium text-gray-700">Boletim'
+                + (boletimOpcional ? ' <span class="font-normal text-gray-400">(opcional)</span>' : '')
+                + '</label>'
                 + '<select id="bw-boletim" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">';
-            html += '<option value="">Selecione um Boletim</option>';
+            html += '<option value="">' + (boletimOpcional ? 'Nenhum' : 'Selecione um Boletim') + '</option>';
             (catalogo.boletins || []).forEach(function (b) {
                 var label = b.nome || ('Boletim #' + b.id);
                 label += b.finalidade === 'complementar' ? ' · Extra' : ' · Oficial';
@@ -3797,7 +3818,7 @@ $boletimWizardSteps = [
                 html += '<option value="' + Number(b.id) + '"' + (Number(estado.boletim_id) === Number(b.id) ? ' selected' : '') + '>' + esc(label) + '</option>';
             });
             html += '</select>';
-            if (!(catalogo.boletins || []).length) {
+            if (!(catalogo.boletins || []).length && estado.exibir_em !== 'notas') {
                 html += '<p class="text-xs text-amber-800 mt-1">Cadastre o modelo em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a> antes de criar a avaliação.</p>';
             }
             html += '</div>';
@@ -4834,7 +4855,7 @@ $boletimWizardSteps = [
         if (!Number(j.rascunho.grupo_regras_notas_id || 0) && estado && Number(estado.grupo_regras_notas_id || 0)) {
             j.rascunho.grupo_regras_notas_id = Number(estado.grupo_regras_notas_id);
         }
-        if (!Number(j.rascunho.boletim_id || 0)) {
+        if (!Number(j.rascunho.boletim_id || 0) && !(estado && estado.exibir_em === 'notas')) {
             renderResumo('Falta o modelo de boletim.', ['Volte em Identidade e selecione o Boletim.']);
             return false;
         }
@@ -4873,7 +4894,7 @@ $boletimWizardSteps = [
             });
             return;
         }
-        if (estado.passo === 'identidade' && !boletimEscolhido()) {
+        if (estado.passo === 'identidade' && estado.exibir_em !== 'notas' && !boletimEscolhido()) {
             renderResumo('', ['Selecione um boletim.']);
             return;
         }

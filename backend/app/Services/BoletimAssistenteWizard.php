@@ -870,7 +870,7 @@ class BoletimAssistenteWizard
         } elseif (!$this->temFormulaMontada($estado) && !$this->temPecaComPapelMedia($estado)) {
             $erros[] = 'Marque ao menos uma peça para entrar na média, ou clique numa coluna amarela em Exibir e monte o cálculo.';
         }
-        if ((int) ($estado['boletim_id'] ?? 0) <= 0) {
+        if ((int) ($estado['boletim_id'] ?? 0) <= 0 && ($estado['exibir_em'] ?? 'notas') !== 'notas') {
             if (!class_exists('FechamentoGates', false)) {
                 require_once dirname(__DIR__) . '/Modulos/fechamento/Services/FechamentoGates.php';
             }

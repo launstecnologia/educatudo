@@ -1665,12 +1665,6 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirectFalhaConfiguracao($regraId);
         }
-        if ($boletimIdPost <= 0) {
-            $_SESSION['boletim_flash'] = FechamentoGates::mensagemAvaliacaoSemModelo();
-            $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirectFalhaConfiguracao($regraId);
-        }
-
         $componentes = json_decode($componentesJson, true);
         if (!is_array($componentes) || empty($componentes)) {
             $_SESSION['boletim_flash'] = 'Adicione pelo menos um componente no fluxo do boletim.';
@@ -6494,6 +6488,7 @@ class BoletimConfigController extends BaseController
 
         $grupos = [];
         $modoPorCodigo = [];
+        $modoPorPeca = [];
         foreach ((array) ($regra['componentes'] ?? []) as $comp) {
             if (!is_array($comp)) {
                 continue;
@@ -6503,8 +6498,20 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             $codComp = trim((string) ($comp['codigo'] ?? ''));
+            $modoColuna = strtolower((string) ($grp['mode'] ?? 'media')) === 'soma' ? 'soma' : 'media';
             if ($codComp !== '') {
-                $modoPorCodigo[$codComp] = strtolower((string) ($grp['mode'] ?? 'media')) === 'soma' ? 'soma' : 'media';
+                $modoPorCodigo[$codComp] = $modoColuna;
+                $pecaComp = $this->pecaGrupoDoCodigoColuna($codComp);
+                if ($pecaComp !== '' && !isset($modoPorPeca[$pecaComp])) {
+                    $modoPorPeca[$pecaComp] = $modoColuna;
+                }
+            }
+            foreach ((array) ($grp['modos'] ?? []) as $pecaM => $modoM) {
+                $pecaM = strtolower(trim((string) $pecaM));
+                if ($pecaM === '') {
+                    continue;
+                }
+                $modoPorPeca[$pecaM] = strtolower((string) $modoM) === 'soma' ? 'soma' : 'media';
             }
             $gk = (string) ($grp['key'] ?? '');
             if ($gk === '' || isset($grupos[$gk])) {
@@ -6537,11 +6544,15 @@ class BoletimConfigController extends BaseController
                     $label = $nomeCad;
                 }
             }
+            $modoGrupo = strtolower(trim((string) ($grp['modo_padrao'] ?? '')));
+            if ($modoGrupo !== 'media' && $modoGrupo !== 'soma') {
+                $modoGrupo = strtolower(trim((string) ($grp['mode'] ?? 'media'))) === 'soma' ? 'soma' : 'media';
+            }
             $grupos[$gk] = [
                 'key' => $gk,
                 'label' => $label,
                 'label_key' => $this->canonicalMateriaNomeKey($label),
-                'mode' => strtolower(trim((string) ($grp['mode'] ?? 'media'))) === 'soma' ? 'soma' : 'media',
+                'mode' => $modoGrupo,
                 'filhos_ids' => $filhosIds,
                 'rotulo_ids' => $rotuloIds,
                 'agrupamento_id' => $agId,
@@ -6663,8 +6674,8 @@ class BoletimConfigController extends BaseController
                 return $ka <=> $kb;
             });
 
-            // Cada coluna usa o modo da própria peça (média na semanal, soma na jornada).
-            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode'], $modoPorCodigo);
+            // Cada coluna usa o modo da própria peça (média na semanal, soma na bimestral).
+            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode'], $modoPorCodigo, $modoPorPeca);
             foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
                 if (!is_numeric($valHerdado)) {
                     continue;
@@ -6924,9 +6935,10 @@ class BoletimConfigController extends BaseController
     /**
      * @param list<array<string,mixed>> $filhos
      * @param array<string,string> $modoPorCodigo modo da peça em cada coluna (media|soma)
+     * @param array<string,string> $modoPorPeca modo explícito da peça (semanal, jornada…)
      * @return array<string,mixed>
      */
-    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode, array $modoPorCodigo = []): array
+    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode, array $modoPorCodigo = [], array $modoPorPeca = []): array
     {
         $mode = $mode === 'soma' ? 'soma' : 'media';
         $porCod = [];
@@ -6951,7 +6963,12 @@ class BoletimConfigController extends BaseController
             $ehNq = str_ends_with($cod, '__n') || str_ends_with($cod, '__q');
             $ehFaltas = stripos($cod, 'falta') !== false;
             $ehJornada = stripos($cod, 'jornada') !== false;
-            $modoCol = strtolower((string) ($modoPorCodigo[$cod] ?? $mode));
+            $pecaCol = $this->pecaGrupoDoCodigoColuna((string) $cod);
+            if ($pecaCol !== '' && isset($modoPorPeca[$pecaCol])) {
+                $modoCol = $modoPorPeca[$pecaCol];
+            } else {
+                $modoCol = strtolower((string) ($modoPorCodigo[$cod] ?? $mode));
+            }
             if ($modoCol !== 'soma') {
                 $modoCol = 'media';
             }
@@ -6972,6 +6989,53 @@ class BoletimConfigController extends BaseController
         }
 
         return $out;
+    }
+
+    /**
+     * Peça da linha única a partir do código da coluna.
+     * Semanas e média semanal são a mesma peça.
+     */
+    private function pecaGrupoDoCodigoColuna(string $codigo): string
+    {
+        $cod = strtolower(trim($codigo));
+        if ($cod === '' || str_ends_with($cod, '__n') || str_ends_with($cod, '__q')) {
+            return '';
+        }
+        if ($cod === 'media_sem' || $cod === 'semanal' || preg_match('/^s[1-8]$/', $cod) === 1) {
+            return 'semanal';
+        }
+        if (in_array($cod, ['media_bim', 'media_final', 'media_parcial', 'media_etapa', 'faltas', 'resultado'], true)) {
+            return '';
+        }
+        if (preg_match('/^media_[ms]\d+$/', $cod) === 1) {
+            return '';
+        }
+        $canon = match ($cod) {
+            'bimestral', 'prova_bim' => 'bimestral',
+            'jornada' => 'jornada',
+            'enac' => 'enac',
+            'trab', 'trabalho' => 'trabalho',
+            'part', 'participacao' => 'participacao',
+            'rec', 'recuperacao' => 'recuperacao',
+            default => '',
+        };
+        if ($canon !== '') {
+            return $canon;
+        }
+        if (str_contains($cod, 'jornada')) {
+            return 'jornada';
+        }
+        if (str_contains($cod, 'enac')) {
+            return 'enac';
+        }
+        if (str_contains($cod, 'recup')) {
+            return 'recuperacao';
+        }
+        if (preg_match('/^[a-z][a-z0-9_]{0,40}$/', $cod) === 1) {
+            return $cod;
+        }
+
+        return '';
     }
 
     /**
@@ -7039,10 +7103,14 @@ class BoletimConfigController extends BaseController
             if (!isset($groupMidByKey[$gk])) {
                 $groupMidByKey[$gk] = $nextVirtualMid;
                 $nextVirtualMid--;
+                $modeMeta = strtolower(trim((string) ($grp['modo_padrao'] ?? '')));
+                if ($modeMeta !== 'media' && $modeMeta !== 'soma') {
+                    $modeMeta = strtolower((string) ($grp['mode'] ?? 'media')) === 'soma' ? 'soma' : 'media';
+                }
                 $groupMetaByKey[$gk] = [
                     'label' => $grp['label'],
                     'materias_ids' => $grp['materias_ids'],
-                    'mode' => $grp['mode'],
+                    'mode' => $modeMeta,
                     'divisor' => $grp['divisor'],
                     'agrupamento_id' => (int) ($grp['agrupamento_id'] ?? 0),
                     'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
@@ -7184,6 +7252,11 @@ class BoletimConfigController extends BaseController
 
             if (isset($componentGroupByCode[$codigo])) {
                 $cfg = $componentGroupByCode[$codigo];
+                $pecaCfg = $this->pecaGrupoDoCodigoColuna($codigo);
+                $modosCfg = is_array($cfg['modos'] ?? null) ? $cfg['modos'] : [];
+                if ($pecaCfg !== '' && isset($modosCfg[$pecaCfg])) {
+                    $cfg['mode'] = strtolower((string) $modosCfg[$pecaCfg]) === 'soma' ? 'soma' : 'media';
+                }
                 $vals = [];
                 $sumAcertos = 0;
                 $sumQuestoes = 0;
@@ -9475,10 +9548,28 @@ class BoletimConfigController extends BaseController
             return null;
         }
 
+        $modos = [];
+        foreach ((array) ($grp['modos'] ?? []) as $pecaModo => $modoPeca) {
+            $pecaModo = strtolower(trim((string) $pecaModo));
+            if ($pecaModo === '' || preg_match('/^[a-z][a-z0-9_]{0,40}$/', $pecaModo) !== 1) {
+                continue;
+            }
+            $modos[$pecaModo] = strtolower(trim((string) $modoPeca)) === 'soma' ? 'soma' : 'media';
+            if (count($modos) >= 20) {
+                break;
+            }
+        }
+        $modoPadrao = strtolower(trim((string) ($grp['modo_padrao'] ?? '')));
+        if ($modoPadrao !== 'media' && $modoPadrao !== 'soma') {
+            $modoPadrao = '';
+        }
+
         return [
             'key' => $key,
             'label' => $label,
             'mode' => $mode,
+            'modo_padrao' => $modoPadrao,
+            'modos' => $modos,
             'divisor' => $divisor,
             'materias_ids' => $ids,
             'aplicar_em' => $aplicarEm,
@@ -10687,6 +10778,18 @@ class BoletimConfigController extends BaseController
             $divisor = 0;
         }
 
+        $modosSalvos = [];
+        foreach ((array) ($grp['modos'] ?? []) as $pecaModo => $modoPeca) {
+            $pecaModo = strtolower(trim((string) $pecaModo));
+            if ($pecaModo === '' || preg_match('/^[a-z][a-z0-9_]{0,40}$/', $pecaModo) !== 1) {
+                continue;
+            }
+            $modosSalvos[$pecaModo] = strtolower(trim((string) $modoPeca)) === 'soma' ? 'soma' : 'media';
+            if (count($modosSalvos) >= 20) {
+                break;
+            }
+        }
+        $modoPadraoSalvo = strtolower(trim((string) ($grp['modo_padrao'] ?? '')));
         $out = [
             'enabled' => true,
             'key' => $key,
@@ -10697,6 +10800,12 @@ class BoletimConfigController extends BaseController
             'aplicar_em' => $this->normalizarGroupLineAplicarEm($grp['aplicar_em'] ?? 'ambos'),
             'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
         ];
+        if ($modosSalvos !== []) {
+            $out['modos'] = $modosSalvos;
+        }
+        if ($modoPadraoSalvo === 'media' || $modoPadraoSalvo === 'soma') {
+            $out['modo_padrao'] = $modoPadraoSalvo;
+        }
         $agrupamentoId = (int) ($grp['agrupamento_id'] ?? 0);
         if ($agrupamentoId > 0) {
             $out['agrupamento_id'] = $agrupamentoId;

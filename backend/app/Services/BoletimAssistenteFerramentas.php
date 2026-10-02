@@ -847,6 +847,24 @@ class BoletimAssistenteFerramentas
                     : 'ambos',
                 'arredondamento' => $this->normalizarArredondamentoGrupoLinha($groupLine['arredondamento'] ?? 'todos'),
             ];
+            $modosGl = [];
+            foreach ((array) ($groupLine['modos'] ?? []) as $pecaGl => $modoGl) {
+                $pecaGl = strtolower(trim((string) $pecaGl));
+                if ($pecaGl === '' || preg_match('/^[a-z][a-z0-9_]{0,40}$/', $pecaGl) !== 1) {
+                    continue;
+                }
+                $modosGl[$pecaGl] = strtolower(trim((string) $modoGl)) === 'soma' ? 'soma' : 'media';
+                if (count($modosGl) >= 20) {
+                    break;
+                }
+            }
+            if ($modosGl !== []) {
+                $config['group_line']['modos'] = $modosGl;
+            }
+            $modoPadraoGl = strtolower(trim((string) ($groupLine['modo_padrao'] ?? '')));
+            if ($modoPadraoGl === 'media' || $modoPadraoGl === 'soma') {
+                $config['group_line']['modo_padrao'] = $modoPadraoGl;
+            }
             $agIdGl = (int) ($groupLine['agrupamento_id'] ?? 0);
             if ($agIdGl > 0) {
                 $config['group_line']['agrupamento_id'] = $agIdGl;
