@@ -9,12 +9,19 @@ $flashType = (string) ($flash_type ?? 'success');
 $temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
 $geracaoJobIds = array_values(array_filter(array_map('intval', $geracao_job_ids ?? [])));
 $geracaoConcluidaMsg = trim((string) ($geracao_concluida_msg ?? ''));
-$verDesabilitados = !empty($ver_desabilitados);
+$exibirBloqueados = !empty($exibir_bloqueados);
+$exibirDesabilitados = !empty($exibir_desabilitados);
 $filtrosAtivosCount = 0;
 foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     if ($fv !== '') {
         $filtrosAtivosCount++;
     }
+}
+if ($exibirBloqueados) {
+    $filtrosAtivosCount++;
+}
+if ($exibirDesabilitados) {
+    $filtrosAtivosCount++;
 }
 
 $bimestreLabel = static function ($bimestre, $ano = 0) {
@@ -79,11 +86,6 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-clipboard-list mr-2 text-gray-500"></i>
                 Modelo de Boletim
-            </a>
-            <a href="<?= URL ?>/admin/boletim<?= $verDesabilitados ? '' : '?desabilitados=1' ?>"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid <?= $verDesabilitados ? 'fa-list' : 'fa-eye-slash' ?> mr-2 text-gray-500"></i>
-                <?= $verDesabilitados ? 'Avaliações ativas' : 'Desabilitados' ?>
             </a>
             <a href="<?= URL ?>/admin/boletim/arquivo"
                class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -171,6 +173,17 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 <select id="filtro_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <?= PeriodoLetivo::optionsHtml((int) ($filtroAno !== '' ? $filtroAno : date('Y')), (int) $filtroBimestre, ['todos' => true]) ?>
                 </select>
+            </div>
+            <div class="space-y-3 pt-1">
+                <p class="text-sm font-medium text-gray-700">Também exibir</p>
+                <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" name="bloqueados" value="1" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" <?= $exibirBloqueados ? 'checked' : '' ?>>
+                    Bloqueados
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" name="desabilitados" value="1" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" <?= $exibirDesabilitados ? 'checked' : '' ?>>
+                    Desabilitados
+                </label>
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
@@ -363,13 +376,12 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                             <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
                             <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Liberar para alunos/pais' ?>
                         </button>
-                        <?php if (!$verDesabilitados || !empty($evento['oculto_lista_avaliacoes'])): ?>
-                        <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $verDesabilitados ? 0 : 1 ?>)"
+                        <?php $eventoDesabilitadoMenu = !empty($evento['oculto_lista_avaliacoes']); ?>
+                        <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $eventoDesabilitadoMenu ? 0 : 1 ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid <?= $verDesabilitados ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
-                            <?= $verDesabilitados ? 'Habilitar nesta lista' : 'Desabilitar' ?>
+                            <i class="fa-solid <?= $eventoDesabilitadoMenu ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
+                            <?= $eventoDesabilitadoMenu ? 'Habilitar nesta lista' : 'Desabilitar' ?>
                         </button>
-                        <?php endif; ?>
                         <div class="border-t border-gray-100 my-1"></div>
                         <?php if ($geracaoEmAndamento): ?>
                         <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="block"

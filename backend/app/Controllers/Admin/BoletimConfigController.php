@@ -114,16 +114,28 @@ class BoletimConfigController extends BaseController
         $filtroNome = trim((string) ($_GET['nome'] ?? ''));
         $filtroAno = trim((string) ($_GET['ano_letivo'] ?? ''));
         $filtroBimestre = trim((string) ($_GET['bimestre'] ?? ''));
+        $exibirBloqueados = (string) ($_GET['bloqueados'] ?? '') === '1';
+        $exibirDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
 
         $eventos = $this->boletimConfig->listAllRules(300);
         $eventos = array_values(array_filter($eventos, static function ($ev) {
             return strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim'))) === 'notas';
         }));
-        $verDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
-        $eventos = array_values(array_filter($eventos, function ($ev) use ($verDesabilitados) {
+        $eventos = array_values(array_filter($eventos, function ($ev) use ($exibirBloqueados, $exibirDesabilitados) {
             $ev = is_array($ev) ? $ev : [];
-            $foraDaLista = $this->eventoOcultoNaListaAvaliacoes($ev) || $this->eventoBloqueadoNaExibicao($ev);
-            return $verDesabilitados ? $foraDaLista : !$foraDaLista;
+            $desabilitado = $this->eventoOcultoNaListaAvaliacoes($ev);
+            $bloqueado = $this->eventoBloqueadoNaExibicao($ev);
+            if (!$desabilitado && !$bloqueado) {
+                return true;
+            }
+            if ($bloqueado && $exibirBloqueados) {
+                return true;
+            }
+            if ($desabilitado && $exibirDesabilitados) {
+                return true;
+            }
+
+            return false;
         }));
 
         $nomesBoletim = [];
@@ -223,7 +235,8 @@ class BoletimConfigController extends BaseController
             'filtro_nome' => $filtroNome,
             'filtro_ano' => $filtroAno,
             'filtro_bimestre' => $filtroBimestre,
-            'ver_desabilitados' => $verDesabilitados,
+            'exibir_bloqueados' => $exibirBloqueados,
+            'exibir_desabilitados' => $exibirDesabilitados,
             'pagination' => [
                 'total' => $total,
                 'per_page' => $perPage,
