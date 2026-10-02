@@ -601,7 +601,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 <?php else: ?>
 <div class="space-y-6">
     <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div>
+        <div class="min-w-0 flex-1">
             <h1 class="text-2xl font-bold text-gray-900">Evento de Notas</h1>
             <?php if ($selectedRegraId > 0 && !$modoArquivo): ?>
             <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/renomear" class="mt-2 flex flex-wrap items-center gap-2">
@@ -614,10 +614,47 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                        placeholder="Nome que aparece no boletim">
                 <button type="submit" class="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Salvar título</button>
             </form>
+            <?php
+            $anoCab = (int) ($regra['ano_letivo'] ?? 0);
+            $bimCab = (int) ($regra['bimestre'] ?? 0);
+            $rotuloBimCab = ($anoCab > 0 && $bimCab > 0)
+                ? PeriodoLetivo::rotulo($anoCab, $bimCab)
+                : ($bimCab > 0 ? ($bimCab . 'º') : '—');
+            $detalheCab = trim((string) ($regra['descricao_curta'] ?? ''));
+            $nomeBoletimVinculado = '';
+            foreach ($boletinsCadastro as $bolOptCab) {
+                if ((int) ($bolOptCab['id'] ?? 0) !== $boletimIdSelecionado) {
+                    continue;
+                }
+                $nomeBoletimVinculado = trim((string) ($bolOptCab['nome'] ?? ''));
+                break;
+            }
+            if ($nomeBoletimVinculado === '' && $boletimIdSelecionado > 0) {
+                $nomeBoletimVinculado = 'Boletim #' . $boletimIdSelecionado;
+            }
+            ?>
+            <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <div>
+                    <dt class="text-gray-500">Detalhe</dt>
+                    <dd class="text-gray-900"><?= $detalheCab !== '' ? htmlspecialchars($detalheCab) : '—' ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Bimestre</dt>
+                    <dd class="text-gray-900"><?= htmlspecialchars($rotuloBimCab) ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Ano</dt>
+                    <dd class="text-gray-900"><?= $anoCab > 0 ? $anoCab : '—' ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Boletim vinculado</dt>
+                    <dd class="text-gray-900"><?= $nomeBoletimVinculado !== '' ? htmlspecialchars($nomeBoletimVinculado) : '—' ?></dd>
+                </div>
+            </dl>
             <?php elseif (trim((string) ($regra['nome'] ?? '')) !== ''): ?>
             <p class="text-sm text-gray-700 mt-1"><?= htmlspecialchars((string) $regra['nome']) ?></p>
             <?php endif; ?>
-            <p class="text-sm text-gray-500 mt-1">As fórmulas ficam em Configurar Notas. Depois gere o período em lote.</p>
+            <p class="text-sm text-gray-500 mt-2">As fórmulas ficam em Configurar Notas. Depois gere o período em lote.</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="<?= URL ?>/admin/boletim-configuracao/assistente<?= $selectedRegraId > 0 ? '?regra_id=' . $selectedRegraId : '' ?>"
