@@ -204,6 +204,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Bimestre</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Ano</th>
                             <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Vigente</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Histórico</th>
                             <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Ações</th>
                         </tr>
                     </thead>
@@ -245,6 +246,14 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Não</span>
                                     <?php endif; ?>
                                 </td>
+                                <td class="px-3 py-2 text-gray-600 align-top">
+                                    <?php
+                                    $boletim_versoes = is_array($row['versoes'] ?? null) ? $row['versoes'] : [];
+                                    $boletim_versoes_fallback = (string) ($row['updated_at'] ?? '');
+                                    $boletim_versoes_compact = true;
+                                    require __DIR__ . '/../../partials/boletim_versoes_historico.php';
+                                    ?>
+                                </td>
                                 <td class="px-3 py-2 text-right whitespace-nowrap align-top">
                                     <?php ob_start(); ?>
                                     <button type="button"
@@ -259,7 +268,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                                 </td>
                             </tr>
                             <tr class="preview-row hidden">
-                                <td colspan="6" class="px-3 py-3 bg-indigo-50/40">
+                                <td colspan="7" class="px-3 py-3 bg-indigo-50/40">
                                     <div class="preview-content rounded-lg bg-white border border-indigo-100 p-3 text-sm text-gray-700">
                                         <div class="preview-placeholder text-gray-500">Carregando preview…</div>
                                     </div>
