@@ -380,9 +380,6 @@ $boletimWizardSteps = [
     }
 
     function modoEfetivoPecaGrupo(gl, peca) {
-        if (peca === 'jornada' && estado && estado.jornada_distribuicao_notas === 'nota_unica_todas_linhas') {
-            return 'media';
-        }
         var m = gl && gl.modos ? gl.modos[peca] : '';
         if (m === 'soma' || m === 'media') return m;
         return gl && gl.modo === 'soma' ? 'soma' : 'media';
@@ -4388,13 +4385,7 @@ $boletimWizardSteps = [
                 }
                 var peca = el.getAttribute('data-peca') || '';
                 if (!peca) return;
-                var modoPeca = el.value === 'soma' ? 'soma' : 'media';
-                var modoPadrao = estado.grupo_linha.modo === 'soma' ? 'soma' : 'media';
-                if (modoPeca === modoPadrao) {
-                    delete estado.grupo_linha.modos[peca];
-                } else {
-                    estado.grupo_linha.modos[peca] = modoPeca;
-                }
+                estado.grupo_linha.modos[peca] = el.value === 'soma' ? 'soma' : 'media';
                 agendarMontar();
             });
         });
@@ -4628,6 +4619,15 @@ $boletimWizardSteps = [
                         remoto.bloco_calc = blocoLocal;
                     }
                 }
+                }
+                var modosLocal = (estado && estado.grupo_linha && estado.grupo_linha.modos && typeof estado.grupo_linha.modos === 'object')
+                    ? estado.grupo_linha.modos
+                    : null;
+                if (modosLocal && Object.keys(modosLocal).length) {
+                    if (!remoto.grupo_linha) remoto.grupo_linha = grupoLinhaPadrao();
+                    var modosRemoto = remoto.grupo_linha.modos;
+                    var remotoVazio = !modosRemoto || typeof modosRemoto !== 'object' || !Object.keys(modosRemoto).length;
+                    if (remotoVazio) remoto.grupo_linha.modos = modosLocal;
                 }
                 // Não perde escolha local de arredondamento da área se o remoto voltar sem ela.
                 if ((arredLocal === 'filhas' || arredLocal === 'mae')

@@ -4726,9 +4726,9 @@ class BoletimAssistenteWizard
                 $cfgGl['mode'] = ($peca !== '' && isset($modos[$peca]))
                     ? $modos[$peca]
                     : (string) ($gl['mode'] ?? 'media');
-                if ($peca === 'jornada'
-                    && ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas') {
-                    $cfgGl['mode'] = 'media';
+                $cfgGl['modo_padrao'] = (string) ($gl['mode'] ?? 'media');
+                if ($modos !== []) {
+                    $cfgGl['modos'] = $modos;
                 }
                 $cfg['group_line'] = $cfgGl;
             } elseif (!$this->grupoLinhaEstaVazio($estado)) {
@@ -4763,6 +4763,25 @@ class BoletimAssistenteWizard
             $label = trim((string) ($gl['label'] ?? $gl['key'] ?? ''));
             if ($label === '' || count($ids) < 2) {
                 continue;
+            }
+            $modosGravados = $this->normalizarModosGrupoLinha($gl['modos'] ?? null);
+            $modoPadraoGravado = strtolower(trim((string) ($gl['modo_padrao'] ?? '')));
+            if ($modosGravados !== [] || $modoPadraoGravado === 'soma' || $modoPadraoGravado === 'media') {
+                $estado['grupo_linha'] = [
+                    'ativo' => true,
+                    'nome' => $label,
+                    'modo' => ($modoPadraoGravado === 'soma' || $modoPadraoGravado === 'media')
+                        ? $modoPadraoGravado
+                        : ((strtolower((string) ($gl['mode'] ?? 'media')) === 'soma') ? 'soma' : 'media'),
+                    'modos' => $modosGravados,
+                    'materias_ids' => $ids,
+                    'aplicar_em' => $this->normalizarAplicarEmGrupoLinha($gl['aplicar_em'] ?? 'ambos', 'ambos'),
+                    'agrupamento_id' => max(0, (int) ($gl['agrupamento_id'] ?? 0)),
+                    'arredondamento' => in_array(strtolower((string) ($gl['arredondamento'] ?? 'todos')), ['filhas', 'mae'], true)
+                        ? strtolower((string) $gl['arredondamento'])
+                        : 'todos',
+                ];
+                return;
             }
             $modoPorPeca = [];
             foreach ($comps as $compModo) {

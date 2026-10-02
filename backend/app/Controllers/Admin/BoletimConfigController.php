@@ -6358,6 +6358,21 @@ class BoletimConfigController extends BaseController
                 }
             }
         }
+        $modoSomaMaePorCodigo = [];
+        foreach ($componentesRegra as $cSoma) {
+            if (!is_array($cSoma)) {
+                continue;
+            }
+            $codSoma = trim((string) ($cSoma['codigo'] ?? ''));
+            if ($codSoma === '') {
+                continue;
+            }
+            $grpSoma = $this->parseGroupLineConfigFromComponente($cSoma);
+            if ($grpSoma === null) {
+                continue;
+            }
+            $modoSomaMaePorCodigo[$codSoma] = strtolower((string) ($grpSoma['mode'] ?? 'media')) === 'soma';
+        }
         $linhas = [];
         foreach ($midsOrdenados as $mid) {
             $notasLinha = [];
@@ -6382,7 +6397,9 @@ class BoletimConfigController extends BaseController
                 }
                 $colunaEhFaltas = ((string) ($col['source_type'] ?? '')) === 'faltas_evento'
                     || strtolower((string) ($col['layout_type'] ?? '')) === 'faltas';
-                if (!$colunaEhFaltas && is_numeric($vcell)) {
+                // Soma na linha-mãe passa de 10 (ex.: 8,50+5,00). O teto vale para cada matéria.
+                $maeEmSoma = ((int) $mid) < 0 && !empty($modoSomaMaePorCodigo[$cod]);
+                if (!$colunaEhFaltas && !$maeEmSoma && is_numeric($vcell)) {
                     $escalaCol = max(0.01, (float) ($col['escala_max'] ?? 10));
                     $vcell = round(max(0.0, min($escalaCol, (float) $vcell)), 2);
                 }
@@ -6476,19 +6493,7 @@ class BoletimConfigController extends BaseController
         }
 
         $grupos = [];
-        $codigosJornadaNotaUnica = [];
-        foreach ((array) ($regra['componentes'] ?? []) as $comp) {
-            if (!is_array($comp)) {
-                continue;
-            }
-            $codComp = trim((string) ($comp['codigo'] ?? ''));
-            if ($codComp !== '' && strtolower(trim((string) ($comp['source_type'] ?? ''))) === 'jornadas') {
-                $cfgJ = $this->parseJornadasConfigFromComponente($comp);
-                if (($cfgJ['distribuicao_notas'] ?? '') === 'nota_unica_todas_linhas') {
-                    $codigosJornadaNotaUnica[$codComp] = true;
-                }
-            }
-        }
+        $modoPorCodigo = [];
         foreach ((array) ($regra['componentes'] ?? []) as $comp) {
             if (!is_array($comp)) {
                 continue;
@@ -6496,6 +6501,10 @@ class BoletimConfigController extends BaseController
             $grp = $this->parseGroupLineConfigFromComponente($comp);
             if ($grp === null) {
                 continue;
+            }
+            $codComp = trim((string) ($comp['codigo'] ?? ''));
+            if ($codComp !== '') {
+                $modoPorCodigo[$codComp] = strtolower((string) ($grp['mode'] ?? 'media')) === 'soma' ? 'soma' : 'media';
             }
             $gk = (string) ($grp['key'] ?? '');
             if ($gk === '' || isset($grupos[$gk])) {
@@ -6654,9 +6663,8 @@ class BoletimConfigController extends BaseController
                 return $ka <=> $kb;
             });
 
-            // Filhos trazem tudo do Demonstrativo (semanas N/Q, jornada…). Boletim sobrescreve
-            // só onde a linha agrupada tem valor — jornada costuma faltar no group_line do Boletim.
-            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode'], $codigosJornadaNotaUnica);
+            // Cada coluna usa o modo da própria peça (média na semanal, soma na jornada).
+            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode'], $modoPorCodigo);
             foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
                 if (!is_numeric($valHerdado)) {
                     continue;
@@ -6669,8 +6677,12 @@ class BoletimConfigController extends BaseController
             $paiNotasBoletim = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
             if ($paiNotasBoletim !== null) {
                 foreach ($paiNotasBoletim as $cod => $val) {
-                    if (is_numeric($val)) {
-                        $paiNotas[(string) $cod] = $val;
+                    if (!is_numeric($val)) {
+                        continue;
+                    }
+                    $cod = (string) $cod;
+                    if (!isset($paiNotas[$cod]) || !is_numeric($paiNotas[$cod])) {
+                        $paiNotas[$cod] = $val;
                     }
                 }
             }
@@ -6911,10 +6923,10 @@ class BoletimConfigController extends BaseController
 
     /**
      * @param list<array<string,mixed>> $filhos
-     * @param array<string,bool> $codigosNotaUnica jornada com a mesma nota repetida em todas as matérias
+     * @param array<string,string> $modoPorCodigo modo da peça em cada coluna (media|soma)
      * @return array<string,mixed>
      */
-    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode, array $codigosNotaUnica = []): array
+    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode, array $modoPorCodigo = []): array
     {
         $mode = $mode === 'soma' ? 'soma' : 'media';
         $porCod = [];
@@ -6939,17 +6951,11 @@ class BoletimConfigController extends BaseController
             $ehNq = str_ends_with($cod, '__n') || str_ends_with($cod, '__q');
             $ehFaltas = stripos($cod, 'falta') !== false;
             $ehJornada = stripos($cod, 'jornada') !== false;
-            if (!empty($codigosNotaUnica[$cod])) {
-                $iguais = array_values(array_filter($vals, static function (float $v): bool {
-                    return $v > 0.0;
-                }));
-                if ($iguais === []) {
-                    continue;
-                }
-                $out[$cod] = round(array_sum($iguais) / count($iguais), 2);
-                continue;
+            $modoCol = strtolower((string) ($modoPorCodigo[$cod] ?? $mode));
+            if ($modoCol !== 'soma') {
+                $modoCol = 'media';
             }
-            if ($ehNq || $ehFaltas || $mode === 'soma') {
+            if ($ehNq || $ehFaltas || $modoCol === 'soma') {
                 $soma = array_sum($vals);
                 $out[$cod] = $ehNq || $ehFaltas ? (int) round($soma) : round($soma, 2);
                 continue;
@@ -7220,12 +7226,6 @@ class BoletimConfigController extends BaseController
                     $divisorCfg = ($modoCfg === 'media')
                         ? 0.0
                         : (float) ($cfg['divisor'] ?? 0);
-                    if (($cfg['source_type'] ?? '') === 'jornadas'
-                        && ($cfg['distribuicao_notas'] ?? '') === 'nota_unica_todas_linhas') {
-                        // A mesma nota está repetida em cada filha. Somar triplicaria (7+7+7).
-                        $modoCfg = 'media';
-                        $divisorCfg = 0.0;
-                    }
                     if (($cfg['source_type'] ?? '') === 'jornadas' && $modoCfg === 'media') {
                         // Ignora zeros no agrupamento de Jornadas para não diluir
                         // a nota da área quando há matérias do grupo sem jornada aplicável.
