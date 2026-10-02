@@ -6476,6 +6476,19 @@ class BoletimConfigController extends BaseController
         }
 
         $grupos = [];
+        $codigosJornadaNotaUnica = [];
+        foreach ((array) ($regra['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $codComp = trim((string) ($comp['codigo'] ?? ''));
+            if ($codComp !== '' && strtolower(trim((string) ($comp['source_type'] ?? ''))) === 'jornadas') {
+                $cfgJ = $this->parseJornadasConfigFromComponente($comp);
+                if (($cfgJ['distribuicao_notas'] ?? '') === 'nota_unica_todas_linhas') {
+                    $codigosJornadaNotaUnica[$codComp] = true;
+                }
+            }
+        }
         foreach ((array) ($regra['componentes'] ?? []) as $comp) {
             if (!is_array($comp)) {
                 continue;
@@ -6643,7 +6656,7 @@ class BoletimConfigController extends BaseController
 
             // Filhos trazem tudo do Demonstrativo (semanas N/Q, jornada…). Boletim sobrescreve
             // só onde a linha agrupada tem valor — jornada costuma faltar no group_line do Boletim.
-            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode']);
+            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode'], $codigosJornadaNotaUnica);
             foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
                 if (!is_numeric($valHerdado)) {
                     continue;
@@ -6898,9 +6911,10 @@ class BoletimConfigController extends BaseController
 
     /**
      * @param list<array<string,mixed>> $filhos
+     * @param array<string,bool> $codigosNotaUnica jornada com a mesma nota repetida em todas as matérias
      * @return array<string,mixed>
      */
-    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode): array
+    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode, array $codigosNotaUnica = []): array
     {
         $mode = $mode === 'soma' ? 'soma' : 'media';
         $porCod = [];
@@ -6925,6 +6939,16 @@ class BoletimConfigController extends BaseController
             $ehNq = str_ends_with($cod, '__n') || str_ends_with($cod, '__q');
             $ehFaltas = stripos($cod, 'falta') !== false;
             $ehJornada = stripos($cod, 'jornada') !== false;
+            if (!empty($codigosNotaUnica[$cod])) {
+                $iguais = array_values(array_filter($vals, static function (float $v): bool {
+                    return $v > 0.0;
+                }));
+                if ($iguais === []) {
+                    continue;
+                }
+                $out[$cod] = round(array_sum($iguais) / count($iguais), 2);
+                continue;
+            }
             if ($ehNq || $ehFaltas || $mode === 'soma') {
                 $soma = array_sum($vals);
                 $out[$cod] = $ehNq || $ehFaltas ? (int) round($soma) : round($soma, 2);
@@ -7196,6 +7220,12 @@ class BoletimConfigController extends BaseController
                     $divisorCfg = ($modoCfg === 'media')
                         ? 0.0
                         : (float) ($cfg['divisor'] ?? 0);
+                    if (($cfg['source_type'] ?? '') === 'jornadas'
+                        && ($cfg['distribuicao_notas'] ?? '') === 'nota_unica_todas_linhas') {
+                        // A mesma nota está repetida em cada filha. Somar triplicaria (7+7+7).
+                        $modoCfg = 'media';
+                        $divisorCfg = 0.0;
+                    }
                     if (($cfg['source_type'] ?? '') === 'jornadas' && $modoCfg === 'media') {
                         // Ignora zeros no agrupamento de Jornadas para não diluir
                         // a nota da área quando há matérias do grupo sem jornada aplicável.
@@ -9455,6 +9485,9 @@ class BoletimConfigController extends BaseController
             'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
             'usar_percentual' => !empty($componente['usar_percentual']),
             'source_type' => strtolower(trim((string) ($componente['source_type'] ?? 'provas_sistema'))),
+            'distribuicao_notas' => strtolower(trim((string) ($decoded['distribuicao_notas'] ?? ''))) === 'nota_unica_todas_linhas'
+                ? 'nota_unica_todas_linhas'
+                : 'por_materia',
             'agrupamento_id' => $agrupamentoId > 0 ? $agrupamentoId : 0,
         ];
     }

@@ -371,7 +371,21 @@ $boletimWizardSteps = [
     }
 
     function grupoLinhaPadrao() {
-        return { ativo: false, nome: '', modo: 'media', materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0, arredondamento: 'todos' };
+        return { ativo: false, nome: '', modo: 'media', modos: {}, materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0, arredondamento: 'todos' };
+    }
+
+    function rotuloPecaGrupo(key) {
+        var found = (catalogo.pecas || []).filter(function (p) { return p.key === key; })[0];
+        return (found && found.label) ? found.label : key;
+    }
+
+    function modoEfetivoPecaGrupo(gl, peca) {
+        if (peca === 'jornada' && estado && estado.jornada_distribuicao_notas === 'nota_unica_todas_linhas') {
+            return 'media';
+        }
+        var m = gl && gl.modos ? gl.modos[peca] : '';
+        if (m === 'soma' || m === 'media') return m;
+        return gl && gl.modo === 'soma' ? 'soma' : 'media';
     }
 
     /** Garante que o rascunho aplicado/salvo leve o arredondamento da área escolhido no wizard. */
@@ -408,6 +422,7 @@ $boletimWizardSteps = [
         estado.grupo_linha.ativo = true;
         estado.grupo_linha.nome = ag.nome || '';
         estado.grupo_linha.modo = ag.modo === 'soma' ? 'soma' : 'media';
+        estado.grupo_linha.modos = {};
         estado.grupo_linha.aplicar_em = ag.aplicar_em === 'ambos' ? 'ambos' : 'boletim';
         estado.grupo_linha.materias_ids = (ag.materias_ids || []).map(Number).filter(function (n) { return n > 0; });
     }
@@ -3883,7 +3898,7 @@ $boletimWizardSteps = [
                 aplicarBoletimCadastro(estado.boletim_id, false);
             }
             html += '<p class="text-sm font-medium text-gray-800">Agrupar matérias na linha do boletim</p>';
-            html += '<p class="text-xs text-gray-500 mb-2">O grupo (pai e desdobramentos) já vem de <strong>Componentes Curriculares</strong>. Aqui você só define se a linha junta por média ou soma.</p>';
+            html += '<p class="text-xs text-gray-500 mb-2">O grupo (pai e desdobramentos) já vem de <strong>Componentes Curriculares</strong>. O padrão vale para todas as peças. Em <strong>Ajuste por peça</strong> dá para a semanal e a jornada fazerem média e a prova bimestral somar.</p>';
 
             var gl = estado.grupo_linha || grupoLinhaPadrao();
             if (gl.agrupamento_id === undefined || gl.agrupamento_id === null) gl.agrupamento_id = 0;
@@ -3939,10 +3954,32 @@ $boletimWizardSteps = [
                 }
                 html += '</div></div>';
                 html += '<div><span class="text-xs font-medium text-gray-600">Como juntar as notas dessas matérias</span>';
+                html += '<p class="text-xs text-gray-500 mt-0.5">Padrão das peças que não tiverem ajuste próprio.</p>';
                 html += '<div class="mt-1 flex flex-wrap gap-3 text-sm">';
                 html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo" class="bw-grupo-modo" value="media"' + (gl.modo !== 'soma' ? ' checked' : '') + '> Média</label>';
                 html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo" class="bw-grupo-modo" value="soma"' + (gl.modo === 'soma' ? ' checked' : '') + '> Soma</label>';
                 html += '</div></div>';
+                var pecasGrupo = (estado.pecas || []).map(function (p) { return String(p || ''); }).filter(function (p) { return p !== ''; });
+                if (pecasGrupo.length) {
+                    if (!gl.modos || typeof gl.modos !== 'object') gl.modos = {};
+                    html += '<div class="border rounded-lg bg-white p-3 space-y-2">';
+                    html += '<span class="text-xs font-medium text-gray-600">Ajuste por peça</span>';
+                    html += '<p class="text-xs text-gray-500">Prova semanal inclui as semanas e a média semanal. Ex.: semanal e jornada em média, prova bimestral em soma.</p>';
+                    pecasGrupo.forEach(function (peca) {
+                        var modoPeca = modoEfetivoPecaGrupo(gl, peca);
+                        var jornadaNotaUnica = peca === 'jornada' && estado.jornada_distribuicao_notas === 'nota_unica_todas_linhas';
+                        var hintPeca = peca === 'semanal'
+                            ? '<span class="block text-[11px] text-gray-500 font-normal">Semanas e média semanal.</span>'
+                            : (jornadaNotaUnica ? '<span class="block text-[11px] text-gray-500 font-normal">Mesma nota em todas as matérias: a área repete essa nota.</span>' : '');
+                        html += '<div class="flex flex-wrap items-center justify-between gap-2">';
+                        html += '<span class="text-sm text-gray-800">' + esc(rotuloPecaGrupo(peca)) + hintPeca + '</span>';
+                        html += '<span class="flex flex-wrap gap-3 text-sm">';
+                        html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo-peca-' + esc(peca) + '" class="bw-grupo-modo-peca" data-peca="' + esc(peca) + '" value="media"' + (modoPeca !== 'soma' ? ' checked' : '') + '> Média</label>';
+                        html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-grupo-modo-peca-' + esc(peca) + '" class="bw-grupo-modo-peca" data-peca="' + esc(peca) + '" value="soma"' + (modoPeca === 'soma' ? ' checked' : '') + '> Soma</label>';
+                        html += '</span></div>';
+                    });
+                    html += '</div>';
+                }
                 var arredG = (gl.arredondamento === 'filhas' || gl.arredondamento === 'mae') ? gl.arredondamento : 'todos';
                 html += '<div><span class="text-xs font-medium text-gray-600">Arredondamento da área</span>';
                 html += '<p class="text-xs text-gray-500 mt-0.5 mb-1">Usa o arredondamento do evento (ex.: .00 / .50). Escolha quem recebe.</p>';
@@ -4335,6 +4372,29 @@ $boletimWizardSteps = [
             el.addEventListener('change', function () {
                 if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
                 estado.grupo_linha.modo = el.value === 'soma' ? 'soma' : 'media';
+                estado.grupo_linha.modos = {};
+                bodyEl.querySelectorAll('.bw-grupo-modo-peca').forEach(function (r) {
+                    r.checked = r.value === estado.grupo_linha.modo;
+                });
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-grupo-modo-peca').forEach(function (el) {
+            el.addEventListener('change', function () {
+                if (!el.checked) return;
+                if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
+                if (!estado.grupo_linha.modos || typeof estado.grupo_linha.modos !== 'object') {
+                    estado.grupo_linha.modos = {};
+                }
+                var peca = el.getAttribute('data-peca') || '';
+                if (!peca) return;
+                var modoPeca = el.value === 'soma' ? 'soma' : 'media';
+                var modoPadrao = estado.grupo_linha.modo === 'soma' ? 'soma' : 'media';
+                if (modoPeca === modoPadrao) {
+                    delete estado.grupo_linha.modos[peca];
+                } else {
+                    estado.grupo_linha.modos[peca] = modoPeca;
+                }
                 agendarMontar();
             });
         });

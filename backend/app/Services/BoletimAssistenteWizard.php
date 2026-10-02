@@ -4324,6 +4324,7 @@ class BoletimAssistenteWizard
             'ativo' => false,
             'nome' => '',
             'modo' => 'media',
+            'modos' => [],
             'materias_ids' => [],
             'aplicar_em' => 'boletim',
             'agrupamento_id' => 0,
@@ -4446,7 +4447,7 @@ class BoletimAssistenteWizard
 
     /**
      * @param mixed $raw
-     * @return array{ativo:bool,nome:string,modo:string,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int,arredondamento:string}
+     * @return array{ativo:bool,nome:string,modo:string,modos:array<string,string>,materias_ids:list<int>,aplicar_em:string,agrupamento_id:int,arredondamento:string}
      */
     private function normalizarGrupoLinha($raw): array
     {
@@ -4473,11 +4474,72 @@ class BoletimAssistenteWizard
             'ativo' => !empty($raw['ativo']),
             'nome' => trim((string) ($raw['nome'] ?? '')),
             'modo' => $modo === 'soma' ? 'soma' : 'media',
+            'modos' => $this->normalizarModosGrupoLinha($raw['modos'] ?? null),
             'materias_ids' => $ids,
             'aplicar_em' => $aplicarEm,
             'agrupamento_id' => max(0, (int) ($raw['agrupamento_id'] ?? 0)),
             'arredondamento' => $arred,
         ];
+    }
+
+    /**
+     * Média ou soma por peça (semanal, bimestral, jornada). Vazio = usa o modo geral.
+     *
+     * @param mixed $raw
+     * @return array<string,string>
+     */
+    private function normalizarModosGrupoLinha($raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $peca => $modo) {
+            $peca = strtolower(trim((string) $peca));
+            if ($peca === '' || !(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $peca)) {
+                continue;
+            }
+            $out[$peca] = strtolower(trim((string) $modo)) === 'soma' ? 'soma' : 'media';
+            if (count($out) >= 20) {
+                break;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Peça da linha única a partir do código da coluna (semanas e média semanal = semanal).
+     *
+     * @param array<string,mixed> $componente
+     */
+    private function pecaGrupoDoComponente(array $componente): string
+    {
+        $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+        if ($cod === 'media_sem' || $cod === 'semanal' || (bool) preg_match('/^s[1-8]$/', $cod)) {
+            return 'semanal';
+        }
+        $canon = match ($cod) {
+            'bimestral', 'prova_bim' => 'bimestral',
+            'jornada' => 'jornada',
+            'enac' => 'enac',
+            'trab', 'trabalho' => 'trabalho',
+            'part', 'participacao' => 'participacao',
+            'rec', 'recuperacao' => 'recuperacao',
+            default => '',
+        };
+        if ($canon !== '') {
+            return $canon;
+        }
+        if (in_array($cod, ['media_bim', 'media_final', 'media_parcial', 'media_etapa', 'faltas', 'resultado'], true)) {
+            return '';
+        }
+        if ((bool) preg_match('/^media_[ms]\d+$/', $cod)) {
+            return '';
+        }
+        if ((bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $cod)) {
+            return $cod;
+        }
+        return '';
     }
 
     /**
@@ -4651,6 +4713,7 @@ class BoletimAssistenteWizard
     private function aplicarGrupoLinhaNoRascunho(array $rascunho, array $estado): array
     {
         $gl = $this->configGrupoLinha($estado);
+        $modos = $this->normalizarModosGrupoLinha($estado['grupo_linha']['modos'] ?? null);
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
         foreach ($comps as $i => $c) {
             if (!is_array($c)) {
@@ -4658,7 +4721,16 @@ class BoletimAssistenteWizard
             }
             $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
             if ($gl !== null) {
-                $cfg['group_line'] = $gl;
+                $cfgGl = $gl;
+                $peca = $this->pecaGrupoDoComponente($c);
+                $cfgGl['mode'] = ($peca !== '' && isset($modos[$peca]))
+                    ? $modos[$peca]
+                    : (string) ($gl['mode'] ?? 'media');
+                if ($peca === 'jornada'
+                    && ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas') {
+                    $cfgGl['mode'] = 'media';
+                }
+                $cfg['group_line'] = $cfgGl;
             } elseif (!$this->grupoLinhaEstaVazio($estado)) {
                 unset($cfg['group_line']);
             }
@@ -4692,10 +4764,43 @@ class BoletimAssistenteWizard
             if ($label === '' || count($ids) < 2) {
                 continue;
             }
+            $modoPorPeca = [];
+            foreach ($comps as $compModo) {
+                if (!is_array($compModo)) {
+                    continue;
+                }
+                $cfgModo = is_array($compModo['config'] ?? null) ? $compModo['config'] : [];
+                $glModo = is_array($cfgModo['group_line'] ?? null) ? $cfgModo['group_line'] : [];
+                if (empty($glModo['enabled'])) {
+                    continue;
+                }
+                $peca = $this->pecaGrupoDoComponente($compModo);
+                if ($peca === '') {
+                    continue;
+                }
+                $modoPorPeca[$peca] = (strtolower((string) ($glModo['mode'] ?? 'media')) === 'soma') ? 'soma' : 'media';
+            }
+            $votosSoma = 0;
+            $votosMedia = 0;
+            foreach ($modoPorPeca as $modoPeca) {
+                if ($modoPeca === 'soma') {
+                    $votosSoma++;
+                } else {
+                    $votosMedia++;
+                }
+            }
+            $modoPadrao = $votosSoma > $votosMedia ? 'soma' : 'media';
+            $modos = [];
+            foreach ($modoPorPeca as $peca => $modoPeca) {
+                if ($modoPeca !== $modoPadrao) {
+                    $modos[$peca] = $modoPeca;
+                }
+            }
             $estado['grupo_linha'] = [
                 'ativo' => true,
                 'nome' => $label,
-                'modo' => (strtolower((string) ($gl['mode'] ?? 'media')) === 'soma') ? 'soma' : 'media',
+                'modo' => $modoPadrao,
+                'modos' => $modos,
                 'materias_ids' => $ids,
                 'aplicar_em' => $this->normalizarAplicarEmGrupoLinha($gl['aplicar_em'] ?? 'ambos', 'ambos'),
                 'agrupamento_id' => max(0, (int) ($gl['agrupamento_id'] ?? 0)),
