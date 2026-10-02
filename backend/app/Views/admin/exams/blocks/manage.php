@@ -72,31 +72,31 @@ $estiloMateria = static function (string $nome): array {
 ?>
 
 <!-- Header Section -->
-<div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-8">
-    <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-        <div class="flex items-start gap-3 min-w-0">
-            <div class="shrink-0 w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <i class="fa-solid <?= $modoLancamentoNota ? 'fa-pen-to-square' : 'fa-file-lines' ?> text-lg" aria-hidden="true"></i>
+<div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+            <div class="shrink-0 w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <i class="fa-solid <?= $modoLancamentoNota ? 'fa-pen-to-square' : 'fa-file-lines' ?>" aria-hidden="true"></i>
             </div>
             <div class="min-w-0">
-                <h2 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-900 leading-tight">
                     <?= $modoLancamentoNota ? 'Lançamento de notas' : 'Gerenciar Provas' ?>
                 </h2>
-                <p class="text-base text-gray-800 mt-0.5 truncate" title="<?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>">
+                <p class="text-sm text-gray-600 mt-0.5 truncate" title="<?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>">
                     <?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>
                 </p>
                 <?php if (!$modoLancamentoNota): ?>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2.5">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $statusBadgeClasses ?>">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusBadgeClasses ?>">
                         <?php if (in_array($statusBlocoRaw, ['aprovado', 'liberado'], true)): ?>
                             <i class="fa-solid fa-circle-check text-[10px]" aria-hidden="true"></i>
                         <?php endif; ?>
                         <?= htmlspecialchars($statusBlocoLabel) ?>
                     </span>
                     <?php if (!empty($bloco['prazo_entrega_professor'])): ?>
-                    <span class="inline-flex items-center gap-1.5 text-sm text-gray-500">
+                    <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
                         <i class="fa-regular fa-clock" aria-hidden="true"></i>
-                        Prazo de envio: <?= date('d/m/Y H:i', strtotime((string) $bloco['prazo_entrega_professor'])) ?>
+                        Prazo: <?= date('d/m/Y H:i', strtotime((string) $bloco['prazo_entrega_professor'])) ?>
                     </span>
                     <?php endif; ?>
                 </div>
@@ -104,7 +104,7 @@ $estiloMateria = static function (string $nome): array {
             </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
             <a href="<?= URL ?>/admin/provas" class="<?= $btnOutlineHeader ?>">
                 <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 Voltar
@@ -121,13 +121,13 @@ $estiloMateria = static function (string $nome): array {
                 </a>
                 <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/resultados" class="<?= $btnOutlineHeader ?>">
                     <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
-                    Relatório de notas
+                    Relatório
                 </a>
                 <?php if ($lancamentoPorCoordenacao): ?>
                 <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/lancar-notas-coordenacao"
                    class="btn-primary-custom inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                     <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
-                    Lançar notas (coordenação)
+                    Lançar notas
                 </a>
                 <?php endif; ?>
             <?php else: ?>
@@ -212,27 +212,18 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
 
 <?php if (isset($contagem)): ?>
 <?php
-$totalLn = max(1, (int) ($contagem['ln_nao_iniciado'] ?? 0) + (int) ($contagem['ln_em_andamento'] ?? 0) + (int) ($contagem['ln_concluido'] ?? 0));
 $cardsLn = [
-    ['label' => 'Sem notas lançadas', 'valor' => (int) ($contagem['ln_nao_iniciado'] ?? 0), 'icon' => 'fa-file', 'tone' => 'bg-slate-100 text-slate-600'],
-    ['label' => 'Em andamento', 'valor' => (int) ($contagem['ln_em_andamento'] ?? 0), 'icon' => 'fa-hourglass-half', 'tone' => 'bg-amber-50 text-amber-600'],
-    ['label' => 'Concluído', 'valor' => (int) ($contagem['ln_concluido'] ?? 0), 'icon' => 'fa-circle-check', 'tone' => 'bg-emerald-50 text-emerald-600'],
-    ['label' => 'Notas abaixo de 6', 'valor' => (int) ($contagem['ln_abaixo_seis'] ?? 0), 'icon' => 'fa-triangle-exclamation', 'tone' => 'bg-rose-50 text-rose-600'],
+    ['label' => 'Sem notas', 'valor' => (int) ($contagem['ln_nao_iniciado'] ?? 0)],
+    ['label' => 'Em andamento', 'valor' => (int) ($contagem['ln_em_andamento'] ?? 0)],
+    ['label' => 'Concluído', 'valor' => (int) ($contagem['ln_concluido'] ?? 0)],
+    ['label' => 'Abaixo de 6', 'valor' => (int) ($contagem['ln_abaixo_seis'] ?? 0)],
 ];
 ?>
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-    <?php foreach ($cardsLn as $card): ?>
-    <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3.5">
-        <div class="flex items-start gap-3">
-            <div class="w-9 h-9 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
-                <i class="fa-solid <?= $card['icon'] ?>" aria-hidden="true"></i>
-            </div>
-            <div class="min-w-0">
-                <p class="text-xs text-gray-500 truncate"><?= htmlspecialchars($card['label']) ?></p>
-                <p class="text-2xl font-bold text-gray-900 leading-tight mt-0.5"><?= $card['valor'] ?></p>
-                <p class="text-[11px] text-gray-400 mt-0.5"><?= (int) round(($card['valor'] / $totalLn) * 100) ?>% do total</p>
-            </div>
-        </div>
+<div class="bg-white rounded-xl border border-gray-200 px-4 py-2.5 mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <?php foreach ($cardsLn as $i => $card): ?>
+    <div class="flex items-baseline gap-2 <?= $i > 0 ? 'lg:border-l lg:border-gray-200 lg:pl-6' : '' ?>">
+        <span class="text-sm text-gray-500"><?= htmlspecialchars($card['label']) ?></span>
+        <span class="text-base font-bold text-gray-900"><?= $card['valor'] ?></span>
     </div>
     <?php endforeach; ?>
 </div>
@@ -385,79 +376,70 @@ usort($linhasLancamento, static function (array $a, array $b): int {
     return strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
 });
 $statusMapLancamento = [
-    'nao_iniciado' => ['bg-gray-100 text-gray-700', 'fa-circle', 'Não iniciou'],
-    'em_andamento' => ['bg-amber-50 text-amber-700', 'fa-hourglass-half', 'Em andamento'],
-    'concluido' => ['bg-emerald-50 text-emerald-700', 'fa-circle-check', 'Concluído'],
-    'sem_alunos' => ['bg-gray-50 text-gray-500', 'fa-user-slash', 'Sem alunos nas turmas'],
+    'nao_iniciado' => ['bg-gray-100 text-gray-700', 'Não iniciou'],
+    'em_andamento' => ['bg-amber-50 text-amber-800', 'Em andamento'],
+    'concluido' => ['bg-emerald-50 text-emerald-800', 'Concluído'],
+    'sem_alunos' => ['bg-gray-50 text-gray-500', 'Sem alunos nas turmas'],
 ];
-$materiasFiltroLn = [];
-foreach ($linhasLancamento as $rowMat) {
-    $mn = trim((string) ($rowMat['materia_nome'] ?? ''));
-    if ($mn !== '') {
-        $materiasFiltroLn[$mn] = true;
-    }
-}
-ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
+$mostrarFiltrosLn = count($linhasLancamento) > 3;
 ?>
-<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-    <div class="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-        <div class="flex items-start gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-table-list" aria-hidden="true"></i>
-            </div>
-            <div class="min-w-0">
-                <h3 class="text-lg font-semibold text-gray-900">Lançamento por professor e matéria</h3>
-                <p class="text-sm text-gray-500 mt-0.5">
-                    <?= $lancamentoPorCoordenacao
-                        ? 'Coordenação lança as notas deste evento.'
-                        : 'Acompanhe o progresso dos professores e acesse o lançamento de cada matéria.' ?>
-                </p>
-            </div>
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+    <div class="px-4 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div class="min-w-0">
+            <h3 class="text-base font-semibold text-gray-900">Por professor e matéria</h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+                <?= $lancamentoPorCoordenacao
+                    ? 'Coordenação lança as notas deste evento.'
+                    : 'Acompanhe o progresso e acesse o lançamento de cada matéria.' ?>
+            </p>
         </div>
-        <?php if ($linhasLancamento !== []): ?>
+        <?php if ($mostrarFiltrosLn): ?>
         <div class="flex flex-wrap items-center gap-2">
-            <div class="relative">
-                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" aria-hidden="true"></i>
-                <input type="search" id="buscaLancamentoTabela" placeholder="Buscar por professor, matéria..."
-                       class="pl-9 pr-3 py-2 w-56 sm:w-64 rounded-lg border border-gray-300 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
-            </div>
-            <div class="relative">
-                <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" aria-hidden="true"></i>
-                <select id="filtroMateriaLancamento"
-                        class="appearance-none pl-9 pr-8 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
-                    <option value="">Todas as matérias</option>
-                    <?php foreach (array_keys($materiasFiltroLn) as $matOpt): ?>
-                    <option value="<?= htmlspecialchars($matOpt) ?>"><?= htmlspecialchars($matOpt) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+            <input type="search" id="buscaLancamentoTabela" placeholder="Buscar..."
+                   class="px-3 py-1.5 w-44 rounded-lg border border-gray-300 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+            <select id="filtroMateriaLancamento"
+                    class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                <option value="">Todas as matérias</option>
+                <?php
+                $materiasFiltroLn = [];
+                foreach ($linhasLancamento as $rowMat) {
+                    $mn = trim((string) ($rowMat['materia_nome'] ?? ''));
+                    if ($mn !== '') {
+                        $materiasFiltroLn[$mn] = true;
+                    }
+                }
+                ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
+                foreach (array_keys($materiasFiltroLn) as $matOpt):
+                ?>
+                <option value="<?= htmlspecialchars($matOpt) ?>"><?= htmlspecialchars($matOpt) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <?php endif; ?>
     </div>
     <?php if ($linhasLancamento === []): ?>
-    <div class="px-6 py-8 text-gray-600 bg-gray-50">
+    <div class="px-4 py-6 text-sm text-gray-600 bg-gray-50">
         Nenhum professor/matéria vinculado a este evento. Edite o bloco e adicione professores com turmas.
     </div>
     <?php else: ?>
     <div class="overflow-x-auto">
         <table class="min-w-full" id="tabelaLancamento">
-            <thead>
-                <tr class="border-b border-gray-100">
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Professor</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Matéria</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Progresso</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Situação</th>
-                    <th class="px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ações</th>
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
+                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Matéria</th>
+                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Progresso</th>
+                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
+                    <th class="px-4 py-2.5 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-50">
+            <tbody class="divide-y divide-gray-100">
                 <?php foreach ($linhasLancamento as $row): ?>
                 <?php
                 $st = (string) ($row['status'] ?? '');
-                $pair = $statusMapLancamento[$st] ?? ['bg-gray-100 text-gray-800', 'fa-circle', $st];
+                $pair = $statusMapLancamento[$st] ?? ['bg-gray-100 text-gray-800', $st];
                 $profNome = (string) ($row['professor_nome'] ?? '');
                 $matNome = (string) ($row['materia_nome'] ?? '');
-                [$matCls, $matIcon] = $estiloMateria($matNome);
                 if ($lancamentoPorCoordenacao) {
                     $urlLancar = URL . '/admin/provas/blocos/' . (int) $bloco['id']
                         . '/lancar-notas-coordenacao?materia_id=' . (int) ($row['materia_id'] ?? 0);
@@ -467,34 +449,27 @@ ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
                         . '&materia_id=' . (int) ($row['materia_id'] ?? 0);
                 }
                 ?>
-                <tr class="hover:bg-slate-50/80 linha-tabela-filtravel"
+                <tr class="hover:bg-gray-50 linha-tabela-filtravel"
                     data-professor="<?= htmlspecialchars(mb_strtolower($profNome)) ?>"
                     data-materia="<?= htmlspecialchars(mb_strtolower($matNome)) ?>">
-                    <td class="px-5 py-3.5">
-                        <div class="flex items-center gap-2.5">
-                            <span class="w-8 h-8 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold flex items-center justify-center shrink-0"><?= htmlspecialchars($iniciaisNome($profNome)) ?></span>
-                            <span class="text-sm font-medium text-gray-900"><?= htmlspecialchars($profNome) ?></span>
-                        </div>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                        <?= htmlspecialchars($profNome) ?>
                     </td>
-                    <td class="px-5 py-3.5">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold <?= $matCls ?>">
-                            <i class="fa-solid <?= $matIcon ?> text-[10px]" aria-hidden="true"></i>
-                            <?= htmlspecialchars($matNome) ?>
-                        </span>
+                    <td class="px-4 py-3 text-sm text-gray-700">
+                        <?= htmlspecialchars($matNome) ?>
                     </td>
-                    <td class="px-5 py-3.5 text-sm text-gray-700 whitespace-nowrap">
+                    <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
                         <?= (int) ($row['com_nota'] ?? 0) ?> / <?= (int) ($row['total_esperado'] ?? 0) ?>
                         <?php if ((int) ($row['total_esperado'] ?? 0) > 0): ?>
                             <span class="text-gray-400">(<?= htmlspecialchars((string) ($row['perc'] ?? '')) ?>%)</span>
                         <?php endif; ?>
                     </td>
-                    <td class="px-5 py-3.5 whitespace-nowrap">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold <?= $pair[0] ?>">
-                            <i class="fa-solid <?= $pair[1] ?> text-[10px]" aria-hidden="true"></i>
-                            <?= htmlspecialchars($pair[2]) ?>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium <?= $pair[0] ?>">
+                            <?= htmlspecialchars($pair[1]) ?>
                         </span>
                     </td>
-                    <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                    <td class="px-4 py-3 text-right whitespace-nowrap">
                         <a href="<?= htmlspecialchars($urlLancar) ?>"
                            class="btn-primary-custom inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
@@ -506,9 +481,11 @@ ksort($materiasFiltroLn, SORT_NATURAL | SORT_FLAG_CASE);
             </tbody>
         </table>
     </div>
-    <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+    <?php if ($mostrarFiltrosLn): ?>
+    <div class="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500">
         <span id="contadorLancamentoTabela">Mostrando <?= count($linhasLancamento) ?> de <?= count($linhasLancamento) ?> registros</span>
     </div>
+    <?php endif; ?>
     <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -526,25 +503,23 @@ $cardsOnline = [
     ['key' => 'retornada', 'label' => 'Retornado professor', 'valor' => (int) ($contagem['retornada'] ?? 0), 'icon' => 'fa-rotate-left', 'tone' => 'bg-rose-50 text-rose-600', 'bar' => 'bg-rose-400'],
     ['key' => 'reprovada', 'label' => 'Provas excluídas', 'valor' => (int) ($contagem['reprovada'] ?? 0), 'icon' => 'fa-ban', 'tone' => 'bg-violet-50 text-violet-600', 'bar' => 'bg-violet-400'],
 ];
-$totalOnlineCards = max(1, array_sum(array_column($cardsOnline, 'valor')));
 ?>
-<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6" id="cardsFiltroStatus">
+<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-4" id="cardsFiltroStatus">
     <?php foreach ($cardsOnline as $card): ?>
     <button type="button"
-            class="card-filtro-status group text-left bg-white rounded-xl border border-gray-100 shadow-sm px-3.5 py-3 relative overflow-hidden hover:border-gray-300 transition-colors"
+            class="card-filtro-status group text-left bg-white rounded-lg border border-gray-200 px-3 py-2.5 relative overflow-hidden hover:border-gray-300 transition-colors"
             data-status="<?= htmlspecialchars($card['key']) ?>"
             aria-pressed="false">
-        <div class="flex items-start gap-2.5">
-            <div class="w-8 h-8 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
-                <i class="fa-solid <?= $card['icon'] ?> text-sm" aria-hidden="true"></i>
+        <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-md <?= $card['tone'] ?> flex items-center justify-center shrink-0">
+                <i class="fa-solid <?= $card['icon'] ?> text-xs" aria-hidden="true"></i>
             </div>
             <div class="min-w-0">
-                <p class="text-[11px] text-gray-500 truncate"><?= htmlspecialchars($card['label']) ?></p>
-                <p class="text-xl font-bold text-gray-900 leading-tight"><?= $card['valor'] ?></p>
-                <p class="text-[10px] text-gray-400"><?= (int) round(($card['valor'] / $totalOnlineCards) * 100) ?>% do total</p>
+                <p class="text-[11px] text-gray-500 truncate leading-tight"><?= htmlspecialchars($card['label']) ?></p>
+                <p class="text-lg font-bold text-gray-900 leading-tight"><?= $card['valor'] ?></p>
             </div>
         </div>
-        <span class="card-filtro-bar absolute bottom-0 left-0 right-0 h-1 <?= $card['bar'] ?> opacity-0 group-[.is-active]:opacity-100"></span>
+        <span class="card-filtro-bar absolute bottom-0 left-0 right-0 h-0.5 <?= $card['bar'] ?> opacity-0"></span>
     </button>
     <?php endforeach; ?>
 </div>
