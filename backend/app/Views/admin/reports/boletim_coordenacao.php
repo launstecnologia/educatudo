@@ -33,9 +33,6 @@ if ($selecionarTodos) {
 } elseif ($eventosSelecionados !== []) {
     $queryExport['eventos'] = array_keys($eventosSelecionados);
 }
-if (is_array($relatorio) && (int) ($relatorio['evento_idx'] ?? 0) > 1) {
-    $queryExport['evento_idx'] = (int) $relatorio['evento_idx'];
-}
 $incluirAntigas = !empty($incluir_antigas);
 $formatNota = static function ($value, int $places): string {
     return is_numeric($value) ? number_format((float) $value, $places, ',', '.') : ((string) $value !== '' ? (string) $value : '—');
@@ -59,95 +56,88 @@ include __DIR__ . '/../_partials/flash_message.php';
 </div>
 
 <form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-start">
-        <label class="block xl:col-span-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <label class="block">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir</span>
-            <span class="relative block">
-            <select name="fonte" id="fonte-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <select name="fonte" id="fonte-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
                 <option value="vida_escolar" <?= $fonte === 'vida_escolar' ? 'selected' : '' ?>>Boletim da Vida Escolar</option>
-                <option value="evento" <?= $fonte === 'evento' ? 'selected' : '' ?>>Notas do evento (provas, trabalhos, médias)</option>
+                <option value="evento" <?= $fonte === 'evento' ? 'selected' : '' ?>>Notas do evento</option>
             </select>
-            </span>
         </label>
-        <label class="block xl:col-span-4 campo-fonte campo-fonte-vida_escolar <?= $fonte === 'vida_escolar' ? '' : 'hidden' ?>">
+        <label class="block campo-fonte campo-fonte-vida_escolar <?= $fonte === 'vida_escolar' ? '' : 'hidden' ?>">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Ano letivo</span>
-            <span class="relative block">
-            <select name="ano_letivo" id="ano-letivo-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'vida_escolar' ? 'required' : '' ?>>
+            <select name="ano_letivo" id="ano-letivo-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'vida_escolar' ? 'required' : '' ?>>
                 <?php foreach ($anosLetivos as $ano): ?>
                     <option value="<?= (int) $ano ?>" <?= $anoSelecionado === (int) $ano ? 'selected' : '' ?>><?= (int) $ano ?></option>
                 <?php endforeach; ?>
             </select>
-            </span>
         </label>
-        <label class="block xl:col-span-8 campo-fonte campo-fonte-evento <?= $fonte === 'evento' ? '' : 'hidden' ?>">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Evento de notas</span>
-            <div id="lista-eventos-coord" class="rounded-xl border border-gray-300 bg-white">
-                <label class="flex items-center gap-2 px-3 py-2 border-b border-gray-200 text-sm font-medium text-gray-800 cursor-pointer">
-                    <input type="checkbox" id="eventos-selecionar-todos" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $selecionarTodos ? 'checked' : '' ?>>
-                    Selecionar todos
-                </label>
-                <div id="eventos-itens">
-                    <?php if (empty($eventos)): ?>
-                        <p class="px-3 py-3 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
-                    <?php endif; ?>
-                    <?php foreach ((array) ($eventos ?? []) as $indiceEvento => $evento):
-                        $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
-                        $marcado = $selecionarTodos || isset($eventosSelecionados[$value]);
-                        ?>
-                        <label class="evento-item flex items-start gap-2 px-3 py-2 text-sm text-gray-800 border-b border-gray-100 cursor-pointer" data-idx="<?= (int) $indiceEvento ?>">
-                            <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check mt-0.5 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
-                            <span><?= htmlspecialchars((string) ($evento['nome_exibicao'] ?? $evento['nome'])) ?></span>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
-                <div class="flex items-center justify-between gap-2 px-3 py-2 text-xs text-gray-600">
-                    <button type="button" id="eventos-pagina-anterior" class="px-2 py-1 rounded-md border border-gray-300 bg-white hover:bg-gray-50">Anterior</button>
-                    <span id="eventos-pagina-info">Página 1</span>
-                    <button type="button" id="eventos-pagina-proxima" class="px-2 py-1 rounded-md border border-gray-300 bg-white hover:bg-gray-50">Próxima</button>
-                </div>
-            </div>
-            <input type="hidden" name="evento" id="evento-boletim-coord" value="<?= $selecionarTodos ? 'todos' : '' ?>">
-            <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                <input type="checkbox" name="incluir_antigas" value="1" id="incluir-antigas-boletim-coord"
-                       class="w-3.5 h-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                       <?= $incluirAntigas ? 'checked' : '' ?>
-                       onchange="if (window.sincronizarEventosCoordenacao) { window.sincronizarEventosCoordenacao(); } this.form.submit();">
-                Incluir versões anteriores
-            </label>
-            <?php if ($incluirAntigas): ?>
-                <span class="block text-xs text-gray-500 mt-1">Vigente = oficial (aluno/pais/ficha). Anterior = histórico da mesma regra.</span>
-            <?php endif; ?>
-            <span class="block text-xs text-gray-500 mt-1">A lista mostra 8 eventos por página. Selecionar todos inclui também os das outras páginas.</span>
-        </label>
-        <label class="block xl:col-span-2">
+        <label class="block">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Turma</span>
-            <span class="relative block">
-            <select name="turma_id" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <select name="turma_id" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
                 <option value="0">Todas as turmas</option>
                 <?php foreach ((array) ($turmas ?? []) as $turma): ?>
                     <option value="<?= (int) $turma['id'] ?>" <?= (int) ($turma_id ?? 0) === (int) $turma['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $turma['nome']) ?></option>
                 <?php endforeach; ?>
             </select>
-            </span>
         </label>
-        <label class="block xl:col-span-2">
+        <label class="block">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Média final abaixo de</span>
             <input type="text" name="nota_abaixo_de" inputmode="decimal" placeholder="Ex.: 7 ou 6,5" value="<?= htmlspecialchars($nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '') ?>" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
-            <span class="block text-xs text-gray-500 mt-1">Exibe alunos com ao menos uma matéria abaixo da nota.</span>
         </label>
-        <label class="block xl:col-span-4">
+        <label class="block">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir matérias</span>
-            <span class="relative block">
-            <select name="materias_exibicao" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 pr-10 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <select name="materias_exibicao" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
                 <option value="todas" <?= ($materias_exibicao ?? 'todas') === 'todas' ? 'selected' : '' ?>>Todas as matérias do aluno</option>
                 <option value="abaixo" <?= ($materias_exibicao ?? 'todas') === 'abaixo' ? 'selected' : '' ?>>Somente matérias abaixo do corte</option>
             </select>
-            </span>
         </label>
     </div>
+
+    <div class="campo-fonte campo-fonte-evento mt-5 <?= $fonte === 'evento' ? '' : 'hidden' ?>">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+            <span class="text-sm font-semibold text-gray-700">Boletins</span>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input type="checkbox" id="eventos-selecionar-todos" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $selecionarTodos ? 'checked' : '' ?>>
+                Selecionar todos
+            </label>
+            <span id="eventos-qtd" class="text-xs text-gray-500"></span>
+        </div>
+        <div id="lista-eventos-coord" class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/40">
+            <?php if (empty($eventos)): ?>
+                <p class="px-4 py-6 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
+            <?php endif; ?>
+            <?php foreach ((array) ($eventos ?? []) as $evento):
+                $value = (int) $evento['regra_id'] . ':' . base64_encode((string) $evento['periodo_ref']);
+                $marcado = $selecionarTodos || isset($eventosSelecionados[$value]);
+                $vigente = !empty($evento['eh_vigente']);
+                ?>
+                <label class="evento-item flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-purple-50/40">
+                    <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) ($evento['nome_exibicao'] ?? $evento['nome'])) ?></span>
+                        <span class="block text-xs text-gray-500 truncate"><?= htmlspecialchars((string) ($evento['nome_detalhe'] ?? '')) ?></span>
+                    </span>
+                    <span class="shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full <?= $vigente ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>"><?= $vigente ? 'Vigente' : 'Anterior' ?></span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        <input type="hidden" name="evento" id="evento-boletim-coord" value="<?= $selecionarTodos ? 'todos' : '' ?>">
+        <label class="mt-3 inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" name="incluir_antigas" value="1" id="incluir-antigas-boletim-coord"
+                   class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                   <?= $incluirAntigas ? 'checked' : '' ?>
+                   onchange="if (window.sincronizarEventosCoordenacao) { window.sincronizarEventosCoordenacao(); } this.form.submit();">
+            Incluir versões anteriores
+        </label>
+        <?php if ($incluirAntigas): ?>
+            <span class="block text-xs text-gray-500 mt-1">Vigente = oficial. Anterior = histórico da mesma regra.</span>
+        <?php endif; ?>
+    </div>
+
     <label class="inline-flex items-center gap-2.5 mt-5 text-sm text-gray-700 cursor-pointer">
         <input type="checkbox" name="assinatura" value="1" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= !empty($incluir_assinatura) ? 'checked' : '' ?>>
-        Incluir campo de assinatura ao lado do nome do aluno (vale na conferência e no Excel)
+        Incluir campo de assinatura ao lado do nome do aluno
     </label>
     <div class="mt-5 flex flex-wrap gap-3">
         <button type="submit" name="executar" value="1" class="btn-primary-custom px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:opacity-90 transition-opacity"><i class="fa-solid fa-chart-column mr-2"></i>Gerar relatório</button>
@@ -183,130 +173,180 @@ include __DIR__ . '/../_partials/flash_message.php';
     <?php
     $paginaAtual = max(1, (int) ($relatorio['pagina'] ?? 1));
     $totalPaginas = max(1, (int) ($relatorio['total_paginas'] ?? 1));
-    $eventoIdx = max(1, (int) ($relatorio['evento_idx'] ?? 1));
     $eventosTotal = max(1, (int) ($relatorio['eventos_total'] ?? 1));
-    $linkRelatorio = static function (int $paginaLink, int $idxEvento) use ($queryExport): string {
+    $grupos = is_array($relatorio['grupos'] ?? null) ? $relatorio['grupos'] : [];
+    $indice = is_array($relatorio['indice'] ?? null) ? $relatorio['indice'] : [];
+    $linkRelatorio = static function (int $paginaLink) use ($queryExport): string {
         $params = $queryExport;
         unset($params['pagina'], $params['evento_idx']);
-        if ($idxEvento > 1) {
-            $params['evento_idx'] = $idxEvento;
-        }
         if ($paginaLink > 1) {
             $params['pagina'] = $paginaLink;
         }
         $params['executar'] = 1;
         return URL . '/admin/reports/boletim-coordenacao?' . http_build_query($params);
     };
-    $queryJson = $queryExport;
-    unset($queryJson['pagina'], $queryJson['evento_idx']);
-    $queryArquivo = $queryExport;
-    if ($eventosTotal > 1 && !empty($relatorio['evento_valor'])) {
-        unset($queryArquivo['eventos'], $queryArquivo['evento_idx']);
-        $queryArquivo['evento'] = (string) $relatorio['evento_valor'];
-    }
+    $queryExportacao = $queryExport;
+    unset($queryExportacao['pagina'], $queryExportacao['evento_idx']);
     ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div><strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong> <span class="text-gray-500">· <?= (int) $relatorio['total_linhas'] ?> registros de matérias<?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?><?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?><?php if ($fonteRelatorio === 'vida_escolar' && !empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?></span></div>
+        <div>
+            <strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong>
+            <span class="text-gray-500">
+                · <?= (int) $relatorio['total_linhas'] ?> registros de matérias
+                <?php if ($eventosTotal > 1): ?> · <?= (int) $eventosTotal ?> boletins<?php endif; ?>
+                <?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?>
+                <?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?>
+                <?php if ($fonteRelatorio === 'vida_escolar' && !empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?>
+            </span>
+        </div>
         <div class="flex flex-wrap gap-2">
             <?php if ($fonteRelatorio === 'vida_escolar'): ?>
                 <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && !$zipGerando): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryArquivo + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</a>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</a>
                 <?php elseif ($zipGerando): ?>
                 <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Aguarde o ZIP atual terminar"><i class="fa-solid fa-file-zipper mr-2"></i>Gerando ZIP...</span>
                 <?php else: ?>
                 <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Nenhum aluno com ficha na Vida Escolar"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</span>
                 <?php endif; ?>
-            <?php elseif (!empty($relatorio['total_alunos'])): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryArquivo + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
+            <?php elseif ($eventosTotal === 1 && !empty($relatorio['total_alunos'])): ?>
+                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
             <?php endif; ?>
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryArquivo + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryJson + ['formato' => 'json'])) ?>" class="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900"><i class="fa-solid fa-file-code mr-2"></i>Exportar JSON</a>
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'json'])) ?>" class="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900"><i class="fa-solid fa-file-code mr-2"></i>Exportar JSON</a>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mb-4">O JSON traz todos os alunos e todas as notas do filtro, sem a paginação da tela, para conferência.<?php if ($eventosTotal > 1): ?> Excel e PDF saem do evento que está aberto.<?php endif; ?></p>
-    <?php if ($eventosTotal > 1): ?>
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 px-4 py-3 rounded-xl border border-gray-200 bg-white">
-            <div class="text-sm text-gray-700">
-                <strong>Evento <?= $eventoIdx ?> de <?= $eventosTotal ?></strong>
-                <span class="text-gray-500">· <?= htmlspecialchars((string) ($relatorio['evento_rotulo'] ?? $relatorio['evento_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
-            </div>
-            <div class="flex gap-2">
-                <?php if ($eventoIdx > 1): ?>
-                    <a href="<?= htmlspecialchars($linkRelatorio(1, $eventoIdx - 1), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50">‹ Evento anterior</a>
-                <?php endif; ?>
-                <?php if ($eventoIdx < $eventosTotal): ?>
-                    <a href="<?= htmlspecialchars($linkRelatorio(1, $eventoIdx + 1), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white hover:bg-gray-50">Próximo evento ›</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
+    <p class="text-sm text-gray-500 mb-4">Excel e JSON saem com todos os boletins selecionados. A tela pagina 20 alunos por vez para não ficar pesada.</p>
     <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_com_ficha'] ?? 0) > 0): ?>
         <p class="text-sm text-gray-500 mb-4">Um PDF por aluno, gerado em segundo plano e empacotado em ZIP. Com a escola inteira pode levar vários minutos.</p>
     <?php endif; ?>
-    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && !empty($relatorio['alunos'])): ?>
+    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && (int) ($relatorio['total_alunos'] ?? 0) > 0): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4"><?= (int) $relatorio['alunos_sem_ficha'] ?> aluno(s) desta lista ainda não têm ficha na Vida Escolar no ano <?= (int) ($relatorio['ano_letivo'] ?? 0) ?> e ficam de fora do ZIP.</div>
     <?php endif; ?>
-    <?php if (empty($relatorio['alunos'])): ?>
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?= $fonteRelatorio === 'vida_escolar' ? 'Nenhuma ficha da Vida Escolar encontrada para os filtros selecionados.' : 'Nenhum evento gerado encontrado para os filtros selecionados.' ?></div>
+
+    <?php if (count($indice) > 1): ?>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200">
+                <h2 class="text-sm font-semibold text-gray-900">Boletins neste relatório</h2>
+            </div>
+            <div class="divide-y divide-gray-100">
+                <?php foreach ($indice as $itemIndice): ?>
+                    <?php
+                    $paginaIndice = max(1, (int) ($itemIndice['pagina'] ?? 1));
+                    $qtdIndice = (int) ($itemIndice['alunos'] ?? 0);
+                    ?>
+                    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) ($itemIndice['rotulo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php if (trim((string) ($itemIndice['detalhe'] ?? '')) !== ''): ?>
+                                <div class="text-xs text-gray-500 truncate"><?= htmlspecialchars((string) $itemIndice['detalhe'], ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0 text-xs text-gray-600">
+                            <span><?= $qtdIndice ?> aluno(s)</span>
+                            <?php if ($qtdIndice > 0): ?>
+                                <a href="<?= htmlspecialchars($linkRelatorio($paginaIndice), ENT_QUOTES, 'UTF-8') ?>" class="font-medium text-purple-700 hover:text-purple-900">Ir à pág. <?= $paginaIndice ?></a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
     <?php endif; ?>
-    <?php foreach ((array) $relatorio['alunos'] as $aluno): ?>
-        <?php $observacaoAluno = trim((string) ($aluno['observacao'] ?? '')); ?>
-        <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
-            <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-2">
-                <strong class="text-gray-900"><?= htmlspecialchars((string) $aluno['nome']) ?></strong>
-                <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
-                <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) $aluno['turma']) ?></span>
-                <?php $refEvento = (int) ($relatorio['regra_id'] ?? 0); ?>
-                <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
-                <?php if ((string) $aluno['ra'] !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra']) ?></span><?php endif; ?>
+
+    <?php if ((int) ($relatorio['total_alunos'] ?? 0) <= 0): ?>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?= $fonteRelatorio === 'vida_escolar' ? 'Nenhuma ficha da Vida Escolar encontrada para os filtros selecionados.' : 'Nenhum boletim encontrado para os filtros selecionados.' ?></div>
+    <?php endif; ?>
+
+    <?php foreach ($grupos as $grupo): ?>
+        <?php
+        $colunasGrupo = is_array($grupo['columns'] ?? null) ? $grupo['columns'] : [];
+        $casasGrupo = (int) ($grupo['decimal_places'] ?? $relatorio['decimal_places'] ?? 1);
+        $refEvento = (int) ($grupo['regra_id'] ?? 0);
+        $rotuloGrupo = (string) ($grupo['evento_rotulo'] ?? $grupo['evento_nome'] ?? '');
+        $detalheGrupo = (string) ($grupo['evento_detalhe'] ?? '');
+        ?>
+        <?php if ($rotuloGrupo !== '' && $eventosTotal > 1): ?>
+            <div class="mb-3 mt-6 first:mt-0">
+                <h2 class="text-base font-semibold text-gray-900"><?= htmlspecialchars($rotuloGrupo, ENT_QUOTES, 'UTF-8') ?></h2>
+                <?php if ($detalheGrupo !== ''): ?>
+                    <p class="text-sm text-gray-500"><?= htmlspecialchars($detalheGrupo, ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-gray-50"><tr><th class="px-4 py-2 text-left">Matéria</th><?php foreach ($relatorio['columns'] as $column): ?><th class="px-4 py-2 text-center whitespace-nowrap"><?= htmlspecialchars($column['label']) ?></th><?php endforeach; ?></tr></thead>
-                    <tbody class="divide-y divide-gray-100">
-                    <?php foreach ((array) $aluno['materias'] as $materia): ?><tr><td class="px-4 py-2"><?= htmlspecialchars((string) $materia['nome']) ?></td><?php foreach ($relatorio['columns'] as $column): ?><td class="px-4 py-2 text-center font-medium"><?= htmlspecialchars($formatNota($materia['notas'][$column['codigo']] ?? null, (int) $relatorio['decimal_places'])) ?></td><?php endforeach; ?></tr><?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <div class="coord-observation border-t border-gray-200 bg-slate-50/70 px-5 py-4"
-                 data-endpoint="<?= URL ?>/admin/students/<?= (int) $aluno['id'] ?>/boletim/observacao"
-                 data-csrf="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                <div class="flex items-center justify-between gap-3 mb-2">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-regular fa-note-sticky text-gray-400"></i>
-                        <h4 class="text-sm font-semibold text-gray-800">Observação da coordenação</h4>
+        <?php endif; ?>
+        <?php foreach ((array) ($grupo['alunos'] ?? []) as $aluno): ?>
+            <?php if (!is_array($aluno)) { continue; } ?>
+            <?php $observacaoAluno = trim((string) ($aluno['observacao'] ?? '')); ?>
+            <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+                <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <strong class="text-gray-900"><?= htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
+                    <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
+                    <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) ($aluno['turma'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
+                    <?php if ((string) ($aluno['ra'] ?? '') !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Matéria</th>
+                                <?php foreach ($colunasGrupo as $column): ?>
+                                    <th class="px-4 py-2 text-center whitespace-nowrap"><?= htmlspecialchars((string) ($column['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?></th>
+                                <?php endforeach; ?>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <?php foreach ((array) ($aluno['materias'] ?? []) as $materia): ?>
+                                <tr>
+                                    <td class="px-4 py-2"><?= htmlspecialchars((string) ($materia['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <?php foreach ($colunasGrupo as $column): ?>
+                                        <td class="px-4 py-2 text-center font-medium"><?= htmlspecialchars($formatNota($materia['notas'][$column['codigo']] ?? null, $casasGrupo), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="coord-observation border-t border-gray-200 bg-slate-50/70 px-5 py-4"
+                     data-endpoint="<?= URL ?>/admin/students/<?= (int) ($aluno['id'] ?? 0) ?>/boletim/observacao"
+                     data-csrf="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-regular fa-note-sticky text-gray-400"></i>
+                            <h4 class="text-sm font-semibold text-gray-800">Observação da coordenação</h4>
+                        </div>
+                        <?php if (!empty($pode_editar_observacao)): ?>
+                        <button type="button" class="coord-observation-edit text-sm font-semibold hover:opacity-75" style="color: var(--button-primary-color)">
+                            <?= $observacaoAluno !== '' ? 'Editar' : 'Adicionar observação' ?>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="coord-observation-view">
+                        <p class="coord-observation-text text-sm text-gray-700 whitespace-pre-wrap break-words <?= $observacaoAluno === '' ? 'italic text-gray-400' : '' ?>"><?= htmlspecialchars($observacaoAluno !== '' ? $observacaoAluno : 'Nenhuma observação registrada.', ENT_QUOTES, 'UTF-8') ?></p>
                     </div>
                     <?php if (!empty($pode_editar_observacao)): ?>
-                    <button type="button" class="coord-observation-edit text-sm font-semibold hover:opacity-75" style="color: var(--button-primary-color)">
-                        <?= $observacaoAluno !== '' ? 'Editar' : 'Adicionar observação' ?>
-                    </button>
+                    <div class="coord-observation-form hidden mt-3">
+                        <textarea rows="4" maxlength="5000" class="coord-observation-textarea w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-purple-100" placeholder="Escreva uma observação que ficará no boletim e no PDF…"><?= htmlspecialchars($observacaoAluno, ENT_QUOTES, 'UTF-8') ?></textarea>
+                        <div class="flex flex-wrap items-center gap-2 mt-2">
+                            <button type="button" class="coord-observation-save btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Salvar observação</button>
+                            <button type="button" class="coord-observation-cancel px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+                        </div>
+                    </div>
+                    <span class="coord-observation-status block mt-2 text-xs text-gray-500"></span>
                     <?php endif; ?>
                 </div>
-                <div class="coord-observation-view">
-                    <p class="coord-observation-text text-sm text-gray-700 whitespace-pre-wrap break-words <?= $observacaoAluno === '' ? 'italic text-gray-400' : '' ?>"><?= htmlspecialchars($observacaoAluno !== '' ? $observacaoAluno : 'Nenhuma observação registrada.', ENT_QUOTES, 'UTF-8') ?></p>
-                </div>
-                <?php if (!empty($pode_editar_observacao)): ?>
-                <div class="coord-observation-form hidden mt-3">
-                    <textarea rows="4" maxlength="5000" class="coord-observation-textarea w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-purple-100" placeholder="Escreva uma observação que ficará no boletim e no PDF…"><?= htmlspecialchars($observacaoAluno, ENT_QUOTES, 'UTF-8') ?></textarea>
-                    <div class="flex flex-wrap items-center gap-2 mt-2">
-                        <button type="button" class="coord-observation-save btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Salvar observação</button>
-                        <button type="button" class="coord-observation-cancel px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
-                    </div>
-                </div>
-                <span class="coord-observation-status block mt-2 text-xs text-gray-500"></span>
-                <?php endif; ?>
-            </div>
-        </section>
+            </section>
+        <?php endforeach; ?>
     <?php endforeach; ?>
+
     <?php if ($totalPaginas > 1): ?>
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6 px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm">
-            <div class="text-gray-600">Alunos: página <?= $paginaAtual ?> de <?= $totalPaginas ?> · 20 por página</div>
+            <div class="text-gray-600">Página <?= $paginaAtual ?> de <?= $totalPaginas ?> · 20 alunos por página</div>
             <div class="flex gap-2">
                 <?php if ($paginaAtual > 1): ?>
-                    <a href="<?= htmlspecialchars($linkRelatorio($paginaAtual - 1, $eventoIdx), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">‹ Anterior</a>
+                    <a href="<?= htmlspecialchars($linkRelatorio($paginaAtual - 1), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">‹ Anterior</a>
                 <?php endif; ?>
                 <?php if ($paginaAtual < $totalPaginas): ?>
-                    <a href="<?= htmlspecialchars($linkRelatorio($paginaAtual + 1, $eventoIdx), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Próxima ›</a>
+                    <a href="<?= htmlspecialchars($linkRelatorio($paginaAtual + 1), ENT_QUOTES, 'UTF-8') ?>" class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Próxima ›</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -321,19 +361,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     var form = document.getElementById('form-boletim-coordenacao');
     var checks = Array.prototype.slice.call(document.querySelectorAll('.evento-check'));
     var selecionarTodos = document.getElementById('eventos-selecionar-todos');
-    var itens = Array.prototype.slice.call(document.querySelectorAll('.evento-item'));
-    var info = document.getElementById('eventos-pagina-info');
-    var btnAnterior = document.getElementById('eventos-pagina-anterior');
-    var btnProxima = document.getElementById('eventos-pagina-proxima');
-    var porPagina = 8;
-    var pagina = 0;
-    var primeiroMarcado = -1;
-    checks.forEach(function (check, idx) {
-        if (primeiroMarcado < 0 && check.checked) primeiroMarcado = idx;
-    });
-    if (primeiroMarcado >= 0) {
-        pagina = Math.floor(primeiroMarcado / porPagina);
-    }
+    var qtdEl = document.getElementById('eventos-qtd');
 
     function aplicarFonte() {
         var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
@@ -344,26 +372,17 @@ include __DIR__ . '/../_partials/flash_message.php';
             anoSelect.required = fonte === 'vida_escolar';
         }
     }
-    function desenharPagina() {
-        var total = itens.length;
-        var paginas = Math.max(1, Math.ceil(total / porPagina));
-        if (pagina > paginas - 1) pagina = paginas - 1;
-        if (pagina < 0) pagina = 0;
-        itens.forEach(function (item, idx) {
-            var visivel = idx >= pagina * porPagina && idx < (pagina + 1) * porPagina;
-            item.classList.toggle('hidden', !visivel);
-        });
-        if (info) {
-            info.textContent = total === 0 ? 'Nenhum evento' : ('Página ' + (pagina + 1) + ' de ' + paginas);
-        }
-        if (btnAnterior) btnAnterior.disabled = pagina <= 0;
-        if (btnProxima) btnProxima.disabled = pagina >= paginas - 1;
-    }
-    function atualizarSelecionarTodos() {
-        if (!selecionarTodos) return;
+    function atualizarContagem() {
         var marcados = checks.filter(function (check) { return check.checked; }).length;
-        selecionarTodos.checked = checks.length > 0 && marcados === checks.length;
-        selecionarTodos.indeterminate = marcados > 0 && marcados < checks.length;
+        if (selecionarTodos) {
+            selecionarTodos.checked = checks.length > 0 && marcados === checks.length;
+            selecionarTodos.indeterminate = marcados > 0 && marcados < checks.length;
+        }
+        if (qtdEl) {
+            qtdEl.textContent = checks.length === 0
+                ? ''
+                : (marcados + ' de ' + checks.length + ' selecionado(s)');
+        }
     }
     window.sincronizarEventosCoordenacao = function () {
         var todos = checks.length > 0 && checks.every(function (check) { return check.checked; });
@@ -378,18 +397,12 @@ include __DIR__ . '/../_partials/flash_message.php';
     if (selecionarTodos) {
         selecionarTodos.addEventListener('change', function () {
             checks.forEach(function (check) { check.checked = selecionarTodos.checked; });
-            atualizarSelecionarTodos();
+            atualizarContagem();
         });
     }
     checks.forEach(function (check) {
-        check.addEventListener('change', atualizarSelecionarTodos);
+        check.addEventListener('change', atualizarContagem);
     });
-    if (btnAnterior) {
-        btnAnterior.addEventListener('click', function () { pagina -= 1; desenharPagina(); });
-    }
-    if (btnProxima) {
-        btnProxima.addEventListener('click', function () { pagina += 1; desenharPagina(); });
-    }
     if (form) {
         form.addEventListener('submit', function (event) {
             window.sincronizarEventosCoordenacao();
@@ -399,7 +412,7 @@ include __DIR__ . '/../_partials/flash_message.php';
             if (gerar && fonte === 'evento' && checks.length > 0 && !checks.some(function (check) { return check.checked; })) {
                 event.preventDefault();
                 checks.forEach(function (check) { check.disabled = false; });
-                window.alert('Selecione ao menos um evento de notas.');
+                window.alert('Selecione ao menos um boletim.');
             }
         });
     }
@@ -407,8 +420,7 @@ include __DIR__ . '/../_partials/flash_message.php';
         fonteSelect.addEventListener('change', aplicarFonte);
         aplicarFonte();
     }
-    atualizarSelecionarTodos();
-    desenharPagina();
+    atualizarContagem();
 })();
 </script>
 <?php if (!empty($pode_editar_observacao)): ?>

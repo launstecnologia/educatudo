@@ -284,28 +284,33 @@ class ReportAdminController extends AdminBaseController
             $executar = $executar && $selecionados !== [];
         }
         $relatorio = null;
-        $eventoIdx = max(1, (int) ($_GET['evento_idx'] ?? 1));
         $pagina = max(1, (int) ($_GET['pagina'] ?? 1));
         if ($executar) {
             if ($fonte === 'vida_escolar') {
-                $relatorio = $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao);
+                $relatorio = $this->paginarAlunosRelatorioBoletimCoordenacao(
+                    $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao),
+                    $pagina,
+                    20
+                );
+                $relatorio['grupos'] = [[
+                    'alunos' => $relatorio['alunos'],
+                    'columns' => $relatorio['columns'],
+                    'decimal_places' => $relatorio['decimal_places'],
+                    'regra_id' => 0,
+                    'evento_rotulo' => (string) ($relatorio['evento_nome'] ?? ''),
+                    'evento_detalhe' => '',
+                ]];
+                $relatorio['indice'] = [];
+                $relatorio['eventos_total'] = 1;
             } else {
-                $totalEventos = count($selecionados);
-                $eventoIdx = min($eventoIdx, $totalEventos);
-                $atual = $selecionados[$eventoIdx - 1];
-                $relatorio = $this->montarRelatorioBoletimCoordenacao(
-                    (int) $atual['regra_id'],
-                    (string) $atual['periodo_ref'],
+                $relatorio = $this->montarPaginaEventosBoletimCoordenacao(
+                    $selecionados,
                     $turmaId,
                     $notaAbaixoDe,
-                    $materiasExibicao
+                    $materiasExibicao,
+                    $pagina
                 );
-                $relatorio['evento_rotulo'] = (string) $atual['nome_exibicao'];
-                $relatorio['evento_valor'] = (string) $atual['valor'];
-                $relatorio['evento_idx'] = $eventoIdx;
-                $relatorio['eventos_total'] = $totalEventos;
             }
-            $relatorio = $this->paginarAlunosRelatorioBoletimCoordenacao($relatorio, $pagina, 20);
         }
 
         $flash = $this->getFlashMessage();
@@ -369,11 +374,6 @@ class ReportAdminController extends AdminBaseController
                 $this->redirect('/admin/reports/boletim-coordenacao');
                 return;
             }
-            if ($formato !== 'json' && count($selecionados) > 1) {
-                $idx = max(1, (int) ($_GET['evento_idx'] ?? 1));
-                $idx = min($idx, count($selecionados));
-                $selecionados = [$selecionados[$idx - 1]];
-            }
             $relatorios = [];
             foreach ($selecionados as $evento) {
                 $relatorioEvento = $this->montarRelatorioBoletimCoordenacao(
@@ -400,6 +400,10 @@ class ReportAdminController extends AdminBaseController
             $this->exportarBoletimCoordenacaoJson($relatorios, $filenameBase);
             return;
         }
+        if ($formato === 'excel' && count($relatorios) > 1) {
+            $this->exportarExcelEventosBoletimCoordenacao($relatorios, $incluirAssinatura, $filenameBase);
+            return;
+        }
         if ($formato === 'excel') {
             $this->exportarBoletimCoordenacaoExcel($relatorio, $incluirAssinatura, $filenameBase);
             return;
@@ -407,6 +411,12 @@ class ReportAdminController extends AdminBaseController
 
         if ($fonte === 'vida_escolar') {
             $this->exportarBoletinsVidaEscolarLote($relatorio, $filenameBase);
+            return;
+        }
+
+        if (count($relatorios) > 1) {
+            $this->setFlashMessage('Com vários boletins, use Excel ou JSON. O PDF continua valendo para um boletim por vez.', 'error');
+            $this->redirect($this->urlVoltarBoletimCoordenacao());
             return;
         }
 
@@ -727,10 +737,6 @@ class ReportAdminController extends AdminBaseController
                 $params['eventos'] = $eventosPedidos;
             }
         }
-        $eventoIdx = (int) ($_GET['evento_idx'] ?? 0);
-        if ($eventoIdx > 1) {
-            $params['evento_idx'] = $eventoIdx;
-        }
         foreach ($extra as $chave => $valor) {
             if ($valor === null || $valor === '') {
                 continue;
@@ -972,39 +978,37 @@ class ReportAdminController extends AdminBaseController
             $evento['series_nomes'] = $seriesLabel;
             $tipoLabel = (($evento['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
             $nomeBase = trim((string) ($evento['nome'] ?? 'Evento'));
-            $partes = [$tipoLabel . ' — ' . $nomeBase];
-            if ($seriesLabel !== '' && mb_stripos($nomeBase, $seriesLabel) === false) {
-                $partes[0] .= ' ' . $seriesLabel;
+            $titulo = $nomeBase;
+            if ($seriesLabel !== '' && mb_stripos($titulo, $seriesLabel) === false) {
+                $titulo .= ' · ' . $seriesLabel;
             }
             $ano = (int) ($evento['ano_letivo'] ?? 0);
-            if ($ano > 0) {
-                $partes[] = (string) $ano;
-            }
             $bimestre = (int) ($evento['bimestre'] ?? 0);
             $rotuloPeriodo = '';
             if ($bimestre > 0 && class_exists('PeriodoLetivo')) {
                 $rotuloPeriodo = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
             }
-            if ($rotuloPeriodo === '') {
-                if ($periodoRef !== '') {
-                    $rotuloPeriodo = $this->formatarPeriodoRefBoletimCoordenacao($periodoRef);
+            $detalhes = [$tipoLabel];
+            if ($rotuloPeriodo !== '' && mb_stripos($titulo, $rotuloPeriodo) === false) {
+                $detalhes[] = $rotuloPeriodo;
+            } elseif ($bimestre <= 0 && $periodoRef !== '') {
+                $periodoCurto = str_replace(' – ', ' a ', $this->formatarPeriodoRefBoletimCoordenacao($periodoRef));
+                if ($periodoCurto !== '') {
+                    $detalhes[] = $periodoCurto;
                 }
             }
-            if ($rotuloPeriodo !== '') {
-                $partes[] = $rotuloPeriodo;
-            }
-            $geradoEm = $this->formatarDataGeracaoBoletimCoordenacao((string) ($evento['updated_at'] ?? ''));
-            if ($geradoEm !== '') {
-                $partes[] = 'Gerado em ' . $geradoEm;
+            if ($ano > 0 && mb_stripos($titulo, (string) $ano) === false) {
+                $detalhes[] = (string) $ano;
             }
             if ($ehPrincipal) {
-                $partes[] = 'Vigente';
+                $detalhes[] = 'Vigente';
             } else {
                 $versao = (int) ($evento['versao'] ?? 0);
-                $partes[] = $versao > 0 ? ('Anterior (v' . $versao . ')') : 'Anterior';
+                $detalhes[] = $versao > 0 ? ('Anterior v' . $versao) : 'Anterior';
             }
             $evento['eh_vigente'] = $ehPrincipal;
-            $evento['nome_exibicao'] = implode(' · ', $partes);
+            $evento['nome_exibicao'] = $titulo;
+            $evento['nome_detalhe'] = implode(' · ', $detalhes);
             $evento['_serie_ordem'] = $ordemMax;
             $evento['_ano_ordem'] = $ano;
             $evento['_bim_ordem'] = $bimestre;
@@ -1112,6 +1116,7 @@ class ReportAdminController extends AdminBaseController
                 'regra_id' => $regraId,
                 'periodo_ref' => $periodoRef,
                 'nome_exibicao' => (string) ($evento['nome_exibicao'] ?? $evento['nome'] ?? 'Evento'),
+                'nome_detalhe' => (string) ($evento['nome_detalhe'] ?? ''),
                 'valor' => $valor,
             ];
         }
@@ -1128,9 +1133,89 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
-     * @param array<string,mixed> $relatorio
+     * @param list<array{regra_id:int,periodo_ref:string,nome_exibicao:string,nome_detalhe?:string,valor:string}> $selecionados
      * @return array<string,mixed>
      */
+    private function montarPaginaEventosBoletimCoordenacao(
+        array $selecionados,
+        int $turmaId,
+        ?float $notaAbaixoDe,
+        string $materiasExibicao,
+        int $pagina
+    ): array {
+        $blocos = [];
+        $totalAlunos = 0;
+        $totalLinhas = 0;
+        foreach ($selecionados as $atual) {
+            $bloco = $this->montarRelatorioBoletimCoordenacao(
+                (int) $atual['regra_id'],
+                (string) $atual['periodo_ref'],
+                $turmaId,
+                $notaAbaixoDe,
+                $materiasExibicao
+            );
+            $bloco['evento_rotulo'] = (string) ($atual['nome_exibicao'] ?? $bloco['evento_nome'] ?? 'Boletim');
+            $bloco['evento_detalhe'] = (string) ($atual['nome_detalhe'] ?? '');
+            $totalAlunos += count((array) ($bloco['alunos'] ?? []));
+            $totalLinhas += (int) ($bloco['total_linhas'] ?? 0);
+            $blocos[] = $bloco;
+        }
+
+        $porPagina = 20;
+        $totalPaginas = max(1, (int) ceil($totalAlunos / $porPagina));
+        $pagina = min(max(1, $pagina), $totalPaginas);
+        $inicio = ($pagina - 1) * $porPagina;
+        $fim = $inicio + $porPagina;
+        $cursor = 0;
+        $grupos = [];
+        $indice = [];
+        foreach ($blocos as $bloco) {
+            $alunos = array_values((array) ($bloco['alunos'] ?? []));
+            $qtd = count($alunos);
+            $indice[] = [
+                'rotulo' => (string) ($bloco['evento_rotulo'] ?? ''),
+                'detalhe' => (string) ($bloco['evento_detalhe'] ?? ''),
+                'alunos' => $qtd,
+                'pagina' => $qtd === 0 ? $pagina : ((int) floor($cursor / $porPagina) + 1),
+            ];
+            $slice = [];
+            foreach ($alunos as $offset => $aluno) {
+                $pos = $cursor + $offset;
+                if ($pos >= $inicio && $pos < $fim) {
+                    $slice[] = $aluno;
+                }
+            }
+            $cursor += $qtd;
+            if ($slice !== []) {
+                $bloco['alunos'] = $slice;
+                $grupos[] = $bloco;
+            }
+        }
+
+        $primeiro = $blocos[0] ?? [];
+        return [
+            'fonte' => 'evento',
+            'grupos' => $grupos,
+            'indice' => $indice,
+            'alunos' => [],
+            'columns' => (array) ($primeiro['columns'] ?? []),
+            'decimal_places' => (int) ($primeiro['decimal_places'] ?? 1),
+            'regra_id' => (int) ($primeiro['regra_id'] ?? 0),
+            'evento_nome' => (string) ($primeiro['evento_rotulo'] ?? $primeiro['evento_nome'] ?? ''),
+            'total_alunos' => $totalAlunos,
+            'total_linhas' => $totalLinhas,
+            'nota_abaixo_de' => $notaAbaixoDe,
+            'materias_exibicao' => $materiasExibicao,
+            'pagina' => $pagina,
+            'total_paginas' => $totalPaginas,
+            'por_pagina' => $porPagina,
+            'eventos_total' => count($blocos),
+            'alunos_com_ficha' => 0,
+            'alunos_sem_ficha' => 0,
+            'ano_letivo' => (int) ($primeiro['ano_letivo'] ?? 0),
+        ];
+    }
+
     private function paginarAlunosRelatorioBoletimCoordenacao(array $relatorio, int $pagina, int $porPagina): array
     {
         $porPagina = max(1, $porPagina);
@@ -1752,6 +1837,96 @@ class ReportAdminController extends AdminBaseController
         }, $rows);
         $seriesLabel = $this->joinLabelsBoletimCoordenacao($labels);
         return trim($nome . ($seriesLabel !== '' ? ' ' . $seriesLabel : ''));
+    }
+
+    /**
+     * @param list<array<string,mixed>> $relatorios
+     */
+    private function exportarExcelEventosBoletimCoordenacao(array $relatorios, bool $incluirAssinatura, string $filenameBase): void
+    {
+        $colunasUniao = [];
+        $decimalPlaces = 1;
+        foreach ($relatorios as $relatorio) {
+            $decimalPlaces = max($decimalPlaces, (int) ($relatorio['decimal_places'] ?? 1));
+            foreach ((array) ($relatorio['columns'] ?? []) as $column) {
+                if (!is_array($column)) {
+                    continue;
+                }
+                $codigo = trim((string) ($column['codigo'] ?? ''));
+                if ($codigo === '') {
+                    continue;
+                }
+                $label = trim((string) ($column['label'] ?? ''));
+                if ($label === '') {
+                    $label = 'Nota';
+                }
+                if (!isset($colunasUniao[$codigo])) {
+                    $colunasUniao[$codigo] = $label;
+                    continue;
+                }
+                if ($colunasUniao[$codigo] === $label) {
+                    continue;
+                }
+                $colunasUniao[$codigo] = $label . ' (' . $codigo . ')';
+            }
+        }
+        $usados = [];
+        foreach ($colunasUniao as $codigo => $label) {
+            $base = $label;
+            if (isset($usados[$base])) {
+                $colunasUniao[$codigo] = $base . ' (' . $codigo . ')';
+            }
+            $usados[$colunasUniao[$codigo]] = true;
+        }
+        $headers = ['Boletim', 'Aluno'];
+        if ($incluirAssinatura) {
+            $headers[] = 'Assinatura';
+        }
+        $headers[] = 'RA';
+        $headers[] = 'Turma';
+        $headers[] = 'Matéria';
+        foreach ($colunasUniao as $label) {
+            $headers[] = $label;
+        }
+        $headers[] = 'Observação da coordenação';
+
+        $rows = [];
+        foreach ($relatorios as $relatorio) {
+            $nomeEvento = (string) ($relatorio['evento_nome'] ?? 'Boletim');
+            foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
+                if (!is_array($aluno)) {
+                    continue;
+                }
+                $primeiraMateria = true;
+                foreach ((array) ($aluno['materias'] ?? []) as $materia) {
+                    if (!is_array($materia)) {
+                        continue;
+                    }
+                    $row = [$nomeEvento, (string) ($aluno['nome'] ?? '')];
+                    if ($incluirAssinatura) {
+                        $row[] = '';
+                    }
+                    $row[] = (string) ($aluno['ra'] ?? '');
+                    $row[] = (string) ($aluno['turma'] ?? '');
+                    $row[] = (string) ($materia['nome'] ?? '');
+                    foreach ($colunasUniao as $codigo => $_label) {
+                        $value = $materia['notas'][$codigo] ?? null;
+                        $row[] = is_numeric($value) ? (float) $value : (string) ($value ?? '');
+                    }
+                    $row[] = $primeiraMateria ? (string) ($aluno['observacao'] ?? '') : '';
+                    $rows[] = $row;
+                    $primeiraMateria = false;
+                }
+            }
+        }
+
+        $xlsx = $this->criarXlsxBoletimCoordenacao($headers, $rows, max(0, min(2, $decimalPlaces)));
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filenameBase . '.xlsx"');
+        header('Pragma: no-cache');
+        header('Content-Length: ' . strlen($xlsx));
+        echo $xlsx;
+        exit;
     }
 
     private function exportarBoletimCoordenacaoExcel(array $relatorio, bool $incluirAssinatura, string $filenameBase): void
