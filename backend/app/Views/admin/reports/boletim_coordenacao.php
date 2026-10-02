@@ -62,13 +62,18 @@ include __DIR__ . '/../_partials/flash_message.php';
 <form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
     <?php $alunoQFiltro = trim((string) ($aluno_q ?? '')); ?>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <label class="block md:col-span-2">
+        <label class="block md:col-span-2 relative">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Aluno</span>
-            <input type="text" name="aluno_q" value="<?= htmlspecialchars($alunoQFiltro, ENT_QUOTES, 'UTF-8') ?>"
-                   placeholder="Nome, RA ou código do aluno"
+            <input type="text" name="aluno_q" id="aluno-q-boletim-coord" value="<?= htmlspecialchars($alunoQFiltro, ENT_QUOTES, 'UTF-8') ?>"
+                   placeholder="Digite o nome, RA ou código"
                    class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100"
-                   autocomplete="off">
-            <span class="block text-xs text-gray-500 mt-1">Traz todos os boletins e notas desse aluno no filtro atual.</span>
+                   autocomplete="off"
+                   role="combobox"
+                   aria-autocomplete="list"
+                   aria-expanded="false"
+                   aria-controls="aluno-sugestoes-boletim-coord">
+            <div id="aluno-sugestoes-boletim-coord" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg" role="listbox"></div>
+            <span class="block text-xs text-gray-500 mt-1">Comece a digitar e clique na sugestão (turma · nome).</span>
         </label>
         <label class="block">
             <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir</span>
@@ -375,6 +380,12 @@ include __DIR__ . '/../_partials/flash_message.php';
     var checks = Array.prototype.slice.call(document.querySelectorAll('.evento-check'));
     var selecionarTodos = document.getElementById('eventos-selecionar-todos');
     var qtdEl = document.getElementById('eventos-qtd');
+    var alunoInput = document.getElementById('aluno-q-boletim-coord');
+    var alunoLista = document.getElementById('aluno-sugestoes-boletim-coord');
+    var turmaSelect = form ? form.querySelector('select[name="turma_id"]') : null;
+    var buscaAlunoUrl = <?= json_encode(rtrim((string) URL, '/') . '/admin/reports/boletim-coordenacao/buscar-alunos', JSON_UNESCAPED_SLASHES) ?>;
+    var buscaTimer = null;
+    var buscaSeq = 0;
 
     function aplicarFonte() {
         var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
@@ -407,6 +418,73 @@ include __DIR__ . '/../_partials/flash_message.php';
             check.disabled = todos;
         });
     };
+    function fecharSugestoes() {
+        if (!alunoLista) return;
+        alunoLista.classList.add('hidden');
+        alunoLista.innerHTML = '';
+        if (alunoInput) alunoInput.setAttribute('aria-expanded', 'false');
+    }
+    function abrirSugestoes(alunos) {
+        if (!alunoLista || !alunoInput) return;
+        alunoLista.innerHTML = '';
+        if (!alunos.length) {
+            var vazio = document.createElement('div');
+            vazio.className = 'px-3 py-2 text-sm text-gray-500';
+            vazio.textContent = 'Nenhum aluno encontrado.';
+            alunoLista.appendChild(vazio);
+        } else {
+            alunos.forEach(function (aluno) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'block w-full text-left px-3 py-2.5 text-sm text-gray-800 hover:bg-purple-50 border-b border-gray-100 last:border-b-0';
+                btn.setAttribute('role', 'option');
+                btn.textContent = aluno.rotulo || ((aluno.turma_nome ? aluno.turma_nome + ' · ' : '') + (aluno.nome || ''));
+                btn.addEventListener('mousedown', function (ev) {
+                    ev.preventDefault();
+                    alunoInput.value = aluno.nome || '';
+                    fecharSugestoes();
+                    alunoInput.focus();
+                });
+                alunoLista.appendChild(btn);
+            });
+        }
+        alunoLista.classList.remove('hidden');
+        alunoInput.setAttribute('aria-expanded', 'true');
+    }
+    function buscarAlunos(termo) {
+        if (!termo || termo.length < 2) {
+            fecharSugestoes();
+            return;
+        }
+        var seq = ++buscaSeq;
+        var url = buscaAlunoUrl + '?aluno_q=' + encodeURIComponent(termo);
+        if (turmaSelect && turmaSelect.value && turmaSelect.value !== '0') {
+            url += '&turma_id=' + encodeURIComponent(turmaSelect.value);
+        }
+        fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (seq !== buscaSeq) return;
+                abrirSugestoes((data && data.alunos) ? data.alunos : []);
+            })
+            .catch(function () {
+                if (seq !== buscaSeq) return;
+                fecharSugestoes();
+            });
+    }
+    if (alunoInput) {
+        alunoInput.addEventListener('input', function () {
+            var termo = String(alunoInput.value || '').trim();
+            if (buscaTimer) clearTimeout(buscaTimer);
+            buscaTimer = setTimeout(function () { buscarAlunos(termo); }, 220);
+        });
+        alunoInput.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Escape') fecharSugestoes();
+        });
+        alunoInput.addEventListener('blur', function () {
+            setTimeout(fecharSugestoes, 150);
+        });
+    }
     if (selecionarTodos) {
         selecionarTodos.addEventListener('change', function () {
             checks.forEach(function (check) { check.checked = selecionarTodos.checked; });
@@ -422,7 +500,6 @@ include __DIR__ . '/../_partials/flash_message.php';
             var submitter = event.submitter;
             var gerar = submitter && submitter.name === 'executar';
             var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
-            var alunoInput = form.querySelector('input[name="aluno_q"]');
             var alunoBusca = alunoInput ? String(alunoInput.value || '').trim() : '';
             if (gerar && fonte === 'evento' && checks.length > 0 && !checks.some(function (check) { return check.checked; })) {
                 if (alunoBusca !== '') {

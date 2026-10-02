@@ -246,6 +246,58 @@ class ReportAdminController extends AdminBaseController
         $this->redirect('/admin/censo');
     }
 
+    public function buscarAlunosBoletimCoordenacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', true)) {
+            return;
+        }
+        $termo = $this->parseAlunoBuscaBoletimCoordenacao();
+        $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
+        if (strlen($termo) < 2) {
+            $this->json(['success' => true, 'alunos' => []]);
+            return;
+        }
+        [$whereAluno, $paramsAluno] = $this->whereAlunoBuscaBoletimCoordenacao($termo, 'a');
+        $params = $paramsAluno;
+        $whereTurma = '';
+        if ($turmaId > 0) {
+            $whereTurma = ' AND a.turma_id = :turma_id';
+            $params['turma_id'] = $turmaId;
+        }
+        $codigoSelect = $this->colunaAlunosCodigoExisteBoletimCoordenacao()
+            ? 'a.codigo_aluno'
+            : 'NULL AS codigo_aluno';
+        $rows = $this->db->fetchAll(
+            "SELECT a.id, a.nome, a.ra, {$codigoSelect},
+                    COALESCE(t.nome, '') AS turma_nome
+             FROM alunos a
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE a.ativo = 1{$whereAluno}{$whereTurma}
+             ORDER BY a.nome ASC
+             LIMIT 15",
+            $params
+        ) ?: [];
+        $alunos = [];
+        foreach ($rows as $row) {
+            $nome = trim((string) ($row['nome'] ?? ''));
+            $turma = trim((string) ($row['turma_nome'] ?? ''));
+            $ra = trim((string) ($row['ra'] ?? ''));
+            $rotulo = $turma !== '' ? ($turma . ' · ' . $nome) : $nome;
+            if ($ra !== '') {
+                $rotulo .= ' · RA ' . $ra;
+            }
+            $alunos[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'nome' => $nome,
+                'ra' => $ra,
+                'codigo_aluno' => trim((string) ($row['codigo_aluno'] ?? '')),
+                'turma_nome' => $turma,
+                'rotulo' => $rotulo,
+            ];
+        }
+        $this->json(['success' => true, 'alunos' => $alunos]);
+    }
+
     public function boletimCoordenacao()
     {
         if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', false)) {
