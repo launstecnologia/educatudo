@@ -132,9 +132,17 @@ include __DIR__ . '/../_partials/flash_message.php';
                 ?>
                 <label class="evento-item flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-purple-50/40">
                     <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
-                    <span class="min-w-0 flex-1">
-                        <span class="block text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) ($evento['nome_exibicao'] ?? $evento['nome'])) ?></span>
-                        <span class="block text-xs text-gray-500 truncate"><?= htmlspecialchars((string) ($evento['nome_detalhe'] ?? '')) ?></span>
+                    <?php
+                    $refLista = (int) ($evento['regra_id'] ?? 0);
+                    $bimLista = trim((string) ($evento['rotulo_bimestre'] ?? ''));
+                    $serieLista = trim((string) ($evento['series_nomes'] ?? ''));
+                    $tipoLista = (($evento['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
+                    ?>
+                    <span class="min-w-0 flex-1 flex flex-wrap items-baseline gap-x-4 gap-y-0.5 text-sm text-gray-900">
+                        <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
+                        <span><span class="text-gray-500">Ref</span> <?= $refLista > 0 ? $refLista : '—' ?></span>
+                        <span><span class="text-gray-500">Bimestre</span> <?= htmlspecialchars($bimLista !== '' ? $bimLista : '—', ENT_QUOTES, 'UTF-8') ?></span>
+                        <span class="min-w-0"><span class="text-gray-500">Série</span> <?= htmlspecialchars($serieLista !== '' ? $serieLista : 'Todas', ENT_QUOTES, 'UTF-8') ?></span>
                     </span>
                     <span class="shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full <?= $vigente ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' ?>"><?= $vigente ? 'Vigente' : 'Anterior' ?></span>
                 </label>
@@ -282,6 +290,7 @@ include __DIR__ . '/../_partials/flash_message.php';
         $refEvento = (int) ($grupo['regra_id'] ?? 0);
         $rotuloGrupo = (string) ($grupo['evento_rotulo'] ?? $grupo['evento_nome'] ?? '');
         $detalheGrupo = (string) ($grupo['evento_detalhe'] ?? '');
+        $bimestreGrupo = trim((string) ($grupo['bimestre_rotulo'] ?? ''));
         ?>
         <?php if ($rotuloGrupo !== '' && $eventosTotal > 1): ?>
             <div class="mb-3 mt-6 first:mt-0">
@@ -299,8 +308,12 @@ include __DIR__ . '/../_partials/flash_message.php';
                     <strong class="text-gray-900"><?= htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
                     <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
                     <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) ($aluno['turma'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
-                    <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
-                    <?php if ((string) ($aluno['ra'] ?? '') !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
+                    <?php if ($fonteRelatorio === 'evento'): ?>
+                        <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
+                        <span class="text-sm text-gray-500">Bimestre: <?= htmlspecialchars($bimestreGrupo !== '' ? $bimestreGrupo : '—', ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php else: ?>
+                        <?php if ((string) ($aluno['ra'] ?? '') !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
+                    <?php endif; ?>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">

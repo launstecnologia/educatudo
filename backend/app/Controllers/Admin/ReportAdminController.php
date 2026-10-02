@@ -1072,6 +1072,7 @@ class ReportAdminController extends AdminBaseController
                 $detalhes[] = $versao > 0 ? ('Anterior v' . $versao) : 'Anterior';
             }
             $evento['eh_vigente'] = $ehPrincipal;
+            $evento['rotulo_bimestre'] = $rotuloPeriodo;
             $evento['nome_exibicao'] = $titulo;
             $evento['nome_detalhe'] = implode(' · ', $detalhes);
             $evento['_serie_ordem'] = $ordemMax;
