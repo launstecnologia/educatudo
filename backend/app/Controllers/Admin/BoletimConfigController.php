@@ -5381,6 +5381,8 @@ class BoletimConfigController extends BaseController
                 $midsComNota[(int) $midMap] = true;
             }
         }
+        $irmasDoGrupo = [];
+        $materiasOriginaisPorBloco = $candidatosPorBloco;
         foreach ((array) ($regra['componentes'] ?? []) as $compGl) {
             if (!is_array($compGl)) {
                 continue;
@@ -5399,19 +5401,31 @@ class BoletimConfigController extends BaseController
             if (count($idsGrupo) < 2) {
                 continue;
             }
-            $intersecta = false;
-            foreach (array_keys($idsGrupo) as $midG) {
-                if (isset($midsComNota[$midG])) {
-                    $intersecta = true;
-                    break;
-                }
-            }
-            if (!$intersecta) {
-                continue;
-            }
             foreach (array_keys($basePorBloco) as $blocoId) {
+                $blocoId = (int) $blocoId;
+                $noBloco = [];
+                foreach ((array) ($materiasOriginaisPorBloco[$blocoId] ?? []) as $midBloco) {
+                    $midBloco = (int) $midBloco;
+                    if ($midBloco > 0) {
+                        $noBloco[$midBloco] = true;
+                    }
+                }
+                $cruzaBloco = false;
+                $cruzaNota = false;
                 foreach (array_keys($idsGrupo) as $midG) {
-                    $candidatosPorBloco[(int) $blocoId][] = $midG;
+                    if (isset($noBloco[$midG])) {
+                        $cruzaBloco = true;
+                    }
+                    if (isset($midsComNota[$midG]) && isset($noBloco[$midG])) {
+                        $cruzaNota = true;
+                    }
+                }
+                if (!$cruzaBloco || !$cruzaNota) {
+                    continue;
+                }
+                foreach (array_keys($idsGrupo) as $midG) {
+                    $irmasDoGrupo[$midG] = true;
+                    $candidatosPorBloco[$blocoId][] = $midG;
                 }
             }
         }
@@ -5424,7 +5438,7 @@ class BoletimConfigController extends BaseController
                     continue;
                 }
                 $vistos[$mid] = true;
-                if ($setFiltro !== null && !isset($setFiltro[$mid])) {
+                if ($setFiltro !== null && !isset($setFiltro[$mid]) && !isset($irmasDoGrupo[$mid])) {
                     continue;
                 }
                 if (array_key_exists($mid, $map) && $map[$mid] !== null && is_numeric($map[$mid])) {
@@ -5455,6 +5469,146 @@ class BoletimConfigController extends BaseController
         $s = strtolower(trim((string) $raw));
 
         return $s === '1' || $s === 'true' || $s === 'yes' || $s === 'sim';
+    }
+
+    /**
+     * Nota única (ex.: ENAC) fechada pelo tipo só vinha nas matérias que receberam a linha.
+     * Completa as outras matérias do evento e as irmãs do grupo (Gramática tem nota → Leitura também).
+     *
+     * @param array<int, float|int|string|null> $map
+     * @param list<int> $materiasFiltro
+     * @param array<int, string> $materiaNomesPorId
+     * @return array<int, float|int|string|null>
+     */
+    private function completarMapaNotaUnicaDoTipo(
+        array $map,
+        array $componente,
+        array $regra,
+        array $materiasFiltro,
+        array &$materiaNomesPorId,
+        int $periodo,
+        int $ano
+    ): array {
+        $temNota = false;
+        foreach ($map as $valor) {
+            if (is_numeric($valor)) {
+                $temNota = true;
+                break;
+            }
+        }
+        if (!$temNota) {
+            return $map;
+        }
+        $explicitos = $this->resolveBlocoIdsFromComponentePersisted($componente);
+        $blocoIds = $this->blocosNotaUnicaDoComponente($componente, $periodo, $ano, false);
+        $rows = $this->rowsNotaUnicaComNotaDoBloco($blocoIds, $map);
+        if ($rows === [] && $explicitos !== []) {
+            $blocoIds = $this->blocosNotaUnicaDoComponente($componente, $periodo, $ano, true);
+            $rows = $this->rowsNotaUnicaComNotaDoBloco($blocoIds, $map);
+        }
+        if ($rows === []) {
+            return $map;
+        }
+
+        return $this->completarMapaNotaUnicaBloco($map, $rows, $materiasFiltro, $materiaNomesPorId, $regra);
+    }
+
+    /**
+     * A nota do bloco é a de uma matéria da pauta que já está no mapa.
+     * Sem essa interseção, o bloco não espalha nota.
+     *
+     * @param list<int> $blocoIds
+     * @param array<int, float|int|string|null> $map
+     * @return list<array<string,mixed>>
+     */
+    private function rowsNotaUnicaComNotaDoBloco(array $blocoIds, array $map): array
+    {
+        if ($blocoIds === []) {
+            return [];
+        }
+        $materiasPorBloco = $this->materiasIdsDosBlocosNotaUnica($blocoIds);
+        $rows = [];
+        foreach ($blocoIds as $blocoId) {
+            $blocoId = (int) $blocoId;
+            $notaBloco = null;
+            foreach ((array) ($materiasPorBloco[$blocoId] ?? []) as $mid) {
+                $mid = (int) $mid;
+                if ($mid > 0 && isset($map[$mid]) && is_numeric($map[$mid])) {
+                    $notaBloco = (float) $map[$mid];
+                    break;
+                }
+            }
+            if ($notaBloco === null) {
+                continue;
+            }
+            $rows[] = [
+                'bloco_id' => $blocoId,
+                'nota' => $notaBloco,
+                'nota_unica_todas_materias' => 1,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function blocosNotaUnicaDoComponente(array $componente, int $periodo, int $ano, bool $somenteTipo): array
+    {
+        $explicitos = $somenteTipo ? [] : $this->resolveBlocoIdsFromComponentePersisted($componente);
+        $tipoId = $this->parseTipoAvaliacaoIdFromComponente($componente);
+        $bimestres = $this->parseProvaBimestresFromComponente($componente);
+        if ($bimestres === [] && $periodo >= 1 && $periodo <= 4) {
+            $bimestres = [$periodo];
+        }
+        if ($bimestres === []) {
+            return [];
+        }
+        if ($explicitos === [] && $tipoId <= 0) {
+            return [];
+        }
+        if ($somenteTipo && $tipoId <= 0) {
+            return [];
+        }
+        try {
+            $db = Database::getInstance();
+            $sql = 'SELECT id FROM provas_blocos
+                    WHERE deleted_at IS NULL
+                      AND nota_unica_todas_materias = 1';
+            $params = [];
+            if ($explicitos !== []) {
+                $ph = implode(',', array_fill(0, count($explicitos), '?'));
+                $sql .= ' AND id IN (' . $ph . ')';
+                foreach ($explicitos as $id) {
+                    $params[] = $id;
+                }
+            } else {
+                $sql .= ' AND tipo_avaliacao_id = ?';
+                $params[] = $tipoId;
+            }
+            $phB = implode(',', array_fill(0, count($bimestres), '?'));
+            $sql .= ' AND bimestre IN (' . $phB . ')';
+            foreach ($bimestres as $bim) {
+                $params[] = (int) $bim;
+            }
+            if ($ano > 0) {
+                $sql .= ' AND (ano_letivo = ? OR ano_letivo IS NULL)';
+                $params[] = $ano;
+            }
+            $rows = $db->fetchAll($sql, $params) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -9948,6 +10102,22 @@ class BoletimConfigController extends BaseController
         if ($map === []) {
             return false;
         }
+        $periodoBlocos = $periodo;
+        if ($periodoBlocos <= 0 && preg_match('/^(\d{4})-B([1-4])$/', $periodoRef, $mPeriodo)) {
+            $periodoBlocos = (int) $mPeriodo[2];
+            if ($ano <= 0) {
+                $ano = (int) $mPeriodo[1];
+            }
+        }
+        $map = $this->completarMapaNotaUnicaDoTipo(
+            $map,
+            $componente,
+            $regra,
+            $materiasFiltro,
+            $materiaNomesPorId,
+            $periodoBlocos,
+            $ano
+        );
         $roundModeComp = $this->resolveRoundModeComponente($componente, $roundMode);
         $matrizPorCodigo[$codigo] = $this->applyRoundModeToMateriaMap($map, $roundModeComp);
         $lista = [];
