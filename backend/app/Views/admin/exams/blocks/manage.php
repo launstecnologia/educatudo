@@ -14,46 +14,35 @@ $statusBadgeClasses = match ($statusBlocoRaw) {
     'concluido' => 'bg-gray-800 text-white',
     default => 'bg-gray-100 text-gray-700',
 };
-$btnOutlineHeader = 'inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
+$btnOutlineHeader = 'inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5EAF1] bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors';
 
-$iniciaisNome = static function (string $nome): string {
-    $nome = trim(preg_replace('/\s+/', ' ', $nome) ?? '');
-    if ($nome === '') {
-        return '?';
-    }
-    $partes = explode(' ', $nome);
-    $primeira = mb_substr($partes[0], 0, 1);
-    $ultima = count($partes) > 1 ? mb_substr($partes[count($partes) - 1], 0, 1) : '';
-    return mb_strtoupper($primeira . $ultima);
-};
-
-$estiloMateria = static function (string $nome): array {
+$estiloMateria = static function (string $nome): string {
     $n = mb_strtolower(trim($nome));
     $map = [
-        'biologia' => ['bg-emerald-50 text-emerald-700', 'fa-leaf'],
-        'física' => ['bg-sky-50 text-sky-700', 'fa-atom'],
-        'fisica' => ['bg-sky-50 text-sky-700', 'fa-atom'],
-        'gramática' => ['bg-amber-50 text-amber-700', 'fa-book'],
-        'gramatica' => ['bg-amber-50 text-amber-700', 'fa-book'],
-        'inglês' => ['bg-violet-50 text-violet-700', 'fa-comments'],
-        'ingles' => ['bg-violet-50 text-violet-700', 'fa-comments'],
-        'leitura e interpretação' => ['bg-rose-50 text-rose-700', 'fa-book-open'],
-        'leitura e interpretacao' => ['bg-rose-50 text-rose-700', 'fa-book-open'],
-        'literatura' => ['bg-indigo-50 text-indigo-700', 'fa-book'],
-        'matemática' => ['bg-blue-50 text-blue-700', 'fa-calculator'],
-        'matematica' => ['bg-blue-50 text-blue-700', 'fa-calculator'],
-        'química' => ['bg-teal-50 text-teal-700', 'fa-flask'],
-        'quimica' => ['bg-teal-50 text-teal-700', 'fa-flask'],
-        'história' => ['bg-orange-50 text-orange-700', 'fa-landmark'],
-        'historia' => ['bg-orange-50 text-orange-700', 'fa-landmark'],
-        'geografia' => ['bg-cyan-50 text-cyan-700', 'fa-globe'],
-        'português' => ['bg-fuchsia-50 text-fuchsia-700', 'fa-language'],
-        'portugues' => ['bg-fuchsia-50 text-fuchsia-700', 'fa-language'],
-        'educação física' => ['bg-lime-50 text-lime-700', 'fa-person-running'],
-        'educacao fisica' => ['bg-lime-50 text-lime-700', 'fa-person-running'],
-        'artes' => ['bg-pink-50 text-pink-700', 'fa-palette'],
-        'filosofia' => ['bg-slate-100 text-slate-700', 'fa-brain'],
-        'sociologia' => ['bg-stone-100 text-stone-700', 'fa-users'],
+        'biologia' => 'bg-emerald-50 text-emerald-700',
+        'física' => 'bg-sky-50 text-sky-700',
+        'fisica' => 'bg-sky-50 text-sky-700',
+        'gramática' => 'bg-amber-50 text-amber-700',
+        'gramatica' => 'bg-amber-50 text-amber-700',
+        'inglês' => 'bg-violet-50 text-violet-700',
+        'ingles' => 'bg-violet-50 text-violet-700',
+        'leitura e interpretação' => 'bg-rose-50 text-rose-700',
+        'leitura e interpretacao' => 'bg-rose-50 text-rose-700',
+        'literatura' => 'bg-indigo-50 text-indigo-700',
+        'matemática' => 'bg-blue-50 text-blue-700',
+        'matematica' => 'bg-blue-50 text-blue-700',
+        'química' => 'bg-teal-50 text-teal-700',
+        'quimica' => 'bg-teal-50 text-teal-700',
+        'história' => 'bg-orange-50 text-orange-700',
+        'historia' => 'bg-orange-50 text-orange-700',
+        'geografia' => 'bg-cyan-50 text-cyan-700',
+        'português' => 'bg-fuchsia-50 text-fuchsia-700',
+        'portugues' => 'bg-fuchsia-50 text-fuchsia-700',
+        'educação física' => 'bg-lime-50 text-lime-700',
+        'educacao fisica' => 'bg-lime-50 text-lime-700',
+        'artes' => 'bg-pink-50 text-pink-700',
+        'filosofia' => 'bg-slate-100 text-slate-700',
+        'sociologia' => 'bg-stone-100 text-stone-700',
     ];
     foreach ($map as $chave => $estilo) {
         if ($n === $chave || str_contains($n, $chave)) {
@@ -61,50 +50,45 @@ $estiloMateria = static function (string $nome): array {
         }
     }
     $paleta = [
-        ['bg-slate-100 text-slate-700', 'fa-book'],
-        ['bg-blue-50 text-blue-700', 'fa-book'],
-        ['bg-indigo-50 text-indigo-700', 'fa-book'],
-        ['bg-teal-50 text-teal-700', 'fa-book'],
-        ['bg-amber-50 text-amber-700', 'fa-book'],
+        'bg-slate-100 text-slate-700',
+        'bg-blue-50 text-blue-700',
+        'bg-indigo-50 text-indigo-700',
+        'bg-teal-50 text-teal-700',
+        'bg-amber-50 text-amber-700',
     ];
     return $paleta[abs(crc32($n)) % count($paleta)];
 };
 ?>
 
 <!-- Header Section -->
-<div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-        <div class="flex items-center gap-3 min-w-0">
-            <div class="shrink-0 w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <i class="fa-solid <?= $modoLancamentoNota ? 'fa-pen-to-square' : 'fa-file-lines' ?>" aria-hidden="true"></i>
-            </div>
-            <div class="min-w-0">
-                <h2 class="text-lg sm:text-xl font-bold text-gray-900 leading-tight">
-                    <?= $modoLancamentoNota ? 'Lançamento de notas' : 'Gerenciar Provas' ?>
-                </h2>
-                <p class="text-sm text-gray-600 mt-0.5 truncate" title="<?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>">
-                    <?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>
-                </p>
-                <?php if (!$modoLancamentoNota): ?>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusBadgeClasses ?>">
-                        <?php if (in_array($statusBlocoRaw, ['aprovado', 'liberado'], true)): ?>
-                            <i class="fa-solid fa-circle-check text-[10px]" aria-hidden="true"></i>
-                        <?php endif; ?>
-                        <?= htmlspecialchars($statusBlocoLabel) ?>
-                    </span>
-                    <?php if (!empty($bloco['prazo_entrega_professor'])): ?>
-                    <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
-                        <i class="fa-regular fa-clock" aria-hidden="true"></i>
-                        Prazo: <?= date('d/m/Y H:i', strtotime((string) $bloco['prazo_entrega_professor'])) ?>
-                    </span>
+<div class="mb-5">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+        <div class="min-w-0">
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                <?= $modoLancamentoNota ? 'Lançamento de notas' : 'Gerenciar Provas' ?>
+            </h2>
+            <p class="text-base sm:text-lg font-medium text-gray-800 mt-0.5 truncate" title="<?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>">
+                <?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?>
+            </p>
+            <?php if (!$modoLancamentoNota): ?>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $statusBadgeClasses ?>">
+                    <?php if (in_array($statusBlocoRaw, ['aprovado', 'liberado'], true)): ?>
+                        <i class="fa-solid fa-circle-check text-[10px]" aria-hidden="true"></i>
                     <?php endif; ?>
-                </div>
+                    <?= htmlspecialchars($statusBlocoLabel) ?>
+                </span>
+                <?php if (!empty($bloco['prazo_entrega_professor'])): ?>
+                <span class="inline-flex items-center gap-1.5 text-sm text-gray-500">
+                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                    Prazo de envio: <?= date('d/m/Y H:i', strtotime((string) $bloco['prazo_entrega_professor'])) ?>
+                </span>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+        <div class="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
             <a href="<?= URL ?>/admin/provas" class="<?= $btnOutlineHeader ?>">
                 <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 Voltar
@@ -125,7 +109,7 @@ $estiloMateria = static function (string $nome): array {
                 </a>
                 <?php if ($lancamentoPorCoordenacao): ?>
                 <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/lancar-notas-coordenacao"
-                   class="btn-primary-custom inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                   class="btn-primary-custom inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                     <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
                     Lançar notas
                 </a>
@@ -137,7 +121,8 @@ $estiloMateria = static function (string $nome): array {
                     Cancelados<?= !empty($total_canceladas) ? ' (' . (int) $total_canceladas . ')' : '' ?>
                 </a>
                 <?php if (!empty($bloco['gabarito_liberado'])): ?>
-                <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm font-medium">
+                <span class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#E5EAF1] bg-gray-50 text-gray-700 text-sm font-medium">
+                    <i class="fa-solid fa-lock-open" aria-hidden="true"></i>
                     Gabarito liberado
                 </span>
                 <?php else: ?>
@@ -146,6 +131,7 @@ $estiloMateria = static function (string $nome): array {
                     <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                     <input type="hidden" name="origem" value="gerenciar">
                     <button type="submit" class="<?= $btnOutlineHeader ?>">
+                        <i class="fa-solid fa-lock" aria-hidden="true"></i>
                         Liberar gabarito
                     </button>
                 </form>
@@ -156,13 +142,13 @@ $estiloMateria = static function (string $nome): array {
                 </a>
                 <?php if (!empty($mostrarBotaoAprovacaoFinal)): ?>
                 <button type="button" onclick="aprovarBlocoFinal(<?= (int) $bloco['id'] ?>)"
-                        class="btn-primary-custom inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                        class="btn-primary-custom inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                     <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                     Aprovação Final
                 </button>
                 <?php endif; ?>
                 <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/resultados-novos"
-                   class="btn-primary-custom inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                   class="btn-primary-custom inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                     <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
                     Resultados
                 </a>
@@ -496,30 +482,39 @@ $mostrarFiltrosLn = count($linhasLancamento) > 3;
 <?php if (isset($contagem)): ?>
 <?php
 $cardsOnline = [
-    ['key' => 'em_andamento', 'label' => 'Em andamento', 'valor' => (int) ($contagem['em_andamento'] ?? 0), 'icon' => 'fa-hourglass-half', 'tone' => 'bg-amber-50 text-amber-600', 'bar' => 'bg-amber-400'],
-    ['key' => 'enviada', 'label' => 'Enviadas', 'valor' => (int) ($contagem['enviada'] ?? 0), 'icon' => 'fa-paper-plane', 'tone' => 'bg-sky-50 text-sky-600', 'bar' => 'bg-sky-400'],
-    ['key' => 'nao_enviada', 'label' => 'Não enviadas', 'valor' => (int) ($contagem['nao_enviada'] ?? 0), 'icon' => 'fa-file', 'tone' => 'bg-slate-100 text-slate-600', 'bar' => 'bg-slate-400'],
-    ['key' => 'aprovada', 'label' => 'Aprovadas', 'valor' => (int) ($contagem['aprovada'] ?? 0), 'icon' => 'fa-circle-check', 'tone' => 'bg-emerald-50 text-emerald-600', 'bar' => 'bg-emerald-500'],
-    ['key' => 'retornada', 'label' => 'Retornado professor', 'valor' => (int) ($contagem['retornada'] ?? 0), 'icon' => 'fa-rotate-left', 'tone' => 'bg-rose-50 text-rose-600', 'bar' => 'bg-rose-400'],
-    ['key' => 'reprovada', 'label' => 'Provas excluídas', 'valor' => (int) ($contagem['reprovada'] ?? 0), 'icon' => 'fa-ban', 'tone' => 'bg-violet-50 text-violet-600', 'bar' => 'bg-violet-400'],
+    ['key' => 'em_andamento', 'label' => 'Em andamento', 'valor' => (int) ($contagem['em_andamento'] ?? 0), 'icon' => 'fa-hourglass-half', 'tone' => 'bg-amber-50 text-amber-600', 'cardBg' => 'bg-amber-50/40', 'bar' => 'bg-amber-400'],
+    ['key' => 'enviada', 'label' => 'Enviadas', 'valor' => (int) ($contagem['enviada'] ?? 0), 'icon' => 'fa-paper-plane', 'tone' => 'bg-sky-50 text-sky-600', 'cardBg' => 'bg-sky-50/40', 'bar' => 'bg-sky-400'],
+    ['key' => 'nao_enviada', 'label' => 'Não enviadas', 'valor' => (int) ($contagem['nao_enviada'] ?? 0), 'icon' => 'fa-file', 'tone' => 'bg-slate-100 text-slate-600', 'cardBg' => 'bg-slate-50', 'bar' => 'bg-slate-400'],
+    ['key' => 'aprovada', 'label' => 'Aprovadas', 'valor' => (int) ($contagem['aprovada'] ?? 0), 'icon' => 'fa-circle-check', 'tone' => 'bg-emerald-50 text-emerald-600', 'cardBg' => 'bg-emerald-50/40', 'bar' => 'bg-emerald-500'],
+    ['key' => 'retornada', 'label' => 'Retornado professor', 'valor' => (int) ($contagem['retornada'] ?? 0), 'icon' => 'fa-rotate-left', 'tone' => 'bg-rose-50 text-rose-600', 'cardBg' => 'bg-rose-50/40', 'bar' => 'bg-rose-400'],
+    ['key' => 'reprovada', 'label' => 'Provas excluídas', 'valor' => (int) ($contagem['reprovada'] ?? 0), 'icon' => 'fa-ban', 'tone' => 'bg-violet-50 text-violet-600', 'cardBg' => 'bg-violet-50/40', 'bar' => 'bg-violet-400'],
 ];
+$totalOnlineCards = max(1, array_sum(array_column($cardsOnline, 'valor')));
 ?>
-<div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-4" id="cardsFiltroStatus">
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-5" id="cardsFiltroStatus">
     <?php foreach ($cardsOnline as $card): ?>
+    <?php $percCard = (int) round(($card['valor'] / $totalOnlineCards) * 100); ?>
     <button type="button"
-            class="card-filtro-status group text-left bg-white rounded-lg border border-gray-200 px-3 py-2.5 relative overflow-hidden hover:border-gray-300 transition-colors"
+            class="card-filtro-status text-left <?= $card['cardBg'] ?> rounded-xl border border-[#E5EAF1] px-3.5 py-3 relative overflow-hidden hover:border-gray-300 transition-colors"
             data-status="<?= htmlspecialchars($card['key']) ?>"
             aria-pressed="false">
-        <div class="flex items-center gap-2.5">
-            <div class="w-7 h-7 rounded-md <?= $card['tone'] ?> flex items-center justify-center shrink-0">
-                <i class="fa-solid <?= $card['icon'] ?> text-xs" aria-hidden="true"></i>
-            </div>
+        <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-                <p class="text-[11px] text-gray-500 truncate leading-tight"><?= htmlspecialchars($card['label']) ?></p>
-                <p class="text-lg font-bold text-gray-900 leading-tight"><?= $card['valor'] ?></p>
+                <p class="text-xs text-gray-500 truncate"><?= htmlspecialchars($card['label']) ?></p>
+                <p class="text-2xl font-bold text-gray-900 leading-tight mt-0.5"><?= $card['valor'] ?></p>
+                <p class="text-[11px] text-gray-400 mt-0.5"><?= $percCard ?>% do total</p>
+            </div>
+            <div class="w-8 h-8 rounded-lg <?= $card['tone'] ?> flex items-center justify-center shrink-0">
+                <i class="fa-solid <?= $card['icon'] ?> text-sm" aria-hidden="true"></i>
             </div>
         </div>
-        <span class="card-filtro-bar absolute bottom-0 left-0 right-0 h-0.5 <?= $card['bar'] ?> opacity-0"></span>
+        <?php if ($card['key'] === 'aprovada'): ?>
+        <div class="mt-2.5 h-1 rounded-full bg-emerald-100 overflow-hidden">
+            <div class="h-full <?= $card['bar'] ?> rounded-full" style="width: <?= $percCard ?>%"></div>
+        </div>
+        <?php else: ?>
+        <span class="card-filtro-bar absolute bottom-0 left-0 right-0 h-1 <?= $card['bar'] ?> opacity-0"></span>
+        <?php endif; ?>
     </button>
     <?php endforeach; ?>
 </div>
@@ -545,13 +540,13 @@ usort($linhasProvasOnline, static function (array $a, array $b): int {
 });
 $statusMetaOnline = [
     'nao_avaliada' => ['bg-sky-50 text-sky-700', 'fa-paper-plane', 'Enviada', 'enviada'],
-    'aprovado' => ['bg-emerald-50 text-emerald-700', 'fa-circle-check', 'Aprovada', 'aprovada'],
-    'em_andamento' => ['bg-amber-50 text-amber-700', 'fa-hourglass-half', 'Em Andamento', 'em_andamento'],
+    'aprovado' => ['bg-emerald-50 text-emerald-700', 'fa-check', 'Aprovada', 'aprovada'],
+    'em_andamento' => ['bg-amber-50 text-amber-700', 'fa-hourglass-half', 'Em andamento', 'em_andamento'],
     'concluido' => ['bg-slate-100 text-slate-700', 'fa-flag-checkered', 'Concluída', 'em_andamento'],
     'reprovada' => ['bg-violet-50 text-violet-700', 'fa-ban', 'Prova excluída', 'reprovada'],
-    'nao_enviada' => ['bg-slate-100 text-slate-600', 'fa-file', 'Não Enviada', 'nao_enviada'],
-    'retornada' => ['bg-rose-50 text-rose-700', 'fa-rotate-left', 'Retornada ao professor', 'retornada'],
-    'pendente' => ['bg-gray-100 text-gray-600', 'fa-clock', 'Aguardando envio', 'nao_enviada'],
+    'nao_enviada' => ['bg-slate-100 text-slate-600', 'fa-file', 'Não enviada', 'nao_enviada'],
+    'retornada' => ['bg-rose-50 text-rose-700', 'fa-rotate-left', 'Retornada', 'retornada'],
+    'pendente' => ['bg-gray-100 text-gray-600', 'fa-clock', 'Aguardando', 'nao_enviada'],
 ];
 $materiasFiltroOnline = [];
 foreach ($linhasProvasOnline as $provaMat) {
@@ -561,37 +556,30 @@ foreach ($linhasProvasOnline as $provaMat) {
     }
 }
 ksort($materiasFiltroOnline, SORT_NATURAL | SORT_FLAG_CASE);
-$btnSecundario = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
+$btnSecundario = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5EAF1] bg-white text-gray-700 text-sm font-medium hover:bg-gray-50';
 $totalLinhasOnline = count($linhasProvasOnline);
+$perPageOnline = 8;
 ?>
-<div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-    <div class="px-5 py-4 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-        <div class="flex items-start gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
-            </div>
-            <div class="min-w-0">
-                <h3 class="text-lg font-semibold text-gray-900">Provas por professor e matéria</h3>
-                <p class="text-sm text-gray-500 mt-0.5">Acompanhe o status de cada prova e gerencie vínculos, trocas e aprovações.</p>
-            </div>
+<div class="bg-white rounded-xl border border-[#E5EAF1] overflow-hidden mb-6">
+    <div class="px-4 sm:px-5 py-4 border-b border-[#E5EAF1] flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div class="min-w-0">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900">Provas por professor e matéria</h3>
+            <p class="text-sm text-gray-500 mt-0.5">Acompanhe o status de cada prova e gerencie vínculos, trocas e aprovações.</p>
         </div>
         <?php if ($linhasProvasOnline !== []): ?>
         <div class="flex flex-wrap items-center gap-2">
             <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" aria-hidden="true"></i>
                 <input type="search" id="buscaProvasTabela" placeholder="Buscar por professor, matéria..."
-                       class="pl-9 pr-3 py-2 w-56 sm:w-64 rounded-lg border border-gray-300 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
+                       class="pl-9 pr-3 py-2 w-52 sm:w-64 rounded-lg border border-[#E5EAF1] text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white">
             </div>
-            <div class="relative">
-                <i class="fa-solid fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" aria-hidden="true"></i>
-                <select id="filtroMateriaProvas"
-                        class="appearance-none pl-9 pr-8 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400">
-                    <option value="">Todas as matérias</option>
-                    <?php foreach (array_keys($materiasFiltroOnline) as $matOpt): ?>
-                    <option value="<?= htmlspecialchars($matOpt) ?>"><?= htmlspecialchars($matOpt) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+            <select id="filtroMateriaProvas"
+                    class="px-3 py-2 rounded-lg border border-[#E5EAF1] text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
+                <option value="">Todas as matérias</option>
+                <?php foreach (array_keys($materiasFiltroOnline) as $matOpt): ?>
+                <option value="<?= htmlspecialchars($matOpt) ?>"><?= htmlspecialchars($matOpt) ?></option>
+                <?php endforeach; ?>
+            </select>
         </div>
         <?php endif; ?>
     </div>
@@ -600,17 +588,19 @@ $totalLinhasOnline = count($linhasProvasOnline);
     <?php else: ?>
     <div class="overflow-x-auto">
         <table class="min-w-full" id="tabelaProvasOnline">
-            <thead>
-                <tr class="border-b border-gray-100">
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Professor</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Matéria</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Situação</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Data envio</th>
-                    <th class="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Questões</th>
-                    <th class="px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ações</th>
+            <thead class="bg-[#F7F9FC]">
+                <tr class="border-b border-[#E5EAF1]">
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Professor</th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Matéria</th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Situação</th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                        Data envio
+                    </th>
+                    <th class="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Questões</th>
+                    <th class="px-4 sm:px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ações</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-50">
+            <tbody class="divide-y divide-[#E5EAF1]">
                 <?php foreach ($linhasProvasOnline as $idx => $prova): ?>
                 <?php
                 $statusExibicao = (string) ($prova['status'] ?? 'nao_enviada');
@@ -620,26 +610,24 @@ $totalLinhasOnline = count($linhasProvasOnline);
                     && !empty($prova['prova_id']);
                 $profNome = (string) ($prova['professor_nome'] ?? '');
                 $matNome = (string) ($prova['materia_nome'] ?? '');
-                [$matCls, $matIcon] = $estiloMateria($matNome);
+                $matCls = $estiloMateria($matNome);
                 $menuId = 'menu-acoes-prova-' . $idx;
+                $dataEnvioTs = !empty($prova['data_envio']) ? strtotime((string) $prova['data_envio']) : 0;
                 ?>
-                <tr class="hover:bg-slate-50/80 linha-tabela-filtravel"
+                <tr class="hover:bg-[#F7F9FC]/80 linha-tabela-filtravel"
                     data-professor="<?= htmlspecialchars(mb_strtolower($profNome)) ?>"
                     data-materia="<?= htmlspecialchars(mb_strtolower($matNome)) ?>"
-                    data-status="<?= htmlspecialchars($meta[3]) ?>">
-                    <td class="px-5 py-3.5">
-                        <div class="flex items-center gap-2.5">
-                            <span class="w-8 h-8 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold flex items-center justify-center shrink-0"><?= htmlspecialchars($iniciaisNome($profNome)) ?></span>
-                            <span class="text-sm font-medium text-gray-900"><?= htmlspecialchars($profNome) ?></span>
-                        </div>
+                    data-status="<?= htmlspecialchars($meta[3]) ?>"
+                    data-envio="<?= (int) $dataEnvioTs ?>">
+                    <td class="px-4 sm:px-5 py-3.5 text-sm font-medium text-gray-900 whitespace-nowrap">
+                        <?= htmlspecialchars($profNome) ?>
                     </td>
-                    <td class="px-5 py-3.5">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold <?= $matCls ?>">
-                            <i class="fa-solid <?= $matIcon ?> text-[10px]" aria-hidden="true"></i>
+                    <td class="px-4 sm:px-5 py-3.5">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium <?= $matCls ?>">
                             <?= htmlspecialchars($matNome) ?>
                         </span>
                     </td>
-                    <td class="px-5 py-3.5">
+                    <td class="px-4 sm:px-5 py-3.5">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold <?= $meta[0] ?>">
                             <i class="fa-solid <?= $meta[1] ?> text-[10px]" aria-hidden="true"></i>
                             <?= htmlspecialchars($meta[2]) ?>
@@ -650,20 +638,20 @@ $totalLinhasOnline = count($linhasProvasOnline);
                         </div>
                         <?php endif; ?>
                     </td>
-                    <td class="px-5 py-3.5 whitespace-nowrap text-sm text-gray-600">
-                        <?php if (!empty($prova['data_envio'])): ?>
+                    <td class="px-4 sm:px-5 py-3.5 whitespace-nowrap text-sm text-gray-600">
+                        <?php if ($dataEnvioTs): ?>
                         <span class="inline-flex items-center gap-1.5">
                             <i class="fa-regular fa-calendar text-gray-400" aria-hidden="true"></i>
-                            <?= date('d/m/Y H:i', strtotime((string) $prova['data_envio'])) ?>
+                            <?= date('d/m/Y H:i', $dataEnvioTs) ?>
                         </span>
                         <?php else: ?>
                         —
                         <?php endif; ?>
                     </td>
-                    <td class="px-5 py-3.5 whitespace-nowrap text-sm text-gray-700 font-medium">
+                    <td class="px-4 sm:px-5 py-3.5 whitespace-nowrap text-sm text-gray-700 font-medium">
                         <?= (int) ($prova['numero_questoes'] ?? 0) ?>
                     </td>
-                    <td class="px-5 py-3.5 text-right">
+                    <td class="px-4 sm:px-5 py-3.5 text-right">
                         <div class="inline-flex items-center justify-end gap-2">
                             <?php if (!empty($prova['prova_id'])): ?>
                                 <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
@@ -684,12 +672,12 @@ $totalLinhasOnline = count($linhasProvasOnline);
                             <?php if ($podeAprovarReprovar): ?>
                                 <div class="relative">
                                     <button type="button"
-                                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50"
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-[#E5EAF1] text-gray-500 hover:bg-gray-50"
                                             onclick="toggleMenuAcoesProva('<?= $menuId ?>')"
                                             aria-label="Mais ações">
                                         <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
                                     </button>
-                                    <div id="<?= $menuId ?>" class="hidden absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                                    <div id="<?= $menuId ?>" class="hidden absolute right-0 mt-1 w-40 bg-white border border-[#E5EAF1] rounded-lg shadow-lg z-20 py-1">
                                         <button type="button" onclick="aprovarProva(<?= (int) $prova['prova_id'] ?>)"
                                                 class="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 inline-flex items-center gap-2">
                                             <i class="fa-solid fa-check text-emerald-600" aria-hidden="true"></i>
@@ -721,8 +709,9 @@ $totalLinhasOnline = count($linhasProvasOnline);
             </tbody>
         </table>
     </div>
-    <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-        <span id="contadorProvasTabela">Mostrando <?= $totalLinhasOnline ?> de <?= $totalLinhasOnline ?> registros</span>
+    <div class="px-4 sm:px-5 py-3 border-t border-[#E5EAF1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-500">
+        <span id="contadorProvasTabela">Mostrando <?= min($perPageOnline, $totalLinhasOnline) ?> de <?= $totalLinhasOnline ?> registros</span>
+        <div id="paginacaoProvasTabela" class="flex items-center gap-1" data-per-page="<?= (int) $perPageOnline ?>"></div>
     </div>
     <?php endif; ?>
 </div>
@@ -1025,31 +1014,85 @@ document.addEventListener('click', function (e) {
         var busca = document.getElementById(opts.buscaId);
         var materia = document.getElementById(opts.materiaId);
         var contador = document.getElementById(opts.contadorId);
+        var paginacao = opts.paginacaoId ? document.getElementById(opts.paginacaoId) : null;
+        var perPage = paginacao ? (parseInt(paginacao.getAttribute('data-per-page'), 10) || 8) : 0;
+        var paginaAtual = 1;
         var statusAtivo = '';
         var total = rows.length;
 
-        function aplicar() {
+        function linhasFiltradas() {
             var q = ((busca && busca.value) || '').toLowerCase().trim();
             var mat = ((materia && materia.value) || '').toLowerCase().trim();
-            var visiveis = 0;
-            rows.forEach(function (row) {
+            return rows.filter(function (row) {
                 var prof = row.getAttribute('data-professor') || '';
                 var matRow = row.getAttribute('data-materia') || '';
                 var st = row.getAttribute('data-status') || '';
                 var okBusca = !q || prof.indexOf(q) !== -1 || matRow.indexOf(q) !== -1;
                 var okMat = !mat || matRow === mat;
                 var okStatus = !statusAtivo || st === statusAtivo;
-                var show = okBusca && okMat && okStatus;
-                row.style.display = show ? '' : 'none';
-                if (show) visiveis++;
+                return okBusca && okMat && okStatus;
             });
-            if (contador) {
-                contador.textContent = 'Mostrando ' + visiveis + ' de ' + total + ' registros';
-            }
         }
 
-        if (busca) busca.addEventListener('input', aplicar);
-        if (materia) materia.addEventListener('change', aplicar);
+        function renderPaginacao(totalFiltrado) {
+            if (!paginacao || !perPage) return;
+            var totalPaginas = Math.max(1, Math.ceil(totalFiltrado / perPage));
+            if (paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+            if (totalPaginas <= 1) {
+                paginacao.innerHTML = '';
+                return;
+            }
+            var html = '';
+            html += '<button type="button" class="pg-btn w-8 h-8 rounded-lg border border-[#E5EAF1] text-gray-600 hover:bg-gray-50 disabled:opacity-40" data-page="prev" ' + (paginaAtual <= 1 ? 'disabled' : '') + ' aria-label="Anterior"><i class="fa-solid fa-chevron-left text-xs"></i></button>';
+            for (var i = 1; i <= totalPaginas; i++) {
+                var active = i === paginaAtual;
+                html += '<button type="button" class="pg-btn w-8 h-8 rounded-lg text-sm font-medium ' + (active ? 'btn-primary-custom' : 'border border-[#E5EAF1] text-gray-700 hover:bg-gray-50') + '" data-page="' + i + '">' + i + '</button>';
+            }
+            html += '<button type="button" class="pg-btn w-8 h-8 rounded-lg border border-[#E5EAF1] text-gray-600 hover:bg-gray-50 disabled:opacity-40" data-page="next" ' + (paginaAtual >= totalPaginas ? 'disabled' : '') + ' aria-label="Próxima"><i class="fa-solid fa-chevron-right text-xs"></i></button>';
+            paginacao.innerHTML = html;
+        }
+
+        function aplicar() {
+            var filtradas = linhasFiltradas();
+            var totalFiltrado = filtradas.length;
+            var inicio = 0;
+            var fim = totalFiltrado;
+
+            if (perPage > 0) {
+                var totalPaginas = Math.max(1, Math.ceil(totalFiltrado / perPage));
+                if (paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+                inicio = (paginaAtual - 1) * perPage;
+                fim = Math.min(inicio + perPage, totalFiltrado);
+            }
+
+            rows.forEach(function (row) {
+                row.style.display = 'none';
+            });
+            filtradas.forEach(function (row, idx) {
+                if (!perPage || (idx >= inicio && idx < fim)) {
+                    row.style.display = '';
+                }
+            });
+
+            if (contador) {
+                var mostrando = Math.max(0, fim - inicio);
+                contador.textContent = 'Mostrando ' + mostrando + ' de ' + totalFiltrado + ' registros';
+            }
+            renderPaginacao(totalFiltrado);
+        }
+
+        if (busca) {
+            busca.addEventListener('input', function () {
+                paginaAtual = 1;
+                aplicar();
+            });
+        }
+        if (materia) {
+            materia.addEventListener('change', function () {
+                paginaAtual = 1;
+                aplicar();
+            });
+        }
 
         document.querySelectorAll(opts.cardSelector || '').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -1061,9 +1104,28 @@ document.addEventListener('click', function (e) {
                     b.classList.toggle('is-active', active);
                     b.setAttribute('aria-pressed', active ? 'true' : 'false');
                 });
+                paginaAtual = 1;
                 aplicar();
             });
         });
+
+        if (paginacao) {
+            paginacao.addEventListener('click', function (e) {
+                var btn = e.target.closest('.pg-btn');
+                if (!btn || btn.disabled) return;
+                var page = btn.getAttribute('data-page');
+                var filtradas = linhasFiltradas();
+                var totalPaginas = Math.max(1, Math.ceil(filtradas.length / perPage));
+                if (page === 'prev') {
+                    paginaAtual = Math.max(1, paginaAtual - 1);
+                } else if (page === 'next') {
+                    paginaAtual = Math.min(totalPaginas, paginaAtual + 1);
+                } else {
+                    paginaAtual = parseInt(page, 10) || 1;
+                }
+                aplicar();
+            });
+        }
 
         aplicar();
     }
@@ -1073,6 +1135,7 @@ document.addEventListener('click', function (e) {
         buscaId: 'buscaProvasTabela',
         materiaId: 'filtroMateriaProvas',
         contadorId: 'contadorProvasTabela',
+        paginacaoId: 'paginacaoProvasTabela',
         cardSelector: '.card-filtro-status'
     });
 
@@ -1088,8 +1151,8 @@ document.addEventListener('click', function (e) {
 
 <style>
 .card-filtro-status.is-active {
-    border-color: #cbd5e1;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15);
 }
 .card-filtro-status.is-active .card-filtro-bar {
     opacity: 1;
