@@ -864,6 +864,24 @@ class BoletimConfig
         return $regra;
     }
 
+    public function atualizarNome(int $regraId, string $nome): void
+    {
+        if ($regraId <= 0) {
+            return;
+        }
+        $nome = mb_substr(trim($nome), 0, 150, 'UTF-8');
+        if ($nome === '') {
+            return;
+        }
+        $this->db->update(
+            'UPDATE boletim_regras SET nome = :nome WHERE id = :id AND ativo = 1',
+            [
+                'nome' => $nome,
+                'id' => $regraId,
+            ]
+        );
+    }
+
     public function saveRule(
         string $nome,
         string $formulaFinal,

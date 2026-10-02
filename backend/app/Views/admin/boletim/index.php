@@ -603,7 +603,18 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     <div class="flex items-start justify-between gap-3 flex-wrap">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Evento de Notas</h1>
-            <?php if (trim((string) ($regra['nome'] ?? '')) !== ''): ?>
+            <?php if ($selectedRegraId > 0 && !$modoArquivo): ?>
+            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/renomear" class="mt-2 flex flex-wrap items-center gap-2">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="regra_id" value="<?= $selectedRegraId ?>">
+                <label for="titulo-evento" class="sr-only">Título do evento</label>
+                <input id="titulo-evento" type="text" name="regra_nome" required maxlength="150"
+                       value="<?= htmlspecialchars((string) ($regra['nome'] ?? '')) ?>"
+                       class="w-full sm:w-96 h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="Nome que aparece no boletim">
+                <button type="submit" class="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Salvar título</button>
+            </form>
+            <?php elseif (trim((string) ($regra['nome'] ?? '')) !== ''): ?>
             <p class="text-sm text-gray-700 mt-1"><?= htmlspecialchars((string) $regra['nome']) ?></p>
             <?php endif; ?>
             <p class="text-sm text-gray-500 mt-1">As fórmulas ficam em Configurar Notas. Depois gere o período em lote.</p>

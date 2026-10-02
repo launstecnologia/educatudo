@@ -1408,6 +1408,28 @@ class BoletimConfigController extends BaseController
         exit;
     }
 
+    public function renomearRegra(): void
+    {
+        $this->assertCsrfOrRedirect();
+        $regraId = (int) ($_POST['regra_id'] ?? 0);
+        $nome = trim((string) ($_POST['regra_nome'] ?? ''));
+        $voltar = '/admin/boletim-configuracao' . ($regraId > 0 ? ('?regra_id=' . $regraId) : '');
+        if ($regraId <= 0 || $this->boletimConfig->getRuleById($regraId) === null) {
+            $_SESSION['boletim_flash'] = 'Evento não encontrado.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect('/admin/boletim-configuracao');
+        }
+        if ($nome === '') {
+            $_SESSION['boletim_flash'] = 'Informe o título do evento.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($voltar);
+        }
+        $this->boletimConfig->atualizarNome($regraId, $nome);
+        $_SESSION['boletim_flash'] = 'Título atualizado.';
+        $_SESSION['boletim_flash_type'] = 'success';
+        $this->redirect($voltar);
+    }
+
     public function salvarRegra()
     {
         $this->assertCsrfOrRedirect();
