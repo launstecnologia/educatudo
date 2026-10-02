@@ -89,9 +89,9 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                 Aprovação Final
             </button>
             <?php endif; ?>
-            <a href="<?= URL ?>/admin/provas" 
-               class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
-                Voltar
+            <a href="<?= URL ?>/admin/provas"
+               class="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                ← Voltar
             </a>
         </div>
     </div>
@@ -465,120 +465,153 @@ $statusMapLancamento = [
     </div>
 </div>
 
-<!-- Provas Agrupadas por Matéria -->
-<?php foreach ($provasPorMateria as $materiaNome => $provasMateria): ?>
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4"><?= htmlspecialchars($materiaNome) ?></h3>
-    
+<!-- Provas: tabela unificada (Professor × Matéria) -->
+<?php
+$linhasProvasOnline = [];
+foreach ($provasPorMateria ?? [] as $materiaNome => $provasMateria) {
+    foreach ($provasMateria as $prova) {
+        if (empty($prova['materia_nome'])) {
+            $prova['materia_nome'] = $materiaNome;
+        }
+        $linhasProvasOnline[] = $prova;
+    }
+}
+usort($linhasProvasOnline, static function (array $a, array $b): int {
+    $cmp = strcasecmp((string) ($a['materia_nome'] ?? ''), (string) ($b['materia_nome'] ?? ''));
+    if ($cmp !== 0) {
+        return $cmp;
+    }
+    return strcasecmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
+});
+$statusClassesOnline = [
+    'nao_avaliada' => 'bg-yellow-100 text-yellow-800',
+    'aprovado' => 'bg-green-100 text-green-800',
+    'em_andamento' => 'bg-blue-100 text-blue-800',
+    'concluido' => 'bg-purple-100 text-purple-800',
+    'reprovada' => 'bg-orange-100 text-orange-800',
+    'nao_enviada' => 'bg-red-100 text-red-800',
+    'retornada' => 'bg-amber-100 text-amber-800',
+    'pendente' => 'bg-amber-100 text-amber-800',
+];
+$statusLabelsOnline = [
+    'nao_avaliada' => 'Enviada',
+    'aprovado' => 'Aprovada',
+    'em_andamento' => 'Em Andamento',
+    'concluido' => 'Concluída',
+    'reprovada' => 'Prova excluída',
+    'nao_enviada' => 'Não Enviada',
+    'retornada' => 'Retornada ao professor',
+    'pendente' => 'Aguardando envio',
+];
+?>
+<div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Provas por professor e matéria</h3>
+        <p class="text-sm text-gray-600 mt-0.5">Acompanhe o status de cada prova e gerencie vínculos, trocas e aprovações.</p>
+    </div>
+    <?php if ($linhasProvasOnline === []): ?>
+    <div class="px-6 py-8 text-center text-gray-500">Nenhuma prova encontrada para este filtro.</div>
+    <?php else: ?>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data Envio</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matéria</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data envio</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Questões</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                <?php foreach ($provasMateria as $prova): ?>
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($prova['professor_nome']) ?></div>
+                <?php foreach ($linhasProvasOnline as $prova): ?>
+                <?php
+                $statusExibicao = $prova['status'] ?? 'nao_enviada';
+                $statusClass = $statusClassesOnline[$statusExibicao] ?? 'bg-gray-100 text-gray-800';
+                $statusLabel = $statusLabelsOnline[$statusExibicao] ?? $statusExibicao;
+                $statusOriginalAcoes = $prova['status_original'] ?? '';
+                $podeAprovarReprovar = in_array($statusOriginalAcoes, ['enviada', 'aguardando_aprovacao', 'pendente', 'agendada'], true)
+                    && !empty($prova['prova_id']);
+                ?>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                        <?= htmlspecialchars((string) ($prova['professor_nome'] ?? '')) ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <?php
-                        // Mesmos rótulos dos cards da tela: Em Andamento, Enviadas, Não Enviadas, Aprovadas, Provas Excluídas
-                        $statusClasses = [
-                            'nao_avaliada' => 'bg-yellow-100 text-yellow-800',
-                            'aprovado' => 'bg-green-100 text-green-800',
-                            'em_andamento' => 'bg-blue-100 text-blue-800',
-                            'concluido' => 'bg-purple-100 text-purple-800',
-                            'reprovada' => 'bg-orange-100 text-orange-800',
-                            'nao_enviada' => 'bg-red-100 text-red-800',
-                            'retornada' => 'bg-amber-100 text-amber-800',
-                            'pendente' => 'bg-amber-100 text-amber-800'
-                        ];
-                        $statusLabels = [
-                            'nao_avaliada' => 'Enviada',
-                            'aprovado' => 'Aprovada',
-                            'em_andamento' => 'Em Andamento',
-                            'concluido' => 'Concluída',
-                            'reprovada' => 'Prova excluída',
-                            'nao_enviada' => 'Não Enviada',
-                            'retornada' => 'Retornada ao professor',
-                            'pendente' => 'Aguardando envio'
-                        ];
-                        $statusExibicao = $prova['status'] ?? 'nao_enviada';
-                        $statusClass = $statusClasses[$statusExibicao] ?? 'bg-gray-100 text-gray-800';
-                        $statusLabel = $statusLabels[$statusExibicao] ?? $statusExibicao;
-                        ?>
-                        <span class="px-2 py-1 text-xs font-semibold rounded-full <?= $statusClass ?>">
-                            <?= $statusLabel ?>
-                        </span>
+                    <td class="px-6 py-4 text-sm text-gray-800">
+                        <?= htmlspecialchars((string) ($prova['materia_nome'] ?? '')) ?>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full <?= $statusClass ?>">
+                                <?= htmlspecialchars($statusLabel) ?>
+                            </span>
+                            <?php if (!empty($prova['travada'])): ?>
+                                <span class="text-red-600" title="Travada"><i class="fa-solid fa-lock text-xs" aria-hidden="true"></i></span>
+                            <?php endif; ?>
+                        </div>
                         <?php if (($prova['status'] ?? '') === 'retornada' && !empty($prova['observacao_coordenacao'])): ?>
-                        <div class="text-xs text-amber-700 mt-1 max-w-md" title="<?= htmlspecialchars($prova['observacao_coordenacao']) ?>">
-                            <?= htmlspecialchars(mb_substr($prova['observacao_coordenacao'], 0, 60)) ?><?= mb_strlen($prova['observacao_coordenacao']) > 60 ? '...' : '' ?>
+                        <div class="text-xs text-amber-700 mt-1 max-w-md" title="<?= htmlspecialchars((string) $prova['observacao_coordenacao']) ?>">
+                            <?= htmlspecialchars(mb_substr((string) $prova['observacao_coordenacao'], 0, 60)) ?><?= mb_strlen((string) $prova['observacao_coordenacao']) > 60 ? '...' : '' ?>
                         </div>
                         <?php endif; ?>
-                        <?php if ($prova['travada'] ?? false): ?>
-                            <span class="ml-2 text-red-600" title="Travada">🔒</span>
-                        <?php endif; ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?= $prova['data_envio'] ? date('d/m/Y H:i', strtotime($prova['data_envio'])) : '-' ?>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <?= !empty($prova['data_envio']) ? date('d/m/Y H:i', strtotime((string) $prova['data_envio'])) : '—' ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <?= $prova['numero_questoes'] ?>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <?= (int) ($prova['numero_questoes'] ?? 0) ?>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <?php if ($prova['prova_id']): ?>
-                            <a href="<?= URL ?>/admin/provas/visualizar/<?= $prova['prova_id'] ?>" 
-                               class="text-blue-600 hover:text-blue-900 mr-3">
-                                Ver Prova
-                            </a>
-                            <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
-                                <button type="button" 
-                                        onclick="abrirModalTrocar(<?= (int)$bloco['id'] ?>, <?= (int)$prova['professor_id'] ?>, <?= (int)$prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes($prova['professor_nome'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($prova['materia_nome'] ?? '')) ?>', <?= (int)$prova['prova_id'] ?>)"
-                                        class="text-amber-600 hover:text-amber-900 font-medium">
-                                    Trocar prova
+                    <td class="px-6 py-4 text-right">
+                        <div class="inline-flex flex-wrap justify-end gap-2">
+                            <?php if (!empty($prova['prova_id'])): ?>
+                                <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
+                                   class="inline-flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700">
+                                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                    Ver prova
+                                </a>
+                                <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
+                                <button type="button"
+                                        onclick="abrirModalTrocar(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>', <?= (int) $prova['prova_id'] ?>)"
+                                        class="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700">
+                                    <i class="fa-solid fa-right-left" aria-hidden="true"></i>
+                                    Trocar
                                 </button>
+                                <?php endif; ?>
                             <?php endif; ?>
-                        <?php endif; ?>
-                        
-                        <?php 
-                        // Mostra botões de aprovar/reprovar para provas enviadas OU ainda pendentes/agendadas (coordenação pode aprovar mesmo sem envio)
-                        $statusOriginalAcoes = $prova['status_original'] ?? '';
-                        $podeAprovarReprovar = in_array($statusOriginalAcoes, ['enviada', 'aguardando_aprovacao', 'pendente', 'agendada']) && $prova['prova_id'];
-                        if ($podeAprovarReprovar): ?>
-                            <button onclick="aprovarProva(<?= $prova['prova_id'] ?>)" 
-                                    class="text-green-600 hover:text-green-900 mr-3">
-                                ✅ Aprovar
-                            </button>
-                            <button onclick="reprovarProva(<?= $prova['prova_id'] ?>)" 
-                                    class="text-red-600 hover:text-red-900">
-                                ❌ Reprovar
-                            </button>
-                        <?php elseif ($prova['status'] === 'nao_enviada'): ?>
-                            <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
-                                <button type="button" 
-                                        onclick="abrirModalVincular(<?= (int)$bloco['id'] ?>, <?= (int)$prova['professor_id'] ?>, <?= (int)$prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes($prova['professor_nome'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($prova['materia_nome'] ?? '')) ?>')"
-                                        class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                    🔗 Vincular prova
+
+                            <?php if ($podeAprovarReprovar): ?>
+                                <button type="button" onclick="aprovarProva(<?= (int) $prova['prova_id'] ?>)"
+                                        class="inline-flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700">
+                                    <i class="fa-solid fa-check" aria-hidden="true"></i>
+                                    Aprovar
                                 </button>
-                            <?php else: ?>
-                                <span class="text-gray-400 italic">Aguardando criação da prova</span>
+                                <button type="button" onclick="reprovarProva(<?= (int) $prova['prova_id'] ?>)"
+                                        class="inline-flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                    Reprovar
+                                </button>
+                            <?php elseif (($prova['status'] ?? '') === 'nao_enviada'): ?>
+                                <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
+                                <button type="button"
+                                        onclick="abrirModalVincular(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>')"
+                                        class="btn-primary-custom inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                                    <i class="fa-solid fa-link" aria-hidden="true"></i>
+                                    Vincular
+                                </button>
+                                <?php else: ?>
+                                <span class="text-sm text-gray-400 italic">Aguardando criação</span>
+                                <?php endif; ?>
                             <?php endif; ?>
-                        <?php endif; ?>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+    <?php endif; ?>
 </div>
-<?php endforeach; ?>
 
 <?php endif; ?>
 
