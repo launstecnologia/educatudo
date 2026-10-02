@@ -120,28 +120,21 @@ class BoletimConfigController extends BaseController
             $ordemLista = '';
         }
         $dirLista = strtolower(trim((string) ($_GET['dir'] ?? 'asc'))) === 'desc' ? 'desc' : 'asc';
-        $exibirBloqueados = (string) ($_GET['bloqueados'] ?? '') === '1';
-        $exibirDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
+        $exibirDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1'
+            || (string) ($_GET['bloqueados'] ?? '') === '1';
 
         $eventos = $this->boletimConfig->listAllRules(300);
         $eventos = array_values(array_filter($eventos, static function ($ev) {
             return strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim'))) === 'notas';
         }));
-        $eventos = array_values(array_filter($eventos, function ($ev) use ($exibirBloqueados, $exibirDesabilitados) {
+        $eventos = array_values(array_filter($eventos, function ($ev) use ($exibirDesabilitados) {
             $ev = is_array($ev) ? $ev : [];
-            $desabilitado = $this->eventoOcultoNaListaAvaliacoes($ev);
-            $bloqueado = $this->eventoBloqueadoNaExibicao($ev);
-            if (!$desabilitado && !$bloqueado) {
-                return true;
-            }
-            if ($bloqueado && $exibirBloqueados) {
-                return true;
-            }
-            if ($desabilitado && $exibirDesabilitados) {
+            $foraDaLista = $this->eventoOcultoNaListaAvaliacoes($ev) || $this->eventoBloqueadoNaExibicao($ev);
+            if (!$foraDaLista) {
                 return true;
             }
 
-            return false;
+            return $exibirDesabilitados;
         }));
 
         $nomesBoletim = [];
@@ -300,7 +293,6 @@ class BoletimConfigController extends BaseController
             'series_catalogo' => $seriesCatalogo,
             'ordem_lista' => $ordemLista,
             'dir_lista' => $dirLista,
-            'exibir_bloqueados' => $exibirBloqueados,
             'exibir_desabilitados' => $exibirDesabilitados,
             'pagination' => [
                 'total' => $total,
@@ -1929,13 +1921,15 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirect('/admin/boletim');
         }
-        $ok = $this->boletimConfig->mesclarExtrasJson($regraId, [
+        $okLista = $this->boletimConfig->mesclarExtrasJson($regraId, [
             'oculto_lista_avaliacoes' => $oculto ? 1 : 0,
         ]);
+        $okVis = $this->boletimConfig->atualizarVisibilidadeCoordenacao($regraId, $oculto ? 0 : 1);
+        $ok = $okLista || $okVis;
         if ($ok) {
             $_SESSION['boletim_flash'] = $oculto
-                ? 'Evento desabilitado. Ele saiu desta lista e de Notas da Coordenação. As notas já geradas continuam no aluno.'
-                : 'Evento habilitado de novo nesta lista e em Notas da Coordenação.';
+                ? 'Evento desabilitado. Ele saiu desta lista, de Notas da Coordenação e da exibição da coordenação. As notas já geradas continuam no aluno.'
+                : 'Evento habilitado de novo nesta lista, em Notas da Coordenação e na exibição da coordenação.';
             $_SESSION['boletim_flash_type'] = 'success';
         } else {
             $_SESSION['boletim_flash'] = 'Não foi possível alterar o evento.';
@@ -2015,7 +2009,7 @@ class BoletimConfigController extends BaseController
             $ok = $this->boletimConfig->updateRuleVisibility($regraId, $visivel, $visivel, null);
             if ($ok) {
                 $_SESSION['boletim_flash'] = $visivel
-                    ? 'Evento liberado para alunos e pais visualizarem.'
+                    ? 'Evento disponibilizado para alunos e pais.'
                     : 'Evento ocultado para alunos e pais.';
                 $_SESSION['boletim_flash_type'] = 'success';
             } else {

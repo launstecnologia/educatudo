@@ -24,7 +24,6 @@ $flashType = (string) ($flash_type ?? 'success');
 $temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
 $geracaoJobIds = array_values(array_filter(array_map('intval', $geracao_job_ids ?? [])));
 $geracaoConcluidaMsg = trim((string) ($geracao_concluida_msg ?? ''));
-$exibirBloqueados = !empty($exibir_bloqueados);
 $exibirDesabilitados = !empty($exibir_desabilitados);
 $filtrosAtivosCount = 0;
 foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
@@ -33,9 +32,6 @@ foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     }
 }
 if ($filtroSerieId > 0) {
-    $filtrosAtivosCount++;
-}
-if ($exibirBloqueados) {
     $filtrosAtivosCount++;
 }
 if ($exibirDesabilitados) {
@@ -187,10 +183,6 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
             <div class="space-y-3 pt-1">
                 <p class="text-sm font-medium text-gray-700">Também exibir</p>
                 <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input type="checkbox" name="bloqueados" value="1" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" <?= $exibirBloqueados ? 'checked' : '' ?>>
-                    Bloqueados
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                     <input type="checkbox" name="desabilitados" value="1" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" <?= $exibirDesabilitados ? 'checked' : '' ?>>
                     Desabilitados
                 </label>
@@ -226,13 +218,6 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
 <form id="form-duplicar-evento-boletim" method="POST" action="<?= URL ?>/admin/boletim-configuracao/duplicar-regra" class="hidden" aria-hidden="true">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
     <input type="hidden" name="regra_id" id="duplicar-evento-regra-id" value="">
-</form>
-
-<!-- Bloquear exibição fora desta lista (form compartilhado) -->
-<form id="form-bloquear-exibicao-evento" method="POST" action="<?= URL ?>/admin/boletim-configuracao/visibilidade-regra" class="hidden" aria-hidden="true">
-    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
-    <input type="hidden" name="regra_id" id="bloquear-exibicao-regra-id" value="">
-    <input type="hidden" name="bloquear_exibicao" id="bloquear-exibicao-valor" value="">
 </form>
 
 <!-- Visibilidade para aluno/pais (form compartilhado) -->
@@ -331,8 +316,8 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $ehExtra ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' ?>">
                                 <?= $ehExtra ? 'Modelo Extra' : 'Modelo Oficial' ?>
                             </span>
-                            <?php if ($exibicaoBloqueada): ?>
-                            <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800">Exibição bloqueada</span>
+                            <?php if ($exibicaoBloqueada || !empty($evento['oculto_lista_avaliacoes'])): ?>
+                            <span class="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800">Desabilitado</span>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -372,23 +357,17 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                         </button>
                         <?php
                         $liberadoAlunoPaisMenu = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1);
-                        $exibicaoBloqueadaMenu = (int) ($evento['vis_coordenacao'] ?? 1) !== 1;
+                        $eventoForaDaLista = !empty($evento['oculto_lista_avaliacoes']) || (int) ($evento['vis_coordenacao'] ?? 1) !== 1;
                         ?>
-                        <button type="button" onclick="bloquearExibicaoEventoBoletim(<?= $eventoId ?>, <?= $exibicaoBloqueadaMenu ? 0 : 1 ?>)"
-                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid <?= $exibicaoBloqueadaMenu ? 'fa-lock-open' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
-                            <?= $exibicaoBloqueadaMenu ? 'Liberar exibição' : 'Bloquear exibição' ?>
-                        </button>
                         <button type="button" onclick="alterarVisibilidadeEventoBoletim(<?= $eventoId ?>, <?= $liberadoAlunoPaisMenu ? 0 : 1 ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
-                            <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Liberar para alunos/pais' ?>
+                            <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Disponibilizar' ?>
                         </button>
-                        <?php $eventoDesabilitadoMenu = !empty($evento['oculto_lista_avaliacoes']); ?>
-                        <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $eventoDesabilitadoMenu ? 0 : 1 ?>)"
+                        <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $eventoForaDaLista ? 0 : 1 ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid <?= $eventoDesabilitadoMenu ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
-                            <?= $eventoDesabilitadoMenu ? 'Habilitar nesta lista' : 'Desabilitar' ?>
+                            <i class="fa-solid <?= $eventoForaDaLista ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
+                            <?= $eventoForaDaLista ? 'Habilitar' : 'Desabilitar' ?>
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <?php if ($geracaoEmAndamento): ?>
@@ -520,22 +499,10 @@ function excluirEventoBoletim(id) {
     document.getElementById('form-excluir-evento-boletim').submit();
 }
 
-function bloquearExibicaoEventoBoletim(id, bloquear) {
-    const acao = Number(bloquear) === 1
-        ? 'Bloquear a exibição deste evento? Ele sai desta lista de avaliações e de Notas da Coordenação. As notas já geradas continuam no aluno.'
-        : 'Liberar a exibição deste evento? Ele volta para esta lista e para Notas da Coordenação.';
-    if (!confirm(acao)) {
-        return;
-    }
-    document.getElementById('bloquear-exibicao-regra-id').value = id;
-    document.getElementById('bloquear-exibicao-valor').value = Number(bloquear) === 1 ? '1' : '0';
-    document.getElementById('form-bloquear-exibicao-evento').submit();
-}
-
 function desabilitarEventoLista(id, oculto) {
     const acao = Number(oculto) === 1
-        ? 'Desabilitar este evento? Ele sai desta lista de avaliações e de Notas da Coordenação. As notas já geradas continuam no aluno.'
-        : 'Habilitar este evento de novo nesta lista e em Notas da Coordenação?';
+        ? 'Desabilitar este evento? Ele sai desta lista, de Notas da Coordenação e da exibição da coordenação. As notas já geradas continuam no aluno.'
+        : 'Habilitar este evento de novo nesta lista, em Notas da Coordenação e na exibição da coordenação?';
     if (!confirm(acao)) {
         return;
     }
@@ -545,7 +512,7 @@ function desabilitarEventoLista(id, oculto) {
 }
 
 function alterarVisibilidadeEventoBoletim(id, visivel) {
-    const acao = Number(visivel) === 1 ? 'liberar para alunos e pais visualizarem' : 'ocultar de alunos e pais';
+    const acao = Number(visivel) === 1 ? 'disponibilizar para alunos e pais' : 'ocultar de alunos e pais';
     if (!confirm('Deseja ' + acao + ' este evento?')) {
         return;
     }
