@@ -2690,11 +2690,31 @@ $boletimWizardSteps = [
     /**
      * Demonstrativo: mãe (médias) + filhos aninhados. Se o servidor já mandou eh_grupo_pai, mantém.
      */
+    function materiasDaAreaAtiva() {
+        var gl = (estado && estado.grupo_linha) || grupoLinhaPadrao();
+        var fams = familiasDoEscopo();
+        if (!fams.length) return materiasCatalogoDoEscopo();
+        var escolhida = null;
+        fams.forEach(function (f) {
+            if (idsGrupoIguais(gl.materias_ids, f.materias_ids)) escolhida = f;
+        });
+        if (!escolhida) {
+            fams.forEach(function (f) {
+                var hit = (f.materias_ids || []).some(function (id) {
+                    return (gl.materias_ids || []).some(function (x) { return Number(x) === Number(id); });
+                });
+                if (hit) escolhida = f;
+            });
+        }
+        if (!escolhida && fams.length === 1) escolhida = fams[0];
+        if (!escolhida) return materiasCatalogoDoEscopo();
+        return (escolhida.filhos || []).map(function (ch) {
+            return { id: Number(ch.id), nome: ch.nome || '' };
+        }).filter(function (m) { return m.id > 0 && m.nome; });
+    }
+
     function linhasDoDemonstrativo(brutas, outras, semanas) {
         var lista = (brutas || []).slice();
-        if (lista.some(function (l) { return l && l.eh_grupo_pai; })) {
-            return lista;
-        }
         var gl = (estado && estado.grupo_linha) || {};
         if (!gl.ativo || !(gl.materias_ids || []).length) {
             return lista;
@@ -2705,16 +2725,51 @@ $boletimWizardSteps = [
             if (id > 0) idsGrupo[id] = true;
         });
         var nomesGrupo = {};
+        var nomePorId = {};
         (catalogo.materias || []).forEach(function (m) {
-            if (idsGrupo[Number(m.id)]) nomesGrupo[chaveNomeMateria(m.nome)] = true;
+            var id = Number(m.id);
+            if (!idsGrupo[id]) return;
+            nomesGrupo[chaveNomeMateria(m.nome)] = true;
+            nomePorId[id] = m.nome;
         });
+        var filhosNaLista = 0;
+        var temPai = false;
+        lista.forEach(function (lin) {
+            if (!lin) return;
+            if (lin.eh_grupo_pai) temPai = true;
+            if (idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)]) filhosNaLista++;
+        });
+        if (temPai && filhosNaLista >= 2) {
+            return lista;
+        }
+        Object.keys(idsGrupo).forEach(function (id) {
+            id = Number(id);
+            var nome = nomePorId[id] || '';
+            var kn = chaveNomeMateria(nome);
+            var ja = lista.some(function (lin) {
+                if (!lin || lin.eh_grupo_pai) return false;
+                return Number(lin.materia_id) === id || (kn && chaveNomeMateria(lin.materia_nome) === kn);
+            });
+            if (!ja && nome) {
+                lista.push({ materia_id: id, materia_nome: nome, notas: {} });
+            }
+        });
+        var notasMae = null;
+        lista.forEach(function (lin) {
+            if (lin && lin.eh_grupo_pai && lin.notas) notasMae = lin.notas;
+        });
+        var nomeMae = chaveNomeMateria(gl.nome);
         var membros = [];
         var out = [];
         var pos = -1;
         lista.forEach(function (lin) {
-            if (!lin) return;
+            if (!lin || lin.eh_grupo_pai) return;
             var entra = idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)];
             if (!entra) {
+                if (nomeMae && chaveNomeMateria(lin.materia_nome) === nomeMae && !idsGrupo[Number(lin.materia_id)]) {
+                    if (!notasMae) notasMae = lin.notas || null;
+                    return;
+                }
                 out.push(lin);
                 return;
             }
@@ -2728,14 +2783,23 @@ $boletimWizardSteps = [
                 grupo_pai_nome: String(gl.nome || 'Grupo').trim() || 'Grupo'
             }));
         });
-        if (membros.length < 2 || pos < 0) return lista;
+        if (membros.length < 2 || pos < 0) return (brutas || []).slice();
         membros.sort(function (a, b) {
             return chaveNomeMateria(a.materia_nome).localeCompare(chaveNomeMateria(b.materia_nome));
         });
+        var notasPai = agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', semanas);
+        if (notasMae) {
+            Object.keys(notasMae).forEach(function (cod) {
+                var atual = notasPai[cod];
+                if ((atual == null || atual === '') && notasMae[cod] != null && notasMae[cod] !== '') {
+                    notasPai[cod] = notasMae[cod];
+                }
+            });
+        }
         var pai = {
             materia_id: 0,
             materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
-            notas: agregarNotasLinhas(membros, outras, gl.modo === 'soma' ? 'soma' : 'media', semanas),
+            notas: notasPai,
             eh_grupo_pai: 1,
             eh_grupo_filho: 0
         };
@@ -3828,11 +3892,11 @@ $boletimWizardSteps = [
                 html += '<div><span class="text-xs font-medium text-gray-600">Matérias nesta área (neste evento)</span>';
                 html += '<p class="text-xs text-gray-500 mt-0.5 mb-2">Altera só este Evento de Notas (este bimestre). Os outros bimestres não mudam. Marque ou desmarque para incluir/excluir filhas.</p>';
                 html += '<div class="grid sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-white">';
-                materiasCatalogoDoEscopo().forEach(function (m) {
+                materiasDaAreaAtiva().forEach(function (m) {
                     var on = (gl.materias_ids || []).some(function (id) { return Number(id) === Number(m.id); });
                     html += '<label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" class="bw-grupo-materia rounded border-gray-300 text-indigo-600" value="' + m.id + '"' + (on ? ' checked' : '') + '> ' + esc(m.nome) + '</label>';
                 });
-                if (!materiasCatalogoDoEscopo().length) {
+                if (!materiasDaAreaAtiva().length) {
                     html += '<p class="text-xs text-gray-500">Nenhuma matéria neste boletim.</p>';
                 }
                 html += '</div></div>';

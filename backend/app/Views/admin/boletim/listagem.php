@@ -4,6 +4,8 @@ $csrfToken = (string) ($csrf_token ?? '');
 $filtroNome = (string) ($filtro_nome ?? '');
 $filtroAno = (string) ($filtro_ano ?? '');
 $filtroBimestre = (string) ($filtro_bimestre ?? '');
+$filtroSerieId = (int) ($filtro_serie_id ?? 0);
+$seriesCatalogo = is_array($series_catalogo ?? null) ? $series_catalogo : [];
 $flashMessage = (string) ($flash_message ?? '');
 $flashType = (string) ($flash_type ?? 'success');
 $temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
@@ -16,6 +18,9 @@ foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
     if ($fv !== '') {
         $filtrosAtivosCount++;
     }
+}
+if ($filtroSerieId > 0) {
+    $filtrosAtivosCount++;
 }
 if ($exibirBloqueados) {
     $filtrosAtivosCount++;
@@ -172,6 +177,22 @@ $duracaoGeracao = static function (?string $inicio, ?string $fim): ?string {
                 <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars(PeriodoLetivo::doAno((int) ($filtroAno !== '' ? $filtroAno : date('Y')))['rotulo_campo']) ?></label>
                 <select id="filtro_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <?= PeriodoLetivo::optionsHtml((int) ($filtroAno !== '' ? $filtroAno : date('Y')), (int) $filtroBimestre, ['todos' => true]) ?>
+                </select>
+            </div>
+            <div>
+                <label for="filtro_serie" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
+                <select id="filtro_serie" name="serie_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Todas</option>
+                    <?php foreach ($seriesCatalogo as $serieFiltro): ?>
+                        <?php
+                        $sidFiltro = (int) ($serieFiltro['id'] ?? 0);
+                        $nomeFiltro = trim((string) ($serieFiltro['nome'] ?? ''));
+                        if ($sidFiltro <= 0 || $nomeFiltro === '') {
+                            continue;
+                        }
+                        ?>
+                        <option value="<?= $sidFiltro ?>" <?= $filtroSerieId === $sidFiltro ? 'selected' : '' ?>><?= htmlspecialchars($nomeFiltro) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div class="space-y-3 pt-1">

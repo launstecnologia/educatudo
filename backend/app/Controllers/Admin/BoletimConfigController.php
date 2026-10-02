@@ -114,6 +114,7 @@ class BoletimConfigController extends BaseController
         $filtroNome = trim((string) ($_GET['nome'] ?? ''));
         $filtroAno = trim((string) ($_GET['ano_letivo'] ?? ''));
         $filtroBimestre = trim((string) ($_GET['bimestre'] ?? ''));
+        $filtroSerieId = (int) ($_GET['serie_id'] ?? 0);
         $exibirBloqueados = (string) ($_GET['bloqueados'] ?? '') === '1';
         $exibirDesabilitados = (string) ($_GET['desabilitados'] ?? '') === '1';
 
@@ -168,8 +169,28 @@ class BoletimConfigController extends BaseController
         }
 
         $seriesNomesPorId = [];
+        $seriesCatalogo = [];
         foreach ($this->boletimConfig->getAvailableSeries(300) as $serie) {
-            $seriesNomesPorId[(int) ($serie['id'] ?? 0)] = trim((string) ($serie['nome'] ?? ''));
+            $sid = (int) ($serie['id'] ?? 0);
+            $nomeSerie = trim((string) ($serie['nome'] ?? ''));
+            if ($sid <= 0 || $nomeSerie === '') {
+                continue;
+            }
+            $seriesNomesPorId[$sid] = $nomeSerie;
+            $seriesCatalogo[] = ['id' => $sid, 'nome' => $nomeSerie];
+        }
+        if ($filtroSerieId > 0 && !isset($seriesNomesPorId[$filtroSerieId])) {
+            $filtroSerieId = 0;
+        }
+        if ($filtroSerieId > 0) {
+            $eventos = array_values(array_filter($eventos, function ($ev) use ($filtroSerieId) {
+                $ids = $this->parseSeriesIdsFromRegra(is_array($ev) ? $ev : []);
+                if ($ids === []) {
+                    return true;
+                }
+
+                return in_array($filtroSerieId, $ids, true);
+            }));
         }
         $ultimaGeracaoPorRegra = $this->boletimConfig->getUltimaGeracaoPorRegra();
         $statusGeracaoPorRegra = $this->boletimConfig->mapearStatusGeracaoAssincrona();
@@ -235,6 +256,8 @@ class BoletimConfigController extends BaseController
             'filtro_nome' => $filtroNome,
             'filtro_ano' => $filtroAno,
             'filtro_bimestre' => $filtroBimestre,
+            'filtro_serie_id' => $filtroSerieId,
+            'series_catalogo' => $seriesCatalogo,
             'exibir_bloqueados' => $exibirBloqueados,
             'exibir_desabilitados' => $exibirDesabilitados,
             'pagination' => [
@@ -5896,6 +5919,24 @@ class BoletimConfigController extends BaseController
                 }
             }
         }
+        // No demonstrativo (sem colapsar group_line), a mãe-rótulo continua na matriz
+        // só para a hierarquia herdar a nota. A linha solta "Língua Portuguesa" não fica.
+        $labelsGrupoDemonstrativo = [];
+        if ($pularAgrupamentoLinhas) {
+            foreach ($componentesRegra as $compLbl) {
+                if (!is_array($compLbl)) {
+                    continue;
+                }
+                $grpLbl = $this->parseGroupLineConfigFromComponente($compLbl);
+                if ($grpLbl === null) {
+                    continue;
+                }
+                $labelKey = $this->canonicalMateriaNomeKey((string) ($grpLbl['label'] ?? ''));
+                if ($labelKey !== '') {
+                    $labelsGrupoDemonstrativo[$labelKey] = true;
+                }
+            }
+        }
         // Remove órfãos / pais-rótulo que já entraram via nota sem nome resolvido.
         foreach (array_keys($allMids) as $midLimpeza) {
             $midLimpeza = (int) $midLimpeza;
@@ -5903,8 +5944,12 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             if (isset($idsRotuloPai[$midLimpeza])) {
-                unset($allMids[$midLimpeza]);
-                continue;
+                $nomeRotulo = (string) ($materiaNomesPorId[$midLimpeza] ?? ($nomesCatalogoById[$midLimpeza] ?? ''));
+                $nomeRotuloKey = $this->canonicalMateriaNomeKey($nomeRotulo);
+                if ($nomeRotuloKey === '' || !isset($labelsGrupoDemonstrativo[$nomeRotuloKey])) {
+                    unset($allMids[$midLimpeza]);
+                    continue;
+                }
             }
             $nomeLimpeza = trim((string) ($materiaNomesPorId[$midLimpeza] ?? ($nomesCatalogoById[$midLimpeza] ?? '')));
             if ($nomeLimpeza === '' || preg_match('/^Matéria #\d+$/u', $nomeLimpeza) === 1) {
@@ -5950,6 +5995,85 @@ class BoletimConfigController extends BaseController
             $midsOrdenados = array_values(array_filter($midsOrdenados, static function (int $mid) use ($set) {
                 return $mid <= 0 || isset($set[$mid]);
             }));
+        }
+        // Filhas marcadas na linha única entram mesmo se o modelo só tinha o pai
+        // (a nota pode estar no id da filha e o filtro do boletim ter ficado no rótulo).
+        if ($pularAgrupamentoLinhas) {
+            $idsGrupoLinha = [];
+            $labelsGrupoLinha = [];
+            foreach ($componentesRegra as $compGl) {
+                if (!is_array($compGl)) {
+                    continue;
+                }
+                $grpGl = $this->parseGroupLineConfigFromComponente($compGl);
+                if ($grpGl === null) {
+                    continue;
+                }
+                $labelGl = $this->canonicalMateriaNomeKey((string) ($grpGl['label'] ?? ''));
+                if ($labelGl !== '') {
+                    $labelsGrupoLinha[$labelGl] = true;
+                }
+                foreach ((array) ($grpGl['materias_ids'] ?? []) as $midGl) {
+                    $midGl = (int) $midGl;
+                    if ($midGl > 0) {
+                        $idsGrupoLinha[$midGl] = true;
+                    }
+                }
+            }
+            $jaOrdenado = array_fill_keys(array_map('intval', $midsOrdenados), true);
+            foreach (array_keys($idsGrupoLinha) as $midGl) {
+                $midGl = (int) $midGl;
+                if (isset($jaOrdenado[$midGl])) {
+                    continue;
+                }
+                $nomeGl = trim((string) ($nomesCatalogoById[$midGl] ?? ($materiaNomesPorId[$midGl] ?? '')));
+                if ($nomeGl === '') {
+                    continue;
+                }
+                if (!isset($materiaNomesPorId[$midGl])) {
+                    $materiaNomesPorId[$midGl] = $nomeGl;
+                }
+                $nomeKeyGl = $this->canonicalMateriaNomeKey($nomeGl);
+                foreach ($matrizPorCodigo as $codGl => $mapGl) {
+                    if (!is_array($mapGl)) {
+                        continue;
+                    }
+                    if (isset($mapGl[$midGl]) && is_numeric($mapGl[$midGl])) {
+                        continue;
+                    }
+                    foreach ($mapGl as $midOutro => $valOutro) {
+                        $midOutro = (int) $midOutro;
+                        if ($midOutro === $midGl || !is_numeric($valOutro)) {
+                            continue;
+                        }
+                        $nomeOutro = trim((string) ($materiaNomesPorId[$midOutro] ?? ($nomesCatalogoById[$midOutro] ?? '')));
+                        if ($nomeKeyGl !== '' && $this->canonicalMateriaNomeKey($nomeOutro) === $nomeKeyGl) {
+                            $matrizPorCodigo[$codGl][$midGl] = (float) $valOutro;
+                            break;
+                        }
+                    }
+                }
+                $midsOrdenados[] = $midGl;
+                $jaOrdenado[$midGl] = true;
+            }
+            if ($labelsGrupoLinha !== []) {
+                foreach (array_keys($idsRotuloPai) as $pidMae) {
+                    $pidMae = (int) $pidMae;
+                    if ($pidMae <= 0 || isset($jaOrdenado[$pidMae])) {
+                        continue;
+                    }
+                    $nomeMae = trim((string) ($nomesCatalogoById[$pidMae] ?? ($materiaNomesPorId[$pidMae] ?? '')));
+                    $nomeMaeKey = $this->canonicalMateriaNomeKey($nomeMae);
+                    if ($nomeMaeKey === '' || !isset($labelsGrupoLinha[$nomeMaeKey])) {
+                        continue;
+                    }
+                    if (!isset($materiaNomesPorId[$pidMae]) && $nomeMae !== '') {
+                        $materiaNomesPorId[$pidMae] = $nomeMae;
+                    }
+                    $midsOrdenados[] = $pidMae;
+                    $jaOrdenado[$pidMae] = true;
+                }
+            }
         }
 
         $colunasFaltasPorCodigo = [];
@@ -6268,27 +6392,38 @@ class BoletimConfigController extends BaseController
 
         $linhasPorMid = [];
         $outras = [];
+        $notasMaeHerdada = [];
         foreach ($matriz['linhas'] as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
             $mid = (int) ($linha['materia_id'] ?? 0);
-            // Virtual / rótulo solto: some do flat; a mãe entra pelo bloco do grupo.
+            $nomeKey = $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? ''));
+            $notasLinha = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            // Virtual / rótulo solto: some do flat; a nota da mãe fica para o bloco do grupo.
             if ($mid < 0) {
+                if ($nomeKey !== '' && isset($rotulosGrupo[$nomeKey]) && $notasLinha !== []) {
+                    $notasMaeHerdada[$nomeKey] = $notasLinha;
+                }
                 continue;
             }
             if ($mid > 0 && isset($excluidosDoGrupo[$mid])) {
                 continue;
             }
             if ($mid > 0 && isset($rotulosIds[$mid])) {
+                if ($nomeKey !== '' && isset($rotulosGrupo[$nomeKey]) && $notasLinha !== []) {
+                    $notasMaeHerdada[$nomeKey] = $notasLinha;
+                }
                 continue;
             }
-            $nomeKey = $this->canonicalMateriaNomeKey((string) ($linha['materia_nome'] ?? ''));
             if ($mid > 0 && isset($todosFilhos[$mid])) {
                 $linhasPorMid[$mid] = $linha;
                 continue;
             }
             if ($nomeKey !== '' && isset($rotulosGrupo[$nomeKey]) && !isset($todosFilhos[$mid])) {
+                if ($notasLinha !== []) {
+                    $notasMaeHerdada[$nomeKey] = $notasLinha;
+                }
                 continue;
             }
             $outras[] = $linha;
@@ -6314,7 +6449,17 @@ class BoletimConfigController extends BaseController
                     $filhosLinhas[] = $filho;
                 }
             }
-            if (count($filhosLinhas) < 2) {
+            $notasHerdadasMae = is_array($notasMaeHerdada[$g['label_key']] ?? null)
+                ? $notasMaeHerdada[$g['label_key']]
+                : [];
+            $temNotaHerdada = false;
+            foreach ($notasHerdadasMae as $valHerdado) {
+                if (is_numeric($valHerdado)) {
+                    $temNotaHerdada = true;
+                    break;
+                }
+            }
+            if (count($filhosLinhas) < 2 && !$temNotaHerdada) {
                 foreach ($filhosLinhas as $f) {
                     unset($f['eh_grupo_pai'], $f['eh_grupo_filho'], $f['grupo_pai_nome'], $f['grupo_key']);
                     $blocos[] = [
@@ -6333,6 +6478,15 @@ class BoletimConfigController extends BaseController
             // Filhos trazem tudo do Demonstrativo (semanas N/Q, jornada…). Boletim sobrescreve
             // só onde a linha agrupada tem valor — jornada costuma faltar no group_line do Boletim.
             $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode']);
+            foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
+                if (!is_numeric($valHerdado)) {
+                    continue;
+                }
+                $codHerdado = (string) $codHerdado;
+                if (!isset($paiNotas[$codHerdado]) || !is_numeric($paiNotas[$codHerdado])) {
+                    $paiNotas[$codHerdado] = $valHerdado;
+                }
+            }
             $paiNotasBoletim = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
             if ($paiNotasBoletim !== null) {
                 foreach ($paiNotasBoletim as $cod => $val) {

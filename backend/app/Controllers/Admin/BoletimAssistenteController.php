@@ -390,6 +390,12 @@ class BoletimAssistenteController extends BaseController
                     $comp['materia_unica_modo'] = $materiaUnicaModo;
                 }
                 $cfgSalva = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+                if ($cfgSalva === [] && is_string($comp['config_json'] ?? null) && trim((string) $comp['config_json']) !== '') {
+                    $cfgDec = json_decode((string) $comp['config_json'], true);
+                    if (is_array($cfgDec)) {
+                        $cfgSalva = $cfgDec;
+                    }
+                }
                 if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
                     $cfgSalva['group_line'] = $grupoLinha;
                 }
