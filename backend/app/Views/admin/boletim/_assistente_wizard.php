@@ -140,6 +140,10 @@ $boletimWizardSteps = [
 }
 .boletim-assistente-dot:nth-child(2) { animation-delay: 0.15s; }
 .boletim-assistente-dot:nth-child(3) { animation-delay: 0.3s; }
+#boletim-wizard-steps .step-nav-btn { flex: 0 0 auto; }
+#boletim-wizard-steps .step-nav-btn > span { min-width: max-content; }
+#boletim-wizard-steps .step-nav-btn .font-semibold,
+#boletim-wizard-steps .step-nav-btn .text-xs { white-space: nowrap; }
 .bw-step-btn { font-size: 11px; padding: 4px 10px; border-radius: 9999px; border: 1px solid #e5e7eb; color: #6b7280; background: #fff; }
 .bw-step-btn.active { border-color: #6366f1; background: #eef2ff; color: #4338ca; font-weight: 600; }
 .bw-step-btn.done { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
