@@ -3499,6 +3499,10 @@ class BoletimConfigController extends BaseController
                 if (isset($cfgDraft['jornada_bimestres']) && is_array($cfgDraft['jornada_bimestres'])) {
                     $cfg['jornada_bimestres'] = $cfgDraft['jornada_bimestres'];
                 }
+                if (array_key_exists('nota_unica_incluir_materias', $cfgDraft) && is_array($cfgDraft['nota_unica_incluir_materias'])) {
+                    $cfg['nota_unica_incluir_materias'] = $cfgDraft['nota_unica_incluir_materias'];
+                    unset($cfg['nota_unica_omitir_materias']);
+                }
             }
 
             $nome = trim((string) ($comp['nome'] ?? ''));
@@ -6182,7 +6186,17 @@ class BoletimConfigController extends BaseController
             return null;
         }
 
-        $this->aplicarEspalhamentoJornadasNotaUnicaNaMatriz($componentesRegra, $matrizPorCodigo, $componentesResultado, $allMids, $roundMode);
+        $filhasPorVirtualMid = is_array($grp['filhas_por_virtual_mid'] ?? null)
+            ? $grp['filhas_por_virtual_mid']
+            : [];
+        $this->aplicarEspalhamentoJornadasNotaUnicaNaMatriz(
+            $componentesRegra,
+            $matrizPorCodigo,
+            $componentesResultado,
+            $allMids,
+            $roundMode,
+            $filhasPorVirtualMid
+        );
 
         $midsOrdenados = array_keys($allMids);
         if ($materiasAgrupadas !== []) {
@@ -6556,7 +6570,14 @@ class BoletimConfigController extends BaseController
                 $modoPorPeca[$pecaM] = strtolower((string) $modoM) === 'soma' ? 'soma' : 'media';
             }
             $gk = (string) ($grp['key'] ?? '');
-            if ($gk === '' || isset($grupos[$gk])) {
+            if ($gk === '') {
+                continue;
+            }
+            if (isset($grupos[$gk])) {
+                $arredJa = $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos');
+                if ($arredJa !== 'todos') {
+                    $grupos[$gk]['arredondamento'] = $arredJa;
+                }
                 continue;
             }
             $filhosIds = [];
@@ -6598,6 +6619,7 @@ class BoletimConfigController extends BaseController
                 'filhos_ids' => $filhosIds,
                 'rotulo_ids' => $rotuloIds,
                 'agrupamento_id' => $agId,
+                'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
             ];
         }
         if ($grupos === []) {
@@ -6717,7 +6739,16 @@ class BoletimConfigController extends BaseController
             });
 
             // Cada coluna usa o modo da própria peça (média na semanal, soma na bimestral).
-            $paiNotas = $this->agregarNotasLinhasFilhosGrupo($filhosLinhas, $g['mode'], $modoPorCodigo, $modoPorPeca);
+            $arredGrupo = $this->normalizarArredondamentoGrupo($g['arredondamento'] ?? 'todos');
+            $roundModeGrupo = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'half'));
+            $paiNotas = $this->agregarNotasLinhasFilhosGrupo(
+                $filhosLinhas,
+                $g['mode'],
+                $modoPorCodigo,
+                $modoPorPeca,
+                $roundModeGrupo,
+                $arredGrupo
+            );
             foreach ($notasHerdadasMae as $codHerdado => $valHerdado) {
                 if (!is_numeric($valHerdado)) {
                     continue;
@@ -6740,7 +6771,7 @@ class BoletimConfigController extends BaseController
                 }
             }
             // Média Bim e as colunas seguintes saem da fórmula, com as notas já juntadas da área.
-            $paiNotas = $this->aplicarFormulasCalculadasNaLinhaGrupo($paiNotas, $regra);
+            $paiNotas = $this->aplicarFormulasCalculadasNaLinhaGrupo($paiNotas, $regra, $arredGrupo);
             $pai = [
                 'materia_id' => 0,
                 'materia_nome' => $g['label'],
@@ -6982,7 +7013,14 @@ class BoletimConfigController extends BaseController
      * @param array<string,string> $modoPorPeca modo explícito da peça (semanal, jornada…)
      * @return array<string,mixed>
      */
-    private function agregarNotasLinhasFilhosGrupo(array $filhos, string $mode, array $modoPorCodigo = [], array $modoPorPeca = []): array
+    private function agregarNotasLinhasFilhosGrupo(
+        array $filhos,
+        string $mode,
+        array $modoPorCodigo = [],
+        array $modoPorPeca = [],
+        string $roundMode = 'half',
+        string $arredondamento = 'todos'
+    ): array
     {
         $mode = $mode === 'soma' ? 'soma' : 'media';
         $porCod = [];
@@ -7016,9 +7054,9 @@ class BoletimConfigController extends BaseController
             if ($modoCol !== 'soma') {
                 $modoCol = 'media';
             }
-            if ($ehNq || $ehFaltas || $modoCol === 'soma') {
+            if ($ehNq || $ehFaltas) {
                 $soma = array_sum($vals);
-                $out[$cod] = $ehNq || $ehFaltas ? (int) round($soma) : round($soma, 2);
+                $out[$cod] = (int) round($soma);
                 continue;
             }
             if ($ehJornada) {
@@ -7029,7 +7067,10 @@ class BoletimConfigController extends BaseController
                     continue;
                 }
             }
-            $out[$cod] = round(array_sum($vals) / count($vals), 2);
+            $bruto = $modoCol === 'soma'
+                ? array_sum($vals)
+                : array_sum($vals) / count($vals);
+            $out[$cod] = $this->aplicarArredondamentoMaeGrupo($bruto, $roundMode, $arredondamento);
         }
 
         return $out;
@@ -7090,7 +7131,7 @@ class BoletimConfigController extends BaseController
      * @param array<string,mixed> $regra
      * @return array<string,mixed>
      */
-    private function aplicarFormulasCalculadasNaLinhaGrupo(array $notas, array $regra): array
+    private function aplicarFormulasCalculadasNaLinhaGrupo(array $notas, array $regra, string $arredondamento = 'todos'): array
     {
         $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'half'));
         $exprs = [];
@@ -7127,7 +7168,7 @@ class BoletimConfigController extends BaseController
                     continue;
                 }
                 $modoCol = $this->resolveRoundModeComponente($item['comp'], $roundMode);
-                $arred = $this->applyRoundMode((float) $resultado['valor'], $modoCol);
+                $arred = $this->aplicarArredondamentoMaeGrupo((float) $resultado['valor'], $modoCol, $arredondamento);
                 if ($arred === null) {
                     continue;
                 }
@@ -7281,6 +7322,7 @@ class BoletimConfigController extends BaseController
                 'materias_agrupadas' => [],
                 'grupos_virtual_mids' => [],
                 'agrupamento_por_virtual_mid' => [],
+                'filhas_por_virtual_mid' => [],
             ];
         }
 
@@ -7587,6 +7629,7 @@ class BoletimConfigController extends BaseController
 
         $gruposVirtualMids = [];
         $agrupamentoPorVirtualMid = [];
+        $filhasPorVirtualMid = [];
         foreach ($groupMetaByKey as $gk => $meta) {
             if (empty($groupKeysAtivos[(string) $gk])) {
                 continue;
@@ -7598,6 +7641,14 @@ class BoletimConfigController extends BaseController
                 if ($aid > 0) {
                     $agrupamentoPorVirtualMid[$vmid] = $aid;
                 }
+                $filhas = [];
+                foreach ((array) ($meta['materias_ids'] ?? []) as $midFilha) {
+                    $midFilha = (int) $midFilha;
+                    if ($midFilha > 0) {
+                        $filhas[$midFilha] = $midFilha;
+                    }
+                }
+                $filhasPorVirtualMid[$vmid] = array_values($filhas);
             }
         }
 
@@ -7609,6 +7660,7 @@ class BoletimConfigController extends BaseController
             'materias_agrupadas' => $materiasAgrupadasAtivas,
             'grupos_virtual_mids' => $gruposVirtualMids,
             'agrupamento_por_virtual_mid' => $agrupamentoPorVirtualMid,
+            'filhas_por_virtual_mid' => $filhasPorVirtualMid,
         ];
     }
 
@@ -9391,6 +9443,10 @@ class BoletimConfigController extends BaseController
                     continue;
                 }
                 $modo = $this->resolveRoundModeComponente($comp, $roundMode);
+                $grpFormula = $this->parseGroupLineConfigFromComponente($comp);
+                $arredFormula = $this->normalizarArredondamentoGrupo(
+                    is_array($grpFormula) ? ($grpFormula['arredondamento'] ?? 'todos') : 'todos'
+                );
                 if (!isset($matrizPorCodigo[$codigo]) || !is_array($matrizPorCodigo[$codigo])) {
                     $matrizPorCodigo[$codigo] = [];
                 }
@@ -9427,7 +9483,7 @@ class BoletimConfigController extends BaseController
                     if (empty($resultado['ok']) || !isset($resultado['valor']) || !is_numeric($resultado['valor'])) {
                         continue;
                     }
-                    $arred = $this->applyRoundMode((float) $resultado['valor'], $modo);
+                    $arred = $this->aplicarArredondamentoMaeGrupo((float) $resultado['valor'], $modo, $arredFormula);
                     if ($arred === null) {
                         continue;
                     }
@@ -9447,13 +9503,15 @@ class BoletimConfigController extends BaseController
      * @param array<string, array<int, float|null>> $matrizPorCodigo
      * @param array<int|string, mixed> $componentesResultado
      * @param array<int, true> $allMids
+     * @param array<int, list<int>> $filhasPorVirtualMid id virtual da área => matérias do grupo
      */
     private function aplicarEspalhamentoJornadasNotaUnicaNaMatriz(
         array $componentesRegra,
         array &$matrizPorCodigo,
         array $componentesResultado,
         array $allMids,
-        string $roundMode
+        string $roundMode,
+        array $filhasPorVirtualMid = []
     ): void {
         foreach ($componentesRegra as $cJr) {
             $codJr = trim((string) ($cJr['codigo'] ?? ''));
@@ -9501,8 +9559,19 @@ class BoletimConfigController extends BaseController
             if (!isset($matrizPorCodigo[$codJr]) || !is_array($matrizPorCodigo[$codJr])) {
                 $matrizPorCodigo[$codJr] = [];
             }
-            // Matérias que já têm jornada no escopo (vieram de por_materia).
-            // Não espalha a nota única em Arte/Ed. Física etc. sem jornada própria.
+            $incluirRaw = $cfgJr['nota_unica_incluir_materias'] ?? null;
+            $temInclusaoExplicita = is_array($incluirRaw);
+            $incluirSet = [];
+            if ($temInclusaoExplicita) {
+                foreach ($incluirRaw as $im) {
+                    $im = (int) $im;
+                    if ($im > 0) {
+                        $incluirSet[$im] = true;
+                    }
+                }
+            }
+            // Sem lista explícita: só matérias que já têm jornada no escopo.
+            // Com a lista, a matéria marcada recebe a nota mesmo sem jornada própria.
             $midsComJornada = [];
             foreach ($matrizPorCodigo[$codJr] as $midExistente => $valExistente) {
                 $midExistente = (int) $midExistente;
@@ -9512,9 +9581,28 @@ class BoletimConfigController extends BaseController
             }
             // Só jornadas sem matéria (mid 0): aí a nota global ainda vale para todas as linhas.
             $espalharEmTodas = ($midsComJornada === []);
-            foreach (array_keys($allMids) as $midRep) {
+            $midsAlvo = $allMids;
+            if ($temInclusaoExplicita) {
+                foreach (array_keys($incluirSet) as $imAlvo) {
+                    $midsAlvo[(int) $imAlvo] = true;
+                }
+            }
+            $vistos = [];
+            foreach (array_keys($midsAlvo) as $midRep) {
                 $midRep = (int) $midRep;
-                if (isset($omitSet[$midRep])) {
+                if (isset($vistos[$midRep])) {
+                    continue;
+                }
+                $vistos[$midRep] = true;
+                // A linha da área (id negativo) é resolvida depois, pelas filhas marcadas.
+                if ($midRep < 0 && $temInclusaoExplicita) {
+                    continue;
+                }
+                if ($temInclusaoExplicita && !isset($incluirSet[$midRep])) {
+                    $matrizPorCodigo[$codJr][$midRep] = null;
+                    continue;
+                }
+                if (!$temInclusaoExplicita && isset($omitSet[$midRep])) {
                     $matrizPorCodigo[$codJr][$midRep] = null;
                     continue;
                 }
@@ -9525,11 +9613,35 @@ class BoletimConfigController extends BaseController
                         : null;
                     continue;
                 }
-                if (!$espalharEmTodas && !isset($midsComJornada[$midRep])) {
+                if (!$temInclusaoExplicita && !$espalharEmTodas && !isset($midsComJornada[$midRep])) {
                     $matrizPorCodigo[$codJr][$midRep] = null;
                     continue;
                 }
                 $matrizPorCodigo[$codJr][$midRep] = $padrao;
+            }
+            if (!$temInclusaoExplicita || $filhasPorVirtualMid === []) {
+                continue;
+            }
+            foreach ($filhasPorVirtualMid as $vmid => $filhas) {
+                $vmid = (int) $vmid;
+                if ($vmid >= 0) {
+                    continue;
+                }
+                if (array_key_exists($vmid, $substNorm)) {
+                    $sv = $substNorm[$vmid];
+                    $matrizPorCodigo[$codJr][$vmid] = is_numeric($sv)
+                        ? $this->applyRoundMode((float) $sv, $roundModeJr)
+                        : null;
+                    continue;
+                }
+                $recebe = false;
+                foreach ((array) $filhas as $fid) {
+                    if (isset($incluirSet[(int) $fid])) {
+                        $recebe = true;
+                        break;
+                    }
+                }
+                $matrizPorCodigo[$codJr][$vmid] = $recebe ? $padrao : null;
             }
         }
     }
@@ -9542,6 +9654,7 @@ class BoletimConfigController extends BaseController
      *   faixas_percentuais: list<array{percentual_min:int, nota:float}>,
      *   distribuicao_notas: string,
      *   nota_unica_omitir_materias: list<int>,
+     *   nota_unica_incluir_materias: list<int>|null,
      *   nota_unica_fonte_por_materia: array<int, list<int>>,
      *   nota_unica_fonte_por_grupo: array<string, list<int>>,
      *   traco_abaixo_minimo: bool
@@ -9566,6 +9679,7 @@ class BoletimConfigController extends BaseController
                 'faixas_percentuais' => [],
                 'distribuicao_notas' => 'por_materia',
                 'nota_unica_omitir_materias' => [],
+                'nota_unica_incluir_materias' => null,
                 'nota_unica_fonte_por_materia' => [],
                 'nota_unica_fonte_por_grupo' => [],
                 'traco_abaixo_minimo' => false,
@@ -9607,6 +9721,18 @@ class BoletimConfigController extends BaseController
             }
         }
         $omitir = array_values(array_unique($omitir));
+
+        $incluir = null;
+        if (array_key_exists('nota_unica_incluir_materias', $decoded)) {
+            $incluir = [];
+            foreach ((array) $decoded['nota_unica_incluir_materias'] as $im) {
+                $im = (int) $im;
+                if ($im > 0) {
+                    $incluir[] = $im;
+                }
+            }
+            $incluir = array_values(array_unique($incluir));
+        }
 
         $fontePorMateria = [];
         foreach ((array) ($decoded['nota_unica_fonte_por_materia'] ?? []) as $tk => $list) {
@@ -9653,6 +9779,7 @@ class BoletimConfigController extends BaseController
             'faixas_percentuais' => $faixas,
             'distribuicao_notas' => $dist,
             'nota_unica_omitir_materias' => $omitir,
+            'nota_unica_incluir_materias' => $incluir,
             'nota_unica_fonte_por_materia' => $fontePorMateria,
             'nota_unica_fonte_por_grupo' => $fontePorGrupo,
             'traco_abaixo_minimo' => !empty($decoded['traco_abaixo_minimo']),
@@ -10374,6 +10501,17 @@ class BoletimConfigController extends BaseController
             $om = array_values(array_unique($om));
             if ($om !== []) {
                 $payload['nota_unica_omitir_materias'] = $om;
+            }
+            if (array_key_exists('nota_unica_incluir_materias', $componente['config']) && is_array($componente['config']['nota_unica_incluir_materias'])) {
+                $incluirSalvar = [];
+                foreach ($componente['config']['nota_unica_incluir_materias'] as $im) {
+                    $im = (int) $im;
+                    if ($im > 0) {
+                        $incluirSalvar[] = $im;
+                    }
+                }
+                $payload['nota_unica_incluir_materias'] = array_values(array_unique($incluirSalvar));
+                unset($payload['nota_unica_omitir_materias']);
             }
             $fp = [];
             if (isset($componente['config']['nota_unica_fonte_por_materia']) && is_array($componente['config']['nota_unica_fonte_por_materia'])) {

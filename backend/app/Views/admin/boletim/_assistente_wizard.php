@@ -920,12 +920,13 @@ $boletimWizardSteps = [
             html += '</div></div>';
         }
         html += '<div><span class="text-xs font-medium text-gray-600">Como lançar a nota</span>';
-        html += '<p class="text-xs text-gray-500 mt-0.5">Por matéria usa a jornada de cada disciplina. Média única calcula o % geral de conclusão e repete a mesma nota em todas as matérias.</p>';
+        html += '<p class="text-xs text-gray-500 mt-0.5">Por matéria usa a jornada de cada disciplina. Média única calcula o % geral de conclusão e repete a mesma nota nas matérias marcadas, mesmo nas que não tiveram jornada.</p>';
         html += '<div class="mt-2 flex flex-wrap gap-3 text-sm">';
         var dist = (estado.jornada_distribuicao_notas === 'nota_unica_todas_linhas') ? 'nota_unica_todas_linhas' : 'por_materia';
         html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-jornada-dist" class="bw-jornada-dist" value="por_materia"' + (dist === 'por_materia' ? ' checked' : '') + '> Por matéria</label>';
         html += '<label class="inline-flex items-center gap-1.5"><input type="radio" name="bw-jornada-dist" class="bw-jornada-dist" value="nota_unica_todas_linhas"' + (dist === 'nota_unica_todas_linhas' ? ' checked' : '') + '> Média única (mesma nota em todas)</label>';
         html += '</div></div>';
+        if (dist === 'nota_unica_todas_linhas') html += htmlMateriasJornadaNotaUnica();
         html += '<div><span class="text-xs font-medium text-gray-600">Pontuação por conclusão</span>';
         html += '<p class="text-xs text-gray-500 mt-0.5">A nota depende de quantas jornadas do bimestre o aluno concluiu.</p>';
         html += '<div class="mt-2 flex flex-wrap gap-3 text-sm">';
@@ -952,6 +953,90 @@ $boletimWizardSteps = [
         }
         html += '</div>';
         return html;
+    }
+
+    function materiasDaJornadaNoEvento() {
+        var lista = materiasParaExcecao();
+        if (!lista.length) lista = materiasCatalogoDoEscopo();
+        var porId = {};
+        (lista || []).forEach(function (m) {
+            var id = Number(m && m.id);
+            if (id > 0) porId[id] = { id: id, nome: m.nome || '' };
+        });
+        var paisComFilhas = {};
+        familiasDoEscopo().forEach(function (f) {
+            (f.filhos || []).forEach(function (ch) {
+                var id = Number(ch.id);
+                if (id > 0) {
+                    porId[id] = { id: id, nome: ch.nome || (porId[id] && porId[id].nome) || '' };
+                }
+            });
+            if ((f.filhos || []).length >= 2 && Number(f.pai_id) > 0) {
+                paisComFilhas[Number(f.pai_id)] = true;
+            }
+        });
+        return Object.keys(porId).map(function (k) { return porId[k]; }).filter(function (m) {
+            return m.id > 0 && m.nome && !paisComFilhas[m.id];
+        });
+    }
+
+    function selecaoMateriasJornada() {
+        var lista = materiasDaJornadaNoEvento();
+        var sel = {};
+        if (!lista.length) return { lista: [], sel: sel };
+        if (estado.jornada_materias_tocada && Array.isArray(estado.jornada_materias_ids)) {
+            estado.jornada_materias_ids.forEach(function (id) { sel[Number(id)] = true; });
+            return { lista: lista, sel: sel };
+        }
+        var omit = {};
+        (estado.jornada_materias_omitir || []).forEach(function (id) { omit[Number(id)] = true; });
+        var ids = [];
+        lista.forEach(function (m) {
+            var id = Number(m.id);
+            if (!omit[id]) {
+                sel[id] = true;
+                ids.push(id);
+            }
+        });
+        estado.jornada_materias_ids = ids;
+        estado.jornada_materias_tocada = true;
+        return { lista: lista, sel: sel };
+    }
+
+    function htmlMateriasJornadaNotaUnica() {
+        var pacote = selecaoMateriasJornada();
+        var lista = pacote.lista.slice().sort(function (a, b) {
+            return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+        });
+        var html = '<div><span class="text-xs font-medium text-gray-600">Matérias que recebem a nota</span>';
+        html += '<p class="text-xs text-gray-500 mt-0.5">Marque quem entra nesta nota. Uma matéria sem jornada própria também recebe a média única se estiver marcada.</p>';
+        if (!lista.length) {
+            html += '<p class="text-xs text-gray-500 mt-2">Nenhuma matéria no escopo deste evento.</p></div>';
+            return html;
+        }
+        html += '<div class="flex flex-wrap gap-2 mt-2">';
+        html += '<button type="button" id="bw-jornada-materias-todas" class="text-xs px-2 py-1 rounded-md bg-white border border-gray-300 text-gray-700">Marcar todas</button>';
+        html += '<button type="button" id="bw-jornada-materias-nenhuma" class="text-xs px-2 py-1 rounded-md bg-white border border-gray-300 text-gray-700">Desmarcar todas</button>';
+        html += '</div>';
+        html += '<div class="grid sm:grid-cols-2 gap-2 mt-2 max-h-52 overflow-y-auto">';
+        lista.forEach(function (m) {
+            var id = Number(m.id);
+            html += '<label class="inline-flex items-start gap-2 text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer">';
+            html += '<input type="checkbox" class="bw-jornada-materia mt-0.5 rounded border-gray-300 text-indigo-600" value="' + id + '"' + (pacote.sel[id] ? ' checked' : '') + '>';
+            html += '<span>' + esc(m.nome || ('Matéria #' + id)) + '</span></label>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    function lerMateriasJornadaMarcadas() {
+        var ids = [];
+        document.querySelectorAll('.bw-jornada-materia:checked').forEach(function (c) {
+            var id = parseInt(c.value, 10);
+            if (id > 0) ids.push(id);
+        });
+        estado.jornada_materias_ids = ids;
+        estado.jornada_materias_tocada = true;
     }
 
     function tipoNomeFixoPeca(key) {
@@ -1294,6 +1379,7 @@ $boletimWizardSteps = [
             formulas_blocos: {},
             formulas_materias_blocos: {},
             nomes_blocos: {},
+            nomes_limpos: {},
             bloco_calc: '',
             materia_calc: 0,
             blocos_calc: [],
@@ -1308,6 +1394,8 @@ $boletimWizardSteps = [
             jornada_bimestres: [],
             jornada_nota_modo: 'linear',
             jornada_distribuicao_notas: 'por_materia',
+            jornada_materias_ids: [],
+            jornada_materias_tocada: false,
             jornada_faixas: faixasJornadaPadrao(),
             series_ids: [],
             turmas_ids: [],
@@ -1341,6 +1429,8 @@ $boletimWizardSteps = [
         if (estado.jornada_distribuicao_notas !== 'nota_unica_todas_linhas') {
             estado.jornada_distribuicao_notas = 'por_materia';
         }
+        if (!Array.isArray(estado.jornada_materias_ids)) estado.jornada_materias_ids = [];
+        if (estado.jornada_materias_tocada == null) estado.jornada_materias_tocada = false;
         if ((estado.pecas || []).indexOf('jornada') >= 0 && estado.jornada_modo === 'todas') estado.jornada_modo = 'bimestre';
         if (!Array.isArray(estado.formula_tokens)) estado.formula_tokens = [];
         if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object') estado.formulas_blocos = {};
@@ -1757,7 +1847,62 @@ $boletimWizardSteps = [
         if (estado.nomes_blocos[codigo]) return estado.nomes_blocos[codigo];
         var quadro = pecaCodigoQuadro(codigo);
         if (quadro && quadro !== codigo && estado.nomes_blocos[quadro]) return estado.nomes_blocos[quadro];
+        var aliases = {
+            media_sem: 'semanal', semanal: 'media_sem',
+            prova_bim: 'bimestral', bimestral: 'prova_bim',
+            rec: 'recuperacao', recuperacao: 'rec',
+            trab: 'trabalho', trabalho: 'trab',
+            part: 'participacao', participacao: 'part'
+        };
+        var outro = aliases[codigo] || '';
+        if (outro && estado.nomes_blocos[outro]) return estado.nomes_blocos[outro];
         return '';
+    }
+
+    function nomeTituloParaCodigo(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || codigo === '_semanal' || /^s[1-8]$/.test(codigo)) return '';
+        return String(tituloColuna(codigo) || '').trim().slice(0, 60);
+    }
+
+    function tituloFoiLimpo(codigo) {
+        if (!estado || !estado.nomes_limpos) return false;
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo) return false;
+        if (estado.nomes_limpos[codigo]) return true;
+        var aliases = {
+            media_sem: 'semanal', semanal: 'media_sem',
+            prova_bim: 'bimestral', bimestral: 'prova_bim',
+            rec: 'recuperacao', recuperacao: 'rec',
+            trab: 'trabalho', trabalho: 'trab',
+            part: 'participacao', participacao: 'part'
+        };
+        var outro = aliases[codigo] || '';
+        return !!(outro && estado.nomes_limpos[outro]);
+    }
+
+    function aplicarNomesNoRascunho(r) {
+        if (!r || !Array.isArray(r.componentes) || !estado) return r;
+        r.componentes.forEach(function (c) {
+            if (!c) return;
+            var cod = String(c.codigo || '');
+            if (/^s[1-8]$/.test(cod) || cod === '_semanal') return;
+            if (tituloFoiLimpo(cod)) {
+                var padrao = nomeBlocoCalc(cod);
+                if (padrao) c.nome = padrao;
+                return;
+            }
+            var nome = nomeTituloParaCodigo(cod);
+            if (nome) c.nome = nome;
+        });
+        return r;
+    }
+
+    function flushTituloAberto() {
+        if (!estado || !estado.bloco_calc) return;
+        var inp = document.getElementById('bw-formula-bloco-nome-input');
+        if (!inp) return;
+        aplicarTituloBloco(estado.bloco_calc, String(inp.value || ''));
     }
 
     function nomeBlocoCalc(codigo) {
@@ -2338,26 +2483,45 @@ $boletimWizardSteps = [
         agendarMontar();
     }
 
+    function codigosEquivalentesColuna(codigo) {
+        var set = {};
+        codigo = String(codigo || '');
+        if (!codigo) return set;
+        set[codigo] = true;
+        var quadro = pecaCodigoQuadro(codigo);
+        if (quadro) set[quadro] = true;
+        var aliases = {
+            media_sem: 'semanal', semanal: 'media_sem',
+            prova_bim: 'bimestral', bimestral: 'prova_bim',
+            rec: 'recuperacao', recuperacao: 'rec',
+            trab: 'trabalho', trabalho: 'trab',
+            part: 'participacao', participacao: 'part'
+        };
+        if (aliases[codigo]) set[aliases[codigo]] = true;
+        return set;
+    }
+
     function pintarTituloNasColunas(codigo, nome) {
         codigo = String(codigo || '');
         nome = String(nome || '').trim();
         if (!codigo || !nome) return;
+        var equivalentes = codigosEquivalentesColuna(codigo);
         function paint(c) {
             if (!c) return;
-            if (String(c.codigo || '') === codigo) c.nome = nome;
+            if (equivalentes[String(c.codigo || '')]) c.nome = nome;
         }
         if (previewAtual) {
             (previewAtual.colunas || []).forEach(paint);
             (previewAtual.tabelas || []).forEach(function (t) {
                 (t.outras || []).forEach(paint);
+                (t.semanas || []).forEach(paint);
                 (t.colunas || []).forEach(paint);
             });
         }
-        if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
-            rascunhoAtual.componentes.forEach(function (c) {
-                if (c && String(c.codigo || '') === codigo) c.nome = nome;
-            });
-        }
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(paint);
+        });
     }
 
     function aplicarTituloBloco(codigo, nome) {
@@ -2367,8 +2531,22 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object' || Array.isArray(estado.nomes_blocos)) {
             estado.nomes_blocos = {};
         }
-        if (nome) estado.nomes_blocos[codigo] = nome;
-        else delete estado.nomes_blocos[codigo];
+        if (!estado.nomes_limpos || typeof estado.nomes_limpos !== 'object' || Array.isArray(estado.nomes_limpos)) {
+            estado.nomes_limpos = {};
+        }
+        var equivalentes = codigosEquivalentesColuna(codigo);
+        if (nome) {
+            Object.keys(equivalentes).forEach(function (cod) {
+                delete estado.nomes_blocos[cod];
+                delete estado.nomes_limpos[cod];
+            });
+            estado.nomes_blocos[codigo] = nome;
+        } else {
+            Object.keys(equivalentes).forEach(function (cod) {
+                delete estado.nomes_blocos[cod];
+                if (cod !== '_semanal' && !/^s[1-8]$/.test(cod)) estado.nomes_limpos[cod] = 1;
+            });
+        }
         var visivel = nome || nomeBlocoCalc(codigo);
         document.querySelectorAll('#bw-colunas-lista .bw-col-chip').forEach(function (chip) {
             if (chip.getAttribute('data-codigo') !== codigo) return;
@@ -2377,7 +2555,7 @@ $boletimWizardSteps = [
         });
         var rotulo = document.getElementById('bw-formula-bloco-nome');
         if (rotulo && estado.bloco_calc === codigo) rotulo.textContent = visivel;
-        if (nome) pintarTituloNasColunas(codigo, nome);
+        if (visivel) pintarTituloNasColunas(codigo, visivel);
         var pvEl = document.getElementById('bw-preview-wrap');
         if (pvEl && previewAtual) pvEl.innerHTML = htmlPreview(previewAtual);
         var pal = document.getElementById('bw-formula-pecas-pal');
@@ -2652,6 +2830,24 @@ $boletimWizardSteps = [
         if (dec < 0.25) return base;
         if (dec < 0.75) return base + 0.5;
         return base + 1;
+    }
+
+    function arredondamentoGrupoAtual() {
+        var gl = (estado && estado.grupo_linha) || {};
+        if (gl.arredondamento === 'filhas' || gl.arredondamento === 'mae') return gl.arredondamento;
+        return 'todos';
+    }
+
+    /** quem: mae = linha da área; filha = matéria de dentro. */
+    function roundNotaGrupo(v, quem) {
+        var n = Number(v);
+        if (!isFinite(n)) return v;
+        var modo = arredondamentoGrupoAtual();
+        var aplica = quem === 'mae'
+            ? (modo === 'mae' || modo === 'todos')
+            : (modo === 'filhas' || modo === 'todos');
+        if (!aplica) return Math.round(n * 100) / 100;
+        return roundPreviewValor(n);
     }
 
     function pecaDoCodigoGrupo(codigo) {
@@ -3164,10 +3360,12 @@ $boletimWizardSteps = [
                 var peca = pecaDoCodigoGrupo(codigo);
                 if (peca) modoCol = modoEfetivoPecaGrupo(gl, peca);
             }
-            if (forcarSoma || modoCol === 'soma') {
+            if (forcarSoma) {
                 notas[codigo] = Math.round(total * 100) / 100;
+            } else if (modoCol === 'soma') {
+                notas[codigo] = roundNotaGrupo(total, 'mae');
             } else {
-                notas[codigo] = Math.round((total / vals.length) * 100) / 100;
+                notas[codigo] = roundNotaGrupo(total / vals.length, 'mae');
             }
         }
         (outras || []).forEach(function (col) {
@@ -3263,7 +3461,7 @@ $boletimWizardSteps = [
         try {
             var n = Function('"use strict"; return (' + src + ');')();
             if (!isFinite(n)) return null;
-            return roundPreviewValor(n);
+            return roundNotaGrupo(n, 'mae');
         } catch (e) {
             return null;
         }
@@ -4938,6 +5136,10 @@ $boletimWizardSteps = [
                 estado.jornada_distribuicao_notas = el.value === 'nota_unica_todas_linhas'
                     ? 'nota_unica_todas_linhas'
                     : 'por_materia';
+                if (estado.jornada_distribuicao_notas === 'nota_unica_todas_linhas' && !estado.jornada_materias_tocada) {
+                    selecaoMateriasJornada();
+                }
+                renderAll();
                 agendarMontar();
             });
         });
@@ -4950,6 +5152,30 @@ $boletimWizardSteps = [
                 agendarMontar();
             });
         });
+        bodyEl.querySelectorAll('.bw-jornada-materia').forEach(function (el) {
+            el.addEventListener('change', function () {
+                lerMateriasJornadaMarcadas();
+                agendarMontar();
+            });
+        });
+        var btnJornadaTodas = document.getElementById('bw-jornada-materias-todas');
+        if (btnJornadaTodas) {
+            btnJornadaTodas.addEventListener('click', function () {
+                estado.jornada_materias_ids = materiasDaJornadaNoEvento().map(function (m) { return Number(m.id); }).filter(function (id) { return id > 0; });
+                estado.jornada_materias_tocada = true;
+                renderAll();
+                agendarMontar();
+            });
+        }
+        var btnJornadaNenhuma = document.getElementById('bw-jornada-materias-nenhuma');
+        if (btnJornadaNenhuma) {
+            btnJornadaNenhuma.addEventListener('click', function () {
+                estado.jornada_materias_ids = [];
+                estado.jornada_materias_tocada = true;
+                renderAll();
+                agendarMontar();
+            });
+        }
         bodyEl.querySelectorAll('.bw-jornada-id').forEach(function (el) {
             el.addEventListener('change', function () {
                 estado.jornada_modo = 'selecionadas';
@@ -5241,6 +5467,8 @@ $boletimWizardSteps = [
 
     function montarAgora() {
         garantirEstado();
+        flushTituloAberto();
+        aplicarNomesNoRascunho(estado && estado.rascunho_preservado);
         aplicarMateriaUnicaNasPecas();
         if (estado.bloco_calc) gravarTokensBlocoAberto();
         var versaoEnvio = formulaVersao;
@@ -5281,6 +5509,14 @@ $boletimWizardSteps = [
                     if (nomeVivo) nomesAgora[cod] = nomeVivo;
                 });
                 remoto.nomes_blocos = nomesAgora;
+                var limposAgora = {};
+                var fonteLimpos = (estado && estado.nomes_limpos && typeof estado.nomes_limpos === 'object' && !Array.isArray(estado.nomes_limpos))
+                    ? estado.nomes_limpos : {};
+                Object.keys(fonteLimpos).forEach(function (cod) {
+                    if (!cod || cod === '_semanal' || /^s[1-8]$/.test(cod) || nomesAgora[cod]) return;
+                    if (fonteLimpos[cod]) limposAgora[cod] = 1;
+                });
+                remoto.nomes_limpos = limposAgora;
                 if (versaoEnvio !== formulaVersao) {
                     remoto.formulas_blocos = estado.formulas_blocos || {};
                     remoto.formulas_materias_blocos = estado.formulas_materias_blocos || {};
@@ -5509,6 +5745,9 @@ $boletimWizardSteps = [
             renderResumo((j && (j.error || (j.erros && j.erros[0]))) || 'Não consegui montar o evento.', ['Volte nas etapas anteriores, confira as peças/fontes e tente de novo.']);
             return false;
         }
+        flushTituloAberto();
+        aplicarNomesNoRascunho(j.rascunho);
+        aplicarNomesNoRascunho(estado && estado.rascunho_preservado);
         garantirArredondamentoGrupoNoRascunho(j.rascunho);
         gravarEscolhasGrupoNoRascunho(j.rascunho);
         var compsRasc = (j.rascunho && Array.isArray(j.rascunho.componentes)) ? j.rascunho.componentes : [];

@@ -508,6 +508,8 @@ class BoletimAssistenteWizard
             'jornada_bimestres' => [],
             'jornada_nota_modo' => 'linear',
             'jornada_distribuicao_notas' => 'por_materia',
+            'jornada_materias_ids' => [],
+            'jornada_materias_tocada' => false,
             'jornada_faixas' => self::faixasJornadaPadrao(),
             'series_ids' => [],
             'turmas_ids' => [],
@@ -1598,6 +1600,7 @@ class BoletimAssistenteWizard
         $merged['formulas_blocos'] = $this->normalizarFormulasBlocos($merged['formulas_blocos'] ?? []);
         $merged['formulas_materias_blocos'] = $this->normalizarFormulasMateriasBlocos($merged['formulas_materias_blocos'] ?? []);
         $merged['nomes_blocos'] = $this->normalizarNomesBlocos($merged['nomes_blocos'] ?? []);
+        $merged['nomes_limpos'] = $this->normalizarNomesLimpos($merged['nomes_limpos'] ?? []);
         $merged['blocos_calc'] = $this->normalizarColunasOrdem($merged['blocos_calc'] ?? []);
         $merged['bloco_calc'] = strtolower(trim((string) ($merged['bloco_calc'] ?? '')));
         if ($merged['bloco_calc'] !== '' && !(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $merged['bloco_calc'])) {
@@ -1715,6 +1718,15 @@ class BoletimAssistenteWizard
         $merged['jornada_distribuicao_notas'] = ((string) ($merged['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas'
             ? 'nota_unica_todas_linhas'
             : 'por_materia';
+        $merged['jornada_materias_tocada'] = !empty($merged['jornada_materias_tocada']);
+        $materiasJornada = [];
+        foreach ((array) ($merged['jornada_materias_ids'] ?? []) as $midJornada) {
+            $midJornada = (int) $midJornada;
+            if ($midJornada > 0) {
+                $materiasJornada[] = $midJornada;
+            }
+        }
+        $merged['jornada_materias_ids'] = array_values(array_unique($materiasJornada));
         $merged['jornada_faixas'] = $this->normalizarFaixasJornada($merged['jornada_faixas'] ?? null);
         $merged['series_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['series_ids'] ?? [])))));
         $merged['turmas_ids'] = array_values(array_unique(array_filter(array_map('intval', (array) ($merged['turmas_ids'] ?? [])))));
@@ -1761,8 +1773,47 @@ class BoletimAssistenteWizard
         $merged['colunas_ocultas'] = $this->normalizarColunasOcultas($merged['colunas_ocultas'] ?? []);
         $merged['fontes_bimestres'] = $this->normalizarFontesBimestres($merged['fontes_bimestres'] ?? []);
         $merged['fontes_faltas'] = $this->normalizarFontesBimestres($merged['fontes_faltas'] ?? []);
+        $this->reidratarNomesDosComponentes($merged);
         $this->reidratarFormulasDosComponentes($merged);
         return $merged;
+    }
+
+    /**
+     * O título da coluna fica no nome do componente. Ao reabrir, devolve esse nome
+     * para nomes_blocos sem apagar um título que o usuário acabou de digitar.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function reidratarNomesDosComponentes(array &$estado): void
+    {
+        if (!is_array($estado['nomes_blocos'] ?? null)) {
+            $estado['nomes_blocos'] = [];
+        }
+        $rascunho = is_array($estado['rascunho_preservado'] ?? null) ? $estado['rascunho_preservado'] : [];
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        foreach ($comps as $c) {
+            if (!is_array($c) || count($estado['nomes_blocos']) >= 40) {
+                break;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || $cod === '_semanal' || (bool) preg_match('/^s[1-8]$/', $cod)) {
+                continue;
+            }
+            if (!(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $cod)) {
+                continue;
+            }
+            if (trim((string) ($estado['nomes_blocos'][$cod] ?? '')) !== '') {
+                continue;
+            }
+            if ($this->colunaTituloFoiLimpo($estado, $cod)) {
+                continue;
+            }
+            $nome = trim(mb_substr((string) ($c['nome'] ?? ''), 0, 60));
+            if ($nome === '') {
+                continue;
+            }
+            $estado['nomes_blocos'][$cod] = $nome;
+        }
     }
 
     /**
@@ -2777,6 +2828,73 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * Códigos cujo título o usuário apagou nesta edição.
+     * Não podem ser reidratados a partir do nome antigo do componente.
+     *
+     * @param mixed $raw
+     * @return array<string,true>
+     */
+    private function normalizarNomesLimpos($raw): array
+    {
+        $out = [];
+        if (!is_array($raw)) {
+            return $out;
+        }
+        foreach ($raw as $codigo => $marcado) {
+            if (!$marcado) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) $codigo));
+            if ($codigo === '' || $codigo === '_semanal' || (bool) preg_match('/^s[1-8]$/', $codigo)) {
+                continue;
+            }
+            if (!(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $codigo)) {
+                continue;
+            }
+            $out[$codigo] = true;
+            if (count($out) >= 40) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    private function colunaTituloFoiLimpo(array $estado, string $cod): bool
+    {
+        $limpos = is_array($estado['nomes_limpos'] ?? null) ? $estado['nomes_limpos'] : [];
+        $cod = strtolower(trim($cod));
+        if ($cod !== '' && !empty($limpos[$cod])) {
+            return true;
+        }
+        $aliases = [
+            'media_sem' => 'semanal',
+            'semanal' => 'media_sem',
+            'prova_bim' => 'bimestral',
+            'bimestral' => 'prova_bim',
+            'rec' => 'recuperacao',
+            'recuperacao' => 'rec',
+            'trab' => 'trabalho',
+            'trabalho' => 'trab',
+            'part' => 'participacao',
+            'participacao' => 'part',
+        ];
+        $outro = $aliases[$cod] ?? '';
+
+        return $outro !== '' && !empty($limpos[$outro]);
+    }
+
+    private function nomePadraoColuna(string $cod): string
+    {
+        return match ($cod) {
+            'media_bim' => 'Média Bim',
+            'media_final' => 'Resultado Final',
+            'media_sem' => 'Média Sem',
+            default => $cod,
+        };
+    }
+
+    /**
      * @param list<array{type:string,value:string,label?:string}> $tokens
      * @param array<string,array{codigo:string,papel?:string,nome?:string}> $mapaCodigo
      * @param list<string> $pecasPermitidas
@@ -3315,6 +3433,7 @@ class BoletimAssistenteWizard
             $config['distribuicao_notas'] = ($dist === 'nota_unica_todas_linhas')
                 ? 'nota_unica_todas_linhas'
                 : 'por_materia';
+            $config = $this->aplicarMateriasJornadaNoConfig($config, $estado);
         } elseif ($base['source_type'] === 'provas_sistema') {
             $tipoRef = $tipoId > 0 ? $tipoId : ($base['tipo_sugerido'] !== '' ? $base['tipo_sugerido'] : $filtroTitulo);
             $bimsPeca = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
@@ -3524,6 +3643,26 @@ class BoletimAssistenteWizard
             $estado['jornada_distribuicao_notas'] = ($dist === 'nota_unica_todas_linhas')
                 ? 'nota_unica_todas_linhas'
                 : 'por_materia';
+            if (array_key_exists('nota_unica_incluir_materias', $cfg) && is_array($cfg['nota_unica_incluir_materias'])) {
+                $incluir = [];
+                foreach ($cfg['nota_unica_incluir_materias'] as $midInc) {
+                    $midInc = (int) $midInc;
+                    if ($midInc > 0) {
+                        $incluir[] = $midInc;
+                    }
+                }
+                $estado['jornada_materias_ids'] = array_values(array_unique($incluir));
+                $estado['jornada_materias_tocada'] = true;
+            } else {
+                $omitir = [];
+                foreach ((array) ($cfg['nota_unica_omitir_materias'] ?? []) as $midOm) {
+                    $midOm = (int) $midOm;
+                    if ($midOm > 0) {
+                        $omitir[] = $midOm;
+                    }
+                }
+                $estado['jornada_materias_omitir'] = array_values(array_unique($omitir));
+            }
             return;
         }
     }
@@ -3586,6 +3725,7 @@ class BoletimAssistenteWizard
             } elseif ($bimsEstado !== []) {
                 $cfg['jornada_bimestres'] = $bimsEstado;
             }
+            $cfg = $this->aplicarMateriasJornadaNoConfig($cfg, $estado);
             $c['config'] = $cfg;
             $c['config_json'] = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             $comps[$i] = $c;
@@ -3595,6 +3735,48 @@ class BoletimAssistenteWizard
             $rascunho['componentes'] = $comps;
         }
         return $rascunho;
+    }
+
+    /**
+     * Matérias marcadas na média única. Null = o usuário ainda não escolheu.
+     *
+     * @param array<string,mixed> $estado
+     * @return list<int>|null
+     */
+    private function idsMateriasJornadaDoEstado(array $estado): ?array
+    {
+        if (empty($estado['jornada_materias_tocada'])) {
+            return null;
+        }
+        if (((string) ($estado['jornada_distribuicao_notas'] ?? '')) !== 'nota_unica_todas_linhas') {
+            return null;
+        }
+        $ids = [];
+        foreach ((array) ($estado['jornada_materias_ids'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param array<string,mixed> $cfg
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function aplicarMateriasJornadaNoConfig(array $cfg, array $estado): array
+    {
+        $ids = $this->idsMateriasJornadaDoEstado($estado);
+        if ($ids === null) {
+            return $cfg;
+        }
+        $cfg['nota_unica_incluir_materias'] = $ids;
+        unset($cfg['nota_unica_omitir_materias']);
+
+        return $cfg;
     }
 
     /**
@@ -3991,14 +4173,17 @@ class BoletimAssistenteWizard
             if ($nomeCustom !== '') {
                 $c['nome'] = $nomeCustom;
             }
+            if ($this->colunaTituloFoiLimpo($estado, $cod)) {
+                $c['nome'] = $this->nomePadraoColuna($cod);
+            }
             if ($cod === 'media_final') {
                 $c['config']['layout_type'] = 'media';
-                if ($nomeCustom === '') {
+                if ($nomeCustom === '' && trim((string) ($c['nome'] ?? '')) === '') {
                     $c['nome'] = 'Resultado Final';
                 }
             } elseif ($cod === 'media_bim') {
                 $c['config']['layout_type'] = 'media';
-                if ($nomeCustom === '') {
+                if ($nomeCustom === '' && trim((string) ($c['nome'] ?? '')) === '') {
                     $c['nome'] = 'Média Bim';
                 }
             } else {
@@ -4077,9 +4262,9 @@ class BoletimAssistenteWizard
                 continue;
             }
             $nomeCustom = trim((string) ((is_array($estado['nomes_blocos'] ?? null) ? $estado['nomes_blocos'] : [])[$codigoAlvo] ?? ''));
-            $nome = $nomeCustom !== '' ? $nomeCustom : ($nomes[$codigoAlvo] ?? $codigoAlvo);
             $idxExistente = null;
             $sourceExistente = '';
+            $nomeExistente = '';
             foreach ($comps as $i => $c) {
                 if (!is_array($c)) {
                     continue;
@@ -4089,7 +4274,15 @@ class BoletimAssistenteWizard
                 }
                 $idxExistente = $i;
                 $sourceExistente = (string) ($c['source_type'] ?? '');
+                $nomeExistente = trim((string) ($c['nome'] ?? ''));
                 break;
+            }
+            if ($this->colunaTituloFoiLimpo($estado, $codigoAlvo)) {
+                $nome = $this->nomePadraoColuna($codigoAlvo);
+            } else {
+                $nome = $nomeCustom !== ''
+                    ? $nomeCustom
+                    : ($nomeExistente !== '' ? $nomeExistente : ($nomes[$codigoAlvo] ?? $codigoAlvo));
             }
             if ($idxExistente !== null && $sourceExistente !== 'calculado') {
                 continue;
@@ -4208,6 +4401,10 @@ class BoletimAssistenteWizard
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
             if ($cod === '' || (bool) preg_match('/^s[1-8]$/', $cod)) {
+                continue;
+            }
+            if ($this->colunaTituloFoiLimpo($estado, $cod)) {
+                $c['nome'] = $this->nomePadraoColuna($cod);
                 continue;
             }
             $nome = trim((string) ($nomes[$cod] ?? ''));

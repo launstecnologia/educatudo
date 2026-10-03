@@ -422,6 +422,10 @@ class BoletimAssistenteController extends BaseController
                     if (isset($cfgWizard['jornada_bimestres']) && is_array($cfgWizard['jornada_bimestres'])) {
                         $cfgSalva['jornada_bimestres'] = $cfgWizard['jornada_bimestres'];
                     }
+                    if (array_key_exists('nota_unica_incluir_materias', $cfgWizard) && is_array($cfgWizard['nota_unica_incluir_materias'])) {
+                        $cfgSalva['nota_unica_incluir_materias'] = $cfgWizard['nota_unica_incluir_materias'];
+                        unset($cfgSalva['nota_unica_omitir_materias']);
+                    }
                     if ($usarPercWizard !== null) {
                         $comp['usar_percentual'] = (int) ((int) $usarPercWizard ? 1 : 0);
                     }
@@ -1373,6 +1377,17 @@ class BoletimAssistenteController extends BaseController
             }
             $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
             $config['distribuicao_notas'] = $dist;
+            if ($dist === 'nota_unica_todas_linhas' && !empty($estado['jornada_materias_tocada'])) {
+                $incluirJornada = [];
+                foreach ((array) ($estado['jornada_materias_ids'] ?? []) as $midJornada) {
+                    $midJornada = (int) $midJornada;
+                    if ($midJornada > 0) {
+                        $incluirJornada[] = $midJornada;
+                    }
+                }
+                $config['nota_unica_incluir_materias'] = array_values(array_unique($incluirJornada));
+                unset($config['nota_unica_omitir_materias']);
+            }
             if ($notaModo === 'faixas') {
                 $config['faixas_percentuais'] = $faixas;
                 $comp['usar_percentual'] = 0;

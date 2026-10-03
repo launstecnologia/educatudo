@@ -595,7 +595,8 @@ Manual desta tela (não invente botão ou regra fora disto):
 - Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada do aluno…). O título do evento não define o tipo.
 - Prova Semanal mostra os eventos daquele tipo no bimestre marcado. Semanas S1–S8: Bloco A ímpares, Bloco B pares.
 - Média = soma entre parênteses ÷ quantidade. Ex.: (Prova Semanal + Avaliação Bimestral + Jornada) ÷ 3.
-- Quando sugerir um cálculo, escreva uma linha exatamente assim: Nome da coluna = expressão. Use menor(), maior(), parênteses, +, −, × e ÷. Use o título da coluna como está na tela (Média Bim, Recuperação, ENAC, Resultado Final ou o título que o evento já tem). Ex.: Resultado Final = menor(7, maior(Média Bim, Recuperação)).
+- Quando sugerir um cálculo, escreva uma linha exatamente assim: Nome da coluna = expressão. Use menor(), maior(), parênteses, +, −, × e ÷. Use o título da coluna como está na tela (Média Bim, Recuperação, ENAC, Resultado Final ou o título que o evento já tem).
+- Se a recuperação só entra quando for maior que a média, e a recuperação não pode passar de 7: Resultado Final = maior(Média Bim, menor(7, Recuperação)). Sem recuperação, o resultado continua a Média Bim, mesmo acima de 7. Não use menor(7, maior(Média Bim, Recuperação)): isso limita a média também.
 - Para ficar com a média e só trocar se o ENAC for maior: Resultado Final = maior(Média Bim, ENAC). Não use "Maior entre as duas primeiras".
 - Se a conta for (Média Bim + ENAC) ÷ 2 e esse resultado só entra quando for maior que a Média Bim: Resultado Final = maior((Média Bim + ENAC) ÷ 2, Média Bim). Explique com um exemplo numérico, sem fórmula técnica.
 - Jornada entra pelo bimestre cadastrado na jornada.

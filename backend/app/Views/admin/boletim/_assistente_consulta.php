@@ -5,13 +5,72 @@
  */
 $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
 ?>
+<style>
+#bw-consulta-panel:not(.hidden) {
+    display: flex;
+}
+#bw-consulta-panel {
+    position: relative;
+    flex-direction: column;
+    width: min(24rem, calc(100vw - 2rem));
+    height: min(32rem, calc(100vh - 7rem));
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 7rem);
+    min-width: 18rem;
+    min-height: 16rem;
+    overflow: hidden;
+}
+#bw-consulta-panel .bw-consulta-cabeca,
+#bw-consulta-panel .bw-consulta-atalhos,
+#bw-consulta-form {
+    flex: 0 0 auto;
+}
+#bw-consulta-panel .bw-consulta-atalhos {
+    max-height: 6rem;
+    overflow-y: auto;
+}
+#bw-consulta-msgs {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+#bw-consulta-msgs img {
+    display: block;
+    max-width: 100%;
+    max-height: 9rem;
+    object-fit: contain;
+}
+#bw-consulta-msgs .whitespace-pre-wrap {
+    overflow-wrap: anywhere;
+}
+#bw-consulta-resize {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    cursor: nwse-resize;
+}
+#bw-consulta-resize:hover { color: #334155; }
+#bw-consulta-panel.bw-redimensionando { user-select: none; }
+</style>
 <div id="bw-consulta-root" class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none"
      data-url="<?= htmlspecialchars(URL . '/admin/boletim-configuracao/assistente/consulta', ENT_QUOTES, 'UTF-8') ?>"
      data-csrf="<?= htmlspecialchars((string) ($csrfToken ?? ''), ENT_QUOTES, 'UTF-8') ?>"
      data-disponivel="<?= $boletimAssistenteDisponivel ? '1' : '0' ?>">
     <div class="pointer-events-auto flex flex-col items-end gap-3">
-        <div id="bw-consulta-panel" class="hidden w-[min(100vw-2rem,24rem)] h-[min(70vh,32rem)] bg-white border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden">
-            <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-3">
+        <div id="bw-consulta-panel" class="hidden bg-white border border-slate-200 shadow-2xl rounded-2xl">
+            <button type="button" id="bw-consulta-resize" aria-label="Redimensionar" title="Arraste para redimensionar">
+                <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-width="1.5" d="M5 3H3v2M3 9v4h4M9 13h4"/></svg>
+            </button>
+            <div class="bw-consulta-cabeca px-4 py-3 pl-6 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-900">Assistente do evento de notas</h3>
                     <p class="text-xs text-slate-500">Pergunte, ou cole um print para conferir o que está errado ou não marcado.</p>
@@ -30,7 +89,7 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                     Pergunte como montar a média, peça um dado real, ou cole um print (Ctrl+V). O print é comparado com o que está marcado neste evento.
                 </div>
             </div>
-            <div class="px-3 pt-2 flex flex-wrap gap-1.5 border-t border-slate-100 bg-white">
+            <div class="bw-consulta-atalhos px-3 pt-2 pb-2 flex flex-wrap gap-1.5 border-t border-slate-100 bg-white max-h-24 overflow-y-auto">
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Como ficar com a média e só trocar se o ENAC for maior?">ENAC maior que a média</button>
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Como calcular a média das peças?">Como calcular a média</button>
                 <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Quantas jornadas a Alice Cardoso Mariano fez no 1º bimestre?">Jornadas de um aluno</button>
@@ -275,6 +334,51 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
         }
     });
     if (printLimpar) printLimpar.addEventListener('click', limparPrint);
+    (function () {
+        var alca = document.getElementById('bw-consulta-resize');
+        if (!alca || !panel) return;
+        var chave = 'bw-consulta-tamanho';
+        try {
+            var salvo = JSON.parse(localStorage.getItem(chave) || 'null');
+            if (salvo && salvo.w && salvo.h) {
+                panel.style.width = Math.round(salvo.w) + 'px';
+                panel.style.height = Math.round(salvo.h) + 'px';
+            }
+        } catch (e) {}
+        function limitar(px, min, max) {
+            return Math.max(min, Math.min(max, px));
+        }
+        alca.addEventListener('pointerdown', function (e) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            var rect = panel.getBoundingClientRect();
+            var inicioX = e.clientX;
+            var inicioY = e.clientY;
+            var largura = rect.width;
+            var altura = rect.height;
+            panel.classList.add('bw-redimensionando');
+            function mover(ev) {
+                var maxW = Math.max(280, window.innerWidth - 32);
+                var maxH = Math.max(260, window.innerHeight - 112);
+                panel.style.width = limitar(largura + (inicioX - ev.clientX), 280, maxW) + 'px';
+                panel.style.height = limitar(altura + (inicioY - ev.clientY), 260, maxH) + 'px';
+            }
+            function soltar() {
+                panel.classList.remove('bw-redimensionando');
+                document.removeEventListener('pointermove', mover);
+                document.removeEventListener('pointerup', soltar);
+                try {
+                    var atual = panel.getBoundingClientRect();
+                    localStorage.setItem(chave, JSON.stringify({
+                        w: Math.round(atual.width),
+                        h: Math.round(atual.height)
+                    }));
+                } catch (err) {}
+            }
+            document.addEventListener('pointermove', mover);
+            document.addEventListener('pointerup', soltar);
+        });
+    })();
     root.querySelectorAll('.bw-consulta-atalho').forEach(function (b) {
         b.addEventListener('click', function () {
             abrir(false);
