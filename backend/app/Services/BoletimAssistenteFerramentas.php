@@ -634,7 +634,8 @@ class BoletimAssistenteFerramentas
         ?string $dataFim = null,
         int $limit = 100,
         ?int $semana = null,
-        array $bimestres = []
+        array $bimestres = [],
+        int $anoLetivo = 0
     ): array {
         $tipo = $this->resolverTipoAvaliacao($tipoAvaliacaoIdOuNome);
         if ($tipo === null) {
@@ -644,7 +645,7 @@ class BoletimAssistenteFerramentas
         $eventos = [];
         $vistos = [];
         foreach ($this->idsTiposDaMesmaPeca($tipo) as $tipoId) {
-            foreach ($this->listarEventosProva($tipoId, max($limit, 4000)) as $ev) {
+            foreach ($this->listarEventosProva($tipoId, max($limit, 4000), $anoLetivo) as $ev) {
                 $idEv = (int) ($ev['id'] ?? 0);
                 if ($idEv <= 0 || isset($vistos[$idEv])) {
                     continue;

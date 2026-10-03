@@ -3866,7 +3866,8 @@ class BoletimConfigController extends BaseController
                 $blocoIds,
                 $range['inicio'] ?? null,
                 $range['fim'] ?? null,
-                $bimestresComp
+                $bimestresComp,
+                (int) ($regra['ano_letivo'] ?? 0)
             );
             $blocoIds = $resolvidoQuadro['bloco_ids'];
             $quadroForcado = !empty($resolvidoQuadro['forcada']);
@@ -4602,7 +4603,8 @@ class BoletimConfigController extends BaseController
                     $blocoIds,
                     $range['inicio'] ?? null,
                     $range['fim'] ?? null,
-                    $bimestresComp
+                    $bimestresComp,
+                    (int) ($regra['ano_letivo'] ?? 0)
                 );
                 $blocoIds = $resolvidoQuadro['bloco_ids'];
                 $quadroForcado = !empty($resolvidoQuadro['forcada']);
@@ -11232,7 +11234,8 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Mesma lista de eventos da montagem: semana do quadro, bimestre e tipos da mesma peça.
+     * Mesma lista da montagem: ano do evento, bimestre marcado e semana do quadro.
+     * Evento sem bimestre não entra quando a peça já tem bimestre — a lista marcada também não mostra.
      *
      * @param list<int> $bimestres
      * @return list<int>
@@ -11242,7 +11245,8 @@ class BoletimConfigController extends BaseController
         int $semana,
         ?string $inicio,
         ?string $fim,
-        array $bimestres
+        array $bimestres,
+        int $anoLetivo = 0
     ): array {
         $bims = [];
         foreach ($bimestres as $bimestre) {
@@ -11252,27 +11256,43 @@ class BoletimConfigController extends BaseController
             }
         }
         sort($bims);
-        $chave = $tipoAvaliacaoId . '|' . $semana . '|' . (string) $inicio . '|' . (string) $fim . '|' . implode(',', $bims);
-        if (isset($this->blocosSemanaAssistenteCache[$chave])) {
-            return $this->blocosSemanaAssistenteCache[$chave];
-        }
         if (!class_exists('BoletimAssistenteFerramentas', false)) {
             require_once dirname(__DIR__, 2) . '/Services/BoletimAssistenteFerramentas.php';
         }
-        $resolvido = (new BoletimAssistenteFerramentas($this->boletimConfig))->resolverBlocosPorTipo(
+        $ferramentas = new BoletimAssistenteFerramentas($this->boletimConfig);
+        if ($anoLetivo < 2000 || $anoLetivo > 2100) {
+            $anoLetivo = $ferramentas->anoLetivoPadrao();
+        }
+        $chave = $tipoAvaliacaoId . '|' . $semana . '|' . (string) $inicio . '|' . (string) $fim
+            . '|' . implode(',', $bims) . '|' . $anoLetivo;
+        if (isset($this->blocosSemanaAssistenteCache[$chave])) {
+            return $this->blocosSemanaAssistenteCache[$chave];
+        }
+        $resolvido = $ferramentas->resolverBlocosPorTipo(
             $tipoAvaliacaoId,
             $inicio,
             $fim,
             4000,
             $semana,
-            $bims
+            $bims,
+            $anoLetivo
         );
         $ids = [];
-        foreach ((array) ($resolvido['blocos_ids'] ?? []) as $id) {
-            $id = (int) $id;
-            if ($id > 0) {
-                $ids[$id] = $id;
+        foreach ((array) ($resolvido['eventos'] ?? []) as $ev) {
+            if (!is_array($ev)) {
+                continue;
             }
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ($bims !== []) {
+                $bimEv = (int) ($ev['bimestre'] ?? 0);
+                if (!in_array($bimEv, $bims, true)) {
+                    continue;
+                }
+            }
+            $ids[$id] = $id;
         }
 
         return $this->blocosSemanaAssistenteCache[$chave] = array_values($ids);
@@ -11290,7 +11310,8 @@ class BoletimConfigController extends BaseController
         array $blocoIds,
         ?string $inicio,
         ?string $fim,
-        array $bimestresComp
+        array $bimestresComp,
+        int $anoLetivo = 0
     ): array {
         // Coluna sN: sempre tipo + semana (igual ao assistente). grupo_regras_* sem filtro
         // de semana misturava/zerava S1–S8 na simulação da home.
@@ -11352,7 +11373,7 @@ class BoletimConfigController extends BaseController
         $manualSemana = !empty($cfgSemana['blocos_ids_manual']);
         if (!$manualSemana && $tipoAvaliacaoComp > 0) {
             return [
-                'bloco_ids' => $this->blocosSemanaComoAssistente($tipoAvaliacaoComp, $semanaComp, $inicio, $fim, $bimestresComp),
+                'bloco_ids' => $this->blocosSemanaComoAssistente($tipoAvaliacaoComp, $semanaComp, $inicio, $fim, $bimestresComp, $anoLetivo),
                 'forcada' => true,
             ];
         }
@@ -11370,7 +11391,7 @@ class BoletimConfigController extends BaseController
         }
         if ($tipoAvaliacaoComp > 0) {
             return [
-                'bloco_ids' => $this->blocosSemanaComoAssistente($tipoAvaliacaoComp, $semanaComp, $inicio, $fim, $bimestresComp),
+                'bloco_ids' => $this->blocosSemanaComoAssistente($tipoAvaliacaoComp, $semanaComp, $inicio, $fim, $bimestresComp, $anoLetivo),
                 'forcada' => true,
             ];
         }
