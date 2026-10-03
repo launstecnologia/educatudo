@@ -23,6 +23,8 @@ class BoletimConfig
     private array $regraPorCodigoCache = [];
     /** @var array<string, bool> */
     private array $tabelaExisteCache = [];
+    /** @var array<int, list<array{id:int,versao:int,created_at:string}>> */
+    private array $configVersoesCasarCache = [];
 
     public function __construct()
     {
@@ -897,6 +899,68 @@ class BoletimConfig
     }
 
     /**
+     * A geração de notas nasce logo depois da versão da configuração.
+     * O ID e o número exibidos são os da configuração, para as duas listas baterem.
+     *
+     * @return array{id:int,versao:int,created_at:string}
+     */
+    public function casarVersaoConfig(int $regraId, string $criadoEmNota): array
+    {
+        $tsNota = strtotime($criadoEmNota);
+        if ($regraId <= 0 || $tsNota === false) {
+            return [];
+        }
+        $escolhida = [];
+        $primeiraDepois = [];
+        foreach ($this->versoesConfigParaCasar($regraId) as $cv) {
+            $ts = strtotime($cv['created_at']);
+            if ($ts === false) {
+                continue;
+            }
+            if ($ts <= $tsNota) {
+                $escolhida = $cv;
+                continue;
+            }
+            if ($primeiraDepois === [] && $ts <= $tsNota + 30) {
+                $primeiraDepois = $cv;
+            }
+        }
+
+        return $escolhida !== [] ? $escolhida : $primeiraDepois;
+    }
+
+    /**
+     * @return list<array{id:int,versao:int,created_at:string}>
+     */
+    private function versoesConfigParaCasar(int $regraId): array
+    {
+        if (isset($this->configVersoesCasarCache[$regraId])) {
+            return $this->configVersoesCasarCache[$regraId];
+        }
+        $this->ensureSchemaVersionamento();
+        $rows = $this->db->fetchAll(
+            'SELECT id, versao, created_at
+             FROM boletim_config_versoes
+             WHERE regra_id = :regra_id
+             ORDER BY created_at ASC, id ASC',
+            ['regra_id' => $regraId]
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $out[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'versao' => (int) ($row['versao'] ?? 0),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+            ];
+        }
+
+        return $this->configVersoesCasarCache[$regraId] = $out;
+    }
+
+    /**
      * @return array<string,mixed>|null
      */
     public function obterSnapshotConfiguracao(int $regraId, int $versaoId): ?array
@@ -1636,7 +1700,18 @@ class BoletimConfig
         }
         $sql .= " ORDER BY versao DESC, id DESC LIMIT {$limit}";
 
-        return $this->db->fetchAll($sql, $params) ?: [];
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        foreach ($rows as &$geracao) {
+            if (!is_array($geracao)) {
+                continue;
+            }
+            $casada = $this->casarVersaoConfig($regraId, (string) ($geracao['created_at'] ?? ''));
+            $geracao['config_id'] = (int) ($casada['id'] ?? 0);
+            $geracao['config_versao'] = (int) ($casada['versao'] ?? 0);
+        }
+        unset($geracao);
+
+        return $rows;
     }
 
     public function findGeracao(int $geracaoId): ?array
@@ -1767,7 +1842,7 @@ class BoletimConfig
             ? ', MAX(ge.usuario_nome) AS usuario_nome, MAX(ge.modo) AS modo'
             : ', NULL AS usuario_nome, NULL AS modo';
 
-        return $this->db->fetchAll(
+        $rows = $this->db->fetchAll(
             "SELECT g.versao, MIN(g.id) AS id, MAX(g.vigente) AS vigente, MAX(g.geracao_id) AS geracao_id,
                     MIN(g.created_at) AS created_at {$selectExtra}
              FROM boletim_resultados_gerados g
@@ -1782,6 +1857,17 @@ class BoletimConfig
                 'periodo_ref' => $periodoRef,
             ]
         ) ?: [];
+        foreach ($rows as &$row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $casada = $this->casarVersaoConfig($regraId, (string) ($row['created_at'] ?? ''));
+            $row['config_id'] = (int) ($casada['id'] ?? 0);
+            $row['config_versao'] = (int) ($casada['versao'] ?? 0);
+        }
+        unset($row);
+
+        return $rows;
     }
 
     /**
@@ -1836,6 +1922,12 @@ class BoletimConfig
 
         $porChave = [];
         foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $casada = $this->casarVersaoConfig((int) ($ev['regra_id'] ?? 0), (string) ($ev['created_at'] ?? ''));
+            $ev['config_id'] = (int) ($casada['id'] ?? 0);
+            $ev['config_versao'] = (int) ($casada['versao'] ?? 0);
             $chave = (int) ($ev['regra_id'] ?? 0) . '|' . (int) ($ev['aluno_id'] ?? 0) . '|' . (string) ($ev['periodo_ref'] ?? '');
             $porChave[$chave][] = $ev;
         }

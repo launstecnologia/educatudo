@@ -38,14 +38,21 @@ foreach ($boletimVersoes as $versaoItem) {
     } else {
         $texto = $verbo . ' por ' . $nome . ' em ' . $quando;
     }
-    $idVersao = (int) ($versaoItem['geracao_id'] ?? 0);
+    $idVersao = (int) ($versaoItem['config_id'] ?? 0);
+    $numExibir = (int) ($versaoItem['config_versao'] ?? 0);
+    if ($idVersao <= 0) {
+        $idVersao = (int) ($versaoItem['geracao_id'] ?? 0);
+    }
     if ($idVersao <= 0) {
         $idVersao = (int) ($versaoItem['id'] ?? 0);
+    }
+    if ($numExibir <= 0) {
+        $numExibir = $num;
     }
     $linhasVersao[] = [
         'num' => $num,
         'id' => $idVersao,
-        'texto' => ($idVersao > 0 ? 'ID ' . $idVersao . ' · ' : '') . 'v' . $num . ' · ' . $texto,
+        'texto' => ($idVersao > 0 ? 'ID ' . $idVersao . ' · ' : '') . 'v' . $numExibir . ' · ' . $texto,
         'vigente' => (int) ($versaoItem['vigente'] ?? 0) === 1,
     ];
 }

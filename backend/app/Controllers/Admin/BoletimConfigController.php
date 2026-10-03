@@ -59,6 +59,8 @@ class BoletimConfigController extends BaseController
     private array $seriesEscopoGeracao = [];
     /** @var array<string, list<int>> */
     private array $blocosFiltradosPorTurmaCache = [];
+    /** @var array<string, list<int>> */
+    private array $blocosSemanaAssistenteCache = [];
     /** @var array<int, array{a: list<int>, b: list<int>}> */
     private array $semanasQuadroCache = [];
     private const TAMANHO_LOTE_ALUNOS_PERSISTIR = 200;
@@ -947,6 +949,25 @@ class BoletimConfigController extends BaseController
             }
         }
 
+        $boletim_versoes = ((int) ($evento['preview'] ?? 0) === 1)
+            ? []
+            : $this->boletimConfig->listarVersoesAluno($regraId, $alunoId, $periodoRef);
+        $idExibido = (int) ($evento['geracao_id'] ?? 0);
+        if ($idExibido <= 0) {
+            $idExibido = (int) ($evento['id'] ?? 0);
+        }
+        $versaoExibida = (int) ($evento['versao'] ?? 0);
+        foreach ($boletim_versoes as $versaoItem) {
+            if (!is_array($versaoItem) || (int) ($versaoItem['versao'] ?? 0) !== $versaoExibida) {
+                continue;
+            }
+            if ((int) ($versaoItem['config_id'] ?? 0) > 0) {
+                $idExibido = (int) $versaoItem['config_id'];
+                $versaoExibida = (int) ($versaoItem['config_versao'] ?? $versaoExibida);
+            }
+            break;
+        }
+
         $rotuloBimestre = PeriodoLetivo::rotuloBoletim(
             (int) ($evento['ano_letivo'] ?? 0),
             (int) ($evento['bimestre'] ?? 0),
@@ -961,18 +982,12 @@ class BoletimConfigController extends BaseController
             ((int) ($evento['preview'] ?? 0) === 1)
                 ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800">preview</span>'
                 : '',
-            ((int) ($evento['versao'] ?? 0) > 0)
+            ($versaoExibida > 0)
                 ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700">'
-                    . (((int) ($evento['geracao_id'] ?? 0) > 0)
-                        ? 'ID ' . (int) $evento['geracao_id'] . ' · '
-                        : (((int) ($evento['id'] ?? 0) > 0) ? 'ID ' . (int) $evento['id'] . ' · ' : ''))
-                    . 'versão ' . (int) $evento['versao'] . (((int) ($evento['vigente'] ?? 0) === 1) ? ' vigente' : '') . '</span>'
+                    . ($idExibido > 0 ? 'ID ' . $idExibido . ' · ' : '')
+                    . 'versão ' . $versaoExibida . (((int) ($evento['vigente'] ?? 0) === 1) ? ' vigente' : '') . '</span>'
                 : ''
         );
-
-        $boletim_versoes = ((int) ($evento['preview'] ?? 0) === 1)
-            ? []
-            : $this->boletimConfig->listarVersoesAluno($regraId, $alunoId, $periodoRef);
         $boletim_versoes_fallback = (string) ($evento['updated_at'] ?? '');
         $boletim_versoes_compact = false;
         $boletim_versao_aberta = (int) ($evento['versao'] ?? 0);
@@ -3841,8 +3856,9 @@ class BoletimConfigController extends BaseController
                 continue;
             }
             $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
-            $bimestresComp = $this->parseProvaBimestresFromComponente($componente);
-            if ($blocoIds !== [] && $bimestresComp !== []) {
+            $bimestresComp = $this->bimestresDoComponenteOuRegra($componente, $regra);
+            $cfgBlocos = $this->decodeComponenteConfig($componente);
+            if ($blocoIds !== [] && $bimestresComp !== [] && empty($cfgBlocos['blocos_ids_manual'])) {
                 $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
             }
             $resolvidoQuadro = $this->resolverBlocosQuadroDoComponente(
@@ -4576,8 +4592,9 @@ class BoletimConfigController extends BaseController
                     ? null
                     : ($materiaFiltro > 0 ? $materiaFiltro : null);
                 $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
-                $bimestresComp = $this->parseProvaBimestresFromComponente($componente);
-                if ($blocoIds !== [] && $bimestresComp !== []) {
+                $bimestresComp = $this->bimestresDoComponenteOuRegra($componente, $regra);
+                $cfgBlocos = $this->decodeComponenteConfig($componente);
+                if ($blocoIds !== [] && $bimestresComp !== [] && empty($cfgBlocos['blocos_ids_manual'])) {
                     $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
                 }
                 $resolvidoQuadro = $this->resolverBlocosQuadroDoComponente(
@@ -11194,6 +11211,74 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Bimestres marcados na peça. Se a coluna não tiver, usa o bimestre do evento.
+     *
+     * @param array<string,mixed> $componente
+     * @param array<string,mixed> $regra
+     * @return list<int>
+     */
+    private function bimestresDoComponenteOuRegra(array $componente, array $regra): array
+    {
+        $bimestres = $this->parseProvaBimestresFromComponente($componente);
+        if ($bimestres !== []) {
+            return $bimestres;
+        }
+        $bimestre = (int) ($regra['bimestre'] ?? 0);
+        if ($bimestre >= 1 && $bimestre <= 4) {
+            return [$bimestre];
+        }
+
+        return [];
+    }
+
+    /**
+     * Mesma lista de eventos da montagem: semana do quadro, bimestre e tipos da mesma peça.
+     *
+     * @param list<int> $bimestres
+     * @return list<int>
+     */
+    private function blocosSemanaComoAssistente(
+        int $tipoAvaliacaoId,
+        int $semana,
+        ?string $inicio,
+        ?string $fim,
+        array $bimestres
+    ): array {
+        $bims = [];
+        foreach ($bimestres as $bimestre) {
+            $n = (int) $bimestre;
+            if ($n >= 1 && $n <= 4 && !in_array($n, $bims, true)) {
+                $bims[] = $n;
+            }
+        }
+        sort($bims);
+        $chave = $tipoAvaliacaoId . '|' . $semana . '|' . (string) $inicio . '|' . (string) $fim . '|' . implode(',', $bims);
+        if (isset($this->blocosSemanaAssistenteCache[$chave])) {
+            return $this->blocosSemanaAssistenteCache[$chave];
+        }
+        if (!class_exists('BoletimAssistenteFerramentas', false)) {
+            require_once dirname(__DIR__, 2) . '/Services/BoletimAssistenteFerramentas.php';
+        }
+        $resolvido = (new BoletimAssistenteFerramentas($this->boletimConfig))->resolverBlocosPorTipo(
+            $tipoAvaliacaoId,
+            $inicio,
+            $fim,
+            4000,
+            $semana,
+            $bims
+        );
+        $ids = [];
+        foreach ((array) ($resolvido['blocos_ids'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+
+        return $this->blocosSemanaAssistenteCache[$chave] = array_values($ids);
+    }
+
+    /**
      * Resolve eventos de prova da coluna: IDs do grupo (tipo+marca) têm prioridade sobre semana.
      *
      * @param list<int> $blocoIds
@@ -11263,6 +11348,17 @@ class BoletimConfigController extends BaseController
             return ['bloco_ids' => $blocoIds, 'forcada' => $blocoIds !== []];
         }
 
+        $cfgSemana = $this->decodeComponenteConfig($componente);
+        $manualSemana = !empty($cfgSemana['blocos_ids_manual']);
+        if (!$manualSemana && $tipoAvaliacaoComp > 0) {
+            return [
+                'bloco_ids' => $this->blocosSemanaComoAssistente($tipoAvaliacaoComp, $semanaComp, $inicio, $fim, $bimestresComp),
+                'forcada' => true,
+            ];
+        }
+        if ($manualSemana) {
+            return ['bloco_ids' => $blocoIds, 'forcada' => true];
+        }
         if ($blocoIds !== []) {
             $filtradosSemana = $this->boletimConfig->filtrarBlocoIdsPorSemana($blocoIds, $semanaComp);
             if ($bimestresComp !== [] && $filtradosSemana !== []) {
@@ -11273,25 +11369,10 @@ class BoletimConfigController extends BaseController
             }
         }
         if ($tipoAvaliacaoComp > 0) {
-            $buscados = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                $tipoAvaliacaoComp,
-                $semanaComp,
-                $inicio,
-                $fim,
-                $bimestresComp
-            );
-            // Período do evento às vezes não cobre data_prova da semana; tenta sem filtro de data.
-            if ($buscados === [] && ($inicio !== null || $fim !== null)) {
-                $buscados = $this->boletimConfig->buscarBlocoIdsPorTipoESemana(
-                    $tipoAvaliacaoComp,
-                    $semanaComp,
-                    null,
-                    null,
-                    $bimestresComp
-                );
-            }
-
-            return ['bloco_ids' => $buscados, 'forcada' => true];
+            return [
+                'bloco_ids' => $this->blocosSemanaComoAssistente($tipoAvaliacaoComp, $semanaComp, $inicio, $fim, $bimestresComp),
+                'forcada' => true,
+            ];
         }
 
         return ['bloco_ids' => [], 'forcada' => true];
