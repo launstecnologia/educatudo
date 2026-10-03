@@ -1717,6 +1717,7 @@ class BoletimAssistenteFerramentas
                 'blocos_ids' => $blocos,
                 'materias_ids' => $this->decodeIdsJson($c['materias_ids'] ?? null),
                 'materia_unica' => !empty($c['materia_unica']) ? 1 : 0,
+                'materia_unica_modo' => strtolower(trim((string) ($c['materia_unica_modo'] ?? 'soma'))) === 'media' ? 'media' : 'soma',
                 'usar_percentual' => !empty($c['usar_percentual']) ? 1 : 0,
                 'escala_max' => isset($c['escala_max']) ? (float) $c['escala_max'] : 10.0,
                 'obrigatorio' => !empty($c['obrigatorio']) ? 1 : 0,
@@ -2059,7 +2060,7 @@ class BoletimAssistenteFerramentas
             );
             $componentes[] = [
                 'codigo' => 'media_final',
-                'nome' => 'Média Bim Final',
+                'nome' => 'Resultado Final',
                 'source_type' => 'calculado',
                 'calc_type' => 'media',
                 'peso' => 1,

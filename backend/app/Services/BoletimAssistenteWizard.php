@@ -1848,7 +1848,7 @@ class BoletimAssistenteWizard
             'jornada' => 'Jornada do aluno',
             'enac' => 'ENAC',
             'media_bim' => 'Média Bim',
-            'media_final' => 'Média Bim Final',
+            'media_final' => 'Resultado Final',
             'trab' => 'Trabalho',
             'trabalho' => 'Trabalho',
             'part' => 'Participação',
@@ -3959,9 +3959,7 @@ class BoletimAssistenteWizard
             }
             if ($cod === 'media_final') {
                 $c['config']['layout_type'] = 'media';
-                if ($nomeCustom === '') {
-                    $c['nome'] = 'Média Bim Final';
-                }
+                $c['nome'] = 'Resultado Final';
             } elseif ($cod === 'media_bim') {
                 $c['config']['layout_type'] = 'media';
                 if ($nomeCustom === '') {
@@ -4000,7 +3998,7 @@ class BoletimAssistenteWizard
         $mapa = $this->expandirMapaFormula($mapaPecas, $comps);
         $nomes = [
             'media_bim' => 'Média Bim',
-            'media_final' => $ehQuadro ? 'Média Bim Final' : 'Média final',
+            'media_final' => 'Resultado Final',
             'media_sem' => 'Média Sem',
         ];
 
@@ -4582,8 +4580,6 @@ class BoletimAssistenteWizard
                 $ids = $idsDoEstado;
             } else {
                 $ids = array_values(array_map('intval', (array) ($encontrado['materias_ids'] ?? [])));
-                $modo = (($encontrado['modo'] ?? 'media') === 'soma') ? 'soma' : 'media';
-                $aplicarEm = (($encontrado['aplicar_em'] ?? 'boletim') === 'ambos') ? 'ambos' : 'boletim';
             }
         }
         if ($label === '' || count($ids) < 2) {
@@ -5666,7 +5662,7 @@ class BoletimAssistenteWizard
         if (in_array('recuperacao', $pecas, true)) {
             $comps[] = [
                 'codigo' => 'media_final',
-                'nome' => 'Média Bim Final',
+                'nome' => 'Resultado Final',
                 'source_type' => 'calculado',
                 'config' => [
                     'expressao' => 'max(media_bim, rec)',

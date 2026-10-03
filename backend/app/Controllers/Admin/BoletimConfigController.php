@@ -731,9 +731,11 @@ class BoletimConfigController extends BaseController
             }
         }
 
+        $nomeEvento = is_array($estadoInicial) ? trim((string) ($estadoInicial['nome'] ?? '')) : '';
+        $tituloEvento = $nomeEvento !== '' ? $nomeEvento : 'Evento de Notas';
         $data = [
-            'title' => 'Evento de Notas - EducaTudo',
-            'page_title' => 'Evento de Notas',
+            'title' => $tituloEvento . ' - EducaTudo',
+            'page_title' => $tituloEvento,
             'user' => $user,
             'current_page' => 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
@@ -1401,7 +1403,7 @@ class BoletimConfigController extends BaseController
         }
 
         $versao = (int) ($geracao['versao'] ?? 0);
-        $_SESSION['boletim_flash'] = 'Versão ' . ($versao > 0 ? $versao : $geracaoId) . ' voltou a ser a vigente. As notas antigas não foram alteradas.';
+        $_SESSION['boletim_flash'] = 'Versão ' . ($versao > 0 ? $versao : $geracaoId) . ' voltou a ser a vigente. O boletim oficial da vida escolar usa esta versão, exceto ficha homologada ou nota lançada de fora. As outras versões continuam no histórico.';
         $_SESSION['boletim_flash_type'] = 'success';
         $this->redirect('/admin/boletim-configuracao?' . http_build_query($qs));
     }
@@ -1844,8 +1846,11 @@ class BoletimConfigController extends BaseController
                 $regraId = $savedId;
                 unset($_SESSION['boletim_assistente_rascunho']);
             }
-            $gerarNotas = (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
-            if ($savedId > 0 && $gerarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
+            $publicarNotas = $exibirEm === 'notas' && (
+                (string) ($_POST['gerar_nova_versao'] ?? '') === '1'
+                || !empty($_POST['origem_assistente'])
+            );
+            if ($savedId > 0 && $publicarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
                 return;
             }
             $_SESSION['boletim_flash'] = $versaoConfig > 0
@@ -1918,6 +1923,11 @@ class BoletimConfigController extends BaseController
                     (int) (is_array($usuario) ? ($usuario['id'] ?? 0) : 0),
                     trim((string) (is_array($usuario) ? ($usuario['nome'] ?? '') : ''))
                 );
+                $exibirSnap = strtolower(trim((string) ($snap['exibir_em'] ?? '')));
+                if ($exibirSnap === 'notas'
+                    && $this->iniciarNovaVersaoNotas($savedId, (int) $nova)) {
+                    return;
+                }
                 $_SESSION['boletim_flash'] = 'Configuração da versão ' . (int) ($snap['versao'] ?? 0) . ' recuperada'
                     . ($nova > 0 ? (' e salva como versão ' . $nova . '.') : '.');
                 $_SESSION['boletim_flash_type'] = 'success';
@@ -1968,7 +1978,7 @@ class BoletimConfigController extends BaseController
         }
         $mensagem = 'Configuração salva'
             . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
-            . '. A nova versão das notas está sendo gerada e não substitui a anterior.';
+            . '. Esta versão passa a ser a vigente no detalhe do aluno e substitui a nota no boletim oficial. A anterior fica no histórico.';
         if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar', $mensagem)) {
             return true;
         }
@@ -2049,8 +2059,8 @@ class BoletimConfigController extends BaseController
         $ok = $okLista || $okVis;
         if ($ok) {
             $_SESSION['boletim_flash'] = $oculto
-                ? 'Evento desabilitado. Ele saiu desta lista, de Notas da Coordenação e da exibição da coordenação. As notas já geradas continuam no aluno.'
-                : 'Evento habilitado de novo nesta lista, em Notas da Coordenação e na exibição da coordenação.';
+                ? 'Evento desabilitado. Ele saiu desta lista, de Notas da Coordenação e do detalhe do aluno.'
+                : 'Evento habilitado de novo nesta lista, em Notas da Coordenação e no detalhe do aluno.';
             $_SESSION['boletim_flash_type'] = 'success';
         } else {
             $_SESSION['boletim_flash'] = 'Não foi possível alterar o evento.';
@@ -2827,7 +2837,10 @@ class BoletimConfigController extends BaseController
         string $mensagem = ''
     ): bool {
         if ($this->boletimConfig->temGeracaoEmAndamento($regraId)) {
-            $_SESSION['boletim_flash'] = 'Já existe uma geração em andamento para este evento. Aguarde terminar para gerar de novo.';
+            $avisoFila = 'Já existe uma geração em andamento para este evento. Aguarde terminar para gerar de novo.';
+            $_SESSION['boletim_flash'] = $mensagem !== ''
+                ? ('A configuração foi salva. ' . $avisoFila . ' Se ela ainda não começou, esta versão entra quando rodar. Se já estiver calculando, salve outra vez ao terminar.')
+                : $avisoFila;
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
         }
@@ -3254,7 +3267,7 @@ class BoletimConfigController extends BaseController
             }
             require_once dirname(__DIR__, 2) . '/Modulos/vida-escolar/Services/VidaEscolarService.php';
             $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
-            $vida->sincronizarDeEventosGerados($alunoId, $usuario, $regraId, $periodoRef, null, true, false);
+            $vida->sincronizarDeEventosGerados($alunoId, $usuario, $regraId, $periodoRef, null, true, false, true);
         } catch (Throwable $e) {
             error_log('Vida escolar sync aluno #' . $alunoId . ': ' . $e->getMessage());
         }
@@ -3854,7 +3867,7 @@ class BoletimConfigController extends BaseController
             }
             require_once dirname(__DIR__, 2) . '/Modulos/vida-escolar/Services/VidaEscolarService.php';
             $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
-            $vida->sincronizarDeEventosGeradosEmLote($alunoIds, $usuario, $regraId, $periodoRef);
+            $vida->sincronizarDeEventosGeradosEmLote($alunoIds, $usuario, $regraId, $periodoRef, true);
         } catch (Throwable $e) {
             error_log('Vida escolar sync lote: ' . $e->getMessage());
         }
@@ -9618,14 +9631,21 @@ class BoletimConfigController extends BaseController
             }
             // Lista do evento (materias_ids) prevalece sobre o cadastro — permite excluir/incluir filha por bimestre.
             if (count($idsLocais) < 2) {
-                $modeCad = strtolower(trim((string) ($cadastro['modo'] ?? 'media')));
-                $mode = $modeCad === 'soma' ? 'soma' : 'media';
                 $ids = array_values(array_map('intval', (array) $cadastro['materias_ids']));
+                $modoEvento = strtolower(trim((string) ($grp['modo_padrao'] ?? $grp['mode'] ?? '')));
+                if ($modoEvento === 'media' || $modoEvento === 'soma') {
+                    $mode = $modoEvento;
+                } else {
+                    $modeCad = strtolower(trim((string) ($cadastro['modo'] ?? 'media')));
+                    $mode = $modeCad === 'soma' ? 'soma' : 'media';
+                }
                 $divCad = $cadastro['divisor'] ?? null;
                 $divisor = ($divCad !== null && $divCad !== '' && (float) $divCad > 0)
                     ? (float) $divCad
                     : 0.0;
-                $aplicarEm = $this->normalizarGroupLineAplicarEm($cadastro['aplicar_em'] ?? $aplicarEm);
+                if (trim((string) ($grp['aplicar_em'] ?? '')) === '') {
+                    $aplicarEm = $this->normalizarGroupLineAplicarEm($cadastro['aplicar_em'] ?? $aplicarEm);
+                }
             }
             if ($key === '' && $labelCad !== '') {
                 $key = $this->slug($labelCad);
@@ -10836,8 +10856,13 @@ class BoletimConfigController extends BaseController
             // Só herda do cadastro se o evento não trouxe lista própria.
             if (count($idsLocais) < 2) {
                 $grp['materias_ids'] = $cadastro['materias_ids'];
-                $grp['mode'] = $cadastro['modo'];
-                $grp['aplicar_em'] = $cadastro['aplicar_em'];
+                $modoLocal = strtolower(trim((string) ($grp['modo_padrao'] ?? $grp['mode'] ?? '')));
+                if ($modoLocal !== 'media' && $modoLocal !== 'soma') {
+                    $grp['mode'] = $cadastro['modo'];
+                }
+                if (trim((string) ($grp['aplicar_em'] ?? '')) === '') {
+                    $grp['aplicar_em'] = $cadastro['aplicar_em'];
+                }
                 if (($cadastro['divisor'] ?? null) !== null) {
                     $grp['divisor'] = $cadastro['divisor'];
                 }

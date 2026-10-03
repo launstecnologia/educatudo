@@ -3024,7 +3024,10 @@ class BoletimConfig
         $selFinalidade = $this->hasColumn('boletim_regras', 'finalidade')
             ? 'r.finalidade'
             : "'oficial' AS finalidade";
-        $sql = "SELECT g.*, r.nome AS regra_nome, r.codigo AS regra_codigo, r.exibir_em, {$selFinalidade}, r.decimal_places, r.bimestre AS regra_bimestre, r.ano_letivo AS regra_ano_letivo
+        $selExtras = $this->hasColumn('boletim_regras', 'extras_json')
+            ? 'r.extras_json AS regra_extras_json'
+            : 'NULL AS regra_extras_json';
+        $sql = "SELECT g.*, r.nome AS regra_nome, r.codigo AS regra_codigo, r.exibir_em, {$selFinalidade}, {$selExtras}, r.decimal_places, r.bimestre AS regra_bimestre, r.ano_letivo AS regra_ano_letivo
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
              WHERE g.aluno_id = :aluno_id
@@ -3046,6 +3049,9 @@ class BoletimConfig
 
         $eventos = [];
         foreach ($rows as $r) {
+            if ($perfil === 'coordenacao' && $this->regraOcultaNaListaAvaliacoes($r)) {
+                continue;
+            }
             $k = (int) ($r['regra_id'] ?? 0) . '|' . (string) ($r['periodo_ref'] ?? '');
             if (!isset($eventos[$k])) {
                 $eventos[$k] = [
@@ -3111,6 +3117,19 @@ class BoletimConfig
         });
 
         return $eventosFiltrados;
+    }
+
+    /**
+     * Desabilitar na lista de Notas grava oculto_lista_avaliacoes no extras da regra.
+     *
+     * @param array<string,mixed> $row
+     */
+    private function regraOcultaNaListaAvaliacoes(array $row): bool
+    {
+        $raw = $row['regra_extras_json'] ?? ($row['extras_json'] ?? '');
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        return is_array($decoded) && !empty($decoded['oculto_lista_avaliacoes']);
     }
 
     public function getGeneratedBoletimByAlunoAndRegra(int $alunoId, int $regraId): ?array

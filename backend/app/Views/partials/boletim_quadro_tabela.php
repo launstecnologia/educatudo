@@ -155,7 +155,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                                 || $ltOc === 'other';
                         ?>
                             <th rowspan="2" class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
-                                <?= htmlspecialchars((string) ($oc['nome'] ?? $oc['codigo'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                <?= htmlspecialchars(BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
                                 <?php if ($mostraValor10 && $ltOc !== 'faltas' && $ltOc !== 'rec'): ?>
                                     <div class="text-[10px] font-normal opacity-80">Valor 10</div>
                                 <?php endif; ?>

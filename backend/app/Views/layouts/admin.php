@@ -164,7 +164,7 @@
                         </svg>
                     </button>
                     <div class="flex-1 min-w-0">
-                        <h1 class="text-lg md:text-2xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_title ?? 'Dashboard Admin') ?></h1>
+                        <h1 id="admin-page-title" class="text-lg md:text-2xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_title ?? 'Dashboard Admin') ?></h1>
                         <p class="text-xs md:text-sm text-gray-600 truncate"><?= htmlspecialchars($page_subtitle ?? ('Bem-vindo, ' . ($user['nome'] ?? 'Administrador') . '!')) ?></p>
                     </div>
                     <div class="flex items-center space-x-2 md:space-x-4 flex-shrink-0">

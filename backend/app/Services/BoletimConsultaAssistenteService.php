@@ -376,8 +376,8 @@ class BoletimConsultaAssistenteService
         }
         $t = mb_strtolower($mensagem);
         if (preg_match('/enac|substitu|maior\s*\(/u', $t)) {
-            return "Para a Média Bim Final ficar com a média e só trocar quando o ENAC for maior:\n\n"
-                . "1. Abra a coluna Média Bim Final.\n"
+            return "Para o Resultado Final ficar com a média e só trocar quando o ENAC for maior:\n\n"
+                . "1. Abra a coluna Resultado Final.\n"
                 . "2. Limpe a fórmula.\n"
                 . "3. Monte: maior (  Média Bim  ,  ENAC  )\n"
                 . "4. Salvar bloco.\n\n"
@@ -433,13 +433,13 @@ class BoletimConsultaAssistenteService
 
     private function textoMediaComEnac(): string
     {
-        return "A Média Bim Final fica com o maior destes dois valores:\n\n"
+        return "O Resultado Final fica com o maior destes dois valores:\n\n"
             . "• a Média Bim\n"
             . "• a média da Média Bim com o ENAC: (Média Bim + ENAC) ÷ 2\n\n"
             . "Se essa conta der maior que a Média Bim, ela entra. Se der menor, a coluna continua com a Média Bim. O ENAC não baixa a nota.\n\n"
             . "Exemplo: Média Bim 6 e ENAC 10. (6 + 10) ÷ 2 = 8, e 8 é maior que 6, então fica 8.\n"
             . "Exemplo: Média Bim 8 e ENAC 6. (8 + 6) ÷ 2 = 7, e 7 é menor que 8, então continua 8.\n\n"
-            . "Na coluna Média Bim Final:\n"
+            . "Na coluna Resultado Final:\n"
             . "1. Limpe a fórmula.\n"
             . "2. Monte: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim )\n"
             . "3. Salvar bloco.\n\n"
@@ -479,7 +479,7 @@ class BoletimConsultaAssistenteService
         }
         $config = $this->configuracaoParaComparar($wizardEstado);
         $prompt = <<<PROMPT
-Você confere um print da tela de Evento de Notas do EducaTudo com a configuração que o sistema tem agora. Responda em português, curto, em lista. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Média Bim Final.
+Você confere um print da tela de Evento de Notas do EducaTudo com a configuração que o sistema tem agora. Responda em português, curto, em lista. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Resultado Final.
 
 O que fazer:
 - Leia o print: o que está marcado, desmarcado, vazio ou com traço.
@@ -588,7 +588,7 @@ PROMPT;
         $resumo = $this->resumoEvento($wizardEstado);
 
         return <<<PROMPT
-Você é o assistente da tela Evento de Notas do EducaTudo. Responda em português, curto e direto. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Média Bim Final.
+Você é o assistente da tela Evento de Notas do EducaTudo. Responda em português, curto e direto. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Resultado Final.
 
 Manual desta tela (não invente botão ou regra fora disto):
 - Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada do aluno…). O título do evento não define o tipo.

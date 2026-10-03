@@ -889,7 +889,8 @@ class VidaEscolarService
         array $alunoIds,
         array $usuario = [],
         ?int $regraId = null,
-        ?string $periodoRef = null
+        ?string $periodoRef = null,
+        bool $forcarEscrita = false
     ): array {
         if (!$this->model->schemaPronto()) {
             return ['success' => false, 'error' => 'Migration da vida escolar ainda não foi aplicada.'];
@@ -1066,7 +1067,14 @@ class VidaEscolarService
                             continue;
                         }
                         $status = (string) ($cel['status'] ?? '');
-                        if ($status !== 'aberta' || ($cel['origem'] ?? '') === 'externa') {
+                        $origemCel = (string) ($cel['origem'] ?? '');
+                        if ($origemCel === 'externa' || $status === 'homologada') {
+                            continue;
+                        }
+                        $podeSubstituirFechada = $forcarEscrita
+                            && in_array($status, ['fechada', 'reaberta'], true)
+                            && in_array($origemCel, ['calculada', 'vazia', ''], true);
+                        if ($status !== 'aberta' && !$podeSubstituirFechada) {
                             continue;
                         }
                         $nota = $vals['nota'] ?? null;
@@ -1150,10 +1158,7 @@ class VidaEscolarService
                     continue;
                 }
                 $stFinal = (string) ($final['status'] ?? '');
-                if ($stFinal === 'homologada') {
-                    continue;
-                }
-                if ($stFinal === 'fechada' && ($final['origem'] ?? '') === 'externa') {
+                if ($stFinal === 'homologada' || ($final['origem'] ?? '') === 'externa') {
                     continue;
                 }
                 $materiaId = 0;
@@ -1522,7 +1527,7 @@ class VidaEscolarService
         if (!$final) {
             return;
         }
-        if (in_array($final['status'] ?? '', ['homologada'], true) && !$forcarEscrita) {
+        if (in_array($final['status'] ?? '', ['homologada'], true)) {
             $faltaVazia = ($final['faltas'] ?? null) === null || $final['faltas'] === '';
             if ($temFaltas && $faltaVazia) {
                 $this->model->atualizarCelula((int) $final['id'], ['faltas' => $faltasTotal]);
@@ -1847,7 +1852,9 @@ class VidaEscolarService
             ]);
             $nomeFold = trim((string) preg_replace('/[^a-z0-9]+/', ' ', $nomeFold));
             $ehMediaBimFinal = $cod === 'media_bim_final'
-                || str_contains($nomeFold, 'media bim final');
+                || $cod === 'resultado_final'
+                || str_contains($nomeFold, 'media bim final')
+                || str_contains($nomeFold, 'resultado final');
             $prio = 1;
             // Média Bim Final (nome ou código) fica acima do media_final gravado.
             // Em Língua Portuguesa o código media_final pode ser a média antes do ENAC.
@@ -1876,6 +1883,8 @@ class VidaEscolarService
             $jaQual = (int) ($out[$bimEvento]['qualidade'] ?? 0);
             if ($jaQual < 4 && isset($notasLower['media_bim_final']) && is_numeric($notasLower['media_bim_final'])) {
                 $aplicar($bimEvento, (float) $notasLower['media_bim_final'], null, false, 4);
+            } elseif ($jaQual < 4 && isset($notasLower['resultado_final']) && is_numeric($notasLower['resultado_final'])) {
+                $aplicar($bimEvento, (float) $notasLower['resultado_final'], null, false, 4);
             } elseif ($jaQual < 4 && is_numeric($row['media_final'] ?? null)) {
                 $aplicar($bimEvento, (float) $row['media_final'], null, false, 3);
             } elseif ($jaQual < 4 && isset($notasLower['media_final']) && is_numeric($notasLower['media_final'])) {
@@ -1953,7 +1962,7 @@ class VidaEscolarService
             if (!$temNotaNoAlvo && $bimEvento >= 1 && $bimEvento <= 4) {
             $media = null;
             $qualidade = 1;
-            foreach (['media_bim_final' => 4, 'media_final' => 3, 'media_bim' => 2, 'media' => 2] as $k => $q) {
+            foreach (['media_bim_final' => 4, 'resultado_final' => 4, 'media_final' => 3, 'media_bim' => 2, 'media' => 2] as $k => $q) {
                 if (isset($notasLower[$k]) && is_numeric($notasLower[$k])) {
                     $media = (float) $notasLower[$k];
                     $qualidade = $q;
@@ -1965,7 +1974,7 @@ class VidaEscolarService
             }
         }
 
-        // A coluna do relatório "Média Bim Final" é a nota da ficha.
+        // A coluna Resultado Final (antes "Média Bim Final") é a nota da ficha.
         // Não cede para a coluna "Média" (6,00) nem para media_final gravado.
         if ($bimEvento >= 1 && $bimEvento <= 4) {
             $notaBimFinal = null;
@@ -1979,11 +1988,13 @@ class VidaEscolarService
                     'í' => 'i', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ú' => 'u', 'ç' => 'c',
                 ]);
                 $nomeFold = trim((string) preg_replace('/[^a-z0-9]+/', ' ', $nomeFold));
+                $codCol = strtolower(trim((string) ($col['codigo'] ?? '')));
                 $val = $valorColuna($col);
                 if ($val === null) {
                     continue;
                 }
-                if (str_contains($nomeFold, 'media bim final')) {
+                if (str_contains($nomeFold, 'media bim final') || str_contains($nomeFold, 'resultado final')
+                    || in_array($codCol, ['media_bim_final', 'resultado_final'], true)) {
                     $notaBimFinal = $val;
                 } elseif ($nomeFold === 'media') {
                     $notaMedia = $val;
@@ -2016,12 +2027,14 @@ class VidaEscolarService
         if (!is_array($notas)) {
             return $temMediaFinalRow ? 2 : 1;
         }
-        if (isset($notas['media_bim_final']) && is_numeric($notas['media_bim_final'])
-            && abs($nota - (float) $notas['media_bim_final']) < 0.001
-            && !($temMediaFinalRow && abs($nota - (float) $row['media_final']) < 0.001)) {
-            return 4;
+        foreach (['media_bim_final', 'resultado_final'] as $kOficial) {
+            if (isset($notas[$kOficial]) && is_numeric($notas[$kOficial])
+                && abs($nota - (float) $notas[$kOficial]) < 0.001
+                && !($temMediaFinalRow && abs($nota - (float) $row['media_final']) < 0.001)) {
+                return 4;
+            }
         }
-        foreach (['media_final', 'media_bim_final'] as $k) {
+        foreach (['media_final', 'media_bim_final', 'resultado_final'] as $k) {
             if (isset($notas[$k]) && is_numeric($notas[$k]) && abs($nota - (float) $notas[$k]) < 0.001) {
                 return 3;
             }
@@ -2274,11 +2287,15 @@ class VidaEscolarService
             return false;
         }
         $status = (string) ($cel['status'] ?? '');
+        $origemCel = (string) ($cel['origem'] ?? '');
         $permitidos = $incluirReabertas ? ['aberta', 'reaberta'] : ['aberta'];
-        if (($cel['origem'] ?? '') === 'externa') {
+        if ($origemCel === 'externa' || $status === 'homologada') {
             return false;
         }
-        if (!$forcarEscrita && !in_array($status, $permitidos, true)) {
+        $podeSubstituirFechada = $forcarEscrita
+            && in_array($status, ['fechada', 'reaberta'], true)
+            && in_array($origemCel, ['calculada', 'vazia', ''], true);
+        if (!$podeSubstituirFechada && !in_array($status, $permitidos, true)) {
             $faltaVazia = ($cel['faltas'] ?? null) === null || $cel['faltas'] === '';
             if ($faltas === null || !$faltaVazia) {
                 return false;

@@ -124,7 +124,7 @@ class BoletimQuadroLayoutHelper
             return true;
         }
         $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
-        if (in_array($cod, ['resultado', 'media_final', 'media_bim_final'], true)) {
+        if (in_array($cod, ['resultado', 'resultado_final', 'media_final', 'media_bim_final'], true)) {
             return true;
         }
         if ((bool) preg_match('/(?:^|_)media_(?:bim_)?final$/', $cod)) {
@@ -149,6 +149,51 @@ class BoletimQuadroLayoutHelper
         }
 
         return false;
+    }
+
+    /**
+     * A coluna Média Bim Final é o Resultado Final: é a nota do boletim oficial.
+     */
+    public static function colunaEhResultadoFinalOficial(array $col): bool
+    {
+        $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+        $nome = self::nomeColunaSemAcento($col);
+        if (str_contains($nome, 'media bim final') || str_contains($nome, 'resultado final')) {
+            return true;
+        }
+        if (in_array($cod, ['media_bim_final', 'resultado_final'], true)) {
+            return true;
+        }
+        if ($cod !== 'media_final') {
+            return false;
+        }
+
+        return $nome === '' || $nome === 'media final' || $nome === 'media bim final' || $nome === 'resultado final';
+    }
+
+    public static function rotuloColunaQuadro(array $col): string
+    {
+        if (self::colunaEhResultadoFinalOficial($col)) {
+            return 'Resultado Final';
+        }
+        $nome = trim((string) ($col['nome'] ?? ''));
+        if ($nome !== '') {
+            return $nome;
+        }
+
+        return trim((string) ($col['codigo'] ?? ''));
+    }
+
+    private static function nomeColunaSemAcento(array $col): string
+    {
+        $nome = mb_strtolower(trim((string) ($col['nome'] ?? '')), 'UTF-8');
+        $nome = str_replace(
+            ['á', 'à', 'ã', 'â', 'ä', 'é', 'è', 'ê', 'ë', 'í', 'ì', 'î', 'ï', 'ó', 'ò', 'õ', 'ô', 'ö', 'ú', 'ù', 'û', 'ü', 'ç'],
+            ['a', 'a', 'a', 'a', 'a', 'e', 'e', 'e', 'e', 'i', 'i', 'i', 'i', 'o', 'o', 'o', 'o', 'o', 'u', 'u', 'u', 'u', 'c'],
+            $nome
+        );
+
+        return trim((string) preg_replace('/[^a-z0-9]+/', ' ', $nome));
     }
 
     /**

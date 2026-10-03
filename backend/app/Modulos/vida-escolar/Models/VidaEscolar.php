@@ -300,16 +300,22 @@ class VidaEscolar
      */
     private function sqlFiltroExibicaoCoordenacao(): string
     {
+        $sql = '';
         try {
             $col = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'vis_coordenacao'");
             if ($col) {
-                return ' AND r.vis_coordenacao = 1';
+                $sql = ' AND r.vis_coordenacao = 1';
             }
+            $colExtras = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'extras_json'");
+            if ($colExtras) {
+                $sql .= " AND (r.extras_json IS NULL OR r.extras_json = '' OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.extras_json, '$.oculto_lista_avaliacoes')), '0') NOT IN ('1', 'true'))";
+            }
+            return $sql;
         } catch (\Throwable $e) {
-            // coluna ainda não migrada
+            // coluna ainda não migrada: mantém o filtro que já deu certo
         }
 
-        return '';
+        return $sql;
     }
 
     /**

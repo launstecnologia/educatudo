@@ -4,6 +4,9 @@
  *
  * @var list<array<string,mixed>> $paineis_notas
  */
+if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+    require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+}
 $paineisNotas = is_array($paineis_notas ?? null) ? $paineis_notas : [];
 if ($paineisNotas === []) {
     return;
@@ -47,7 +50,7 @@ $fmtNota = static function (?float $n): string {
                                     <?php foreach ($colunas as $col): ?>
                                         <?php $calc = (($col['papel'] ?? '') === 'calculada'); ?>
                                         <th class="px-3 py-2 font-semibold text-center whitespace-nowrap <?= $calc ? 'bg-violet-50 text-violet-900' : '' ?>">
-                                            <?= htmlspecialchars((string) ($col['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                                            <?= htmlspecialchars(BoletimQuadroLayoutHelper::rotuloColunaQuadro(is_array($col) ? $col : []), ENT_QUOTES, 'UTF-8') ?>
                                             <?php if (!empty($col['vai_para_boletim'])): ?>
                                                 <span class="block text-[10px] font-normal text-violet-600 uppercase tracking-wide">Boletim</span>
                                             <?php endif; ?>

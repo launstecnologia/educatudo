@@ -1985,7 +1985,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 tipo('trab', 'Trab', 'trabalho', 1, 'media'),
                 calc('media_bim', 'Média Bim', '(media_sem + prova_bim + enac + part + trab) / 5', [], 'media'),
                 tipo('rec', 'Rec', 'recupera', 0, 'rec'),
-                calc('media_final', 'Média Bim Final', 'max(media_bim, rec)', [], 'resultado')
+                calc('media_final', 'Resultado Final', 'max(media_bim, rec)', [], 'resultado')
             ];
             return {
                 regra_nome: 'Quadro semanal — S1 a S8',

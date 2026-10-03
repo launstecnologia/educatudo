@@ -12,6 +12,8 @@ $page_header_back_url = (string) ($page_header_back_url ?? '');
 $page_header_title = (string) ($page_header_title ?? '');
 $page_header_subtitle = (string) ($page_header_subtitle ?? '');
 $page_header_subtitle_html = (string) ($page_header_subtitle_html ?? '');
+$page_header_title_id = (string) ($page_header_title_id ?? '');
+$page_header_subtitle_id = (string) ($page_header_subtitle_id ?? '');
 ?>
 <div class="mb-6">
     <div class="flex items-center gap-4">
@@ -21,11 +23,11 @@ $page_header_subtitle_html = (string) ($page_header_subtitle_html ?? '');
             </svg>
         </a>
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-1"><?= htmlspecialchars($page_header_title) ?></h2>
+            <h2 class="text-2xl font-bold text-gray-900 mb-1"<?= $page_header_title_id !== '' ? ' id="' . htmlspecialchars($page_header_title_id, ENT_QUOTES, 'UTF-8') . '"' : '' ?>><?= htmlspecialchars($page_header_title) ?></h2>
             <?php if ($page_header_subtitle_html !== ''): ?>
-            <p class="text-gray-600 text-sm"><?= $page_header_subtitle_html ?></p>
+            <p class="text-gray-600 text-sm"<?= $page_header_subtitle_id !== '' ? ' id="' . htmlspecialchars($page_header_subtitle_id, ENT_QUOTES, 'UTF-8') . '"' : '' ?>><?= $page_header_subtitle_html ?></p>
             <?php elseif ($page_header_subtitle !== ''): ?>
-            <p class="text-gray-600 text-sm"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            <p class="text-gray-600 text-sm"<?= $page_header_subtitle_id !== '' ? ' id="' . htmlspecialchars($page_header_subtitle_id, ENT_QUOTES, 'UTF-8') . '"' : '' ?>><?= htmlspecialchars($page_header_subtitle) ?></p>
             <?php endif; ?>
         </div>
     </div>

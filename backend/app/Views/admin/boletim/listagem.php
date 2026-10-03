@@ -493,8 +493,8 @@ function excluirEventoBoletim(id) {
 
 function desabilitarEventoLista(id, oculto) {
     const acao = Number(oculto) === 1
-        ? 'Desabilitar este evento? Ele sai desta lista, de Notas da Coordenação e da exibição da coordenação. As notas já geradas continuam no aluno.'
-        : 'Habilitar este evento de novo nesta lista, em Notas da Coordenação e na exibição da coordenação?';
+        ? 'Desabilitar este evento? Ele sai desta lista, de Notas da Coordenação e do detalhe do aluno.'
+        : 'Habilitar este evento de novo nesta lista, em Notas da Coordenação e no detalhe do aluno?';
     if (!confirm(acao)) {
         return;
     }

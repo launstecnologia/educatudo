@@ -24,10 +24,10 @@ $boletimConfigVersoes = is_array($boletim_config_versoes ?? null) ? $boletim_con
 $boletimWizardSteps = [
     ['label' => 'Começar', 'sub' => 'Origem'],
     ['label' => 'Identidade', 'sub' => 'Evento'],
-    ['label' => 'Peças', 'sub' => 'Blocos'],
-    ['label' => 'Exibir', 'sub' => 'Colunas'],
+    ['label' => 'Tipo de Notas', 'sub' => 'Peças'],
     ['label' => 'Agrupar', 'sub' => 'Linha'],
-    ['label' => 'Revisar', 'sub' => 'Confirmar'],
+    ['label' => 'Fórmula', 'sub' => 'Colunas'],
+    ['label' => 'Revisão', 'sub' => 'Confirmar'],
 ];
 ?>
 <div id="boletim-assistente-root" class="<?= $boletimAssistentePageMode ? 'w-full' : 'fixed bottom-4 right-4 z-[10000] flex flex-col items-end gap-2' ?>"
@@ -223,10 +223,10 @@ $boletimWizardSteps = [
     var PASSOS = [
         { id: 'inicio', label: '1. Começar', sub: 'Origem' },
         { id: 'identidade', label: '2. Identidade', sub: 'Evento' },
-        { id: 'pecas', label: '3. Peças', sub: 'Blocos' },
-        { id: 'formula', label: '4. Exibir', sub: 'Colunas' },
-        { id: 'publico', label: '5. Agrupar', sub: 'Linha' },
-        { id: 'revisar', label: '6. Revisar', sub: 'Confirmar' }
+        { id: 'pecas', label: '3. Tipo de Notas', sub: 'Peças' },
+        { id: 'publico', label: '4. Agrupar', sub: 'Linha' },
+        { id: 'formula', label: '5. Fórmula', sub: 'Colunas' },
+        { id: 'revisar', label: '6. Revisão', sub: 'Confirmar' }
     ];
 
     var dadosIniciaisEl = document.getElementById('boletim-assistente-dados-iniciais');
@@ -379,10 +379,69 @@ $boletimWizardSteps = [
         return (found && found.label) ? found.label : key;
     }
 
+    function modosGrupoComoObjeto(raw) {
+        var out = {};
+        if (!raw || typeof raw !== 'object') return out;
+        Object.keys(raw).forEach(function (k) {
+            if (k === 'length') return;
+            if (raw[k] === 'soma' || raw[k] === 'media') out[k] = raw[k];
+        });
+        return out;
+    }
+
     function modoEfetivoPecaGrupo(gl, peca) {
-        var m = gl && gl.modos ? gl.modos[peca] : '';
-        if (m === 'soma' || m === 'media') return m;
+        var modos = modosGrupoComoObjeto(gl && gl.modos);
+        if (modos[peca] === 'soma' || modos[peca] === 'media') return modos[peca];
         return gl && gl.modo === 'soma' ? 'soma' : 'media';
+    }
+
+    function gravarModoPadraoNasPecas(modo) {
+        if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
+        estado.grupo_linha.modos = {};
+        (estado.pecas || []).forEach(function (p) {
+            if (p) estado.grupo_linha.modos[p] = modo;
+        });
+    }
+
+    /** Copia média/soma, peças e arredondamento do wizard para o rascunho que será gravado. */
+    function gravarEscolhasGrupoNoRascunho(r) {
+        if (!r || !estado) return r;
+        garantirEstado();
+        var gl = estado.grupo_linha || grupoLinhaPadrao();
+        var modoPadrao = gl.modo === 'soma' ? 'soma' : 'media';
+        var modos = modosGrupoComoObjeto(gl.modos);
+        var ar = (gl.arredondamento === 'filhas' || gl.arredondamento === 'mae') ? gl.arredondamento : 'todos';
+        var modoIguais = estado.materia_unica_modo === 'media' ? 'media' : 'soma';
+        var flagIguais = estado.materia_unica ? 1 : 0;
+        (r.componentes || []).forEach(function (c) {
+            if (!c || typeof c !== 'object') return;
+            if ((c.source_type || '') !== 'calculado') {
+                c.materia_unica = flagIguais;
+                c.materia_unica_modo = modoIguais;
+            }
+            if (!gl.ativo) return;
+            if (!c.config || typeof c.config !== 'object') c.config = {};
+            var linha = (c.config.group_line && typeof c.config.group_line === 'object') ? c.config.group_line : {};
+            if (!linha.enabled && !linha.key && !(gl.materias_ids || []).length) return;
+            var peca = '';
+            var cod = String(c.codigo || '').toLowerCase();
+            if (cod === 'media_sem' || cod === 'semanal' || /^s[1-8]$/.test(cod)) peca = 'semanal';
+            else if (cod === 'prova_bim' || cod === 'bimestral') peca = 'bimestral';
+            else if (cod === 'rec') peca = 'recuperacao';
+            else if (modos[cod]) peca = cod;
+            linha.enabled = true;
+            linha.mode = (peca && modos[peca]) ? modos[peca] : modoPadrao;
+            linha.modo_padrao = modoPadrao;
+            linha.modos = modos;
+            linha.arredondamento = ar;
+            if ((gl.materias_ids || []).length >= 2) {
+                linha.materias_ids = (gl.materias_ids || []).map(Number).filter(function (n) { return n > 0; });
+            }
+            if (gl.nome) linha.label = gl.nome;
+            if (gl.aplicar_em === 'ambos' || gl.aplicar_em === 'boletim') linha.aplicar_em = gl.aplicar_em;
+            c.config.group_line = linha;
+        });
+        return r;
     }
 
     /** Garante que o rascunho aplicado/salvo leve o arredondamento da área escolhido no wizard. */
@@ -1262,6 +1321,8 @@ $boletimWizardSteps = [
         if (estado.grupo_linha.arredondamento !== 'filhas' && estado.grupo_linha.arredondamento !== 'mae') {
             estado.grupo_linha.arredondamento = 'todos';
         }
+        estado.grupo_linha.modos = modosGrupoComoObjeto(estado.grupo_linha.modos);
+        if (estado.grupo_linha.modo !== 'soma') estado.grupo_linha.modo = 'media';
         if (!estado.finalidade) estado.finalidade = 'oficial';
         if (estado.boletim_id == null) estado.boletim_id = 0;
         if (estado.grupo_regras_notas_id == null) estado.grupo_regras_notas_id = 0;
@@ -1342,7 +1403,7 @@ $boletimWizardSteps = [
         var nomes = {
             media_sem: 'Média Sem',
             media_bim: 'Média Bim',
-            media_final: 'Média Bim Final',
+            media_final: 'Resultado Final',
             prova_bim: 'Prova Bim',
             trab: 'Trab',
             part: 'Part',
@@ -1660,9 +1721,9 @@ $boletimWizardSteps = [
     }
 
     function nomeBlocoCalc(codigo) {
+        if (codigo === 'media_final') return 'Resultado Final';
         if (estado && estado.nomes_blocos && estado.nomes_blocos[codigo]) return estado.nomes_blocos[codigo];
         if (codigo === 'media_bim') return 'Média Bim';
-        if (codigo === 'media_final') return 'Média Bim Final';
         if (codigo === 'media_sem') return 'Média Sem';
         return pecaLabel(codigo);
     }
@@ -1918,7 +1979,7 @@ $boletimWizardSteps = [
             if (c.tipo !== 'calculado' && c.codigo !== 'media_sem') return;
             add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
         });
-        if (!html) html = '<p class="text-xs text-gray-500">Volte em Peças e marque ao menos uma.</p>';
+        if (!html) html = '<p class="text-xs text-gray-500">Volte em Tipo de Notas e marque ao menos uma.</p>';
         return html;
     }
 
@@ -1936,7 +1997,7 @@ $boletimWizardSteps = [
         }
         if (!estado.nomes_blocos[codigo]) {
             estado.nomes_blocos[codigo] = codigo === 'media_bim' ? 'Média Bim'
-                : (codigo === 'media_final' ? 'Média Bim Final' : 'Nova média');
+                : (codigo === 'media_final' ? 'Resultado Final' : 'Nova média');
         }
         marcarEdicaoManual();
         previewAtual = null;
@@ -2666,7 +2727,7 @@ $boletimWizardSteps = [
         if (semanas.length) html += '<th colspan="2">Total</th>';
         outras.forEach(function (o) {
             var extra = (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
-            html += '<th rowspan="2">' + esc(o.nome || o.codigo) + extra + '</th>';
+            html += '<th rowspan="2">' + esc(rotuloColunaPreview(o)) + extra + '</th>';
         });
         html += '</tr><tr>';
         semanas.forEach(function () { html += '<th class="sub">N</th><th class="sub">Q</th>'; });
@@ -3087,12 +3148,28 @@ $boletimWizardSteps = [
         return ordenarLinhasPorNome(out);
     }
 
+    function rotuloColunaPreview(o) {
+        if (!o) return '';
+        var cod = String(o.codigo || '').toLowerCase();
+        var nome = String(o.nome || '');
+        var nomeNorm = nome.toLocaleLowerCase('pt-BR');
+        nomeNorm = nomeNorm.normalize ? nomeNorm.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : nomeNorm;
+        nomeNorm = nomeNorm.replace(/[^a-z0-9]+/g, ' ').trim();
+        if (nomeNorm.indexOf('media bim final') >= 0 || nomeNorm.indexOf('resultado final') >= 0) return 'Resultado Final';
+        if (cod === 'media_bim_final' || cod === 'resultado_final' || cod === 'media_final') {
+            if (cod !== 'media_final' || nomeNorm === '' || nomeNorm === 'media final' || nomeNorm === 'media bim final' || nomeNorm === 'resultado final') {
+                return 'Resultado Final';
+            }
+        }
+        return nome || o.codigo || '';
+    }
+
     function colunaEhResultadoResumo(o) {
         if (!o) return false;
         var lt = String(o.layout_type || '').toLowerCase();
         if (lt === 'resultado') return true;
         var cod = String(o.codigo || '').toLowerCase();
-        if (cod === 'resultado' || cod === 'media_final' || cod === 'media_bim_final') return true;
+        if (cod === 'resultado' || cod === 'resultado_final' || cod === 'media_final' || cod === 'media_bim_final') return true;
         if (/(?:^|_)media_(?:bim_)?final$/.test(cod)) return true;
         var nome = String(o.nome || '').toLocaleLowerCase('pt-BR');
         if (nome.indexOf('resultado') >= 0) return true;
@@ -3127,7 +3204,7 @@ $boletimWizardSteps = [
         html += '<th class="text-left">Matéria</th>';
         outras.forEach(function (o) {
             var extra = colunaEhFaltas(o) ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
-            html += '<th>' + esc(o.nome || o.codigo) + extra + '</th>';
+            html += '<th>' + esc(rotuloColunaPreview(o)) + extra + '</th>';
         });
         html += '</tr></thead><tbody>';
         linhas.forEach(function (lin) {
@@ -3479,6 +3556,7 @@ $boletimWizardSteps = [
                 blocos_ids: blocos,
                 materias_ids: Array.isArray(c.materias_ids) ? c.materias_ids : [],
                 materia_unica: c.materia_unica ? 1 : 0,
+                materia_unica_modo: c.materia_unica_modo === 'media' ? 'media' : 'soma',
                 usar_percentual: c.usar_percentual ? 1 : 0,
                 escala_max: c.escala_max != null ? c.escala_max : 10,
                 obrigatorio: c.obrigatorio ? 1 : 0,
@@ -3936,7 +4014,7 @@ $boletimWizardSteps = [
 
         if (passo === 'pecas') {
             html += '<p class="text-sm text-gray-700">Quais notas entram neste boletim?</p>';
-            html += '<p class="text-xs text-gray-500 mt-1">Marque o que entra e o ' + esc(rotuloCampoPeriodo().toLocaleLowerCase('pt-BR')) + ' de cada peça. Ordem das colunas e fórmulas ficam no passo <strong>Exibir</strong>.</p>';
+            html += '<p class="text-xs text-gray-500 mt-1">Marque o que entra e o ' + esc(rotuloCampoPeriodo().toLocaleLowerCase('pt-BR')) + ' de cada tipo. Ordem das colunas e o cálculo ficam no passo <strong>Fórmula</strong>.</p>';
             html += '<div class="grid gap-3 mt-3">';
             (catalogo.pecas || []).forEach(function (p) {
                 var on = (estado.pecas || []).indexOf(p.key) >= 0;
@@ -4135,15 +4213,13 @@ $boletimWizardSteps = [
             html += '<p class="text-xs text-gray-500 mt-1">' + (ehBoletimComposto()
                 ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
                 : (ehEventoNotasPreview()
-                    ? 'É o quadro com blocos e semanas. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.'
-                    : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Exibir</strong>.')) + '</p>';
+                    ? 'É o quadro com blocos e semanas. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.'
+                    : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.')) + '</p>';
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
             html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
-            html += '<label class="flex items-start gap-2 text-sm text-gray-800">';
-            html += '<input type="checkbox" id="bw-gerar-versao-notas" class="mt-0.5 rounded border-gray-300 text-indigo-600">';
-            html += '<span><strong>Gerar nova versão das notas</strong><span class="block text-xs text-gray-600 font-normal">Ao salvar, gera as notas de novo. A versão anterior continua guardada e não é substituída.</span></span></label>';
-            html += '<p class="text-xs text-gray-600">Salvar a configuração também cria uma versão, para recuperar se precisar.</p>';
+            html += '<p class="text-sm text-gray-800"><strong>Esta versão entra no aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Ao salvar, ela passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
+            html += '<p class="text-xs text-gray-600">Para usar outra, recupere uma configuração antiga aqui ou escolha o evento em Gerar avaliações do ano.</p>';
             html += htmlVersoesConfiguracao();
             html += '</div>';
             html += '<p class="text-xs text-indigo-700 mt-4">Se estiver certo, clique em <strong>Concluir e aplicar</strong>.</p>';
@@ -4489,7 +4565,7 @@ $boletimWizardSteps = [
             el.addEventListener('change', function () {
                 if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
                 estado.grupo_linha.modo = el.value === 'soma' ? 'soma' : 'media';
-                estado.grupo_linha.modos = {};
+                gravarModoPadraoNasPecas(estado.grupo_linha.modo);
                 bodyEl.querySelectorAll('.bw-grupo-modo-peca').forEach(function (r) {
                     r.checked = r.value === estado.grupo_linha.modo;
                 });
@@ -4500,9 +4576,7 @@ $boletimWizardSteps = [
             el.addEventListener('change', function () {
                 if (!el.checked) return;
                 if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
-                if (!estado.grupo_linha.modos || typeof estado.grupo_linha.modos !== 'object') {
-                    estado.grupo_linha.modos = {};
-                }
+                estado.grupo_linha.modos = modosGrupoComoObjeto(estado.grupo_linha.modos);
                 var peca = el.getAttribute('data-peca') || '';
                 if (!peca) return;
                 estado.grupo_linha.modos[peca] = el.value === 'soma' ? 'soma' : 'media';
@@ -4610,6 +4684,20 @@ $boletimWizardSteps = [
             else if (key === 'nota_minima_aprovacao') estado[key] = parseFloat(el.value);
             else estado[key] = el.value;
         });
+        atualizarCabecalhoEvento();
+    }
+
+    function atualizarCabecalhoEvento() {
+        var nome = String((estado && estado.nome) || '').trim();
+        var ref = Number((estado && estado.regra_id) || regraId || 0);
+        var titulo = nome || 'Evento de Notas';
+        var h1 = document.getElementById('admin-page-title');
+        var h2 = document.getElementById('evento-notas-titulo');
+        var sub = document.getElementById('evento-notas-ref');
+        if (h1) h1.textContent = titulo;
+        if (h2) h2.textContent = titulo;
+        if (sub) sub.textContent = ref > 0 ? ('Ref ' + ref) : 'Novo evento, ainda sem ref';
+        if (nome || ref > 0) document.title = titulo + ' - EducaTudo';
     }
 
     function renderResumo(resumo, erros) {
@@ -4740,14 +4828,13 @@ $boletimWizardSteps = [
                     }
                 }
                 }
-                var modosLocal = (estado && estado.grupo_linha && estado.grupo_linha.modos && typeof estado.grupo_linha.modos === 'object')
-                    ? estado.grupo_linha.modos
-                    : null;
-                if (modosLocal && Object.keys(modosLocal).length) {
-                    if (!remoto.grupo_linha) remoto.grupo_linha = grupoLinhaPadrao();
-                    var modosRemoto = remoto.grupo_linha.modos;
-                    var remotoVazio = !modosRemoto || typeof modosRemoto !== 'object' || !Object.keys(modosRemoto).length;
-                    if (remotoVazio) remoto.grupo_linha.modos = modosLocal;
+                var modosLocal = modosGrupoComoObjeto(estado && estado.grupo_linha ? estado.grupo_linha.modos : null);
+                var modoLocal = (estado && estado.grupo_linha && estado.grupo_linha.modo === 'soma') ? 'soma' : 'media';
+                if (!remoto.grupo_linha) remoto.grupo_linha = grupoLinhaPadrao();
+                if (Object.keys(modosLocal).length) remoto.grupo_linha.modos = modosLocal;
+                if (estado && estado.grupo_linha && estado.grupo_linha.ativo) {
+                    remoto.grupo_linha.modo = modoLocal;
+                    remoto.grupo_linha.ativo = true;
                 }
                 // Não perde escolha local de arredondamento da área se o remoto voltar sem ela.
                 if ((arredLocal === 'filhas' || arredLocal === 'mae')
@@ -4761,6 +4848,7 @@ $boletimWizardSteps = [
             }
             rascunhoAtual = j.rascunho || null;
             garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
+            gravarEscolhasGrupoNoRascunho(rascunhoAtual);
             previewAtual = j.preview || previewAtual;
             formulasDisp = j.formulas_disponiveis || formulasDisp;
             renderResumo(j.resumo, j.erros || []);
@@ -4791,6 +4879,7 @@ $boletimWizardSteps = [
         }
         garantirEstado();
         renderAll();
+        atualizarCabecalhoEvento();
         if (iniciado) return;
         iniciado = true;
         if (dadosIniciais.estado) {
@@ -4866,7 +4955,7 @@ $boletimWizardSteps = [
         if (!r || typeof r !== 'object') return false;
         var comps = normalizarComponentesRascunho(r.componentes);
         if (!comps.length) {
-            renderResumo('O assistente montou o evento, mas sem blocos.', ['Volte em Peças, marque as colunas e monte a média. Depois clique de novo em Concluir e aplicar.']);
+            renderResumo('O assistente montou o evento, mas sem blocos.', ['Volte em Tipo de Notas, marque as colunas e monte a média em Fórmula. Depois clique de novo em Concluir e aplicar.']);
             return false;
         }
         r.componentes = comps;
@@ -4922,8 +5011,7 @@ $boletimWizardSteps = [
             add('componentes_json', JSON.stringify(comps));
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
-            var gerarNotas = document.getElementById('bw-gerar-versao-notas');
-            if (gerarNotas && gerarNotas.checked) add('gerar_nova_versao', '1');
+            if (ehEventoNotasPreview()) add('gerar_nova_versao', '1');
             document.body.appendChild(form);
             form.submit();
             return 'submit';
@@ -4943,6 +5031,7 @@ $boletimWizardSteps = [
             return false;
         }
         garantirArredondamentoGrupoNoRascunho(j.rascunho);
+        gravarEscolhasGrupoNoRascunho(j.rascunho);
         var compsRasc = (j.rascunho && Array.isArray(j.rascunho.componentes)) ? j.rascunho.componentes : [];
         if (j.ok !== true && !compsRasc.length) {
             renderResumo(j.resumo || 'Ainda falta ajustar o evento.', j.erros && j.erros.length ? j.erros : ['O assistente ainda não conseguiu montar um evento válido.']);

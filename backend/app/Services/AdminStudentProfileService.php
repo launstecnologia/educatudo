@@ -640,6 +640,7 @@ class AdminStudentProfileService
                          FROM boletim_regras
                          WHERE ativo = 1
                            AND vis_coordenacao = 1
+                           AND (extras_json IS NULL OR extras_json = '' OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(extras_json, '$.oculto_lista_avaliacoes')), '0') NOT IN ('1', 'true'))
                            AND exibir_em = 'notas'
                            AND codigo IS NOT NULL AND codigo <> ''
                          ORDER BY updated_at DESC, id DESC
@@ -708,15 +709,20 @@ class AdminStudentProfileService
             // de parse/filtro de série; mostra eventos "notas" visíveis para coordenação
             // respeitando a(s) série(s) ativa(s) do aluno.
             if (empty($boletimEventosNotas)) {
-                $rowsNotas = $this->db->fetchAll(
-                    "SELECT id, nome, codigo, updated_at, default_data_inicio, default_data_fim, series_ids, turmas_ids, bimestre, ano_letivo
-                     FROM boletim_regras
-                     WHERE ativo = 1
-                       AND vis_coordenacao = 1
-                       AND exibir_em = 'notas'
-                     ORDER BY updated_at DESC, id DESC
-                     LIMIT 200"
-                ) ?: [];
+                try {
+                    $rowsNotas = $this->db->fetchAll(
+                        "SELECT id, nome, codigo, updated_at, default_data_inicio, default_data_fim, series_ids, turmas_ids, bimestre, ano_letivo
+                         FROM boletim_regras
+                         WHERE ativo = 1
+                           AND vis_coordenacao = 1
+                           AND (extras_json IS NULL OR extras_json = '' OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(extras_json, '$.oculto_lista_avaliacoes')), '0') NOT IN ('1', 'true'))
+                           AND exibir_em = 'notas'
+                         ORDER BY updated_at DESC, id DESC
+                         LIMIT 200"
+                    ) ?: [];
+                } catch (\Throwable $eNotas) {
+                    $rowsNotas = [];
+                }
                 foreach ($rowsNotas as $rn) {
                     $rid = (int) ($rn['id'] ?? 0);
                     if ($rid <= 0 || isset($seenNotas[$rid])) {
