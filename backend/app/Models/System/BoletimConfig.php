@@ -3415,7 +3415,7 @@ class BoletimConfig
                     0 AS total_questoes,
                     0 AS acertos
                 FROM provas_realizacoes pr
-                INNER JOIN provas p ON p.id = pr.prova_id
+                INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
                 LEFT JOIN materias m ON m.id = p.materia_id
                 WHERE pr.aluno_id = :aluno_id
                   AND pr.status = 'finalizado'";
@@ -3482,12 +3482,12 @@ class BoletimConfig
                     m.nome AS materia_nome,
                     p.titulo,
                     p.valor_total,
-                    (SELECT COUNT(*) FROM provas_respostas rr
-                      WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id) AS total_questoes,
-                    (SELECT COUNT(*) FROM provas_respostas rr
+                    (SELECT COUNT(*) FROM provas_questoes pq
+                      WHERE pq.prova_id = pr.prova_id) AS total_questoes,
+                    (SELECT COUNT(DISTINCT rr.questao_id) FROM provas_respostas rr
                       WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id AND rr.correta = 1) AS acertos
                 FROM provas_realizacoes pr
-                INNER JOIN provas p ON p.id = pr.prova_id
+                INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
                 LEFT JOIN materias m ON m.id = p.materia_id
                 INNER JOIN provas_blocos_vinculo pbv ON pbv.prova_id = pr.prova_id
                 INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
@@ -3592,7 +3592,7 @@ class BoletimConfig
                     0 AS total_questoes,
                     0 AS acertos
                 FROM provas_realizacoes pr
-                INNER JOIN provas p ON p.id = pr.prova_id
+                INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
                 LEFT JOIN materias m ON m.id = p.materia_id
                 INNER JOIN provas_blocos_vinculo pbv ON pbv.prova_id = pr.prova_id
                 INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
@@ -3726,7 +3726,7 @@ class BoletimConfig
                     0 AS total_questoes,
                     0 AS acertos
                 FROM provas_realizacoes pr
-                INNER JOIN provas p ON p.id = pr.prova_id
+                INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
                 LEFT JOIN materias m ON m.id = p.materia_id
                 INNER JOIN provas_blocos_vinculo pbv ON pbv.prova_id = pr.prova_id
                 INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
@@ -3803,25 +3803,50 @@ class BoletimConfig
         $phProvas = implode(',', array_fill(0, count($provaIds), '?'));
         $stats = $this->db->fetchAll(
             "SELECT prova_id, aluno_id,
-                    COUNT(*) AS total_questoes,
-                    SUM(CASE WHEN correta = 1 THEN 1 ELSE 0 END) AS acertos
+                    COUNT(DISTINCT questao_id) AS respondidas,
+                    COUNT(DISTINCT CASE WHEN correta = 1 THEN questao_id END) AS acertos
              FROM provas_respostas
              WHERE aluno_id IN ($phAlunos) AND prova_id IN ($phProvas)
              GROUP BY prova_id, aluno_id",
             array_merge($alunoIds, $provaIds)
         ) ?: [];
+        $tamanhos = $this->db->fetchAll(
+            "SELECT prova_id, COUNT(*) AS total_questoes
+             FROM provas_questoes
+             WHERE prova_id IN ($phProvas)
+             GROUP BY prova_id",
+            $provaIds
+        ) ?: [];
+        $tamanhoPorProva = [];
+        foreach ($tamanhos as $tam) {
+            $pidTam = (int) ($tam['prova_id'] ?? 0);
+            if ($pidTam > 0) {
+                $tamanhoPorProva[$pidTam] = (int) ($tam['total_questoes'] ?? 0);
+            }
+        }
         $mapa = [];
         foreach ($stats as $st) {
             $chave = (int) ($st['aluno_id'] ?? 0) . ':' . (int) ($st['prova_id'] ?? 0);
             $mapa[$chave] = $st;
         }
         foreach ($rows as $i => $row) {
-            $chave = (int) ($row['aluno_id'] ?? 0) . ':' . (int) ($row['prova_id'] ?? 0);
-            if (!isset($mapa[$chave])) {
+            $pid = (int) ($row['prova_id'] ?? 0);
+            if ($pid <= 0 || $pid >= 2000000000) {
                 continue;
             }
-            $rows[$i]['total_questoes'] = (int) ($mapa[$chave]['total_questoes'] ?? 0);
-            $rows[$i]['acertos'] = (int) ($mapa[$chave]['acertos'] ?? 0);
+            $chave = (int) ($row['aluno_id'] ?? 0) . ':' . $pid;
+            $acertos = isset($mapa[$chave]) ? (int) ($mapa[$chave]['acertos'] ?? 0) : 0;
+            $respondidas = isset($mapa[$chave]) ? (int) ($mapa[$chave]['respondidas'] ?? 0) : 0;
+            $cadastro = (int) ($tamanhoPorProva[$pid] ?? 0);
+            $total = $cadastro > 0 ? $cadastro : $respondidas;
+            if ($total <= 0) {
+                continue;
+            }
+            if ($acertos > $total) {
+                $acertos = $total;
+            }
+            $rows[$i]['total_questoes'] = $total;
+            $rows[$i]['acertos'] = $acertos;
         }
 
         return $rows;

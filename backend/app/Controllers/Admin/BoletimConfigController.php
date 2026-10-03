@@ -4505,6 +4505,7 @@ class BoletimConfigController extends BaseController
                         $filtroTitulo,
                         $materiaFiltroConsulta
                     );
+                    $rows = $this->restringirProvasAosBlocosDaTurma($rows, $blocoIds, $alunoId);
                     $detalhes['blocos_ids'] = $blocoIds;
                 } elseif ($quadroForcado) {
                     $rows = [];
@@ -4528,6 +4529,9 @@ class BoletimConfigController extends BaseController
                     // ENAC nota única sem filtro: preenche matérias do bloco adicionadas depois do lançamento.
                     $rows = $this->expandirNotaUnicaBlocoParaMateriasSelecionadas($rows, []);
                 }
+                // Dois professores da mesma matéria somam as questões uma vez.
+                // A mesma prova ligada a mais de um bloco da semana não entra de novo.
+                $rows = $this->deduplicarProvasDaMateria($rows);
 
                 $statsPorMateria = [];
                 $layoutNq = $this->parseLayoutMetaFromComponente($componente);
@@ -8517,6 +8521,78 @@ class BoletimConfigController extends BaseController
         }
 
         return $saida;
+    }
+
+    /**
+     * Mantém só os blocos da turma do aluno (e blocos sem turma).
+     * Outra série com a mesma semana não soma as questões de novo.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @param list<int> $blocoIds
+     * @return list<array<string,mixed>>
+     */
+    private function restringirProvasAosBlocosDaTurma(array $rows, array $blocoIds, int $alunoId): array
+    {
+        if ($rows === [] || $alunoId <= 0 || $blocoIds === []) {
+            return $rows;
+        }
+        if (!class_exists('AlunoTurmaHelper', false)) {
+            require_once dirname(__DIR__, 2) . '/Core/AlunoTurmaHelper.php';
+        }
+        $turmas = AlunoTurmaHelper::getTurmaIds(Database::getInstance(), $alunoId);
+        if ($turmas === []) {
+            return $rows;
+        }
+        $permitidos = array_fill_keys($this->boletimConfig->filtrarBlocoIdsPorTurmas($blocoIds, $turmas), true);
+        if ($permitidos === []) {
+            return $rows;
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $blocoId = (int) ($row['bloco_id'] ?? 0);
+            if ($blocoId > 0 && !isset($permitidos[$blocoId])) {
+                continue;
+            }
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Uma prova conta uma vez na matéria, mesmo com duas realizações ou dois blocos.
+     * Professores diferentes continuam somando, porque cada um tem a sua prova.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function deduplicarProvasDaMateria(array $rows): array
+    {
+        $vistas = [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $provaId = (int) ($row['prova_id'] ?? 0);
+            $mid = (int) ($row['materia_id'] ?? 0);
+            $aluno = (int) ($row['aluno_id'] ?? 0);
+            if ($provaId <= 0) {
+                $out[] = $row;
+                continue;
+            }
+            $chave = $aluno . ':' . $provaId . ':' . $mid;
+            if (isset($vistas[$chave])) {
+                continue;
+            }
+            $vistas[$chave] = true;
+            $out[] = $row;
+        }
+
+        return $out;
     }
 
     private function extrairProvaUid(array $row): string
