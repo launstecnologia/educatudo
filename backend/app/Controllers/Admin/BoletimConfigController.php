@@ -910,6 +910,24 @@ class BoletimConfigController extends BaseController
             return;
         }
 
+        $regraPreview = $this->boletimConfig->getRuleById($regraId);
+        if (is_array($regraPreview) && !empty($regraPreview['componentes']) && !empty($evento['linhas'])) {
+            try {
+                $simulacaoPreview = $this->montarMatrizDemonstrativoComGrupoHierarquico([
+                    'matriz_materias' => [
+                        'colunas' => $evento['colunas'] ?? [],
+                        'linhas' => $evento['linhas'],
+                    ],
+                ], $regraPreview);
+                $matrizPreview = is_array($simulacaoPreview['matriz_materias'] ?? null) ? $simulacaoPreview['matriz_materias'] : [];
+                if (!empty($matrizPreview['linhas']) && is_array($matrizPreview['linhas'])) {
+                    $evento['linhas'] = $matrizPreview['linhas'];
+                }
+            } catch (Throwable $e) {
+                error_log('Preview gerado regra #' . $regraId . ': ' . $e->getMessage());
+            }
+        }
+
         $rotuloBimestre = PeriodoLetivo::rotuloBoletim(
             (int) ($evento['ano_letivo'] ?? 0),
             (int) ($evento['bimestre'] ?? 0),
@@ -934,6 +952,7 @@ class BoletimConfigController extends BaseController
             : $this->boletimConfig->listarVersoesAluno($regraId, $alunoId, $periodoRef);
         $boletim_versoes_fallback = (string) ($evento['updated_at'] ?? '');
         $boletim_versoes_compact = false;
+        $boletim_versao_aberta = (int) ($evento['versao'] ?? 0);
 
         // Reusa o partial existente, sem botão de remover (a tela já tem o seu próprio).
         $boletins_gerados = [$evento];

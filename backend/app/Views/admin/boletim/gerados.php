@@ -336,7 +336,11 @@ document.addEventListener('keydown', function (e) {
 
     function getRowData(btn) {
         var row = btn.closest('tr.boletim-gerado-row');
-        if (!row) return null;
+        if (!row) {
+            var preview = btn.closest('tr.preview-row');
+            row = preview ? preview.previousElementSibling : null;
+        }
+        if (!row || !row.classList.contains('boletim-gerado-row')) return null;
         return {
             row: row,
             previewRow: row.nextElementSibling && row.nextElementSibling.classList.contains('preview-row') ? row.nextElementSibling : null,
@@ -346,28 +350,19 @@ document.addEventListener('keydown', function (e) {
         };
     }
 
-    tabela.addEventListener('click', function (e) {
-        var btnPreview = e.target.closest('.btn-preview-boletim');
-        if (!btnPreview) return;
-        e.preventDefault();
-        document.querySelectorAll('[data-dropdown-menu]').forEach(function (m) { m.classList.add('hidden'); });
-        var d = getRowData(btnPreview);
+    function carregarPreview(d, versao) {
         if (!d || !d.previewRow) return;
         var content = d.previewRow.querySelector('.preview-content');
         if (!content) return;
-
-        if (!d.previewRow.classList.contains('hidden') && d.previewRow.dataset.loaded === '1') {
-            d.previewRow.classList.add('hidden');
-            return;
-        }
         d.previewRow.classList.remove('hidden');
-        if (d.previewRow.dataset.loaded === '1') return;
-
+        d.previewRow.dataset.loaded = '0';
+        d.previewRow.dataset.versao = versao > 0 ? String(versao) : '';
         content.innerHTML = '<div class="preview-placeholder text-gray-500">Carregando preview…</div>';
         var params = new URLSearchParams();
         params.set('aluno_id', String(d.alunoId));
         params.set('regra_id', String(d.regraId));
         params.set('periodo_ref', d.periodoRef);
+        if (versao > 0) params.set('versao', String(versao));
         fetch(baseUrl + '/admin/boletim-configuracao/gerados/preview?' + params.toString(), {
             credentials: 'same-origin',
             headers: { 'Accept': 'text/html' },
@@ -383,6 +378,31 @@ document.addEventListener('keydown', function (e) {
         }).catch(function () {
             content.innerHTML = '<div class="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">Erro de rede ao carregar preview.</div>';
         });
+    }
+
+    tabela.addEventListener('click', function (e) {
+        var btnVersao = e.target.closest('.btn-ver-versao');
+        if (btnVersao) {
+            e.preventDefault();
+            var versao = parseInt(btnVersao.getAttribute('data-versao') || '0', 10);
+            carregarPreview(getRowData(btnVersao), versao);
+            return;
+        }
+        var btnPreview = e.target.closest('.btn-preview-boletim');
+        if (!btnPreview) return;
+        e.preventDefault();
+        document.querySelectorAll('[data-dropdown-menu]').forEach(function (m) { m.classList.add('hidden'); });
+        var d = getRowData(btnPreview);
+        if (!d || !d.previewRow) return;
+        if (!d.previewRow.classList.contains('hidden') && d.previewRow.dataset.loaded === '1' && (d.previewRow.dataset.versao || '') === '') {
+            d.previewRow.classList.add('hidden');
+            return;
+        }
+        if (d.previewRow.dataset.loaded === '1' && (d.previewRow.dataset.versao || '') === '') {
+            d.previewRow.classList.remove('hidden');
+            return;
+        }
+        carregarPreview(d, 0);
     });
 })();
 </script>

@@ -16,6 +16,7 @@ $fmtVersaoQuando = static function ($value): string {
     return $ts ? date('d/m/Y H:i:s', $ts) : $v;
 };
 
+$versaoAberta = (int) ($boletim_versao_aberta ?? 0);
 $linhasVersao = [];
 $menorVersao = null;
 foreach ($boletimVersoes as $versaoItem) {
@@ -37,10 +38,11 @@ foreach ($boletimVersoes as $versaoItem) {
     } else {
         $texto = $verbo . ' por ' . $nome . ' em ' . $quando;
     }
-    if ($num > 1) {
-        $texto = 'v' . $num . ' · ' . $texto;
-    }
-    $linhasVersao[] = $texto;
+    $linhasVersao[] = [
+        'num' => $num,
+        'texto' => 'v' . $num . ' · ' . $texto,
+        'vigente' => (int) ($versaoItem['vigente'] ?? 0) === 1,
+    ];
 }
 
 if ($linhasVersao === []) {
@@ -52,20 +54,36 @@ if ($linhasVersao === []) {
     return;
 }
 
-$linhasHtml = array_map(static function (string $linha): string {
-    return htmlspecialchars($linha, ENT_QUOTES, 'UTF-8');
-}, $linhasVersao);
+$botaoVersao = static function (array $linha) use ($versaoAberta): string {
+    $num = (int) ($linha['num'] ?? 0);
+    $aberta = $versaoAberta > 0 && $num === $versaoAberta;
+    $classe = 'btn-ver-versao block w-full text-left hover:text-indigo-700';
+    if ($aberta) {
+        $classe .= ' font-semibold text-indigo-800';
+    }
+    $html = '<button type="button" class="' . $classe . '" data-versao="' . $num . '" title="Ver as notas desta versão">';
+    $html .= htmlspecialchars((string) ($linha['texto'] ?? ''), ENT_QUOTES, 'UTF-8');
+    if (!empty($linha['vigente'])) {
+        $html .= ' <span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>';
+    }
+    if ($aberta) {
+        $html .= ' <span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-indigo-100 text-indigo-800">em tela</span>';
+    }
+    $html .= '</button>';
 
-if ($boletimVersoesCompact && count($linhasHtml) > 3) {
-    $totalLinhas = count($linhasHtml);
+    return $html;
+};
+
+if ($boletimVersoesCompact && count($linhasVersao) > 3) {
+    $totalLinhas = count($linhasVersao);
     echo '<div class="text-xs leading-5 text-gray-700 min-w-[16rem]">';
-    echo '<div>' . $linhasHtml[0] . '</div>';
-    echo '<div>' . $linhasHtml[$totalLinhas - 1] . '</div>';
+    echo '<div>' . $botaoVersao($linhasVersao[0]) . '</div>';
+    echo '<div>' . $botaoVersao($linhasVersao[$totalLinhas - 1]) . '</div>';
     echo '<details class="mt-0.5">';
     echo '<summary class="cursor-pointer text-indigo-700">ver as ' . $totalLinhas . ' versões</summary>';
     echo '<ul class="mt-1 space-y-0.5">';
-    foreach ($linhasHtml as $linhaHtml) {
-        echo '<li>' . $linhaHtml . '</li>';
+    foreach ($linhasVersao as $linha) {
+        echo '<li>' . $botaoVersao($linha) . '</li>';
     }
     echo '</ul></details></div>';
     return;
@@ -75,7 +93,10 @@ $classeLista = $boletimVersoesCompact
     ? 'text-xs leading-5 text-gray-700 space-y-0.5 min-w-[16rem]'
     : 'mb-3 space-y-1 text-xs text-gray-700';
 echo '<ul class="' . $classeLista . '">';
-foreach ($linhasHtml as $linhaHtml) {
-    echo '<li>' . $linhaHtml . '</li>';
+foreach ($linhasVersao as $linha) {
+    echo '<li>' . $botaoVersao($linha) . '</li>';
 }
 echo '</ul>';
+if (!$boletimVersoesCompact && count($linhasVersao) > 1) {
+    echo '<p class="mb-3 text-xs text-gray-500">Clique numa versão para ver as notas daquela gravação, da primeira até a vigente.</p>';
+}
