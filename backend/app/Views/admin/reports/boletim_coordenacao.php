@@ -1,5 +1,6 @@
 <?php
-$fonte = (($fonte ?? 'vida_escolar') === 'evento') ? 'evento' : 'vida_escolar';
+$fontePedido = (string) ($fonte ?? 'vida_escolar');
+$fonte = in_array($fontePedido, ['evento', 'vida_escolar', 'demonstrativo'], true) ? $fontePedido : 'vida_escolar';
 $relatorio = is_array($relatorio ?? null) ? $relatorio : null;
 $anosLetivos = (array) ($anos_letivos ?? []);
 if ($anosLetivos === []) {
@@ -20,6 +21,7 @@ $selecionarTodos = !empty($selecionar_todos);
 $queryExport = [
     'fonte' => $fonte,
     'ano_letivo' => $anoSelecionado,
+    'periodo' => max(0, (int) ($periodo ?? 0)),
     'turma_id' => (int) ($turma_id ?? 0),
     'aluno_q' => trim((string) ($aluno_q ?? '')),
     'nota_abaixo_de' => $nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '',
@@ -56,65 +58,90 @@ include __DIR__ . '/../_partials/flash_message.php';
 ?>
 <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Notas da Coordenação</h1>
-    <p class="text-gray-600 mt-1">Escolha o boletim da Vida Escolar ou as notas do evento (provas, trabalhos e médias).</p>
+    <p class="text-gray-600 mt-1">Escolha o boletim, o demonstrativo de notas ou as notas do evento (provas, trabalhos e médias).</p>
 </div>
 
-<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-    <?php $alunoQFiltro = trim((string) ($aluno_q ?? '')); ?>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <label class="block md:col-span-2 relative">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Aluno</span>
-            <input type="text" name="aluno_q" id="aluno-q-boletim-coord" value="<?= htmlspecialchars($alunoQFiltro, ENT_QUOTES, 'UTF-8') ?>"
-                   placeholder="Digite o nome, RA ou código"
-                   class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100"
-                   autocomplete="off"
-                   role="combobox"
-                   aria-autocomplete="list"
-                   aria-expanded="false"
-                   aria-controls="aluno-sugestoes-boletim-coord">
-            <div id="aluno-sugestoes-boletim-coord" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg" role="listbox"></div>
-            <span class="block text-xs text-gray-500 mt-1">Comece a digitar e clique na sugestão (turma · nome).</span>
-        </label>
+<?php
+$periodoSelecionado = max(0, (int) ($periodo ?? 0));
+$periodosPorAno = is_array($periodos_por_ano ?? null) ? $periodos_por_ano : [];
+$infoPeriodoAno = is_array($periodosPorAno[(string) $anoSelecionado] ?? null) ? $periodosPorAno[(string) $anoSelecionado] : [];
+$rotuloPeriodo = trim((string) ($infoPeriodoAno['rotulo'] ?? 'Bimestre'));
+if ($rotuloPeriodo === '') {
+    $rotuloPeriodo = 'Bimestre';
+}
+$opcoesPeriodo = is_array($infoPeriodoAno['opcoes'] ?? null) ? $infoPeriodoAno['opcoes'] : [];
+$campoClasse = 'w-full h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100';
+$alunoQFiltro = trim((string) ($aluno_q ?? ''));
+?>
+<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
+    <div class="p-5 md:p-6 space-y-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <label class="block">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir</span>
-            <select name="fonte" id="fonte-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
-                <option value="vida_escolar" <?= $fonte === 'vida_escolar' ? 'selected' : '' ?>>Boletim da Vida Escolar</option>
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Exibir</span>
+            <select name="fonte" id="fonte-boletim-coord" class="<?= $campoClasse ?>">
+                <option value="vida_escolar" <?= $fonte === 'vida_escolar' ? 'selected' : '' ?>>Boletim</option>
+                <option value="demonstrativo" <?= $fonte === 'demonstrativo' ? 'selected' : '' ?>>Demonstrativo de notas</option>
                 <option value="evento" <?= $fonte === 'evento' ? 'selected' : '' ?>>Notas do evento</option>
             </select>
         </label>
-        <label class="block campo-fonte campo-fonte-vida_escolar <?= $fonte === 'vida_escolar' ? '' : 'hidden' ?>">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Ano letivo</span>
-            <select name="ano_letivo" id="ano-letivo-boletim-coord" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100" <?= $fonte === 'vida_escolar' ? 'required' : '' ?>>
+        <label class="block">
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Ano letivo</span>
+            <select name="ano_letivo" id="ano-letivo-boletim-coord" class="<?= $campoClasse ?>">
                 <?php foreach ($anosLetivos as $ano): ?>
                     <option value="<?= (int) $ano ?>" <?= $anoSelecionado === (int) $ano ? 'selected' : '' ?>><?= (int) $ano ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
         <label class="block">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Turma</span>
-            <select name="turma_id" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+            <span class="block text-sm font-medium text-gray-700 mb-1.5" id="rotulo-periodo-boletim-coord"><?= htmlspecialchars($rotuloPeriodo, ENT_QUOTES, 'UTF-8') ?></span>
+            <select name="periodo" id="periodo-boletim-coord" class="<?= $campoClasse ?>">
+                <option value="0" <?= $periodoSelecionado === 0 ? 'selected' : '' ?>>Todos</option>
+                <?php foreach ($opcoesPeriodo as $opcaoPeriodo): ?>
+                    <?php if (!is_array($opcaoPeriodo)) { continue; } ?>
+                    <?php $valorPeriodo = (int) ($opcaoPeriodo['valor'] ?? 0); ?>
+                    <option value="<?= $valorPeriodo ?>" <?= $periodoSelecionado === $valorPeriodo ? 'selected' : '' ?>><?= htmlspecialchars((string) ($opcaoPeriodo['rotulo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="block">
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Turma</span>
+            <select name="turma_id" class="<?= $campoClasse ?>">
                 <option value="0">Todas as turmas</option>
                 <?php foreach ((array) ($turmas ?? []) as $turma): ?>
                     <option value="<?= (int) $turma['id'] ?>" <?= (int) ($turma_id ?? 0) === (int) $turma['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $turma['nome']) ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
-        <label class="block">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Média final abaixo de</span>
-            <input type="text" name="nota_abaixo_de" inputmode="decimal" placeholder="Ex.: 7 ou 6,5" value="<?= htmlspecialchars($nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '') ?>" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <label class="block md:col-span-2 relative">
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Aluno</span>
+            <input type="text" name="aluno_q" id="aluno-q-boletim-coord" value="<?= htmlspecialchars($alunoQFiltro, ENT_QUOTES, 'UTF-8') ?>"
+                   placeholder="Nome, RA ou código"
+                   class="<?= $campoClasse ?>"
+                   autocomplete="off"
+                   role="combobox"
+                   aria-autocomplete="list"
+                   aria-expanded="false"
+                   aria-controls="aluno-sugestoes-boletim-coord">
+            <div id="aluno-sugestoes-boletim-coord" class="hidden absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg" role="listbox"></div>
         </label>
         <label class="block">
-            <span class="block text-sm font-semibold text-gray-700 mb-1.5">Exibir matérias</span>
-            <select name="materias_exibicao" class="w-full h-11 rounded-xl border border-gray-300 bg-white px-3 text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100">
-                <option value="todas" <?= ($materias_exibicao ?? 'todas') === 'todas' ? 'selected' : '' ?>>Todas as matérias do aluno</option>
-                <option value="abaixo" <?= ($materias_exibicao ?? 'todas') === 'abaixo' ? 'selected' : '' ?>>Somente matérias abaixo do corte</option>
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Nota abaixo de</span>
+            <input type="text" name="nota_abaixo_de" inputmode="decimal" placeholder="Ex.: 7 ou 6,5" value="<?= htmlspecialchars($nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '') ?>" class="<?= $campoClasse ?>">
+        </label>
+        <label class="block">
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Matérias</span>
+            <select name="materias_exibicao" class="<?= $campoClasse ?>">
+                <option value="todas" <?= ($materias_exibicao ?? 'todas') === 'todas' ? 'selected' : '' ?>>Todas as matérias</option>
+                <option value="abaixo" <?= ($materias_exibicao ?? 'todas') === 'abaixo' ? 'selected' : '' ?>>Só as que estão abaixo do corte</option>
             </select>
         </label>
     </div>
 
-    <div class="campo-fonte campo-fonte-evento mt-5 <?= $fonte === 'evento' ? '' : 'hidden' ?>">
+    <div class="campo-fonte campo-fonte-evento campo-fonte-demonstrativo mt-5 <?= in_array($fonte, ['evento', 'demonstrativo'], true) ? '' : 'hidden' ?>">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <span class="text-sm font-semibold text-gray-700">Boletins</span>
+            <span class="text-sm font-medium text-gray-700">Eventos</span>
             <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input type="checkbox" id="eventos-selecionar-todos" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $selecionarTodos ? 'checked' : '' ?>>
                 Selecionar todos
@@ -124,7 +151,9 @@ include __DIR__ . '/../_partials/flash_message.php';
         <div id="lista-eventos-coord" class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/40">
             <?php
             $valorEventoLista = static function (array $ev): string {
-                return (int) ($ev['regra_id'] ?? 0) . ':' . base64_encode((string) ($ev['periodo_ref'] ?? ''));
+                return (int) ($ev['regra_id'] ?? 0)
+                    . ':' . base64_encode((string) ($ev['periodo_ref'] ?? ''))
+                    . ':' . (int) ($ev['geracao_id'] ?? 0);
             };
             $dataVersaoLista = static function (array $ev): string {
                 $raw = trim((string) ($ev['criado_em'] ?? ''));
@@ -154,7 +183,10 @@ include __DIR__ . '/../_partials/flash_message.php';
                     if ($vigA !== $vigB) {
                         return $vigA <=> $vigB;
                     }
-                    return strcmp((string) ($b['updated_at'] ?? ''), (string) ($a['updated_at'] ?? ''));
+                    $dataA = (string) ($b['criado_em'] ?? $b['updated_at'] ?? '');
+                    $dataB = (string) ($a['criado_em'] ?? $a['updated_at'] ?? '');
+
+                    return strcmp($dataA, $dataB);
                 });
                 $linhasEvento[] = $versoesGrupo;
             }
@@ -186,7 +218,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                     <span></span>
                     <span>Tipo</span>
                     <span>Ref</span>
-                    <span>Bimestre</span>
+                    <span id="cab-periodo-eventos"><?= htmlspecialchars($rotuloPeriodo, ENT_QUOTES, 'UTF-8') ?></span>
                     <span>Série</span>
                     <span>Versões</span>
                 </div>
@@ -208,7 +240,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                 $tipoLista = (($escolhida['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
                 $totalVersoes = count($versoesLinha);
                 ?>
-                <div class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 12.5rem;">
+                <div class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 12.5rem;" data-ano="<?= (int) ($escolhida['ano_letivo'] ?? 0) ?>" data-bimestre="<?= (int) ($escolhida['bimestre'] ?? 0) ?>">
                     <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
                     <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
                     <span>Ref: <?= $refLista > 0 ? $refLista : '—' ?></span>
@@ -252,17 +284,21 @@ include __DIR__ . '/../_partials/flash_message.php';
                     </div>
                 </div>
             <?php endforeach; ?>
+            <p id="eventos-filtro-vazio" class="hidden px-4 py-6 text-sm text-gray-500">Nenhum evento neste ano e período.</p>
         </div>
         <input type="hidden" name="evento" id="evento-boletim-coord" value="">
     </div>
 
-    <label class="inline-flex items-center gap-2.5 mt-5 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" name="assinatura" value="1" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= !empty($incluir_assinatura) ? 'checked' : '' ?>>
-        Incluir campo de assinatura ao lado do nome do aluno
-    </label>
-    <div class="mt-5 flex flex-wrap gap-3">
-        <button type="submit" name="executar" value="1" class="btn-primary-custom px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:opacity-90 transition-opacity"><i class="fa-solid fa-chart-column mr-2"></i>Gerar relatório</button>
-        <a href="<?= URL ?>/admin/reports/boletim-coordenacao" class="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">Limpar</a>
+    <div class="pt-4 border-t border-gray-100 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <label class="inline-flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer">
+            <input type="checkbox" name="assinatura" value="1" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= !empty($incluir_assinatura) ? 'checked' : '' ?>>
+            Incluir campo de assinatura ao lado do nome
+        </label>
+        <div class="flex flex-wrap gap-3">
+            <a href="<?= URL ?>/admin/reports/boletim-coordenacao" class="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">Limpar</a>
+            <button type="submit" name="executar" value="1" class="btn-primary-custom px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:opacity-90 transition-opacity"><i class="fa-solid fa-chart-column mr-2"></i>Gerar relatório</button>
+        </div>
+    </div>
     </div>
 </form>
 
@@ -329,7 +365,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                 <?php else: ?>
                 <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Nenhum aluno com ficha na Vida Escolar"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</span>
                 <?php endif; ?>
-            <?php elseif ($eventosTotal === 1 && !empty($relatorio['total_alunos'])): ?>
+            <?php elseif ($fonteRelatorio !== 'demonstrativo' && $eventosTotal === 1 && !empty($relatorio['total_alunos'])): ?>
                 <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
             <?php endif; ?>
             <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
@@ -375,7 +411,15 @@ include __DIR__ . '/../_partials/flash_message.php';
     <?php endif; ?>
 
     <?php if ((int) ($relatorio['total_alunos'] ?? 0) <= 0): ?>
-        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?= $fonteRelatorio === 'vida_escolar' ? 'Nenhuma ficha da Vida Escolar encontrada para os filtros selecionados.' : 'Nenhum boletim encontrado para os filtros selecionados.' ?></div>
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?php
+            if ($fonteRelatorio === 'vida_escolar') {
+                echo 'Nenhuma ficha encontrada para os filtros selecionados.';
+            } elseif ($fonteRelatorio === 'demonstrativo') {
+                echo 'Nenhum demonstrativo de notas encontrado para os filtros selecionados.';
+            } else {
+                echo 'Nenhum boletim encontrado para os filtros selecionados.';
+            }
+        ?></div>
     <?php endif; ?>
 
     <?php foreach ($grupos as $grupo): ?>
@@ -403,13 +447,22 @@ include __DIR__ . '/../_partials/flash_message.php';
                     <strong class="text-gray-900"><?= htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
                     <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
                     <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) ($aluno['turma'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
-                    <?php if ($fonteRelatorio === 'evento'): ?>
+                    <?php if ($fonteRelatorio === 'evento' || $fonteRelatorio === 'demonstrativo'): ?>
                         <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
                         <span class="text-sm text-gray-500">Bimestre: <?= htmlspecialchars($bimestreGrupo !== '' ? $bimestreGrupo : '—', ENT_QUOTES, 'UTF-8') ?></span>
                     <?php else: ?>
                         <?php if ((string) ($aluno['ra'] ?? '') !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
                     <?php endif; ?>
                 </div>
+                <?php if ($fonteRelatorio === 'demonstrativo'): ?>
+                <div class="p-4 overflow-x-auto">
+                    <?php if (trim((string) ($aluno['demonstrativo_html'] ?? '')) !== ''): ?>
+                        <?= $aluno['demonstrativo_html'] ?>
+                    <?php else: ?>
+                        <p class="text-sm text-gray-500">Não há demonstrativo de notas para este aluno neste evento.</p>
+                    <?php endif; ?>
+                </div>
+                <?php else: ?>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead class="bg-gray-50">
@@ -432,6 +485,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                         </tbody>
                     </table>
                 </div>
+                <?php endif; ?>
                 <div class="coord-observation border-t border-gray-200 bg-slate-50/70 px-5 py-4"
                      data-endpoint="<?= URL ?>/admin/students/<?= (int) ($aluno['id'] ?? 0) ?>/boletim/observacao"
                      data-csrf="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -484,6 +538,11 @@ include __DIR__ . '/../_partials/flash_message.php';
     var fonteSelect = document.getElementById('fonte-boletim-coord');
     var eventoHidden = document.getElementById('evento-boletim-coord');
     var anoSelect = document.getElementById('ano-letivo-boletim-coord');
+    var periodoSelect = document.getElementById('periodo-boletim-coord');
+    var rotuloPeriodo = document.getElementById('rotulo-periodo-boletim-coord');
+    var cabPeriodo = document.getElementById('cab-periodo-eventos');
+    var avisoEventos = document.getElementById('eventos-filtro-vazio');
+    var periodosPorAno = <?= json_encode($periodosPorAno, JSON_UNESCAPED_UNICODE) ?>;
     var form = document.getElementById('form-boletim-coordenacao');
     var checks = Array.prototype.slice.call(document.querySelectorAll('.evento-check'));
     var selecionarTodos = document.getElementById('eventos-selecionar-todos');
@@ -500,21 +559,65 @@ include __DIR__ . '/../_partials/flash_message.php';
         document.querySelectorAll('.campo-fonte').forEach(function (el) {
             el.classList.toggle('hidden', !el.classList.contains('campo-fonte-' + fonte));
         });
-        if (anoSelect) {
-            anoSelect.required = fonte === 'vida_escolar';
-        }
+    }
+    function checksVisiveis() {
+        return checks.filter(function (check) {
+            var item = check.closest('.evento-item');
+            return !item || !item.classList.contains('hidden');
+        });
     }
     function atualizarContagem() {
-        var marcados = checks.filter(function (check) { return check.checked; }).length;
+        var visiveis = checksVisiveis();
+        var marcados = visiveis.filter(function (check) { return check.checked; }).length;
         if (selecionarTodos) {
-            selecionarTodos.checked = checks.length > 0 && marcados === checks.length;
-            selecionarTodos.indeterminate = marcados > 0 && marcados < checks.length;
+            selecionarTodos.checked = visiveis.length > 0 && marcados === visiveis.length;
+            selecionarTodos.indeterminate = marcados > 0 && marcados < visiveis.length;
         }
         if (qtdEl) {
-            qtdEl.textContent = checks.length === 0
+            qtdEl.textContent = visiveis.length === 0
                 ? ''
-                : (marcados + ' de ' + checks.length + ' selecionado(s)');
+                : (marcados + ' de ' + visiveis.length + ' selecionado(s)');
         }
+    }
+    function preencherPeriodos() {
+        if (!periodoSelect || !anoSelect) return;
+        var info = periodosPorAno[String(anoSelect.value)] || { rotulo: 'Bimestre', opcoes: [] };
+        var rotulo = info.rotulo || 'Bimestre';
+        if (rotuloPeriodo) rotuloPeriodo.textContent = rotulo;
+        if (cabPeriodo) cabPeriodo.textContent = rotulo;
+        var atual = periodoSelect.value;
+        periodoSelect.innerHTML = '';
+        var todos = document.createElement('option');
+        todos.value = '0';
+        todos.textContent = 'Todos';
+        periodoSelect.appendChild(todos);
+        (info.opcoes || []).forEach(function (opcao) {
+            var opt = document.createElement('option');
+            opt.value = String(opcao.valor);
+            opt.textContent = opcao.rotulo || '';
+            periodoSelect.appendChild(opt);
+        });
+        var existe = Array.prototype.some.call(periodoSelect.options, function (opt) { return opt.value === atual; });
+        periodoSelect.value = existe ? atual : '0';
+    }
+    function filtrarEventos() {
+        var ano = anoSelect ? (parseInt(anoSelect.value, 10) || 0) : 0;
+        var periodo = periodoSelect ? (parseInt(periodoSelect.value, 10) || 0) : 0;
+        var visiveis = 0;
+        document.querySelectorAll('.evento-item').forEach(function (item) {
+            var anoItem = parseInt(item.getAttribute('data-ano') || '0', 10);
+            var bimItem = parseInt(item.getAttribute('data-bimestre') || '0', 10);
+            var ok = (ano <= 0 || anoItem <= 0 || anoItem === ano) && (periodo <= 0 || bimItem === periodo);
+            item.classList.toggle('hidden', !ok);
+            if (!ok) {
+                var check = item.querySelector('.evento-check');
+                if (check) check.checked = false;
+            } else {
+                visiveis += 1;
+            }
+        });
+        if (avisoEventos) avisoEventos.classList.toggle('hidden', visiveis > 0);
+        atualizarContagem();
     }
     function aplicarVersaoNosChecks() {
         document.querySelectorAll('.evento-item').forEach(function (item) {
@@ -621,7 +724,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     }
     if (selecionarTodos) {
         selecionarTodos.addEventListener('change', function () {
-            checks.forEach(function (check) { check.checked = selecionarTodos.checked; });
+            checksVisiveis().forEach(function (check) { check.checked = selecionarTodos.checked; });
             atualizarContagem();
         });
     }
@@ -635,10 +738,11 @@ include __DIR__ . '/../_partials/flash_message.php';
             var gerar = submitter && submitter.name === 'executar';
             var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
             var alunoBusca = alunoInput ? String(alunoInput.value || '').trim() : '';
-            var nenhum = checks.length > 0 && !checks.some(function (check) { return check.checked; });
-            if (gerar && fonte === 'evento' && nenhum) {
+            var visiveis = checksVisiveis();
+            var nenhum = visiveis.length > 0 && !visiveis.some(function (check) { return check.checked; });
+            if (gerar && (fonte === 'evento' || fonte === 'demonstrativo') && nenhum) {
                 if (alunoBusca !== '') {
-                    checks.forEach(function (check) { check.checked = true; check.disabled = false; });
+                    visiveis.forEach(function (check) { check.checked = true; check.disabled = false; });
                     if (eventoHidden) {
                         eventoHidden.disabled = false;
                         eventoHidden.value = 'todos';
@@ -657,7 +761,16 @@ include __DIR__ . '/../_partials/flash_message.php';
         fonteSelect.addEventListener('change', aplicarFonte);
         aplicarFonte();
     }
-    atualizarContagem();
+    if (anoSelect) {
+        anoSelect.addEventListener('change', function () {
+            preencherPeriodos();
+            filtrarEventos();
+        });
+    }
+    if (periodoSelect) {
+        periodoSelect.addEventListener('change', filtrarEventos);
+    }
+    filtrarEventos();
 })();
 </script>
 <?php if (!empty($pode_editar_observacao)): ?>
