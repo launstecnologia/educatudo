@@ -1109,20 +1109,25 @@ $boletimWizardSteps = [
             if (tipoId > 0 && tipoEv === tipoId) return true;
             return tipoEv > 0 && tiposIdsDoPapel('semanal').indexOf(tipoEv) >= 0;
         }
-        if (tipoId > 0 && tipoEv === tipoId) return true;
-        if (tipoEv > 0 && tiposIdsDoPapel(papel).indexOf(tipoEv) >= 0) return true;
-        var blob = (String(ev.tipo_avaliacao_nome || '') + ' ' + String(ev.chave_quadro || '')).toLowerCase();
-        if (papel === 'bimestral' && blob.indexOf('bimestral') >= 0) return true;
-        if (papel === 'enac' && blob.indexOf('enac') >= 0) return true;
+        if (papel === 'bimestral' || papel === 'enac') {
+            if (tipoId > 0 && tipoEv === tipoId) return true;
+            if (tipoEv > 0 && tiposIdsDoPapel(papel).indexOf(tipoEv) >= 0) return true;
+            var blobFam = (String(ev.tipo_avaliacao_nome || '') + ' ' + String(ev.chave_quadro || '')).toLowerCase();
+            if (papel === 'bimestral' && blobFam.indexOf('bimestral') >= 0) return true;
+            if (papel === 'enac' && blobFam.indexOf('enac') >= 0) return true;
+            return false;
+        }
+        // Recuperação Final e Semestral são tipos diferentes: só o id do tipo entra.
+        if (tipoId > 0) return tipoEv === tipoId;
         var ch = String(ev.chave_quadro || '').toLowerCase();
         return ch !== '' && ch === papel;
     }
 
     function eventosDaPecaFiltrados(key, bim, exigirAno) {
         var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
-        var tipoId = Number(opts.tipo_avaliacao_id || 0);
         var meta = pecaMeta(key);
-        if (!tipoId && meta) tipoId = Number(meta.tipo_avaliacao_id || 0);
+        var tipoMeta = meta ? Number(meta.tipo_avaliacao_id || 0) : 0;
+        var tipoId = tipoMeta > 0 ? tipoMeta : Number(opts.tipo_avaliacao_id || 0);
         var ano = Number((estado && estado.ano_letivo) || 0);
         var papel = papelDaPeca(key);
         var bimsMarcados = normalizarBimestresPeca(opts.bimestres);
@@ -1177,6 +1182,15 @@ $boletimWizardSteps = [
         var layout = String(cfg.layout_type || layoutObj.type || '').toLowerCase();
         var layoutGroup = String(cfg.layout_group || layoutObj.group || '').toLowerCase();
         if (src === 'jornadas' || blob.indexOf('jornada') >= 0) return 'jornada';
+        if (/^s[1-8]$/.test(cod)) return 'semanal';
+        var tipoIdPeca = Number(cfg.tipo_avaliacao_id || c.tipo_avaliacao_id || 0);
+        if (tipoIdPeca > 0) {
+            var fromTipo = '';
+            (catalogo.pecas || []).forEach(function (p) {
+                if (Number(p.tipo_avaliacao_id || 0) === tipoIdPeca) fromTipo = p.key;
+            });
+            if (fromTipo) return fromTipo;
+        }
         var chaveQuadro = String(cfg.chave_quadro || c.chave_quadro || '').toLowerCase().trim();
         if (chaveQuadro === 'semanal') return 'semanal';
         if (chaveQuadro === 'prova_bim' || chaveQuadro === 'bimestral') return 'bimestral';

@@ -2163,6 +2163,16 @@ class BoletimAssistenteWizard
         if ($src === 'jornadas' || str_contains($blob, 'jornada')) {
             return 'jornada';
         }
+        if ((bool) preg_match('/^s[1-8]$/', $cod)) {
+            return 'semanal';
+        }
+        $tipoIdComp = (int) (($cfg['tipo_avaliacao_id'] ?? null) ?: ($c['tipo_avaliacao_id'] ?? 0));
+        if ($tipoIdComp > 0) {
+            $porTipo = $this->chavePecaPorTipoId($tipoIdComp);
+            if ($porTipo !== '') {
+                return $porTipo;
+            }
+        }
         if ($chaveTipo !== '') {
             return $chaveTipo;
         }
@@ -3330,7 +3340,7 @@ class BoletimAssistenteWizard
                 if ($label !== '') {
                     $def['nome'] = $label;
                 }
-                if ($tipoId <= 0 && (int) ($meta['tipo_avaliacao_id'] ?? 0) > 0) {
+                if ((int) ($meta['tipo_avaliacao_id'] ?? 0) > 0) {
                     $def['tipo_avaliacao_id'] = (int) $meta['tipo_avaliacao_id'];
                 }
             }
@@ -3341,7 +3351,10 @@ class BoletimAssistenteWizard
             return null;
         }
 
-        $id = $tipoId > 0 ? $tipoId : (int) ($meta['tipo_avaliacao_id'] ?? 0);
+        $id = (int) ($meta['tipo_avaliacao_id'] ?? 0);
+        if ($id <= 0) {
+            $id = $tipoId;
+        }
         $nome = $meta !== null ? trim((string) ($meta['label'] ?? '')) : '';
         if ($nome === '') {
             $nome = 'Tipo #' . $id;
@@ -3392,7 +3405,10 @@ class BoletimAssistenteWizard
         $dataFim = (string) ($estado['data_fim'] ?? '');
         $config = ['formula_mode' => 'single', 'expressao' => '', 'papel_wizard' => $this->normalizarPapel($opts['papel'] ?? '', $peca)];
         $blocosIds = [];
-        $tipoId = max(0, (int) ($opts['tipo_avaliacao_id'] ?? ($base['tipo_avaliacao_id'] ?? 0)));
+        $tipoId = max(0, (int) ($base['tipo_avaliacao_id'] ?? 0));
+        if ($tipoId <= 0) {
+            $tipoId = max(0, (int) ($opts['tipo_avaliacao_id'] ?? 0));
+        }
         $tipoNome = '';
         $filtroTitulo = $base['filtro_titulo'];
 
@@ -3445,6 +3461,24 @@ class BoletimAssistenteWizard
             }
             $manualBlocos = !empty($opts['blocos_ids_manual']);
             $blocosManualIds = $this->normalizarIdsLista($opts['blocos_ids'] ?? []);
+            if ($tipoId > 0) {
+                $config['tipo_avaliacao_id'] = $tipoId;
+            }
+            if ($manualBlocos && $tipoId > 0 && $blocosManualIds !== []) {
+                $doTipo = $this->ferramentas->resolverBlocosPorTipo(
+                    $tipoId,
+                    null,
+                    null,
+                    4000,
+                    null,
+                    $bimsPeca
+                );
+                $permitidos = array_fill_keys(array_map('intval', (array) ($doTipo['blocos_ids'] ?? [])), true);
+                $blocosManualIds = array_values(array_filter(
+                    $blocosManualIds,
+                    static fn ($id) => isset($permitidos[(int) $id])
+                ));
+            }
             $resolvido = $manualBlocos
                 ? ['tipo' => null, 'blocos_ids' => $blocosManualIds]
                 : $this->ferramentas->resolverBlocosPorTipo(
