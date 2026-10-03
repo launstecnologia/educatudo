@@ -1223,7 +1223,9 @@ class BoletimAssistenteController extends BaseController
         foreach ($candidatas as $linha) {
             if (!empty($linha['eh_grupo_pai'])) {
                 $gk = trim((string) ($linha['grupo_key'] ?? ''));
-                if ($gk === '' || empty($keysComFilho[$gk])) {
+                $chavePai = $this->chaveNomeMateria((string) ($linha['materia_nome'] ?? ''));
+                $nomeNoBloco = $chavePai !== '' && isset($nomes[$chavePai]);
+                if (($gk === '' || empty($keysComFilho[$gk])) && !$nomeNoBloco) {
                     continue;
                 }
             }
@@ -1283,7 +1285,16 @@ class BoletimAssistenteController extends BaseController
         foreach ($candidatas as $linha) {
             if (!empty($linha['eh_grupo_pai'])) {
                 $gk = trim((string) ($linha['grupo_key'] ?? ''));
-                if ($gk === '' || empty($keysComFilho[$gk])) {
+                $notasPai = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+                $temFilho = $gk !== '' && !empty($keysComFilho[$gk]);
+                $paiVisivel = BoletimQuadroLayoutHelper::linhaVisivelNoQuadro(
+                    $blocoKey,
+                    $semanasDeste,
+                    $semanasOutro,
+                    $outras,
+                    $notasPai
+                );
+                if (!$temFilho && !$paiVisivel) {
                     continue;
                 }
             }

@@ -582,7 +582,8 @@ class BoletimQuadroLayoutHelper
         if (self::linhaTemDadosNoBloco($semanasOutro, $notas)) {
             return false;
         }
-        if (strtolower($blocoKey) !== 'a') {
+        // Sem o outro bloco (quadro só B, por exemplo), a média da área entra aqui.
+        if (strtolower($blocoKey) !== 'a' && $semanasOutro !== []) {
             return false;
         }
         foreach ($outrasCols as $c) {

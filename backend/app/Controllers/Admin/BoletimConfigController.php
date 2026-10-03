@@ -6722,14 +6722,17 @@ class BoletimConfigController extends BaseController
                     break;
                 }
             }
-            if (count($filhosLinhas) < 2 && !$temNotaHerdada) {
-                foreach ($filhosLinhas as $f) {
-                    unset($f['eh_grupo_pai'], $f['eh_grupo_filho'], $f['grupo_pai_nome'], $f['grupo_key']);
-                    $blocos[] = [
-                        'sort' => $this->canonicalMateriaNomeKey((string) ($f['materia_nome'] ?? '')),
-                        'linhas' => [$f],
-                    ];
+            $paiNotasBoletim = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
+            $temNotaBoletim = false;
+            if (is_array($paiNotasBoletim)) {
+                foreach ($paiNotasBoletim as $valBoletim) {
+                    if (is_numeric($valBoletim)) {
+                        $temNotaBoletim = true;
+                        break;
+                    }
                 }
+            }
+            if ($filhosLinhas === [] && !$temNotaHerdada && !$temNotaBoletim) {
                 continue;
             }
             usort($filhosLinhas, function (array $a, array $b): int {
@@ -6758,7 +6761,6 @@ class BoletimConfigController extends BaseController
                     $paiNotas[$codHerdado] = $valHerdado;
                 }
             }
-            $paiNotasBoletim = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
             if ($paiNotasBoletim !== null) {
                 foreach ($paiNotasBoletim as $cod => $val) {
                     if (!is_numeric($val)) {

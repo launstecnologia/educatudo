@@ -84,10 +84,10 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
         $linhasTab = [];
         $keysComFilho = [];
         $paisPendentes = [];
+        $keyTab = strtolower((string) ($tabQ['key'] ?? 'a'));
+        $semanasOutro = $keyTab === 'b' ? $semanasPorBloco['a'] : $semanasPorBloco['b'];
         foreach ($linhasQuadro as $linQ) {
             $notasQ = is_array($linQ['notas'] ?? null) ? $linQ['notas'] : [];
-            $keyTab = strtolower((string) ($tabQ['key'] ?? 'a'));
-            $semanasOutro = $keyTab === 'b' ? $semanasPorBloco['a'] : $semanasPorBloco['b'];
             if (!empty($linQ['eh_grupo_pai'])) {
                 $paisPendentes[] = $linQ;
                 continue;
@@ -105,7 +105,18 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
         }
         foreach ($paisPendentes as $paiQ) {
             $gk = trim((string) ($paiQ['grupo_key'] ?? ''));
-            if ($gk === '' || empty($keysComFilho[$gk])) {
+            $notasPai = is_array($paiQ['notas'] ?? null) ? $paiQ['notas'] : [];
+            $temFilho = $gk !== '' && !empty($keysComFilho[$gk]);
+            // A área (ex.: Língua Portuguesa) fica na tabela mesmo sem filha visível,
+            // quando a própria linha-mãe já tem nota. Sem isso o aluno some do quadro.
+            $paiVisivel = BoletimQuadroLayoutHelper::linhaVisivelNoQuadro(
+                $keyTab,
+                $semanasCols,
+                $semanasOutro,
+                $outrasCols,
+                $notasPai
+            );
+            if (!$temFilho && !$paiVisivel) {
                 continue;
             }
             // Insere a mãe imediatamente antes do primeiro filho do grupo.
@@ -113,6 +124,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
             $novas = [];
             foreach ($linhasTab as $linExist) {
                 if (!$inserido
+                    && $temFilho
                     && !empty($linExist['eh_grupo_filho'])
                     && trim((string) ($linExist['grupo_key'] ?? '')) === $gk) {
                     $novas[] = $paiQ;
@@ -121,7 +133,19 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                 $novas[] = $linExist;
             }
             if (!$inserido) {
-                $novas[] = $paiQ;
+                $nomePai = mb_strtolower(trim((string) ($paiQ['materia_nome'] ?? '')), 'UTF-8');
+                $novas = [];
+                foreach ($linhasTab as $linExist) {
+                    $nomeExist = mb_strtolower(trim((string) ($linExist['materia_nome'] ?? '')), 'UTF-8');
+                    if (!$inserido && $nomeExist !== '' && $nomeExist > $nomePai) {
+                        $novas[] = $paiQ;
+                        $inserido = true;
+                    }
+                    $novas[] = $linExist;
+                }
+                if (!$inserido) {
+                    $novas[] = $paiQ;
+                }
             }
             $linhasTab = $novas;
         }
