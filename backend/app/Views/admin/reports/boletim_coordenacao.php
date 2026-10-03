@@ -198,7 +198,6 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     $totalPaginas = max(1, (int) ($relatorio['total_paginas'] ?? 1));
     $eventosTotal = max(1, (int) ($relatorio['eventos_total'] ?? 1));
     $grupos = is_array($relatorio['grupos'] ?? null) ? $relatorio['grupos'] : [];
-    $indice = is_array($relatorio['indice'] ?? null) ? $relatorio['indice'] : [];
     $linkRelatorio = static function (int $paginaLink) use ($queryExport): string {
         $params = $queryExport;
         unset($params['pagina'], $params['evento_idx']);
@@ -211,69 +210,34 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     $queryExportacao = $queryExport;
     unset($queryExportacao['pagina'], $queryExportacao['evento_idx']);
     ?>
+    <?php
+    $totalAlunosResumo = (int) ($relatorio['total_alunos'] ?? 0);
+    $btnExportar = 'inline-flex items-center justify-center w-10 h-10 rounded-lg';
+    $urlExportar = static function (string $formato) use ($queryExportacao): string {
+        return URL . '/admin/reports/boletim-coordenacao/exportar?' . http_build_query($queryExportacao + ['formato' => $formato]);
+    };
+    ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div>
-            <strong><?= (int) $relatorio['total_alunos'] ?> alunos</strong>
-            <span class="text-gray-500">
-                · <?= (int) $relatorio['total_linhas'] ?> registros de matérias
-                <?php if ($eventosTotal > 1): ?> · <?= (int) $eventosTotal ?> boletins<?php endif; ?>
-                <?php if ($relatorio['nota_abaixo_de'] !== null): ?> · média final abaixo de <?= htmlspecialchars(number_format((float) $relatorio['nota_abaixo_de'], 1, ',', '.')) ?><?php endif; ?>
-                <?php if (($relatorio['materias_exibicao'] ?? 'todas') === 'abaixo'): ?> · somente matérias abaixo do corte<?php endif; ?>
-                <?php if ($fonteRelatorio === 'vida_escolar' && !empty($relatorio['alunos_com_ficha'])): ?> · <?= (int) $relatorio['alunos_com_ficha'] ?> com ficha na Vida Escolar<?php endif; ?>
-            </span>
-        </div>
+        <strong><?= $totalAlunosResumo ?> <?= $totalAlunosResumo === 1 ? 'aluno' : 'alunos' ?></strong>
         <div class="flex flex-wrap gap-2">
             <?php if ($fonteRelatorio === 'vida_escolar'): ?>
                 <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && !$zipGerando): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</a>
+                <a href="<?= htmlspecialchars($urlExportar('pdf'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-red-600 text-white hover:bg-red-700" title="Baixar boletins (ZIP)" aria-label="Baixar boletins (ZIP)"><i class="fa-solid fa-file-zipper"></i></a>
                 <?php elseif ($zipGerando): ?>
-                <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Aguarde o ZIP atual terminar"><i class="fa-solid fa-file-zipper mr-2"></i>Gerando ZIP...</span>
+                <span class="<?= $btnExportar ?> bg-gray-200 text-gray-500 cursor-not-allowed" title="Aguarde o ZIP atual terminar" aria-label="Gerando ZIP"><i class="fa-solid fa-file-zipper"></i></span>
                 <?php else: ?>
-                <span class="px-4 py-2 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed" title="Nenhum aluno com ficha na Vida Escolar"><i class="fa-solid fa-file-zipper mr-2"></i>Baixar boletins (ZIP)</span>
+                <span class="<?= $btnExportar ?> bg-gray-200 text-gray-500 cursor-not-allowed" title="Nenhum aluno com ficha na Vida Escolar" aria-label="Baixar boletins (ZIP)"><i class="fa-solid fa-file-zipper"></i></span>
                 <?php endif; ?>
-            <?php elseif ($fonteRelatorio !== 'demonstrativo' && $eventosTotal === 1 && !empty($relatorio['total_alunos'])): ?>
-                <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'pdf'])) ?>" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"><i class="fa-solid fa-file-pdf mr-2"></i>Exportar PDF</a>
+            <?php elseif ($fonteRelatorio !== 'demonstrativo' && $eventosTotal === 1 && $totalAlunosResumo > 0): ?>
+                <a href="<?= htmlspecialchars($urlExportar('pdf'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-red-600 text-white hover:bg-red-700" title="Exportar PDF" aria-label="Exportar PDF"><i class="fa-solid fa-file-pdf"></i></a>
             <?php endif; ?>
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'excel'])) ?>" class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-2"></i>Exportar Excel</a>
-            <a href="<?= URL ?>/admin/reports/boletim-coordenacao/exportar?<?= htmlspecialchars(http_build_query($queryExportacao + ['formato' => 'json'])) ?>" class="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-900"><i class="fa-solid fa-file-code mr-2"></i>Exportar JSON</a>
+            <a href="<?= htmlspecialchars($urlExportar('excel'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-emerald-600 text-white hover:bg-emerald-700" title="Exportar Excel" aria-label="Exportar Excel"><i class="fa-solid fa-file-excel"></i></a>
+            <a href="<?= htmlspecialchars($urlExportar('json'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-slate-800 text-white hover:bg-slate-900" title="Exportar JSON" aria-label="Exportar JSON"><i class="fa-solid fa-file-code"></i></a>
+            <a href="<?= htmlspecialchars($urlExportar('txt'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-sky-700 text-white hover:bg-sky-800" title="Exportar TXT" aria-label="Exportar TXT"><i class="fa-solid fa-file-lines"></i></a>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mb-4">Excel e JSON saem com todos os boletins selecionados. A tela pagina 20 alunos por vez para não ficar pesada.</p>
-    <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_com_ficha'] ?? 0) > 0): ?>
-        <p class="text-sm text-gray-500 mb-4">Um PDF por aluno, gerado em segundo plano e empacotado em ZIP. Com a escola inteira pode levar vários minutos.</p>
-    <?php endif; ?>
     <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && (int) ($relatorio['total_alunos'] ?? 0) > 0): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-4"><?= (int) $relatorio['alunos_sem_ficha'] ?> aluno(s) desta lista ainda não têm ficha na Vida Escolar no ano <?= (int) ($relatorio['ano_letivo'] ?? 0) ?> e ficam de fora do ZIP.</div>
-    <?php endif; ?>
-
-    <?php if (count($indice) > 1): ?>
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm mb-5 overflow-hidden">
-            <div class="px-4 py-3 border-b border-gray-200">
-                <h2 class="text-sm font-semibold text-gray-900">Boletins neste relatório</h2>
-            </div>
-            <div class="divide-y divide-gray-100">
-                <?php foreach ($indice as $itemIndice): ?>
-                    <?php
-                    $paginaIndice = max(1, (int) ($itemIndice['pagina'] ?? 1));
-                    $qtdIndice = (int) ($itemIndice['alunos'] ?? 0);
-                    ?>
-                    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                        <div class="min-w-0">
-                            <div class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) ($itemIndice['rotulo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
-                            <?php if (trim((string) ($itemIndice['detalhe'] ?? '')) !== ''): ?>
-                                <div class="text-xs text-gray-500 truncate"><?= htmlspecialchars((string) $itemIndice['detalhe'], ENT_QUOTES, 'UTF-8') ?></div>
-                            <?php endif; ?>
-                        </div>
-                        <div class="flex items-center gap-3 shrink-0 text-xs text-gray-600">
-                            <span><?= $qtdIndice ?> aluno(s)</span>
-                            <?php if ($qtdIndice > 0): ?>
-                                <a href="<?= htmlspecialchars($linkRelatorio($paginaIndice), ENT_QUOTES, 'UTF-8') ?>" class="font-medium text-purple-700 hover:text-purple-900">Ir à pág. <?= $paginaIndice ?></a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
     <?php endif; ?>
 
     <?php if ((int) ($relatorio['total_alunos'] ?? 0) <= 0): ?>
@@ -296,6 +260,8 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         $rotuloGrupo = (string) ($grupo['evento_rotulo'] ?? $grupo['evento_nome'] ?? '');
         $detalheGrupo = (string) ($grupo['evento_detalhe'] ?? '');
         $bimestreGrupo = trim((string) ($grupo['bimestre_rotulo'] ?? ''));
+        $versaoNumero = (int) ($grupo['versao_numero'] ?? 0);
+        $versaoVigente = !empty($grupo['versao_vigente']);
         ?>
         <?php if ($rotuloGrupo !== '' && $eventosTotal > 1): ?>
             <div class="mb-3 mt-6 first:mt-0">
@@ -307,17 +273,39 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         <?php endif; ?>
         <?php foreach ((array) ($grupo['alunos'] ?? []) as $aluno): ?>
             <?php if (!is_array($aluno)) { continue; } ?>
-            <?php $observacaoAluno = trim((string) ($aluno['observacao'] ?? '')); ?>
-            <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+            <?php
+            $observacaoAluno = trim((string) ($aluno['observacao'] ?? ''));
+            $nomeAluno = (string) ($aluno['nome'] ?? '');
+            $tituloImpressao = $nomeAluno;
+            if ($fonteRelatorio === 'demonstrativo' || $fonteRelatorio === 'evento') {
+                $tituloImpressao = trim($nomeAluno . ($rotuloGrupo !== '' ? ' — ' . $rotuloGrupo : ''));
+            } else {
+                $tituloImpressao = trim('Boletim — ' . $nomeAluno);
+            }
+            $fichaAluno = (int) ($aluno['ficha_id'] ?? 0);
+            $pdfOficial = $fonteRelatorio === 'vida_escolar' && (int) ($aluno['id'] ?? 0) > 0 && $fichaAluno > 0
+                ? URL . '/admin/students/' . (int) $aluno['id'] . '/vida-escolar/pdf?ficha_id=' . $fichaAluno
+                : '';
+            ?>
+            <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden" data-print-title="<?= htmlspecialchars($tituloImpressao, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="coord-aluno-impressao">
                 <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-2">
-                    <strong class="text-gray-900"><?= htmlspecialchars((string) ($aluno['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
+                    <strong class="text-gray-900"><?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?></strong>
                     <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
                     <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) ($aluno['turma'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
                     <?php if ($fonteRelatorio === 'evento' || $fonteRelatorio === 'demonstrativo'): ?>
                         <?php if ($refEvento > 0): ?><span class="text-sm text-gray-500">Ref: <?= $refEvento ?></span><?php endif; ?>
+                        <?php if ($versaoNumero > 0 || $versaoVigente): ?>
+                            <span class="text-sm text-gray-700">Versão<?= $versaoNumero > 0 ? ' ' . $versaoNumero : '' ?><?= $versaoVigente ? ' · Vigente' : '' ?></span>
+                        <?php endif; ?>
                         <span class="text-sm text-gray-500">Bimestre: <?= htmlspecialchars($bimestreGrupo !== '' ? $bimestreGrupo : '—', ENT_QUOTES, 'UTF-8') ?></span>
                     <?php else: ?>
                         <?php if ((string) ($aluno['ra'] ?? '') !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
+                    <?php endif; ?>
+                    <?php if ($pdfOficial !== ''): ?>
+                        <a href="<?= htmlspecialchars($pdfOficial, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" class="no-print ml-auto inline-flex items-center justify-center w-9 h-9 rounded-lg bg-red-600 text-white hover:bg-red-700" title="PDF deste boletim" aria-label="PDF deste boletim"><i class="fa-solid fa-file-pdf"></i></a>
+                    <?php else: ?>
+                        <button type="button" class="js-pdf-aluno no-print ml-auto inline-flex items-center justify-center w-9 h-9 rounded-lg bg-red-600 text-white hover:bg-red-700" title="<?= $fonteRelatorio === 'vida_escolar' ? 'PDF deste boletim' : 'PDF deste demonstrativo' ?>" aria-label="<?= $fonteRelatorio === 'vida_escolar' ? 'PDF deste boletim' : 'PDF deste demonstrativo' ?>"><i class="fa-solid fa-file-pdf"></i></button>
                     <?php endif; ?>
                 </div>
                 <?php if ($fonteRelatorio === 'demonstrativo'): ?>
@@ -352,6 +340,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                     </table>
                 </div>
                 <?php endif; ?>
+                </div>
                 <div class="coord-observation border-t border-gray-200 bg-slate-50/70 px-5 py-4"
                      data-endpoint="<?= URL ?>/admin/students/<?= (int) ($aluno['id'] ?? 0) ?>/boletim/observacao"
                      data-csrf="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
@@ -628,6 +617,31 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         cursoSelect.addEventListener('change', filtrarTurmas);
     }
     filtrarTurmas();
+    document.querySelectorAll('.js-pdf-aluno').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var section = btn.closest('section');
+            var area = section ? section.querySelector('.coord-aluno-impressao') : null;
+            if (!area) return;
+            var win = window.open('', '_blank', 'width=1100,height=800');
+            if (!win) {
+                window.alert('Não foi possível abrir a impressão. Verifique o bloqueio de pop-up.');
+                return;
+            }
+            var titulo = section.getAttribute('data-print-title') || 'Notas';
+            var estilos = '';
+            document.querySelectorAll('link[rel="stylesheet"]').forEach(function (link) {
+                estilos += link.outerHTML;
+            });
+            var seguro = titulo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            win.document.write(
+                '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + seguro + '</title>' + estilos +
+                '<style>@page{size:A4 landscape;margin:10mm;}body{background:#fff;margin:0;padding:12px;} .no-print{display:none !important;}</style></head><body>' +
+                area.innerHTML +
+                '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>'
+            );
+            win.document.close();
+        });
+    });
 })();
 </script>
 <?php if (!empty($pode_editar_observacao)): ?>

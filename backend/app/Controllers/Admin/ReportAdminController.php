@@ -409,7 +409,7 @@ class ReportAdminController extends AdminBaseController
         $materiasExibicao = $this->parseMateriasExibicaoBoletim($_GET['materias_exibicao'] ?? 'todas');
         $incluirAssinatura = !empty($_GET['assinatura']);
         $formato = strtolower(trim((string) ($_GET['formato'] ?? 'pdf')));
-        if (!in_array($formato, ['pdf', 'excel', 'json'], true)) {
+        if (!in_array($formato, ['pdf', 'excel', 'json', 'txt'], true)) {
             $this->redirect('/admin/reports/boletim-coordenacao');
             return;
         }
@@ -453,6 +453,10 @@ class ReportAdminController extends AdminBaseController
 
         if ($formato === 'json') {
             $this->exportarBoletimCoordenacaoJson($relatorios, $filenameBase);
+            return;
+        }
+        if ($formato === 'txt') {
+            $this->exportarBoletimCoordenacaoTxt($relatorios, $incluirAssinatura, $filenameBase);
             return;
         }
         if ($formato === 'excel' && count($relatorios) > 1) {
@@ -1404,6 +1408,7 @@ class ReportAdminController extends AdminBaseController
                 'bimestre' => (int) ($evento['bimestre'] ?? 0),
                 'valor' => $valor,
                 'eh_vigente' => !empty($evento['eh_vigente']),
+                'versao' => (int) ($evento['versao'] ?? 0),
             ];
         }
         if ($forcarTodos || (string) ($_GET['evento'] ?? '') === 'todos') {
@@ -1423,6 +1428,23 @@ class ReportAdminController extends AdminBaseController
             }
         }
         return array_values($saida);
+    }
+
+    private function versaoConfigReferenciaBoletimCoordenacao(int $regraId): int
+    {
+        if ($regraId <= 0) {
+            return 0;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT versao FROM boletim_config_versoes WHERE regra_id = :regra_id ORDER BY versao DESC, id DESC LIMIT 1',
+                ['regra_id' => $regraId]
+            );
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        return (int) (is_array($row) ? ($row['versao'] ?? 0) : 0);
     }
 
     private function parseAlunoBuscaBoletimCoordenacao(): string
@@ -1505,6 +1527,10 @@ class ReportAdminController extends AdminBaseController
             );
             $bloco['evento_rotulo'] = (string) ($atual['nome_exibicao'] ?? $bloco['evento_nome'] ?? 'Boletim');
             $bloco['evento_detalhe'] = (string) ($atual['nome_detalhe'] ?? '');
+            $versaoNotas = (int) ($atual['versao'] ?? 0);
+            $versaoConfig = $this->versaoConfigReferenciaBoletimCoordenacao((int) $atual['regra_id']);
+            $bloco['versao_numero'] = $versaoConfig > 0 ? $versaoConfig : $versaoNotas;
+            $bloco['versao_vigente'] = !empty($atual['usar_vigente']) || !empty($atual['eh_vigente']);
             $totalAlunos += count((array) ($bloco['alunos'] ?? []));
             $totalLinhas += (int) ($bloco['total_linhas'] ?? 0);
             $blocos[] = $bloco;
@@ -2182,6 +2208,7 @@ class ReportAdminController extends AdminBaseController
             $obsAluno = $obs[$alunoId] ?? [];
             $alunos[] = [
                 'id' => $alunoId,
+                'ficha_id' => $fichaId,
                 'nome' => (string) ($ficha['aluno_nome'] ?? ''),
                 'ra' => (string) ($ficha['ra'] ?? ''),
                 'turma' => (string) ($ficha['turma_nome'] ?? ''),
@@ -2658,6 +2685,98 @@ class ReportAdminController extends AdminBaseController
         header('Pragma: no-cache');
         header('Content-Length: ' . strlen($xlsx));
         echo $xlsx;
+        exit;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $relatorios
+     */
+    private function exportarBoletimCoordenacaoTxt(array $relatorios, bool $incluirAssinatura, string $filenameBase): void
+    {
+        $linhas = [];
+        $varios = count($relatorios) > 1;
+        foreach ($relatorios as $relatorio) {
+            if (!is_array($relatorio)) {
+                continue;
+            }
+            $nome = trim((string) ($relatorio['evento_nome'] ?? ''));
+            if ($varios && $nome !== '') {
+                if ($linhas !== []) {
+                    $linhas[] = '';
+                }
+                $linhas[] = $nome;
+            }
+            $cabecalho = ['Aluno'];
+            if ($incluirAssinatura) {
+                $cabecalho[] = 'Assinatura';
+            }
+            $refEvento = (int) ($relatorio['regra_id'] ?? 0);
+            if ($refEvento > 0) {
+                $cabecalho[] = 'Ref';
+            }
+            $cabecalho[] = 'Bimestre';
+            $cabecalho[] = 'Ano';
+            $cabecalho[] = 'RA';
+            $cabecalho[] = 'Turma';
+            $cabecalho[] = 'Matéria';
+            $colunas = [];
+            foreach ((array) ($relatorio['columns'] ?? []) as $column) {
+                if (!is_array($column)) {
+                    continue;
+                }
+                $colunas[] = $column;
+                $cabecalho[] = (string) ($column['label'] ?? 'Nota');
+            }
+            $cabecalho[] = 'Observação da coordenação';
+            $linhas[] = implode("\t", $cabecalho);
+
+            $bimestre = (string) ($relatorio['bimestre_rotulo'] ?? '');
+            $ano = (int) ($relatorio['ano_letivo'] ?? 0);
+            $casas = max(0, min(2, (int) ($relatorio['decimal_places'] ?? 1)));
+            foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
+                if (!is_array($aluno)) {
+                    continue;
+                }
+                $primeiraMateria = true;
+                foreach ((array) ($aluno['materias'] ?? []) as $materia) {
+                    if (!is_array($materia)) {
+                        continue;
+                    }
+                    $campos = [(string) ($aluno['nome'] ?? '')];
+                    if ($incluirAssinatura) {
+                        $campos[] = '';
+                    }
+                    if ($refEvento > 0) {
+                        $campos[] = (string) $refEvento;
+                    }
+                    $campos[] = $bimestre;
+                    $campos[] = $ano > 0 ? (string) $ano : '';
+                    $campos[] = (string) ($aluno['ra'] ?? '');
+                    $campos[] = (string) ($aluno['turma'] ?? '');
+                    $campos[] = (string) ($materia['nome'] ?? '');
+                    foreach ($colunas as $column) {
+                        $valor = $materia['notas'][$column['codigo'] ?? ''] ?? null;
+                        if (is_numeric($valor)) {
+                            $campos[] = number_format((float) $valor, $casas, ',', '');
+                        } else {
+                            $campos[] = trim((string) ($valor ?? ''));
+                        }
+                    }
+                    $campos[] = $primeiraMateria ? (string) ($aluno['observacao'] ?? '') : '';
+                    $linhas[] = implode("\t", array_map(static function ($campo): string {
+                        return str_replace(["\t", "\r", "\n"], ' ', (string) $campo);
+                    }, $campos));
+                    $primeiraMateria = false;
+                }
+            }
+        }
+
+        $conteudo = "\xEF\xBB\xBF" . implode("\r\n", $linhas) . "\r\n";
+        header('Content-Type: text/plain; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filenameBase . '.txt"');
+        header('Pragma: no-cache');
+        header('Content-Length: ' . strlen($conteudo));
+        echo $conteudo;
         exit;
     }
 
