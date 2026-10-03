@@ -2,6 +2,8 @@
 $itens = is_array($itens ?? null) ? $itens : [];
 $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
+$podeDev = !empty($pode_dev);
+$classeSoDev = $podeDev ? '' : ' js-so-dev';
 
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 ?>
@@ -16,12 +18,12 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         </a>
         <div class="flex items-center gap-3 flex-wrap">
             <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors<?= $classeSoDev ?>">
                 <i class="fa-solid fa-file-lines mr-2 text-gray-500"></i>
                 Notas Geradas
             </a>
             <a href="<?= URL ?>/admin/boletim"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors<?= $classeSoDev ?>">
                 <i class="fa-solid fa-table mr-2 text-gray-500"></i>
                 Avaliações
             </a>
@@ -31,7 +33,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 Relatório PDF
             </a>
             <a href="<?= URL ?>/admin/boletins/novo"
-               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90<?= $classeSoDev ?>">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo modelo
             </a>
@@ -104,11 +106,11 @@ if (!class_exists('PeriodoLetivo')) {
                         ob_start();
                         ?>
                         <a href="<?= URL ?>/admin/boletins/<?= (int) $item['id'] ?>/editar"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap<?= $classeSoDev ?>">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center shrink-0"></i> Editar
                         </a>
                         <button type="button"
-                                class="js-notas-eventos flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+                                class="js-notas-eventos flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap<?= $classeSoDev ?>"
                                 data-notas-alvo="notas-eventos-<?= (int) $item['id'] ?>"
                                 aria-expanded="false"
                                 aria-haspopup="true">
@@ -127,7 +129,7 @@ if (!class_exists('PeriodoLetivo')) {
                             <?php $eventoNotaId = (int) ($eventoNota['id'] ?? 0); ?>
                             <?php if ($eventoNotaId <= 0) { continue; } ?>
                             <a href="<?= URL ?>/admin/boletim-configuracao/assistente?regra_id=<?= $eventoNotaId ?>&amp;boletim_id=<?= (int) $item['id'] ?>&amp;voltar=boletins"
-                               class="flex items-start gap-2 mx-1 px-2 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-50"
+                               class="flex items-start gap-2 mx-1 px-2 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-50<?= $classeSoDev ?>"
                                title="Abrir na edição">
                                 <i class="fa-solid fa-pen text-gray-400 w-4 text-center shrink-0 mt-0.5"></i>
                                 <span class="break-words leading-snug"><?= htmlspecialchars((string) ($eventoNota['nome'] ?? ('Evento #' . $eventoNotaId)), ENT_QUOTES, 'UTF-8') ?></span>
@@ -136,12 +138,13 @@ if (!class_exists('PeriodoLetivo')) {
                             <?php endif; ?>
                         </div>
                         <a href="<?= URL ?>/admin/boletins/<?= (int) $item['id'] ?>/gerar-avaliacoes"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 whitespace-nowrap<?= $classeSoDev ?>">
                             <i class="fa-solid fa-calendar-plus text-gray-400 w-4 text-center shrink-0"></i> Novo <?= htmlspecialchars($rotuloPeriodo, ENT_QUOTES, 'UTF-8') ?>
                         </a>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form method="POST" action="<?= URL ?>/admin/boletins/<?= (int) $item['id'] ?>/delete"
-                              onsubmit="return confirm('Excluir este modelo de boletim? Avaliações e notas já geradas permanecem.');">
+                              class="<?= $podeDev ? '' : 'js-so-dev' ?>"
+                              onsubmit="<?= $podeDev ? "return confirm('Excluir este modelo de boletim? Avaliações e notas já geradas permanecem.');" : 'return false;' ?>">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center shrink-0"></i> Excluir
@@ -201,6 +204,13 @@ if (!class_exists('PeriodoLetivo')) {
     }
 
     document.addEventListener('click', function (e) {
+        var bloqueado = e.target.closest('.js-so-dev');
+        if (bloqueado) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.alert('Você não tem permissão. Contate o Administrador.');
+            return;
+        }
         var btn = e.target.closest('.js-notas-eventos');
         if (btn) {
             e.preventDefault();

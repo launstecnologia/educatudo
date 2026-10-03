@@ -27,6 +27,9 @@ class BoletimAssistenteController extends BaseController
         if (!$this->usuarioPodeConfigurarBoletim($user)) {
             $this->json(['success' => false, 'error' => 'Acesso negado.'], 403);
         }
+        if ((string) ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['success' => false, 'error' => 'Você não tem permissão. Contate o Administrador.'], 403);
+        }
         $this->assistente = new BoletimAssistenteService();
         $this->wizard = new BoletimAssistenteWizard($this->assistente->ferramentas());
     }

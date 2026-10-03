@@ -88,6 +88,11 @@ class BoletimConfigController extends BaseController
             $this->redirect(URL . '/admin/dashboard');
             exit;
         }
+
+        if ((string) ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->setFlashMessage('Você não tem permissão. Contate o Administrador.', 'error');
+            $this->redirect('/admin/boletins');
+        }
     }
 
     /**

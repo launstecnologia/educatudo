@@ -55,10 +55,12 @@ class BoletimCadastroAdminController extends AdminBaseController
         }
         unset($item);
 
+        $usuario = $this->auth->getUser();
         $this->viewWithLayout('admin', 'admin/boletins/index', [
             'title' => 'Modelo de Boletim — EducaTudo',
             'page_title' => 'Painel Administrativo',
-            'user' => $this->auth->getUser(),
+            'user' => $usuario,
+            'pode_dev' => is_array($usuario) && (string) ($usuario['perfil_admin'] ?? '') === 'dev',
             'current_page' => 'boletins',
             'itens' => $itens,
             'schema_pronto' => $this->service->model()->tabelasProntas(),
@@ -70,6 +72,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function novo(): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
@@ -78,6 +83,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function editar($id): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'alterar', false)) {
             return;
         }
@@ -92,6 +100,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function salvar(): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
@@ -112,6 +123,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function atualizar($id): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'alterar', false)) {
             return;
         }
@@ -132,6 +146,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function excluir($id): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'excluir', false)) {
             return;
         }
@@ -152,6 +169,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function gerarAvaliacoes($id): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
@@ -195,6 +215,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function gerarAvaliacoesExecutar($id): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
@@ -272,6 +295,9 @@ class BoletimCadastroAdminController extends AdminBaseController
 
     public function gerarDocumento($id): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'alterar', false)) {
             return;
         }
@@ -297,11 +323,23 @@ class BoletimCadastroAdminController extends AdminBaseController
         $this->redirect('/admin/boletim');
     }
 
-    /**
-     * Tela de simular / gerar boletins do modelo (sem passar pelo Evento de Notas).
-     */
+    private function exigirDevModeloBoletim(): bool
+    {
+        $user = $this->auth->getUser();
+        if (is_array($user) && (string) ($user['perfil_admin'] ?? '') === 'dev') {
+            return true;
+        }
+        $this->setFlashMessage('Você não tem permissão. Contate o Administrador.', 'error');
+        $this->redirect('/admin/boletins');
+
+        return false;
+    }
+
     private function renderGeracaoBoletins(int $id, bool $abrirSimular): void
     {
+        if (!$this->exigirDevModeloBoletim()) {
+            return;
+        }
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'visualizar', false)) {
             return;
         }
