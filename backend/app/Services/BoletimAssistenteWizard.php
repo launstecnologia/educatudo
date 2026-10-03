@@ -2761,7 +2761,7 @@ class BoletimAssistenteWizard
             if ($codigo === '' || !(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $codigo)) {
                 continue;
             }
-            if ($codigo === 'media_sem' || (bool) preg_match('/^s[1-8]$/', $codigo)) {
+            if ($codigo === '_semanal' || (bool) preg_match('/^s[1-8]$/', $codigo)) {
                 continue;
             }
             $nome = trim(mb_substr((string) $nome, 0, 60));
@@ -2769,7 +2769,7 @@ class BoletimAssistenteWizard
                 continue;
             }
             $out[$codigo] = $nome;
-            if (count($out) >= 20) {
+            if (count($out) >= 40) {
                 break;
             }
         }
@@ -2784,7 +2784,8 @@ class BoletimAssistenteWizard
     private function compilarTokensParaExpressao(array $tokens, array $mapaCodigo, array $pecasPermitidas = []): string
     {
         $parts = [];
-        $temPeca = false;
+        $temColuna = false;
+        $temNumero = false;
         $parens = 0;
         foreach ($tokens as $t) {
             if (!is_array($t)) {
@@ -2793,11 +2794,12 @@ class BoletimAssistenteWizard
             $type = (string) ($t['type'] ?? '');
             $v = (string) ($t['value'] ?? '');
             if ($type === 'peca') {
-                if (!isset($mapaCodigo[$v]['codigo'])) {
+                $codigo = $this->codigoColunaDoTokenFormula($v, $mapaCodigo);
+                if ($codigo === '') {
                     return '';
                 }
-                $parts[] = (string) $mapaCodigo[$v]['codigo'];
-                $temPeca = true;
+                $parts[] = $codigo;
+                $temColuna = true;
             } elseif ($type === 'fn') {
                 $v = strtolower($v);
                 if (!in_array($v, ['max', 'min'], true)) {
@@ -2823,9 +2825,10 @@ class BoletimAssistenteWizard
                     return '';
                 }
                 $parts[] = $v;
+                $temNumero = true;
             }
         }
-        if (!$temPeca || $parts === [] || $parens !== 0) {
+        if ((!$temColuna && !$temNumero) || $parts === [] || $parens !== 0) {
             return '';
         }
         $primeiro = (string) $parts[0];
@@ -2847,6 +2850,37 @@ class BoletimAssistenteWizard
             return '';
         }
         return $this->envolverSomaAntesDeDivisaoNaExpressao($exp);
+    }
+
+    /**
+     * Coluna citada na fórmula: código do quadro, apelido (recuperacao → rec) ou o próprio identificador.
+     *
+     * @param array<string,array{codigo?:string,papel?:string,nome?:string}> $mapa
+     */
+    private function codigoColunaDoTokenFormula(string $token, array $mapa): string
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return '';
+        }
+        $baixo = strtolower($token);
+        foreach ($mapa as $chave => $info) {
+            if (!is_array($info)) {
+                continue;
+            }
+            if (strtolower(trim((string) $chave)) !== $baixo) {
+                continue;
+            }
+            $codigo = strtolower(trim((string) ($info['codigo'] ?? '')));
+            if ($codigo !== '') {
+                return $codigo;
+            }
+        }
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $token)) {
+            return $baixo;
+        }
+
+        return '';
     }
 
     /**
@@ -3959,7 +3993,9 @@ class BoletimAssistenteWizard
             }
             if ($cod === 'media_final') {
                 $c['config']['layout_type'] = 'media';
-                $c['nome'] = 'Resultado Final';
+                if ($nomeCustom === '') {
+                    $c['nome'] = 'Resultado Final';
+                }
             } elseif ($cod === 'media_bim') {
                 $c['config']['layout_type'] = 'media';
                 if ($nomeCustom === '') {
@@ -3996,6 +4032,17 @@ class BoletimAssistenteWizard
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
         $ehQuadro = $this->rascunhoJaEhQuadro($rascunho);
         $mapa = $this->expandirMapaFormula($mapaPecas, $comps);
+        foreach (array_keys($formulas) as $codFormula) {
+            $codFormula = strtolower(trim((string) $codFormula));
+            if ($codFormula === '' || isset($mapa[$codFormula]['codigo'])) {
+                continue;
+            }
+            $mapa[$codFormula] = [
+                'codigo' => $codFormula,
+                'papel' => 'exibe',
+                'nome' => $codFormula,
+            ];
+        }
         $nomes = [
             'media_bim' => 'Média Bim',
             'media_final' => 'Resultado Final',
@@ -4160,16 +4207,31 @@ class BoletimAssistenteWizard
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-            if ($cod === '' || !isset($nomes[$cod])) {
+            if ($cod === '' || (bool) preg_match('/^s[1-8]$/', $cod)) {
                 continue;
             }
-            if ((string) ($c['source_type'] ?? '') !== 'calculado') {
+            $nome = trim((string) ($nomes[$cod] ?? ''));
+            if ($nome === '') {
+                $aliases = [
+                    'media_sem' => 'semanal',
+                    'semanal' => 'media_sem',
+                    'prova_bim' => 'bimestral',
+                    'bimestral' => 'prova_bim',
+                    'rec' => 'recuperacao',
+                    'recuperacao' => 'rec',
+                    'trab' => 'trabalho',
+                    'trabalho' => 'trab',
+                    'part' => 'participacao',
+                    'participacao' => 'part',
+                ];
+                $outro = $aliases[$cod] ?? '';
+                if ($outro !== '') {
+                    $nome = trim((string) ($nomes[$outro] ?? ''));
+                }
+            }
+            if ($nome === '') {
                 continue;
             }
-            if ($cod === 'media_sem' || (bool) preg_match('/^s[1-8]$/', $cod)) {
-                continue;
-            }
-            $nome = trim((string) $nomes[$cod]);
             if ($nome !== '') {
                 $c['nome'] = $nome;
             }
@@ -4215,6 +4277,12 @@ class BoletimAssistenteWizard
                 'papel' => 'exibe',
                 'nome' => (string) ($c['nome'] ?? $cod),
             ];
+        }
+        foreach ($aliases as $peca => $codQuadro) {
+            if (isset($mapa[$peca]['codigo']) || !isset($mapa[$codQuadro]['codigo'])) {
+                continue;
+            }
+            $mapa[$peca] = $mapa[$codQuadro];
         }
         return $mapa;
     }

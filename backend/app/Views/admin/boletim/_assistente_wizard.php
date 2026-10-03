@@ -175,14 +175,16 @@ $boletimWizardSteps = [
 .bw-preview-table.boletim tr:nth-child(even) td { background: #f8fafc; }
 .bw-preview-table.boletim td.ok { color: #047857; font-weight: 700; }
 .bw-preview-table.boletim td.nok { color: #b91c1c; font-weight: 700; }
-.bw-col-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 0.5rem; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 600; cursor: grab; user-select: none; }
-.bw-col-chip.travada { background: #f1f5f9; border-color: #cbd5e1; color: #475569; cursor: default; }
+.bw-col-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 0.5rem; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 600; cursor: grab; user-select: none; touch-action: none; }
+.bw-col-chip.travada, .bw-col-chip.fixa { cursor: default; touch-action: auto; }
+.bw-col-chip.travada { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
 .bw-col-chip.calc { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
 .bw-col-chip.aberta { box-shadow: 0 0 0 2px #f59e0b; }
-.bw-col-chip.dragging { opacity: 0.45; }
-.bw-col-chip.drop-alvo { box-shadow: 0 0 0 2px #6366f1; }
+.bw-col-chip.dragging { opacity: 0.35; cursor: grabbing; position: relative; z-index: 5; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18); }
+#bw-colunas-lista.arrastando { cursor: grabbing; }
+.bw-col-marca { width: 3px; align-self: stretch; min-height: 2rem; border-radius: 999px; background: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.22); pointer-events: none; flex: 0 0 3px; }
 .bw-col-grip { cursor: grab; opacity: 0.45; letter-spacing: -1px; font-size: 13px; line-height: 1; padding-right: 2px; }
-.bw-col-chip:active .bw-col-grip { cursor: grabbing; }
+#bw-colunas-lista.arrastando .bw-col-grip { cursor: grabbing; }
 .bw-col-x { margin-left: 2px; color: #92400e; font-size: 14px; line-height: 1; padding: 0 2px; opacity: 0.6; cursor: pointer; }
 .bw-col-x:hover { opacity: 1; color: #b91c1c; }
 #bw-formula-editor.bw-editor-excecao { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 3px rgba(79,70,229,.18); }
@@ -255,6 +257,7 @@ $boletimWizardSteps = [
     var previewAtual = dadosIniciais.preview || null;
     var colunasDrag = null;
     var colunasDragou = false;
+    var arrasteColuna = null;
 
     function coletarEstadoFormulario() {
         if (!document.getElementById('form-regra-boletim')) {
@@ -1442,14 +1445,38 @@ $boletimWizardSteps = [
         ];
     }
 
+    function codigosColunaFormula() {
+        var set = {};
+        function add(v) {
+            v = String(v || '');
+            if (!v || v === '_semanal') return;
+            set[v] = true;
+            var quadro = pecaCodigoQuadro(v);
+            if (quadro) set[quadro] = true;
+        }
+        if (!estado) return set;
+        (estado.pecas || []).forEach(add);
+        (estado.blocos_calc || []).forEach(add);
+        Object.keys(estado.formulas_blocos || {}).forEach(add);
+        Object.keys(estado.nomes_blocos || {}).forEach(add);
+        ['media_sem', 'media_bim', 'media_final', 'prova_bim', 'enac', 'jornada', 'rec', 'faltas'].forEach(add);
+        var pv = (typeof previewEfetivo === 'function') ? previewEfetivo() : null;
+        ((pv && pv.colunas) || []).forEach(function (c) { if (c) add(c.codigo); });
+        ((pv && pv.tabelas) || []).forEach(function (t) {
+            (t.outras || []).concat(t.semanas || []).forEach(function (c) { if (c) add(c.codigo); });
+        });
+        ((typeof rascunhoAtual !== 'undefined' && rascunhoAtual && rascunhoAtual.componentes) || []).forEach(function (c) {
+            if (c) add(c.codigo);
+        });
+        return set;
+    }
+
     function filtrarTokensOrfaos() {
         if (!estado) return;
-        var pecas = estado.pecas || [];
-        var livres = ['media_sem', 'media_bim', 'media_final', 'prova_bim'].concat(estado.blocos_calc || []);
-        Object.keys(estado.formulas_blocos || {}).forEach(function (k) { livres.push(k); });
-        Object.keys(estado.nomes_blocos || {}).forEach(function (k) { livres.push(k); });
+        var conhecidos = codigosColunaFormula();
         function pecaTokenOk(v) {
-            return pecas.indexOf(v) >= 0 || livres.indexOf(v) >= 0;
+            v = String(v || '');
+            return !!(conhecidos[v] || conhecidos[pecaCodigoQuadro(v)]);
         }
         function filtrarLista(toks) {
             var out = (toks || []).filter(function (t) {
@@ -1724,9 +1751,18 @@ $boletimWizardSteps = [
         return 'Matéria #' + n;
     }
 
+    function tituloColuna(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo || !estado || !estado.nomes_blocos) return '';
+        if (estado.nomes_blocos[codigo]) return estado.nomes_blocos[codigo];
+        var quadro = pecaCodigoQuadro(codigo);
+        if (quadro && quadro !== codigo && estado.nomes_blocos[quadro]) return estado.nomes_blocos[quadro];
+        return '';
+    }
+
     function nomeBlocoCalc(codigo) {
-        if (codigo === 'media_final') return 'Resultado Final';
-        if (estado && estado.nomes_blocos && estado.nomes_blocos[codigo]) return estado.nomes_blocos[codigo];
+        if (codigo === 'media_final' && !tituloColuna(codigo)) return 'Resultado Final';
+        if (tituloColuna(codigo)) return tituloColuna(codigo);
         if (codigo === 'media_bim') return 'Média Bim';
         if (codigo === 'media_sem') return 'Média Sem';
         return pecaLabel(codigo);
@@ -1979,8 +2015,17 @@ $boletimWizardSteps = [
         });
         var pv = previewEfetivo();
         ((pv && pv.colunas) || []).forEach(function (c) {
-            if (!c || c.travada || c.codigo === '_semanal') return;
-            if (c.tipo !== 'calculado' && c.codigo !== 'media_sem') return;
+            if (!c || c.travada || c.codigo === '_semanal' || c.tipo === 'semana_grupo') return;
+            add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
+        });
+        ((pv && pv.tabelas) || []).forEach(function (t) {
+            (t.outras || []).concat(t.semanas || []).forEach(function (c) {
+                if (!c || !c.codigo) return;
+                add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
+            });
+        });
+        ((rascunhoAtual && rascunhoAtual.componentes) || []).forEach(function (c) {
+            if (!c || !c.codigo || c.codigo === '_semanal') return;
             add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
         });
         if (!html) html = '<p class="text-xs text-gray-500">Volte em Tipo de Notas e marque ao menos uma.</p>';
@@ -2007,6 +2052,27 @@ $boletimWizardSteps = [
         previewAtual = null;
         renderRevisarDinamico();
         abrirFormulaBloco(codigo);
+        agendarMontar();
+    }
+
+    function salvarTituloColuna() {
+        if (!estado) return;
+        var cod = String(estado.titulo_codigo || estado.bloco_calc || '');
+        if (!cod || cod === '_semanal' || /^s[1-8]$/.test(cod)) return;
+        var inp = document.getElementById('bw-titulo-coluna-input');
+        var nome = String((inp && inp.value) || '').trim().slice(0, 60);
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (nome) estado.nomes_blocos[cod] = nome;
+        else delete estado.nomes_blocos[cod];
+        if (estado.bloco_calc === cod) {
+            var inpFormula = document.getElementById('bw-formula-bloco-nome-input');
+            if (inpFormula) inpFormula.value = nome || nomeBlocoCalc(cod);
+            var rotulo = document.getElementById('bw-formula-bloco-nome');
+            if (rotulo) rotulo.textContent = nome || nomeBlocoCalc(cod);
+        }
+        marcarEdicaoManual();
+        previewAtual = null;
+        renderRevisarDinamico();
         agendarMontar();
     }
 
@@ -2611,9 +2677,9 @@ $boletimWizardSteps = [
                     return;
                 }
                 if (o.source_type === 'calculado' && o.codigo === 'media_final') {
-                    var base = typeof notas.media_bim === 'number' ? notas.media_bim : (temSemanal ? notas.media_sem : 0);
-                    var extra = typeof notas.enac === 'number' ? notas.enac : (typeof notas.rec === 'number' ? notas.rec : base);
-                    notas.media_final = roundPreviewValor(Math.max(base, extra));
+                    return;
+                }
+                if (o.source_type === 'calculado') {
                     return;
                 }
                 if (o.codigo === 'rec' && (h % 3) === 0) {
@@ -2622,7 +2688,7 @@ $boletimWizardSteps = [
                 }
                 notas[o.codigo] = roundPreviewValor(Math.round(10 * (5 + Math.abs(h + o.codigo.length * 7) % 51) / 10) / 10);
             });
-            return notas;
+            return aplicarFormulasNaLinhaGrupo(notas);
         }
         var mats = materiasPreviewLocal(['Física', 'Matemática', 'Geografia', 'Biologia', 'Educação Física']);
         var metade = Math.ceil(mats.length / 2);
@@ -3154,6 +3220,8 @@ $boletimWizardSteps = [
 
     function rotuloColunaPreview(o) {
         if (!o) return '';
+        var custom = tituloColuna(o.codigo);
+        if (custom) return custom;
         var cod = String(o.codigo || '').toLowerCase();
         var nome = String(o.nome || '');
         var nomeNorm = nome.toLocaleLowerCase('pt-BR');
@@ -3332,20 +3400,34 @@ $boletimWizardSteps = [
         html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Ordem das colunas</p>';
         html += '<button type="button" id="bw-add-media" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-950 bg-amber-50 hover:bg-amber-100">Adicionar bloco de cálculo</button>';
         html += '</div>';
-        html += '<p class="text-xs text-gray-500 mb-2">Arraste pelo <strong>⋮⋮</strong> para mudar a ordem. Clique no <strong>×</strong> para tirar a coluna. No nome amarelo, edite a fórmula.</p>';
+        html += '<p class="text-xs text-gray-500 mb-2">Segure a coluna e arraste. A faixa azul mostra onde ela entra. Clique no <strong>×</strong> para tirar. Um clique sem arrastar troca o título; no amarelo, abre a fórmula.</p>';
         html += '<div id="bw-colunas-lista" class="flex flex-wrap gap-2 min-h-[2.5rem] p-2 rounded-lg border border-dashed border-indigo-200 bg-slate-50">';
         if (!cols.length) html += '<span class="text-xs text-gray-400">Nenhuma coluna ainda.</span>';
         cols.forEach(function (c, i) {
             if (colunaSegueBlocoSemanal(c)) return;
-            var cls = 'bw-col-chip' + (c.travada ? ' travada' : '') + (c.tipo === 'calculado' ? ' calc' : '');
-            if (estado && estado.bloco_calc && c.codigo === estado.bloco_calc) cls += ' aberta';
-            html += '<span class="' + cls + '" draggable="' + (c.travada ? 'false' : 'true') + '" data-codigo="' + esc(c.codigo) + '" data-tipo="' + esc(c.tipo || '') + '" data-idx="' + i + '">';
-            if (!c.travada) html += '<span class="bw-col-grip" title="Arrastar" aria-hidden="true">⋮⋮</span>';
-            html += '<span class="bw-col-nome">' + esc(c.nome) + '</span>';
+            var fixa = c.codigo === '_semanal' || c.codigo === 'media_sem';
+            var cls = 'bw-col-chip' + (c.travada ? ' travada' : '') + (fixa ? ' fixa' : '') + (c.tipo === 'calculado' ? ' calc' : '');
+            if (estado && ((estado.titulo_codigo && c.codigo === estado.titulo_codigo) || (estado.bloco_calc && c.codigo === estado.bloco_calc))) cls += ' aberta';
+            html += '<span class="' + cls + '" data-codigo="' + esc(c.codigo) + '" data-tipo="' + esc(c.tipo || '') + '" data-idx="' + i + '">';
+            if (!c.travada && !fixa) html += '<span class="bw-col-grip" title="Arrastar" aria-hidden="true">⋮⋮</span>';
+            html += '<span class="bw-col-nome">' + esc(tituloColuna(c.codigo) || c.nome) + '</span>';
             html += '<button type="button" class="bw-col-x" data-codigo="' + esc(c.codigo) + '" aria-label="Remover">×</button>';
             html += '</span>';
         });
         html += '</div>';
+        var selTitulo = (estado && (estado.titulo_codigo || estado.bloco_calc)) || '';
+        var nomeSel = '';
+        cols.forEach(function (c) {
+            if (c && c.codigo === selTitulo) nomeSel = tituloColuna(c.codigo) || c.nome || c.codigo;
+        });
+        if (selTitulo && selTitulo !== '_semanal' && !/^s[1-8]$/.test(selTitulo)) {
+            html += '<div class="mt-2 flex flex-wrap items-end gap-2">';
+            html += '<label class="flex-1 min-w-[14rem]"><span class="text-xs font-medium text-gray-700">Título da coluna</span>';
+            html += '<input id="bw-titulo-coluna-input" type="text" maxlength="60" class="mt-1 w-full h-10 border border-gray-300 rounded-lg px-3 text-sm bg-white" value="' + esc(nomeSel) + '" placeholder="Ex.: Prova Bimestral">';
+            html += '<span class="block text-[11px] text-gray-500 mt-1">Muda só o cabeçalho. A fórmula segue no código <strong>' + esc(selTitulo) + '</strong>.</span></label>';
+            html += '<button type="button" id="bw-titulo-coluna-aplicar" class="h-10 px-3 text-sm font-medium rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50">Aplicar título</button>';
+            html += '</div>';
+        }
         return html;
     }
 
@@ -3378,6 +3460,24 @@ $boletimWizardSteps = [
                 removerBlocoCalc(xcol.getAttribute('data-codigo'));
                 return;
             }
+            if (e.target.closest('#bw-titulo-coluna-aplicar')) {
+                salvarTituloColuna();
+                return;
+            }
+            var chipQualquer = e.target.closest('#bw-colunas-lista .bw-col-chip');
+            if (chipQualquer && !e.target.closest('.bw-col-x') && !e.target.closest('.bw-col-grip') && !colunasDragou) {
+                var codTitulo = chipQualquer.getAttribute('data-codigo');
+                if (codTitulo && estado && !chipQualquer.classList.contains('calc')) {
+                    estado.titulo_codigo = codTitulo;
+                    renderRevisarDinamico();
+                    var inpTitulo = document.getElementById('bw-titulo-coluna-input');
+                    if (inpTitulo) {
+                        inpTitulo.focus();
+                        inpTitulo.select();
+                    }
+                    return;
+                }
+            }
             var chipCalc = e.target.closest('#bw-colunas-lista .bw-col-chip.calc');
             if (chipCalc) {
                 if (colunasDragou || e.target.closest('.bw-col-grip')) {
@@ -3386,6 +3486,7 @@ $boletimWizardSteps = [
                 }
                 var codCalc = chipCalc.getAttribute('data-codigo');
                 if (codCalc && codCalc !== 'media_sem') {
+                    estado.titulo_codigo = codCalc;
                     if (estado.passo !== 'formula') {
                         estado.passo = 'formula';
                         estado.bloco_calc = codCalc;
@@ -3393,6 +3494,7 @@ $boletimWizardSteps = [
                         agendarMontar();
                         return;
                     }
+                    renderRevisarDinamico();
                     abrirFormulaBloco(codCalc);
                 }
             }
@@ -3438,59 +3540,134 @@ $boletimWizardSteps = [
             renderRevisarDinamico();
             agendarMontar();
         });
-        bodyEl.addEventListener('dragstart', function (e) {
+        bodyEl.addEventListener('pointerdown', function (e) {
             var chip = e.target.closest('#bw-colunas-lista .bw-col-chip');
-            if (!chip || chip.classList.contains('travada') || e.target.closest('.bw-col-x')) return;
-            colunasDrag = chip.getAttribute('data-codigo');
-            colunasDragou = true;
-            chip.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', colunasDrag || '');
-            e.dataTransfer.effectAllowed = 'move';
+            if (!chip || e.button > 0 || e.target.closest('.bw-col-x')) return;
+            var cod = chip.getAttribute('data-codigo') || '';
+            if (!cod || cod === '_semanal' || cod === 'media_sem' || chip.classList.contains('travada')) return;
+            arrasteColuna = {
+                codigo: cod,
+                chip: chip,
+                x: e.clientX,
+                y: e.clientY,
+                ativo: false,
+                pointerId: e.pointerId
+            };
         });
-        bodyEl.addEventListener('dragend', function (e) {
-            var chip = e.target.closest('#bw-colunas-lista .bw-col-chip');
-            if (chip) chip.classList.remove('dragging');
-            document.querySelectorAll('#bw-colunas-lista .drop-alvo').forEach(function (el) {
-                el.classList.remove('drop-alvo');
-            });
-            setTimeout(function () { colunasDragou = false; }, 0);
-        });
-        bodyEl.addEventListener('dragover', function (e) {
-            if (!e.target.closest('#bw-colunas-lista')) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            var alvo = e.target.closest('.bw-col-chip');
-            document.querySelectorAll('#bw-colunas-lista .drop-alvo').forEach(function (el) {
-                if (el !== alvo) el.classList.remove('drop-alvo');
-            });
-            if (alvo && !alvo.classList.contains('travada')) alvo.classList.add('drop-alvo');
-        });
-        bodyEl.addEventListener('drop', function (e) {
-            var lista = e.target.closest('#bw-colunas-lista');
-            if (!lista || !colunasDrag) return;
-            e.preventDefault();
-            var alvo = e.target.closest('.bw-col-chip');
-            var ordem = [];
-            lista.querySelectorAll('.bw-col-chip').forEach(function (el) {
-                var c = el.getAttribute('data-codigo');
-                if (c && c !== '_semanal' && c !== 'media_sem' && c !== colunasDrag) ordem.push(c);
-            });
-            var at = ordem.length;
-            if (alvo) {
-                var ac = alvo.getAttribute('data-codigo');
-                if (ac && ac !== '_semanal' && ac !== 'media_sem') {
-                    var ix = ordem.indexOf(ac);
-                    if (ix >= 0) at = ix;
-                }
+        bodyEl.addEventListener('pointermove', function (e) {
+            if (!arrasteColuna || e.pointerId !== arrasteColuna.pointerId) return;
+            var dx = e.clientX - arrasteColuna.x;
+            var dy = e.clientY - arrasteColuna.y;
+            if (!arrasteColuna.ativo) {
+                if ((dx * dx) + (dy * dy) < 16) return;
+                arrasteColuna.ativo = true;
+                colunasDragou = true;
+                colunasDrag = arrasteColuna.codigo;
+                arrasteColuna.chip.classList.add('dragging');
+                var listaAtiva = document.getElementById('bw-colunas-lista');
+                if (listaAtiva) listaAtiva.classList.add('arrastando');
+                try { arrasteColuna.chip.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
             }
-            ordem.splice(at, 0, colunasDrag);
-            estado.colunas_ordem = ordem;
-            colunasDrag = null;
-            marcarEdicaoManual();
-            previewAtual = null;
-            renderRevisarDinamico();
-            agendarMontar();
+            e.preventDefault();
+            posicionarMarcaColuna(e.clientX, e.clientY);
         });
+        bodyEl.addEventListener('pointerup', function (e) {
+            if (!arrasteColuna || e.pointerId !== arrasteColuna.pointerId) return;
+            var ativo = arrasteColuna.ativo;
+            var codigo = arrasteColuna.codigo;
+            if (arrasteColuna.chip) arrasteColuna.chip.classList.remove('dragging');
+            var listaAtiva = document.getElementById('bw-colunas-lista');
+            if (listaAtiva) listaAtiva.classList.remove('arrastando');
+            arrasteColuna = null;
+            colunasDrag = null;
+            if (!ativo) {
+                colunasDragou = false;
+                return;
+            }
+            e.preventDefault();
+            soltarColunaNaMarca(codigo);
+            setTimeout(function () { colunasDragou = false; }, 80);
+        });
+        bodyEl.addEventListener('pointercancel', function (e) {
+            if (!arrasteColuna || e.pointerId !== arrasteColuna.pointerId) return;
+            limparMarcaColuna();
+            if (arrasteColuna.chip) arrasteColuna.chip.classList.remove('dragging');
+            var listaAtiva = document.getElementById('bw-colunas-lista');
+            if (listaAtiva) listaAtiva.classList.remove('arrastando');
+            arrasteColuna = null;
+            colunasDrag = null;
+            setTimeout(function () { colunasDragou = false; }, 80);
+        });
+    }
+
+    function limparMarcaColuna() {
+        var marca = document.getElementById('bw-col-marca');
+        if (marca && marca.parentNode) marca.parentNode.removeChild(marca);
+    }
+
+    function posicionarMarcaColuna(x, y) {
+        var lista = document.getElementById('bw-colunas-lista');
+        if (!lista || !arrasteColuna) return;
+        var marca = document.getElementById('bw-col-marca');
+        if (!marca) {
+            marca = document.createElement('span');
+            marca.id = 'bw-col-marca';
+            marca.className = 'bw-col-marca';
+            marca.setAttribute('aria-hidden', 'true');
+        }
+        var destino = null;
+        var melhor = Infinity;
+        lista.querySelectorAll('.bw-col-chip').forEach(function (el) {
+            if (el === arrasteColuna.chip) return;
+            var cod = el.getAttribute('data-codigo') || '';
+            if (!cod || cod === '_semanal' || cod === 'media_sem') return;
+            var r = el.getBoundingClientRect();
+            var d = Math.abs(y - (r.top + r.height / 2)) * 3 + Math.abs(x - (r.left + r.width / 2));
+            if (d < melhor) {
+                melhor = d;
+                destino = el;
+            }
+        });
+        if (!destino) {
+            lista.appendChild(marca);
+            return;
+        }
+        var box = destino.getBoundingClientRect();
+        var antes = x < box.left + box.width / 2;
+        if (antes) {
+            if (marca.nextSibling !== destino) lista.insertBefore(marca, destino);
+        } else if (destino.nextSibling !== marca) {
+            lista.insertBefore(marca, destino.nextSibling);
+        }
+    }
+
+    function soltarColunaNaMarca(codigo) {
+        var lista = document.getElementById('bw-colunas-lista');
+        var marca = document.getElementById('bw-col-marca');
+        if (!lista || !codigo || !estado) {
+            limparMarcaColuna();
+            return;
+        }
+        var ordem = [];
+        Array.prototype.forEach.call(lista.children, function (el) {
+            if (el === marca) {
+                ordem.push(codigo);
+                return;
+            }
+            if (!el.classList || !el.classList.contains('bw-col-chip')) return;
+            var c = el.getAttribute('data-codigo');
+            if (!c || c === codigo || c === '_semanal' || c === 'media_sem') return;
+            ordem.push(c);
+        });
+        limparMarcaColuna();
+        if (ordem.indexOf(codigo) < 0) ordem.push(codigo);
+        var anterior = (estado.colunas_ordem || []).join('|');
+        if (anterior === ordem.join('|')) return;
+        estado.colunas_ordem = ordem;
+        marcarEdicaoManual();
+        previewAtual = null;
+        renderRevisarDinamico();
+        agendarMontar();
     }
 
     function aplicarRascunhoNoWizard(r) {
@@ -3910,6 +4087,9 @@ $boletimWizardSteps = [
         }
         btnVoltar.disabled = curIdx <= 0;
         var label = cur === 'revisar' ? 'Concluir e aplicar' : (cur === 'formula' ? 'Salvar e continuar' : 'Continuar');
+        if (btnAplicar && pageMode && ehEventoNotasPreview()) {
+            btnAplicar.textContent = cur === 'revisar' ? 'Salvar sem gerar notas' : 'Aplicar na configuração';
+        }
         if (pageMode) {
             btnAvancar.innerHTML = esc(label) + (cur === 'revisar' ? ' <i class="fa-solid fa-check ml-2"></i>' : ' <i class="fa-solid fa-arrow-right ml-2"></i>');
         } else {
@@ -4055,7 +4235,7 @@ $boletimWizardSteps = [
                 html += '<div id="bw-formula-editor" class="' + (estado.bloco_calc ? '' : 'hidden') + ' mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">';
                 html += '<div id="bw-excecao-banner" class="hidden mb-3 rounded-xl border-2 border-indigo-400 bg-indigo-600 text-white px-3 py-2.5"></div>';
                 html += '<div class="flex flex-wrap items-end justify-between gap-2 mb-2">';
-                html += '<label class="flex-1 min-w-[12rem]"><span class="text-xs font-medium text-amber-950">Nome do bloco</span>';
+                html += '<label class="flex-1 min-w-[12rem]"><span class="text-xs font-medium text-amber-950">Título da coluna</span>';
                 html += '<input id="bw-formula-bloco-nome-input" type="text" maxlength="60" class="mt-1 w-full h-10 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(nomeBlocoCalc(estado.bloco_calc || '')) + '" placeholder="Ex.: Média Bim">';
                 html += '</label>';
                 html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
@@ -4222,11 +4402,18 @@ $boletimWizardSteps = [
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
             html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
-            html += '<p class="text-sm text-gray-800"><strong>Esta versão entra no aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Ao salvar, ela passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
+            if (ehEventoNotasPreview()) {
+                html += '<p class="text-sm text-gray-800"><strong>Salvar sem gerar notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só a versão da configuração. O detalhe do aluno e o boletim oficial continuam com as notas que já estão vigentes.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava a configuração e gera as notas. Essa versão passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
+            } else {
+                html += '<p class="text-sm text-gray-800"><strong>Esta versão entra no aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Ao salvar, ela passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
+            }
             html += '<p class="text-xs text-gray-600">Para usar outra, recupere uma configuração antiga aqui ou escolha o evento em Gerar avaliações do ano.</p>';
             html += htmlVersoesConfiguracao();
             html += '</div>';
-            html += '<p class="text-xs text-indigo-700 mt-4">Se estiver certo, clique em <strong>Concluir e aplicar</strong>.</p>';
+            html += '<p class="text-xs text-indigo-700 mt-4">' + (ehEventoNotasPreview()
+                ? 'Para guardar a fórmula sem publicar, use <strong>Salvar sem gerar notas</strong>. Para publicar no aluno, <strong>Concluir e aplicar</strong>.'
+                : 'Se estiver certo, clique em <strong>Concluir e aplicar</strong>.') + '</p>';
         }
 
         bodyEl.innerHTML = html;
@@ -4955,7 +5142,7 @@ $boletimWizardSteps = [
         }
     }
 
-    function aplicarRascunhoNaConfiguracao(r) {
+    function aplicarRascunhoNaConfiguracao(r, gerarNotas) {
         if (!r || typeof r !== 'object') return false;
         var comps = normalizarComponentesRascunho(r.componentes);
         if (!comps.length) {
@@ -5015,7 +5202,7 @@ $boletimWizardSteps = [
             add('componentes_json', JSON.stringify(comps));
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
-            if (ehEventoNotasPreview()) add('gerar_nova_versao', '1');
+            if (gerarNotas === true && ehEventoNotasPreview()) add('gerar_nova_versao', '1');
             document.body.appendChild(form);
             form.submit();
             return 'submit';
@@ -5029,7 +5216,7 @@ $boletimWizardSteps = [
         }
     }
 
-    function aplicarRascunhoSeOk(j, msgOk) {
+    function aplicarRascunhoSeOk(j, msgOk, gerarNotas) {
         if (!j || !j.rascunho) {
             renderResumo((j && (j.error || (j.erros && j.erros[0]))) || 'Não consegui montar o evento.', ['Volte nas etapas anteriores, confira as peças/fontes e tente de novo.']);
             return false;
@@ -5051,7 +5238,7 @@ $boletimWizardSteps = [
             renderResumo('Falta o modelo de boletim.', ['Volte em Identidade e selecione o Boletim.']);
             return false;
         }
-        var aplicado = aplicarRascunhoNaConfiguracao(j.rascunho);
+        var aplicado = aplicarRascunhoNaConfiguracao(j.rascunho, gerarNotas === true);
         if (!aplicado) {
             return false;
         }
@@ -5070,7 +5257,7 @@ $boletimWizardSteps = [
         if (estado.passo === 'revisar') {
             if (btnAvancar) btnAvancar.disabled = true;
             montarAgora().then(function (j) {
-                var aplicado = aplicarRascunhoSeOk(j, pageMode ? 'Aplicado. Salvando o evento…' : 'Aplicado no formulário. Revise os blocos e clique em Salvar evento.');
+                var aplicado = aplicarRascunhoSeOk(j, pageMode ? 'Aplicado. Salvando o evento…' : 'Aplicado no formulário. Revise os blocos e clique em Salvar evento.', true);
                 if (!aplicado) {
                     if (btnAvancar) btnAvancar.disabled = false;
                     return;
@@ -5322,7 +5509,7 @@ $boletimWizardSteps = [
             garantirEstado();
             renderResumo('Montando o quadro...', []);
             montarAgora().then(function (j) {
-                aplicarRascunhoSeOk(j, pageMode ? 'Aplicado. Abrindo a configuração para salvar o evento.' : 'Aplicado no formulário (ainda não salvo). Salve o evento para valer na simulação.');
+                aplicarRascunhoSeOk(j, pageMode ? 'Configuração salva. As notas não foram geradas.' : 'Aplicado no formulário (ainda não salvo). Salve o evento para valer na simulação.', false);
             });
         });
     }

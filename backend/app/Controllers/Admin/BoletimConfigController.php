@@ -1865,16 +1865,20 @@ class BoletimConfigController extends BaseController
                 $regraId = $savedId;
                 unset($_SESSION['boletim_assistente_rascunho']);
             }
-            $publicarNotas = $exibirEm === 'notas' && (
-                (string) ($_POST['gerar_nova_versao'] ?? '') === '1'
-                || !empty($_POST['origem_assistente'])
-            );
+            $publicarNotas = $exibirEm === 'notas'
+                && (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
             if ($savedId > 0 && $publicarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
                 return;
             }
+            $soConfiguracao = $exibirEm === 'notas' && !empty($_POST['origem_assistente']);
             $_SESSION['boletim_flash'] = $versaoConfig > 0
-                ? ('Configuração salva na versão ' . $versaoConfig . '. Dá para recuperar esta versão no final do Configurar Notas.')
-                : 'Evento de notas salvo com sucesso.';
+                ? ('Configuração salva na versão ' . $versaoConfig . '.'
+                    . ($soConfiguracao
+                        ? ' As notas não foram geradas. Para publicá-las no aluno, use Concluir e aplicar.'
+                        : ' Dá para recuperar esta versão no final do Configurar Notas.'))
+                : ($soConfiguracao
+                    ? 'Evento de notas salvo. As notas não foram geradas.'
+                    : 'Evento de notas salvo com sucesso.');
             $_SESSION['boletim_flash_type'] = 'success';
         } catch (Throwable $e) {
             error_log('Erro ao salvar regra de boletim: ' . $e->getMessage());
@@ -4707,7 +4711,8 @@ class BoletimConfigController extends BaseController
         }
         $this->aplicarEspalhamentoJornadasNotaUnicaNaMatriz($componentes, $matrizPorCodigo, $componentesResultado, $allMidsPreCalc, $roundModeSim);
 
-        foreach ($componentes as $componente) {
+        $manterManualPorCodigo = [];
+        foreach ($this->listarCalculadosNaOrdemDaFormula($componentes) as $componente) {
             $codigo = (string) ($componente['codigo'] ?? '');
             if ($codigo === '' || ($componente['source_type'] ?? '') !== 'calculado') {
                 continue;
@@ -4847,6 +4852,10 @@ class BoletimConfigController extends BaseController
                         $bloqueado = true;
                     }
                 }
+                foreach ($materiasComOverride as $midManter => $_infoManter) {
+                    $midManter = (int) $midManter;
+                    $manterManualPorCodigo[$codigo][$midManter] = $matrizPorCodigo[$codigo][$midManter] ?? null;
+                }
                 if ($materiasComOverride !== []) {
                     $detalhes['materias_com_override_manual'] = $materiasComOverride;
                     $listaComOverride = [];
@@ -4882,6 +4891,7 @@ class BoletimConfigController extends BaseController
                 'detalhes' => $detalhes,
             ];
         }
+        $this->repassarFormulasNaMatriz($componentes, $matrizPorCodigo, $componentesResultado, $roundMode, $manterManualPorCodigo);
         $this->fundirMateriasIguaisNaMatriz($matrizPorCodigo, $materiaNomesPorId, $componentes);
 
         $porCodigoRes = [];
@@ -7135,23 +7145,7 @@ class BoletimConfigController extends BaseController
      */
     private function valorNotaGrupoPorCodigo(array $notas, string $codigo): float
     {
-        $baixo = strtolower(trim($codigo));
-        $aliases = [
-            'semanal' => 'media_sem',
-            'media_sem' => 'semanal',
-            'bimestral' => 'prova_bim',
-            'prova_bim' => 'bimestral',
-            'recuperacao' => 'rec',
-            'rec' => 'recuperacao',
-            'trabalho' => 'trab',
-            'trab' => 'trabalho',
-            'participacao' => 'part',
-            'part' => 'participacao',
-        ];
-        $candidatos = [$codigo];
-        if (isset($aliases[$baixo])) {
-            $candidatos[] = $aliases[$baixo];
-        }
+        $candidatos = $this->aliasesCodigoColuna($codigo);
         foreach ($candidatos as $cand) {
             foreach ($notas as $chave => $valor) {
                 if (strcasecmp((string) $chave, (string) $cand) === 0 && is_numeric($valor)) {
@@ -7330,6 +7324,18 @@ class BoletimConfigController extends BaseController
             }
         }
 
+        $notasManuaisVirtuais = [];
+        foreach ($matrizPorCodigo as $codVirtual => $mapVirtual) {
+            if (!is_array($mapVirtual)) {
+                continue;
+            }
+            foreach ($mapVirtual as $midVirtual => $valVirtual) {
+                if ((int) $midVirtual < 0 && (is_numeric($valVirtual) || $valVirtual === null)) {
+                    $notasManuaisVirtuais[(string) $codVirtual][(int) $midVirtual] = $valVirtual;
+                }
+            }
+        }
+
         $faltasFontePorCodigo = [];
         foreach ($matrizPorCodigo as $codFonte => $mapFonte) {
             if (!isset($codigosFaltas[$codFonte]) || !is_array($mapFonte)) {
@@ -7466,27 +7472,18 @@ class BoletimConfigController extends BaseController
                         if ($expr !== '') {
                             $refsExpr = $this->codigosReferenciadosNaExpressao($expr, array_keys($matrizPorCodigo));
                             if ($refsExpr !== []) {
-                                $vars = [];
-                                $codeInsensitive = [];
-                                foreach (array_keys($matrizPorCodigo) as $existingCode) {
-                                    $codeInsensitive[strtolower((string) $existingCode)] = (string) $existingCode;
-                                }
-                                foreach ($refsExpr as $refToken) {
-                                    $refCode = null;
-                                    if (array_key_exists((string) $refToken, $matrizPorCodigo)) {
-                                        $refCode = (string) $refToken;
-                                    } else {
-                                        $lk = strtolower((string) $refToken);
-                                        if (isset($codeInsensitive[$lk])) {
-                                            $refCode = $codeInsensitive[$lk];
-                                        }
-                                    }
-                                    if ($refCode === null) {
-                                        $vars[(string) $refToken] = 0.0;
+                                $notasVirtuais = [];
+                                foreach ($matrizPorCodigo as $codExistente => $mapExistente) {
+                                    if (!is_array($mapExistente)) {
                                         continue;
                                     }
-                                    $valRef = $matrizPorCodigo[$refCode][$vmid] ?? null;
-                                    $vars[(string) $refCode] = is_numeric($valRef) ? (float) $valRef : 0.0;
+                                    if (isset($mapExistente[$vmid]) && is_numeric($mapExistente[$vmid])) {
+                                        $notasVirtuais[(string) $codExistente] = (float) $mapExistente[$vmid];
+                                    }
+                                }
+                                $vars = [];
+                                foreach ($refsExpr as $refToken) {
+                                    $vars[(string) $refToken] = $this->valorNotaGrupoPorCodigo($notasVirtuais, (string) $refToken);
                                 }
                                 $rFormula = $this->avaliarFormula($expr, $vars);
                                 if (!empty($rFormula['ok']) && isset($rFormula['valor']) && is_numeric($rFormula['valor'])) {
@@ -7531,6 +7528,16 @@ class BoletimConfigController extends BaseController
             }
 
             $matrizPorCodigo[$codigo] = $map;
+        }
+
+        $this->aplicarFormulasNasLinhasVirtuais($matrizPorCodigo, $componentesRegra, $roundModeGrupo, $notasManuaisVirtuais);
+        foreach ($notasManuaisVirtuais as $codVirtual => $porMidVirtual) {
+            if (!isset($matrizPorCodigo[$codVirtual]) || !is_array($matrizPorCodigo[$codVirtual])) {
+                $matrizPorCodigo[$codVirtual] = [];
+            }
+            foreach ($porMidVirtual as $midVirtual => $valVirtual) {
+                $matrizPorCodigo[$codVirtual][(int) $midVirtual] = $valVirtual;
+            }
         }
 
         $this->recomputarSomaFaltasDosGrupos(
@@ -8958,6 +8965,234 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Nome da peça e código da coluna são a mesma nota (recuperacao = rec, semanal = media_sem).
+     *
+     * @return list<string>
+     */
+    private function aliasesCodigoColuna(string $codigo): array
+    {
+        $codigo = trim($codigo);
+        $baixo = strtolower($codigo);
+        $pares = [
+            'recuperacao' => 'rec',
+            'rec' => 'recuperacao',
+            'semanal' => 'media_sem',
+            'media_sem' => 'semanal',
+            'bimestral' => 'prova_bim',
+            'prova_bim' => 'bimestral',
+            'trabalho' => 'trab',
+            'trab' => 'trabalho',
+            'participacao' => 'part',
+            'part' => 'participacao',
+        ];
+        $out = [];
+        foreach ([$codigo, $baixo, $pares[$baixo] ?? ''] as $cand) {
+            $cand = trim($cand);
+            if ($cand !== '' && !in_array($cand, $out, true)) {
+                $out[] = $cand;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Fórmula só com número (min(7, 8) ou 6) vale para toda matéria que já tem alguma coluna.
+     *
+     * @param array<string, string> $exprs
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @return array<int, float>
+     */
+    private function matrizFormulaConstante(array $exprs, array $matrizPorCodigo): array
+    {
+        $fallback = trim((string) ($exprs['*'] ?? ''));
+        if ($fallback === '') {
+            foreach ($exprs as $kExpr => $vExpr) {
+                if ((string) $kExpr === '*') {
+                    continue;
+                }
+                $cand = trim((string) $vExpr);
+                if ($cand !== '') {
+                    $fallback = $cand;
+                    break;
+                }
+            }
+        }
+        if ($fallback === '') {
+            return [];
+        }
+        $mids = [];
+        foreach ($matrizPorCodigo as $map) {
+            if (!is_array($map)) {
+                continue;
+            }
+            foreach (array_keys($map) as $mid) {
+                $mid = (int) $mid;
+                if ($mid !== 0) {
+                    $mids[$mid] = true;
+                }
+            }
+        }
+        $out = [];
+        foreach (array_keys($mids) as $mid) {
+            $mid = (int) $mid;
+            $exprMid = trim((string) ($exprs[(string) $mid] ?? $fallback));
+            if ($exprMid === '') {
+                continue;
+            }
+            $resultado = $this->avaliarFormula($exprMid, []);
+            if (!empty($resultado['ok']) && isset($resultado['valor']) && is_numeric($resultado['valor'])) {
+                $out[$mid] = (float) $resultado['valor'];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Segunda passada: coluna que cita outra calculada enxerga o valor já fechado.
+     *
+     * @param array<int|string, mixed> $componentes
+     * @param array<string, array<int, float>> $matrizPorCodigo
+     * @param list<array<string, mixed>> $componentesResultado
+     * @param array<string, array<int, float|null>> $manterManualPorCodigo
+     */
+    private function repassarFormulasNaMatriz(
+        array $componentes,
+        array &$matrizPorCodigo,
+        array &$componentesResultado,
+        string $roundMode,
+        array $manterManualPorCodigo = []
+    ): void {
+        $lista = $this->listarCalculadosNaOrdemDaFormula($componentes);
+        if ($lista === []) {
+            return;
+        }
+        $passos = count($lista);
+        for ($passo = 0; $passo < $passos; $passo++) {
+            foreach ($lista as $comp) {
+                if (!is_array($comp)) {
+                    continue;
+                }
+                if ($this->parseAgregarNqFromComponente($comp) !== []) {
+                    continue;
+                }
+                $codigo = trim((string) ($comp['codigo'] ?? ''));
+                $expr = $this->parseExpressaoColunaCalculada($comp);
+                $porMateria = $this->parseFormulaMateriasCalculadoFromComponente($comp);
+                if ($codigo === '' || ($expr === '' && $porMateria === [])) {
+                    continue;
+                }
+                $map = $this->matrizColunaCalculada($expr, $porMateria, $codigo, $matrizPorCodigo);
+                if ($map === []) {
+                    continue;
+                }
+                $modo = $this->resolveRoundModeComponente($comp, $roundMode);
+                $map = $this->applyRoundModeToMateriaMap($map, $modo);
+                foreach ($manterManualPorCodigo as $codManual => $porMidManual) {
+                    if (strcasecmp((string) $codManual, $codigo) !== 0 || !is_array($porMidManual)) {
+                        continue;
+                    }
+                    foreach ($porMidManual as $midManual => $notaManual) {
+                        $map[(int) $midManual] = $notaManual;
+                    }
+                }
+                $matrizPorCodigo[$codigo] = $map;
+                $vals = [];
+                foreach ($map as $nota) {
+                    if (is_numeric($nota)) {
+                        $vals[] = (float) $nota;
+                    }
+                }
+                if ($vals === []) {
+                    continue;
+                }
+                $valor = $this->applyRoundMode(round(array_sum($vals) / count($vals), 2), $modo);
+                foreach ($componentesResultado as &$cr) {
+                    if (!is_array($cr)) {
+                        continue;
+                    }
+                    if (strcasecmp((string) ($cr['codigo'] ?? ''), $codigo) === 0) {
+                        $cr['valor'] = $valor;
+                        break;
+                    }
+                }
+                unset($cr);
+            }
+        }
+    }
+
+    /**
+     * Coluna calculada que cita outra (Resultado Final usa media_3) roda depois da citada.
+     *
+     * @param array<int|string, mixed> $componentes
+     * @return list<array<string, mixed>>
+     */
+    private function listarCalculadosNaOrdemDaFormula(array $componentes): array
+    {
+        $calc = [];
+        $exprPorCod = [];
+        foreach ($componentes as $comp) {
+            if (!is_array($comp) || strtolower(trim((string) ($comp['source_type'] ?? ''))) !== 'calculado') {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            if ($cod === '' || isset($calc[$cod])) {
+                continue;
+            }
+            $calc[$cod] = $comp;
+            $expr = strtolower($this->parseExpressaoColunaCalculada($comp));
+            foreach ($this->parseFormulaMateriasCalculadoFromComponente($comp) as $exprFm) {
+                $expr .= ' ' . strtolower((string) $exprFm);
+            }
+            $exprPorCod[$cod] = $expr;
+        }
+        if ($calc === []) {
+            return [];
+        }
+        $deps = [];
+        foreach ($exprPorCod as $cod => $expr) {
+            $deps[$cod] = [];
+            if ($expr === '') {
+                continue;
+            }
+            foreach (array_keys($calc) as $outro) {
+                if ($outro === $cod) {
+                    continue;
+                }
+                foreach ($this->aliasesCodigoColuna((string) $outro) as $nome) {
+                    $nome = strtolower(trim($nome));
+                    if ($nome === '') {
+                        continue;
+                    }
+                    if (preg_match('/(?<![a-z0-9_])' . preg_quote($nome, '/') . '(?![a-z0-9_])/', $expr)) {
+                        $deps[$cod][$outro] = true;
+                        break;
+                    }
+                }
+            }
+        }
+        $ordenados = [];
+        $visitados = [];
+        $walk = function (string $cod) use (&$walk, &$visitados, &$ordenados, $deps, $calc): void {
+            if (isset($visitados[$cod]) || !isset($calc[$cod])) {
+                return;
+            }
+            $visitados[$cod] = true;
+            foreach (array_keys($deps[$cod] ?? []) as $dep) {
+                $walk((string) $dep);
+            }
+            $ordenados[] = $calc[$cod];
+        };
+        foreach (array_keys($calc) as $cod) {
+            $walk($cod);
+        }
+
+        return $ordenados;
+    }
+
+    /**
+     * @param array<string, string> $formulaPorMateria
      * @param array<string, array<int, float>> $matrizPorCodigo
      * @return array<int, float>
      */
@@ -9016,7 +9251,7 @@ class BoletimConfigController extends BaseController
         }
         $refs = array_keys($refsResolved);
         if ($refs === []) {
-            return [];
+            return $this->matrizFormulaConstante($exprs, $matrizPorCodigo);
         }
 
         $fallbackExpr = trim((string) ($exprs['*'] ?? ''));
@@ -9035,20 +9270,25 @@ class BoletimConfigController extends BaseController
 
         $unionMids = [];
         foreach ($refs as $rc) {
-            foreach (array_keys($matrizPorCodigo[$rc] ?? []) as $mid) {
-                $cell = $matrizPorCodigo[$rc][$mid] ?? null;
-                if (is_numeric($cell)) {
-                    $unionMids[(int) $mid] = true;
+            foreach ($this->aliasesCodigoColuna((string) $rc) as $cand) {
+                foreach ($matrizPorCodigo as $chave => $mapChave) {
+                    if (!is_array($mapChave) || strcasecmp((string) $chave, $cand) !== 0) {
+                        continue;
+                    }
+                    foreach ($mapChave as $mid => $cell) {
+                        if (is_numeric($cell)) {
+                            $unionMids[(int) $mid] = true;
+                        }
+                    }
                 }
             }
         }
-
         $out = [];
         foreach (array_keys($unionMids) as $mid) {
             $valoresFormula = [];
             foreach ($refs as $rc) {
-                $map = $matrizPorCodigo[$rc] ?? [];
-                $valoresFormula[$rc] = (isset($map[$mid]) && is_numeric($map[$mid])) ? (float) $map[$mid] : 0.0;
+                $notaRef = $this->notaNaMatrizPorApelido($matrizPorCodigo, (string) $rc, (int) $mid);
+                $valoresFormula[$rc] = $notaRef ?? 0.0;
             }
             $exprUse = trim((string) ($exprs[(string) ((int) $mid)] ?? $fallbackExpr));
             if ($exprUse === '') {
@@ -9061,6 +9301,141 @@ class BoletimConfigController extends BaseController
         }
 
         return $out;
+    }
+
+    /**
+     * Nota da matéria no código citado ou no apelido (rec e recuperacao são a mesma coluna).
+     *
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     */
+    private function notaNaMatrizPorApelido(array $matrizPorCodigo, string $codigo, int $mid): ?float
+    {
+        $alternativa = null;
+        foreach ($this->aliasesCodigoColuna($codigo) as $cand) {
+            foreach ($matrizPorCodigo as $chave => $map) {
+                if (!is_array($map) || strcasecmp((string) $chave, $cand) !== 0) {
+                    continue;
+                }
+                if (!isset($map[$mid]) || !is_numeric($map[$mid])) {
+                    continue;
+                }
+                $valor = (float) $map[$mid];
+                if (strcasecmp((string) $chave, trim($codigo)) === 0) {
+                    return $valor;
+                }
+                if ($alternativa === null) {
+                    $alternativa = $valor;
+                }
+            }
+        }
+
+        return $alternativa;
+    }
+
+    /**
+     * Mãe do grupo: a coluna calculada usa a fórmula nas notas já juntadas, não a média dos resultados das filhas.
+     *
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     * @param array<int|string, mixed> $componentes
+     * @param array<string, array<int, float|null>> $notasManuaisVirtuais
+     */
+    private function aplicarFormulasNasLinhasVirtuais(
+        array &$matrizPorCodigo,
+        array $componentes,
+        string $roundMode,
+        array $notasManuaisVirtuais = []
+    ): void
+    {
+        $vmids = [];
+        foreach ($matrizPorCodigo as $map) {
+            if (!is_array($map)) {
+                continue;
+            }
+            foreach (array_keys($map) as $mid) {
+                if ((int) $mid < 0) {
+                    $vmids[(int) $mid] = true;
+                }
+            }
+        }
+        if ($vmids === []) {
+            return;
+        }
+        $lista = $this->listarCalculadosNaOrdemDaFormula($componentes);
+        if ($lista === []) {
+            return;
+        }
+        $passos = count($lista);
+        for ($passo = 0; $passo < $passos; $passo++) {
+            foreach ($notasManuaisVirtuais as $codManual => $porMidManual) {
+                if (!is_array($porMidManual)) {
+                    continue;
+                }
+                if (!isset($matrizPorCodigo[$codManual]) || !is_array($matrizPorCodigo[$codManual])) {
+                    $matrizPorCodigo[$codManual] = [];
+                }
+                foreach ($porMidManual as $midManual => $notaManual) {
+                    $midManual = (int) $midManual;
+                    $matrizPorCodigo[$codManual][$midManual] = $notaManual;
+                    if ($midManual < 0) {
+                        $vmids[$midManual] = true;
+                    }
+                }
+            }
+            foreach ($lista as $comp) {
+                if (!is_array($comp) || $this->parseAgregarNqFromComponente($comp) !== []) {
+                    continue;
+                }
+                $codigo = trim((string) ($comp['codigo'] ?? ''));
+                $expr = $this->parseExpressaoColunaCalculada($comp);
+                if ($codigo === '' || $expr === '') {
+                    continue;
+                }
+                $modo = $this->resolveRoundModeComponente($comp, $roundMode);
+                if (!isset($matrizPorCodigo[$codigo]) || !is_array($matrizPorCodigo[$codigo])) {
+                    $matrizPorCodigo[$codigo] = [];
+                }
+                foreach (array_keys($vmids) as $vmid) {
+                    $celulaManual = false;
+                    foreach ($notasManuaisVirtuais as $codManual => $porMidManual) {
+                        if (!is_array($porMidManual) || strcasecmp((string) $codManual, $codigo) !== 0) {
+                            continue;
+                        }
+                        if (array_key_exists((int) $vmid, $porMidManual)) {
+                            $celulaManual = true;
+                            break;
+                        }
+                    }
+                    if ($celulaManual) {
+                        continue;
+                    }
+                    $notas = [];
+                    foreach ($matrizPorCodigo as $codNota => $mapNota) {
+                        if (!is_array($mapNota) || !isset($mapNota[$vmid]) || !is_numeric($mapNota[$vmid])) {
+                            continue;
+                        }
+                        $notas[(string) $codNota] = (float) $mapNota[$vmid];
+                    }
+                    $refs = $this->codigosReferenciadosNaExpressao($expr, array_merge(array_keys($notas), array_keys($matrizPorCodigo)));
+                    $vars = [];
+                    foreach ($refs as $ref) {
+                        $vars[(string) $ref] = $this->valorNotaGrupoPorCodigo($notas, (string) $ref);
+                    }
+                    if ($refs === [] && !preg_match('/\d/', $expr)) {
+                        continue;
+                    }
+                    $resultado = $this->avaliarFormula($expr, $vars);
+                    if (empty($resultado['ok']) || !isset($resultado['valor']) || !is_numeric($resultado['valor'])) {
+                        continue;
+                    }
+                    $arred = $this->applyRoundMode((float) $resultado['valor'], $modo);
+                    if ($arred === null) {
+                        continue;
+                    }
+                    $matrizPorCodigo[$codigo][(int) $vmid] = $arred;
+                    $vmids[(int) $vmid] = true;
+                }
+            }
+        }
     }
 
     /**
