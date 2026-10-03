@@ -253,17 +253,15 @@ class ReportAdminController extends AdminBaseController
         }
         $termo = $this->parseAlunoBuscaBoletimCoordenacao();
         $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
+        $cursoId = max(0, (int) ($_GET['curso_id'] ?? 0));
         if (strlen($termo) < 2) {
             $this->json(['success' => true, 'alunos' => []]);
             return;
         }
         [$whereAluno, $paramsAluno] = $this->whereAlunoBuscaBoletimCoordenacao($termo, 'a');
         $params = $paramsAluno;
-        $whereTurma = '';
-        if ($turmaId > 0) {
-            $whereTurma = ' AND a.turma_id = :turma_id';
-            $params['turma_id'] = $turmaId;
-        }
+        [$whereTurma, $paramsTurma] = $this->whereTurmasBoletimCoordenacao($turmaId, $cursoId, 'a');
+        $params += $paramsTurma;
         $codigoSelect = $this->colunaAlunosCodigoExisteBoletimCoordenacao()
             ? 'a.codigo_aluno'
             : 'NULL AS codigo_aluno';
@@ -307,6 +305,7 @@ class ReportAdminController extends AdminBaseController
         $user = $this->auth->getUser();
         $fonte = $this->parseFonteBoletimCoordenacao();
         $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
+        $cursoId = max(0, (int) ($_GET['curso_id'] ?? 0));
         $anoLetivo = max(0, (int) ($_GET['ano_letivo'] ?? 0));
         $periodo = $this->parsePeriodoBoletimCoordenacao($anoLetivo);
         $alunoQ = $this->parseAlunoBuscaBoletimCoordenacao();
@@ -314,21 +313,9 @@ class ReportAdminController extends AdminBaseController
         $materiasExibicao = $this->parseMateriasExibicaoBoletim($_GET['materias_exibicao'] ?? 'todas');
         $incluirAssinatura = !empty($_GET['assinatura']);
         $incluirAntigas = false;
-        $selecionarTodos = (string) ($_GET['evento'] ?? '') === 'todos';
-        $eventos = $this->listarEventosBoletimCoordenacao(true);
-        $selecionados = $this->filtrarSelecionadosPorAnoPeriodo(
-            $this->resolverEventosSelecionadosBoletimCoordenacao($eventos),
-            $anoLetivo,
-            $periodo
-        );
-        if (($fonte === 'evento' || $fonte === 'demonstrativo') && $selecionados === [] && $alunoQ !== '') {
-            $selecionados = $this->filtrarSelecionadosPorAnoPeriodo(
-                $this->resolverEventosSelecionadosBoletimCoordenacao($eventos, true),
-                $anoLetivo,
-                $periodo
-            );
-            $selecionarTodos = true;
-        }
+        $selecionados = $fonte === 'demonstrativo'
+            ? $this->eventosVigentesBoletimCoordenacao($anoLetivo, $periodo)
+            : [];
         $executar = !empty($_GET['executar']);
         if ($fonte === 'vida_escolar') {
             $executar = $executar && $anoLetivo > 0;
@@ -340,7 +327,7 @@ class ReportAdminController extends AdminBaseController
         if ($executar) {
             if ($fonte === 'vida_escolar') {
                 $relatorio = $this->paginarAlunosRelatorioBoletimCoordenacao(
-                    $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo),
+                    $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId),
                     $pagina,
                     20
                 );
@@ -361,7 +348,8 @@ class ReportAdminController extends AdminBaseController
                     $notaAbaixoDe,
                     $materiasExibicao,
                     $pagina,
-                    $alunoQ
+                    $alunoQ,
+                    $cursoId
                 );
                 if ($fonte === 'demonstrativo') {
                     $relatorio['fonte'] = 'demonstrativo';
@@ -377,15 +365,16 @@ class ReportAdminController extends AdminBaseController
             'user' => $user,
             'current_page' => 'reports_boletim_coordenacao',
             'fonte' => $fonte,
-            'eventos' => $eventos,
             'incluir_antigas' => $incluirAntigas,
             'anos_letivos' => $anosLista = $this->listarAnosBoletimCoordenacao(),
             'periodos_por_ano' => $this->mapaPeriodosBoletimCoordenacao($anosLista),
             'periodo' => $periodo,
-            'turmas' => $this->db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome ASC") ?: [],
-            'eventos_selecionados' => array_column($selecionados, 'valor'),
-            'selecionar_todos' => $selecionarTodos,
-            'evento_selecionado' => count($selecionados) === 1 ? (string) $selecionados[0]['valor'] : '',
+            'turmas' => $this->listarTurmasBoletimCoordenacao(),
+            'cursos' => $this->listarCursosBoletimCoordenacao(),
+            'curso_id' => $cursoId,
+            'eventos_selecionados' => [],
+            'selecionar_todos' => false,
+            'evento_selecionado' => '',
             'ano_letivo' => $anoLetivo,
             'turma_id' => $turmaId,
             'aluno_q' => $alunoQ,
@@ -393,6 +382,7 @@ class ReportAdminController extends AdminBaseController
             'materias_exibicao' => $materiasExibicao,
             'incluir_assinatura' => $incluirAssinatura,
             'executar' => $executar,
+            'aviso_sem_vigente' => $fonte === 'demonstrativo' && !empty($_GET['executar']) && $selecionados === [],
             'relatorio' => $relatorio,
             'pode_editar_observacao' => $this->podeEditarObservacaoBoletimCoordenacao($user),
             'csrf_token' => $this->generateCsrfToken(),
@@ -411,6 +401,7 @@ class ReportAdminController extends AdminBaseController
         }
         $fonte = $this->parseFonteBoletimCoordenacao();
         $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
+        $cursoId = max(0, (int) ($_GET['curso_id'] ?? 0));
         $anoLetivo = max(0, (int) ($_GET['ano_letivo'] ?? 0));
         $periodo = $this->parsePeriodoBoletimCoordenacao($anoLetivo);
         $alunoQ = $this->parseAlunoBuscaBoletimCoordenacao();
@@ -427,21 +418,9 @@ class ReportAdminController extends AdminBaseController
                 $this->redirect('/admin/reports/boletim-coordenacao');
                 return;
             }
-            $relatorios = [$this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo)];
+            $relatorios = [$this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId)];
         } else {
-            $catalogo = $this->listarEventosBoletimCoordenacao(true);
-            $selecionados = $this->filtrarSelecionadosPorAnoPeriodo(
-                $this->resolverEventosSelecionadosBoletimCoordenacao($catalogo),
-                $anoLetivo,
-                $periodo
-            );
-            if ($selecionados === [] && $alunoQ !== '') {
-                $selecionados = $this->filtrarSelecionadosPorAnoPeriodo(
-                    $this->resolverEventosSelecionadosBoletimCoordenacao($catalogo, true),
-                    $anoLetivo,
-                    $periodo
-                );
-            }
+            $selecionados = $this->eventosVigentesBoletimCoordenacao($anoLetivo, $periodo);
             if ($selecionados === []) {
                 $this->redirect('/admin/reports/boletim-coordenacao');
                 return;
@@ -456,7 +435,8 @@ class ReportAdminController extends AdminBaseController
                     $materiasExibicao,
                     $alunoQ,
                     (int) ($evento['geracao_id'] ?? 0),
-                    !empty($evento['usar_vigente'])
+                    !empty($evento['usar_vigente']),
+                    $cursoId
                 );
                 if (trim((string) ($evento['nome_exibicao'] ?? '')) !== '') {
                     $relatorioEvento['evento_nome'] = (string) $evento['nome_exibicao'];
@@ -801,6 +781,7 @@ class ReportAdminController extends AdminBaseController
             'incluir_antigas' => !empty($_GET['incluir_antigas']) ? 1 : 0,
             'ano_letivo' => max(0, (int) ($_GET['ano_letivo'] ?? 0)),
             'periodo' => max(0, (int) ($_GET['periodo'] ?? 0)),
+            'curso_id' => max(0, (int) ($_GET['curso_id'] ?? 0)),
             'turma_id' => max(0, (int) ($_GET['turma_id'] ?? 0)),
             'aluno_q' => $this->parseAlunoBuscaBoletimCoordenacao(),
             'nota_abaixo_de' => (string) ($_GET['nota_abaixo_de'] ?? ''),
@@ -826,10 +807,13 @@ class ReportAdminController extends AdminBaseController
     private function parseFonteBoletimCoordenacao(): string
     {
         $raw = strtolower(trim((string) ($_GET['fonte'] ?? '')));
-        if ($raw === 'evento' || $raw === 'vida_escolar' || $raw === 'demonstrativo') {
-            return $raw;
+        if ($raw === 'evento' || $raw === 'demonstrativo') {
+            return 'demonstrativo';
         }
-        return trim((string) ($_GET['evento'] ?? '')) !== '' ? 'evento' : 'vida_escolar';
+        if ($raw === 'vida_escolar') {
+            return 'vida_escolar';
+        }
+        return 'vida_escolar';
     }
 
     /**
@@ -851,6 +835,140 @@ class ReportAdminController extends AdminBaseController
             $anos[] = (int) date('Y');
         }
         return $anos;
+    }
+
+    /**
+     * @return list<array{id:int,nome:string}>
+     */
+    private function listarCursosBoletimCoordenacao(): array
+    {
+        foreach (['curso', 'cursos'] as $tabela) {
+            try {
+                $existe = $this->db->fetch("SHOW TABLES LIKE '{$tabela}'");
+                if (!is_array($existe) || $existe === []) {
+                    continue;
+                }
+                try {
+                    $rows = $this->db->fetchAll(
+                        "SELECT id, nome FROM {$tabela} WHERE ativo = 1 ORDER BY nome ASC"
+                    );
+                } catch (\Throwable $eAtivo) {
+                    $rows = $this->db->fetchAll("SELECT id, nome FROM {$tabela} ORDER BY nome ASC");
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $cursos = [];
+            foreach (is_array($rows) ? $rows : [] as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                $nome = trim((string) ($row['nome'] ?? ''));
+                if ($id <= 0 || $nome === '') {
+                    continue;
+                }
+                $cursos[] = ['id' => $id, 'nome' => $nome];
+            }
+            if ($cursos !== []) {
+                return $cursos;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,curso_id:int}>
+     */
+    private function listarTurmasBoletimCoordenacao(): array
+    {
+        $expr = $this->expressaoCursoTurmaBoletimCoordenacao();
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, nome, {$expr} AS curso_id FROM turmas WHERE ativo = 1 ORDER BY nome ASC"
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $turmas = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $turmas[] = [
+                'id' => $id,
+                'nome' => (string) ($row['nome'] ?? ''),
+                'curso_id' => (int) ($row['curso_id'] ?? 0),
+            ];
+        }
+
+        return $turmas;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function idsTurmasDoCursoBoletimCoordenacao(int $cursoId): array
+    {
+        if ($cursoId <= 0) {
+            return [];
+        }
+        $ids = [];
+        foreach ($this->listarTurmasBoletimCoordenacao() as $turma) {
+            if ((int) $turma['curso_id'] === $cursoId) {
+                $ids[] = (int) $turma['id'];
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @return array{0:string,1:array<string,int>}
+     */
+    private function whereTurmasBoletimCoordenacao(int $turmaId, int $cursoId, string $alias = 'a'): array
+    {
+        if ($alias !== 'a' && $alias !== 'f') {
+            $alias = 'a';
+        }
+        if ($turmaId > 0) {
+            return [" AND {$alias}.turma_id = :turma_filtro", ['turma_filtro' => $turmaId]];
+        }
+        if ($cursoId <= 0) {
+            return ['', []];
+        }
+        $ids = $this->idsTurmasDoCursoBoletimCoordenacao($cursoId);
+        if ($ids === []) {
+            return [' AND 1 = 0', []];
+        }
+        $placeholders = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $chave = 'turma_curso_' . $i;
+            $placeholders[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+
+        return [' AND ' . $alias . '.turma_id IN (' . implode(',', $placeholders) . ')', $params];
+    }
+
+    private function expressaoCursoTurmaBoletimCoordenacao(): string
+    {
+        $partes = [];
+        foreach (['curso_novo_id', 'curso_id'] as $coluna) {
+            try {
+                $existe = $this->db->fetch("SHOW COLUMNS FROM turmas LIKE '{$coluna}'");
+            } catch (\Throwable $e) {
+                $existe = false;
+            }
+            if (is_array($existe) && $existe !== []) {
+                $partes[] = 'NULLIF(' . $coluna . ', 0)';
+            }
+        }
+        if ($partes === []) {
+            return '0';
+        }
+
+        return 'COALESCE(' . implode(', ', $partes) . ', 0)';
     }
 
     private function exportarBoletimCoordenacaoTabelaPdf(array $relatorio, bool $incluirAssinatura, string $filenameBase): void
@@ -1367,7 +1485,8 @@ class ReportAdminController extends AdminBaseController
         ?float $notaAbaixoDe,
         string $materiasExibicao,
         int $pagina,
-        string $alunoQ = ''
+        string $alunoQ = '',
+        int $cursoId = 0
     ): array {
         $blocos = [];
         $totalAlunos = 0;
@@ -1381,7 +1500,8 @@ class ReportAdminController extends AdminBaseController
                 $materiasExibicao,
                 $alunoQ,
                 (int) ($atual['geracao_id'] ?? 0),
-                !empty($atual['usar_vigente'])
+                !empty($atual['usar_vigente']),
+                $cursoId
             );
             $bloco['evento_rotulo'] = (string) ($atual['nome_exibicao'] ?? $bloco['evento_nome'] ?? 'Boletim');
             $bloco['evento_detalhe'] = (string) ($atual['nome_detalhe'] ?? '');
@@ -1717,15 +1837,13 @@ class ReportAdminController extends AdminBaseController
         string $materiasExibicao = 'todas',
         string $alunoQ = '',
         int $geracaoId = 0,
-        bool $usarVigente = true
+        bool $usarVigente = true,
+        int $cursoId = 0
     ): array
     {
-        $whereTurma = $turmaId > 0 ? ' AND a.turma_id = :turma_id' : '';
+        [$whereTurma, $paramsTurma] = $this->whereTurmasBoletimCoordenacao($turmaId, $cursoId, 'a');
         [$whereAluno, $paramsAluno] = $this->whereAlunoBuscaBoletimCoordenacao($alunoQ, 'a');
-        $params = ['regra_id' => $regraId, 'periodo_ref' => $periodoRef] + $paramsAluno;
-        if ($turmaId > 0) {
-            $params['turma_id'] = $turmaId;
-        }
+        $params = ['regra_id' => $regraId, 'periodo_ref' => $periodoRef] + $paramsAluno + $paramsTurma;
         $filtroVersao = ' AND g.vigente = 1';
         if (!$usarVigente && $geracaoId > 0) {
             $filtroVersao = ' AND g.geracao_id = :geracao_id';
@@ -1967,7 +2085,8 @@ class ReportAdminController extends AdminBaseController
         ?float $notaAbaixoDe = null,
         string $materiasExibicao = 'todas',
         string $alunoQ = '',
-        int $periodo = 0
+        int $periodo = 0,
+        int $cursoId = 0
     ): array {
         $columns = $this->colunasFichaVidaEscolar($anoLetivo, $periodo);
         $codigoCorte = $periodo > 0 ? ('n' . $periodo) : 'n0';
@@ -2000,6 +2119,12 @@ class ReportAdminController extends AdminBaseController
         }
 
         $fichas = $vida->model()->listarFichasAnoLetivo($anoLetivo, $turmaId);
+        if ($turmaId <= 0 && $cursoId > 0) {
+            $turmasCurso = array_flip($this->idsTurmasDoCursoBoletimCoordenacao($cursoId));
+            $fichas = array_values(array_filter($fichas, static function (array $ficha) use ($turmasCurso): bool {
+                return isset($turmasCurso[(int) ($ficha['turma_id'] ?? 0)]);
+            }));
+        }
         if (trim($alunoQ) !== '') {
             [$whereAluno, $paramsAluno] = $this->whereAlunoBuscaBoletimCoordenacao($alunoQ, 'a');
             $idsPermitidos = [];
@@ -2201,9 +2326,17 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
-     * @param list<array<string,mixed>> $selecionados
      * @return list<array<string,mixed>>
      */
+    private function eventosVigentesBoletimCoordenacao(int $anoLetivo, int $periodo): array
+    {
+        return $this->filtrarSelecionadosPorAnoPeriodo(
+            $this->resolverEventosSelecionadosBoletimCoordenacao($this->listarEventosBoletimCoordenacao(true), true),
+            $anoLetivo,
+            $periodo
+        );
+    }
+
     private function filtrarSelecionadosPorAnoPeriodo(array $selecionados, int $anoLetivo, int $periodo): array
     {
         if ($anoLetivo <= 0 && $periodo <= 0) {

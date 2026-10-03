@@ -1,6 +1,6 @@
 <?php
 $fontePedido = (string) ($fonte ?? 'vida_escolar');
-$fonte = in_array($fontePedido, ['evento', 'vida_escolar', 'demonstrativo'], true) ? $fontePedido : 'vida_escolar';
+$fonte = $fontePedido === 'demonstrativo' ? 'demonstrativo' : 'vida_escolar';
 $relatorio = is_array($relatorio ?? null) ? $relatorio : null;
 $anosLetivos = (array) ($anos_letivos ?? []);
 if ($anosLetivos === []) {
@@ -22,6 +22,7 @@ $queryExport = [
     'fonte' => $fonte,
     'ano_letivo' => $anoSelecionado,
     'periodo' => max(0, (int) ($periodo ?? 0)),
+    'curso_id' => max(0, (int) ($curso_id ?? 0)),
     'turma_id' => (int) ($turma_id ?? 0),
     'aluno_q' => trim((string) ($aluno_q ?? '')),
     'nota_abaixo_de' => $nota_abaixo_de !== null ? str_replace('.', ',', (string) $nota_abaixo_de) : '',
@@ -58,7 +59,7 @@ include __DIR__ . '/../_partials/flash_message.php';
 ?>
 <div class="mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Notas da Coordenação</h1>
-    <p class="text-gray-600 mt-1">Escolha o boletim, o demonstrativo de notas ou as notas do evento (provas, trabalhos e médias).</p>
+    <p class="text-gray-600 mt-1">Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.</p>
 </div>
 
 <?php
@@ -81,7 +82,6 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             <select name="fonte" id="fonte-boletim-coord" class="<?= $campoClasse ?>">
                 <option value="vida_escolar" <?= $fonte === 'vida_escolar' ? 'selected' : '' ?>>Boletim</option>
                 <option value="demonstrativo" <?= $fonte === 'demonstrativo' ? 'selected' : '' ?>>Demonstrativo de notas</option>
-                <option value="evento" <?= $fonte === 'evento' ? 'selected' : '' ?>>Notas do evento</option>
             </select>
         </label>
         <label class="block">
@@ -104,17 +104,28 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             </select>
         </label>
         <label class="block">
-            <span class="block text-sm font-medium text-gray-700 mb-1.5">Turma</span>
-            <select name="turma_id" class="<?= $campoClasse ?>">
-                <option value="0">Todas as turmas</option>
-                <?php foreach ((array) ($turmas ?? []) as $turma): ?>
-                    <option value="<?= (int) $turma['id'] ?>" <?= (int) ($turma_id ?? 0) === (int) $turma['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $turma['nome']) ?></option>
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Curso/Ciclo</span>
+            <select name="curso_id" id="curso-boletim-coord" class="<?= $campoClasse ?>">
+                <option value="0">Todos</option>
+                <?php foreach ((array) ($cursos ?? []) as $curso): ?>
+                    <?php if (!is_array($curso)) { continue; } ?>
+                    <option value="<?= (int) ($curso['id'] ?? 0) ?>" <?= (int) ($curso_id ?? 0) === (int) ($curso['id'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string) ($curso['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <label class="block md:col-span-2 relative">
+        <label class="block">
+            <span class="block text-sm font-medium text-gray-700 mb-1.5">Turma</span>
+            <select name="turma_id" id="turma-boletim-coord" class="<?= $campoClasse ?>">
+                <option value="0">Todas as turmas</option>
+                <?php foreach ((array) ($turmas ?? []) as $turma): ?>
+                    <?php if (!is_array($turma)) { continue; } ?>
+                    <option value="<?= (int) ($turma['id'] ?? 0) ?>" data-curso="<?= (int) ($turma['curso_id'] ?? 0) ?>" <?= (int) ($turma_id ?? 0) === (int) ($turma['id'] ?? 0) ? 'selected' : '' ?>><?= htmlspecialchars((string) ($turma['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <label class="block md:col-span-1 xl:col-span-1 relative">
             <span class="block text-sm font-medium text-gray-700 mb-1.5">Aluno</span>
             <input type="text" name="aluno_q" id="aluno-q-boletim-coord" value="<?= htmlspecialchars($alunoQFiltro, ENT_QUOTES, 'UTF-8') ?>"
                    placeholder="Nome, RA ou código"
@@ -139,155 +150,6 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         </label>
     </div>
 
-    <div class="campo-fonte campo-fonte-evento campo-fonte-demonstrativo mt-5 <?= in_array($fonte, ['evento', 'demonstrativo'], true) ? '' : 'hidden' ?>">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <span class="text-sm font-medium text-gray-700">Eventos</span>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input type="checkbox" id="eventos-selecionar-todos" class="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $selecionarTodos ? 'checked' : '' ?>>
-                Selecionar todos
-            </label>
-            <span id="eventos-qtd" class="text-xs text-gray-500"></span>
-        </div>
-        <div id="lista-eventos-coord" class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/40">
-            <?php
-            $valorEventoLista = static function (array $ev): string {
-                return (int) ($ev['regra_id'] ?? 0)
-                    . ':' . base64_encode((string) ($ev['periodo_ref'] ?? ''))
-                    . ':' . (int) ($ev['geracao_id'] ?? 0);
-            };
-            $dataVersaoLista = static function (array $ev): string {
-                $raw = trim((string) ($ev['criado_em'] ?? ''));
-                if ($raw === '') {
-                    $raw = trim((string) ($ev['updated_at'] ?? ''));
-                }
-                $ts = strtotime($raw);
-
-                return $ts !== false ? date('d/m/Y', $ts) : '';
-            };
-            $gruposVersao = [];
-            foreach ((array) ($eventos ?? []) as $eventoGrupo) {
-                if (!is_array($eventoGrupo)) {
-                    continue;
-                }
-                $ridGrupo = (int) ($eventoGrupo['regra_id'] ?? 0);
-                if ($ridGrupo <= 0) {
-                    continue;
-                }
-                $gruposVersao[$ridGrupo][] = $eventoGrupo;
-            }
-            $linhasEvento = [];
-            foreach ($gruposVersao as $versoesGrupo) {
-                usort($versoesGrupo, static function (array $a, array $b): int {
-                    $vigA = !empty($a['eh_vigente']) ? 0 : 1;
-                    $vigB = !empty($b['eh_vigente']) ? 0 : 1;
-                    if ($vigA !== $vigB) {
-                        return $vigA <=> $vigB;
-                    }
-                    $dataA = (string) ($b['criado_em'] ?? $b['updated_at'] ?? '');
-                    $dataB = (string) ($a['criado_em'] ?? $a['updated_at'] ?? '');
-
-                    return strcmp($dataA, $dataB);
-                });
-                $linhasEvento[] = $versoesGrupo;
-            }
-            usort($linhasEvento, static function (array $a, array $b): int {
-                $baseA = $a[0];
-                $baseB = $b[0];
-                $serieA = mb_strtolower(trim((string) ($baseA['series_nomes'] ?? '')));
-                $serieB = mb_strtolower(trim((string) ($baseB['series_nomes'] ?? '')));
-                $cmp = $serieA <=> $serieB;
-                if ($cmp !== 0) {
-                    return $cmp;
-                }
-                $tipoA = (($baseA['exibir_em'] ?? '') === 'notas') ? 0 : 1;
-                $tipoB = (($baseB['exibir_em'] ?? '') === 'notas') ? 0 : 1;
-                if ($tipoA !== $tipoB) {
-                    return $tipoA <=> $tipoB;
-                }
-                $cmp = ((int) ($baseA['bimestre'] ?? 0)) <=> ((int) ($baseB['bimestre'] ?? 0));
-                if ($cmp !== 0) {
-                    return $cmp;
-                }
-                return ((int) ($baseA['regra_id'] ?? 0)) <=> ((int) ($baseB['regra_id'] ?? 0));
-            });
-            ?>
-            <?php if ($linhasEvento === []): ?>
-                <p class="px-4 py-6 text-sm text-gray-500">Nenhuma avaliação gerada. Em Avaliações, gere o lote para ver provas, trabalhos e médias.</p>
-            <?php else: ?>
-                <div class="grid gap-x-3 items-center px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 12.5rem;">
-                    <span></span>
-                    <span>Tipo</span>
-                    <span>Ref</span>
-                    <span id="cab-periodo-eventos"><?= htmlspecialchars($rotuloPeriodo, ENT_QUOTES, 'UTF-8') ?></span>
-                    <span>Série</span>
-                    <span>Versões</span>
-                </div>
-            <?php endif; ?>
-            <?php foreach ($linhasEvento as $versoesLinha):
-                $escolhida = $versoesLinha[0];
-                $marcado = $selecionarTodos;
-                foreach ($versoesLinha as $versaoEv) {
-                    if (isset($eventosSelecionados[$valorEventoLista($versaoEv)])) {
-                        $escolhida = $versaoEv;
-                        $marcado = true;
-                        break;
-                    }
-                }
-                $value = $valorEventoLista($escolhida);
-                $refLista = (int) ($escolhida['regra_id'] ?? 0);
-                $bimLista = trim((string) ($escolhida['rotulo_bimestre'] ?? ''));
-                $serieLista = trim((string) ($escolhida['series_nomes'] ?? ''));
-                $tipoLista = (($escolhida['exibir_em'] ?? '') === 'notas') ? 'Notas' : 'Boletim';
-                $totalVersoes = count($versoesLinha);
-                ?>
-                <div class="evento-item grid gap-x-3 items-center px-4 py-2.5 bg-white border-b border-gray-100 last:border-b-0 hover:bg-purple-50/40 text-sm text-gray-900" style="grid-template-columns: 1.25rem 4.25rem 4.5rem 7rem minmax(0,1fr) 12.5rem;" data-ano="<?= (int) ($escolhida['ano_letivo'] ?? 0) ?>" data-bimestre="<?= (int) ($escolhida['bimestre'] ?? 0) ?>">
-                    <input type="checkbox" name="eventos[]" value="<?= htmlspecialchars($value, ENT_QUOTES, 'UTF-8') ?>" class="evento-check w-4 h-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500" <?= $marcado ? 'checked' : '' ?>>
-                    <span class="font-medium"><?= htmlspecialchars($tipoLista, ENT_QUOTES, 'UTF-8') ?></span>
-                    <span>Ref: <?= $refLista > 0 ? $refLista : '—' ?></span>
-                    <span><?= $bimLista !== '' ? htmlspecialchars($bimLista, ENT_QUOTES, 'UTF-8') : '' ?></span>
-                    <span class="min-w-0 truncate"><?= htmlspecialchars($serieLista !== '' ? $serieLista : 'Todas', ENT_QUOTES, 'UTF-8') ?></span>
-                    <div class="min-w-0">
-                        <span class="block text-[10px] text-gray-500 mb-1"><?= $totalVersoes ?> <?= $totalVersoes === 1 ? 'versão' : 'versões' ?></span>
-                        <div class="flex flex-col gap-1">
-                            <?php foreach ($versoesLinha as $versaoEv):
-                                $valorVersao = $valorEventoLista($versaoEv);
-                                $ativa = $valorVersao === $value;
-                                $ehVigenteVersao = !empty($versaoEv['eh_vigente']);
-                                $dataVersao = $dataVersaoLista($versaoEv);
-                                $classeVersao = $ativa
-                                    ? ($ehVigenteVersao
-                                        ? 'border-green-400 bg-green-50 text-green-900'
-                                        : 'border-gray-400 bg-gray-50 text-gray-900')
-                                    : 'border-gray-200 bg-white text-gray-600';
-                                ?>
-                                <?php if ($totalVersoes > 1): ?>
-                                    <button type="button"
-                                            class="evento-versao w-full text-left rounded-md border px-2 py-1 leading-tight <?= $classeVersao ?>"
-                                            data-value="<?= htmlspecialchars($valorVersao, ENT_QUOTES, 'UTF-8') ?>"
-                                            data-vigente="<?= $ehVigenteVersao ? '1' : '0' ?>"
-                                            aria-pressed="<?= $ativa ? 'true' : 'false' ?>">
-                                        <span class="block text-[11px] font-semibold"><?= $ehVigenteVersao ? 'Vigente' : 'Anterior' ?></span>
-                                        <?php if ($dataVersao !== ''): ?>
-                                            <span class="block text-[10px] opacity-80"><?= htmlspecialchars($dataVersao, ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php endif; ?>
-                                    </button>
-                                <?php else: ?>
-                                    <span class="inline-flex flex-col rounded-md border border-green-200 bg-green-50 px-2 py-1 leading-tight text-green-900">
-                                        <span class="text-[11px] font-semibold">Vigente</span>
-                                        <?php if ($dataVersao !== ''): ?>
-                                            <span class="text-[10px] opacity-80"><?= htmlspecialchars($dataVersao, ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php endif; ?>
-                                    </span>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-            <p id="eventos-filtro-vazio" class="hidden px-4 py-6 text-sm text-gray-500">Nenhum evento neste ano e período.</p>
-        </div>
-        <input type="hidden" name="evento" id="evento-boletim-coord" value="">
-    </div>
 
     <div class="pt-4 border-t border-gray-100 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <label class="inline-flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer">
@@ -301,6 +163,10 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     </div>
     </div>
 </form>
+
+<?php if (!empty($aviso_sem_vigente)): ?>
+    <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6">Nenhuma versão vigente neste ano e período.</div>
+<?php endif; ?>
 
 <?php if ($zipGerando || $zipPronto || $zipFalhou): ?>
     <div id="zip-boletins-banner" class="rounded-lg p-4 mb-6 <?= $zipFalhou ? 'bg-red-50 border border-red-200 text-red-800' : ($zipPronto ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-indigo-50 border border-indigo-200 text-indigo-900') ?>">
@@ -549,7 +415,18 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     var qtdEl = document.getElementById('eventos-qtd');
     var alunoInput = document.getElementById('aluno-q-boletim-coord');
     var alunoLista = document.getElementById('aluno-sugestoes-boletim-coord');
-    var turmaSelect = form ? form.querySelector('select[name="turma_id"]') : null;
+    var cursoSelect = document.getElementById('curso-boletim-coord');
+    var turmaSelect = document.getElementById('turma-boletim-coord');
+    var turmasCatalogo = <?= json_encode(array_values(array_map(static function ($turma): array {
+        if (!is_array($turma)) {
+            return ['id' => 0, 'nome' => '', 'curso_id' => 0];
+        }
+        return [
+            'id' => (int) ($turma['id'] ?? 0),
+            'nome' => (string) ($turma['nome'] ?? ''),
+            'curso_id' => (int) ($turma['curso_id'] ?? 0),
+        ];
+    }, (array) ($turmas ?? []))), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var buscaAlunoUrl = <?= json_encode(rtrim((string) URL, '/') . '/admin/reports/boletim-coordenacao/buscar-alunos', JSON_UNESCAPED_SLASHES) ?>;
     var buscaTimer = null;
     var buscaSeq = 0;
@@ -599,6 +476,26 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         });
         var existe = Array.prototype.some.call(periodoSelect.options, function (opt) { return opt.value === atual; });
         periodoSelect.value = existe ? atual : '0';
+    }
+    function filtrarTurmas() {
+        if (!turmaSelect) return;
+        var cursoId = cursoSelect ? (parseInt(cursoSelect.value, 10) || 0) : 0;
+        var atual = turmaSelect.value;
+        turmaSelect.innerHTML = '';
+        var todas = document.createElement('option');
+        todas.value = '0';
+        todas.textContent = 'Todas as turmas';
+        turmaSelect.appendChild(todas);
+        turmasCatalogo.forEach(function (turma) {
+            if (!turma || !turma.id) return;
+            if (cursoId > 0 && parseInt(turma.curso_id, 10) !== cursoId) return;
+            var opt = document.createElement('option');
+            opt.value = String(turma.id);
+            opt.textContent = turma.nome || '';
+            turmaSelect.appendChild(opt);
+        });
+        var existe = Array.prototype.some.call(turmaSelect.options, function (opt) { return opt.value === atual; });
+        turmaSelect.value = existe ? atual : '0';
     }
     function filtrarEventos() {
         var ano = anoSelect ? (parseInt(anoSelect.value, 10) || 0) : 0;
@@ -697,6 +594,8 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         var url = buscaAlunoUrl + '?aluno_q=' + encodeURIComponent(termo);
         if (turmaSelect && turmaSelect.value && turmaSelect.value !== '0') {
             url += '&turma_id=' + encodeURIComponent(turmaSelect.value);
+        } else if (cursoSelect && cursoSelect.value && cursoSelect.value !== '0') {
+            url += '&curso_id=' + encodeURIComponent(cursoSelect.value);
         }
         fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
             .then(function (resp) { return resp.json(); })
@@ -722,55 +621,13 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             setTimeout(fecharSugestoes, 150);
         });
     }
-    if (selecionarTodos) {
-        selecionarTodos.addEventListener('change', function () {
-            checksVisiveis().forEach(function (check) { check.checked = selecionarTodos.checked; });
-            atualizarContagem();
-        });
-    }
-    checks.forEach(function (check) {
-        check.addEventListener('change', atualizarContagem);
-    });
-    if (form) {
-        form.addEventListener('submit', function (event) {
-            window.sincronizarEventosCoordenacao();
-            var submitter = event.submitter;
-            var gerar = submitter && submitter.name === 'executar';
-            var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
-            var alunoBusca = alunoInput ? String(alunoInput.value || '').trim() : '';
-            var visiveis = checksVisiveis();
-            var nenhum = visiveis.length > 0 && !visiveis.some(function (check) { return check.checked; });
-            if (gerar && (fonte === 'evento' || fonte === 'demonstrativo') && nenhum) {
-                if (alunoBusca !== '') {
-                    visiveis.forEach(function (check) { check.checked = true; check.disabled = false; });
-                    if (eventoHidden) {
-                        eventoHidden.disabled = false;
-                        eventoHidden.value = 'todos';
-                    }
-                    atualizarContagem();
-                } else {
-                    event.preventDefault();
-                    window.alert('Selecione ao menos um boletim ou informe o aluno.');
-                }
-            } else if (eventoHidden) {
-                eventoHidden.value = '';
-            }
-        });
-    }
-    if (fonteSelect) {
-        fonteSelect.addEventListener('change', aplicarFonte);
-        aplicarFonte();
-    }
     if (anoSelect) {
-        anoSelect.addEventListener('change', function () {
-            preencherPeriodos();
-            filtrarEventos();
-        });
+        anoSelect.addEventListener('change', preencherPeriodos);
     }
-    if (periodoSelect) {
-        periodoSelect.addEventListener('change', filtrarEventos);
+    if (cursoSelect) {
+        cursoSelect.addEventListener('change', filtrarTurmas);
     }
-    filtrarEventos();
+    filtrarTurmas();
 })();
 </script>
 <?php if (!empty($pode_editar_observacao)): ?>

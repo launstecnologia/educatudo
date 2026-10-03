@@ -7,7 +7,7 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('boletim')) {
     $hub_cards[] = [
         'href' => URL . '/admin/reports/boletim-coordenacao',
         'title' => 'Notas da Coordenação',
-        'description' => 'Boletim, demonstrativo de notas ou notas do evento (provas, trabalhos e médias).',
+        'description' => 'Boletim ou demonstrativo de notas, sempre na versão vigente.',
         'icon' => 'fa-solid fa-file-signature',
     ];
 }
