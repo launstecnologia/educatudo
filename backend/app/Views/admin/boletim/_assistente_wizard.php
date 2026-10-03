@@ -850,7 +850,7 @@ $boletimWizardSteps = [
             var id = Number(v.id || 0);
             if (id <= 0) return;
             html += '<div class="flex items-center justify-between gap-2 text-xs text-gray-700">';
-            html += '<span>Versão ' + Number(v.versao || 0) + (v.criado_em ? ' · ' + esc(v.criado_em) : '') + (v.usuario_nome ? ' · ' + esc(v.usuario_nome) : '') + '</span>';
+            html += '<span>ID ' + id + ' · Versão ' + Number(v.versao || 0) + (v.criado_em ? ' · ' + esc(v.criado_em) : '') + (v.usuario_nome ? ' · ' + esc(v.usuario_nome) : '') + '</span>';
             html += '<button type="button" class="js-restaurar-config text-indigo-700 hover:underline" data-versao-id="' + id + '">Recuperar</button>';
             html += '</div>';
         });

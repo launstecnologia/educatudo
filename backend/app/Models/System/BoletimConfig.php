@@ -571,6 +571,8 @@ class BoletimConfig
             'data_fim' => (string) ($first['data_fim'] ?? ''),
             'updated_at' => (string) ($first['updated_at'] ?? ''),
             'preview' => (int) ($first['preview'] ?? 0),
+            'id' => (int) ($first['id'] ?? 0),
+            'geracao_id' => (int) ($first['geracao_id'] ?? 0),
             'versao' => (int) ($first['versao'] ?? 1),
             'vigente' => (int) ($first['vigente'] ?? 1),
             'aluno_id' => (int) ($first['aluno_id'] ?? 0),
@@ -1766,7 +1768,7 @@ class BoletimConfig
             : ', NULL AS usuario_nome, NULL AS modo';
 
         return $this->db->fetchAll(
-            "SELECT g.versao, MAX(g.vigente) AS vigente, MAX(g.geracao_id) AS geracao_id,
+            "SELECT g.versao, MIN(g.id) AS id, MAX(g.vigente) AS vigente, MAX(g.geracao_id) AS geracao_id,
                     MIN(g.created_at) AS created_at {$selectExtra}
              FROM boletim_resultados_gerados g
              {$joinGeracao}
@@ -1819,6 +1821,8 @@ class BoletimConfig
 
         $eventos = $this->db->fetchAll(
             "SELECT g.regra_id, g.aluno_id, g.periodo_ref, g.versao,
+                    MIN(g.id) AS id,
+                    MAX(g.geracao_id) AS geracao_id,
                     MAX(g.vigente) AS vigente,
                     MIN(g.created_at) AS created_at,
                     {$selectUsuario}

@@ -911,7 +911,26 @@ class BoletimConfigController extends BaseController
         }
 
         $regraPreview = $this->boletimConfig->getRuleById($regraId);
-        if (is_array($regraPreview) && !empty($regraPreview['componentes']) && !empty($evento['linhas'])) {
+        $ehVigente = (int) ($evento['vigente'] ?? 0) === 1 || (int) ($evento['preview'] ?? 0) === 1;
+        if ($ehVigente && is_array($regraPreview) && !empty($regraPreview['componentes'])) {
+            $iniEvt = $this->normalizarDataYmdOpcional((string) ($evento['data_inicio'] ?? ''));
+            $fimEvt = $this->normalizarDataYmdOpcional((string) ($evento['data_fim'] ?? ''));
+            if ($iniEvt === null || $fimEvt === null) {
+                $iniEvt = $this->normalizarDataYmdOpcional((string) ($regraPreview['default_data_inicio'] ?? ''));
+                $fimEvt = $this->normalizarDataYmdOpcional((string) ($regraPreview['default_data_fim'] ?? ''));
+            }
+            try {
+                $matrizAtual = $this->matrizDemonstrativoAtual($regraPreview, $alunoId, $periodoRef, $iniEvt, $fimEvt);
+                if (!empty($matrizAtual['linhas']) && is_array($matrizAtual['linhas'])) {
+                    if (!empty($matrizAtual['colunas']) && is_array($matrizAtual['colunas'])) {
+                        $evento['colunas'] = $matrizAtual['colunas'];
+                    }
+                    $evento['linhas'] = $matrizAtual['linhas'];
+                }
+            } catch (Throwable $e) {
+                error_log('Preview vigente regra #' . $regraId . ': ' . $e->getMessage());
+            }
+        } elseif (is_array($regraPreview) && !empty($regraPreview['componentes']) && !empty($evento['linhas'])) {
             try {
                 $simulacaoPreview = $this->montarMatrizDemonstrativoComGrupoHierarquico([
                     'matriz_materias' => [
@@ -943,7 +962,11 @@ class BoletimConfigController extends BaseController
                 ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800">preview</span>'
                 : '',
             ((int) ($evento['versao'] ?? 0) > 0)
-                ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700">versão ' . (int) $evento['versao'] . (((int) ($evento['vigente'] ?? 0) === 1) ? ' vigente' : '') . '</span>'
+                ? ' <span class="inline-block ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700">'
+                    . (((int) ($evento['geracao_id'] ?? 0) > 0)
+                        ? 'ID ' . (int) $evento['geracao_id'] . ' · '
+                        : (((int) ($evento['id'] ?? 0) > 0) ? 'ID ' . (int) $evento['id'] . ' · ' : ''))
+                    . 'versão ' . (int) $evento['versao'] . (((int) ($evento['vigente'] ?? 0) === 1) ? ' vigente' : '') . '</span>'
                 : ''
         );
 
@@ -3091,6 +3114,82 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Quadro igual ao da montagem do assistente: S1, S2 e N/Q atuais, com a linha da área.
+     *
+     * O lote filtra blocos pela união das turmas e reusa o cache de provas. Isso puxa
+     * eventos a mais da mesma semana e grava N/Q diferente do que a montagem mostrou.
+     * Aqui a simulação segue o caminho de um aluno só.
+     *
+     * @param array<string,mixed> $regra
+     * @return array{colunas:list<array<string,mixed>>,linhas:list<array<string,mixed>>}
+     */
+    private function matrizDemonstrativoAtual(
+        array $regra,
+        int $alunoId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim
+    ): array {
+        $escopoTurmas = $this->turmasEscopoGeracao;
+        $escopoSeries = $this->seriesEscopoGeracao;
+        $cacheProvas = $this->provasGeracaoCache;
+        $prefetch = $this->prefetchGeracaoPronto;
+        $this->turmasEscopoGeracao = [];
+        $this->seriesEscopoGeracao = [];
+        $this->provasGeracaoCache = [];
+        $this->prefetchGeracaoPronto = false;
+        try {
+            $sim = $this->simularRegraAluno(
+                $regra,
+                $alunoId,
+                $periodoRef,
+                $dataInicio,
+                $dataFim,
+                [],
+                false,
+                true
+            );
+            try {
+                $simBoletim = $this->simularRegraAluno(
+                    $regra,
+                    $alunoId,
+                    $periodoRef,
+                    $dataInicio,
+                    $dataFim,
+                    [],
+                    true,
+                    false
+                );
+                $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null)
+                    ? $simBoletim['matriz_materias']
+                    : null;
+                if (is_array($matrizBoletim)) {
+                    $sim['matriz_materias_boletim'] = $matrizBoletim;
+                }
+            } catch (\App\Services\FilaJobCanceladaException $e) {
+                throw $e;
+            } catch (Throwable $e) {
+                error_log('matriz demonstrativo boletim aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+            $sim = $this->montarMatrizDemonstrativoComGrupoHierarquico($sim, $regra);
+            $matriz = is_array($sim['matriz_materias'] ?? null) ? $sim['matriz_materias'] : null;
+            if (!is_array($matriz)) {
+                return ['colunas' => [], 'linhas' => []];
+            }
+
+            return [
+                'colunas' => is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [],
+                'linhas' => is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [],
+            ];
+        } finally {
+            $this->turmasEscopoGeracao = $escopoTurmas;
+            $this->seriesEscopoGeracao = $escopoSeries;
+            $this->provasGeracaoCache = $cacheProvas;
+            $this->prefetchGeracaoPronto = $prefetch;
+        }
+    }
+
+    /**
      * Recalcula a matriz e grava uma nova versão vigente em boletim_resultados_gerados por aluno.
      * Alunos travados são pulados (a versão vigente deles permanece).
      *
@@ -3145,8 +3244,7 @@ class BoletimConfigController extends BaseController
             }
             $this->renovarHeartbeatGeracao();
             try {
-                $sim = $this->simularRegraAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
-                $matriz = $sim['matriz_materias'] ?? null;
+                $matriz = $this->matrizDemonstrativoAtual($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
                 $colunas = is_array($matriz) && is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
                 $rows = is_array($matriz) && is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
                 $itensPersistir[] = [

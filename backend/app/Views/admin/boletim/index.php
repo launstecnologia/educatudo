@@ -1203,6 +1203,10 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                                 <?php foreach ($versoesAluno as $vAl): ?>
                                     <?php
                                     $vNum = (int) ($vAl['versao'] ?? 0);
+                                    $vId = (int) ($vAl['geracao_id'] ?? 0);
+                                    if ($vId <= 0) {
+                                        $vId = (int) ($vAl['id'] ?? 0);
+                                    }
                                     $vVig = (int) ($vAl['vigente'] ?? 0) === 1;
                                     $vQuando = !empty($vAl['created_at']) ? date('d/m/Y H:i', strtotime((string) $vAl['created_at'])) : '';
                                     $previewUrl = URL . '/admin/boletim-configuracao/gerados/preview?' . http_build_query([
@@ -1214,7 +1218,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                                     ?>
                                     <li class="flex items-center justify-between gap-2">
                                         <span>
-                                            Versão <?= $vNum ?>
+                                            <?= $vId > 0 ? 'ID ' . $vId . ' · ' : '' ?>Versão <?= $vNum ?>
                                             <?php if ($vVig): ?>
                                                 <span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>
                                             <?php endif; ?>
@@ -5124,7 +5128,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                                 : ' <button type="button" class="btn-restaurar-geracao ml-2 text-indigo-600 hover:underline" data-geracao-id="' + g.id + '" data-versao="' + g.versao + '">Usar esta versão</button>';
                             html += '<div class="border-b border-gray-100 pb-1.5">'
                                 + '<button type="button" class="btn-geracao-detalhe text-left" data-geracao-id="' + g.id + '">'
-                                + '<span class="text-gray-900 font-medium">Versão ' + g.versao + vigente + '</span>'
+                                + '<span class="text-gray-900 font-medium">ID ' + g.id + ' · Versão ' + g.versao + vigente + '</span>'
                                 + ' — ' + (g.created_at_fmt || '')
                                 + ' · ' + (g.usuario_nome || 'usuário desconhecido')
                                 + ' · ' + g.alunos_processados + ' aluno(s)'
