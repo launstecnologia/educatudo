@@ -1427,7 +1427,7 @@ $boletimWizardSteps = [
         if (tok.type === 'op' && tok.value === '*') return '×';
         if (tok.type === 'op' && tok.value === '/') return '÷';
         if (tok.type === 'op' && tok.value === '-') return '−';
-        if (tok.type === 'peca') return tok.label || pecaLabel(tok.value);
+        if (tok.type === 'peca') return tituloColuna(tok.value) || tok.label || pecaLabel(tok.value);
         return tok.label || tok.value;
     }
 
@@ -1768,6 +1768,289 @@ $boletimWizardSteps = [
         return pecaLabel(codigo);
     }
 
+    function normalizarExprFormula(src) {
+        var s = String(src || '').toLocaleLowerCase('pt-BR');
+        if (s.normalize) s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        s = s.replace(/÷/g, '/').replace(/×/g, '*').replace(/[−–—]/g, '-');
+        s = s.replace(/[^a-z0-9+\-*/(),.\s_]/g, ' ');
+        return s.replace(/\s+/g, ' ').trim();
+    }
+
+    function indiceNomesFormula() {
+        var itens = [];
+        function add(nome, codigo, prio) {
+            var n = normalizarExprFormula(nome);
+            var c = String(codigo || '').trim();
+            if (!n || !c || c === '_semanal' || /^s[1-8]$/.test(c)) return;
+            if (/^(menor|maior|min|max)$/.test(n)) return;
+            itens.push({ n: n, codigo: c, label: String(nome || c), prio: prio || 0 });
+        }
+        add('Média Bim', 'media_bim', 1);
+        add('Resultado Final', 'media_final', 1);
+        add('Média Final', 'media_final', 1);
+        add('Média Bim Final', 'media_final', 1);
+        add('Média Sem', 'media_sem', 1);
+        add('Média Semanal', 'media_sem', 1);
+        add('Prova Semanal', 'semanal', 1);
+        add('Avaliação Bimestral', 'bimestral', 1);
+        add('Prova Bimestral', 'bimestral', 1);
+        add('Prova Bim', 'bimestral', 1);
+        add('ENAC', 'enac', 1);
+        add('Jornada do aluno', 'jornada', 1);
+        add('Jornada', 'jornada', 1);
+        add('Recuperação Final', 'recuperacao', 1);
+        add('Recuperação', 'recuperacao', 1);
+        add('Trabalho', 'trabalho', 1);
+        add('Participação', 'participacao', 1);
+        add('Faltas', 'faltas', 1);
+        (catalogo.pecas || []).forEach(function (p) {
+            if (p && p.key) add(p.label || p.key, p.key, 2);
+        });
+        function addColuna(c) {
+            if (!c || !c.codigo) return;
+            add(c.nome || c.codigo, c.codigo, 3);
+            add(c.codigo, c.codigo, 0);
+        }
+        var pv = (typeof previewEfetivo === 'function') ? previewEfetivo() : null;
+        ((pv && pv.colunas) || []).forEach(addColuna);
+        ((pv && pv.tabelas) || []).forEach(function (t) {
+            (t.outras || []).concat(t.semanas || []).forEach(addColuna);
+        });
+        ((rascunhoAtual && rascunhoAtual.componentes) || []).forEach(function (c) {
+            if (!c) return;
+            add(c.nome || c.codigo, c.codigo, 3);
+            add(c.codigo, c.codigo, 0);
+        });
+        if (estado && estado.nomes_blocos) {
+            Object.keys(estado.nomes_blocos).forEach(function (cod) {
+                add(estado.nomes_blocos[cod], cod, 4);
+                add(nomeBlocoCalc(cod), cod, 3);
+            });
+        }
+        (estado && estado.blocos_calc || []).forEach(function (cod) {
+            add(nomeBlocoCalc(cod), cod, 3);
+            add(cod, cod, 0);
+        });
+        itens.sort(function (a, b) {
+            if (b.n.length !== a.n.length) return b.n.length - a.n.length;
+            return b.prio - a.prio;
+        });
+        return itens;
+    }
+
+    function codigoPeloNomeFormula(nome, indice) {
+        var n = normalizarExprFormula(nome);
+        var melhor = null;
+        (indice || []).forEach(function (item) {
+            if (item.n !== n) return;
+            if (!melhor || item.prio > melhor.prio) melhor = item;
+        });
+        return melhor ? melhor.codigo : '';
+    }
+
+    function tokenizarFormulaTexto(src, indice) {
+        var t = normalizarExprFormula(src);
+        if (!t) return { ok: false, erro: 'A resposta não trouxe uma fórmula.', tokens: [] };
+        var i = 0;
+        var flat = [];
+        var temColuna = false;
+        while (i < t.length) {
+            if (t.charAt(i) === ' ') { i++; continue; }
+            var ch = t.charAt(i);
+            if ('+-*/(),'.indexOf(ch) >= 0) {
+                flat.push({ k: 'op', v: ch });
+                i++;
+                continue;
+            }
+            if (/[0-9]/.test(ch)) {
+                var j = i;
+                while (j < t.length && /[0-9.]/.test(t.charAt(j))) j++;
+                var num = t.slice(i, j);
+                if (!/^\d+(\.\d+)?$/.test(num)) return { ok: false, erro: 'Número inválido na fórmula.', tokens: [] };
+                flat.push({ k: 'num', v: num });
+                i = j;
+                continue;
+            }
+            var rest = t.slice(i);
+            var fn = rest.match(/^(menor|maior|min|max)(?![a-z0-9_])/);
+            if (fn) {
+                var qual = fn[1];
+                var posFn = i + qual.length;
+                while (t.charAt(posFn) === ' ') posFn++;
+                if (t.charAt(posFn) !== '(') {
+                    return { ok: false, erro: 'A função ' + qual + ' precisa abrir com parêntese.', tokens: [] };
+                }
+                flat.push({ k: 'fn', v: (qual === 'menor' || qual === 'min') ? 'min' : 'max' });
+                i = posFn + 1;
+                continue;
+            }
+            var achou = null;
+            for (var k = 0; k < indice.length; k++) {
+                var nome = indice[k].n;
+                if (rest.slice(0, nome.length) !== nome) continue;
+                var depois = rest.charAt(nome.length);
+                if (depois && /[a-z0-9_]/.test(depois)) continue;
+                achou = indice[k];
+                break;
+            }
+            if (!achou) {
+                var id = rest.match(/^[a-z][a-z0-9_]*/);
+                var codigos = codigosColunaFormula();
+                if (id && codigos[id[0]]) {
+                    flat.push({ k: 'peca', v: id[0], label: nomeBlocoCalc(id[0]) });
+                    temColuna = true;
+                    i += id[0].length;
+                    continue;
+                }
+                var trecho = (id && id[0]) || rest.slice(0, 24).trim();
+                return { ok: false, erro: 'Não achei a coluna "' + trecho + '" neste evento.', tokens: [] };
+            }
+            flat.push({ k: 'peca', v: achou.codigo, label: achou.label });
+            temColuna = true;
+            i += achou.n.length;
+        }
+        if (!flat.length || !temColuna) return { ok: false, erro: 'A fórmula não cita nenhuma coluna.', tokens: [] };
+        var profundidade = 0;
+        for (var p = 0; p < flat.length; p++) {
+            if (flat[p].k === 'fn' || (flat[p].k === 'op' && flat[p].v === '(')) profundidade++;
+            else if (flat[p].k === 'op' && flat[p].v === ')') profundidade--;
+            if (profundidade < 0) return { ok: false, erro: 'Os parênteses da fórmula não fecham.', tokens: [] };
+        }
+        if (profundidade !== 0) return { ok: false, erro: 'Os parênteses da fórmula não fecham.', tokens: [] };
+        var toks = [];
+        flat.forEach(function (item) {
+            if (item.k === 'fn') toks.push({ type: 'fn', value: item.v, label: item.v === 'min' ? 'menor (' : 'maior (' });
+            else if (item.k === 'num') toks.push({ type: 'num', value: item.v, label: item.v });
+            else if (item.k === 'peca') toks.push({ type: 'peca', value: item.v, label: item.label || nomeBlocoCalc(item.v) });
+            else if (item.k === 'op') {
+                var lab = item.v === '/' ? '÷' : (item.v === '*' ? '×' : (item.v === '-' ? '−' : item.v));
+                toks.push({ type: 'op', value: item.v, label: lab });
+            }
+        });
+        if (toks.length > 80) return { ok: false, erro: 'A fórmula ficou longa demais.', tokens: [] };
+        return { ok: true, erro: '', tokens: toks, temColuna: true };
+    }
+
+    function extrairFormulasDoTexto(texto) {
+        var indice = indiceNomesFormula();
+        var linhas = String(texto || '').split(/\n/);
+        var lista = [];
+        var ultimaColuna = '';
+        linhas.forEach(function (linha) {
+            var limpa = String(linha || '').replace(/```/g, ' ').replace(/`/g, '').replace(/\*\*/g, '').replace(/^[\s\d\.\)•\-]+/, '').trim();
+            var mcol = limpa.match(/\bcoluna\s+([^\n:,]{2,40})/i);
+            if (mcol && codigoPeloNomeFormula(mcol[1].replace(/[:.]+$/g, '').trim(), indice)) {
+                ultimaColuna = mcol[1].replace(/[:.]+$/g, '').trim();
+            }
+            limpa = limpa.replace(/^(monte|use|fórmula|formula)\s*:\s*/i, '').trim();
+            if (!limpa) return;
+            var eq = limpa.indexOf('=');
+            var destino = '';
+            var expr = limpa;
+            if (eq > 0) {
+                destino = limpa.slice(0, eq).trim();
+                expr = limpa.slice(eq + 1).trim();
+            } else if (ultimaColuna) {
+                destino = ultimaColuna;
+            }
+            if (!/(?:menor|maior|min|max)\s*\(|[+\-*/÷×]|[()]/.test(expr)) return;
+            if (!/[a-zA-ZÀ-ÿ]/.test(expr)) return;
+            lista.push({ destino: destino, expr: expr.replace(/[."']+$/g, '').trim() });
+        });
+        var formulas = [];
+        var vistos = {};
+        var erro = '';
+        lista.forEach(function (c) {
+            var lido = tokenizarFormulaTexto(c.expr, indice);
+            if (!lido.ok) { erro = lido.erro; return; }
+            var dest = c.destino ? codigoPeloNomeFormula(c.destino, indice) : '';
+            var chave = (dest || '-') + '|' + c.expr;
+            if (vistos[chave]) return;
+            vistos[chave] = true;
+            formulas.push({
+                destino: dest,
+                nome: dest ? nomeBlocoCalc(dest) : '',
+                tokens: lido.tokens
+            });
+        });
+        var comDestino = formulas.filter(function (f) { return !!f.destino; });
+        if (comDestino.length) formulas = comDestino;
+        else if (formulas.length > 1) {
+            formulas.sort(function (a, b) { return b.tokens.length - a.tokens.length; });
+            formulas = [formulas[0]];
+        }
+        return { formulas: formulas, erro: formulas.length ? '' : (erro || 'Não achei uma fórmula para usar.') };
+    }
+
+    function colunaAceitaFormula(codigo) {
+        codigo = String(codigo || '');
+        return !!codigo && codigo !== 'media_sem' && codigo !== '_semanal' && !/^s[1-8]$/.test(codigo);
+    }
+
+    function aplicarFormulaNoBloco(codigo, tokens) {
+        if (!estado || !colunaAceitaFormula(codigo) || !tokens || !tokens.length) return false;
+        if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object' || Array.isArray(estado.formulas_blocos)) {
+            estado.formulas_blocos = {};
+        }
+        if ((estado.blocos_calc || []).indexOf(codigo) < 0 && codigo !== 'media_sem') {
+            if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+            estado.blocos_calc.push(codigo);
+        }
+        estado.materia_calc = 0;
+        estado.formulas_blocos[codigo] = tokens.slice();
+        estado.titulo_codigo = codigo;
+        if (estado.passo !== 'formula') {
+            estado.passo = 'formula';
+            estado.bloco_calc = codigo;
+            renderAll();
+        }
+        abrirFormulaBloco(codigo);
+        if (estado.bloco_calc !== codigo) return false;
+        estado.formula_tokens = tokens.slice();
+        afterFormulaChange();
+        var aviso = document.getElementById('bw-formula-salva');
+        if (aviso) {
+            aviso.textContent = 'Fórmula aplicada.';
+            aviso.classList.remove('hidden');
+        }
+        var ed = document.getElementById('bw-formula-editor');
+        if (ed && ed.scrollIntoView) ed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return true;
+    }
+
+    window.boletimWizardLerFormulaTexto = function (texto) {
+        if (!estado) return { formulas: [], erro: 'Abra o evento de notas para usar a fórmula.' };
+        return extrairFormulasDoTexto(texto);
+    };
+
+    window.boletimWizardAplicarFormulaTexto = function (texto) {
+        if (!estado) return { ok: false, erro: 'Abra o evento de notas para usar a fórmula.', nomes: [] };
+        var lido = extrairFormulasDoTexto(texto);
+        if (!lido.formulas.length) return { ok: false, erro: lido.erro, nomes: [] };
+        var nomes = [];
+        var ultima = '';
+        var tokensUltima = [];
+        if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object' || Array.isArray(estado.formulas_blocos)) {
+            estado.formulas_blocos = {};
+        }
+        lido.formulas.forEach(function (f) {
+            var codigo = f.destino || (estado.bloco_calc || '');
+            if (!colunaAceitaFormula(codigo) || !f.tokens || !f.tokens.length) return;
+            if ((estado.blocos_calc || []).indexOf(codigo) < 0 && codigo !== 'media_sem') {
+                if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+                estado.blocos_calc.push(codigo);
+            }
+            estado.formulas_blocos[codigo] = f.tokens.slice();
+            ultima = codigo;
+            tokensUltima = f.tokens;
+            nomes.push(nomeBlocoCalc(codigo));
+        });
+        if (!nomes.length || !aplicarFormulaNoBloco(ultima, tokensUltima)) {
+            return { ok: false, erro: 'Abra a coluna amarela (Resultado Final, Média Bim…) e use a fórmula de novo.', nomes: [] };
+        }
+        return { ok: true, erro: '', nomes: nomes };
+    };
+
     function codigoBlocoReservado(cod) {
         var reserved = { _semanal: 1, media_sem: 1, prova_bim: 1, enac: 1, trab: 1, part: 1, rec: 1, jornada: 1 };
         (estado.pecas || []).forEach(function (k) { reserved[k] = 1; reserved[pecaCodigoQuadro(k)] = 1; });
@@ -2055,25 +2338,51 @@ $boletimWizardSteps = [
         agendarMontar();
     }
 
-    function salvarTituloColuna() {
-        if (!estado) return;
-        var cod = String(estado.titulo_codigo || estado.bloco_calc || '');
-        if (!cod || cod === '_semanal' || /^s[1-8]$/.test(cod)) return;
-        var inp = document.getElementById('bw-titulo-coluna-input');
-        var nome = String((inp && inp.value) || '').trim().slice(0, 60);
-        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
-        if (nome) estado.nomes_blocos[cod] = nome;
-        else delete estado.nomes_blocos[cod];
-        if (estado.bloco_calc === cod) {
-            var inpFormula = document.getElementById('bw-formula-bloco-nome-input');
-            if (inpFormula) inpFormula.value = nome || nomeBlocoCalc(cod);
-            var rotulo = document.getElementById('bw-formula-bloco-nome');
-            if (rotulo) rotulo.textContent = nome || nomeBlocoCalc(cod);
+    function pintarTituloNasColunas(codigo, nome) {
+        codigo = String(codigo || '');
+        nome = String(nome || '').trim();
+        if (!codigo || !nome) return;
+        function paint(c) {
+            if (!c) return;
+            if (String(c.codigo || '') === codigo) c.nome = nome;
         }
-        marcarEdicaoManual();
-        previewAtual = null;
-        renderRevisarDinamico();
-        agendarMontar();
+        if (previewAtual) {
+            (previewAtual.colunas || []).forEach(paint);
+            (previewAtual.tabelas || []).forEach(function (t) {
+                (t.outras || []).forEach(paint);
+                (t.colunas || []).forEach(paint);
+            });
+        }
+        if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
+            rascunhoAtual.componentes.forEach(function (c) {
+                if (c && String(c.codigo || '') === codigo) c.nome = nome;
+            });
+        }
+    }
+
+    function aplicarTituloBloco(codigo, nome) {
+        codigo = String(codigo || '');
+        nome = String(nome || '').trim().slice(0, 60);
+        if (!estado || !codigo || codigo === '_semanal' || /^s[1-8]$/.test(codigo)) return;
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object' || Array.isArray(estado.nomes_blocos)) {
+            estado.nomes_blocos = {};
+        }
+        if (nome) estado.nomes_blocos[codigo] = nome;
+        else delete estado.nomes_blocos[codigo];
+        var visivel = nome || nomeBlocoCalc(codigo);
+        document.querySelectorAll('#bw-colunas-lista .bw-col-chip').forEach(function (chip) {
+            if (chip.getAttribute('data-codigo') !== codigo) return;
+            var el = chip.querySelector('.bw-col-nome');
+            if (el) el.textContent = visivel;
+        });
+        var rotulo = document.getElementById('bw-formula-bloco-nome');
+        if (rotulo && estado.bloco_calc === codigo) rotulo.textContent = visivel;
+        if (nome) pintarTituloNasColunas(codigo, nome);
+        var pvEl = document.getElementById('bw-preview-wrap');
+        if (pvEl && previewAtual) pvEl.innerHTML = htmlPreview(previewAtual);
+        var pal = document.getElementById('bw-formula-pecas-pal');
+        if (pal) pal.innerHTML = htmlPalettePecasExibir();
+        renderFormulaCanvas();
     }
 
     function salvarBlocoCalc() {
@@ -2085,13 +2394,11 @@ $boletimWizardSteps = [
         var inp = document.getElementById('bw-formula-bloco-nome-input');
         var nome = String((inp && inp.value) || '').trim().slice(0, 60);
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
-        if (nome) estado.nomes_blocos[estado.bloco_calc] = nome;
+        aplicarTituloBloco(estado.bloco_calc, nome);
         var codigoSalvo = estado.bloco_calc;
         formulaVersao++;
         gravarTokensBlocoAberto();
         marcarEdicaoManual();
-        previewAtual = null;
-        renderRevisarDinamico();
         abrirFormulaBloco(codigoSalvo);
         var avisoSalvo = document.getElementById('bw-formula-salva');
         if (avisoSalvo) {
@@ -2252,11 +2559,7 @@ $boletimWizardSteps = [
         bodyEl.addEventListener('input', function (e) {
             if (!e.target || e.target.id !== 'bw-formula-bloco-nome-input' || !estado || !estado.bloco_calc) return;
             if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
-            estado.nomes_blocos[estado.bloco_calc] = String(e.target.value || '').slice(0, 60);
-            previewAtual = null;
-            var chipNome = document.querySelector('#bw-colunas-lista .bw-col-chip[data-codigo="' + estado.bloco_calc + '"] .bw-col-nome');
-            if (chipNome) chipNome.textContent = estado.nomes_blocos[estado.bloco_calc] || nomeBlocoCalc(estado.bloco_calc);
-            renderRevisarDinamico();
+            aplicarTituloBloco(estado.bloco_calc, String(e.target.value || ''));
         });
         bodyEl.addEventListener('dragstart', function (e) {
             var pal = e.target.closest('.bw-pal-chip');
@@ -3400,7 +3703,7 @@ $boletimWizardSteps = [
         html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Ordem das colunas</p>';
         html += '<button type="button" id="bw-add-media" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-950 bg-amber-50 hover:bg-amber-100">Adicionar bloco de cálculo</button>';
         html += '</div>';
-        html += '<p class="text-xs text-gray-500 mb-2">Segure a coluna e arraste. A faixa azul mostra onde ela entra. Clique no <strong>×</strong> para tirar. Um clique sem arrastar troca o título; no amarelo, abre a fórmula.</p>';
+        html += '<p class="text-xs text-gray-500 mb-2">Segure a coluna e arraste. A faixa azul mostra onde ela entra. Clique no <strong>×</strong> para tirar. No amarelo, o título da coluna fica dentro do quadro.</p>';
         html += '<div id="bw-colunas-lista" class="flex flex-wrap gap-2 min-h-[2.5rem] p-2 rounded-lg border border-dashed border-indigo-200 bg-slate-50">';
         if (!cols.length) html += '<span class="text-xs text-gray-400">Nenhuma coluna ainda.</span>';
         cols.forEach(function (c, i) {
@@ -3415,19 +3718,6 @@ $boletimWizardSteps = [
             html += '</span>';
         });
         html += '</div>';
-        var selTitulo = (estado && (estado.titulo_codigo || estado.bloco_calc)) || '';
-        var nomeSel = '';
-        cols.forEach(function (c) {
-            if (c && c.codigo === selTitulo) nomeSel = tituloColuna(c.codigo) || c.nome || c.codigo;
-        });
-        if (selTitulo && selTitulo !== '_semanal' && !/^s[1-8]$/.test(selTitulo)) {
-            html += '<div class="mt-2 flex flex-wrap items-end gap-2">';
-            html += '<label class="flex-1 min-w-[14rem]"><span class="text-xs font-medium text-gray-700">Título da coluna</span>';
-            html += '<input id="bw-titulo-coluna-input" type="text" maxlength="60" class="mt-1 w-full h-10 border border-gray-300 rounded-lg px-3 text-sm bg-white" value="' + esc(nomeSel) + '" placeholder="Ex.: Prova Bimestral">';
-            html += '<span class="block text-[11px] text-gray-500 mt-1">Muda só o cabeçalho. A fórmula segue no código <strong>' + esc(selTitulo) + '</strong>.</span></label>';
-            html += '<button type="button" id="bw-titulo-coluna-aplicar" class="h-10 px-3 text-sm font-medium rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50">Aplicar título</button>';
-            html += '</div>';
-        }
         return html;
     }
 
@@ -3459,24 +3749,6 @@ $boletimWizardSteps = [
                 e.preventDefault();
                 removerBlocoCalc(xcol.getAttribute('data-codigo'));
                 return;
-            }
-            if (e.target.closest('#bw-titulo-coluna-aplicar')) {
-                salvarTituloColuna();
-                return;
-            }
-            var chipQualquer = e.target.closest('#bw-colunas-lista .bw-col-chip');
-            if (chipQualquer && !e.target.closest('.bw-col-x') && !e.target.closest('.bw-col-grip') && !colunasDragou) {
-                var codTitulo = chipQualquer.getAttribute('data-codigo');
-                if (codTitulo && estado && !chipQualquer.classList.contains('calc')) {
-                    estado.titulo_codigo = codTitulo;
-                    renderRevisarDinamico();
-                    var inpTitulo = document.getElementById('bw-titulo-coluna-input');
-                    if (inpTitulo) {
-                        inpTitulo.focus();
-                        inpTitulo.select();
-                    }
-                    return;
-                }
             }
             var chipCalc = e.target.closest('#bw-colunas-lista .bw-col-chip.calc');
             if (chipCalc) {
@@ -4972,6 +5244,7 @@ $boletimWizardSteps = [
         aplicarMateriaUnicaNasPecas();
         if (estado.bloco_calc) gravarTokensBlocoAberto();
         var versaoEnvio = formulaVersao;
+        var nomesLocal = JSON.parse(JSON.stringify(estado.nomes_blocos || {}));
         var formulaLocal = JSON.parse(JSON.stringify(estado.formulas_blocos || {}));
         var excecoesLocal = JSON.parse(JSON.stringify(estado.formulas_materias_blocos || {}));
         var tokensLocal = (estado.formula_tokens || []).slice();
@@ -4998,6 +5271,16 @@ $boletimWizardSteps = [
             if (j.estado) {
                 var arredLocal = (estado && estado.grupo_linha && estado.grupo_linha.arredondamento) || '';
                 var remoto = j.estado;
+                var nomesAgora = {};
+                var fonteNomes = (estado && estado.nomes_blocos && typeof estado.nomes_blocos === 'object' && !Array.isArray(estado.nomes_blocos))
+                    ? estado.nomes_blocos
+                    : (nomesLocal || {});
+                Object.keys(fonteNomes).forEach(function (cod) {
+                    if (!cod || cod === '_semanal' || /^s[1-8]$/.test(cod)) return;
+                    var nomeVivo = String(fonteNomes[cod] || '').trim().slice(0, 60);
+                    if (nomeVivo) nomesAgora[cod] = nomeVivo;
+                });
+                remoto.nomes_blocos = nomesAgora;
                 if (versaoEnvio !== formulaVersao) {
                     remoto.formulas_blocos = estado.formulas_blocos || {};
                     remoto.formulas_materias_blocos = estado.formulas_materias_blocos || {};
@@ -5041,6 +5324,11 @@ $boletimWizardSteps = [
             garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
             gravarEscolhasGrupoNoRascunho(rascunhoAtual);
             previewAtual = j.preview || previewAtual;
+            if (previewAtual && estado && estado.nomes_blocos) {
+                Object.keys(estado.nomes_blocos).forEach(function (cod) {
+                    pintarTituloNasColunas(cod, estado.nomes_blocos[cod]);
+                });
+            }
             formulasDisp = j.formulas_disponiveis || formulasDisp;
             renderResumo(j.resumo, j.erros || []);
             var materiaUnicaEl = document.getElementById('bw-materia-unica');

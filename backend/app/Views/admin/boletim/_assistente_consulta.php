@@ -128,8 +128,40 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             el.appendChild(img);
         }
         el.appendChild(document.createTextNode(texto || ''));
+        if (role !== 'user') anexarBotaoFormula(el, texto || '');
         msgs.appendChild(el);
         msgs.scrollTop = msgs.scrollHeight;
+    }
+    function anexarBotaoFormula(el, texto) {
+        if (typeof window.boletimWizardLerFormulaTexto !== 'function') return;
+        var lido = null;
+        try { lido = window.boletimWizardLerFormulaTexto(texto); } catch (e) { return; }
+        if (!lido || !lido.formulas || !lido.formulas.length) return;
+        var nomes = [];
+        lido.formulas.forEach(function (f) { if (f && f.nome && nomes.indexOf(f.nome) < 0) nomes.push(f.nome); });
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mt-2 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60';
+        btn.textContent = nomes.length > 1 ? 'Utilizar fórmulas' : 'Utilizar fórmula';
+        var aviso = document.createElement('p');
+        aviso.className = 'mt-1 text-xs text-slate-500';
+        if (nomes.length) aviso.textContent = 'Entra em ' + nomes.join(', ') + '.';
+        btn.addEventListener('click', function () {
+            if (typeof window.boletimWizardAplicarFormulaTexto !== 'function') return;
+            var r = null;
+            try { r = window.boletimWizardAplicarFormulaTexto(texto); } catch (e) { r = null; }
+            if (r && r.ok) {
+                btn.disabled = true;
+                btn.textContent = 'Fórmula no cálculo';
+                aviso.className = 'mt-1 text-xs font-medium text-emerald-700';
+                aviso.textContent = 'Aplicada em ' + ((r.nomes && r.nomes.length) ? r.nomes.join(', ') : (nomes.join(', ') || 'a coluna aberta')) + '.';
+            } else {
+                aviso.className = 'mt-1 text-xs text-red-700';
+                aviso.textContent = (r && r.erro) || 'Não deu para montar essa fórmula.';
+            }
+        });
+        el.appendChild(btn);
+        el.appendChild(aviso);
     }
     function mostrarPrint(dataUrl) {
         imagemPendente = dataUrl;

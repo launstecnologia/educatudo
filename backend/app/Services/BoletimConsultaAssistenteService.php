@@ -440,6 +440,7 @@ class BoletimConsultaAssistenteService
             . "Exemplo: Média Bim 6 e ENAC 10. (6 + 10) ÷ 2 = 8, e 8 é maior que 6, então fica 8.\n"
             . "Exemplo: Média Bim 8 e ENAC 6. (8 + 6) ÷ 2 = 7, e 7 é menor que 8, então continua 8.\n\n"
             . "Na coluna Resultado Final:\n"
+            . "Resultado Final = maior((Média Bim + ENAC) ÷ 2, Média Bim)\n"
             . "1. Limpe a fórmula.\n"
             . "2. Monte: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim )\n"
             . "3. Salvar bloco.\n\n"
@@ -594,8 +595,9 @@ Manual desta tela (não invente botão ou regra fora disto):
 - Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada do aluno…). O título do evento não define o tipo.
 - Prova Semanal mostra os eventos daquele tipo no bimestre marcado. Semanas S1–S8: Bloco A ímpares, Bloco B pares.
 - Média = soma entre parênteses ÷ quantidade. Ex.: (Prova Semanal + Avaliação Bimestral + Jornada) ÷ 3.
-- Para ficar com a média e só trocar se o ENAC for maior: maior ( Média Bim , ENAC ). Não use "Maior entre as duas primeiras".
-- Se a conta for (Média Bim + ENAC) ÷ 2 e esse resultado só entra quando for maior que a Média Bim: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim ). Explique com um exemplo numérico, sem fórmula técnica.
+- Quando sugerir um cálculo, escreva uma linha exatamente assim: Nome da coluna = expressão. Use menor(), maior(), parênteses, +, −, × e ÷. Use o título da coluna como está na tela (Média Bim, Recuperação, ENAC, Resultado Final ou o título que o evento já tem). Ex.: Resultado Final = menor(7, maior(Média Bim, Recuperação)).
+- Para ficar com a média e só trocar se o ENAC for maior: Resultado Final = maior(Média Bim, ENAC). Não use "Maior entre as duas primeiras".
+- Se a conta for (Média Bim + ENAC) ÷ 2 e esse resultado só entra quando for maior que a Média Bim: Resultado Final = maior((Média Bim + ENAC) ÷ 2, Média Bim). Explique com um exemplo numérico, sem fórmula técnica.
 - Jornada entra pelo bimestre cadastrado na jornada.
 - "1º A", "1a" ou "do 1a" é a turma, não o bimestre. Só use bimestre se a frase disser a palavra bimestre.
 - Se a coluna Jornada do aluno do boletim tiver número, não diga que o aluno não tem jornada. Informe esse número. A jornada pode estar cadastrada com outro nome de matéria e mesmo assim aparecer na linha do boletim.
@@ -656,7 +658,15 @@ PROMPT;
         $linhas = [];
         $linhas[] = 'Nome: ' . ($nome !== '' ? $nome : '(sem nome)');
         $linhas[] = 'Ano: ' . (int) ($estado['ano_letivo'] ?? 0) . ' · bimestre do evento: ' . (int) ($estado['bimestre'] ?? 0);
+        $titulos = [];
+        foreach ($nomes as $rotulo) {
+            $rotulo = trim((string) $rotulo);
+            if ($rotulo !== '' && !in_array($rotulo, $titulos, true)) {
+                $titulos[] = $rotulo;
+            }
+        }
         $linhas[] = 'Peças: ' . ($pecas !== [] ? implode(', ', $pecas) : '(nenhuma)');
+        $linhas[] = 'Títulos das colunas: ' . ($titulos !== [] ? implode(', ', $titulos) : '(Média Bim, Resultado Final e os nomes padrão)');
         $linhas[] = 'Fórmulas: ' . ($formulas !== [] ? implode(' | ', $formulas) : '(nenhuma salva no rascunho)');
         if ($alunoPreview > 0) {
             $linhas[] = 'Aluno selecionado na prévia: id ' . $alunoPreview . ' (pode usar aluno_id direto).';
