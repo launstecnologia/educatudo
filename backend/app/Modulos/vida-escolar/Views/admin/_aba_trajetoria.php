@@ -140,23 +140,10 @@ foreach ($documentos as $d) {
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
+<?php if ($traj !== []): ?>
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <div class="flex items-start justify-between gap-3 flex-wrap mb-1">
-        <div>
-            <h3 class="text-lg font-semibold text-gray-900">Trajetória escolar</h3>
-            <p class="text-sm text-gray-500 mt-1">Anos internos (esta escola) e externos (transferência). O histórico oficial lê daqui. Clique em <strong>Boletim</strong> para ver as notas daquele ano.</p>
-        </div>
-        <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
-        <button type="button" onclick="veAbrirLancarEscola()"
-                class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold shrink-0">
-            <i class="fa-solid fa-plus mr-1.5"></i>Digitar ano
-        </button>
-        <?php endif; ?>
-    </div>
-    <?php if ($traj === []): ?>
-        <p class="text-sm text-gray-500 mt-4">Nenhum ano fechado ainda. Anexe o histórico para a leitura, ou digite cada ano. O ano desta escola entra sozinho quando o boletim for homologado.</p>
-    <?php else: ?>
-        <div class="overflow-x-auto border border-gray-200 rounded-lg mt-4">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Anos registrados</h3>
+        <div class="overflow-x-auto border border-gray-200 rounded-lg">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50">
                     <tr>
@@ -231,8 +218,8 @@ foreach ($documentos as $d) {
                 <?php endforeach; ?>
             </table>
         </div>
-    <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
 <div class="bg-white rounded-xl shadow-lg p-6">
@@ -242,7 +229,13 @@ foreach ($documentos as $d) {
     </div>
 
     <div data-ve-origem-painel="historico">
-        <p class="text-sm text-gray-500 mb-4">Anos já concluídos. Anexe o PDF para a leitura ou digite o ano. O ano desta escola entra sozinho na homologação do boletim.</p>
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <p class="text-sm text-gray-500 flex-1 min-w-[16rem]">Anos já concluídos. Anexe o PDF para a leitura ou digite o ano. O ano desta escola entra sozinho na homologação do boletim.</p>
+            <button type="button" onclick="veAbrirLancarEscola()"
+                    class="shrink-0 inline-flex items-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50">
+                <i class="fa-solid fa-plus mr-1.5"></i>Digitar um ano
+            </button>
+        </div>
         <form method="post" action="<?= $base ?>/documento" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <input type="hidden" name="_token" value="<?= $esc($token) ?>">
             <input type="hidden" name="tipo" value="historico">
@@ -254,14 +247,19 @@ foreach ($documentos as $d) {
                 <input name="escola_emissora" value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola de origem" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
             </div>
             <div class="md:col-span-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
-                <input type="file" name="arquivo" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="w-full text-sm">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Arquivo</span>
+                <label id="ve-historico-drop" for="ve-historico-arquivo"
+                       class="flex flex-col items-center justify-center w-full border border-dashed border-gray-300 rounded-lg bg-gray-50 px-3 py-3 text-center cursor-pointer hover:bg-gray-100"
+                       style="min-height:4.5rem;">
+                    <input type="file" name="arquivo" id="ve-historico-arquivo" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="sr-only">
+                    <span class="text-sm text-gray-700">Arraste o arquivo aqui</span>
+                    <span id="ve-historico-arquivo-nome" class="text-xs text-gray-500 mt-1">ou clique para escolher · PDF ou imagem</span>
+                </label>
             </div>
             <div class="md:col-span-3">
                 <button class="btn-primary-custom w-full px-4 py-2 rounded-lg text-sm font-semibold"><?= $podeLerIa ? 'Anexar e ler' : 'Anexar PDF' ?></button>
             </div>
         </form>
-        <button type="button" onclick="veAbrirLancarEscola()" class="mt-3 text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900">Digitar um ano</button>
         <?php if ($docsHistorico !== []): ?>
         <ul class="mt-4 divide-y divide-gray-100 border border-gray-200 rounded-lg text-sm">
             <?php foreach ($docsHistorico as $d): ?>
@@ -460,6 +458,56 @@ foreach ($documentos as $d) {
 </div>
 <?php endif; ?>
 <script>
+(function () {
+    var zona = document.getElementById('ve-historico-drop');
+    var input = document.getElementById('ve-historico-arquivo');
+    var nome = document.getElementById('ve-historico-arquivo-nome');
+    if (!zona || !input) return;
+    function aceita(file) {
+        if (!file) return false;
+        var n = (file.name || '').toLowerCase();
+        return /\.(pdf|jpe?g|png|webp)$/.test(n);
+    }
+    var aplicando = false;
+    function aplicar(file, jaNoInput) {
+        if (!aceita(file)) {
+            if (nome && !(input.files && input.files[0])) {
+                nome.textContent = 'Use PDF ou imagem (jpg, png, webp).';
+            }
+            return;
+        }
+        if (!jaNoInput) {
+            aplicando = true;
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            aplicando = false;
+        }
+        if (nome) nome.textContent = file.name;
+    }
+    input.addEventListener('change', function () {
+        if (aplicando) return;
+        if (input.files && input.files[0]) aplicar(input.files[0], true);
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+        zona.addEventListener(ev, function (e) {
+            e.preventDefault();
+            zona.style.borderColor = '#2563eb';
+            zona.style.background = '#eff6ff';
+        });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+        zona.addEventListener(ev, function (e) {
+            e.preventDefault();
+            zona.style.borderColor = '';
+            zona.style.background = '';
+        });
+    });
+    zona.addEventListener('drop', function (e) {
+        var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        aplicar(file);
+    });
+})();
 function veAbrirLancarEscola() {
     var drawer = document.getElementById('veLancarEscolaDrawer');
     var backdrop = document.getElementById('veLancarEscolaBackdrop');
