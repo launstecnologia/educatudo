@@ -8,9 +8,20 @@ $ufsPorNome = StudentFormHelper::ufsBrasilPorNome();
 $corRacaAtual = trim((string) ($student['cor_raca'] ?? ''));
 $zonaAtual = trim((string) ($student['zona'] ?? ''));
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+$parteCivil = $parteCivil ?? 'tudo';
+$mostraFiliacao = $parteCivil === 'tudo' || $parteCivil === 'filiacao';
+$mostraCivil = $parteCivil === 'tudo' || $parteCivil === 'civil';
+$mostraCertidao = $parteCivil === 'tudo' || $parteCivil === 'certidao';
+$mostraEstrangeiros = $parteCivil === 'tudo' || $parteCivil === 'estrangeiros';
+$temEstrangeiro = trim((string) ($student['pais'] ?? '')) !== ''
+    || trim((string) ($student['passaporte'] ?? '')) !== ''
+    || trim((string) ($student['rne'] ?? '')) !== '';
 ?>
-<div class="md:col-span-2 pt-2">
+<?php if ($mostraFiliacao): ?>
+<div class="<?= $parteCivil === 'tudo' ? 'md:col-span-2 pt-2' : '' ?>">
+    <?php if ($parteCivil === 'tudo'): ?>
     <h4 class="text-base font-semibold text-gray-900 mb-4">Filiação e Censo</h4>
+    <?php endif; ?>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
             <label for="nome_mae" class="block text-sm font-medium text-gray-700 mb-2">Nome da mãe</label>
@@ -32,9 +43,13 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<div class="md:col-span-2 pt-2">
+<?php if ($mostraCivil): ?>
+<div class="<?= $parteCivil === 'tudo' ? 'md:col-span-2 pt-2' : '' ?>">
+    <?php if ($parteCivil === 'tudo'): ?>
     <h4 class="text-base font-semibold text-gray-900 mb-4">Identificação civil</h4>
+    <?php endif; ?>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
             <label for="nacionalidade" class="block text-sm font-medium text-gray-700 mb-2">Nacionalidade</label>
@@ -90,9 +105,14 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
             </select>
         </div>
     </div>
+</div>
+<?php endif; ?>
 
-    <div class="mt-6">
+<?php if ($mostraCertidao): ?>
+    <div class="<?= $parteCivil === 'tudo' ? 'mt-6' : '' ?>">
+        <?php if ($parteCivil === 'tudo'): ?>
         <h4 class="text-base font-semibold text-gray-900 mb-4">Certidão de nascimento</h4>
+        <?php endif; ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="md:col-span-2">
                 <label for="certidao_nascimento" class="block text-sm font-medium text-gray-700 mb-2">Matrícula / número da certidão</label>
@@ -121,9 +141,18 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
             </div>
         </div>
     </div>
+<?php endif; ?>
 
-    <div class="mt-6">
+<?php if ($mostraEstrangeiros): ?>
+    <div class="<?= $parteCivil === 'estrangeiros' ? '' : 'mt-6' ?>">
+        <?php if ($parteCivil === 'estrangeiros'): ?>
+        <details <?= $temEstrangeiro ? 'open' : '' ?>>
+            <summary class="cursor-pointer text-base font-semibold text-gray-900">Estrangeiros (opcional)</summary>
+            <p class="mt-1 text-sm text-gray-500">Use só quando o aluno mora no exterior ou tem documento de estrangeiro.</p>
+            <div class="mt-4">
+        <?php else: ?>
         <h4 class="text-base font-semibold text-gray-900 mb-4">Estrangeiros (opcional)</h4>
+        <?php endif; ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label for="pais" class="block text-sm font-medium text-gray-700 mb-2">País de residência</label>
@@ -145,5 +174,9 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
                        value="<?= $esc($student['rne'] ?? '') ?>">
             </div>
         </div>
+        <?php if ($parteCivil === 'estrangeiros'): ?>
+            </div>
+        </details>
+        <?php endif; ?>
     </div>
-</div>
+<?php endif; ?>

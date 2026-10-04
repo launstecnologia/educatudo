@@ -6,12 +6,21 @@ $tiposSanguineos = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 $transporteTipo = trim((string) ($ficha['transporte_tipo'] ?? ''));
 $usaTransporte = !empty($ficha['usa_transporte_escolar']);
 $inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500';
+$parteFicha = $parteFicha ?? 'tudo';
+$mostraSaude = $parteFicha === 'tudo' || $parteFicha === 'saude';
+$mostraAlimentacao = $parteFicha === 'tudo' || $parteFicha === 'alimentacao';
+$mostraTransporte = $parteFicha === 'tudo' || $parteFicha === 'transporte';
+$mostraObservacoes = $parteFicha === 'tudo' || $parteFicha === 'observacoes';
+$classeBloco = $parteFicha === 'tudo' ? 'p-6 space-y-6' : 'space-y-6';
 ?>
-<div class="p-6 space-y-6">
+<?php if ($mostraSaude): ?>
+<div class="<?= $classeBloco ?>">
+    <?php if ($parteFicha === 'tudo'): ?>
     <div>
         <h3 class="text-lg font-semibold text-gray-900">Saúde</h3>
         <p class="text-sm text-gray-500">Informações de saúde usadas em emergências e pelo cuidado pedagógico.</p>
     </div>
+    <?php endif; ?>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
             <label for="tipo_sanguineo" class="block text-sm font-medium text-gray-700 mb-2">Tipo sanguíneo</label>
@@ -81,12 +90,16 @@ $inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<div class="p-6 space-y-6">
+<?php if ($mostraAlimentacao): ?>
+<div class="<?= $classeBloco ?>">
+    <?php if ($parteFicha === 'tudo'): ?>
     <div>
         <h3 class="text-lg font-semibold text-gray-900">Alimentação</h3>
         <p class="text-sm text-gray-500">Restrições e observações para a merenda/cantina.</p>
     </div>
+    <?php endif; ?>
     <div class="grid grid-cols-1 gap-6">
         <div>
             <label for="restricoes_alimentares" class="block text-sm font-medium text-gray-700 mb-2">Restrições alimentares</label>
@@ -99,12 +112,16 @@ $inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<div class="p-6 space-y-6">
+<?php if ($mostraTransporte): ?>
+<div class="<?= $classeBloco ?>">
+    <?php if ($parteFicha === 'tudo'): ?>
     <div>
         <h3 class="text-lg font-semibold text-gray-900">Transporte escolar</h3>
         <p class="text-sm text-gray-500">Dados de deslocamento do aluno até a escola.</p>
     </div>
+    <?php endif; ?>
     <div>
         <label class="inline-flex items-center gap-2">
             <input type="hidden" name="usa_transporte_escolar" value="0">
@@ -113,6 +130,7 @@ $inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-
             <span class="text-sm text-gray-700">Utiliza transporte escolar</span>
         </label>
     </div>
+    <div id="transporte-campos" class="<?= $usaTransporte ? '' : 'hidden' ?>">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
             <label for="transporte_tipo" class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
@@ -146,12 +164,20 @@ $inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-
                    value="<?= $escf($ficha['transporte_telefone'] ?? '') ?>" placeholder="(00) 00000-0000">
         </div>
     </div>
+    </div>
 </div>
+<?php endif; ?>
 
-<div class="p-6 space-y-6">
-    <h3 class="text-lg font-semibold text-gray-900">Observações gerais</h3>
+<?php if ($mostraObservacoes): ?>
+<div class="<?= $classeBloco ?>">
+    <?php if ($parteFicha === 'tudo'): ?>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Observações gerais</h3>
+    <?php else: ?>
+    <label for="observacoes_gerais" class="block text-sm font-medium text-gray-700 mb-2">Outras informações relevantes sobre o aluno</label>
+    <?php endif; ?>
     <div>
         <textarea id="observacoes_gerais" name="observacoes_gerais" rows="3" class="<?= $inputClass ?>"
                   placeholder="Outras informações relevantes sobre o aluno"><?= $escf($ficha['observacoes_gerais'] ?? '') ?></textarea>
     </div>
 </div>
+<?php endif; ?>

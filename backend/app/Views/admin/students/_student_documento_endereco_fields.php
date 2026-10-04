@@ -8,7 +8,12 @@ $cepDisplay = StudentFormHelper::formatCepDisplay($student['cep'] ?? '');
 $dataNasc = StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null);
 $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
 $ufRgAtual = strtoupper(trim((string) ($student['uf_rg'] ?? '')));
+$parteDoc = $parteDoc ?? 'tudo';
+$mostraDocumentos = $parteDoc === 'tudo' || $parteDoc === 'documentos';
+$mostraNascimento = $parteDoc === 'tudo' || $parteDoc === 'nascimento';
+$mostraEndereco = $parteDoc === 'tudo' || $parteDoc === 'endereco';
 ?>
+<?php if ($mostraDocumentos): ?>
 <div>
     <label for="cpf" class="block text-sm font-medium text-gray-700 mb-2">CPF / CIN</label>
     <input type="text" id="cpf" name="cpf" inputmode="numeric" maxlength="14" autocomplete="off"
@@ -40,15 +45,21 @@ $ufRgAtual = strtoupper(trim((string) ($student['uf_rg'] ?? '')));
         <?php endforeach; ?>
     </select>
 </div>
+<?php endif; ?>
+<?php if ($mostraNascimento): ?>
 <div>
-    <label for="data_nasc" class="block text-sm font-medium text-gray-700 mb-2">Data de nascimento</label>
+    <label for="data_nasc" class="block text-sm font-medium text-gray-700 mb-2">Data de nascimento <span class="text-red-600">*</span></label>
     <input type="date" id="data_nasc" name="data_nasc"
            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
            value="<?= htmlspecialchars($dataNasc, ENT_QUOTES, 'UTF-8') ?>">
 </div>
+<?php endif; ?>
 
-<div class="md:col-span-2 pt-2">
+<?php if ($mostraEndereco): ?>
+<div class="<?= $parteDoc === 'tudo' ? 'md:col-span-2 pt-2' : '' ?>">
+    <?php if ($parteDoc === 'tudo'): ?>
     <h4 class="text-base font-semibold text-gray-900 mb-4">Endereço</h4>
+    <?php endif; ?>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="md:col-span-2">
             <label for="cep" class="block text-sm font-medium text-gray-700 mb-2">CEP</label>
@@ -111,3 +122,4 @@ $ufRgAtual = strtoupper(trim((string) ($student['uf_rg'] ?? '')));
         </div>
     </div>
 </div>
+<?php endif; ?>
