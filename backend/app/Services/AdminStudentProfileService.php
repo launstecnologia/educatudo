@@ -838,6 +838,15 @@ class AdminStudentProfileService
             $schema = $svc->model()->schemaPronto();
             $prontuario['importacoes'] = $schema ? $svc->model()->listarImportacoes($alunoId) : [];
             $prontuario['materias'] = $svc->model()->materiasAtivas();
+            $turmaComponentes = (int) ($prontuario['aluno']['turma_id'] ?? 0);
+            $prontuario['componentes_turma'] = [];
+            if ($turmaComponentes > 0) {
+                try {
+                    $prontuario['componentes_turma'] = $svc->model()->componentesDaTurma($turmaComponentes);
+                } catch (\Throwable $e) {
+                    $prontuario['componentes_turma'] = [];
+                }
+            }
             $prontuario['schema_pronto'] = $schema;
             $prontuario['periodos'] = \App\Modulos\VidaEscolar\Services\VidaEscolarService::PERIODOS;
 

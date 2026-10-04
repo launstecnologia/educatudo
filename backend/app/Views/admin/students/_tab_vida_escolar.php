@@ -23,6 +23,7 @@ $quadro = $prontuario['quadro'] ?? null;
 $trajetoria = is_array($prontuario['trajetoria'] ?? null) ? $prontuario['trajetoria'] : ['anos' => []];
 $importacoes = is_array($prontuario['importacoes'] ?? null) ? $prontuario['importacoes'] : [];
 $materias = is_array($prontuario['materias'] ?? null) ? $prontuario['materias'] : [];
+$componentes_turma = is_array($prontuario['componentes_turma'] ?? null) ? $prontuario['componentes_turma'] : [];
 $schema_pronto = !empty($prontuario['schema_pronto'] ?? $vida_escolar_schema ?? false);
 $periodos = is_array($prontuario['periodos'] ?? null) ? $prontuario['periodos'] : [1 => '1º', 2 => '2º', 3 => '3º', 4 => '4º', 0 => 'FINAL'];
 $aluno_id = $alunoId;

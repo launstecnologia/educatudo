@@ -235,59 +235,52 @@ foreach ($documentos as $d) {
 </div>
 
 <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <h3 class="text-lg font-semibold text-gray-900">Histórico de outra escola</h3>
-    <p class="text-sm text-gray-500 mt-1 mb-4">Para anos já concluídos. O ano que o aluno está cursando aqui entra sozinho na homologação do boletim.</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="rounded-xl border border-gray-200 p-4">
-            <h4 class="text-sm font-semibold text-gray-900">Anexar e ler</h4>
-            <p class="text-xs text-gray-500 mt-1 mb-3"><?= $podeLerIa ? 'Envie o PDF ou a foto. A leitura vira um rascunho nesta aba. Só entra na lista depois que você confirmar.' : 'A leitura automática está indisponível. Anexe o arquivo e digite os anos ao lado.' ?></p>
-            <form method="post" action="<?= $base ?>/documento" enctype="multipart/form-data" class="space-y-3">
-                <input type="hidden" name="_token" value="<?= $esc($token) ?>">
-                <input type="hidden" name="tipo" value="historico">
-                <?php if ($podeLerIa): ?>
-                <input type="hidden" name="ler_agora" value="1">
-                <?php endif; ?>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Escola</label>
-                    <input name="escola_emissora" value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola de origem" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
-                    <input type="file" name="arquivo" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="w-full text-sm">
-                </div>
-                <button class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold"><?= $podeLerIa ? 'Anexar e ler' : 'Anexar PDF' ?></button>
-            </form>
-            <?php if ($docsHistorico !== []): ?>
-            <ul class="mt-4 space-y-2 text-sm">
-                <?php foreach ($docsHistorico as $d): ?>
-                <li class="flex items-center justify-between gap-2 border border-gray-100 rounded-lg px-3 py-2">
-                    <span class="truncate"><?= $esc($d['escola_emissora'] ?? ($d['arquivo_nome'] ?? 'Documento')) ?></span>
-                    <?php if ($podeLerIa && !empty($d['arquivo_key'])): ?>
-                    <form method="post" action="<?= $base ?>/documento/<?= (int) ($d['id'] ?? 0) ?>/ler" class="shrink-0">
-                        <input type="hidden" name="_token" value="<?= $esc($token) ?>">
-                        <button class="text-sm font-medium text-violet-700 hover:underline">Ler de novo</button>
-                    </form>
-                    <?php endif; ?>
-                </li>
-                <?php endforeach; ?>
-            </ul>
-            <?php endif; ?>
-        </div>
-        <div class="rounded-xl border border-gray-200 p-4 flex flex-col">
-            <h4 class="text-sm font-semibold text-gray-900">Digitar</h4>
-            <p class="text-xs text-gray-500 mt-1 mb-3">Um ano por vez, com a série, o resultado e as disciplinas como estão no papel. A escola já vem preenchida quando a matrícula informou a origem.</p>
-            <button type="button" onclick="veAbrirLancarEscola()" class="mt-auto px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50">
-                Digitar ano
-            </button>
-        </div>
+<div class="bg-white rounded-xl shadow-lg p-6">
+    <div class="flex flex-wrap gap-2 text-sm mb-4" role="tablist">
+        <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full bg-primary text-white" data-ve-origem="historico" onclick="veAbaOrigem('historico')">Histórico de outra escola</button>
+        <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200" data-ve-origem="meio" onclick="veAbaOrigem('meio')">Chegou no meio do ano</button>
     </div>
-</div>
-<?php endif; ?>
 
-<details class="bg-white rounded-xl shadow-lg p-6">
-    <summary class="cursor-pointer text-lg font-semibold text-gray-900">Chegou no meio do ano</summary>
-    <p class="text-sm text-gray-500 mt-2 mb-4">Use só se a outra escola já lançou bimestres deste ano letivo. Essas notas entram no boletim daqui. Anos fechados ficam no histórico acima.</p>
+    <div data-ve-origem-painel="historico">
+        <p class="text-sm text-gray-500 mb-4">Anos já concluídos. Anexe o PDF para a leitura ou digite o ano. O ano desta escola entra sozinho na homologação do boletim.</p>
+        <form method="post" action="<?= $base ?>/documento" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <input type="hidden" name="_token" value="<?= $esc($token) ?>">
+            <input type="hidden" name="tipo" value="historico">
+            <?php if ($podeLerIa): ?>
+            <input type="hidden" name="ler_agora" value="1">
+            <?php endif; ?>
+            <div class="md:col-span-5">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Escola</label>
+                <input name="escola_emissora" value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola de origem" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+            </div>
+            <div class="md:col-span-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
+                <input type="file" name="arquivo" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="w-full text-sm">
+            </div>
+            <div class="md:col-span-3">
+                <button class="btn-primary-custom w-full px-4 py-2 rounded-lg text-sm font-semibold"><?= $podeLerIa ? 'Anexar e ler' : 'Anexar PDF' ?></button>
+            </div>
+        </form>
+        <button type="button" onclick="veAbrirLancarEscola()" class="mt-3 text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900">Digitar um ano</button>
+        <?php if ($docsHistorico !== []): ?>
+        <ul class="mt-4 divide-y divide-gray-100 border border-gray-200 rounded-lg text-sm">
+            <?php foreach ($docsHistorico as $d): ?>
+            <li class="flex items-center justify-between gap-2 px-3 py-2">
+                <span class="truncate"><?= $esc($d['escola_emissora'] ?? ($d['arquivo_nome'] ?? 'Documento')) ?></span>
+                <?php if ($podeLerIa && !empty($d['arquivo_key'])): ?>
+                <form method="post" action="<?= $base ?>/documento/<?= (int) ($d['id'] ?? 0) ?>/ler" class="shrink-0">
+                    <input type="hidden" name="_token" value="<?= $esc($token) ?>">
+                    <button class="text-sm font-medium text-violet-700 hover:underline">Ler de novo</button>
+                </form>
+                <?php endif; ?>
+            </li>
+            <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
+    </div>
+
+    <div data-ve-origem-painel="meio" class="hidden">
+    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou bimestres deste ano. Essas notas entram no boletim daqui. Anos fechados ficam na outra aba.</p>
     <?php
     $outrasImp = [];
     foreach ($importacoes as $imp) {
@@ -344,108 +337,97 @@ foreach ($documentos as $d) {
             }
             $componentesBim[] = ['id' => $mid, 'nome' => $nomeLinha !== '' ? $nomeLinha : ('Matéria #' . $mid)];
         }
-        $usouMatrizFicha = $componentesBim !== [];
-        if (!$usouMatrizFicha) {
-            foreach ($materias as $m) {
-                $componentesBim[] = ['id' => (int) ($m['id'] ?? 0), 'nome' => (string) ($m['nome'] ?? '')];
+        if ($componentesBim === []) {
+            foreach (is_array($componentes_turma ?? null) ? $componentes_turma : [] as $compTurma) {
+                if (!is_array($compTurma)) {
+                    continue;
+                }
+                $nomeLinha = trim((string) ($compTurma['componente_nome'] ?? ''));
+                $mid = (int) ($compTurma['materia_id'] ?? 0);
+                if ($nomeLinha === '' && $mid <= 0) {
+                    continue;
+                }
+                $componentesBim[] = ['id' => $mid, 'nome' => $nomeLinha !== '' ? $nomeLinha : ('Matéria #' . $mid)];
             }
         }
         $nBlocos = count($componentesBim);
+        $celBim = 'w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center bg-white';
         ?>
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-                <h4 class="text-sm font-semibold text-gray-900">Bimestres já cursados</h4>
-                <p class="text-xs text-gray-500 mt-0.5"><?= $usouMatrizFicha ? 'Matérias da turma. Preencha só os bimestres que constam no documento da outra escola.' : 'Escolha a matéria e preencha nota e faltas de cada bimestre.' ?></p>
-            </div>
-            <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" onclick="veAddBlocoBim()">
-                <i class="fa-solid fa-plus mr-1"></i>Adicionar matéria
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <p class="text-sm text-gray-600"><?= $nBlocos > 0 ? 'Componentes da turma. Preencha só os bimestres que constam no documento.' : 'A turma ainda não tem componentes. Adicione os que constam no documento.' ?></p>
+            <button type="button" class="shrink-0 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" onclick="veAddBlocoBim()">
+                <i class="fa-solid fa-plus mr-1"></i>Adicionar componente
             </button>
         </div>
         <input type="hidden" name="bim_bloco_qtd" id="ve-bim-bloco-qtd" value="<?= (int) $nBlocos ?>">
-        <div id="ve-blocos-bim" class="space-y-3">
-            <?php foreach ($componentesBim as $i => $compB): ?>
-            <div class="border border-gray-100 rounded-lg p-3 ve-bloco-bim">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                    <?php if ($usouMatrizFicha && (int) ($compB['id'] ?? 0) > 0): ?>
-                        <p class="text-sm font-medium text-gray-900 px-1 py-2"><?= $esc($compB['nome'] ?? '') ?></p>
-                        <input type="hidden" name="bim_materia_id[<?= $i ?>]" value="<?= (int) $compB['id'] ?>">
-                        <input type="hidden" name="bim_comp[<?= $i ?>]" value="<?= $esc($compB['nome'] ?? '') ?>">
-                    <?php else: ?>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Matéria da turma</label>
-                            <select name="bim_materia_id[<?= $i ?>]" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                            <option value="0">Selecione a matéria</option>
-                            <?php foreach ($materias as $m): ?>
-                                <option value="<?= (int) $m['id'] ?>" <?= (int) ($m['id'] ?? 0) === (int) ($compB['id'] ?? 0) ? 'selected' : '' ?>><?= $esc($m['nome'] ?? '') ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nome no histórico</label>
-                            <input name="bim_comp[<?= $i ?>]" value="<?= $esc($compB['nome'] ?? '') ?>" placeholder="Como aparece no documento" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                        </div>
-                    <?php endif; ?>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <?php for ($p = 1; $p <= 4; $p++): ?>
-                    <div class="rounded-lg border border-gray-100 bg-slate-50 p-2">
-                        <p class="text-xs font-medium text-gray-700 mb-2"><?= $p ?>º bimestre</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[11px] text-gray-500 mb-0.5">Nota</label>
-                                <input name="bim_nota[<?= $i ?>][<?= $p ?>]" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] text-gray-500 mb-0.5">Faltas</label>
-                                <input name="bim_faltas[<?= $i ?>][<?= $p ?>]" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-                            </div>
-                        </div>
-                    </div>
-                    <?php endfor; ?>
-                </div>
-            </div>
-            <?php endforeach; ?>
+        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Componente</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome no documento</th>
+                        <?php for ($p = 1; $p <= 4; $p++): ?>
+                        <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= $p ?>º bimestre</th>
+                        <?php endfor; ?>
+                        <th class="px-2 py-2 w-10"></th>
+                    </tr>
+                    <tr class="border-t border-gray-100">
+                        <th colspan="2"></th>
+                        <?php for ($p = 1; $p <= 4; $p++): ?>
+                        <th class="px-2 py-1 text-center text-[11px] font-medium text-gray-400">Nota</th>
+                        <th class="px-2 py-1 text-center text-[11px] font-medium text-gray-400">Faltas</th>
+                        <?php endfor; ?>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="ve-blocos-bim" class="divide-y divide-gray-100">
+                    <?php foreach ($componentesBim as $i => $compB): ?>
+                    <tr class="ve-bloco-bim">
+                        <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap"><?= $esc($compB['nome'] ?? '') ?></td>
+                        <td class="px-3 py-2">
+                            <input type="hidden" name="bim_materia_id[<?= $i ?>]" value="<?= (int) ($compB['id'] ?? 0) ?>">
+                            <input name="bim_comp[<?= $i ?>]" value="<?= $esc($compB['nome'] ?? '') ?>" class="w-44 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                        </td>
+                        <?php for ($p = 1; $p <= 4; $p++): ?>
+                        <td class="px-2 py-2 text-center"><input name="bim_nota[<?= $i ?>][<?= $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
+                        <td class="px-2 py-2 text-center"><input name="bim_faltas[<?= $i ?>][<?= $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
+                        <?php endfor; ?>
+                        <td class="px-2 py-2 text-center">
+                            <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
         <template id="ve-tpl-bloco-bim">
-            <div class="border border-gray-100 rounded-lg p-3 ve-bloco-bim">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Matéria da turma</label>
-                        <select name="bim_materia_id[__I__]" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                        <option value="0">Selecione a matéria</option>
+            <tr class="ve-bloco-bim">
+                <td class="px-3 py-2">
+                    <select name="bim_materia_id[__I__]" class="w-44 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white" onchange="veNomeDoComponente(this)">
+                        <option value="0">Componente</option>
                         <?php foreach ($materias as $m): ?>
-                            <option value="<?= (int) $m['id'] ?>"><?= $esc($m['nome'] ?? '') ?></option>
+                        <option value="<?= (int) ($m['id'] ?? 0) ?>"><?= $esc($m['nome'] ?? '') ?></option>
                         <?php endforeach; ?>
                     </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome no histórico</label>
-                        <input name="bim_comp[__I__]" placeholder="Como aparece no documento" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <?php for ($p = 1; $p <= 4; $p++): ?>
-                    <div class="rounded-lg border border-gray-100 bg-slate-50 p-2">
-                        <p class="text-xs font-medium text-gray-700 mb-2"><?= $p ?>º bimestre</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[11px] text-gray-500 mb-0.5">Nota</label>
-                                <input name="bim_nota[__I__][<?= $p ?>]" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-                            </div>
-                            <div>
-                                <label class="block text-[11px] text-gray-500 mb-0.5">Faltas</label>
-                                <input name="bim_faltas[__I__][<?= $p ?>]" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
-                            </div>
-                        </div>
-                    </div>
-                    <?php endfor; ?>
-                </div>
-            </div>
+                </td>
+                <td class="px-3 py-2">
+                    <input name="bim_comp[__I__]" placeholder="Como está no documento" class="w-44 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
+                </td>
+                <?php for ($p = 1; $p <= 4; $p++): ?>
+                <td class="px-2 py-2 text-center"><input name="bim_nota[__I__][<?= $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
+                <td class="px-2 py-2 text-center"><input name="bim_faltas[__I__][<?= $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
+                <?php endfor; ?>
+                <td class="px-2 py-2 text-center">
+                    <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
+                </td>
+            </tr>
         </template>
-        <button class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Salvar rascunho das notas</button>
+        <button class="btn-primary-custom mt-4 px-4 py-2 rounded-lg text-sm font-semibold">Salvar rascunho das notas</button>
     </form>
     <?php endif; ?>
-</details>
+    </div>
+</div>
+<?php endif; ?>
 <script>
 function veAbrirLancarEscola() {
     var drawer = document.getElementById('veLancarEscolaDrawer');
@@ -499,17 +481,56 @@ function veAddCompSimples() {
         + '<input name="comp_ch[]" placeholder="h" inputmode="numeric" class="w-28 shrink-0 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">';
     wrap.appendChild(row);
 }
+function veAbaOrigem(nome) {
+    document.querySelectorAll('[data-ve-origem-painel]').forEach(function (painel) {
+        painel.classList.toggle('hidden', painel.getAttribute('data-ve-origem-painel') !== nome);
+    });
+    document.querySelectorAll('.ve-origem-pill').forEach(function (btn) {
+        var ativa = btn.getAttribute('data-ve-origem') === nome;
+        btn.classList.toggle('bg-primary', ativa);
+        btn.classList.toggle('text-white', ativa);
+        btn.classList.toggle('bg-gray-100', !ativa);
+        btn.classList.toggle('text-gray-700', !ativa);
+        btn.classList.toggle('hover:bg-gray-200', !ativa);
+    });
+}
+function veNomeDoComponente(sel) {
+    var row = sel.closest('tr');
+    if (!row) return;
+    var nome = row.querySelector('input[name^="bim_comp"]');
+    var texto = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+    if (!nome || sel.value === '0') return;
+    if (nome.value === '' || nome.value === nome.getAttribute('data-ve-auto')) {
+        nome.value = texto;
+        nome.setAttribute('data-ve-auto', texto);
+    }
+}
+function veReindexarBim() {
+    var list = document.getElementById('ve-blocos-bim');
+    var qtd = document.getElementById('ve-bim-bloco-qtd');
+    if (!list || !qtd) return;
+    list.querySelectorAll('.ve-bloco-bim').forEach(function (row, i) {
+        row.querySelectorAll('[name]').forEach(function (el) {
+            el.name = el.name.replace(/\[(?:\d+|__I__)\]/, '[' + i + ']');
+        });
+    });
+    qtd.value = String(list.querySelectorAll('.ve-bloco-bim').length);
+}
+function veRemoverLinhaBim(btn) {
+    var row = btn.closest('tr');
+    if (row) row.remove();
+    veReindexarBim();
+}
 function veAddBlocoBim() {
     var tpl = document.getElementById('ve-tpl-bloco-bim');
     var list = document.getElementById('ve-blocos-bim');
-    var qtd = document.getElementById('ve-bim-bloco-qtd');
-    if (!tpl || !list || !qtd) return;
+    if (!tpl || !list) return;
     var i = list.querySelectorAll('.ve-bloco-bim').length;
     var html = tpl.innerHTML.replace(/__I__/g, String(i));
-    var wrap = document.createElement('div');
+    var wrap = document.createElement('tbody');
     wrap.innerHTML = html.trim();
-    var node = wrap.firstElementChild;
+    var node = wrap.querySelector('tr');
     if (node) list.appendChild(node);
-    qtd.value = String(list.querySelectorAll('.ve-bloco-bim').length);
+    veReindexarBim();
 }
 </script>
