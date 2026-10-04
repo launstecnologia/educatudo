@@ -23,6 +23,38 @@ $kpiMedia = isset($kpisVe['media']) && $kpisVe['media'] !== null ? (float) $kpis
 $kpiFrequencia = isset($kpisVe['frequencia']) && $kpisVe['frequencia'] !== null ? (float) $kpisVe['frequencia'] : null;
 $moduloVidaEscolar = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar');
 $podeVidaEscolar = !empty($admin_permissions['vida_escolar']['visualizar']);
+$matriculasVigentes = [];
+if (!empty($matriculas_schema_ready) && is_array($matriculas ?? null)) {
+    $hojeVg = date('Y-m-d');
+    foreach ($matriculas as $matVg) {
+        if (!is_array($matVg) || ($matVg['status'] ?? '') !== 'ativa') {
+            continue;
+        }
+        $saidaVg = trim((string) ($matVg['data_saida'] ?? ''));
+        if ($saidaVg !== '' && $saidaVg < $hojeVg) {
+            continue;
+        }
+        $matriculasVigentes[] = $matVg;
+    }
+    $ordemVinculoVg = ['Principal' => 0, 'Extra' => 1, 'Paralela' => 2];
+    usort($matriculasVigentes, static function (array $a, array $b) use ($ordemVinculoVg): int {
+        $oa = $ordemVinculoVg[(string) ($a['vinculo_rotulo'] ?? '')] ?? 9;
+        $ob = $ordemVinculoVg[(string) ($b['vinculo_rotulo'] ?? '')] ?? 9;
+        if ($oa !== $ob) {
+            return $oa <=> $ob;
+        }
+        return strcasecmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
+    });
+}
+$classeVinculoVg = static function (string $rotulo): string {
+    if ($rotulo === 'Principal') {
+        return 'bg-blue-100 text-blue-800';
+    }
+    if ($rotulo === 'Extra') {
+        return 'bg-indigo-100 text-indigo-800';
+    }
+    return 'bg-purple-100 text-purple-800';
+};
 ?>
 <div class="space-y-5">
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
@@ -37,6 +69,43 @@ $podeVidaEscolar = !empty($admin_permissions['vida_escolar']['visualizar']);
                 <div class="student-card-body">
                     <div class="flex flex-col lg:flex-row gap-5">
                         <div class="flex-1 min-w-0">
+                            <?php if ($matriculasVigentes !== []): ?>
+                            <ul class="divide-y divide-slate-100">
+                                <?php foreach ($matriculasVigentes as $matVg): ?>
+                                <?php
+                                $anoVg = !empty($matVg['ano_letivo_ano']) ? (string) (int) $matVg['ano_letivo_ano'] : '';
+                                $nomeVg = trim((string) ($matVg['turma_nome'] ?? ''));
+                                $tituloVg = $nomeVg !== '' ? $nomeVg : $naoInformado;
+                                if ($anoVg !== '') {
+                                    $tituloVg .= ' • ' . $anoVg;
+                                }
+                                $vinculoVg = trim((string) ($matVg['vinculo_rotulo'] ?? ''));
+                                $inicioVg = $matVg['data_entrada'] ?? null;
+                                $fimVg = $matVg['data_saida'] ?? null;
+                                $periodoVg = format_data_br($inicioVg) . ' — ' . ($fimVg ? format_data_br($fimVg) : 'em andamento');
+                                ?>
+                                <li class="py-4 first:pt-0">
+                                    <p class="text-lg font-bold text-slate-900"><?= safe_htmlspecialchars($tituloVg) ?></p>
+                                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                                        <span class="inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativa</span>
+                                        <?php if ($vinculoVg !== ''): ?>
+                                        <span class="inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full <?= $classeVinculoVg($vinculoVg) ?>"><?= safe_htmlspecialchars($vinculoVg) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <dl class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <dt class="student-field-label">Período</dt>
+                                            <dd class="text-sm text-slate-700"><?= $periodoVg ?></dd>
+                                        </div>
+                                        <div>
+                                            <dt class="student-field-label">Tipo de vínculo</dt>
+                                            <dd class="text-sm text-slate-700"><?= safe_htmlspecialchars($vinculoVg !== '' ? $vinculoVg : null, $naoInformado) ?></dd>
+                                        </div>
+                                    </dl>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php else: ?>
                             <p class="text-lg font-bold text-slate-900">
                                 <?= $matriculaAtual || (!$matriculaPendente && !$matriculaEncerrada)
                                     ? safe_htmlspecialchars($turmaAnoLabel)
@@ -61,8 +130,9 @@ $podeVidaEscolar = !empty($admin_permissions['vida_escolar']['visualizar']);
                                     <dd class="text-sm text-slate-700"><?= safe_htmlspecialchars($vinculoAtual !== '' ? $vinculoAtual : null, $naoInformado) ?></dd>
                                 </div>
                             </dl>
+                            <?php endif; ?>
                             <div class="flex flex-wrap gap-2 mt-4">
-                                <button type="button" onclick="selecionarAbaAluno('matriculas')" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrícula</button>
+                                <button type="button" onclick="selecionarAbaAluno('matriculas')" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
                                 <?php if ($moduloVidaEscolar && $podeVidaEscolar): ?>
                                 <button type="button" onclick="selecionarAbaAluno('vida-escolar')" class="aluno-btn-outline" data-perm-key="vida_escolar" data-perm-action="visualizar">Vida escolar</button>
                                 <?php endif; ?>
