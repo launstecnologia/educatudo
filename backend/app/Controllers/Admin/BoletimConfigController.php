@@ -6642,6 +6642,69 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Outra peça gravou a mesma área com outra chave (ex.: Língua Portuguesa).
+     * O evento mostra uma vez; coordenação e detalhe do aluno não podem repetir o bloco.
+     *
+     * @param array<string, array<string,mixed>> $grupos
+     * @param array<int,int> $filhosIds
+     */
+    private function chaveGrupoLinhaMesmaArea(array $grupos, string $labelKey, array $filhosIds): string
+    {
+        $filhosIds = $this->idsPositivosDeLista($filhosIds);
+        foreach ($grupos as $gkExistente => $g) {
+            if (!is_array($g)) {
+                continue;
+            }
+            $labelExistente = $this->tokenNomeAreaGrupo((string) ($g['label'] ?? ''));
+            $idsExistentes = $this->idsPositivosDeLista(is_array($g['filhos_ids'] ?? null) ? $g['filhos_ids'] : []);
+            $mesmoNome = $labelKey !== ''
+                && $labelKey !== 'grupo'
+                && $labelExistente !== ''
+                && $labelExistente !== 'grupo'
+                && $labelExistente === $labelKey;
+            $mesmosFilhos = $filhosIds !== [] && $idsExistentes === $filhosIds;
+            $compartilhamFilho = $mesmoNome && array_intersect_key($idsExistentes, $filhosIds) !== [];
+            if ($mesmosFilhos || $compartilhamFilho) {
+                return (string) $gkExistente;
+            }
+        }
+
+        return '';
+    }
+
+    private function tokenNomeAreaGrupo(string $nome): string
+    {
+        $token = $this->normalizeEventoCodigoToken($nome);
+        if ($token === '' || $token === 'grupo') {
+            return '';
+        }
+
+        return $token;
+    }
+
+    /**
+     * @param array<int|string,mixed> $ids
+     * @return array<int,int>
+     */
+    private function idsPositivosDeLista(array $ids): array
+    {
+        $out = [];
+        foreach ($ids as $k => $v) {
+            if ($v === true && (int) $k > 0) {
+                $out[(int) $k] = (int) $k;
+                continue;
+            }
+            $id = (int) $v;
+            if ($id > 0) {
+                $out[$id] = $id;
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    /**
      * Demonstrativo: linha-mãe do group_line (ex.: Língua Portuguesa) com as médias,
      * seguida das matérias filhas com as notas individuais.
      *
@@ -6699,13 +6762,6 @@ class BoletimConfigController extends BaseController
             if ($gk === '') {
                 continue;
             }
-            if (isset($grupos[$gk])) {
-                $arredJa = $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos');
-                if ($arredJa !== 'todos') {
-                    $grupos[$gk]['arredondamento'] = $arredJa;
-                }
-                continue;
-            }
             $filhosIds = [];
             foreach ((array) ($grp['materias_ids'] ?? []) as $midF) {
                 $midF = (int) $midF;
@@ -6732,6 +6788,32 @@ class BoletimConfigController extends BaseController
                 if ($nomeCad !== '' && $label === 'Grupo') {
                     $label = $nomeCad;
                 }
+            }
+            $labelKeyGrupo = $this->tokenNomeAreaGrupo($label);
+            // Mesma chave, ou a mesma área gravada de novo em outra peça (outro key).
+            // Sem isso, Língua Portuguesa sai duas vezes na coordenação e no aluno.
+            $gkMesmaArea = isset($grupos[$gk])
+                ? $gk
+                : $this->chaveGrupoLinhaMesmaArea($grupos, $labelKeyGrupo, $filhosIds);
+            if ($gkMesmaArea !== '') {
+                if (!isset($grupos[$gk])) {
+                    foreach ($filhosIds as $midF) {
+                        $grupos[$gkMesmaArea]['filhos_ids'][$midF] = $midF;
+                    }
+                    foreach ($rotuloIds as $rid => $_) {
+                        $grupos[$gkMesmaArea]['rotulo_ids'][(int) $rid] = true;
+                    }
+                    if ($this->tokenNomeAreaGrupo((string) ($grupos[$gkMesmaArea]['label'] ?? '')) === ''
+                        && $labelKeyGrupo !== '') {
+                        $grupos[$gkMesmaArea]['label'] = $label;
+                        $grupos[$gkMesmaArea]['label_key'] = $this->canonicalMateriaNomeKey($label);
+                    }
+                }
+                $arredJa = $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos');
+                if ($arredJa !== 'todos') {
+                    $grupos[$gkMesmaArea]['arredondamento'] = $arredJa;
+                }
+                continue;
             }
             $modoGrupo = strtolower(trim((string) ($grp['modo_padrao'] ?? '')));
             if ($modoGrupo !== 'media' && $modoGrupo !== 'soma') {
