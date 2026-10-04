@@ -2385,6 +2385,12 @@ class ModeloDocumentoService
             $corpo = $this->garantirColunasFicha($corpo);
             $rodape = $this->garantirColunasFicha($rodape);
         }
+        if (str_contains($cab . $corpo . $rodape, 'edoc-vert') || str_contains($cab . $corpo . $rodape, 'edoc-logo')) {
+            require_once __DIR__ . '/GiradorTextoVerticalDocumento.php';
+            $cab = GiradorTextoVerticalDocumento::aplicar($cab);
+            $corpo = GiradorTextoVerticalDocumento::aplicar($corpo);
+            $rodape = GiradorTextoVerticalDocumento::aplicar($rodape);
+        }
 
         if ($estilo === 'auto') {
             $estilo = str_starts_with($codigo, 'declaracao_') ? 'declaracao' : 'simples';

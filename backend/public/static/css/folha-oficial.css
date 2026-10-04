@@ -95,14 +95,33 @@ table.seed-folha th.edoc-vert {
   overflow: visible;
   padding: 1mm 0.3mm;
 }
-table.edoc-grade-livre td.edoc-logo {
+/* PDF: o Dompdf ignora writing-mode. A caixa .edoc-giro gira o texto e esta classe desliga o giro do navegador para não girar duas vezes. */
+table.edoc-grade-livre td.edoc-vert.edoc-vert-caixa,
+table.edoc-grade-livre th.edoc-vert.edoc-vert-caixa,
+table.seed-folha td.edoc-vert.edoc-vert-caixa,
+table.seed-folha th.edoc-vert.edoc-vert-caixa {
+  writing-mode: horizontal-tb;
+  text-align: left;
+  font-weight: 400;
+  font-size: 6.5pt;
+  letter-spacing: normal;
+  white-space: normal;
+  overflow: visible;
+  padding: 0;
+  vertical-align: top;
+}
+table.edoc-grade-livre td.edoc-logo,
+table.seed-folha td.edoc-logo {
   text-align: center;
   vertical-align: middle;
+  overflow: hidden;
+  line-height: 0;
 }
 table.edoc-grade-livre td.edoc-logo img,
-table.edoc-grade-livre img {
-  max-width: 22mm;
-  max-height: 22mm;
-  width: auto;
-  height: auto;
+table.edoc-grade-livre .doc-logo-el img,
+table.seed-folha td.edoc-logo img {
+  width: 16mm !important;
+  max-width: 16mm !important;
+  max-height: 14mm !important;
+  height: auto !important;
 }
