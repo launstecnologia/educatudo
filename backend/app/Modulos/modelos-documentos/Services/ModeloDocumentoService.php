@@ -196,6 +196,17 @@ class ModeloDocumentoService
         'secretaria' => 'Secretaria',
     ];
 
+    /** Máscaras dos campos preenchidos na emissão (não vêm do cadastro). */
+    public const MASCARAS_CAMPO = [
+        'texto' => 'Texto',
+        'data' => 'Data',
+        'hora' => 'Horário',
+        'valor' => 'Valor (R$)',
+        'cpf' => 'CPF',
+        'telefone' => 'Telefone',
+        'numero' => 'Número',
+    ];
+
     /**
      * Aliases legados de Word (@campo) → placeholder canônico {{campo}}.
      * Usado nos contratos exportados do sistema antigo (ex.: COLAG).
@@ -1459,6 +1470,10 @@ class ModeloDocumentoService
         if ($emissao !== null) {
             $base['emissao'] = $emissao;
         }
+        $campos = self::camposVariaveisValidos($estrutura['campos_variaveis'] ?? null);
+        if ($campos !== []) {
+            $base['campos_variaveis'] = $campos;
+        }
         return $this->estruturaSemLogoDuplicado($base);
     }
 
@@ -1679,6 +1694,9 @@ class ModeloDocumentoService
         if (trim($payload['codigo']) === '') {
             $payload['codigo'] = 'modelo_' . date('YmdHis');
         }
+        if ($id <= 0 && str_starts_with((string) $payload['codigo'], 'resultado_historico_')) {
+            $payload['codigo'] = $this->codigoDisponivel((string) $payload['codigo']);
+        }
         $saved = $this->salvar($payload, $id > 0 ? $id : null, $user);
         if ($this->temColuna('estrutura_json')) {
             $this->db->update(
@@ -1709,6 +1727,213 @@ class ModeloDocumentoService
             'curso_id' => max(0, (int) ($emissao['curso_id'] ?? 0)),
             'serie_id' => max(0, (int) ($emissao['serie_id'] ?? 0)),
         ];
+    }
+
+    /**
+     * Campos criados no layout e preenchidos na hora de emitir.
+     *
+     * @return list<array{chave:string,rotulo:string,mascara:string,obrigatorio:bool}>
+     */
+    public static function camposVariaveisValidos(mixed $lista): array
+    {
+        if (!is_array($lista)) {
+            return [];
+        }
+        $out = [];
+        $usadas = [];
+        foreach ($lista as $item) {
+            if (!is_array($item) || count($out) >= 24) {
+                continue;
+            }
+            $chave = strtolower(trim((string) ($item['chave'] ?? '')));
+            if (!preg_match('/^cv_[a-z0-9_]{1,40}$/', $chave) || isset($usadas[$chave])) {
+                continue;
+            }
+            $rotulo = trim((string) ($item['rotulo'] ?? ''));
+            $rotulo = preg_replace('/\s+/u', ' ', $rotulo) ?? '';
+            if (mb_strlen($rotulo) < 2) {
+                continue;
+            }
+            $rotulo = mb_substr($rotulo, 0, 80);
+            $mascara = (string) ($item['mascara'] ?? 'texto');
+            if (!isset(self::MASCARAS_CAMPO[$mascara])) {
+                $mascara = 'texto';
+            }
+            $usadas[$chave] = true;
+            $out[] = [
+                'chave' => $chave,
+                'rotulo' => $rotulo,
+                'mascara' => $mascara,
+                'obrigatorio' => !empty($item['obrigatorio']),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $modelo
+     * @return list<array{chave:string,rotulo:string,mascara:string,obrigatorio:bool}>
+     */
+    public function camposDoModelo(array $modelo): array
+    {
+        $est = $this->estruturaDoModelo($modelo);
+        return self::camposVariaveisValidos($est['campos_variaveis'] ?? null);
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,codigo:string,campos:list<array{chave:string,rotulo:string,mascara:string,obrigatorio:bool}>}>
+     */
+    public function listarModelosComCampos(): array
+    {
+        if (!$this->schemaReady() || !$this->temColuna('estrutura_json')) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT id, nome, codigo, estrutura_json
+                 FROM secretaria_modelos_documentos
+                 WHERE ativo = 1 AND estrutura_json LIKE :marca
+                 ORDER BY nome ASC',
+                ['marca' => '%"campos_variaveis"%']
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $est = json_decode((string) ($row['estrutura_json'] ?? ''), true);
+            $campos = self::camposVariaveisValidos(is_array($est) ? ($est['campos_variaveis'] ?? null) : null);
+            if ($campos === []) {
+                continue;
+            }
+            $out[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'nome' => (string) ($row['nome'] ?? ''),
+                'codigo' => (string) ($row['codigo'] ?? ''),
+                'campos' => $campos,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $modelo
+     * @return array<string,string>
+     */
+    public function varsExemploDoModelo(array $modelo): array
+    {
+        $vars = self::varsExemplo();
+        foreach ($this->camposDoModelo($modelo) as $campo) {
+            $vars[$campo['chave']] = htmlspecialchars('[' . $campo['rotulo'] . ']', ENT_QUOTES, 'UTF-8');
+        }
+        return $vars;
+    }
+
+    public static function formatarCampoVariavel(string $mascara, string $bruto): string
+    {
+        $bruto = trim((string) (preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $bruto) ?? ''));
+        $bruto = mb_substr($bruto, 0, 180);
+        if ($bruto === '') {
+            return '';
+        }
+        if ($mascara === 'data') {
+            $iso = substr($bruto, 0, 10);
+            $dt = \DateTime::createFromFormat('Y-m-d', $iso);
+            if ($dt && $dt->format('Y-m-d') === $iso) {
+                return $dt->format('d/m/Y');
+            }
+            $dt = \DateTime::createFromFormat('d/m/Y', $bruto);
+            if ($dt && $dt->format('d/m/Y') === $bruto) {
+                return $bruto;
+            }
+            return '';
+        }
+        if ($mascara === 'hora') {
+            if (preg_match('/^(\d{1,2}):(\d{2})$/', $bruto, $m) === 1) {
+                $hora = (int) $m[1];
+                $minuto = (int) $m[2];
+                if ($hora <= 23 && $minuto <= 59) {
+                    return sprintf('%02d:%02d', $hora, $minuto);
+                }
+            }
+            return '';
+        }
+        if ($mascara === 'valor') {
+            $numero = self::decimalDeMascara($bruto);
+            if ($numero === null) {
+                return '';
+            }
+            return 'R$ ' . number_format($numero, 2, ',', '.');
+        }
+        if ($mascara === 'cpf') {
+            $digitos = preg_replace('/\D/', '', $bruto) ?? '';
+            if (strlen($digitos) !== 11) {
+                return '';
+            }
+            return substr($digitos, 0, 3) . '.' . substr($digitos, 3, 3) . '.'
+                . substr($digitos, 6, 3) . '-' . substr($digitos, 9, 2);
+        }
+        if ($mascara === 'telefone') {
+            $digitos = preg_replace('/\D/', '', $bruto) ?? '';
+            if (strlen($digitos) === 11) {
+                return '(' . substr($digitos, 0, 2) . ') ' . substr($digitos, 2, 5) . '-' . substr($digitos, 7, 4);
+            }
+            if (strlen($digitos) === 10) {
+                return '(' . substr($digitos, 0, 2) . ') ' . substr($digitos, 2, 4) . '-' . substr($digitos, 6, 4);
+            }
+            return '';
+        }
+        if ($mascara === 'numero') {
+            $digitos = preg_replace('/\D/', '', $bruto) ?? '';
+            if ($digitos === '') {
+                return '';
+            }
+            return number_format((float) $digitos, 0, ',', '.');
+        }
+        return $bruto;
+    }
+
+    /**
+     * @param array<string,string> $vars
+     * @param list<array{chave:string,rotulo:string,mascara:string,obrigatorio:bool}> $campos
+     * @param array<string,mixed> $valores
+     * @return array<string,string>
+     */
+    public function mesclarCamposVariaveis(array $vars, array $campos, array $valores): array
+    {
+        foreach ($campos as $campo) {
+            $chave = (string) ($campo['chave'] ?? '');
+            $bruto = trim((string) ($valores[$chave] ?? ''));
+            $formatado = self::formatarCampoVariavel((string) ($campo['mascara'] ?? 'texto'), $bruto);
+            $rotulo = (string) ($campo['rotulo'] ?? 'da emissão');
+            if ($formatado === '' && $bruto !== '') {
+                throw new \InvalidArgumentException('O campo ' . $rotulo . ' está em formato inválido.');
+            }
+            if ($formatado === '' && !empty($campo['obrigatorio'])) {
+                throw new \InvalidArgumentException('Preencha o campo ' . $rotulo . '.');
+            }
+            $vars[$chave] = htmlspecialchars($formatado, ENT_QUOTES, 'UTF-8');
+        }
+        return $vars;
+    }
+
+    private static function decimalDeMascara(string $bruto): ?float
+    {
+        $limpo = str_replace(['R$', ' '], '', $bruto);
+        if ($limpo === '' || preg_match('/[a-zA-Z]/', $limpo) === 1) {
+            return null;
+        }
+        if (str_contains($limpo, ',')) {
+            $limpo = str_replace('.', '', $limpo);
+            $limpo = str_replace(',', '.', $limpo);
+        }
+        if (!is_numeric($limpo)) {
+            return null;
+        }
+        return (float) $limpo;
     }
 
     /**
@@ -2155,6 +2380,12 @@ class ModeloDocumentoService
             $rodape = $this->aplicarPlaceholders((string) ($modelo['rodape_html'] ?? ''), $vars);
         }
 
+        if ($estruturaVisual !== null) {
+            $cab = $this->garantirColunasFicha($cab);
+            $corpo = $this->garantirColunasFicha($corpo);
+            $rodape = $this->garantirColunasFicha($rodape);
+        }
+
         if ($estilo === 'auto') {
             $estilo = str_starts_with($codigo, 'declaracao_') ? 'declaracao' : 'simples';
         }
@@ -2169,7 +2400,8 @@ class ModeloDocumentoService
         $htmlAll = $cab . $corpo . $rodape;
         $temFolhaSeed = str_contains($htmlAll, 'seed-folha');
         $temGradeCompacta = str_contains($htmlAll, 'seed-compacta');
-        if ($temFolhaSeed || $temGradeCompacta) {
+        $temGradeLivre = str_contains($htmlAll, 'edoc-grade-livre');
+        if ($temFolhaSeed || $temGradeCompacta || $temGradeLivre) {
             $css .= "\n" . $this->cssGradeSolta();
         }
         if ($estruturaVisual !== null) {
@@ -2221,7 +2453,13 @@ class ModeloDocumentoService
         }
 
         $fundoHtml = $this->htmlFundoImpresso(is_array($estruturaVisual) ? $estruturaVisual : null);
-        $classeBody = $estruturaVisual !== null ? ' class="folha-impressa"' : '';
+        $rodapeNoFim = is_array($estruturaVisual) && !empty($estruturaVisual['page']['rodapeNoFim']);
+        $classeBody = $estruturaVisual !== null
+            ? ' class="folha-impressa' . ($rodapeNoFim ? ' rodape-no-fim' : '') . '"'
+            : '';
+        if ($rodapeNoFim) {
+            $rodape = '<div class="doc-rodape-fim">' . $rodape . '</div>';
+        }
 
         return <<<HTML
 <!DOCTYPE html>
@@ -3247,6 +3485,32 @@ HTML;
         return trim($codigo, '_');
     }
 
+    /**
+     * Permite gravar de novo um histórico pronto sem esbarrar no código já usado.
+     */
+    private function codigoDisponivel(string $codigo): string
+    {
+        $codigo = $this->normalizarCodigo($codigo);
+        if ($codigo === '') {
+            return $codigo;
+        }
+        $base = $codigo;
+        $n = 2;
+        while ($n < 30) {
+            $dup = $this->db->fetch(
+                'SELECT id FROM secretaria_modelos_documentos WHERE codigo = ? LIMIT 1',
+                [$codigo]
+            );
+            if (!$dup) {
+                return $codigo;
+            }
+            $codigo = $base . '_' . $n;
+            $n++;
+        }
+
+        return $base . '_' . date('His');
+    }
+
     private function cssSimples(array $modelo = []): string
     {
         $margem = $this->margemMm($modelo);
@@ -3302,7 +3566,7 @@ CSS;
   table.doc-linha { width: 100% !important; border-collapse: collapse; table-layout: fixed; margin: 0 0 8px 0; border: none !important; page-break-inside: auto; }
   table.doc-linha > tbody > tr > td { border: none !important; background: transparent !important; padding: 0 2px; }
   table.doc-linha p, table.doc-linha h1, table.doc-linha h2, table.doc-linha h3 { margin: 0; }
-  table.doc-linha table:not(.seed-folha) { width: 100%; margin: 0 !important; border-collapse: collapse; height: auto !important; }
+  table.doc-linha table:not(.seed-folha):not(.edoc-grade-livre) { width: 100%; margin: 0 !important; border-collapse: collapse; height: auto !important; }
   table.doc-linha table.seed-folha { margin: 0; border-collapse: collapse; }
   figure.table { width: 100%; margin: 0 0 10px 0; }
   figure.table table { width: 100%; }
@@ -3364,6 +3628,59 @@ CSS;
     }
 
     /**
+     * A identificação da ficha é uma tabela de duas colunas. No PDF, table-layout
+     * fixo só respeita a largura do rótulo se o colgroup existir.
+     */
+    private function garantirColunasFicha(string $html): string
+    {
+        $ajustado = preg_replace_callback(
+            '/<table\b[^>]*\bedoc-ficha-campos\b[^>]*>.*?<\/table>/is',
+            function (array $m): string {
+                $tabela = $m[0];
+                if (stripos($tabela, '<colgroup') !== false || !$this->tabelaFichaDuasColunas($tabela)) {
+                    return $tabela;
+                }
+                if (preg_match('/^<table\b[^>]*\bstyle="/i', $tabela) === 1) {
+                    $tabela = preg_replace('/^(<table\b[^>]*\bstyle=")/i', '$1table-layout:fixed;', $tabela, 1) ?? $tabela;
+                } else {
+                    $tabela = preg_replace('/^<table\b/i', '<table style="table-layout:fixed"', $tabela, 1) ?? $tabela;
+                }
+
+                return preg_replace(
+                    '/^(<table\b[^>]*>)/i',
+                    '$1<colgroup><col style="width:38%"><col style="width:62%"></colgroup>',
+                    $tabela,
+                    1
+                ) ?? $tabela;
+            },
+            $html
+        );
+
+        return is_string($ajustado) ? $ajustado : $html;
+    }
+
+    private function tabelaFichaDuasColunas(string $tabela): bool
+    {
+        if (preg_match_all('/<tr\b[^>]*>(.*?)<\/tr>/is', $tabela, $linhas) < 1) {
+            return false;
+        }
+        $viuPar = false;
+        foreach ($linhas[1] ?? [] as $miolo) {
+            preg_match_all('/<(?:th|td)\b/i', (string) $miolo, $celulas);
+            $n = count($celulas[0]);
+            if ($n === 1) {
+                continue;
+            }
+            if ($n !== 2) {
+                return false;
+            }
+            $viuPar = true;
+        }
+
+        return $viuPar;
+    }
+
+    /**
      * A folha impressa usa a mesma caixa do editor: página sem margem do navegador
      * e o recuo desenhado como preenchimento interno.
      *
@@ -3389,11 +3706,24 @@ CSS;
     padding: {$top}mm {$right}mm {$bottom}mm {$left}mm;
     font-family: "DejaVu Sans", Arial, Helvetica, sans-serif;
   }
-  body.folha-impressa table.doc-linha { margin: 0 !important; }
-  body.folha-impressa table.doc-linha > tbody > tr > td { padding: 0 !important; border: none !important; }
-  body.folha-impressa table:not(.doc-linha):not(.seed-folha) { width: 100%; margin: 0 0 8px; border-collapse: collapse; }
-  body.folha-impressa table:not(.doc-linha):not(.seed-folha) td,
-  body.folha-impressa table:not(.doc-linha):not(.seed-folha) th {
+  body.folha-impressa.rodape-no-fim {
+    display: flex;
+    flex-direction: column;
+    min-height: {$altura}mm;
+  }
+  body.folha-impressa.rodape-no-fim .doc-rodape-fim { margin-top: auto; }
+  body.folha-impressa table.doc-linha { margin: 0 0 8px !important; }
+  body.folha-impressa table.doc-linha > tbody > tr > td {
+    box-sizing: border-box;
+    padding: 0 2px !important;
+    border: none !important;
+  }
+  body.folha-impressa table.doc-linha table.edoc-ficha-campos,
+  body.folha-impressa table.doc-linha table.edoc-ficha-ano { margin: 0 0 6px !important; }
+  body.folha-impressa table.doc-linha table:not(.seed-folha):not(.edoc-grade-livre):not(.edoc-ficha-campos):not(.edoc-ficha-ano) { margin: 0 0 8px !important; }
+  body.folha-impressa table:not(.doc-linha):not(.seed-folha):not(.edoc-grade-livre) { width: 100%; margin: 0 0 8px; border-collapse: collapse; }
+  body.folha-impressa table:not(.doc-linha):not(.seed-folha):not(.edoc-grade-livre) td,
+  body.folha-impressa table:not(.doc-linha):not(.seed-folha):not(.edoc-grade-livre) th {
     border: 1px solid #d1d5db;
     font-size: 8pt;
     line-height: 1.25;
@@ -3401,6 +3731,71 @@ CSS;
     vertical-align: middle;
     overflow-wrap: break-word;
   }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) {
+    width: 100%;
+    table-layout: fixed;
+    margin: 0 0 8px !important;
+  }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) td,
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th {
+    font-size: 6.5pt;
+    line-height: 1.15;
+    padding: 1px 2px;
+    text-align: center;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th[colspan] {
+    background: #e5e7eb;
+    text-align: center;
+  }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) td:not(:nth-child(2)) {
+    white-space: nowrap;
+  }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) td:nth-child(2),
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th:nth-child(2),
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th[colspan],
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th[rowspan] {
+    white-space: normal;
+  }
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) td:nth-child(2),
+  body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th:nth-child(2) {
+    text-align: left;
+  }
+  body.folha-impressa table.edoc-ficha-campos:not(.doc-linha),
+  body.folha-impressa table.edoc-ficha-ano:not(.doc-linha) {
+    width: 100%;
+    margin: 0 0 6px;
+  }
+  body.folha-impressa table.edoc-ficha-campos:not(.doc-linha) th,
+  body.folha-impressa table.edoc-ficha-campos:not(.doc-linha) td,
+  body.folha-impressa table.edoc-ficha-ano:not(.doc-linha) td {
+    font-size: 8pt;
+    line-height: 1.25;
+    padding: 2px 5px;
+    text-align: left;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  body.folha-impressa table.edoc-ficha-campos:not(.doc-linha) th[colspan] {
+    text-align: center;
+    background: #d9d9d9;
+    font-weight: 700;
+  }
+  body.folha-impressa table.edoc-ficha-campos:has(colgroup) { table-layout: fixed; }
+  body.folha-impressa table.edoc-ficha-campos:not(.doc-linha) tr th:not([colspan]) {
+    font-weight: 700;
+    background: #f3f4f6;
+    white-space: nowrap;
+  }
+  body.folha-impressa table.edoc-ficha-campos:not(.doc-linha):not(:has(colgroup)) tr th:not([colspan]) {
+    width: 38%;
+  }
+  body.folha-impressa table.doc-linha:has(table.edoc-grade-livre) { margin: 0 !important; }
 CSS;
     }
 
@@ -3456,6 +3851,7 @@ CSS;
         } else {
             $page['imprimirFundo'] = !empty($page['imprimirFundo']);
         }
+        $page['rodapeNoFim'] = !empty($page['rodapeNoFim']);
 
         return $page;
     }

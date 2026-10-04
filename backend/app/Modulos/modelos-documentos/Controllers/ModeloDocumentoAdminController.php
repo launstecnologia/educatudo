@@ -7,9 +7,13 @@ require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
 require_once __DIR__ . '/../Services/ModeloDocumentoService.php';
 require_once __DIR__ . '/../Services/ImportadorModeloPlanilhaService.php';
 require_once __DIR__ . '/../Services/DemonstracaoDocumentoService.php';
+require_once __DIR__ . '/../Services/EmissaoCampoVariavelService.php';
+require_once __DIR__ . '/../Services/LayoutsHistoricoEscolar.php';
 
 use App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\EmissaoCampoVariavelService;
 use App\Modulos\ModelosDocumentos\Services\ImportadorModeloPlanilhaService;
+use App\Modulos\ModelosDocumentos\Services\LayoutsHistoricoEscolar;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 
 if (!class_exists('ModeloDocumentoAdminController')) {
@@ -41,6 +45,7 @@ class ModeloDocumentoAdminController extends AdminBaseController
             'categorias' => ModeloDocumentoService::CATEGORIAS,
             'schema_pronto' => $this->service->schemaReady(),
             'layout_pronto' => $this->service->layoutPadraoReady(),
+            'layouts_historico' => LayoutsHistoricoEscolar::catalogo(),
             'csrf_token' => $this->generateCsrfToken(),
         ]);
     }
@@ -331,7 +336,7 @@ class ModeloDocumentoAdminController extends AdminBaseController
             return;
         }
 
-        $vars = ModeloDocumentoService::varsExemplo();
+        $vars = $this->service->varsExemploDoModelo($modelo);
         $vars['_pdf_teste'] = true;
         $estilo = ModeloDocumentoService::estiloDoModelo($modelo);
         $html = $this->service->renderHtml($modelo, $vars, $estilo, $this->config);
@@ -552,6 +557,20 @@ class ModeloDocumentoAdminController extends AdminBaseController
         $estrutura = $modelo
             ? $this->service->estruturaDoModelo($modelo)
             : ModeloDocumentoService::estruturaVazia();
+        if (!$modelo) {
+            $layoutChave = strtolower(trim((string) ($_GET['layout'] ?? '')));
+            $layoutPronto = $layoutChave !== '' ? LayoutsHistoricoEscolar::paraChave($layoutChave) : null;
+            if ($layoutPronto) {
+                $estrutura = $layoutPronto['estrutura'];
+                $modelo = [
+                    'nome' => $layoutPronto['nome'],
+                    'codigo' => $layoutPronto['codigo'],
+                    'descricao' => $layoutPronto['descricao'],
+                    'usar_layout_padrao' => 0,
+                ];
+                $categoria = 'oficial';
+            }
+        }
         $layoutSugerido = ModeloDocumentoService::estruturaSugeridaParaCodigo(
             (string) ($modelo['codigo'] ?? '')
         );
@@ -582,7 +601,69 @@ class ModeloDocumentoAdminController extends AdminBaseController
             'ia_disponivel' => true,
             'cursos_emissao' => $this->service->listarCursosParaEmissao(),
             'series_emissao' => $this->service->listarSeriesParaEmissao(),
+            'mascaras_campo' => ModeloDocumentoService::MASCARAS_CAMPO,
         ]);
+    }
+
+    public function emitirLote(): void
+    {
+        if (!$this->podeEmitirCampos()) {
+            $_SESSION['error_message'] = 'Sem permissão para esta ação.';
+            $this->redirect('/admin/modelos-documentos');
+            return;
+        }
+        $emissao = new EmissaoCampoVariavelService($this->db);
+        $flash = $this->getFlashMessage();
+        $this->viewWithLayout('admin', 'admin/modelos-documentos/emitir-lote', [
+            'title' => 'Emitir documento em lote — EducaTudo',
+            'user' => $this->auth->getUser(),
+            'current_page' => 'modelos_documentos',
+            'flash_message' => $flash['message'],
+            'flash_type' => $flash['type'],
+            'modelos' => $this->service->listarModelosComCampos(),
+            'turmas' => $emissao->listarTurmas(),
+            'mascaras' => ModeloDocumentoService::MASCARAS_CAMPO,
+        ]);
+    }
+
+    public function emitirLotePdf(): void
+    {
+        if (!$this->podeEmitirCampos()) {
+            $_SESSION['error_message'] = 'Sem permissão para esta ação.';
+            $this->redirect('/admin/modelos-documentos');
+            return;
+        }
+        $valores = $_GET['c'] ?? [];
+        if (!is_array($valores)) {
+            $valores = [];
+        }
+        try {
+            (new EmissaoCampoVariavelService($this->db))->enviarLote(
+                (int) ($_GET['modelo_id'] ?? 0),
+                (int) ($_GET['turma_id'] ?? 0),
+                $valores,
+                $this->config,
+                $this->auth->getUser() ?: null
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+            $this->redirect('/admin/modelos-documentos/emitir-lote');
+        } catch (\Throwable $e) {
+            error_log('ModeloDocumento emitirLotePdf: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível gerar o PDF.', 'error');
+            $this->redirect('/admin/modelos-documentos/emitir-lote');
+        }
+    }
+
+    private function podeEmitirCampos(): bool
+    {
+        $user = $this->auth->getUser();
+        if (!class_exists('AdminPermissionMatrix')) {
+            require_once __DIR__ . '/../../../Core/AdminPermissionMatrix.php';
+        }
+        $permissions = \AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        return \AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'visualizar')
+            || \AdminPermissionMatrix::can($permissions, 'declaracoes_aluno', 'visualizar');
     }
 
     private function renderForm(?array $modelo): void

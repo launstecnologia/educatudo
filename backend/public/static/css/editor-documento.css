@@ -21,6 +21,13 @@ body.edoc-body {
 }
 .edoc-top-title input:hover, .edoc-top-title input:focus { background: #f3f4f6; outline: none; }
 .edoc-top-status { font-size: 12px; color: #6b7280; white-space: nowrap; }
+.edoc-top-status.is-ia {
+  background: #f3e8ff;
+  color: #6b21a8;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
 .edoc-btn {
   display: inline-flex; align-items: center; gap: 6px;
   border: 1px solid #d1d5db; background: #fff; color: #374151;
@@ -61,6 +68,46 @@ body.edoc-body {
 .edoc-layout-bars span { background: #d1d5db; border-radius: 2px; }
 .edoc-center {
   flex: 1; min-width: 0; display: flex; flex-direction: column; background: #d7dde5;
+  position: relative;
+}
+.edoc-ia-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, .55);
+}
+.edoc-ia-overlay.is-on { display: flex; }
+.edoc-ia-overlay-card {
+  width: min(440px, calc(100% - 32px));
+  padding: 28px 32px;
+  text-align: center;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+}
+.edoc-ia-overlay-card i {
+  display: inline-block;
+  font-size: 32px;
+  color: #a855f7;
+  animation: edoc-ia-pulso 1.1s ease-in-out infinite;
+}
+.edoc-ia-overlay-card strong {
+  display: block;
+  margin-top: 14px;
+  font-size: 18px;
+  color: #111827;
+}
+.edoc-ia-overlay-card p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  color: #4b5563;
+}
+@keyframes edoc-ia-pulso {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: .55; }
 }
 .edoc-canvas-tools {
   display: flex; align-items: center; gap: 6px; justify-content: center;
@@ -106,6 +153,13 @@ body.edoc-body {
 .edoc-area-label {
   font-size: 9px; font-weight: 700; letter-spacing: .1em; color: #9ca3af;
   margin: 0 0 4px; text-transform: uppercase;
+}
+.edoc-paper.edoc-rodape-fim {
+  display: flex;
+  flex-direction: column;
+}
+.edoc-paper.edoc-rodape-fim .edoc-area-footer {
+  margin-top: auto;
 }
 .edoc-section {
   position: relative; min-height: 0; margin: 0 0 8px;
@@ -173,9 +227,10 @@ body.edoc-body {
   font-size: 8pt !important;
   line-height: 1.25 !important;
 }
-.edoc-html-raw[contenteditable="true"]:has(table.seed-folha) {
+.edoc-html-raw[contenteditable="true"]:has(table.seed-folha),
+.edoc-html-raw[contenteditable="true"]:has(table.edoc-grade-livre) {
   font-size: 6.5pt !important;
-  line-height: 1.05 !important;
+  line-height: 1.15 !important;
 }
 .edoc-rte-bar {
   display: flex; flex-wrap: wrap; gap: 2px; padding: 4px;
@@ -208,6 +263,31 @@ body.edoc-body {
   box-shadow: 0 8px 24px rgba(15, 23, 42, .25);
 }
 .edoc-inline-bar.is-open { display: flex; }
+#edoc-menu-celula {
+  display: none;
+  position: fixed;
+  z-index: 95;
+  min-width: 168px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .16);
+}
+#edoc-menu-celula.is-open { display: block; }
+#edoc-menu-celula button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #111827;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#edoc-menu-celula button:hover { background: #f3f4f6; }
 .edoc-inline-bar button { color: #e5e7eb; }
 .edoc-inline-bar button:hover { background: #374151; color: #fff; }
 .edoc-inline-bar .edoc-fmt-sep { background: #4b5563; }
@@ -322,6 +402,13 @@ body.edoc-body {
 }
 .edoc-modal.open { display: flex; }
 .edoc-modal-box { background: #fff; border-radius: 12px; width: min(520px, 92vw); max-height: 80vh; overflow: auto; padding: 16px; }
+.edoc-modal-box label { display: block; font-size: 12px; font-weight: 600; margin: 8px 0 4px; color: #334155; }
+.edoc-modal-box input[type="text"],
+.edoc-modal-box input:not([type]),
+.edoc-modal-box select {
+  width: 100%; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 8px 10px; font-size: 13px; font-family: inherit;
+}
 .edoc-var-search {
   width: 100%; box-sizing: border-box; margin: 0 0 10px;
   border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 10px;
@@ -387,6 +474,15 @@ body.edoc-body {
   color: #64748b;
 }
 .edoc-var-chip:hover { border-color: var(--color-primary, #2563eb); background: #eff6ff; }
+.edoc-campos-lista { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.edoc-campo-item { display: flex; align-items: stretch; gap: 4px; }
+.edoc-campo-item .edoc-var-chip { flex: 1; }
+.edoc-campo-acoes { display: flex; flex-direction: column; gap: 2px; }
+.edoc-campo-acoes button {
+  border: 1px solid #e5e7eb; background: #fff; color: #64748b; border-radius: 6px;
+  width: 28px; height: 22px; cursor: pointer; font-size: 11px;
+}
+.edoc-campo-acoes button:hover { border-color: var(--color-primary, #2563eb); color: #1d4ed8; }
 .edoc-preview .edoc-el-toolbar, .edoc-preview .edoc-el-handles,
 .edoc-preview .edoc-section-bar, .edoc-preview .edoc-gutter { display: none !important; }
 .edoc-preview .edoc-el, .edoc-preview .edoc-col, .edoc-preview .edoc-section { outline: none !important; }
@@ -420,15 +516,16 @@ body.edoc-selecionando-celulas * { user-select: none !important; }
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 .edoc-html-raw { font-size: 10pt; line-height: 1.4; max-width: 100%; overflow: hidden; }
-.edoc-html-raw:has(table.seed-folha) { overflow: visible; max-width: none; font-size: 6.5pt; line-height: 1.05; }
-.edoc-html-raw table:not(.seed-folha) {
+.edoc-html-raw:has(table.seed-folha),
+.edoc-html-raw:has(table.edoc-grade-livre) { overflow: visible; max-width: none; font-size: 6.5pt; line-height: 1.15; }
+.edoc-html-raw table:not(.seed-folha):not(.edoc-grade-livre) {
   width: 100% !important; max-width: 100%; table-layout: auto;
   border-collapse: collapse; margin: 0 0 8px;
 }
-.edoc-html-raw table:not(.seed-folha) th,
-.edoc-html-raw table:not(.seed-folha) td,
-.edoc-el-body[contenteditable="true"] table:not(.seed-folha) td,
-.edoc-el-body[contenteditable="true"] table:not(.seed-folha) th {
+.edoc-html-raw table:not(.seed-folha):not(.edoc-grade-livre) th,
+.edoc-html-raw table:not(.seed-folha):not(.edoc-grade-livre) td,
+.edoc-el-body[contenteditable="true"] table:not(.seed-folha):not(.edoc-grade-livre) td,
+.edoc-el-body[contenteditable="true"] table:not(.seed-folha):not(.edoc-grade-livre) th {
   border: 1px solid #d1d5db;
   font-size: 8pt;
   line-height: 1.25;
@@ -438,20 +535,25 @@ body.edoc-selecionando-celulas * { user-select: none !important; }
   vertical-align: middle;
   min-height: 18px;
 }
-.edoc-el-body[contenteditable="true"] table:not(.seed-folha) td,
-.edoc-el-body[contenteditable="true"] table:not(.seed-folha) th {
+.edoc-el-body[contenteditable="true"] table:not(.seed-folha):not(.edoc-grade-livre) td,
+.edoc-el-body[contenteditable="true"] table:not(.seed-folha):not(.edoc-grade-livre) th {
   cursor: text;
 }
-.edoc-html-raw table:not(.seed-folha) th {
+.edoc-html-raw table:not(.seed-folha):not(.edoc-grade-livre) th {
   background: #f3f4f6;
   font-weight: 600;
   text-align: left;
 }
-.edoc-html-raw table:not(.seed-folha) th[colspan] {
+.edoc-html-raw table:not(.seed-folha):not(.edoc-grade-livre) th[colspan] {
   background: #e5e7eb;
   text-align: center;
 }
-.edoc-html-raw table.edoc-ficha-grade {
+.edoc-el-body[contenteditable="true"] table.edoc-grade-livre td,
+.edoc-el-body[contenteditable="true"] table.edoc-grade-livre th,
+.edoc-el-body[contenteditable="true"] table.seed-folha td,
+.edoc-el-body[contenteditable="true"] table.seed-folha th {
+  cursor: text;
+}
   table-layout: fixed;
 }
 .edoc-html-raw table.edoc-ficha-grade th,
@@ -477,6 +579,9 @@ body.edoc-selecionando-celulas * { user-select: none !important; }
   border-collapse: collapse;
   margin: 0 0 6px;
 }
+.edoc-html-raw table.edoc-ficha-campos:has(colgroup) {
+  table-layout: fixed;
+}
 .edoc-html-raw table.edoc-ficha-campos th,
 .edoc-html-raw table.edoc-ficha-campos td,
 .edoc-html-raw table.edoc-ficha-ano td {
@@ -493,9 +598,11 @@ body.edoc-selecionando-celulas * { user-select: none !important; }
   font-weight: 700;
 }
 .edoc-html-raw table.edoc-ficha-campos tr th:not([colspan]) {
-  width: 38%;
   font-weight: 700;
   background: #f3f4f6;
+}
+.edoc-html-raw table.edoc-ficha-campos:not(:has(colgroup)) tr th:not([colspan]) {
+  width: 38%;
 }
 td.edoc-celula-drop, th.edoc-celula-drop {
   box-shadow: inset 0 0 0 2px #2563eb;

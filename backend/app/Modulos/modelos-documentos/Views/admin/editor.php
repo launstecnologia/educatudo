@@ -132,6 +132,12 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                         <div class="edoc-var-chips" id="edoc-demo-comps"></div>
                     </details>
                 </div>
+                <div class="edoc-sec-label">CAMPOS DA EMISSÃO</div>
+                <p class="edoc-hint">Crie data, horário, local ou valor. Na emissão, a secretaria preenche e o texto entra no documento. Arraste o campo para a folha.</p>
+                <div id="edoc-campos-lista" class="edoc-campos-lista"></div>
+                <button type="button" class="edoc-btn" id="edoc-campo-novo" style="width:100%;margin-bottom:12px">
+                    <i class="fa-solid fa-plus"></i> Novo campo
+                </button>
                 <input type="search" id="edoc-var-search" class="edoc-var-search" placeholder="Buscar variável…" autocomplete="off">
                 <?php foreach ($grupos as $g):
                     $chavesGrupo = is_array($g['chaves'] ?? null) ? $g['chaves'] : [];
@@ -172,12 +178,19 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         </aside>
 
         <main class="edoc-center">
+            <div class="edoc-ia-overlay" id="edoc-ia-overlay" aria-live="polite">
+                <div class="edoc-ia-overlay-card">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                    <strong>A IA está reproduzindo o documento</strong>
+                    <p id="edoc-ia-overlay-msg">Lendo a imagem…</p>
+                </div>
+            </div>
             <div class="edoc-canvas-tools">
                 <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-zoom-out"><i class="fa-solid fa-minus"></i></button>
                 <span id="edoc-zoom-label" style="font-size:12px;min-width:48px;text-align:center">90%</span>
                 <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-zoom-in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="edoc-btn" id="edoc-zoom-fit">Ajustar à tela</button>
-                <span class="edoc-canvas-hint">Medidas em mm. O zoom não altera a impressão.</span>
+                <span class="edoc-canvas-hint">Medidas em mm. O zoom não altera a impressão. No histórico: selecione células, mescle, use texto na vertical e faixa cinza. O PDF repete a folha.</span>
                 <span class="edoc-canvas-hint" id="edoc-folha-aviso"></span>
                 <?php if (!empty($layout_sugerido)): ?>
                 <button type="button" class="edoc-btn" id="edoc-layout-sugerido" title="Monta cabeçalho, identificação, notas e assinaturas lado a lado">
@@ -245,6 +258,28 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
     </div>
 </div>
 
+<div class="edoc-modal" id="edoc-campo-modal">
+    <div class="edoc-modal-box">
+        <h3 style="margin:0 0 12px;font-size:16px" id="edoc-campo-titulo">Novo campo</h3>
+        <label for="edoc-campo-rotulo">Rótulo</label>
+        <input id="edoc-campo-rotulo" maxlength="80" placeholder="Ex.: Data do passeio">
+        <label for="edoc-campo-mascara">Máscara</label>
+        <select id="edoc-campo-mascara">
+            <?php foreach ((array) ($mascaras_campo ?? []) as $chaveMascara => $rotuloMascara): ?>
+            <option value="<?= $esc($chaveMascara) ?>"><?= $esc($rotuloMascara) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <label class="edoc-demo-check" for="edoc-campo-obrigatorio" style="margin:10px 0 14px">
+            <input type="checkbox" id="edoc-campo-obrigatorio" checked>
+            Obrigatório na emissão
+        </label>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="button" class="edoc-btn" id="edoc-campo-cancelar">Cancelar</button>
+            <button type="button" class="edoc-btn edoc-btn-primary" id="edoc-campo-confirmar">Salvar campo</button>
+        </div>
+    </div>
+</div>
+
 <div class="edoc-modal" id="edoc-vars">
     <div class="edoc-modal-box">
         <h3 style="margin:0 0 12px;font-size:16px">Inserir variável</h3>
@@ -281,7 +316,8 @@ window.EDOC = {
   layoutSugerido: <?= json_encode($layout_sugerido ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   iaUrl: <?= json_encode(!empty($ia_disponivel) ? (URL . '/admin/modelos-documentos/reproduzir-imagem') : '', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   series: <?= json_encode($series_emissao ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
-  demoUrl: <?= json_encode(URL . '/admin/modelos-documentos/demonstracao', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>
+  demoUrl: <?= json_encode(URL . '/admin/modelos-documentos/demonstracao', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
+  mascaras: <?= json_encode($mascaras_campo ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>
 };
 </script>
 <script src="<?= URL ?>/static/js/editor-documento.js?v=<?= $esc($vJs) ?>"></script>

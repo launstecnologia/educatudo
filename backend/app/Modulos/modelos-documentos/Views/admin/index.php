@@ -18,6 +18,9 @@ ob_start(); ?>
 <a href="<?= URL ?>/admin/modelos-documentos/importar" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
     <i class="fa-solid fa-file-import mr-1.5"></i> Importar planilha
 </a>
+<a href="<?= URL ?>/admin/modelos-documentos/emitir-lote" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+    <i class="fa-solid fa-print mr-1.5"></i> Emitir em lote
+</a>
 <a href="<?= URL ?>/admin/modelos-documentos/editor?categoria=<?= $esc($categoria === 'todos' ? 'outro' : $categoria) ?>"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i> Novo modelo
@@ -54,6 +57,26 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         </a>
     </div>
 </div>
+
+<?php
+$layoutsHistorico = is_array($layouts_historico ?? null) ? $layouts_historico : [];
+if ($layoutsHistorico !== []):
+?>
+<div class="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+    <h3 class="text-base font-semibold text-gray-900">Layouts de histórico escolar</h3>
+    <p class="text-sm text-gray-600 mt-1 mb-4">Escolha um modelo, edite cada célula e salve. O PDF sai igual à folha: mesma grade, mesma fonte e o mesmo texto na vertical.</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <?php foreach ($layoutsHistorico as $chaveLayout => $lay): ?>
+        <a href="<?= URL ?>/admin/modelos-documentos/editor?layout=<?= $esc($chaveLayout) ?>&amp;categoria=oficial"
+           class="rounded-lg border border-gray-200 p-4 hover:border-gray-400 hover:bg-gray-50">
+            <div class="text-sm font-semibold text-gray-900"><?= $esc($lay['nome'] ?? '') ?></div>
+            <p class="text-xs text-gray-600 mt-1"><?= $esc($lay['resumo'] ?? '') ?></p>
+            <div class="text-xs text-gray-400 mt-2"><?= (int) ($lay['paginas'] ?? 1) === 1 ? '1 página' : (int) ($lay['paginas'] ?? 2) . ' páginas' ?></div>
+        </a>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="flex flex-wrap gap-2 text-sm mb-6">
     <?php foreach ($categorias as $key => $label):
