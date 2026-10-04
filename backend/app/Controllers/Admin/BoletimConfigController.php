@@ -148,7 +148,7 @@ class BoletimConfigController extends BaseController
         try {
             $cadastro = new BoletimCadastroService();
             if ($cadastro->model()->tabelasProntas()) {
-                foreach ($cadastro->model()->listar() as $bol) {
+                foreach ($cadastro->model()->listar(false, true) as $bol) {
                     $nomesBoletim[(int) $bol['id']] = (string) $bol['nome'];
                 }
             }

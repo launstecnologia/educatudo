@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
 require_once __DIR__ . '/../Services/BoletimCadastroService.php';
 require_once __DIR__ . '/../../../Models/System/BoletimConfig.php';
 require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
+require_once __DIR__ . '/../../../Helpers/AdminPasswordHelper.php';
 
 use App\Modulos\Boletins\Services\BoletimCadastroService;
 
@@ -157,13 +158,25 @@ class BoletimCadastroAdminController extends AdminBaseController
             $this->redirect('/admin/boletins');
             return;
         }
+        $senha = (string) ($_POST['senha'] ?? '');
+        $user = $this->auth->getUser();
+        if (trim($senha) === '') {
+            $this->setFlashMessage('Digite sua senha para confirmar a exclusão.', 'error');
+            $this->redirect('/admin/boletins');
+            return;
+        }
+        if (!is_array($user) || !AdminPasswordHelper::verifyAdminPassword($this->db, $user, $senha)) {
+            $this->setFlashMessage('Senha incorreta.', 'error');
+            $this->redirect('/admin/boletins');
+            return;
+        }
         $result = $this->service->excluir((int) $id);
         if (!$result['success']) {
             $this->setFlashMessage($result['error'] ?? 'Não foi possível excluir.', 'error');
             $this->redirect('/admin/boletins');
             return;
         }
-        $this->setFlashMessage('Boletim excluído. Eventos de notas e boletins já gerados foram mantidos.', 'success');
+        $this->setFlashMessage('Modelo ocultado da lista. O cadastro, as avaliações e as notas já geradas foram mantidos.', 'success');
         $this->redirect('/admin/boletins');
     }
 

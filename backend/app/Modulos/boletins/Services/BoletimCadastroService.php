@@ -87,8 +87,12 @@ class BoletimCadastroService
         if ($item === null) {
             return ['success' => false, 'error' => 'Boletim não encontrado.'];
         }
-        $this->boletimConfig->desvincularEventosDoBoletim($id);
-        $this->model->excluir($id);
+        if (!empty($item['excluido_em'])) {
+            return ['success' => true];
+        }
+        if (!$this->model->excluir($id)) {
+            return ['success' => false, 'error' => 'Não foi possível ocultar o modelo.'];
+        }
         return ['success' => true];
     }
 

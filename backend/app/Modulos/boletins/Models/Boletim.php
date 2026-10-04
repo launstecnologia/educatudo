@@ -35,6 +35,25 @@ class Boletim
         }
         if ($ok) {
             $this->ensureColunaRegraAcademica();
+            $this->ensureColunaExcluidoEm();
+        }
+        return $ok;
+    }
+
+    public function temColunaExcluidoEm(): bool
+    {
+        if (!$this->tabelasProntas()) {
+            return false;
+        }
+        static $ok = null;
+        if ($ok !== null) {
+            return $ok;
+        }
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM boletins LIKE 'excluido_em'");
+            $ok = !empty($col);
+        } catch (Throwable $e) {
+            $ok = false;
         }
         return $ok;
     }
@@ -60,14 +79,21 @@ class Boletim
     /**
      * @return list<array<string,mixed>>
      */
-    public function listar(bool $apenasAtivos = false): array
+    public function listar(bool $apenasAtivos = false, bool $incluirExcluidos = false): array
     {
         if (!$this->tabelasProntas()) {
             return [];
         }
-        $sql = "SELECT b.* FROM boletins b";
+        $where = [];
         if ($apenasAtivos) {
-            $sql .= " WHERE b.ativo = 1";
+            $where[] = 'b.ativo = 1';
+        }
+        if (!$incluirExcluidos && $this->temColunaExcluidoEm()) {
+            $where[] = 'b.excluido_em IS NULL';
+        }
+        $sql = "SELECT b.* FROM boletins b";
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
         }
         $sql .= " ORDER BY b.ano_letivo DESC, b.finalidade ASC, b.nome ASC";
         $rows = $this->db->fetchAll($sql) ?: [];
@@ -174,9 +200,19 @@ class Boletim
         );
     }
 
-    public function excluir(int $id): void
+    /**
+     * Some da listagem. A linha, as avaliações e as notas permanecem.
+     */
+    public function excluir(int $id): bool
     {
-        $this->db->delete("DELETE FROM boletins WHERE id = :id", ['id' => $id]);
+        if ($id <= 0 || !$this->tabelasProntas() || !$this->temColunaExcluidoEm()) {
+            return false;
+        }
+        $this->db->update(
+            "UPDATE boletins SET excluido_em = NOW() WHERE id = :id AND excluido_em IS NULL",
+            ['id' => $id]
+        );
+        return true;
     }
 
     /**
@@ -270,6 +306,26 @@ class Boletim
             'regra_academica_id' => !empty($data['regra_academica_id']) ? (int) $data['regra_academica_id'] : null,
             'ativo' => !isset($data['ativo']) || !empty($data['ativo']) ? 1 : 0,
         ];
+    }
+
+    private function ensureColunaExcluidoEm(): void
+    {
+        static $done = false;
+        if ($done) {
+            return;
+        }
+        $done = true;
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM boletins LIKE 'excluido_em'");
+            if ($col) {
+                return;
+            }
+            $this->db->query(
+                "ALTER TABLE boletins ADD COLUMN excluido_em DATETIME NULL DEFAULT NULL COMMENT 'Oculto da listagem. O cadastro permanece'"
+            );
+        } catch (Throwable $e) {
+            // migration ainda não rodou / sem permissão ALTER
+        }
     }
 
     private function ensureColunaRegraAcademica(): void

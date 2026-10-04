@@ -143,10 +143,11 @@ if (!class_exists('PeriodoLetivo')) {
                         </a>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form method="POST" action="<?= URL ?>/admin/boletins/<?= (int) $item['id'] ?>/delete"
-                              class="<?= $podeDev ? '' : 'js-so-dev' ?>"
-                              onsubmit="<?= $podeDev ? "return confirm('Excluir este modelo de boletim? Avaliações e notas já geradas permanecem.');" : 'return false;' ?>">
+                              class="js-form-excluir-boletim<?= $podeDev ? '' : ' js-so-dev' ?>">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap">
+                            <input type="hidden" name="senha" value="">
+                            <button type="button" class="js-excluir-boletim flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap"
+                                    data-nome="<?= htmlspecialchars((string) ($item['nome'] ?? 'este modelo'), ENT_QUOTES, 'UTF-8') ?>">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center shrink-0"></i> Excluir
                             </button>
                         </form>
@@ -164,6 +165,24 @@ if (!class_exists('PeriodoLetivo')) {
         </table>
     </div>
 </div>
+<?php if (!empty($podeDev)): ?>
+<div id="modal-excluir-boletim" class="hidden fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto">
+    <div class="absolute inset-0 bg-gray-600/50" data-fechar-excluir-boletim></div>
+    <div class="relative top-24 mx-4 p-5 border w-full max-w-md shadow-lg rounded-xl bg-white z-10">
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Excluir modelo de boletim</h3>
+        <p class="text-sm text-gray-600 mb-4">O modelo <strong id="nome-excluir-boletim"></strong> deixa de aparecer nesta lista. O cadastro continua no banco, com as avaliações e as notas já geradas. Digite sua senha para confirmar.</p>
+        <label for="senha-excluir-boletim" class="block text-sm font-medium text-gray-700 mb-2">Sua senha</label>
+        <input type="password" id="senha-excluir-boletim" autocomplete="current-password"
+               class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm focus:border-red-500 focus:ring-2 focus:ring-red-100"
+               placeholder="Digite sua senha">
+        <p id="erro-excluir-boletim" class="mt-2 text-sm text-red-600 hidden"></p>
+        <div class="flex justify-end gap-3 mt-5">
+            <button type="button" data-fechar-excluir-boletim class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="button" id="confirmar-excluir-boletim" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">Excluir</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <script>
 (function () {
     function marcarAbertos() {
@@ -203,12 +222,53 @@ if (!class_exists('PeriodoLetivo')) {
         marcarAbertos();
     }
 
+    var modalExcluir = document.getElementById('modal-excluir-boletim');
+    var formExcluirPendente = null;
+    var senhaExcluir = document.getElementById('senha-excluir-boletim');
+    var erroExcluir = document.getElementById('erro-excluir-boletim');
+    var nomeExcluir = document.getElementById('nome-excluir-boletim');
+
+    function fecharModalExcluir() {
+        if (!modalExcluir) return;
+        modalExcluir.classList.add('hidden');
+        formExcluirPendente = null;
+        if (senhaExcluir) senhaExcluir.value = '';
+        if (erroExcluir) {
+            erroExcluir.textContent = '';
+            erroExcluir.classList.add('hidden');
+        }
+    }
+
+    function abrirModalExcluir(btn) {
+        var form = btn.closest('form');
+        if (!form || !modalExcluir) return;
+        formExcluirPendente = form;
+        if (nomeExcluir) nomeExcluir.textContent = btn.getAttribute('data-nome') || 'este modelo';
+        if (senhaExcluir) senhaExcluir.value = '';
+        if (erroExcluir) erroExcluir.classList.add('hidden');
+        modalExcluir.classList.remove('hidden');
+        fecharListas();
+        if (senhaExcluir) senhaExcluir.focus();
+    }
+
     document.addEventListener('click', function (e) {
         var bloqueado = e.target.closest('.js-so-dev');
         if (bloqueado) {
             e.preventDefault();
             e.stopPropagation();
             window.alert('Você não tem permissão. Contate o Administrador.');
+            return;
+        }
+        var excluirBtn = e.target.closest('.js-excluir-boletim');
+        if (excluirBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            abrirModalExcluir(excluirBtn);
+            return;
+        }
+        if (e.target.closest('[data-fechar-excluir-boletim]')) {
+            e.preventDefault();
+            fecharModalExcluir();
             return;
         }
         var btn = e.target.closest('.js-notas-eventos');
@@ -233,5 +293,33 @@ if (!class_exists('PeriodoLetivo')) {
         fecharListas();
     }, true);
     window.addEventListener('resize', fecharListas);
+
+    var confirmarExcluir = document.getElementById('confirmar-excluir-boletim');
+    if (confirmarExcluir) {
+        confirmarExcluir.addEventListener('click', function () {
+            if (!formExcluirPendente) return;
+            var senha = senhaExcluir ? String(senhaExcluir.value || '') : '';
+            if (senha.trim() === '') {
+                if (erroExcluir) {
+                    erroExcluir.textContent = 'Digite sua senha para confirmar.';
+                    erroExcluir.classList.remove('hidden');
+                }
+                if (senhaExcluir) senhaExcluir.focus();
+                return;
+            }
+            var campo = formExcluirPendente.querySelector('input[name="senha"]');
+            if (campo) campo.value = senha;
+            formExcluirPendente.submit();
+        });
+    }
+    if (senhaExcluir) {
+        senhaExcluir.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                if (confirmarExcluir) confirmarExcluir.click();
+            }
+            if (ev.key === 'Escape') fecharModalExcluir();
+        });
+    }
 })();
 </script>
