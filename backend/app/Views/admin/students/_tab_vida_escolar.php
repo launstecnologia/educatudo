@@ -65,8 +65,6 @@ $veAbas = [
     'conferencia' => ['label' => 'SED / INEP', 'icon' => 'fa-clipboard-check', 'perm_key' => 'vida_escolar'],
     'dossie' => ['label' => 'Dossiê', 'icon' => 'fa-box-archive', 'perm_key' => 'vida_escolar'],
 ];
-$hrefPacote = !empty($links['pacote']) ? (URL . $links['pacote']) : ($base . '/pacote-transferencia');
-$hrefDossie = !empty($links['dossie']) ? (URL . $links['dossie']) : ($base . '/dossie');
 $modDir = dirname(__DIR__, 3) . '/Modulos/vida-escolar/Views/admin';
 $mostrarCapa = $podeVidaEscolar && $prontuario !== [];
 $escolaAnterior = trim((string) ($prontuario['escola_anterior'] ?? ''));
@@ -129,20 +127,6 @@ $veBannerOrigem = true;
             </div>
         </div>
         <?php endforeach; ?>
-    </div>
-
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <p class="text-sm text-gray-600">
-            <?= $esc($capa['turma'] ?? '') ?><?= !empty($capa['serie']) ? ' · ' . $esc($capa['serie']) : '' ?>
-            <?= !empty($capa['ano_letivo']) ? ' · ' . (int) $capa['ano_letivo'] : '' ?>
-            · <?= (int) ($capa['anos_trajetoria'] ?? 0) ?> ano(s) na trajetória
-            <?php if (!empty($capa['historico_emitido'])): ?> · Histórico oficial emitido<?php endif; ?>
-            · Educacenso: <?= $esc($capa['inep_txt'] ?? '') ?>
-        </p>
-        <div class="flex flex-wrap gap-2">
-            <a href="<?= $esc($hrefPacote) ?>" download class="aluno-btn-outline text-sm">Baixar pacote de transferência</a>
-            <a href="<?= $esc($hrefDossie) ?>" download class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Baixar dossiê (PDF)</a>
-        </div>
     </div>
     <?php endif; ?>
 

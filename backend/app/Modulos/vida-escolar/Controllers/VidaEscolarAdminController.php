@@ -440,6 +440,78 @@ class VidaEscolarAdminController extends AdminBaseController
         $this->redirectAluno($id, 'trajetoria', 0, $leitura['job_id']);
     }
 
+    public function lerDocumentoDaFicha($id, $fichaDocId): void
+    {
+        if (!$this->exigirPermissao('cadastrar')) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido.', 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $alunoId = (int) $id;
+        $docFichaId = (int) $fichaDocId;
+        require_once dirname(__DIR__, 3) . '/Models/User/StudentDocument.php';
+        $doc = (new \StudentDocument())->find($alunoId, $docFichaId);
+        if (!$doc || trim((string) ($doc['arquivo_key'] ?? '')) === '') {
+            $this->setFlashMessage('Esse documento não está na ficha deste aluno.', 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $tipoFicha = (string) ($doc['tipo'] ?? '');
+        if (!in_array($tipoFicha, ['historico_escolar', 'declaracao_transferencia'], true)) {
+            $this->setFlashMessage('Só dá para ler o histórico escolar ou a declaração de transferência da ficha.', 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $marcaFicha = 'ficha_aluno:' . $docFichaId;
+        foreach ($this->service()->model()->listarDocumentos($alunoId) as $jaCopiado) {
+            if ((string) ($jaCopiado['observacao'] ?? '') !== $marcaFicha) {
+                continue;
+            }
+            if (trim((string) ($jaCopiado['arquivo_key'] ?? '')) === '') {
+                continue;
+            }
+            $leitura = $this->enfileirarLeituraHistorico($alunoId, (int) ($jaCopiado['id'] ?? 0));
+            if (!$leitura['ok']) {
+                $this->setFlashMessage('A leitura não começou: ' . $leitura['error'], 'error');
+                $this->redirectAluno($id, 'trajetoria');
+                return;
+            }
+            $this->setFlashMessage('Lendo de novo o histórico que já estava na ficha.', 'success');
+            $this->redirectAluno($id, 'trajetoria', 0, $leitura['job_id']);
+            return;
+        }
+        try {
+            $arquivo = $this->copiarDocumentoDaFicha($alunoId, $doc);
+        } catch (\Throwable $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $tipoVe = $tipoFicha === 'declaracao_transferencia' ? 'declaracao_transferencia' : 'historico';
+        $docId = $this->service()->model()->criarDocumento([
+            'aluno_id' => $alunoId,
+            'tipo' => $tipoVe,
+            'escola_emissora' => trim((string) ($_POST['escola_emissora'] ?? '')) ?: null,
+            'arquivo_key' => $arquivo['arquivo_key'],
+            'arquivo_nome' => $arquivo['arquivo_nome'],
+            'arquivo_mime' => $arquivo['arquivo_mime'],
+            'arquivo_tamanho' => $arquivo['arquivo_tamanho'],
+            'observacao' => $marcaFicha,
+            'enviado_por' => (int) ($this->auth->getUser()['id'] ?? 0) ?: null,
+        ]);
+        $leitura = $this->enfileirarLeituraHistorico($alunoId, $docId);
+        if (!$leitura['ok']) {
+            $this->setFlashMessage('O arquivo da ficha foi ligado à trajetória, mas a leitura não começou: ' . $leitura['error'], 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $this->setFlashMessage('Lendo o histórico que já estava na ficha. O rascunho aparece aqui para conferir.', 'success');
+        $this->redirectAluno($id, 'trajetoria', 0, $leitura['job_id']);
+    }
+
     /**
      * @return array{ok: bool, job_id: int, error: string}
      */
@@ -796,6 +868,83 @@ class VidaEscolarAdminController extends AdminBaseController
             'arquivo_mime' => $mime,
             'arquivo_tamanho' => (int) ($file['size'] ?? 0),
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $doc
+     * @return array{arquivo_key:string,arquivo_nome:string,arquivo_mime:string,arquivo_tamanho:int}
+     */
+    private function copiarDocumentoDaFicha(int $alunoId, array $doc): array
+    {
+        $nomeOrig = (string) ($doc['arquivo_nome'] ?? 'historico');
+        $ext = strtolower((string) pathinfo($nomeOrig, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp'], true)) {
+            throw new \Exception('O arquivo da ficha precisa ser PDF ou imagem (JPG/PNG/WebP).');
+        }
+        require_once dirname(__DIR__, 3) . '/Services/MediaStorageService.php';
+        $conteudo = (new \MediaStorageService($this->config))->getContents('arquivos', (string) ($doc['arquivo_key'] ?? ''));
+        if (!is_string($conteudo) || $conteudo === '') {
+            throw new \Exception('Não encontrei o arquivo na aba Documentos deste aluno.');
+        }
+        if (strlen($conteudo) > 10 * 1024 * 1024) {
+            throw new \Exception('Arquivo maior que 10MB.');
+        }
+        if (!defined('TENANT_SLUG') || trim((string) TENANT_SLUG) === '') {
+            throw new \Exception('Não foi possível gravar o arquivo (escola não identificada).');
+        }
+        $slug = preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG);
+        if ($slug === '') {
+            throw new \Exception('Não foi possível gravar o arquivo (escola não identificada).');
+        }
+        $dir = dirname(__DIR__, 4) . '/storage/uploads/' . $slug . '/vida-escolar/' . $alunoId;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new \Exception('Não foi possível gravar o arquivo.');
+        }
+        $nome = 'doc_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $dest = $dir . '/' . $nome;
+        if (file_put_contents($dest, $conteudo) === false) {
+            if (is_file($dest)) {
+                @unlink($dest);
+            }
+            throw new \Exception('Falha ao copiar o arquivo da ficha.');
+        }
+        @chmod($dest, 0640);
+        try {
+            $mime = 'application/octet-stream';
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $detected = finfo_file($finfo, $dest);
+                    finfo_close($finfo);
+                    if (is_string($detected)) {
+                        $mime = $detected;
+                    }
+                }
+            }
+            $okMime = [
+                'pdf' => 'application/pdf',
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'webp' => 'image/webp',
+            ];
+            if (($okMime[$ext] ?? '') === '' || $mime !== $okMime[$ext]) {
+                throw new \Exception('Extensão e conteúdo do arquivo da ficha não coincidem.');
+            }
+            $tamanho = filesize($dest);
+            if ($tamanho === false) {
+                throw new \Exception('Falha ao copiar o arquivo da ficha.');
+            }
+            return [
+                'arquivo_key' => $slug . '/vida-escolar/' . $alunoId . '/' . $nome,
+                'arquivo_nome' => $nomeOrig !== '' ? $nomeOrig : $nome,
+                'arquivo_mime' => $mime,
+                'arquivo_tamanho' => (int) $tamanho,
+            ];
+        } catch (\Throwable $e) {
+            @unlink($dest);
+            throw $e instanceof \Exception ? $e : new \Exception('Falha ao copiar o arquivo da ficha.');
+        }
     }
 }
 }

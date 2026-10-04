@@ -236,45 +236,114 @@ foreach ($documentos as $d) {
                 <i class="fa-solid fa-plus mr-1.5"></i>Digitar um ano
             </button>
         </div>
-        <form method="post" action="<?= $base ?>/documento" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <?php
+        $docsBusca = [];
+        if (!class_exists('StudentDocument', false)) {
+            $pathDocAluno = dirname(__DIR__, 4) . '/Models/User/StudentDocument.php';
+            if (is_file($pathDocAluno)) {
+                require_once $pathDocAluno;
+            }
+        }
+        $rotulosDoc = class_exists('StudentDocument', false) ? StudentDocument::checklist() : [];
+        $ordemDoc = ['historico_escolar' => 0, 'declaracao_transferencia' => 1];
+        foreach (is_array($documentos_aluno ?? null) ? $documentos_aluno : [] as $docFicha) {
+            if (!is_array($docFicha) || trim((string) ($docFicha['arquivo_key'] ?? '')) === '') {
+                continue;
+            }
+            $nomeArq = (string) ($docFicha['arquivo_nome'] ?? '');
+            $extArq = strtolower((string) pathinfo($nomeArq, PATHINFO_EXTENSION));
+            if (!in_array($extArq, ['pdf', 'jpg', 'jpeg', 'png', 'webp'], true)) {
+                continue;
+            }
+            $tipoFicha = (string) ($docFicha['tipo'] ?? '');
+            if (!isset($ordemDoc[$tipoFicha])) {
+                continue;
+            }
+            $rotulo = (string) ($rotulosDoc[$tipoFicha] ?? $tipoFicha);
+            $docsBusca[] = [
+                'ordem' => $ordemDoc[$tipoFicha] ?? 5,
+                'rotulo' => $rotulo,
+                'arquivo' => $nomeArq !== '' ? $nomeArq : 'Arquivo',
+                'origem' => 'ficha',
+                'id' => (int) ($docFicha['id'] ?? 0),
+            ];
+        }
+        foreach ($docsHistorico as $docVe) {
+            if (!is_array($docVe) || trim((string) ($docVe['arquivo_key'] ?? '')) === '') {
+                continue;
+            }
+            $nomeArq = (string) ($docVe['arquivo_nome'] ?? '');
+            $docsBusca[] = [
+                'ordem' => 3,
+                'rotulo' => 'Já recebido na trajetória',
+                'arquivo' => $nomeArq !== '' ? $nomeArq : (string) ($docVe['escola_emissora'] ?? 'Documento'),
+                'origem' => 'vida',
+                'id' => (int) ($docVe['id'] ?? 0),
+            ];
+        }
+        usort($docsBusca, static function (array $a, array $b): int {
+            $cmp = ($a['ordem'] <=> $b['ordem']);
+            return $cmp !== 0 ? $cmp : strcasecmp((string) $a['arquivo'], (string) $b['arquivo']);
+        });
+        ?>
+        <div class="rounded-xl border border-gray-200 p-4 mb-4">
+            <h4 class="text-sm font-semibold text-gray-900">Documento já na ficha</h4>
+            <p class="text-sm text-gray-500 mt-1 mb-3">Se a coordenação já anexou o histórico em Documentos, busque o arquivo aqui. Não precisa enviar de novo.</p>
+            <?php if ($docsBusca === []): ?>
+            <p class="text-sm text-gray-500">Nenhum histórico escolar ou declaração de transferência na aba Documentos deste aluno.</p>
+            <?php else: ?>
+            <input type="search" id="ve-busca-doc" placeholder="Buscar por histórico, transferência ou nome do arquivo" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white mb-3">
+            <ul class="divide-y divide-gray-100 border border-gray-200 rounded-lg text-sm">
+                <?php foreach ($docsBusca as $docBusca):
+                    $textoBusca = mb_strtolower($docBusca['rotulo'] . ' ' . $docBusca['arquivo'], 'UTF-8');
+                    $acaoLer = $docBusca['origem'] === 'ficha'
+                        ? $base . '/documento-ficha/' . (int) $docBusca['id'] . '/ler'
+                        : $base . '/documento/' . (int) $docBusca['id'] . '/ler';
+                ?>
+                <li class="flex items-center justify-between gap-3 px-3 py-2" data-ve-doc-item data-ve-doc-busca="<?= $esc($textoBusca) ?>">
+                    <span class="min-w-0">
+                        <span class="block font-medium text-gray-900 truncate"><?= $esc($docBusca['rotulo']) ?></span>
+                        <span class="block text-xs text-gray-500 truncate"><?= $esc($docBusca['arquivo']) ?></span>
+                    </span>
+                    <?php if ($podeLerIa && (int) $docBusca['id'] > 0): ?>
+                    <form method="post" action="<?= $esc($acaoLer) ?>" class="shrink-0">
+                        <input type="hidden" name="_token" value="<?= $esc($token) ?>">
+                        <?php if ($docBusca['origem'] === 'ficha' && $escolaAnterior !== ''): ?>
+                        <input type="hidden" name="escola_emissora" value="<?= $esc($escolaAnterior) ?>">
+                        <?php endif; ?>
+                        <button class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50">Ler</button>
+                    </form>
+                    <?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <p id="ve-busca-doc-vazio" class="hidden text-sm text-gray-500 mt-2">Nenhum documento com esse nome.</p>
+            <?php endif; ?>
+        </div>
+        <form method="post" action="<?= $base ?>/documento" enctype="multipart/form-data" class="rounded-xl border border-gray-200 p-4 space-y-3">
             <input type="hidden" name="_token" value="<?= $esc($token) ?>">
             <input type="hidden" name="tipo" value="historico">
             <?php if ($podeLerIa): ?>
             <input type="hidden" name="ler_agora" value="1">
             <?php endif; ?>
-            <div class="md:col-span-5">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Escola</label>
-                <input name="escola_emissora" value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola de origem" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-            </div>
-            <div class="md:col-span-4">
-                <span class="block text-sm font-medium text-gray-700 mb-1">Arquivo</span>
+            <div>
+                <h4 class="text-sm font-semibold text-gray-900">Enviar um arquivo novo</h4>
+                <p class="text-sm text-gray-500 mt-1 mb-3">Só se o histórico ainda não estiver na ficha.</p>
                 <label id="ve-historico-drop" for="ve-historico-arquivo"
-                       class="flex flex-col items-center justify-center w-full border border-dashed border-gray-300 rounded-lg bg-gray-50 px-3 py-3 text-center cursor-pointer hover:bg-gray-100"
-                       style="min-height:4.5rem;">
+                       class="flex flex-col items-center justify-center w-full border border-dashed border-gray-300 rounded-lg bg-gray-50 px-3 py-6 text-center cursor-pointer hover:bg-gray-100">
                     <input type="file" name="arquivo" id="ve-historico-arquivo" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="sr-only">
                     <span class="text-sm text-gray-700">Arraste o arquivo aqui</span>
                     <span id="ve-historico-arquivo-nome" class="text-xs text-gray-500 mt-1">ou clique para escolher · PDF ou imagem</span>
                 </label>
             </div>
-            <div class="md:col-span-3">
-                <button class="btn-primary-custom w-full px-4 py-2 rounded-lg text-sm font-semibold"><?= $podeLerIa ? 'Anexar e ler' : 'Anexar PDF' ?></button>
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="flex-1 min-w-[16rem]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Escola</label>
+                    <input name="escola_emissora" value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola de origem" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                </div>
+                <button class="btn-primary-custom shrink-0 px-4 py-2 rounded-lg text-sm font-semibold"><?= $podeLerIa ? 'Anexar e ler' : 'Anexar PDF' ?></button>
             </div>
         </form>
-        <?php if ($docsHistorico !== []): ?>
-        <ul class="mt-4 divide-y divide-gray-100 border border-gray-200 rounded-lg text-sm">
-            <?php foreach ($docsHistorico as $d): ?>
-            <li class="flex items-center justify-between gap-2 px-3 py-2">
-                <span class="truncate"><?= $esc($d['escola_emissora'] ?? ($d['arquivo_nome'] ?? 'Documento')) ?></span>
-                <?php if ($podeLerIa && !empty($d['arquivo_key'])): ?>
-                <form method="post" action="<?= $base ?>/documento/<?= (int) ($d['id'] ?? 0) ?>/ler" class="shrink-0">
-                    <input type="hidden" name="_token" value="<?= $esc($token) ?>">
-                    <button class="text-sm font-medium text-violet-700 hover:underline">Ler de novo</button>
-                </form>
-                <?php endif; ?>
-            </li>
-            <?php endforeach; ?>
-        </ul>
-        <?php endif; ?>
     </div>
 
     <div data-ve-origem-painel="meio" class="hidden">
@@ -506,6 +575,22 @@ foreach ($documentos as $d) {
     zona.addEventListener('drop', function (e) {
         var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         aplicar(file);
+    });
+})();
+(function () {
+    var busca = document.getElementById('ve-busca-doc');
+    if (!busca) return;
+    busca.addEventListener('input', function () {
+        var q = (busca.value || '').toLocaleLowerCase().trim();
+        var algum = false;
+        document.querySelectorAll('[data-ve-doc-item]').forEach(function (li) {
+            var hay = (li.getAttribute('data-ve-doc-busca') || '').toLocaleLowerCase();
+            var ok = q === '' || hay.indexOf(q) !== -1;
+            li.classList.toggle('hidden', !ok);
+            if (ok) algum = true;
+        });
+        var vazio = document.getElementById('ve-busca-doc-vazio');
+        if (vazio) vazio.classList.toggle('hidden', algum || q === '');
     });
 })();
 function veAbrirLancarEscola() {
