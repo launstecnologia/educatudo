@@ -1,8 +1,6 @@
 <?php
 $naoInformado = 'Não informado';
 $matriculaAtual = is_array($matriculaAtual ?? null) ? $matriculaAtual : null;
-$pendenciasAluno = is_array($pendenciasAluno ?? null) ? $pendenciasAluno : [];
-$pendenciasCount = (int) ($pendenciasCount ?? count($pendenciasAluno));
 $alunoIdVg = (int) ($student['id'] ?? 0);
 $turnoLabelsVg = ['manha' => 'Manhã', 'tarde' => 'Tarde', 'noite' => 'Noite', 'integral' => 'Integral'];
 $turnoAtual = $turnoLabelsVg[$student['turma_turno'] ?? ''] ?? '';
@@ -21,6 +19,8 @@ $qtdOcorrencias = count($ocorrencias);
 $kpisVe = is_array($vida_escolar_kpis ?? null) ? $vida_escolar_kpis : [];
 $kpiMedia = isset($kpisVe['media']) && $kpisVe['media'] !== null ? (float) $kpisVe['media'] : null;
 $kpiFrequencia = isset($kpisVe['frequencia']) && $kpisVe['frequencia'] !== null ? (float) $kpisVe['frequencia'] : null;
+$kpisPorTurmaAno = is_array($kpis_por_turma_ano ?? null) ? $kpis_por_turma_ano : [];
+$ocorrenciasLista = is_array($ocorrencias ?? null) ? $ocorrencias : [];
 $moduloVidaEscolar = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar');
 $podeVidaEscolar = !empty($admin_permissions['vida_escolar']['visualizar']);
 $matriculasVigentes = [];
@@ -67,24 +67,41 @@ $classeVinculoVg = static function (string $rotulo): string {
                     </div>
                 </div>
                 <div class="student-card-body">
-                    <div class="flex flex-col lg:flex-row gap-5">
-                        <div class="flex-1 min-w-0">
-                            <?php if ($matriculasVigentes !== []): ?>
-                            <ul class="divide-y divide-slate-100">
-                                <?php foreach ($matriculasVigentes as $matVg): ?>
-                                <?php
-                                $anoVg = !empty($matVg['ano_letivo_ano']) ? (string) (int) $matVg['ano_letivo_ano'] : '';
-                                $nomeVg = trim((string) ($matVg['turma_nome'] ?? ''));
-                                $tituloVg = $nomeVg !== '' ? $nomeVg : $naoInformado;
-                                if ($anoVg !== '') {
-                                    $tituloVg .= ' • ' . $anoVg;
-                                }
-                                $vinculoVg = trim((string) ($matVg['vinculo_rotulo'] ?? ''));
-                                $inicioVg = $matVg['data_entrada'] ?? null;
-                                $fimVg = $matVg['data_saida'] ?? null;
-                                $periodoVg = format_data_br($inicioVg) . ' — ' . ($fimVg ? format_data_br($fimVg) : 'em andamento');
-                                ?>
-                                <li class="py-4 first:pt-0">
+                    <?php if ($matriculasVigentes !== []): ?>
+                    <ul class="divide-y divide-slate-100">
+                        <?php foreach ($matriculasVigentes as $matVg): ?>
+                        <?php
+                        $anoVg = !empty($matVg['ano_letivo_ano']) ? (string) (int) $matVg['ano_letivo_ano'] : '';
+                        $nomeVg = trim((string) ($matVg['turma_nome'] ?? ''));
+                        $tituloVg = $nomeVg !== '' ? $nomeVg : $naoInformado;
+                        if ($anoVg !== '') {
+                            $tituloVg .= ' • ' . $anoVg;
+                        }
+                        $vinculoVg = trim((string) ($matVg['vinculo_rotulo'] ?? ''));
+                        $inicioVg = $matVg['data_entrada'] ?? null;
+                        $fimVg = $matVg['data_saida'] ?? null;
+                        $periodoVg = format_data_br($inicioVg) . ' — ' . ($fimVg ? format_data_br($fimVg) : 'em andamento');
+                        $turmaVg = (int) ($matVg['turma_id'] ?? 0);
+                        $chaveKpiVg = $turmaVg . '-' . (int) ($matVg['ano_letivo_ano'] ?? 0);
+                        $kpiLinha = is_array($kpisPorTurmaAno[$chaveKpiVg] ?? null) ? $kpisPorTurmaAno[$chaveKpiVg] : [];
+                        $freqLinha = isset($kpiLinha['frequencia']) && $kpiLinha['frequencia'] !== null ? (float) $kpiLinha['frequencia'] : null;
+                        $mediaLinha = isset($kpiLinha['media']) && $kpiLinha['media'] !== null ? (float) $kpiLinha['media'] : null;
+                        $ocorrLinha = 0;
+                        foreach ($ocorrenciasLista as $ocVg) {
+                            if (!is_array($ocVg)) {
+                                continue;
+                            }
+                            $turmaOc = (int) ($ocVg['turma_id'] ?? 0);
+                            if ($turmaOc === $turmaVg && $turmaVg > 0) {
+                                $ocorrLinha++;
+                            } elseif ($turmaOc === 0 && $vinculoVg === 'Principal') {
+                                $ocorrLinha++;
+                            }
+                        }
+                        ?>
+                        <li class="py-4 first:pt-0">
+                            <div class="flex flex-col lg:flex-row gap-5">
+                                <div class="flex-1 min-w-0">
                                     <p class="text-lg font-bold text-slate-900"><?= safe_htmlspecialchars($tituloVg) ?></p>
                                     <div class="flex flex-wrap items-center gap-2 mt-2">
                                         <span class="inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativa</span>
@@ -102,10 +119,47 @@ $classeVinculoVg = static function (string $rotulo): string {
                                             <dd class="text-sm text-slate-700"><?= safe_htmlspecialchars($vinculoVg !== '' ? $vinculoVg : null, $naoInformado) ?></dd>
                                         </div>
                                     </dl>
-                                </li>
-                                <?php endforeach; ?>
-                            </ul>
-                            <?php else: ?>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 lg:w-[22rem] shrink-0">
+                                    <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>onclick="selecionarAbaAluno('vida-escolar')"<?php endif; ?>>
+                                        <p class="text-xs text-slate-500 mb-1">Frequência</p>
+                                        <?php if ($freqLinha !== null): ?>
+                                            <p class="text-2xl font-bold text-slate-800 leading-none"><?= number_format($freqLinha, 0, ',', '.') ?>%</p>
+                                            <p class="text-[11px] text-slate-500 mt-1">Desta turma</p>
+                                        <?php else: ?>
+                                            <p class="text-2xl font-bold text-slate-400 leading-none">—</p>
+                                            <p class="text-[11px] text-slate-400 mt-1"><?= safe_htmlspecialchars($naoInformado) ?></p>
+                                        <?php endif; ?>
+                                    </button>
+                                    <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>onclick="selecionarAbaAluno('vida-escolar')"<?php endif; ?>>
+                                        <p class="text-xs text-slate-500 mb-1">Média geral</p>
+                                        <?php if ($mediaLinha !== null): ?>
+                                            <p class="text-2xl font-bold text-slate-800 leading-none"><?= number_format($mediaLinha, 1, ',', '.') ?></p>
+                                            <p class="text-[11px] text-slate-500 mt-1">Média das finais</p>
+                                        <?php else: ?>
+                                            <p class="text-2xl font-bold text-slate-400 leading-none">—</p>
+                                            <p class="text-[11px] text-slate-400 mt-1"><?= safe_htmlspecialchars($naoInformado) ?></p>
+                                        <?php endif; ?>
+                                    </button>
+                                    <button type="button" class="aluno-kpi text-left" onclick="abrirAbaAlunoComSub('pedagogico', 'ocorrencias')">
+                                        <p class="text-xs text-slate-500 mb-1">Ocorrências</p>
+                                        <p class="text-2xl font-bold <?= $ocorrLinha > 0 ? 'text-amber-600' : 'text-slate-800' ?> leading-none"><?= $ocorrLinha ?></p>
+                                        <p class="text-[11px] <?= $ocorrLinha > 0 ? 'text-amber-600' : 'text-slate-500' ?> mt-1"><?= $ocorrLinha > 0 ? 'Registradas' : 'Sem ocorrências' ?></p>
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <button type="button" onclick="selecionarAbaAluno('matriculas')" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
+                        <?php if ($moduloVidaEscolar && $podeVidaEscolar): ?>
+                        <button type="button" onclick="selecionarAbaAluno('vida-escolar')" class="aluno-btn-outline" data-perm-key="vida_escolar" data-perm-action="visualizar">Vida escolar</button>
+                        <?php endif; ?>
+                    </div>
+                    <?php else: ?>
+                    <div class="flex flex-col lg:flex-row gap-5">
+                        <div class="flex-1 min-w-0">
                             <p class="text-lg font-bold text-slate-900">
                                 <?= $matriculaAtual || (!$matriculaPendente && !$matriculaEncerrada)
                                     ? safe_htmlspecialchars($turmaAnoLabel)
@@ -130,7 +184,6 @@ $classeVinculoVg = static function (string $rotulo): string {
                                     <dd class="text-sm text-slate-700"><?= safe_htmlspecialchars($vinculoAtual !== '' ? $vinculoAtual : null, $naoInformado) ?></dd>
                                 </div>
                             </dl>
-                            <?php endif; ?>
                             <div class="flex flex-wrap gap-2 mt-4">
                                 <button type="button" onclick="selecionarAbaAluno('matriculas')" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
                                 <?php if ($moduloVidaEscolar && $podeVidaEscolar): ?>
@@ -166,40 +219,12 @@ $classeVinculoVg = static function (string $rotulo): string {
                             </button>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </section>
         </div>
 
         <div class="xl:col-span-4 space-y-5">
-            <section class="student-card">
-                <div class="student-card-header flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-triangle-exclamation"></i></span>
-                        <h3 class="text-base font-semibold text-slate-900">Pendências</h3>
-                    </div>
-                    <span class="inline-flex min-w-[1.5rem] h-6 px-2 items-center justify-center rounded-full text-xs font-semibold <?= $pendenciasCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' ?>">
-                        <?= $pendenciasCount ?>
-                    </span>
-                </div>
-                <div class="student-card-body">
-                    <?php if (empty($pendenciasAluno)): ?>
-                        <p class="text-sm text-slate-500">Nenhuma pendência no momento.</p>
-                    <?php else: ?>
-                        <ul class="space-y-2.5">
-                            <?php foreach ($pendenciasAluno as $pend): ?>
-                            <li class="text-sm text-slate-700 flex items-start gap-2">
-                                <span class="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
-                                <span><?= safe_htmlspecialchars($pend) ?></span>
-                            </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    <?php endif; ?>
-                    <button type="button" onclick="selecionarAbaAluno('documentos')" data-perm-key="documentos_aluno" data-perm-action="visualizar" class="aluno-btn-outline w-full mt-4">
-                        Ver documentos
-                    </button>
-                </div>
-            </section>
-
             <section class="student-card">
                 <div class="student-card-header">
                     <div class="flex items-center gap-2">

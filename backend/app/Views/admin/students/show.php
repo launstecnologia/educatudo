@@ -269,97 +269,24 @@ if (!empty($student['numero_chamada'])) {
 $metaLinhaAluno = implode(' | ', $metaPartesAluno);
 $statusMatriculaVisual = $matriculaEstado === 'vinculada' ? 'Ativa' : $statusMatriculaLabel;
 
-$pendenciasAluno = [];
-foreach ($docsPendentesLabels as $docPend) {
-    $pendenciasAluno[] = $docPend;
-}
-if ($matriculaPendente) {
-    $pendenciasAluno[] = 'Matrícula pendente';
-}
-if (!$primeiroAcessoRealizado) {
-    $pendenciasAluno[] = 'Primeiro acesso ainda não realizado';
-}
-$pendenciasCount = count($pendenciasAluno);
-$pendenciasAluno = array_slice($pendenciasAluno, 0, 3);
-
-$atividadeLabelsAudit = [
-    'CREATE_STUDENT' => ['Cadastro', 'Cadastro do aluno'],
-    'UPDATE_STUDENT' => ['Cadastro', 'Edição do cadastro'],
-    'DELETE_STUDENT' => ['Cadastro', 'Exclusão do aluno'],
-    'LINK_GUARDIAN' => ['Responsável', 'Responsável vinculado'],
-    'UPDATE_GUARDIAN' => ['Responsável', 'Responsável atualizado'],
-    'SAVE_STUDENT_DOCUMENT' => ['Documento', 'Documento salvo'],
-    'DELETE_STUDENT_DOCUMENT' => ['Documento', 'Documento removido'],
-    'DOWNLOAD_STUDENT_DOCUMENT' => ['Documento', 'Download de documento'],
-    'GENERATE_DECLARATION' => ['Declaração', 'Declaração emitida'],
-    'VIEW_ADMIN' => ['Sistema', 'Visualização do perfil'],
-];
-$atividadeRecente = [];
-if ($matriculaAtual) {
-    $quandoRaw = (string) ($matriculaAtual['updated_at'] ?? $matriculaAtual['created_at'] ?? $matriculaAtual['data_entrada'] ?? '');
-    $descMat = $anoLetivoFicha !== ''
-        ? ('Matrícula confirmada para o ano letivo de ' . $anoLetivoFicha)
-        : 'Matrícula atualizada';
-    $atividadeRecente[] = [
-        'quando' => $quandoRaw !== '' ? date('d/m/Y H:i', strtotime($quandoRaw)) : '',
-        'tipo' => 'Matrícula',
-        'descricao' => $descMat,
-        'usuario' => '',
-        '_ts' => $quandoRaw !== '' ? strtotime($quandoRaw) : 1,
-    ];
-}
-foreach (array_slice($audit_logs, 0, 5) as $logAtv) {
-    $codeAtv = (string) ($logAtv['action'] ?? '');
-    $metaAtv = $atividadeLabelsAudit[$codeAtv] ?? ['Sistema', $codeAtv];
-    $quandoRaw = (string) ($logAtv['created_at'] ?? '');
-    $papelAtv = trim((string) ($logAtv['user_role'] ?? ''));
-    $atividadeRecente[] = [
-        'quando' => $quandoRaw !== '' ? date('d/m/Y H:i', strtotime($quandoRaw)) : '',
-        'tipo' => $metaAtv[0],
-        'descricao' => $metaAtv[1],
-        'usuario' => $papelAtv !== '' ? ucfirst($papelAtv) : '',
-        '_ts' => $quandoRaw !== '' ? strtotime($quandoRaw) : 0,
-    ];
-}
-foreach (array_slice($historico_acesso, 0, 3) as $ha) {
-    $quandoRaw = (string) ($ha['created_at'] ?? '');
-    $atividadeRecente[] = [
-        'quando' => $quandoRaw !== '' ? date('d/m/Y H:i', strtotime($quandoRaw)) : '',
-        'tipo' => 'Acesso',
-        'descricao' => 'Login no portal do aluno',
-        'usuario' => 'Aluno',
-        '_ts' => $quandoRaw !== '' ? strtotime($quandoRaw) : 0,
-    ];
-}
-foreach (array_slice($ocorrencias, 0, 3) as $oc) {
-    $quandoRaw = (string) ($oc['data_ocorrencia'] ?? $oc['created_at'] ?? '');
-    $atividadeRecente[] = [
-        'quando' => $quandoRaw !== '' ? date('d/m/Y H:i', strtotime($quandoRaw)) : '',
-        'tipo' => 'Ocorrência',
-        'descricao' => (string) ($oc['titulo'] ?? 'Ocorrência registrada'),
-        'usuario' => (string) ($oc['criado_por_nome'] ?? ''),
-        '_ts' => $quandoRaw !== '' ? strtotime($quandoRaw) : 0,
-    ];
-}
-usort($atividadeRecente, static function ($a, $b) {
-    return ($b['_ts'] ?? 0) <=> ($a['_ts'] ?? 0);
-});
-$atividadeRecente = array_slice($atividadeRecente, 0, 5);
-
 $moduloVidaEscolar = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar');
 $abasAluno = [
     'visao-geral' => ['label' => 'Visão geral', 'count' => null],
     'dados-pessoais' => ['label' => 'Dados pessoais', 'count' => null],
-    'responsaveis' => ['label' => 'Responsáveis', 'count' => $responsaveisCount, 'perm_key' => 'responsaveis_vinculados'],
+    'responsaveis' => ['label' => 'Responsáveis', 'count' => null, 'perm_key' => 'responsaveis_vinculados'],
     'matriculas' => ['label' => 'Matrículas', 'count' => null, 'perm_key' => 'matriculas_aluno'],
     'saude' => ['label' => 'Saúde', 'count' => null],
-    'documentos' => ['label' => 'Documentos', 'count' => $totalChecklist, 'perm_key' => 'documentos_aluno'],
+    'documentos' => [
+        'label' => 'Documentos',
+        'count' => count($docsPendentesLabels),
+        'count_class' => 'bg-red-100 text-red-700',
+        'perm_key' => 'documentos_aluno',
+    ],
 ];
 if ($moduloVidaEscolar) {
     $abasAluno['vida-escolar'] = ['label' => 'Vida escolar', 'count' => null];
 }
 $abasAluno['pedagogico'] = ['label' => 'Pedagógico', 'count' => null];
-$abasAluno['historico'] = ['label' => 'Histórico', 'count' => null];
 ?>
 
 <?php if ($flash_message !== ''): ?>
@@ -416,8 +343,8 @@ function voltarDetalheAluno() {
                         <?php if (!empty($abaMeta['perm_key'])): ?>data-perm-key="<?= safe_htmlspecialchars($abaMeta['perm_key']) ?>" data-perm-action="visualizar"<?php endif; ?>
                         onclick="selecionarAbaAluno('<?= safe_htmlspecialchars($abaId) ?>')">
                     <?= safe_htmlspecialchars($abaMeta['label']) ?>
-                    <?php if ($abaMeta['count'] !== null): ?>
-                        <span class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold"><?= (int) $abaMeta['count'] ?></span>
+                    <?php if ($abaMeta['count'] !== null && (int) $abaMeta['count'] > 0): ?>
+                        <span class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-xs font-semibold <?= safe_htmlspecialchars($abaMeta['count_class'] ?? 'bg-slate-100 text-slate-600') ?>"><?= (int) $abaMeta['count'] ?></span>
                     <?php endif; ?>
                 </button>
                 <?php endforeach; ?>
@@ -452,32 +379,6 @@ function voltarDetalheAluno() {
 <div id="aba-painel-pedagogico" class="aluno-aba-painel hidden" role="tabpanel" aria-labelledby="aba-btn-pedagogico" hidden>
     <?php include __DIR__ . '/_relatorio_detalhado.php'; ?>
 </div>
-<div id="aba-painel-historico" class="aluno-aba-painel hidden" role="tabpanel" aria-labelledby="aba-btn-historico" hidden>
-    <?php include __DIR__ . '/_secao_auditoria.php'; ?>
-    <div class="student-card mt-5">
-        <div class="student-card-header">
-            <h3 class="text-base font-semibold text-slate-900">Atividade recente</h3>
-        </div>
-        <div class="student-card-body">
-            <?php if (empty($atividadeRecente)): ?>
-                <p class="text-sm text-slate-500">Nenhuma atividade recente registrada.</p>
-            <?php else: ?>
-                <ul class="divide-y divide-slate-100">
-                    <?php foreach ($atividadeRecente as $ev): ?>
-                    <li class="py-3 first:pt-0">
-                        <p class="text-sm font-medium text-slate-800"><?= safe_htmlspecialchars($ev['descricao'] ?? '') ?></p>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            <?= safe_htmlspecialchars($ev['quando'] ?? '') ?>
-                            · <?= safe_htmlspecialchars($ev['tipo'] ?? '') ?>
-                            <?php if (!empty($ev['usuario'])): ?> · <?= safe_htmlspecialchars($ev['usuario']) ?><?php endif; ?>
-                        </p>
-                    </li>
-                    <?php endforeach; ?>
-                </ul>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
 
 <?php include __DIR__ . '/_offcanvas_acoes_aluno.php'; ?>
 <?php include __DIR__ . '/_drawers_aluno.php'; ?>
@@ -498,7 +399,7 @@ var ABA_ALUNO_HASH = {
     'section-matriculas-aluno': 'matriculas',
     'section-documentos-aluno': 'documentos',
     'section-responsaveis-vinculados': 'responsaveis',
-    'section-auditoria-aluno': 'historico',
+    'section-auditoria-aluno': 'visao-geral',
     'section-relatorio-detalhado': 'pedagogico'
 };
 

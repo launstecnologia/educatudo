@@ -765,6 +765,8 @@ class AdminStudentProfileService
             $boletinsGeradosNotasPorRegra = [];
         }
 
+        $vidaEscolar = $this->carregarVidaEscolar($id, (int) ($opts['ficha_id'] ?? 0), $adminPermissions);
+
         return array_merge([
             'student' => $aluno,
             'stats' => $stats,
@@ -800,7 +802,72 @@ class AdminStudentProfileService
             'admin_permissions' => $adminPermissions,
             'user' => $user,
             'paineis_notas' => $this->paineisNotasDoAluno((int) $id),
-        ], $this->carregarVidaEscolar($id, (int) ($opts['ficha_id'] ?? 0), $adminPermissions));
+            'kpis_por_turma_ano' => $this->kpisPorTurmaAno($matriculas, $vidaEscolar),
+        ], $vidaEscolar);
+    }
+
+    /**
+     * Média e frequência do boletim de cada matrícula ativa, pela turma e pelo ano.
+     *
+     * @param list<array<string,mixed>> $matriculas
+     * @param array<string,mixed> $vidaEscolar
+     * @return array<string,array{media:?float,frequencia:?float}>
+     */
+    private function kpisPorTurmaAno(array $matriculas, array $vidaEscolar): array
+    {
+        $mapa = [];
+        $prontuario = is_array($vidaEscolar['vida_escolar_prontuario'] ?? null) ? $vidaEscolar['vida_escolar_prontuario'] : [];
+        $fichas = is_array($prontuario['fichas'] ?? null) ? $prontuario['fichas'] : [];
+        $quadroAtual = is_array($prontuario['quadro'] ?? null) ? $prontuario['quadro'] : null;
+        $fichaAtualId = (int) ($prontuario['ficha_id'] ?? 0);
+        $svc = null;
+
+        foreach ($matriculas as $mat) {
+            if (!is_array($mat) || ($mat['status'] ?? '') !== 'ativa') {
+                continue;
+            }
+            $turmaId = (int) ($mat['turma_id'] ?? 0);
+            $ano = (int) ($mat['ano_letivo_ano'] ?? 0);
+            if ($turmaId <= 0 || $ano <= 0) {
+                continue;
+            }
+            $chave = $turmaId . '-' . $ano;
+            if (isset($mapa[$chave])) {
+                continue;
+            }
+
+            $fichaId = 0;
+            foreach ($fichas as $ficha) {
+                if (!is_array($ficha)) {
+                    continue;
+                }
+                if ((int) ($ficha['turma_id'] ?? 0) === $turmaId && (int) ($ficha['ano_letivo'] ?? 0) === $ano) {
+                    $fichaId = (int) ($ficha['id'] ?? 0);
+                    break;
+                }
+            }
+
+            if ($fichaId <= 0) {
+                $mapa[$chave] = ['media' => null, 'frequencia' => null];
+                continue;
+            }
+            if ($fichaId === $fichaAtualId && $quadroAtual !== null) {
+                $mapa[$chave] = $this->kpisDoQuadro($quadroAtual);
+                continue;
+            }
+
+            try {
+                if ($svc === null) {
+                    require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarService.php';
+                    $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+                }
+                $mapa[$chave] = $this->kpisDoQuadro($svc->quadro($fichaId));
+            } catch (\Throwable $e) {
+                $mapa[$chave] = ['media' => null, 'frequencia' => null];
+            }
+        }
+
+        return $mapa;
     }
 
     /**
