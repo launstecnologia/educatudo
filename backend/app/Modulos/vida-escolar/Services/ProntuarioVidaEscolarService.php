@@ -21,7 +21,7 @@ use StudentDocument;
  */
 class ProntuarioVidaEscolarService
 {
-    public const ABAS = ['identidade', 'trajetoria', 'boletim', 'documentos', 'conferencia', 'dossie'];
+    public const ABAS = ['identidade', 'trajetoria', 'boletim', 'documentos', 'conferencia'];
 
     private DeclarationService $declaracoes;
     private HistoricoEscolarService $historico;

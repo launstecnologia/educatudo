@@ -18,7 +18,6 @@ $abas = [
     'boletim' => ['label' => 'Boletim', 'icon' => 'fa-table'],
     'documentos' => ['label' => 'Documentos', 'icon' => 'fa-folder-open'],
     'conferencia' => ['label' => 'SED / INEP', 'icon' => 'fa-clipboard-check'],
-    'dossie' => ['label' => 'Dossiê', 'icon' => 'fa-box-archive'],
 ];
 ?>
 <div class="mb-6">
@@ -30,7 +29,6 @@ $abas = [
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="<?= URL . ($links['pacote'] ?? ($base . '/pacote-transferencia')) ?>" download class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50">Baixar pacote de transferência</a>
-            <a href="<?= URL . ($links['dossie'] ?? ($base . '/dossie')) ?>" download class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Baixar dossiê (PDF)</a>
         </div>
     </div>
 </div>

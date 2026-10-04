@@ -821,7 +821,7 @@ class VidaEscolarAdminController extends AdminBaseController
         } catch (\Throwable $e) {
             error_log('VidaEscolarAdminController PDF: ' . $e->getMessage());
             $this->setFlashMessage('Não foi possível gerar o PDF. Confira o Layout de documentos (papel timbrado e modelos da Vida Escolar).', 'error');
-            $this->redirectAluno($alunoId, $tipo === 'sed' ? 'conferencia' : ($tipo === 'boletim' ? 'boletim' : 'dossie'), $fichaId);
+            $this->redirectAluno($alunoId, $tipo === 'sed' ? 'conferencia' : 'boletim', $fichaId);
         }
     }
 

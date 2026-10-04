@@ -35,10 +35,10 @@ $podeVidaEscolar = !empty($admin_permissions['vida_escolar']['visualizar']);
 $podeNotasTab = !empty($admin_permissions['tab_notas']['visualizar']);
 $podeBoletimTab = !empty($admin_permissions['tab_boletim']['visualizar']);
 
-$veAbasValidas = ['boletim', 'notas', 'trajetoria', 'documentos', 'conferencia', 'dossie'];
+$veAbasValidas = ['boletim', 'notas', 'trajetoria', 'documentos', 'conferencia'];
 $veAbaPedido = strtolower(trim((string) ($_GET['ve_aba'] ?? $_GET['aba'] ?? '')));
 $veAba = $veAbaPedido !== '' ? $veAbaPedido : 'boletim';
-if ($veAba === 'identidade') {
+if ($veAba === 'identidade' || $veAba === 'dossie') {
     $veAba = 'boletim';
 }
 if (!in_array($veAba, $veAbasValidas, true)) {
@@ -63,7 +63,6 @@ $veAbas = [
     'trajetoria' => ['label' => 'Trajetória', 'icon' => 'fa-timeline', 'perm_key' => 'vida_escolar'],
     'documentos' => ['label' => 'Histórico / emissões', 'icon' => 'fa-folder-open', 'perm_key' => 'vida_escolar'],
     'conferencia' => ['label' => 'SED / INEP', 'icon' => 'fa-clipboard-check', 'perm_key' => 'vida_escolar'],
-    'dossie' => ['label' => 'Dossiê', 'icon' => 'fa-box-archive', 'perm_key' => 'vida_escolar'],
 ];
 $modDir = dirname(__DIR__, 3) . '/Modulos/vida-escolar/Views/admin';
 $mostrarCapa = $podeVidaEscolar && $prontuario !== [];
@@ -168,7 +167,7 @@ $veBannerOrigem = true;
         </div>
     </div>
 
-    <?php foreach (['trajetoria', 'documentos', 'conferencia', 'dossie'] as $veChave): ?>
+    <?php foreach (['trajetoria', 'documentos', 'conferencia'] as $veChave): ?>
     <div id="ve-painel-<?= $esc($veChave) ?>" class="ve-painel <?= $veAba === $veChave ? '' : 'hidden' ?>" data-ve-aba="<?= $esc($veChave) ?>">
         <?php
         $partial = $modDir . '/_aba_' . $veChave . '.php';
