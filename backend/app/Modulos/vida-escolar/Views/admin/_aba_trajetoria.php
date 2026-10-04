@@ -280,7 +280,21 @@ foreach ($documentos as $d) {
     </div>
 
     <div data-ve-origem-painel="meio" class="hidden">
-    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou bimestres deste ano. Essas notas entram no boletim daqui. Anos fechados ficam na outra aba.</p>
+    <?php
+    $anoPeriodo = (int) (is_array($aluno ?? null) ? ($aluno['turma_ano_letivo'] ?? 0) : 0);
+    if ($anoPeriodo <= 0) {
+        $anoPeriodo = (int) date('Y');
+    }
+    if (!class_exists('PeriodoLetivo', false)) {
+        require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
+    }
+    $infoPeriodo = PeriodoLetivo::doAno($anoPeriodo);
+    $periodosMeio = is_array($infoPeriodo['rotulos'] ?? null) && $infoPeriodo['rotulos'] !== []
+        ? $infoPeriodo['rotulos']
+        : [1 => '1º Bimestre', 2 => '2º Bimestre', 3 => '3º Bimestre', 4 => '4º Bimestre'];
+    $nomePeriodos = mb_strtolower((string) ($infoPeriodo['rotulo_campo_plural'] ?? 'períodos'));
+    ?>
+    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou <?= $esc($nomePeriodos) ?> deste ano. Essas notas entram no boletim daqui. Anos fechados ficam na outra aba.</p>
     <?php
     $outrasImp = [];
     foreach ($importacoes as $imp) {
@@ -306,15 +320,15 @@ foreach ($documentos as $d) {
         <div class="rounded-xl border border-gray-200 p-4">
             <h4 class="text-sm font-semibold text-gray-900 mb-3">Escola de origem</h4>
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <div class="md:col-span-6">
+                <div class="md:col-span-12">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Escola <span class="text-red-500">*</span></label>
                     <input name="escola_origem" required value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                 </div>
-                <div class="md:col-span-3">
+                <div class="md:col-span-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Data da transferência</label>
                     <input type="date" name="data_transferencia" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                 </div>
-                <div class="md:col-span-3">
+                <div class="md:col-span-8">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Documento anexado</label>
                     <select name="documento_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                         <option value="0">Nenhum</option>
@@ -354,7 +368,7 @@ foreach ($documentos as $d) {
         $celBim = 'w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center bg-white';
         ?>
         <div class="flex items-center justify-between gap-3 mb-3">
-            <p class="text-sm text-gray-600"><?= $nBlocos > 0 ? 'Componentes da turma. Preencha só os bimestres que constam no documento.' : 'A turma ainda não tem componentes. Adicione os que constam no documento.' ?></p>
+            <p class="text-sm text-gray-600"><?= $nBlocos > 0 ? 'Componentes da turma. Preencha só os ' . $esc($nomePeriodos) . ' que constam no documento.' : 'A turma ainda não tem componentes. Adicione os que constam no documento.' ?></p>
             <button type="button" class="shrink-0 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" onclick="veAddBlocoBim()">
                 <i class="fa-solid fa-plus mr-1"></i>Adicionar componente
             </button>
@@ -366,17 +380,17 @@ foreach ($documentos as $d) {
                     <tr>
                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Componente</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome no documento</th>
-                        <?php for ($p = 1; $p <= 4; $p++): ?>
-                        <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= $p ?>º bimestre</th>
-                        <?php endfor; ?>
+                        <?php foreach ($periodosMeio as $rotuloP): ?>
+                        <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= $esc($rotuloP) ?></th>
+                        <?php endforeach; ?>
                         <th class="px-2 py-2 w-10"></th>
                     </tr>
                     <tr class="border-t border-gray-100">
                         <th colspan="2"></th>
-                        <?php for ($p = 1; $p <= 4; $p++): ?>
+                        <?php foreach ($periodosMeio as $rotuloP): ?>
                         <th class="px-2 py-1 text-center text-[11px] font-medium text-gray-400">Nota</th>
                         <th class="px-2 py-1 text-center text-[11px] font-medium text-gray-400">Faltas</th>
-                        <?php endfor; ?>
+                        <?php endforeach; ?>
                         <th></th>
                     </tr>
                 </thead>
@@ -388,10 +402,10 @@ foreach ($documentos as $d) {
                             <input type="hidden" name="bim_materia_id[<?= $i ?>]" value="<?= (int) ($compB['id'] ?? 0) ?>">
                             <input name="bim_comp[<?= $i ?>]" value="<?= $esc($compB['nome'] ?? '') ?>" class="w-44 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
                         </td>
-                        <?php for ($p = 1; $p <= 4; $p++): ?>
-                        <td class="px-2 py-2 text-center"><input name="bim_nota[<?= $i ?>][<?= $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
-                        <td class="px-2 py-2 text-center"><input name="bim_faltas[<?= $i ?>][<?= $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
-                        <?php endfor; ?>
+                        <?php foreach ($periodosMeio as $p => $rotuloP): ?>
+                        <td class="px-2 py-2 text-center"><input name="bim_nota[<?= $i ?>][<?= (int) $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
+                        <td class="px-2 py-2 text-center"><input name="bim_faltas[<?= $i ?>][<?= (int) $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
+                        <?php endforeach; ?>
                         <td class="px-2 py-2 text-center">
                             <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
                         </td>
@@ -413,10 +427,10 @@ foreach ($documentos as $d) {
                 <td class="px-3 py-2">
                     <input name="bim_comp[__I__]" placeholder="Como está no documento" class="w-44 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
                 </td>
-                <?php for ($p = 1; $p <= 4; $p++): ?>
-                <td class="px-2 py-2 text-center"><input name="bim_nota[__I__][<?= $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
-                <td class="px-2 py-2 text-center"><input name="bim_faltas[__I__][<?= $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
-                <?php endfor; ?>
+                <?php foreach ($periodosMeio as $p => $rotuloP): ?>
+                <td class="px-2 py-2 text-center"><input name="bim_nota[__I__][<?= (int) $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
+                <td class="px-2 py-2 text-center"><input name="bim_faltas[__I__][<?= (int) $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
+                <?php endforeach; ?>
                 <td class="px-2 py-2 text-center">
                     <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
                 </td>
