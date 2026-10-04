@@ -68,6 +68,35 @@ $hrefPacote = !empty($links['pacote']) ? (URL . $links['pacote']) : ($base . '/p
 $hrefDossie = !empty($links['dossie']) ? (URL . $links['dossie']) : ($base . '/dossie');
 $modDir = dirname(__DIR__, 3) . '/Modulos/vida-escolar/Views/admin';
 $mostrarCapa = $podeVidaEscolar && $prontuario !== [];
+$escolaAnterior = trim((string) ($prontuario['escola_anterior'] ?? ''));
+$veioDeFora = $escolaAnterior !== '';
+if ($escolaAnterior === '') {
+    foreach (is_array($trajetoria['anos'] ?? null) ? $trajetoria['anos'] : [] as $anoVe) {
+        if (!is_array($anoVe) || ($anoVe['origem'] ?? '') !== 'externo') {
+            continue;
+        }
+        $veioDeFora = true;
+        $nomeVe = trim((string) ($anoVe['escola_nome'] ?? ''));
+        if ($nomeVe !== '' && $nomeVe !== 'Esta instituição') {
+            $escolaAnterior = $nomeVe;
+            break;
+        }
+    }
+}
+if (!$veioDeFora) {
+    foreach ($importacoes as $impVe) {
+        if (!is_array($impVe)) {
+            continue;
+        }
+        $nomeVe = trim((string) ($impVe['escola_origem'] ?? ''));
+        if ($nomeVe !== '') {
+            $veioDeFora = true;
+            $escolaAnterior = $nomeVe;
+            break;
+        }
+    }
+}
+$veBannerOrigem = true;
 ?>
 <div class="space-y-5">
     <?php if ($podeVidaEscolar && empty($schema_pronto)): ?>
@@ -113,6 +142,13 @@ $mostrarCapa = $podeVidaEscolar && $prontuario !== [];
             <a href="<?= $esc($hrefPacote) ?>" download class="aluno-btn-outline text-sm">Baixar pacote de transferência</a>
             <a href="<?= $esc($hrefDossie) ?>" download class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Baixar dossiê (PDF)</a>
         </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($veioDeFora): ?>
+    <div class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950">
+        <p class="font-semibold">Veio de outra escola<?= $escolaAnterior !== '' ? ': ' . $esc($escolaAnterior) : '' ?></p>
+        <p class="mt-1 text-violet-900">Os anos já concluídos ficam na Trajetória, separados do boletim desta escola.</p>
     </div>
     <?php endif; ?>
 

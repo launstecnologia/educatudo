@@ -50,8 +50,8 @@ $badgeDoc = static function (string $st): string {
 
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
     <h3 class="text-lg font-semibold text-gray-900 mb-1">Recebidos de outra escola</h3>
-    <p class="text-sm text-gray-500 mb-4">Anexe o PDF aqui. Depois use <strong>Ler com IA</strong>. Os anos e as notas aparecem na aba Trajetória para conferir e validar — não preenchem sozinhos o histórico oficial.</p>
-    <?php if ($aiJobId > 0): ?>
+    <p class="text-sm text-gray-500 mb-4">O caminho mais curto é a aba Trajetória: anexar e ler, ou digitar o ano. Aqui ficam os arquivos já recebidos e as emissões.</p>
+    <?php if ($aiJobId > 0 && (string) ($veAba ?? $aba ?? '') !== 'trajetoria'): ?>
     <div id="historicoIaLoading" class="flex items-center gap-3 text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-4">
         <i class="fa-solid fa-spinner fa-spin"></i>
         <span>Lendo o histórico… o rascunho vai para a aba Trajetória.</span>

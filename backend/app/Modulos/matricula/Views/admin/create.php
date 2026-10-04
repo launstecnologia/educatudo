@@ -345,7 +345,11 @@ $steps = [
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Escola anterior</label>
-                    <input type="text" name="aluno_escola_anterior" id="aluno_escola_anterior" value="<?= $val('aluno_escola_anterior') ?>" class="<?= $inputClass ?>">
+                    <input type="text" name="aluno_escola_anterior" id="aluno_escola_anterior" value="<?= $val('aluno_escola_anterior') ?>" class="<?= $inputClass ?>" placeholder="Preencha se o aluno veio de outra escola">
+                    <p class="text-xs text-gray-500 mt-1">Os anos já concluídos não entram nesta ficha. Depois de salvar, abra Vida escolar → Trajetória: dá para anexar o histórico para a leitura ou digitar cada ano.</p>
+                    <?php if (!empty($prefill['aluno_id'])): ?>
+                    <a href="<?= URL ?>/admin/students/<?= (int) $prefill['aluno_id'] ?>?tab=vida-escolar&amp;ve_aba=trajetoria" class="inline-block mt-2 text-sm font-medium text-indigo-700 hover:underline">Abrir trajetória deste aluno</a>
+                    <?php endif; ?>
                 </div>
 
                 <div class="pt-2 border-t border-gray-100">

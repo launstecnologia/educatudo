@@ -28,7 +28,7 @@ $documentos = is_array($documentos ?? $docs_recebidos ?? null) ? ($documentos ??
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div class="sm:col-span-2">
                         <label for="ve_escola_nome" class="block text-sm font-medium text-gray-700 mb-1">Escola <span class="text-red-500">*</span></label>
-                        <input type="text" id="ve_escola_nome" name="escola_nome" required placeholder="Nome da escola de origem"
+                        <input type="text" id="ve_escola_nome" name="escola_nome" required value="<?= $esc($escolaAnterior ?? '') ?>" placeholder="Nome da escola de origem"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
                     <div>

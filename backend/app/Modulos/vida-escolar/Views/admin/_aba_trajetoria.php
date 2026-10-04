@@ -32,7 +32,46 @@ foreach ($importacoes as $imp) {
         $pendentes[] = $imp;
     }
 }
+$escolaAnterior = trim((string) ($escolaAnterior ?? ($prontuario['escola_anterior'] ?? '')));
+$veioDeFora = $escolaAnterior !== '';
+if ($escolaAnterior === '') {
+    foreach ($traj as $anoVe) {
+        if (!is_array($anoVe) || ($anoVe['origem'] ?? '') !== 'externo') {
+            continue;
+        }
+        $veioDeFora = true;
+        $nomeVe = trim((string) ($anoVe['escola_nome'] ?? ''));
+        if ($nomeVe !== '' && $nomeVe !== 'Esta instituição') {
+            $escolaAnterior = $nomeVe;
+            break;
+        }
+    }
+}
+$podeLerIa = !empty($pode_ler_ia);
+$aiJobId = (int) ($ai_job_id ?? 0);
+$docsHistorico = [];
+foreach ($documentos as $d) {
+    if (!is_array($d)) {
+        continue;
+    }
+    if (in_array((string) ($d['tipo'] ?? ''), ['historico', 'ficha_individual', 'declaracao_transferencia'], true)) {
+        $docsHistorico[] = $d;
+    }
+}
 ?>
+<?php if ($aiJobId > 0 && (string) ($veAba ?? $aba ?? 'trajetoria') === 'trajetoria'): ?>
+<div id="historicoIaLoading" class="flex items-center gap-3 text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-3 mb-6">
+    <i class="fa-solid fa-spinner fa-spin"></i>
+    <span>Lendo o histórico. Quando terminar, o rascunho aparece aqui para conferir.</span>
+</div>
+<div id="historicoIaErro" class="hidden rounded-xl bg-red-50 border border-red-200 text-red-800 text-sm px-4 py-3 mb-6"></div>
+<?php endif; ?>
+<?php if ($veioDeFora && empty($veBannerOrigem)): ?>
+<div class="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 mb-6 text-sm text-violet-950">
+    <p class="font-semibold">Veio de outra escola<?= $escolaAnterior !== '' ? ': ' . $esc($escolaAnterior) : '' ?></p>
+    <p class="mt-1 text-violet-900">Os anos já concluídos ficam na lista abaixo. O boletim desta escola não recebe essas notas.</p>
+</div>
+<?php endif; ?>
 <?php if ($pendentes !== []): ?>
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-violet-100">
     <h3 class="text-lg font-semibold text-gray-900 mb-1">Rascunho da leitura com IA</h3>
@@ -110,12 +149,12 @@ foreach ($importacoes as $imp) {
         <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
         <button type="button" onclick="veAbrirLancarEscola()"
                 class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold shrink-0">
-            <i class="fa-solid fa-plus mr-1.5"></i>Lançar Escola
+            <i class="fa-solid fa-plus mr-1.5"></i>Digitar ano
         </button>
         <?php endif; ?>
     </div>
     <?php if ($traj === []): ?>
-        <p class="text-sm text-gray-500 mt-4">Nenhum ano registrado. Homologue o boletim ou clique em <strong>Lançar Escola</strong>.</p>
+        <p class="text-sm text-gray-500 mt-4">Nenhum ano fechado ainda. Anexe o histórico para a leitura, ou digite cada ano. O ano desta escola entra sozinho quando o boletim for homologado.</p>
     <?php else: ?>
         <div class="overflow-x-auto border border-gray-200 rounded-lg mt-4">
             <table class="min-w-full text-sm">
@@ -195,9 +234,60 @@ foreach ($importacoes as $imp) {
     <?php endif; ?>
 </div>
 
-<div class="bg-white rounded-xl shadow-lg p-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-1">Notas do ano em curso (outra escola)</h3>
-    <p class="text-sm text-gray-500 mb-4">Use isto só se o aluno chegou no meio do ano e já tem bimestres na escola de origem. Esses lançamentos entram no <strong>boletim</strong>. Anos já fechados (5º, 6º, 7º…) vão em <strong>Lançar Escola</strong>, no quadro da trajetória.</p>
+<?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900">Histórico de outra escola</h3>
+    <p class="text-sm text-gray-500 mt-1 mb-4">Para anos já concluídos. O ano que o aluno está cursando aqui entra sozinho na homologação do boletim.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-gray-200 p-4">
+            <h4 class="text-sm font-semibold text-gray-900">Anexar e ler</h4>
+            <p class="text-xs text-gray-500 mt-1 mb-3"><?= $podeLerIa ? 'Envie o PDF ou a foto. A leitura vira um rascunho nesta aba. Só entra na lista depois que você confirmar.' : 'A leitura automática está indisponível. Anexe o arquivo e digite os anos ao lado.' ?></p>
+            <form method="post" action="<?= $base ?>/documento" enctype="multipart/form-data" class="space-y-3">
+                <input type="hidden" name="_token" value="<?= $esc($token) ?>">
+                <input type="hidden" name="tipo" value="historico">
+                <?php if ($podeLerIa): ?>
+                <input type="hidden" name="ler_agora" value="1">
+                <?php endif; ?>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Escola</label>
+                    <input name="escola_emissora" value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola de origem" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
+                    <input type="file" name="arquivo" required accept=".pdf,.jpg,.jpeg,.png,.webp" class="w-full text-sm">
+                </div>
+                <button class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold"><?= $podeLerIa ? 'Anexar e ler' : 'Anexar PDF' ?></button>
+            </form>
+            <?php if ($docsHistorico !== []): ?>
+            <ul class="mt-4 space-y-2 text-sm">
+                <?php foreach ($docsHistorico as $d): ?>
+                <li class="flex items-center justify-between gap-2 border border-gray-100 rounded-lg px-3 py-2">
+                    <span class="truncate"><?= $esc($d['escola_emissora'] ?? ($d['arquivo_nome'] ?? 'Documento')) ?></span>
+                    <?php if ($podeLerIa && !empty($d['arquivo_key'])): ?>
+                    <form method="post" action="<?= $base ?>/documento/<?= (int) ($d['id'] ?? 0) ?>/ler" class="shrink-0">
+                        <input type="hidden" name="_token" value="<?= $esc($token) ?>">
+                        <button class="text-sm font-medium text-violet-700 hover:underline">Ler de novo</button>
+                    </form>
+                    <?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-4 flex flex-col">
+            <h4 class="text-sm font-semibold text-gray-900">Digitar</h4>
+            <p class="text-xs text-gray-500 mt-1 mb-3">Um ano por vez, com a série, o resultado e as disciplinas como estão no papel. A escola já vem preenchida quando a matrícula informou a origem.</p>
+            <button type="button" onclick="veAbrirLancarEscola()" class="mt-auto px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50">
+                Digitar ano
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<details class="bg-white rounded-xl shadow-lg p-6">
+    <summary class="cursor-pointer text-lg font-semibold text-gray-900">Chegou no meio do ano</summary>
+    <p class="text-sm text-gray-500 mt-2 mb-4">Use só se a outra escola já lançou bimestres deste ano letivo. Essas notas entram no boletim daqui. Anos fechados ficam no histórico acima.</p>
     <?php
     $outrasImp = [];
     foreach ($importacoes as $imp) {
@@ -217,10 +307,6 @@ foreach ($importacoes as $imp) {
         </ul>
     <?php endif; ?>
     <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
-    <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 mb-5">
-        Histórico de anos anteriores não se preenche aqui.
-        <button type="button" class="font-semibold underline underline-offset-2 hover:text-blue-700" onclick="veAbrirLancarEscola()">Abrir Lançar Escola</button>
-    </div>
     <form method="post" action="<?= $base ?>/importar" class="space-y-5" id="form-importar-transferencia">
         <input type="hidden" name="_token" value="<?= $esc($token) ?>">
         <input type="hidden" name="anos_qtd" value="0">
@@ -229,7 +315,7 @@ foreach ($importacoes as $imp) {
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
                 <div class="md:col-span-6">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Escola <span class="text-red-500">*</span></label>
-                    <input name="escola_origem" required placeholder="Nome da escola" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <input name="escola_origem" required value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                 </div>
                 <div class="md:col-span-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Data da transferência</label>
@@ -359,7 +445,7 @@ foreach ($importacoes as $imp) {
         <button class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Salvar rascunho das notas</button>
     </form>
     <?php endif; ?>
-</div>
+</details>
 <script>
 function veAbrirLancarEscola() {
     var drawer = document.getElementById('veLancarEscolaDrawer');

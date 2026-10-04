@@ -104,6 +104,7 @@ class ProntuarioVidaEscolarService
             'resultados' => $resultados,
             'emissoes' => $emissoes,
             'trajetoria' => $trajetoria,
+            'escola_anterior' => $this->escolaAnteriorDoAluno($alunoId),
             'fichas' => $fichas,
             'ficha_id' => $fichaId,
             'quadro' => $quadro,
@@ -161,6 +162,28 @@ class ProntuarioVidaEscolarService
      * @param array<string,mixed> $trajetoria
      * @return array<string,mixed>
      */
+    private function escolaAnteriorDoAluno(int $alunoId): string
+    {
+        if ($alunoId <= 0) {
+            return '';
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT aluno_escola_anterior
+                 FROM matricula_processos
+                 WHERE aluno_id = :id
+                   AND aluno_escola_anterior IS NOT NULL
+                   AND TRIM(aluno_escola_anterior) <> ''
+                 ORDER BY id DESC
+                 LIMIT 1",
+                ['id' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return '';
+        }
+        return is_array($row) ? trim((string) ($row['aluno_escola_anterior'] ?? '')) : '';
+    }
+
     private function capa(
         array $aluno,
         ?array $matricula,

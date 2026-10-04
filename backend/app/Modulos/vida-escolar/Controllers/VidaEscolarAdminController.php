@@ -376,11 +376,18 @@ class VidaEscolarAdminController extends AdminBaseController
                 $arquivo = $this->gravarArquivo((int) $id, $file);
             } catch (\Throwable $e) {
                 $this->setFlashMessage($e->getMessage(), 'error');
-                $this->redirectAluno($id, 'documentos');
+                $abaErro = (string) ($_POST['ler_agora'] ?? '') === '1' ? 'trajetoria' : 'documentos';
+                $this->redirectAluno($id, $abaErro);
                 return;
             }
         }
-        $this->service()->model()->criarDocumento(array_merge([
+        $lerAgora = (string) ($_POST['ler_agora'] ?? '') === '1';
+        if ($lerAgora && $arquivo === null) {
+            $this->setFlashMessage('Anexe o PDF ou a foto do histórico para a leitura.', 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $docId = $this->service()->model()->criarDocumento(array_merge([
             'aluno_id' => (int) $id,
             'tipo' => in_array($_POST['tipo'] ?? '', ['historico', 'ficha_individual', 'declaracao_transferencia', 'guia', 'outro'], true)
                 ? $_POST['tipo'] : 'historico',
@@ -390,8 +397,19 @@ class VidaEscolarAdminController extends AdminBaseController
             'enviado_por' => (int) ($this->auth->getUser()['id'] ?? 0) ?: null,
         ], $arquivo ?? []));
         $this->prontuario()->reconhecerEntregasExternas((int) $id, $this->service());
-        $this->setFlashMessage('Documento anexado. O checklist da ficha foi atualizado.', 'success');
-        $this->redirectAluno($id, 'documentos');
+        if (!$lerAgora) {
+            $this->setFlashMessage('Documento anexado. O checklist da ficha foi atualizado.', 'success');
+            $this->redirectAluno($id, 'documentos');
+            return;
+        }
+        $leitura = $this->enfileirarLeituraHistorico((int) $id, $docId);
+        if (!$leitura['ok']) {
+            $this->setFlashMessage('Histórico anexado, mas a leitura não começou: ' . $leitura['error'] . ' Dá para digitar os anos.', 'error');
+            $this->redirectAluno($id, 'trajetoria');
+            return;
+        }
+        $this->setFlashMessage('Histórico anexado. A leitura aparece nesta aba para você conferir antes de entrar na trajetória.', 'success');
+        $this->redirectAluno($id, 'trajetoria', 0, $leitura['job_id']);
     }
 
     public function lerHistorico($id, $documentoId): void
@@ -412,12 +430,24 @@ class VidaEscolarAdminController extends AdminBaseController
             $this->redirectAluno($id, 'documentos');
             return;
         }
-        if (!$this->podeLerHistoricoIa()) {
-            $this->setFlashMessage('Leitura por IA indisponível (TudiCoins desligado ou sem saldo na carteira da escola).', 'error');
-            $this->redirectAluno($id, 'documentos');
+        $leitura = $this->enfileirarLeituraHistorico($alunoId, $docId);
+        if (!$leitura['ok']) {
+            $this->setFlashMessage($leitura['error'], 'error');
+            $this->redirectAluno($id, 'trajetoria');
             return;
         }
+        $this->setFlashMessage('Lendo o histórico. Em instantes o rascunho aparece aqui para conferir.', 'success');
+        $this->redirectAluno($id, 'trajetoria', 0, $leitura['job_id']);
+    }
 
+    /**
+     * @return array{ok: bool, job_id: int, error: string}
+     */
+    private function enfileirarLeituraHistorico(int $alunoId, int $docId): array
+    {
+        if (!$this->podeLerHistoricoIa()) {
+            return ['ok' => false, 'job_id' => 0, 'error' => 'Leitura por IA indisponível (TudiCoins desligado ou sem saldo na carteira da escola).'];
+        }
         require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
         require_once dirname(__DIR__, 3) . '/Services/CreditosService.php';
         require_once dirname(__DIR__, 3) . '/Core/CreditosModuleRegistry.php';
@@ -425,7 +455,6 @@ class VidaEscolarAdminController extends AdminBaseController
         $creditsModulo = 'vida_escolar_ler_historico';
         $creditsRef = 'vida_escolar_doc:' . $docId;
         $debitou = false;
-        $jobId = 0;
         try {
             $creditos = new \App\Services\CreditosService();
             if (!$creditos->podeConsumir('escola', \CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $creditsModulo)) {
@@ -450,12 +479,9 @@ class VidaEscolarAdminController extends AdminBaseController
                     error_log('Vida escolar estorno OCR: ' . $eEstorno->getMessage());
                 }
             }
-            $this->setFlashMessage('Não foi possível iniciar a leitura: ' . $e->getMessage(), 'error');
-            $this->redirectAluno($id, 'documentos');
-            return;
+            return ['ok' => false, 'job_id' => 0, 'error' => 'Não foi possível iniciar a leitura: ' . $e->getMessage()];
         }
-        $this->setFlashMessage('Lendo o histórico. Em instantes o rascunho aparece na Trajetória para conferir.', 'success');
-        $this->redirectAluno($id, 'documentos', 0, $jobId);
+        return ['ok' => true, 'job_id' => (int) $jobId, 'error' => ''];
     }
 
     public function importar($id): void
