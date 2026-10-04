@@ -139,7 +139,7 @@ class VidaEscolarPdfService
             throw new \RuntimeException('Modelo vida_escolar_oficio indisponível. Cadastre-o em Layout de documentos.');
         }
         $html = $this->modelos->renderHtml($modelo, $this->varsDoOficio($oficio), 'auto', $config);
-        $this->enviarPdf($html, $filename, $modelo);
+        $this->enviarPdf($html, $filename, $modelo, (int) ($oficio['aluno_id'] ?? 0), 'Ofício', $config);
     }
 
     /**
@@ -153,7 +153,13 @@ class VidaEscolarPdfService
         if (!$modelo) {
             throw new \RuntimeException('Modelo vida_escolar_historico indisponível. Cadastre-o em Layout de documentos.');
         }
-        $this->enviarPdf($html, $filename, $modelo);
+        $aluno = is_array($dadosPdf['aluno'] ?? null) ? $dadosPdf['aluno'] : [];
+        $doc = is_array($dadosPdf['documento'] ?? null) ? $dadosPdf['documento'] : [];
+        $titulo = (string) ($doc['finalidade'] ?? '') === 'Transferencia'
+            ? 'Histórico para transferência'
+            : 'Histórico escolar';
+        $alunoId = (int) ($aluno['id'] ?? $doc['aluno_id'] ?? 0);
+        $this->enviarPdf($html, $filename, $modelo, $alunoId, $titulo, $config);
     }
 
     /**
@@ -172,9 +178,13 @@ class VidaEscolarPdfService
         $aluno = is_array($dadosPdf['aluno'] ?? null) ? $dadosPdf['aluno'] : [];
         $unidade = is_array($dadosPdf['unidade'] ?? null) ? $dadosPdf['unidade'] : [];
         $doc = is_array($dadosPdf['documento'] ?? null) ? $dadosPdf['documento'] : [];
+        $finalidade = (string) ($doc['finalidade'] ?? '');
+        $tituloDoc = $finalidade === 'Transferencia'
+            ? 'Histórico Escolar para Transferência'
+            : 'Histórico Escolar';
         $viewData = [
             'tipo' => 'historico',
-            'titulo' => 'Histórico Escolar',
+            'titulo' => $tituloDoc,
             'dados' => [
                 'aluno' => $aluno,
                 'unidade' => $unidade,
@@ -191,13 +201,23 @@ class VidaEscolarPdfService
             $vars['resp_nome'] = htmlspecialchars($filiacao, ENT_QUOTES, 'UTF-8');
         }
         $vars['historico_html'] = $this->historicoOficialHtml($dadosPdf);
+        $vars['titulo'] = htmlspecialchars($tituloDoc, ENT_QUOTES, 'UTF-8');
         $vars['observacoes'] = htmlspecialchars(
             (string) ($dadosPdf['observacoes_gerais'] ?? $doc['observacoes_gerais'] ?? ''),
             ENT_QUOTES,
             'UTF-8'
         );
 
-        return $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config);
+        $html = $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config);
+        if ($finalidade === 'Transferencia') {
+            $html = str_replace(
+                '<h1 class="doc-title">Histórico Escolar</h1>',
+                '<h1 class="doc-title">Histórico Escolar para Transferência</h1>',
+                $html
+            );
+        }
+
+        return $html;
     }
 
     /**
@@ -271,7 +291,8 @@ class VidaEscolarPdfService
         string $filename
     ): void {
         $out = $this->htmlProntuario($codigo, $titulo, $prontuario, $periodos, $config);
-        $this->enviarPdf($out['html'], $filename, $out['modelo']);
+        $aluno = is_array($prontuario['aluno'] ?? null) ? $prontuario['aluno'] : [];
+        $this->enviarPdf($out['html'], $filename, $out['modelo'], (int) ($aluno['id'] ?? 0), $titulo, $config);
     }
 
     /**
@@ -645,8 +666,9 @@ class VidaEscolarPdfService
 
     /**
      * @param array<string,mixed> $modelo
+     * @param array<string,mixed>|null $config
      */
-    private function enviarPdf(string $html, string $filename, array $modelo): void
+    private function enviarPdf(string $html, string $filename, array $modelo, int $alunoId = 0, string $titulo = '', ?array $config = null): void
     {
         $filename = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'documento.pdf';
         if (!str_ends_with(strtolower($filename), '.pdf')) {
@@ -663,6 +685,7 @@ class VidaEscolarPdfService
                 ob_end_clean();
             }
             $bin = $this->gerarPdfBinario($html, $modelo);
+            $this->arquivarPdfAluno($alunoId, $titulo, $filename, $bin, $config);
             header('Content-Type: application/pdf');
             header('Content-Disposition: attachment; filename="' . $filename . '"');
             header('Content-Length: ' . strlen($bin));
@@ -672,6 +695,32 @@ class VidaEscolarPdfService
             exit;
         } finally {
             ini_set('display_errors', (string) $old);
+        }
+    }
+
+    /**
+     * @param array<string,mixed>|null $config
+     */
+    private function arquivarPdfAluno(int $alunoId, string $titulo, string $filename, string $bin, ?array $config): void
+    {
+        if ($alunoId <= 0 || $bin === '') {
+            return;
+        }
+        try {
+            require_once __DIR__ . '/ArquivoPdfAlunoService.php';
+            $tipo = preg_replace('/[^a-z0-9]+/i', '_', $titulo) ?: 'documento';
+            (new ArquivoPdfAlunoService($this->db))->guardar(
+                $alunoId,
+                strtolower((string) $tipo),
+                $titulo !== '' ? $titulo : 'Documento',
+                $bin,
+                $filename,
+                null,
+                '',
+                $config
+            );
+        } catch (\Throwable $e) {
+            error_log('Vida escolar arquivar PDF: ' . $e->getMessage());
         }
     }
 

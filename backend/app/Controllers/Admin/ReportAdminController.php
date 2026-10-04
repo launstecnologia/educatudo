@@ -1624,6 +1624,34 @@ class ReportAdminController extends AdminBaseController
         return $grupos;
     }
 
+    public function htmlDemonstrativoNotasDoAluno(int $alunoId): string
+    {
+        if ($alunoId <= 0) {
+            return '';
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT regra_id, periodo_ref
+                 FROM boletim_resultados_gerados
+                 WHERE aluno_id = :aluno AND preview = 0
+                 ORDER BY vigente DESC, id DESC
+                 LIMIT 1',
+                ['aluno' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return '';
+        }
+        if (!is_array($row)) {
+            return '';
+        }
+
+        return $this->htmlDemonstrativoNotasAluno(
+            $alunoId,
+            (int) ($row['regra_id'] ?? 0),
+            (string) ($row['periodo_ref'] ?? '')
+        );
+    }
+
     private function htmlDemonstrativoNotasAluno(int $alunoId, int $regraId, string $periodoRef): string
     {
         if ($alunoId <= 0 || $regraId <= 0) {

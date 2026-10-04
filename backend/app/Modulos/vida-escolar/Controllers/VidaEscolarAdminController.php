@@ -7,7 +7,11 @@ require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
 require_once __DIR__ . '/../Services/VidaEscolarService.php';
 require_once __DIR__ . '/../Services/ProntuarioVidaEscolarService.php';
 require_once __DIR__ . '/../Services/VidaEscolarPdfService.php';
+require_once __DIR__ . '/../Services/EmissaoDocumentosAlunoService.php';
+require_once __DIR__ . '/../Services/ArquivoPdfAlunoService.php';
 
+use App\Modulos\VidaEscolar\Services\ArquivoPdfAlunoService;
+use App\Modulos\VidaEscolar\Services\EmissaoDocumentosAlunoService;
 use App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService;
 use App\Modulos\VidaEscolar\Services\VidaEscolarPdfService;
 use App\Modulos\VidaEscolar\Services\VidaEscolarService;
@@ -252,6 +256,56 @@ class VidaEscolarAdminController extends AdminBaseController
     public function boletimPdf($id): void
     {
         $this->emitirPdfProntuario((int) $id, 'boletim');
+    }
+
+    public function pdfEmitido($id, $pdfId): void
+    {
+        if (!$this->exigirPermissao('visualizar')) {
+            return;
+        }
+        $arquivo = (new ArquivoPdfAlunoService())->baixar((int) $id, (int) $pdfId, $this->config ?? null);
+        if ($arquivo === null) {
+            $this->setFlashMessage('PDF não encontrado.', 'error');
+            $this->redirectAluno($id, 'documentos');
+            return;
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $arquivo['nome'] . '"');
+        header('Content-Length: ' . strlen($arquivo['conteudo']));
+        header('X-Content-Type-Options: nosniff');
+        echo $arquivo['conteudo'];
+        exit;
+    }
+
+    public function emitirDocumento($id, $tipo): void
+    {
+        if (!$this->exigirPermissao('visualizar')) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido.', 'error');
+            $this->redirectAluno($id, 'documentos');
+            return;
+        }
+        try {
+            (new EmissaoDocumentosAlunoService())->emitir(
+                (int) $id,
+                (string) $tipo,
+                $this->auth->getUser() ?: [],
+                $this->config ?? null
+            );
+        } catch (\PDOException $e) {
+            error_log('Vida escolar emitir documento: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível emitir o documento.', 'error');
+            $this->redirectAluno($id, 'documentos');
+        } catch (\RuntimeException $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+            $this->redirectAluno($id, 'documentos');
+        } catch (\Throwable $e) {
+            error_log('Vida escolar emitir documento: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível emitir o documento.', 'error');
+            $this->redirectAluno($id, 'documentos');
+        }
     }
 
     public function pacoteTransferencia($id): void

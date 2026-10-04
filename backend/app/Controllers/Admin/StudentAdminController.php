@@ -3889,11 +3889,28 @@ class StudentAdminController extends AdminBaseController
                 $slug = 'aluno_' . $alunoId;
             }
             $filename = 'boletim_' . $slug . '_' . date('Ymd_His') . '.pdf';
+            $bin = $dompdf->output();
+            try {
+                require_once __DIR__ . '/../../Modulos/vida-escolar/Services/ArquivoPdfAlunoService.php';
+                $quem = $this->auth->getUser() ?: [];
+                (new \App\Modulos\VidaEscolar\Services\ArquivoPdfAlunoService($this->db))->guardar(
+                    $alunoId,
+                    'boletim',
+                    'Boletim',
+                    $bin,
+                    $filename,
+                    (int) ($quem['id'] ?? 0) ?: null,
+                    (string) ($quem['nome'] ?? ''),
+                    $this->config ?? null
+                );
+            } catch (\Throwable $e) {
+                error_log('Boletim do aluno arquivar PDF: ' . $e->getMessage());
+            }
             header('Content-Type: application/pdf');
             header('Content-Disposition: attachment; filename="' . $filename . '"');
             header('Cache-Control: private, max-age=0, must-revalidate');
             header('Pragma: public');
-            echo $dompdf->output();
+            echo $bin;
             exit;
         } finally {
             ini_set('display_errors', (string) $oldDisplayErrors);

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../Models/Education/ResultadoAcademico.php';
 require_once __DIR__ . '/../../Models/Education/ComponenteCurricular.php';
 require_once __DIR__ . '/../../Services/ResultadoHomologacaoService.php';
 require_once __DIR__ . '/../../Services/DocumentoOficialService.php';
+require_once __DIR__ . '/../../Modulos/modelos-documentos/Services/GeradorPdfFolhaService.php';
 
 if (!class_exists('ResultadoFinalAdminController')) {
 class ResultadoFinalAdminController extends AdminBaseController
@@ -272,7 +273,7 @@ class ResultadoFinalAdminController extends AdminBaseController
                 (int) ($this->auth->getUser()['id'] ?? 0),
                 $this->config ?? null
             );
-            $this->outputPdf($emitido['html'], 'ficha_individual_' . (int) $alunoId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4');
+            $this->outputPdf($emitido['html'], 'ficha_individual_' . (int) $alunoId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4', $alunoId, 'Ficha do aluno');
         } catch (Throwable $e) {
             $this->abortarSaidaPdf();
             $this->setFlashMessage($e->getMessage(), 'error');
@@ -349,7 +350,7 @@ class ResultadoFinalAdminController extends AdminBaseController
                 (int) ($this->auth->getUser()['id'] ?? 0),
                 $this->config ?? null
             );
-            $this->outputPdf($emitido['html'], 'boletim_oficial_' . (int) $alunoId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4');
+            $this->outputPdf($emitido['html'], 'boletim_oficial_' . (int) $alunoId . '.pdf', $emitido['orientacao'], $emitido['papel'] ?? 'A4', $alunoId, 'Boletim');
         } catch (Throwable $e) {
             $this->abortarSaidaPdf();
             $this->setFlashMessage($e->getMessage(), 'error');
@@ -606,7 +607,7 @@ class ResultadoFinalAdminController extends AdminBaseController
         }
     }
 
-    private function outputPdf(string $html, string $filename, string $orientation = 'portrait', string $paper = 'A4'): void
+    private function outputPdf(string $html, string $filename, string $orientation = 'portrait', string $paper = 'A4', int $alunoId = 0, string $titulo = ''): void
     {
         $orientation = $orientation === 'landscape' ? 'landscape' : 'portrait';
         $paper = strtoupper($paper) === 'A5' ? 'A5' : 'A4';
@@ -624,16 +625,49 @@ class ResultadoFinalAdminController extends AdminBaseController
             if (is_string($chroot) && is_dir($chroot)) {
                 $options->setChroot($chroot);
             }
+            $pdfFolha = (new \App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService())->gerarSeFolhaOficial($html);
+            if (is_string($pdfFolha)) {
+                $this->arquivarPdfAluno($alunoId, $titulo, $filename, $pdfFolha);
+                header('Content-Type: application/pdf');
+                header('Content-Disposition: inline; filename="' . $this->nomeArquivoPdf($filename) . '"');
+                echo $pdfFolha;
+                exit;
+            }
             $dompdf = new \Dompdf\Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
             $dompdf->setPaper($paper, $orientation);
             $dompdf->render();
+            $bin = $dompdf->output();
+            $this->arquivarPdfAluno($alunoId, $titulo, $filename, $bin);
             header('Content-Type: application/pdf');
             header('Content-Disposition: inline; filename="' . $this->nomeArquivoPdf($filename) . '"');
-            echo $dompdf->output();
+            echo $bin;
             exit;
         } finally {
             ini_set('display_errors', (string) $old);
+        }
+    }
+
+    private function arquivarPdfAluno(int $alunoId, string $titulo, string $filename, string $bin): void
+    {
+        if ($alunoId <= 0 || $bin === '') {
+            return;
+        }
+        try {
+            require_once __DIR__ . '/../../Modulos/vida-escolar/Services/ArquivoPdfAlunoService.php';
+            $user = $this->auth->getUser() ?: [];
+            (new \App\Modulos\VidaEscolar\Services\ArquivoPdfAlunoService($this->db))->guardar(
+                $alunoId,
+                $titulo === 'Ficha do aluno' ? 'ficha' : 'boletim',
+                $titulo !== '' ? $titulo : 'Documento',
+                $bin,
+                $filename,
+                (int) ($user['id'] ?? 0) ?: null,
+                (string) ($user['nome'] ?? ''),
+                $this->config ?? null
+            );
+        } catch (\Throwable $e) {
+            error_log('Resultado final arquivar PDF: ' . $e->getMessage());
         }
     }
 }

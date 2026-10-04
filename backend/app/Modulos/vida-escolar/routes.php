@@ -29,6 +29,8 @@ $router->get('/admin/students/{id}/vida-escolar/sed', 'Modulos/vida-escolar/Vida
 $router->get('/admin/students/{id}/vida-escolar/documento/{documentoId}/arquivo', 'Modulos/vida-escolar/VidaEscolarAdminController@arquivoDocumento');
 $router->post('/admin/students/{id}/vida-escolar/ano-externo', 'Modulos/vida-escolar/VidaEscolarAdminController@anoExterno');
 $router->post('/admin/students/{id}/vida-escolar/documento', 'Modulos/vida-escolar/VidaEscolarAdminController@documento');
+$router->post('/admin/students/{id}/vida-escolar/emitir/{tipo}', 'Modulos/vida-escolar/VidaEscolarAdminController@emitirDocumento');
+$router->get('/admin/students/{id}/vida-escolar/pdf-emitido/{pdfId}', 'Modulos/vida-escolar/VidaEscolarAdminController@pdfEmitido');
 $router->post('/admin/students/{id}/vida-escolar/documento-ficha/{fichaDocId}/ler', 'Modulos/vida-escolar/VidaEscolarAdminController@lerDocumentoDaFicha');
 $router->post('/admin/students/{id}/vida-escolar/documento/{documentoId}/ler', 'Modulos/vida-escolar/VidaEscolarAdminController@lerHistorico');
 $router->get('/admin/students/{id}/vida-escolar/importar', 'Modulos/vida-escolar/VidaEscolarAdminController@importar');

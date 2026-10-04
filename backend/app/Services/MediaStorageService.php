@@ -36,6 +36,8 @@ class MediaStorageService
         'arquivos' => 'arquivos',
         'apostilas' => 'apostilas',
         'provas_marcacao_final' => 'provas/marcacao_final',
+        'documentos_emissoes' => 'documentos/emissoes',
+        'pdfs_aluno' => 'pdfs/aluno',
         'tickets' => 'tickets',
         'notifications' => 'notifications',
         'simulados_questoes' => 'simulados/questoes',

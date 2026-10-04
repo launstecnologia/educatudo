@@ -123,6 +123,21 @@ class VidaEscolarBoletinsLoteService
                     if ($binario === '') {
                         throw new \RuntimeException('PDF vazio.');
                     }
+                    try {
+                        require_once __DIR__ . '/ArquivoPdfAlunoService.php';
+                        (new ArquivoPdfAlunoService())->guardar(
+                            $alunoId,
+                            'boletim',
+                            'Boletim',
+                            $binario,
+                            'boletim_' . $alunoId . '.pdf',
+                            null,
+                            '',
+                            null
+                        );
+                    } catch (\Throwable $eArq) {
+                        error_log('Lote boletim arquivar PDF aluno #' . $alunoId . ': ' . $eArq->getMessage());
+                    }
 
                     $nomeAluno = (string) ($dados['aluno']['nome'] ?? $dados['nome'] ?? 'aluno');
                     $ra = (string) ($dados['aluno']['ra'] ?? $dados['ra'] ?? '');
