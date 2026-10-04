@@ -955,9 +955,11 @@ class VidaEscolar
     {
         $row = $this->db->fetch(
             "SELECT a.*, t.nome AS turma_nome, t.serie AS turma_serie, t.matriz_curricular_id,
-                    t.ano_letivo AS turma_ano_letivo
+                    t.ano_letivo AS turma_ano_letivo,
+                    al.ano AS turma_ano_calendario
              FROM alunos a
              LEFT JOIN turmas t ON t.id = a.turma_id
+             LEFT JOIN ano_letivo al ON al.id = t.ano_letivo_id
              WHERE a.id = :id",
             ['id' => $id]
         );
@@ -985,9 +987,11 @@ class VidaEscolar
         }
         $rows = $this->db->fetchAll(
             "SELECT a.*, t.nome AS turma_nome, t.serie AS turma_serie, t.matriz_curricular_id,
-                    t.ano_letivo AS turma_ano_letivo
+                    t.ano_letivo AS turma_ano_letivo,
+                    al.ano AS turma_ano_calendario
              FROM alunos a
              LEFT JOIN turmas t ON t.id = a.turma_id
+             LEFT JOIN ano_letivo al ON al.id = t.ano_letivo_id
              WHERE a.id IN (" . implode(',', $ph) . ')',
             $params
         ) ?: [];

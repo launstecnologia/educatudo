@@ -281,8 +281,20 @@ foreach ($documentos as $d) {
 
     <div data-ve-origem-painel="meio" class="hidden">
     <?php
-    $anoPeriodo = (int) (is_array($aluno ?? null) ? ($aluno['turma_ano_letivo'] ?? 0) : 0);
-    if ($anoPeriodo <= 0) {
+    $anoTurma = 0;
+    if (is_array($aluno ?? null)) {
+        $anoTurma = (int) ($aluno['turma_ano_calendario'] ?? 0);
+        if ($anoTurma < 2000 || $anoTurma > 2100) {
+            $anoTurma = (int) ($aluno['turma_ano_letivo'] ?? 0);
+        }
+    }
+    $anoPeriodo = $anoTurma;
+    $fichaMeio = is_array(($quadro ?? [])['ficha'] ?? null) ? $quadro['ficha'] : [];
+    $anoFicha = (int) ($fichaMeio['ano_letivo'] ?? 0);
+    if ($anoFicha >= 2000 && $anoFicha <= 2100) {
+        $anoPeriodo = $anoFicha;
+    }
+    if ($anoPeriodo < 2000 || $anoPeriodo > 2100) {
         $anoPeriodo = (int) date('Y');
     }
     if (!class_exists('PeriodoLetivo', false)) {
@@ -293,8 +305,11 @@ foreach ($documentos as $d) {
         ? $infoPeriodo['rotulos']
         : [1 => '1º Bimestre', 2 => '2º Bimestre', 3 => '3º Bimestre', 4 => '4º Bimestre'];
     $nomePeriodos = mb_strtolower((string) ($infoPeriodo['rotulo_campo_plural'] ?? 'períodos'));
+    $tipoPeriodo = (string) ($infoPeriodo['tipo'] ?? 'bimestre');
+    $rotuloDivisao = (string) (PeriodoLetivo::TIPOS[$tipoPeriodo] ?? 'Bimestral (4 períodos)');
     ?>
-    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou <?= $esc($nomePeriodos) ?> deste ano. Essas notas entram no boletim daqui. Anos fechados ficam na outra aba.</p>
+    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou <?= $esc($nomePeriodos) ?> de <?= (int) $anoPeriodo ?>. Essas notas entram no boletim daqui. Anos fechados ficam na outra aba.</p>
+    <p class="text-xs text-gray-500 mb-4">Ano letivo <?= (int) $anoPeriodo ?> · <?= $esc($rotuloDivisao) ?>. As colunas seguem essa divisão (bimestre, trimestre, semestre ou etapa única), a mesma do boletim.</p>
     <?php
     $outrasImp = [];
     foreach ($importacoes as $imp) {
@@ -319,24 +334,26 @@ foreach ($documentos as $d) {
         <input type="hidden" name="anos_qtd" value="0">
         <div class="rounded-xl border border-gray-200 p-4">
             <h4 class="text-sm font-semibold text-gray-900 mb-3">Escola de origem</h4>
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <div class="md:col-span-12">
+            <div class="space-y-3">
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Escola <span class="text-red-500">*</span></label>
-                    <input name="escola_origem" required value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <input name="escola_origem" required value="<?= $esc($escolaAnterior) ?>" placeholder="Nome da escola" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" style="width:100%;box-sizing:border-box;">
                 </div>
-                <div class="md:col-span-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Data da transferência</label>
-                    <input type="date" name="data_transferencia" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                </div>
-                <div class="md:col-span-8">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Documento anexado</label>
-                    <select name="documento_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                        <option value="0">Nenhum</option>
-                        <?php foreach ($documentos as $d): ?>
-                            <?php if (!is_array($d)) { continue; } ?>
-                            <option value="<?= (int) ($d['id'] ?? 0) ?>"><?= $esc(($d['tipo'] ?? 'documento') . ' #' . (int) ($d['id'] ?? 0)) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data da transferência</label>
+                        <input type="date" name="data_transferencia" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" style="width:100%;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Documento anexado</label>
+                        <select name="documento_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" style="width:100%;box-sizing:border-box;">
+                            <option value="0">Nenhum</option>
+                            <?php foreach ($documentos as $d): ?>
+                                <?php if (!is_array($d)) { continue; } ?>
+                                <option value="<?= (int) ($d['id'] ?? 0) ?>"><?= $esc(($d['tipo'] ?? 'documento') . ' #' . (int) ($d['id'] ?? 0)) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
@@ -381,7 +398,7 @@ foreach ($documentos as $d) {
                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Componente</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nome no documento</th>
                         <?php foreach ($periodosMeio as $rotuloP): ?>
-                        <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= $esc($rotuloP) ?></th>
+                        <th class="px-2 py-2 text-center text-xs font-medium text-gray-700 normal-case" colspan="2"><?= $esc($rotuloP) ?></th>
                         <?php endforeach; ?>
                         <th class="px-2 py-2 w-10"></th>
                     </tr>
