@@ -1643,10 +1643,11 @@ class ReportAdminController extends AdminBaseController
             if ($ini > $fim) {
                 [$ini, $fim] = [$fim, $ini];
             }
+            $periodoSim = 'RANGE:' . $ini . ':' . $fim;
             $simulacao = $motor->simularRegraAluno(
                 $regra,
                 $alunoId,
-                $periodoRef,
+                $periodoSim,
                 $ini,
                 $fim,
                 [],
@@ -1668,12 +1669,13 @@ class ReportAdminController extends AdminBaseController
                 require_once __DIR__ . '/../../Helpers/BoletimQuadroLayoutHelper.php';
             }
             $edicaoSimulacao = null;
-            $html = '';
-            if (BoletimQuadroLayoutHelper::partirTabelas($cols) !== []) {
-                ob_start();
-                include __DIR__ . '/../../Views/partials/boletim_quadro_tabela.php';
-                $html = (string) ob_get_clean();
-            }
+            $ev = [
+                'grupo_regras_notas_id' => (int) ($regra['grupo_regras_notas_id'] ?? 0),
+                'exibir_em' => 'notas',
+            ];
+            ob_start();
+            include __DIR__ . '/../../Views/partials/boletim_quadro_tabela.php';
+            $html = (string) ob_get_clean();
             if (stripos($html, '<table') !== false) {
                 return $html;
             }

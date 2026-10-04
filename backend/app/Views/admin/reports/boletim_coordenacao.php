@@ -232,8 +232,8 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                 <a href="<?= htmlspecialchars($urlExportar('pdf'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-red-600 text-white hover:bg-red-700" title="Exportar PDF" aria-label="Exportar PDF"><i class="fa-solid fa-file-pdf"></i></a>
             <?php endif; ?>
             <a href="<?= htmlspecialchars($urlExportar('excel'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-emerald-600 text-white hover:bg-emerald-700" title="Exportar Excel" aria-label="Exportar Excel"><i class="fa-solid fa-file-excel"></i></a>
-            <a href="<?= htmlspecialchars($urlExportar('json'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-slate-800 text-white hover:bg-slate-900" title="Exportar JSON" aria-label="Exportar JSON"><i class="fa-solid fa-file-code"></i></a>
-            <a href="<?= htmlspecialchars($urlExportar('txt'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> bg-sky-700 text-white hover:bg-sky-800" title="Exportar TXT" aria-label="Exportar TXT"><i class="fa-solid fa-file-lines"></i></a>
+            <a href="<?= htmlspecialchars($urlExportar('json'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> text-white hover:opacity-90" style="background-color:#0f172a" title="Exportar JSON" aria-label="Exportar JSON"><i class="fa-solid fa-file-code"></i></a>
+            <a href="<?= htmlspecialchars($urlExportar('txt'), ENT_QUOTES, 'UTF-8') ?>" class="<?= $btnExportar ?> text-white hover:opacity-90" style="background-color:#1d4ed8" title="Exportar TXT" aria-label="Exportar TXT"><i class="fa-solid fa-file-lines"></i></a>
         </div>
     </div>
     <?php if ($fonteRelatorio === 'vida_escolar' && (int) ($relatorio['alunos_sem_ficha'] ?? 0) > 0 && (int) ($relatorio['total_alunos'] ?? 0) > 0): ?>
