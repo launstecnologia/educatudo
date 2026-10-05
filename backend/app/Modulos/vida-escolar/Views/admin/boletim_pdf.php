@@ -48,12 +48,12 @@ $fmt = static function ($c): string {
         <thead>
             <tr>
                 <th rowspan="2">Componentes curriculares</th>
-                <?php foreach ([1, 2, 3, 4, 0] as $p): ?>
+                <?php foreach ([1, 2, 3, 4] as $p): ?>
                     <th colspan="2"><?= $esc($periodos[$p] ?? $p) ?></th>
                 <?php endforeach; ?>
             </tr>
             <tr>
-                <?php foreach ([1, 2, 3, 4, 0] as $p): ?>
+                <?php foreach ([1, 2, 3, 4] as $p): ?>
                     <th>Nota</th><th>Falta</th>
                 <?php endforeach; ?>
             </tr>
@@ -62,7 +62,7 @@ $fmt = static function ($c): string {
             <?php foreach ($grid as $row): ?>
             <tr>
                 <td><?= $esc($row['linha']['componente_nome'] ?? '') ?></td>
-                <?php foreach ([1, 2, 3, 4, 0] as $p):
+                <?php foreach ([1, 2, 3, 4] as $p):
                     $c = $row['celulas'][$p] ?? null;
                     $nota = $fmt($c);
                     if (is_array($c) && ($c['origem'] ?? '') === 'externa' && $nota !== '—') {

@@ -800,11 +800,16 @@ class ModeloDocumentoService
         }
         $nPer = count($periodos);
         $colspan = 1 + ($nPer * 2);
+        $ehColunaFinal = static function (int $i) use ($periodos): bool {
+            $rotulo = mb_strtolower(trim((string) ($periodos[$i] ?? '')), 'UTF-8');
+
+            return $rotulo === 'final';
+        };
 
         $html = '<table class="quadro-notas dados"><thead><tr>'
             . self::thQuadro('Componente', ' class="comp" rowspan="2"', '#e5e7eb');
         foreach ($periodos as $i => $rotulo) {
-            $final = ($i === $nPer - 1);
+            $final = $ehColunaFinal((int) $i);
             $html .= self::thQuadro(
                 htmlspecialchars((string) $rotulo, ENT_QUOTES, 'UTF-8'),
                 ' colspan="2"' . ($final ? ' class="final"' : ''),
@@ -813,7 +818,7 @@ class ModeloDocumentoService
         }
         $html .= '</tr><tr>';
         for ($i = 0; $i < $nPer; $i++) {
-            $final = ($i === $nPer - 1);
+            $final = $ehColunaFinal($i);
             $cls = $final ? ' class="final"' : '';
             $bg = $final ? '#dbe3ee' : '#eef0f3';
             $html .= self::thQuadro('Nota', $cls, $bg) . self::thQuadro('Falta', $cls, $bg);
@@ -837,7 +842,7 @@ class ModeloDocumentoService
                     $c = is_array($celulas[$i] ?? null) ? $celulas[$i] : [];
                     $nota = trim((string) ($c['nota'] ?? '')) !== '' ? (string) $c['nota'] : '—';
                     $falta = trim((string) ($c['falta'] ?? '')) !== '' ? (string) $c['falta'] : '—';
-                    $final = ($i === $nPer - 1);
+                    $final = $ehColunaFinal($i);
                     $tdBg = $final ? '#eef2f7' : ($zebra ? '#f8fafc' : '#ffffff');
                     $cls = 'num' . ($final ? ' final' : '');
                     $tdAttr = ' class="' . $cls . '" bgcolor="' . $tdBg . '" style="background-color:' . $tdBg . ';"';

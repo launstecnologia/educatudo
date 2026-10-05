@@ -11,7 +11,7 @@ if (!class_exists('PeriodoLetivo')) {
 $anoFicha = (int) ($ficha['ano_letivo'] ?? date('Y'));
 $infoPeriodo = PeriodoLetivo::doAno($anoFicha);
 $periodos = $infoPeriodo['rotulos'];
-$periodos[0] = 'FINAL';
+$periodosQuadro = [1, 2, 3, 4];
 $fichas = is_array($fichas ?? null) ? $fichas : [];
 $editavelFicha = $ficha && ($ficha['status'] ?? '') !== 'homologada';
 $fichaHomologada = (bool) $ficha && ($ficha['status'] ?? '') === 'homologada';
@@ -66,7 +66,7 @@ $fmtNota = static function ($c): string {
                 } else {
                     echo 'Conforme o modelo de boletim oficial da turma. ';
                 }
-            ?>Cada bimestre: nota à esquerda, falta à direita. A FINAL segue a fórmula das regras acadêmicas. <span class="text-violet-700">¹</span> = escola anterior.</p>
+            ?>Cada bimestre: nota à esquerda, falta à direita. <span class="text-violet-700">¹</span> = escola anterior.</p>
             <?php if ($fichaHomologada): ?>
             <p class="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Boletim homologado — notas travadas. Para corrigir, reabra o período abaixo (motivo obrigatório; fica na auditoria).</p>
             <?php endif; ?>
@@ -98,13 +98,13 @@ $fmtNota = static function ($c): string {
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Componente</th>
-                        <?php foreach ([1, 2, 3, 4, 0] as $p): ?>
+                        <?php foreach ($periodosQuadro as $p): ?>
                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="2"><?= $esc($periodos[$p] ?? $p) ?></th>
                         <?php endforeach; ?>
                     </tr>
                     <tr>
                         <th></th>
-                        <?php foreach ([1, 2, 3, 4, 0] as $p): ?>
+                        <?php foreach ($periodosQuadro as $p): ?>
                             <th class="px-2 py-1 text-center text-[10px] text-gray-400">Nota</th>
                             <th class="px-2 py-1 text-center text-[10px] text-gray-400">Falta</th>
                         <?php endforeach; ?>
@@ -117,7 +117,7 @@ $fmtNota = static function ($c): string {
                     ?>
                     <tr class="hover:bg-gray-50">
                         <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap"><?= $esc($linha['componente_nome'] ?? '') ?></td>
-                        <?php foreach ([1, 2, 3, 4, 0] as $p):
+                        <?php foreach ($periodosQuadro as $p):
                             $c = $cels[$p] ?? null;
                             $origem = (string) ($c['origem'] ?? 'vazia');
                             $aberta = $c && in_array($c['status'] ?? '', ['aberta', 'reaberta'], true) && $p !== 0;
@@ -153,7 +153,7 @@ $fmtNota = static function ($c): string {
                     </tr>
                     <?php endforeach; ?>
                     <?php if ($grid === []): ?>
-                    <tr><td colspan="11" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
+                    <tr><td colspan="9" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>

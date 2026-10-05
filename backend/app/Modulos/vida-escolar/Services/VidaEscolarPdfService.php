@@ -420,7 +420,7 @@ class VidaEscolarPdfService
     private function quadroHtml(array $quadro, array $periodos): string
     {
         $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
-        $cols = [1, 2, 3, 4, 0];
+        $cols = [1, 2, 3, 4];
         $rotulos = [];
         foreach ($cols as $p) {
             $rotulos[] = (string) ($periodos[$p] ?? (string) $p);

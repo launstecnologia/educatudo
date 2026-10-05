@@ -2303,29 +2303,20 @@ class ReportAdminController extends AdminBaseController
         }
         if ($periodoFiltro > 0 && in_array($periodoFiltro, $numeros, true)) {
             $numeros = [$periodoFiltro];
-        } else {
-            $numeros[] = 0;
         }
         $rotulos = is_array($info['rotulos'] ?? null) ? $info['rotulos'] : [];
         $unico = count($numeros) === 1;
         $cols = [];
         foreach ($numeros as $periodo) {
-            $rotuloNota = $periodo === 0
-                ? 'Final'
-                : (string) ($rotulos[$periodo] ?? ($periodo . 'º'));
             $cols[] = [
                 'codigo' => 'n' . $periodo,
-                'label' => $rotuloNota,
-                'group' => $periodo === 0 ? 'final' : 'b' . $periodo,
+                'label' => (string) ($rotulos[$periodo] ?? ($periodo . 'º')),
+                'group' => 'b' . $periodo,
             ];
-            $rotuloFalta = 'Faltas ' . ($periodo === 0 ? 'final' : $periodo . 'º');
-            if ($unico && $periodo !== 0) {
-                $rotuloFalta = 'Faltas';
-            }
             $cols[] = [
                 'codigo' => 'f' . $periodo,
-                'label' => $rotuloFalta,
-                'group' => $periodo === 0 ? 'final' : 'b' . $periodo,
+                'label' => $unico ? 'Faltas' : ('Faltas ' . $periodo . 'º'),
+                'group' => 'b' . $periodo,
             ];
         }
         return $cols;
