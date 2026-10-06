@@ -1156,12 +1156,8 @@ $boletimWizardSteps = [
 
     function eventosDaPecaNoBimestre(key, bim) {
         var noAno = eventosDaPecaFiltrados(key, bim, true);
-        var todos = eventosDaPecaFiltrados(key, bim, false);
-        if (!noAno.length) return todos;
-        if (todos.length <= noAno.length) return noAno;
-        var byId = {};
-        noAno.concat(todos).forEach(function (ev) { byId[Number(ev.id)] = ev; });
-        return Object.keys(byId).map(function (id) { return byId[id]; });
+        if (noAno.length) return noAno;
+        return eventosDaPecaFiltrados(key, bim, false);
     }
 
     function papeisCatalogo() {
