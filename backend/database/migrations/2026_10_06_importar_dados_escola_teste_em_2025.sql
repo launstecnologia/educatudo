@@ -56,7 +56,7 @@ BEGIN
   WHERE r.codigo LIKE 'et25-%';
 
   DELETE FROM boletins
-  WHERE ano_letivo = 2025 AND nome LIKE 'Boletim % T% 2025';
+  WHERE ano_letivo = 2025 AND (nome LIKE 'Boletim % T% 2025' OR nome = 'Boletim Ensino Médio 2025');
 
   DELETE FROM boletim_regras WHERE codigo LIKE 'et25-%';
 
@@ -872,12 +872,35 @@ BEGIN
   EXECUTE et25_stmt;
   DEALLOCATE PREPARE et25_stmt;
 
-  UPDATE boletim_regras
-  SET materias_ids = (
-    SELECT JSON_ARRAYAGG(m.id) FROM materias m
-    WHERE m.nome IN ('Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia')
+  UPDATE boletim_regras n
+  INNER JOIN boletins b ON b.id = n.boletim_id
+  SET n.boletim_id = NULL
+  WHERE b.ano_letivo = 2026
+    AND b.nome LIKE 'Boletim %'
+    AND (b.materias_ids IS NULL OR b.materias_ids IN ('', '[]', 'null'));
+
+  DELETE FROM boletins
+  WHERE ano_letivo = 2026
+    AND nome LIKE 'Boletim %'
+    AND (materias_ids IS NULL OR materias_ids IN ('', '[]', 'null'));
+
+  INSERT INTO boletim_regras (
+    nome, codigo, descricao_curta, formula_final, materias_ids, series_ids, turmas_ids, exibir_em,
+    ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao,
+    vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places,
+    default_data_inicio, default_data_fim, ativo
   )
-  WHERE codigo LIKE 'et25-%' AND exibir_em = 'boletim';
+  SELECT 'Boletim Ensino Médio 2025', 'et25-em',
+         'ET25 Modelo único do Ensino Médio. Mesma métrica nas três séries e nos três trimestres.',
+         '(SIM1 + SIM2 + SIM3 + max(PROVA, min(REC, 6))) / 4',
+         (SELECT JSON_ARRAYAGG(m.id) FROM materias m WHERE m.nome IN ('Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia')),
+         JSON_ARRAY(v_s1, v_s2, v_s3),
+         (SELECT JSON_ARRAYAGG(t.id) FROM turmas t WHERE t.observacoes LIKE 'ET25 %'),
+         'boletim', 2025, NULL, 6.00, 1, 1, 1, 1, 'none', 2,
+         '2025-02-03', '2025-12-12', 1
+  FROM DUAL
+  WHERE NOT EXISTS (SELECT 1 FROM boletim_regras WHERE codigo = 'et25-em');
+  SET v_regra = (SELECT id FROM boletim_regras WHERE codigo = 'et25-em' LIMIT 1);
 
   INSERT INTO boletins (
     nome, finalidade, ano_letivo, materias_ids, series_ids, turmas_ids,
@@ -886,8 +909,8 @@ BEGIN
   SELECT r.nome, 'oficial', 2025, r.materias_ids, r.series_ids, r.turmas_ids,
          6.00, 1, 1, 1, r.id, v_regra_acad, 1
   FROM boletim_regras r
-  WHERE r.codigo LIKE 'et25-%' AND r.exibir_em = 'boletim'
-    AND NOT EXISTS (SELECT 1 FROM boletins b WHERE b.regra_id = r.id);
+  WHERE r.codigo = 'et25-em'
+    AND NOT EXISTS (SELECT 1 FROM boletins b WHERE b.nome = 'Boletim Ensino Médio 2025' AND b.ano_letivo = 2025);
 
   INSERT INTO boletim_regras (
     nome, codigo, descricao_curta, formula_final, materias_ids, series_ids, turmas_ids, exibir_em,
@@ -895,21 +918,37 @@ BEGIN
     vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places,
     default_data_inicio, default_data_fim, ativo, boletim_id
   )
-  SELECT CONCAT('Notas ', r.nome), CONCAT(r.codigo, '-notas'), r.descricao_curta, r.formula_final,
+  SELECT CONCAT('ET25 ', p.rotulo), CONCAT('et25-em-t', p.n, '-notas'),
+         'ET25 Evento de notas do trimestre, válido para todo o Ensino Médio.',
+         '(SIM1 + SIM2 + SIM3 + max(PROVA, min(REC, 6))) / 4',
          r.materias_ids, r.series_ids, r.turmas_ids, 'notas',
-         r.ano_letivo, r.bimestre, r.nota_minima_aprovacao, r.usar_resultado_aprovacao,
-         r.vis_aluno, r.vis_pais, r.vis_coordenacao, r.round_mode, r.decimal_places,
-         r.default_data_inicio, r.default_data_fim, 1, b.id
+         2025, p.n, 6.00, 1, 1, 1, 1, 'none', 2, p.di, p.df, 1, b.id
   FROM boletim_regras r
-  INNER JOIN boletins b ON b.regra_id = r.id
-  WHERE r.codigo LIKE 'et25-%' AND r.exibir_em = 'boletim'
-    AND NOT EXISTS (SELECT 1 FROM boletim_regras n WHERE n.codigo = CONCAT(r.codigo, '-notas'));
+  INNER JOIN boletins b ON b.regra_id = r.id AND b.nome = 'Boletim Ensino Médio 2025'
+  INNER JOIN (
+    SELECT 1 n, '1º trimestre' rotulo, '2025-02-03' di, '2025-05-16' df
+    UNION ALL SELECT 2, '2º trimestre', '2025-05-19', '2025-08-29'
+    UNION ALL SELECT 3, '3º trimestre', '2025-09-01', '2025-12-12'
+  ) p
+  WHERE r.codigo = 'et25-em'
+    AND NOT EXISTS (SELECT 1 FROM boletim_regras n WHERE n.codigo = CONCAT('et25-em-t', p.n, '-notas'));
 
   INSERT INTO boletim_componentes (regra_id, codigo, nome, source_type, calc_type, peso, blocos_ids, config_json, obrigatorio, ordem, ativo)
-  SELECT n.id, c.codigo, c.nome, c.source_type, c.calc_type, c.peso, c.blocos_ids, c.config_json, c.obrigatorio, c.ordem, c.ativo
-  FROM boletim_componentes c
-  INNER JOIN boletim_regras r ON r.id = c.regra_id AND r.codigo LIKE 'et25-%' AND r.exibir_em = 'boletim'
-  INNER JOIN boletim_regras n ON n.codigo = CONCAT(r.codigo, '-notas');
+  SELECT r.id, x.cod, x.nom, x.src, 'media', 1,
+         (SELECT GROUP_CONCAT(pb.id ORDER BY pb.id) FROM provas_blocos pb
+           WHERE pb.deleted_at IS NULL AND pb.titulo LIKE CONCAT('ET25 ', x.nom, ' — % T', r.bimestre)),
+         x.cfg, x.obr, x.ord, 1
+  FROM boletim_regras r
+  INNER JOIN (
+    SELECT 'SIM1' cod, 'Simulado 1' nom, 'provas_sistema' src, NULL cfg, 1 obr, 1 ord
+    UNION ALL SELECT 'SIM2', 'Simulado 2', 'provas_sistema', NULL, 1, 2
+    UNION ALL SELECT 'SIM3', 'Simulado 3', 'provas_sistema', NULL, 1, 3
+    UNION ALL SELECT 'PROVA', 'Prova Bimestral', 'provas_sistema', NULL, 1, 4
+    UNION ALL SELECT 'REC', 'Rec', 'provas_sistema', NULL, 0, 5
+    UNION ALL SELECT 'PROVA_POS', 'Prova após recuperação', 'calculado', '{"expressao":"max(PROVA, min(REC, 6))","formula_mode":"single"}', 0, 6
+    UNION ALL SELECT 'MEDIA', 'Média do trimestre', 'calculado', '{"expressao":"(SIM1 + SIM2 + SIM3 + PROVA_POS) / 4","formula_mode":"single"}', 0, 7
+  ) x
+  WHERE r.codigo IN ('et25-em-t1-notas', 'et25-em-t2-notas', 'et25-em-t3-notas');
 
   INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
   SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
@@ -993,7 +1032,7 @@ BEGIN
   INSERT INTO boletim_geracoes (regra_id, periodo_ref, versao, vigente, modo, usuario_id, usuario_nome, alunos_processados, linhas_geradas)
   SELECT r.id, CONCAT('2025-T', r.bimestre), 1, 1, 'gerar', v_admin, 'Seed ET25', 50, 400
   FROM boletim_regras r
-  WHERE r.codigo LIKE 'et25-%';
+  WHERE r.exibir_em = 'boletim' AND r.codigo REGEXP '^et25-[123][abcd]-t[123]$';
 
   INSERT INTO boletim_resultados_gerados (
     regra_id, aluno_id, periodo_ref, data_inicio, data_fim, materia_id, materia_nome, materia_ref,

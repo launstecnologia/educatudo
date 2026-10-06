@@ -48,7 +48,7 @@ BEGIN
   WHERE r.codigo LIKE 'et25-%';
 
   DELETE FROM boletins
-  WHERE ano_letivo = 2025 AND nome LIKE 'Boletim % T% 2025';
+  WHERE ano_letivo = 2025 AND (nome LIKE 'Boletim % T% 2025' OR nome = 'Boletim Ensino Médio 2025');
 
   DELETE FROM boletim_regras WHERE codigo LIKE 'et25-%';
 
