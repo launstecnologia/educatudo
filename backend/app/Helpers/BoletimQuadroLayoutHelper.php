@@ -947,7 +947,8 @@ class BoletimQuadroLayoutHelper
             }
             $type = strtolower(trim((string) ($column['layout_type'] ?? '')));
             $haystack = strtolower((string) (($column['nome'] ?? '') . ' ' . $codigo));
-            if ($type === 'resultado' || strpos($haystack, 'result') !== false) {
+            $resultadoOficial = self::colunaEhResultadoFinalOficial($column);
+            if (!$resultadoOficial && ($type === 'resultado' || strpos($haystack, 'result') !== false)) {
                 continue;
             }
             if (in_array($type, ['semana_nq', 'n', 'q'], true)) {

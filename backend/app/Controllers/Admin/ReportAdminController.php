@@ -2860,6 +2860,9 @@ class ReportAdminController extends AdminBaseController
     private function codigoNotaPlanilhaBoletim(array $relatorio): string
     {
         $columns = is_array($relatorio['columns'] ?? null) ? $relatorio['columns'] : [];
+        if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+            require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
+        }
         $candidatos = [];
         foreach ($columns as $column) {
             if (!is_array($column)) {
@@ -2869,9 +2872,16 @@ class ReportAdminController extends AdminBaseController
             if ($codigo === '') {
                 continue;
             }
-            $blob = mb_strtolower($codigo . ' ' . (string) ($column['label'] ?? ''), 'UTF-8');
+            $blob = mb_strtolower($codigo . ' ' . (string) ($column['label'] ?? '') . ' ' . (string) ($column['nome'] ?? ''), 'UTF-8');
             if (str_contains($blob, 'falt')) {
                 continue;
+            }
+            $colunaOficial = $column;
+            if (trim((string) ($colunaOficial['nome'] ?? '')) === '') {
+                $colunaOficial['nome'] = (string) ($column['label'] ?? '');
+            }
+            if (BoletimQuadroLayoutHelper::colunaEhResultadoFinalOficial($colunaOficial)) {
+                return $codigo;
             }
             $candidatos[] = [$codigo, $blob];
         }
