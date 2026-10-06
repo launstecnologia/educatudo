@@ -1,0 +1,382 @@
+<?php
+require_once __DIR__ . '/FechamentoMaquinaEstados.php';
+require_once __DIR__ . '/../../../Services/DocumentoOficialService.php';
+require_once __DIR__ . '/../../../Services/HistoricoEscolarService.php';
+require_once __DIR__ . '/../../vida-escolar/Services/VidaEscolarPdfService.php';
+
+use App\Modulos\VidaEscolar\Services\VidaEscolarPdfService;
+use App\Services\HistoricoEscolarService;
+
+/**
+ * Impressão em lote do fechamento homologado:
+ * boletim, ficha individual, histórico e resultado final (ata) da turma.
+ */
+class ImpressaoLoteFechamentoService
+{
+    public const DOCUMENTOS = [
+        'boletim' => 'Boletim',
+        'ficha' => 'Ficha individual',
+        'historico' => 'Histórico escolar',
+        'resultado' => 'Resultado final por turma',
+        'relatorio' => 'Relatório de fechamento por turma',
+    ];
+
+    /** Os quatro documentos do pacote, na ordem de impressão. */
+    public const PACOTE = ['boletim', 'ficha', 'historico', 'resultado'];
+
+    private DocumentoOficialService $documentos;
+    private HistoricoEscolarService $historicos;
+    private VidaEscolarPdfService $pdfHistorico;
+
+    public function __construct(
+        ?DocumentoOficialService $documentos = null,
+        ?HistoricoEscolarService $historicos = null,
+        ?VidaEscolarPdfService $pdfHistorico = null
+    ) {
+        $this->documentos = $documentos ?? new DocumentoOficialService();
+        $this->historicos = $historicos ?? new HistoricoEscolarService();
+        $this->pdfHistorico = $pdfHistorico ?? new VidaEscolarPdfService();
+    }
+
+    /**
+     * @param list<array<string,mixed>> $paineis
+     * @return array{pode:bool,total_turmas:int,homologadas:int,pendentes:list<string>,total_alunos:int}
+     */
+    public function resumo(array $paineis): array
+    {
+        $homologadas = 0;
+        $pendentes = [];
+        $alunos = 0;
+        foreach ($paineis as $painel) {
+            $nome = trim((string) ($painel['turma']['nome'] ?? 'Turma'));
+            if (($painel['status'] ?? '') === FechamentoMaquinaEstados::HOMOLOGADO) {
+                $homologadas++;
+                $alunos += (int) ($painel['resumo']['total'] ?? 0);
+                continue;
+            }
+            $pendentes[] = $nome !== '' ? $nome : 'Turma';
+        }
+        $total = count($paineis);
+
+        return [
+            'pode' => $total > 0 && $homologadas === $total,
+            'total_turmas' => $total,
+            'homologadas' => $homologadas,
+            'pendentes' => $pendentes,
+            'total_alunos' => $alunos,
+        ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $paineis
+     * @param array<string,mixed>|null $configApp
+     */
+    public function htmlParaImpressao(
+        string $documento,
+        array $paineis,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $usuarioId,
+        ?array $configApp,
+        string $voltarUrl
+    ): string {
+        if (!isset(self::DOCUMENTOS[$documento])) {
+            throw new InvalidArgumentException('Documento de impressão desconhecido.');
+        }
+        $resumo = $this->resumo($paineis);
+        if (!$resumo['pode']) {
+            throw new RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
+        }
+
+        @set_time_limit(180);
+        $avisos = [];
+        $htmls = [];
+        $orientacao = in_array($documento, ['relatorio', 'resultado', 'boletim'], true) ? 'landscape' : 'portrait';
+
+        foreach ($paineis as $painel) {
+            $turmaId = (int) ($painel['turma']['id'] ?? 0);
+            $turmaNome = trim((string) ($painel['turma']['nome'] ?? 'Turma'));
+            if ($turmaId <= 0) {
+                continue;
+            }
+            if ($documento === 'relatorio' || $documento === 'resultado') {
+                $emitido = $documento === 'resultado'
+                    ? $this->documentos->emitirAta(
+                        $turmaId,
+                        $anoLetivo,
+                        $periodoTipo,
+                        $periodoNumero,
+                        $usuarioId > 0 ? $usuarioId : null,
+                        $configApp,
+                        false
+                    )
+                    : $this->documentos->emitirRelatorio(
+                        'relatorio_fechamento',
+                        $turmaId,
+                        $anoLetivo,
+                        $periodoTipo,
+                        $periodoNumero,
+                        $usuarioId > 0 ? $usuarioId : null,
+                        $configApp,
+                        [],
+                        false
+                    );
+                $htmls[] = (string) ($emitido['html'] ?? '');
+                if (($emitido['orientacao'] ?? '') === 'landscape') {
+                    $orientacao = 'landscape';
+                }
+                continue;
+            }
+
+            $preview = $this->documentos->homologacao()->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+            foreach ($preview['linhas'] ?? [] as $linha) {
+                $alunoId = (int) ($linha['aluno']['id'] ?? 0);
+                $alunoNome = trim((string) ($linha['aluno']['nome'] ?? 'Aluno'));
+                if ($alunoId <= 0) {
+                    continue;
+                }
+                if ($documento === 'ficha' || $documento === 'boletim') {
+                    try {
+                        $emitido = $documento === 'boletim'
+                            ? $this->documentos->emitirBoletim(
+                                $alunoId,
+                                $turmaId,
+                                $anoLetivo,
+                                $periodoTipo,
+                                $periodoNumero,
+                                $usuarioId > 0 ? $usuarioId : null,
+                                $configApp,
+                                false
+                            )
+                            : $this->documentos->emitirFicha(
+                                $alunoId,
+                                $turmaId,
+                                $anoLetivo,
+                                $periodoTipo,
+                                $periodoNumero,
+                                $usuarioId > 0 ? $usuarioId : null,
+                                $configApp,
+                                false
+                            );
+                        $htmls[] = (string) ($emitido['html'] ?? '');
+                        if (($emitido['orientacao'] ?? '') === 'landscape') {
+                            $orientacao = 'landscape';
+                        }
+                    } catch (Throwable $e) {
+                        $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ' . $e->getMessage();
+                    }
+                    continue;
+                }
+                $historico = $this->htmlHistoricoAluno($alunoId, $alunoNome, $turmaNome, $configApp, $avisos);
+                if ($historico !== null) {
+                    $htmls[] = $historico;
+                }
+            }
+        }
+
+        $htmls = array_values(array_filter($htmls, static fn ($html) => trim($html) !== ''));
+        if ($htmls === []) {
+            $detalhe = $avisos !== [] ? ' ' . implode(' ', $avisos) : '';
+            throw new RuntimeException('Nenhum documento para imprimir neste filtro.' . $detalhe);
+        }
+
+        return $this->juntarParaImpressao(
+            self::DOCUMENTOS[$documento],
+            $htmls,
+            $orientacao,
+            $avisos,
+            $voltarUrl
+        );
+    }
+
+    /**
+     * Cria rascunho de conclusão só para aluno que ainda não tem histórico.
+     *
+     * @param list<array<string,mixed>> $paineis
+     * @return array{criados:int,existentes:int,falhas:list<string>}
+     */
+    public function prepararHistoricos(array $paineis, int $anoLetivo, string $periodoTipo, int $periodoNumero, int $usuarioId): array
+    {
+        $criados = 0;
+        $existentes = 0;
+        $falhas = [];
+        foreach ($paineis as $painel) {
+            if (($painel['status'] ?? '') !== FechamentoMaquinaEstados::HOMOLOGADO) {
+                continue;
+            }
+            $turmaId = (int) ($painel['turma']['id'] ?? 0);
+            $turmaNome = trim((string) ($painel['turma']['nome'] ?? 'Turma'));
+            if ($turmaId <= 0) {
+                continue;
+            }
+            $preview = $this->documentos->homologacao()->previewTurma(
+                $turmaId,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero
+            );
+            foreach ($preview['linhas'] ?? [] as $linha) {
+                $alunoId = (int) ($linha['aluno']['id'] ?? 0);
+                $alunoNome = trim((string) ($linha['aluno']['nome'] ?? 'Aluno'));
+                if ($alunoId <= 0) {
+                    continue;
+                }
+                $docs = $this->historicos->listarPorAluno($alunoId);
+                if ($this->historicoOficial($docs) !== null || $this->historicoRascunho($docs) !== null) {
+                    $existentes++;
+                    continue;
+                }
+                $gerado = $this->historicos->gerarRascunho($alunoId, 'Conclusao', $usuarioId > 0 ? $usuarioId : null);
+                if (!empty($gerado['success'])) {
+                    $criados++;
+                    continue;
+                }
+                $falhas[] = $turmaNome . ' — ' . $alunoNome . ': ' . (string) ($gerado['error'] ?? 'falha ao gerar rascunho');
+            }
+        }
+
+        return [
+            'criados' => $criados,
+            'existentes' => $existentes,
+            'falhas' => $falhas,
+        ];
+    }
+
+    /**
+     * @param list<string> $avisos
+     * @param array<string,mixed>|null $configApp
+     */
+    private function htmlHistoricoAluno(
+        int $alunoId,
+        string $alunoNome,
+        string $turmaNome,
+        ?array $configApp,
+        array &$avisos
+    ): ?string {
+        $docs = $this->historicos->listarPorAluno($alunoId);
+        $doc = $this->historicoOficial($docs);
+        $rascunho = false;
+        if ($doc === null) {
+            $doc = $this->historicoRascunho($docs);
+            $rascunho = $doc !== null;
+        }
+        if ($doc === null) {
+            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ainda não há histórico. Prepare os rascunhos nesta tela antes de imprimir.';
+            return null;
+        }
+        $dados = $this->historicos->dadosParaPdf((int) ($doc['id'] ?? 0));
+        if (!$dados) {
+            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': não foi possível montar o histórico.';
+            return null;
+        }
+        $dados['resultado_labels'] = HistoricoEscolarService::RESULTADO_LABELS;
+        try {
+            $html = $this->pdfHistorico->htmlHistorico($dados, $configApp);
+        } catch (Throwable $e) {
+            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ' . $e->getMessage();
+            return null;
+        }
+        if ($rascunho) {
+            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': histórico ainda não emitido; saiu como rascunho.';
+            $html = $this->marcarRascunho($html);
+        }
+
+        return $html;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $docs
+     * @return array<string,mixed>|null
+     */
+    private function historicoOficial(array $docs): ?array
+    {
+        foreach ($docs as $doc) {
+            if (in_array((string) ($doc['status'] ?? ''), ['Assinado', 'Emitido', 'Entregue'], true)) {
+                return $doc;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $docs
+     * @return array<string,mixed>|null
+     */
+    private function historicoRascunho(array $docs): ?array
+    {
+        foreach ($docs as $doc) {
+            if (in_array((string) ($doc['status'] ?? ''), ['Conferido', 'Rascunho'], true)) {
+                return $doc;
+            }
+        }
+
+        return null;
+    }
+
+    private function marcarRascunho(string $html): string
+    {
+        $faixa = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">Rascunho — histórico ainda não emitido</div>';
+        if (preg_match('/<body[^>]*>/i', $html)) {
+            return (string) preg_replace('/(<body[^>]*>)/i', '$1' . $faixa, $html, 1);
+        }
+
+        return $faixa . $html;
+    }
+
+    /**
+     * @param list<string> $htmls
+     * @param list<string> $avisos
+     */
+    private function juntarParaImpressao(string $titulo, array $htmls, string $orientacao, array $avisos, string $voltarUrl): string
+    {
+        $css = '';
+        $corpos = [];
+        foreach ($htmls as $html) {
+            if ($css === '' && preg_match('/<style[^>]*>(.*?)<\/style>/is', $html, $estilo)) {
+                $css = (string) $estilo[1];
+            }
+            if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $corpo)) {
+                $corpos[] = (string) $corpo[1];
+            } else {
+                $corpos[] = $html;
+            }
+        }
+        $ultimo = count($corpos) - 1;
+        $partes = [];
+        foreach ($corpos as $i => $corpo) {
+            $quebra = $i < $ultimo ? 'page-break-after:always;break-after:page;' : '';
+            $partes[] = '<section class="lote-folha" style="' . $quebra . '">' . $corpo . '</section>';
+        }
+        $size = $orientacao === 'landscape' ? 'A4 landscape' : 'A4 portrait';
+        $avisosHtml = '';
+        if ($avisos !== []) {
+            $itens = '';
+            foreach ($avisos as $aviso) {
+                $itens .= '<li>' . htmlspecialchars($aviso, ENT_QUOTES, 'UTF-8') . '</li>';
+            }
+            $avisosHtml = '<div class="lote-avisos"><strong>Antes de imprimir</strong><ul>' . $itens . '</ul></div>';
+        }
+        $tituloEsc = htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8');
+        $voltarEsc = htmlspecialchars($voltarUrl, ENT_QUOTES, 'UTF-8');
+
+        return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>' . $tituloEsc . '</title><style>'
+            . $css
+            . '@page { size: ' . $size . '; }'
+            . '.lote-barra{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 16px;background:#0f172a;color:#fff;font-family:sans-serif}'
+            . '.lote-barra a,.lote-barra button{font:inherit;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;text-decoration:none}'
+            . '.lote-barra a{background:transparent;color:#fff}'
+            . '.lote-barra button{background:#fff;color:#0f172a;font-weight:700}'
+            . '.lote-avisos{margin:16px;padding:12px 16px;border:1px solid #fcd34d;background:#fffbeb;color:#92400e;font-family:sans-serif;font-size:14px}'
+            . '.lote-avisos ul{margin:8px 0 0;padding-left:18px}'
+            . '@media print{.lote-barra,.lote-avisos{display:none!important}}'
+            . '</style></head><body>'
+            . '<div class="lote-barra"><a href="' . $voltarEsc . '">Voltar ao fechamento</a>'
+            . '<strong>' . $tituloEsc . '</strong>'
+            . '<button type="button" onclick="window.print()">Imprimir</button></div>'
+            . $avisosHtml
+            . implode('', $partes)
+            . '</body></html>';
+    }
+}

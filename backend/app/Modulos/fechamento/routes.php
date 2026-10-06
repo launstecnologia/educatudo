@@ -6,6 +6,8 @@
  */
 
 $router->get('/admin/fechamento', 'Modulos/fechamento/FechamentoAdminController@index');
+$router->get('/admin/fechamento/impressao-lote', 'Modulos/fechamento/FechamentoAdminController@impressaoLote');
+$router->post('/admin/fechamento/impressao-lote/preparar-historicos', 'Modulos/fechamento/FechamentoAdminController@prepararHistoricos');
 $router->get('/admin/fechamento/turma/{id}/homologacoes/dados', 'Modulos/fechamento/FechamentoAdminController@dadosHomologacoes');
 $router->get('/admin/fechamento/turma/{id}/documentos/dados', 'Modulos/fechamento/FechamentoAdminController@dadosDocumentos');
 $router->get('/admin/fechamento/turma/{id}', 'Modulos/fechamento/FechamentoAdminController@turma');

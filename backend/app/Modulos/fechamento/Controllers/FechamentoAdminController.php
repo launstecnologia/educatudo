@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
 require_once __DIR__ . '/../Services/FechamentoService.php';
+require_once __DIR__ . '/../Services/ImpressaoLoteFechamentoService.php';
 require_once __DIR__ . '/../Services/FechamentoMaquinaEstados.php';
 require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
 require_once __DIR__ . '/../../../Core/AdminMenuDiagnostico.php';
@@ -29,6 +30,7 @@ class FechamentoAdminController extends AdminBaseController
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
         $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
         $flash = $this->getFlashMessage();
+        $lote = new ImpressaoLoteFechamentoService();
 
         $this->viewWithLayout('admin', 'admin/fechamento/index', [
             'title' => 'Fechamento - EducaTudo',
@@ -41,6 +43,7 @@ class FechamentoAdminController extends AdminBaseController
             'turma_id' => $turmaId,
             'turmas' => $svc->homologacao()->model()->turmasAtivas($anoLetivo),
             'paineis' => $paineis,
+            'impressao_lote' => $lote->resumo($paineis),
             'schema_pronto' => $svc->model()->schemaPronto(),
             'simular_regra_id' => $this->simularRegraId(),
             'csrf_token' => $this->generateCsrfToken(),
@@ -252,6 +255,108 @@ class FechamentoAdminController extends AdminBaseController
         ]);
     }
 
+    public function impressaoLote(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
+            return;
+        }
+        $svc = $this->service();
+        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
+        $anoLetivo = $this->anoDaRequest($anos);
+        [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
+        $turmaId = (int) ($_GET['turma_id'] ?? 0);
+        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
+        $lote = new ImpressaoLoteFechamentoService();
+        $resumo = $lote->resumo($paineis);
+        $documento = (string) ($_GET['documento'] ?? '');
+        $voltar = $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
+
+        if ($documento !== '') {
+            if (!$resumo['pode']) {
+                $this->setFlashMessage('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.', 'error');
+                $this->redirect($voltar);
+                return;
+            }
+            try {
+                $html = $lote->htmlParaImpressao(
+                    $documento,
+                    $paineis,
+                    $anoLetivo,
+                    $periodoTipo,
+                    $periodoNumero,
+                    (int) ($this->auth->getUser()['id'] ?? 0),
+                    is_array($this->config ?? null) ? $this->config : null,
+                    (defined('URL') ? URL : '') . $voltar
+                );
+                header('Content-Type: text/html; charset=UTF-8');
+                echo $html;
+                exit;
+            } catch (Throwable $e) {
+                $this->setFlashMessage($e->getMessage(), 'error');
+                $this->redirect($voltar);
+                return;
+            }
+        }
+
+        $flash = $this->getFlashMessage();
+        $this->viewWithLayout('admin', 'admin/fechamento/impressao-lote', [
+            'title' => 'Impressão em lote - EducaTudo',
+            'user' => $this->auth->getUser(),
+            'current_page' => 'fechamento',
+            'ano_letivo' => $anoLetivo,
+            'periodo_tipo' => $periodoTipo,
+            'periodo_numero' => $periodoNumero,
+            'turma_id' => $turmaId,
+            'impressao_lote' => $resumo,
+            'documentos' => ImpressaoLoteFechamentoService::DOCUMENTOS,
+            'pacote' => ImpressaoLoteFechamentoService::PACOTE,
+            'pode_preparar_historico' => $this->podeAlterarResultados(),
+            'csrf_token' => $this->generateCsrfToken(),
+            'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
+            'flash_message' => $flash['message'] ?? '',
+        ]);
+    }
+
+    public function prepararHistoricos(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'alterar', false)) {
+            return;
+        }
+        $svc = $this->service();
+        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
+        $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
+        if (!in_array($anoLetivo, $anos, true)) {
+            $anoLetivo = (int) ($anos[0] ?? date('Y'));
+        }
+        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
+        $turmaId = (int) ($_POST['turma_id'] ?? 0);
+        $voltar = $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
+        if (!$this->csrfOuRedirect($voltar)) {
+            return;
+        }
+        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
+        $lote = new ImpressaoLoteFechamentoService();
+        if (!$lote->resumo($paineis)['pode']) {
+            $this->setFlashMessage('Prepare os históricos só depois de homologar todas as turmas deste filtro.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $resultado = $lote->prepararHistoricos(
+            $paineis,
+            $anoLetivo,
+            $periodoTipo,
+            $periodoNumero,
+            (int) ($this->auth->getUser()['id'] ?? 0)
+        );
+        $msg = 'Históricos preparados: ' . (int) $resultado['criados'] . ' rascunho(s) novo(s), '
+            . (int) $resultado['existentes'] . ' já existente(s).';
+        if ($resultado['falhas'] !== []) {
+            $msg .= ' Falhas: ' . implode(' ', $resultado['falhas']);
+        }
+        $this->setFlashMessage($msg, $resultado['falhas'] === [] ? 'success' : 'error');
+        $this->redirect($voltar);
+    }
+
     public function documentos(): void
     {
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
@@ -385,6 +490,20 @@ class FechamentoAdminController extends AdminBaseController
         return [$tipo, $numero];
     }
 
+    private function urlImpressaoLote(int $ano, string $tipo, int $numero, int $turmaId = 0): string
+    {
+        $qs = [
+            'ano_letivo' => $ano,
+            'periodo_tipo' => $tipo,
+            'periodo_numero' => $numero,
+        ];
+        if ($turmaId > 0) {
+            $qs['turma_id'] = $turmaId;
+        }
+
+        return '/admin/fechamento/impressao-lote?' . http_build_query($qs);
+    }
+
     private function urlTurma(int $turmaId, ?int $ano = null, ?string $tipo = null, ?int $numero = null): string
     {
         $qs = array_filter([
@@ -414,6 +533,17 @@ class FechamentoAdminController extends AdminBaseController
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
         ]);
+    }
+
+    private function podeAlterarResultados(): bool
+    {
+        $user = $this->auth->getUser();
+        if (!class_exists('AdminPermissionMatrix')) {
+            require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
+        }
+        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+
+        return AdminPermissionMatrix::can($permissions, 'resultados_finais', 'alterar');
     }
 
     private function podeImplantarAcademico(): bool

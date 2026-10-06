@@ -25,7 +25,35 @@ if ($periodoNumero > 0) {
 if ($turmaIdFiltro > 0) {
     $filtrosAtivosCount++;
 }
+$impressaoLote = is_array($impressao_lote ?? null) ? $impressao_lote : [];
+$lotePronto = !empty($impressaoLote['pode']);
+$loteTotal = (int) ($impressaoLote['total_turmas'] ?? 0);
+$loteHomologadas = (int) ($impressaoLote['homologadas'] ?? 0);
+$loteQs = http_build_query([
+    'ano_letivo' => $anoLetivo,
+    'periodo_tipo' => $periodoTipo,
+    'periodo_numero' => $periodoNumero,
+    'turma_id' => $turmaIdFiltro,
+]);
+$loteTitulo = $lotePronto
+    ? 'Imprimir boletim, ficha, histórico e resultado final das turmas homologadas'
+    : ('Homologue todas as turmas deste filtro para imprimir em lote (' . $loteHomologadas . ' de ' . $loteTotal . ').');
 ob_start();
+if ($lotePronto):
+    $ui_btn_variant = 'complementar';
+    $ui_btn_label = 'Imprimir em lote';
+    $ui_btn_icon = 'fa-solid fa-print';
+    $ui_btn_href = URL . '/admin/fechamento/impressao-lote?' . $loteQs;
+    $ui_btn_attrs = 'title="' . htmlspecialchars($loteTitulo, ENT_QUOTES, 'UTF-8') . '"';
+    include __DIR__ . '/../../../../Views/admin/_partials/ui/btn.php';
+else:
+?>
+<span class="inline-flex items-center px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed"
+      title="<?= htmlspecialchars($loteTitulo, ENT_QUOTES, 'UTF-8') ?>">
+    <i class="fa-solid fa-print mr-2"></i> Imprimir em lote
+</span>
+<?php
+endif;
 $ui_btn_variant = 'filtro';
 $ui_btn_label = 'Filtros';
 $ui_btn_icon = 'fa-solid fa-filter';
@@ -201,6 +229,12 @@ $statusBadge = static function (string $status): string {
                         <span class="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 cursor-not-allowed" title="<?= htmlspecialchars($motivoHomologar, ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fa-solid fa-stamp w-4 text-center"></i> Homologar — <?= htmlspecialchars($motivoHomologar !== '' ? $motivoHomologar : 'Há pendências', ENT_QUOTES, 'UTF-8') ?>
                         </span>
+                        <?php endif; ?>
+                        <?php if ($status === FechamentoMaquinaEstados::HOMOLOGADO): ?>
+                        <a href="<?= URL ?>/admin/fechamento/impressao-lote?<?= htmlspecialchars($qs) ?>&amp;turma_id=<?= $tid ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir em lote
+                        </a>
                         <?php endif; ?>
                         <button type="button"
                                 data-fechamento-consulta="documentos"

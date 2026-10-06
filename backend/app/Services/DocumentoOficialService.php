@@ -71,7 +71,7 @@ class DocumentoOficialService
     /**
      * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array}
      */
-    public function emitirAta(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null): array
+    public function emitirAta(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, bool $registrarEmissao = true): array
     {
         $preview = $this->homologacao->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         $linhas = $preview['linhas'] ?? [];
@@ -100,20 +100,20 @@ class DocumentoOficialService
             'unidade' => $this->unidadeDaTurma($turmaId),
         ];
         $payload['conselho_label'] = $this->ehEmissaoOficial('ata_resultados', $payload) ? 'Homologado' : 'Prévia';
-        return $this->emitirDocumento('ata_resultados', $payload, $usuarioId, $configApp, null, $turmaId);
+        return $this->emitirDocumento('ata_resultados', $payload, $usuarioId, $configApp, null, $turmaId, $registrarEmissao);
     }
 
     /**
      * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array}
      */
-    public function emitirBoletim(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null): array
+    public function emitirBoletim(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, bool $registrarEmissao = true): array
     {
         $payload = $this->montarFicha($alunoId, $turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if ($payload === null) {
             throw new RuntimeException('Não foi possível montar o boletim deste aluno.');
         }
         $payload['quadro_notas_html'] = $this->quadroBoletimFinalHtml($payload['componentes_ficha'] ?? []);
-        return $this->emitirDocumento('boletim', $payload, $usuarioId, $configApp, $alunoId, $turmaId);
+        return $this->emitirDocumento('boletim', $payload, $usuarioId, $configApp, $alunoId, $turmaId, $registrarEmissao);
     }
 
     /**
