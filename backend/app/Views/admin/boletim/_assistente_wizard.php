@@ -378,7 +378,7 @@ $boletimWizardSteps = [
     }
 
     function grupoLinhaPadrao() {
-        return { ativo: false, nome: '', modo: 'media', modos: {}, materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0, arredondamento: 'todos' };
+        return { ativo: false, nome: '', modo: 'media', modos: {}, materias_ids: [], aplicar_em: 'boletim', agrupamento_id: 0, arredondamento: 'todos', exemplo_sem_filhas: false };
     }
 
     function rotuloPecaGrupo(key) {
@@ -2803,7 +2803,24 @@ $boletimWizardSteps = [
         });
     }
 
+    function casasDoBoletimVinculado() {
+        var bolId = estado && Number(estado.boletim_id);
+        if (!(bolId > 0) || !catalogo || !Array.isArray(catalogo.boletins)) return null;
+        for (var i = 0; i < catalogo.boletins.length; i++) {
+            var b = catalogo.boletins[i];
+            if (Number(b.id) === bolId && b.decimal_places != null && b.decimal_places !== '') {
+                return Number(b.decimal_places) === 1 ? 1 : 2;
+            }
+        }
+        return null;
+    }
+
     function casasDecimaisPreview() {
+        var doBoletim = casasDoBoletimVinculado();
+        if (doBoletim != null) {
+            if (estado) estado.decimal_places = doBoletim;
+            return doBoletim;
+        }
         return (estado && Number(estado.decimal_places) === 1) ? 1 : 2;
     }
 
@@ -2837,7 +2854,8 @@ $boletimWizardSteps = [
         var n = Number(v);
         if (!isFinite(n)) return v;
         if (!estado || estado.round_mode !== 'half') {
-            return Math.round(n * 100) / 100;
+            var fatorCasas = Math.pow(10, casasDecimaisPreview());
+            return Math.round(n * fatorCasas) / fatorCasas;
         }
         var base = Math.floor(n);
         var dec = n - base;
@@ -2860,7 +2878,10 @@ $boletimWizardSteps = [
         var aplica = quem === 'mae'
             ? (modo === 'mae' || modo === 'todos')
             : (modo === 'filhas' || modo === 'todos');
-        if (!aplica) return Math.round(n * 100) / 100;
+        if (!aplica) {
+            var fatorCasas = Math.pow(10, casasDecimaisPreview());
+            return Math.round(n * fatorCasas) / fatorCasas;
+        }
         return roundPreviewValor(n);
     }
 
@@ -3617,7 +3638,9 @@ $boletimWizardSteps = [
             eh_grupo_filho: 0
         };
         out[pos] = pai;
-        Array.prototype.splice.apply(out, [pos + 1, 0].concat(membros));
+        if (!gl.exemplo_sem_filhas) {
+            Array.prototype.splice.apply(out, [pos + 1, 0].concat(membros));
+        }
         return out.filter(Boolean);
     }
 
@@ -4792,6 +4815,13 @@ $boletimWizardSteps = [
             if (gl.ativo) {
                 garantirFamiliaPadrao();
                 gl = estado.grupo_linha || gl;
+                var nomeExemploArea = String(gl.nome || '').trim() || 'Língua Portuguesa';
+                html += '<label class="ml-6 inline-flex items-start gap-2 text-sm text-gray-800">';
+                html += '<input type="checkbox" id="bw-grupo-exemplo-sem-filhas" class="mt-0.5 rounded border-gray-300 text-indigo-600"' + (gl.exemplo_sem_filhas ? ' checked' : '') + '>';
+                html += '<span>Se quiser, exibir o exemplo de <strong>' + esc(nomeExemploArea) + '</strong> sem as matérias agrupadas.</span></label>';
+                if (gl.exemplo_sem_filhas) {
+                    html += '<div id="bw-preview-wrap" class="ml-6"></div>';
+                }
                 var fams = familiasDoEscopo();
                 if (fams.length) {
                     html += '<div><span class="text-xs font-medium text-gray-600">Área (já cadastrada em Componentes)</span>';
@@ -4902,7 +4932,7 @@ $boletimWizardSteps = [
 
         bodyEl.innerHTML = html;
         bindBodyEvents();
-        if (passo === 'revisar' || passo === 'formula') renderRevisarDinamico();
+        if (passo === 'revisar' || passo === 'formula' || (passo === 'publico' && estado.grupo_linha && estado.grupo_linha.exemplo_sem_filhas)) renderRevisarDinamico();
         if (passo === 'formula' && estado.bloco_calc) abrirFormulaBloco(estado.bloco_calc);
     }
 
@@ -5229,6 +5259,14 @@ $boletimWizardSteps = [
                 agendarMontar();
             });
         });
+        var exemploSemFilhasEl = document.getElementById('bw-grupo-exemplo-sem-filhas');
+        if (exemploSemFilhasEl) {
+            exemploSemFilhasEl.addEventListener('change', function () {
+                if (!estado.grupo_linha) estado.grupo_linha = grupoLinhaPadrao();
+                estado.grupo_linha.exemplo_sem_filhas = !!exemploSemFilhasEl.checked;
+                renderAll();
+            });
+        }
         var grupoAtivoEl = document.getElementById('bw-grupo-ativo');
         if (grupoAtivoEl) {
             grupoAtivoEl.addEventListener('change', function () {

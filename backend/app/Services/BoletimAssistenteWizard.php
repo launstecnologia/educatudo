@@ -312,8 +312,10 @@ class BoletimAssistenteWizard
         if (($estado['round_mode'] ?? '') === '') {
             $estado['round_mode'] = (string) ($bol['round_mode'] ?? 'half');
         }
-        if (!isset($estado['decimal_places']) || $estado['decimal_places'] === '' || $estado['decimal_places'] === null) {
-            $estado['decimal_places'] = ((int) ($bol['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        // Casas decimais vêm da regra de aprovação vigente, não do valor gravado no evento.
+        $estado['decimal_places'] = ((int) ($bol['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        if (is_array($estado['rascunho_preservado'] ?? null)) {
+            $estado['rascunho_preservado']['decimal_places'] = $estado['decimal_places'];
         }
     }
 
@@ -1775,6 +1777,7 @@ class BoletimAssistenteWizard
         $merged['fontes_faltas'] = $this->normalizarFontesBimestres($merged['fontes_faltas'] ?? []);
         $this->reidratarNomesDosComponentes($merged);
         $this->reidratarFormulasDosComponentes($merged);
+        $this->aplicarEscopoDoBoletimCadastro($merged);
         return $merged;
     }
 
@@ -4626,6 +4629,7 @@ class BoletimAssistenteWizard
             'aplicar_em' => 'boletim',
             'agrupamento_id' => 0,
             'arredondamento' => 'todos',
+            'exemplo_sem_filhas' => false,
         ];
     }
 
@@ -4776,6 +4780,7 @@ class BoletimAssistenteWizard
             'aplicar_em' => $aplicarEm,
             'agrupamento_id' => max(0, (int) ($raw['agrupamento_id'] ?? 0)),
             'arredondamento' => $arred,
+            'exemplo_sem_filhas' => !empty($raw['exemplo_sem_filhas']),
         ];
     }
 
@@ -5815,6 +5820,7 @@ class BoletimAssistenteWizard
     {
         $hash = abs(crc32(mb_strtolower($materia))) + $this->hashAlunoPreview($estado);
         $roundMode = ((string) ($estado['round_mode'] ?? 'none')) === 'half' ? 'half' : 'none';
+        $casas = ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2;
         $notas = [];
         foreach ($comps as $c) {
             if (!is_array($c)) {
@@ -5834,14 +5840,14 @@ class BoletimAssistenteWizard
                 continue;
             }
             if ($lt === 'rec') {
-                $notas[$cod] = ($hash % 3) === 0 ? $this->roundPreviewFicticio(5 + (($hash + 11) % 40) / 10, $roundMode) : '—';
+                $notas[$cod] = ($hash % 3) === 0 ? $this->roundPreviewFicticio(5 + (($hash + 11) % 40) / 10, $roundMode, $casas) : '—';
                 continue;
             }
             if ($lt === 'faltas' || $src === 'faltas_evento') {
                 $notas[$cod] = (int) (($hash + strlen($cod) * 5) % 9);
                 continue;
             }
-            $notas[$cod] = $this->roundPreviewFicticio(5 + (($hash + strlen($cod) * 7) % 51) / 10, $roundMode);
+            $notas[$cod] = $this->roundPreviewFicticio(5 + (($hash + strlen($cod) * 7) % 51) / 10, $roundMode, $casas);
         }
         foreach ($comps as $c) {
             if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
@@ -5857,7 +5863,7 @@ class BoletimAssistenteWizard
             } elseif ($lt === 'faltas') {
                 $notas[$cod] = (int) round($val);
             } else {
-                $notas[$cod] = $this->roundPreviewFicticio($val, $roundMode);
+                $notas[$cod] = $this->roundPreviewFicticio($val, $roundMode, $casas);
             }
         }
         $mediaFinal = is_numeric($notas['media_final'] ?? null) ? (float) $notas['media_final'] : null;
@@ -5984,6 +5990,7 @@ class BoletimAssistenteWizard
         $hashJornadaUnica = 1700 + $this->hashAlunoPreview($estado);
         $jornadaNotaUnicaEstado = ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas';
         $roundMode = ((string) ($estado['round_mode'] ?? 'none')) === 'half' ? 'half' : 'none';
+        $casas = ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2;
         $notas = [];
         $sumN = 0;
         $sumQ = 0;
@@ -6015,7 +6022,7 @@ class BoletimAssistenteWizard
             if ($src === 'calculado') {
                 $agregar = is_array($cfg['agregar_nq'] ?? null) ? $cfg['agregar_nq'] : [];
                 if ($agregar !== [] || $cod === 'media_sem') {
-                    $notas[$cod] = $sumQ > 0 ? $this->roundPreviewFicticio(10 * $sumN / $sumQ, $roundMode) : 0.0;
+                    $notas[$cod] = $sumQ > 0 ? $this->roundPreviewFicticio(10 * $sumN / $sumQ, $roundMode, $casas) : 0.0;
                     continue;
                 }
                 $calculados[] = $c;
@@ -6031,7 +6038,7 @@ class BoletimAssistenteWizard
             $seed = $jornadaUnica
                 ? ($hashJornadaUnica + strlen($cod) * 7)
                 : ($hash + strlen($cod) * 7);
-            $notas[$cod] = $this->roundPreviewFicticio(5 + ($seed % 51) / 10, $roundMode);
+            $notas[$cod] = $this->roundPreviewFicticio(5 + ($seed % 51) / 10, $roundMode, $casas);
         }
 
         $pendentes = $calculados;
@@ -6047,7 +6054,7 @@ class BoletimAssistenteWizard
                     $restou[] = $c;
                     continue;
                 }
-                $notas[$cod] = $val !== null ? $this->roundPreviewFicticio($val, $roundMode) : '—';
+                $notas[$cod] = $val !== null ? $this->roundPreviewFicticio($val, $roundMode, $casas) : '—';
             }
             if (count($restou) === count($pendentes)) {
                 foreach ($restou as $c) {
@@ -6062,10 +6069,10 @@ class BoletimAssistenteWizard
         return $notas;
     }
 
-    private function roundPreviewFicticio(float $valor, string $roundMode): float
+    private function roundPreviewFicticio(float $valor, string $roundMode, int $casas = 2): float
     {
         if ($roundMode !== 'half') {
-            return round($valor, 2);
+            return round($valor, $casas === 1 ? 1 : 2);
         }
 
         $base = floor($valor);

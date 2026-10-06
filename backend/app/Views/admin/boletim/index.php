@@ -48,6 +48,15 @@ if (!in_array($finalidade, ['oficial', 'complementar'], true)) {
 }
 $boletimIdSelecionado = (int) ($regra['boletim_id'] ?? 0);
 $decimalPlacesSelected = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
+if ($boletimIdSelecionado > 0) {
+    foreach ($boletinsCadastro as $bolOptDec) {
+        if ((int) ($bolOptDec['id'] ?? 0) !== $boletimIdSelecionado) {
+            continue;
+        }
+        $decimalPlacesSelected = ((int) ($bolOptDec['decimal_places'] ?? $decimalPlacesSelected) === 1) ? 1 : 2;
+        break;
+    }
+}
 $formatNotaBoletim = static function ($valor) use ($decimalPlacesSelected): string {
     return number_format((float) $valor, $decimalPlacesSelected, ',', '.');
 };
