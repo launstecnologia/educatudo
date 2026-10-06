@@ -397,6 +397,117 @@ class ReportAdminController extends AdminBaseController
         ]);
     }
 
+    public function limparObservacoesBoletimCoordenacao()
+    {
+        if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', false)) {
+            return;
+        }
+        $this->aplicarFiltrosPostBoletimCoordenacao();
+        $user = $this->auth->getUser();
+        if (!$this->podeEditarObservacaoBoletimCoordenacao($user)) {
+            $this->setFlashMessage('Acesso não autorizado para apagar observações.', 'error');
+            $this->redirect($this->urlVoltarBoletimCoordenacao());
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Atualize a página e tente de novo.', 'error');
+            $this->redirect($this->urlVoltarBoletimCoordenacao());
+            return;
+        }
+
+        $ids = $this->idsAlunosRelatorioCoordenacaoAtual();
+        $apagadas = 0;
+        if ($ids !== []) {
+            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
+            $cfg = new BoletimConfig();
+            $cfg->ensureSchema();
+            $usuarioId = (int) ($user['id'] ?? 0);
+            $usuarioNome = (string) ($user['nome'] ?? '');
+            foreach ($ids as $alunoId) {
+                $row = $cfg->getObservacaoCoordenacao($alunoId);
+                if (trim((string) ($row['conteudo'] ?? '')) === '') {
+                    continue;
+                }
+                $cfg->limparObservacaoCoordenacao($alunoId, $usuarioId, $usuarioNome);
+                $apagadas++;
+            }
+        }
+
+        if ($apagadas === 0) {
+            $this->setFlashMessage('Nenhum aluno deste relatório tinha observação atual.', 'info');
+        } else {
+            $this->setFlashMessage(
+                'Observação atual apagada de ' . $apagadas . ' aluno' . ($apagadas === 1 ? '' : 's') . '. O texto continua salvo nas versões.',
+                'success'
+            );
+        }
+        $pagina = max(1, (int) ($_POST['pagina'] ?? 1));
+        $this->redirect($this->urlVoltarBoletimCoordenacao($pagina > 1 ? ['pagina' => $pagina] : []));
+    }
+
+    private function aplicarFiltrosPostBoletimCoordenacao(): void
+    {
+        foreach (['fonte', 'ano_letivo', 'periodo', 'curso_id', 'turma_id', 'aluno_q', 'nota_abaixo_de', 'materias_exibicao', 'assinatura', 'incluir_antigas', 'evento', 'eventos', 'pagina', 'executar'] as $chave) {
+            if (array_key_exists($chave, $_POST)) {
+                $_GET[$chave] = $_POST[$chave];
+            }
+        }
+    }
+
+    /**
+     * Alunos de todas as páginas do filtro atual, não só os 20 da tela.
+     *
+     * @return list<int>
+     */
+    private function idsAlunosRelatorioCoordenacaoAtual(): array
+    {
+        $fonte = $this->parseFonteBoletimCoordenacao();
+        $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
+        $cursoId = max(0, (int) ($_GET['curso_id'] ?? 0));
+        $anoLetivo = max(0, (int) ($_GET['ano_letivo'] ?? 0));
+        $periodo = $this->parsePeriodoBoletimCoordenacao($anoLetivo);
+        $alunoQ = $this->parseAlunoBuscaBoletimCoordenacao();
+        $notaAbaixoDe = $this->parseNotaAbaixoDeBoletim($_GET['nota_abaixo_de'] ?? null);
+        $materiasExibicao = $this->parseMateriasExibicaoBoletim($_GET['materias_exibicao'] ?? 'todas');
+        $ids = [];
+        $coletar = static function ($alunos) use (&$ids): void {
+            foreach ((array) $alunos as $aluno) {
+                if (!is_array($aluno)) {
+                    continue;
+                }
+                $id = (int) ($aluno['id'] ?? 0);
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
+        };
+        if ($fonte === 'vida_escolar') {
+            if ($anoLetivo <= 0) {
+                return [];
+            }
+            $relatorio = $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId);
+            $coletar($relatorio['alunos'] ?? []);
+
+            return array_values($ids);
+        }
+        foreach ($this->eventosVigentesBoletimCoordenacao($anoLetivo, $periodo) as $atual) {
+            $bloco = $this->montarRelatorioBoletimCoordenacao(
+                (int) $atual['regra_id'],
+                (string) $atual['periodo_ref'],
+                $turmaId,
+                $notaAbaixoDe,
+                $materiasExibicao,
+                $alunoQ,
+                (int) ($atual['geracao_id'] ?? 0),
+                !empty($atual['usar_vigente']),
+                $cursoId
+            );
+            $coletar($bloco['alunos'] ?? []);
+        }
+
+        return array_values($ids);
+    }
+
     /**
      * @param array<string,mixed> $relatorio
      * @return array<string,mixed>

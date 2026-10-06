@@ -218,7 +218,26 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     };
     ?>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <strong><?= $totalAlunosResumo ?> <?= $totalAlunosResumo === 1 ? 'aluno' : 'alunos' ?></strong>
+        <div class="flex flex-wrap items-center gap-3">
+            <strong><?= $totalAlunosResumo ?> <?= $totalAlunosResumo === 1 ? 'aluno' : 'alunos' ?></strong>
+            <?php if (!empty($pode_editar_observacao) && $totalAlunosResumo > 0): ?>
+            <form method="post" action="<?= URL ?>/admin/reports/boletim-coordenacao/observacoes/limpar" class="inline" onsubmit="return confirm('Apagar a observação atual de todos os alunos deste relatório, inclusive os das outras páginas? O texto continua salvo nas versões.');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="executar" value="1">
+                <input type="hidden" name="pagina" value="<?= $paginaAtual ?>">
+                <?php foreach ($queryExportacao as $chaveFiltro => $valorFiltro): ?>
+                    <?php if (is_array($valorFiltro)): ?>
+                        <?php foreach ($valorFiltro as $itemFiltro): ?>
+                        <input type="hidden" name="<?= htmlspecialchars((string) $chaveFiltro, ENT_QUOTES, 'UTF-8') ?>[]" value="<?= htmlspecialchars((string) $itemFiltro, ENT_QUOTES, 'UTF-8') ?>">
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <input type="hidden" name="<?= htmlspecialchars((string) $chaveFiltro, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) $valorFiltro, ENT_QUOTES, 'UTF-8') ?>">
+                    <?php endif; ?>
+                <?php endforeach; ?>
+                <button type="submit" class="px-3 py-2 rounded-lg border border-red-300 bg-white text-sm font-semibold text-red-700 hover:bg-red-50">Apagar observações</button>
+            </form>
+            <?php endif; ?>
+        </div>
         <div class="flex flex-wrap gap-2">
             <?php if ($fonteRelatorio === 'vida_escolar'): ?>
                 <?php if ((int) ($relatorio['alunos_com_ficha'] ?? 0) > 0 && !$zipGerando): ?>
