@@ -47,9 +47,12 @@ $baseUrlNotas = URL . '/pais/filhos/' . (int) ($filho['id'] ?? 0) . '/notas';
         <?php require __DIR__ . '/../partials/provas_matriz_blocos.php'; ?>
     </div>
 
-    <div class="mt-8">
+    <div class="mt-8" id="notas">
         <h2 class="text-2xl font-bold text-gray-900 mb-1">Notas</h2>
         <p class="text-gray-600 mb-4">O mesmo demonstrativo visto pela coordenação. O boletim fica só com a coordenação.</p>
-        <?php require __DIR__ . '/../partials/notas_portal_coordenacao.php'; ?>
+        <?php
+        $notas_perfil = 'pais';
+        require __DIR__ . '/../partials/notas_portal_coordenacao.php';
+        ?>
     </div>
 </div>
