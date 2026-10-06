@@ -224,6 +224,10 @@ if ($nomeMenuEscola === '') {
             <i class="fa-solid fa-flag-checkered w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
+        <a href="<?= URL ?>/admin/fechamento/apoio-digitacao" class="<?= $linkCls($cp === 'apoio-digitacao') ?>">
+            <i class="fa-solid fa-file-excel w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Apoio à digitação</span>
+        </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
         <a href="<?= URL ?>/admin/conselhos" class="<?= $linkCls($cp === 'conselho_classe') ?>">

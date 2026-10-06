@@ -40,7 +40,7 @@ $pedagogicoOpen = in_array($cur, [
     'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
 ], true);
 $fechamentoOpen = in_array($cur, [
-    'fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais',
+    'fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais', 'apoio-digitacao',
     'conselho_classe',
 ], true);
 $secretariaNavOpen = in_array($cur, [
@@ -265,6 +265,10 @@ $gestaoOpen = $secretariaNavOpen;
         <a href="<?= $urlBase ?>/admin/fechamento" class="<?= $linkCls(in_array($cur, ['fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais'], true)) ?>">
             <i class="fa-solid fa-flag-checkered w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
+        </a>
+        <a href="<?= $urlBase ?>/admin/fechamento/apoio-digitacao" class="<?= $linkCls($cur === 'apoio-digitacao') ?>">
+            <i class="fa-solid fa-file-excel w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Apoio à digitação</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>

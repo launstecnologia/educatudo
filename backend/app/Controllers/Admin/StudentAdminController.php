@@ -1370,6 +1370,27 @@ class StudentAdminController extends AdminBaseController
         $this->viewWithLayout('admin', 'admin/students/create', $data);
     }
 
+    private function identificadoresEstaduaisAlunoPost(): array
+    {
+        $digito = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', (string) ($_POST['ra_digito'] ?? '')) ?? '');
+        $digito = substr($digito, 0, 2);
+        $uf = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) ($_POST['ra_uf'] ?? '')) ?? '');
+        $uf = substr($uf, 0, 2);
+        if (strlen($uf) !== 2) {
+            $uf = '';
+        }
+        $cgm = preg_replace('/\s+/', '', trim((string) ($_POST['cgm'] ?? ''))) ?? '';
+        if (strlen($cgm) > 30) {
+            $cgm = substr($cgm, 0, 30);
+        }
+
+        return [
+            'ra_digito' => $digito !== '' ? $digito : null,
+            'ra_uf' => $uf !== '' ? $uf : null,
+            'cgm' => $cgm !== '' ? $cgm : null,
+        ];
+    }
+
     public function salvarAluno()
     {
         // Verifica CSRF token
@@ -1435,6 +1456,9 @@ class StudentAdminController extends AdminBaseController
                 'ativo' => $ativo,
                 'pagante' => $pagante
             ];
+            if (array_key_exists('ra_digito', $_POST) || array_key_exists('ra_uf', $_POST) || array_key_exists('cgm', $_POST)) {
+                $createPayload = array_merge($createPayload, $this->identificadoresEstaduaisAlunoPost());
+            }
             if ($this->colunaAlunoEnderecoExiste()) {
                 $createPayload['rg'] = $docEndereco['rg'];
                 $createPayload['logradouro'] = $docEndereco['logradouro'];
@@ -1616,6 +1640,9 @@ class StudentAdminController extends AdminBaseController
                 'pagante' => $pagante,
                 'primeiro_acesso' => $primeiro_acesso
             ];
+            if (array_key_exists('ra_digito', $_POST) || array_key_exists('ra_uf', $_POST) || array_key_exists('cgm', $_POST)) {
+                $updateData = array_merge($updateData, $this->identificadoresEstaduaisAlunoPost());
+            }
             if ($this->colunaAlunoSexoExiste()) {
                 $updateData['sexo'] = $sexo;
             }

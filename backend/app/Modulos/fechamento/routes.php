@@ -7,6 +7,11 @@
 
 $router->get('/admin/fechamento', 'Modulos/fechamento/FechamentoAdminController@index');
 $router->get('/admin/fechamento/impressao-lote', 'Modulos/fechamento/FechamentoAdminController@impressaoLote');
+$router->get('/admin/fechamento/apoio-digitacao', 'Modulos/fechamento/FechamentoAdminController@apoioDigitacao');
+$router->post('/admin/fechamento/apoio-digitacao/identificadores', 'Modulos/fechamento/FechamentoAdminController@salvarCodigoApoioDigitacao');
+$router->post('/admin/fechamento/apoio-digitacao/emitir', 'Modulos/fechamento/FechamentoAdminController@emitirApoioDigitacao');
+$router->post('/admin/fechamento/apoio-digitacao/status', 'Modulos/fechamento/FechamentoAdminController@statusApoioDigitacao');
+$router->get('/admin/fechamento/apoio-digitacao/arquivo/{id}/{formato}', 'Modulos/fechamento/FechamentoAdminController@arquivoApoioDigitacao');
 $router->post('/admin/fechamento/impressao-lote/enfileirar', 'Modulos/fechamento/FechamentoAdminController@enfileirarImpressao');
 $router->get('/admin/fechamento/impressao-lote/arquivo/{id}', 'Modulos/fechamento/FechamentoAdminController@arquivoImpressao');
 $router->get('/admin/fechamento/impressao-lote/pdf', 'Modulos/fechamento/FechamentoAdminController@abrirPdf');

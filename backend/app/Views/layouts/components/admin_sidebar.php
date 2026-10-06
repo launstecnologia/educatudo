@@ -134,7 +134,7 @@
         ], true);
         $avaliacoesOpen = $rotinaOpen;
         $fechamentoOpen = in_array($cp, [
-            'fechamento', 'homologacoes', 'documentos-periodo', 'diagnostico-menu',
+            'fechamento', 'homologacoes', 'documentos-periodo', 'diagnostico-menu', 'apoio-digitacao',
             'resultados-finais', 'conselho_classe',
         ], true);
         $secretariaNavOpen = in_array($cp, [
@@ -845,6 +845,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'fechamento': 'fechamento',
         'homologacoes': 'fechamento',
         'documentos-periodo': 'fechamento',
+        'apoio-digitacao': 'fechamento',
         'diagnostico-menu': 'fechamento',
         'resultados-finais': 'fechamento',
         'comunicacao': 'comunicacao',

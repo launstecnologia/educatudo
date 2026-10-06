@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
 require_once __DIR__ . '/../Services/FechamentoService.php';
 require_once __DIR__ . '/../Services/ImpressaoLoteFechamentoService.php';
+require_once __DIR__ . '/../Services/ApoioDigitacaoFechamentoService.php';
 require_once __DIR__ . '/../Services/FechamentoMaquinaEstados.php';
 require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
 require_once __DIR__ . '/../../../Core/AdminMenuDiagnostico.php';
@@ -677,6 +678,180 @@ class FechamentoAdminController extends AdminBaseController
             'matriz' => $matriz,
             'csrf_token' => $this->generateCsrfToken(),
         ]);
+    }
+
+    public function apoioDigitacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
+            return;
+        }
+        $svc = $this->service();
+        $apoio = new ApoioDigitacaoFechamentoService();
+        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
+        $anoLetivo = $this->anoDaRequest($anos);
+        [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
+        $turmaId = (int) ($_GET['turma_id'] ?? 0);
+        $turmas = $apoio->completarTurmas($svc->homologacao()->model()->turmasAtivas($anoLetivo));
+        $emissoes = $apoio->listar($anoLetivo, $turmaId);
+        $pagina = max(1, (int) ($_GET['pagina'] ?? 1));
+        $porPagina = 10;
+        $totalEmissoes = count($emissoes);
+        $emissoesPagina = array_slice($emissoes, ($pagina - 1) * $porPagina, $porPagina);
+        $flash = $this->getFlashMessage();
+
+        $this->viewWithLayout('admin', 'admin/fechamento/apoio-digitacao', [
+            'title' => 'Apoio à digitação - EducaTudo',
+            'user' => $this->auth->getUser(),
+            'current_page' => 'apoio-digitacao',
+            'anos' => $anos,
+            'ano_letivo' => $anoLetivo,
+            'periodo_tipo' => $periodoTipo,
+            'periodo_numero' => $periodoNumero,
+            'turma_id' => $turmaId,
+            'turmas' => $turmas,
+            'escola' => $apoio->escola(),
+            'schema_pronto' => $apoio->schemaPronto(),
+            'emissoes' => $emissoesPagina,
+            'emissoes_total' => $totalEmissoes,
+            'pagina' => $pagina,
+            'paginas' => max(1, (int) ceil($totalEmissoes / $porPagina)),
+            'status_rotulos' => ApoioDigitacaoFechamentoService::STATUS,
+            'csrf_token' => $this->generateCsrfToken(),
+            'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
+            'flash_message' => $flash['message'] ?? '',
+        ]);
+    }
+
+    public function salvarCodigoApoioDigitacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'alterar', false)) {
+            return;
+        }
+        $voltar = $this->urlApoioDigitacao();
+        if (!$this->csrfOuRedirect($voltar)) {
+            return;
+        }
+        $result = (new ApoioDigitacaoFechamentoService())->salvarCodigoEscola((string) ($_POST['codigo_estadual'] ?? ''));
+        $this->setFlashMessage(
+            ($result['success'] ?? false) ? 'Código estadual salvo.' : (string) ($result['error'] ?? 'Não foi possível salvar.'),
+            ($result['success'] ?? false) ? 'success' : 'error'
+        );
+        $this->redirect($voltar);
+    }
+
+    public function emitirApoioDigitacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'alterar', false)) {
+            return;
+        }
+        $turmaId = (int) ($_POST['turma_id'] ?? 0);
+        $anoLetivo = (int) ($_POST['ano_letivo'] ?? date('Y'));
+        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
+        $voltar = $this->urlApoioDigitacao($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
+        if (!$this->csrfOuRedirect($voltar)) {
+            return;
+        }
+        $apoio = new ApoioDigitacaoFechamentoService();
+        $salvo = $apoio->salvarTurmaOficial(
+            $turmaId,
+            (string) ($_POST['numero_classe_oficial'] ?? ''),
+            (string) ($_POST['codigo_curso_oficial'] ?? '')
+        );
+        if (!($salvo['success'] ?? false)) {
+            $this->setFlashMessage((string) ($salvo['error'] ?? 'Não foi possível salvar a turma.'), 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $user = $this->auth->getUser();
+        $result = $apoio->emitir(
+            $turmaId,
+            $anoLetivo,
+            $periodoTipo,
+            $periodoNumero,
+            (int) ($user['id'] ?? 0),
+            trim((string) ($user['nome'] ?? $user['name'] ?? ''))
+        );
+        $this->setFlashMessage(
+            ($result['success'] ?? false) ? 'Planilha e TXT gerados. A versão anterior foi mantida.' : (string) ($result['error'] ?? 'Não foi possível gerar.'),
+            ($result['success'] ?? false) ? 'success' : 'error'
+        );
+        $this->redirect($voltar);
+    }
+
+    public function statusApoioDigitacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'alterar', false)) {
+            return;
+        }
+        $voltar = $this->urlApoioDigitacao();
+        if (!$this->csrfOuRedirect($voltar)) {
+            return;
+        }
+        $result = (new ApoioDigitacaoFechamentoService())->atualizarStatus(
+            (int) ($_POST['id'] ?? 0),
+            (string) ($_POST['status'] ?? ''),
+            (string) ($_POST['protocolo'] ?? '')
+        );
+        $this->setFlashMessage(
+            ($result['success'] ?? false) ? 'Situação atualizada.' : (string) ($result['error'] ?? 'Não foi possível atualizar.'),
+            ($result['success'] ?? false) ? 'success' : 'error'
+        );
+        $this->redirect($voltar);
+    }
+
+    public function arquivoApoioDigitacao($id, $formato): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
+            return;
+        }
+        $formato = (string) $formato;
+        if (!in_array($formato, ['planilha', 'txt'], true)) {
+            $this->setFlashMessage('Arquivo não encontrado.', 'error');
+            $this->redirect($this->urlApoioDigitacao());
+            return;
+        }
+        $arquivo = (new ApoioDigitacaoFechamentoService())->arquivo((int) $id, $formato);
+        if ($arquivo === null) {
+            $this->setFlashMessage('Arquivo não encontrado.', 'error');
+            $this->redirect($this->urlApoioDigitacao());
+            return;
+        }
+        header('Content-Type: ' . $arquivo['mime']);
+        header('Content-Disposition: attachment; filename="' . $arquivo['nome'] . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        readfile($arquivo['caminho']);
+        exit;
+    }
+
+    private function urlApoioDigitacao(int $ano = 0, string $tipo = '', int $numero = -1, int $turmaId = 0): string
+    {
+        if ($ano <= 0) {
+            $ano = (int) ($_POST['ano_letivo'] ?? $_GET['ano_letivo'] ?? date('Y'));
+        }
+        if ($tipo === '') {
+            $tipo = (string) ($_POST['periodo_tipo'] ?? $_GET['periodo_tipo'] ?? 'ano');
+        }
+        if ($numero < 0) {
+            $numero = (int) ($_POST['periodo_numero'] ?? $_GET['periodo_numero'] ?? 0);
+        }
+        if ($turmaId <= 0) {
+            $turmaId = (int) ($_POST['turma_id_filtro'] ?? $_GET['turma_id'] ?? 0);
+        }
+        $qs = [
+            'ano_letivo' => $ano,
+            'periodo_tipo' => $tipo,
+            'periodo_numero' => $numero,
+        ];
+        if ($turmaId > 0) {
+            $qs['turma_id'] = $turmaId;
+        }
+        $pagina = (int) ($_GET['pagina'] ?? 0);
+        if ($pagina > 1) {
+            $qs['pagina'] = $pagina;
+        }
+
+        return '/admin/fechamento/apoio-digitacao?' . http_build_query($qs);
     }
 
     /**

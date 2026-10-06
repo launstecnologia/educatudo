@@ -42,6 +42,7 @@ ob_start();
 ?>
 <a href="<?= URL ?>/admin/resultados-finais/layouts" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Layouts</a>
 <a href="<?= URL ?>/admin/resultados-finais/relatorios" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Relatórios</a>
+<a href="<?= URL ?>/admin/fechamento/apoio-digitacao?<?= htmlspecialchars($loteQs) ?>" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Apoio à digitação</a>
 <?php
 if ($lotePronto):
     $ui_btn_variant = 'complementar';

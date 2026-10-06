@@ -214,8 +214,27 @@ $etapasWizard = [
                             <div>
                                 <label for="ra" class="block text-sm font-medium text-gray-700 mb-2">RA</label>
                                 <input type="text" id="ra" name="ra" value="<?= $escw($student['ra'] ?? '') ?>"
-                                       class="<?= $inputClass ?>" placeholder="RA do governo">
-                                <p class="mt-1 text-xs text-gray-500">Registro do aluno no governo.</p>
+                                       class="<?= $inputClass ?>" placeholder="Número do RA, sem o dígito">
+                                <p class="mt-1 text-xs text-gray-500">Número do registro. O dígito e a UF ficam nos campos ao lado.</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label for="ra_digito" class="block text-sm font-medium text-gray-700 mb-2">Dígito do RA</label>
+                                <input type="text" id="ra_digito" name="ra_digito" maxlength="2" value="<?= $escw($student['ra_digito'] ?? '') ?>"
+                                       class="<?= $inputClass ?>" placeholder="Ex.: 0 ou X" autocomplete="off">
+                                <p class="mt-1 text-xs text-gray-500">Usado na digitação da SED (São Paulo).</p>
+                            </div>
+                            <div>
+                                <label for="ra_uf" class="block text-sm font-medium text-gray-700 mb-2">UF do RA</label>
+                                <input type="text" id="ra_uf" name="ra_uf" maxlength="2" value="<?= $escw($student['ra_uf'] ?? '') ?>"
+                                       class="<?= $inputClass ?> uppercase" placeholder="SP" autocomplete="off">
+                            </div>
+                            <div>
+                                <label for="cgm" class="block text-sm font-medium text-gray-700 mb-2">CGM</label>
+                                <input type="text" id="cgm" name="cgm" maxlength="30" value="<?= $escw($student['cgm'] ?? '') ?>"
+                                       class="<?= $inputClass ?>" placeholder="Código no SERE" autocomplete="off">
+                                <p class="mt-1 text-xs text-gray-500">Usado na conferência do Paraná. Mantenha os zeros à esquerda.</p>
                             </div>
                         </div>
                         <div>

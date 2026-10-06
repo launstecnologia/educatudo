@@ -205,7 +205,7 @@ class Student
             'nome_social', 'nacionalidade', 'naturalidade', 'uf_nascimento', 'cor_raca', 'orgao_emissor', 'uf_rg',
             'certidao_nascimento', 'certidao_livro', 'certidao_folha', 'certidao_termo', 'nis', 'passaporte', 'rne',
             'zona', 'pais', 'whatsapp', 'email_secundario',
-            'nome_mae', 'nome_pai', 'codigo_inep'];
+            'nome_mae', 'nome_pai', 'codigo_inep', 'ra_digito', 'ra_uf', 'cgm'];
         $colsExistentes = $this->colunasAlunos();
         if (!$this->mapaColunasTemNomes($colsExistentes)) {
             $optionalColumns = [];
@@ -324,7 +324,7 @@ class Student
             'nome_social', 'nacionalidade', 'naturalidade', 'uf_nascimento', 'cor_raca', 'orgao_emissor', 'uf_rg',
             'certidao_nascimento', 'certidao_livro', 'certidao_folha', 'certidao_termo', 'nis', 'passaporte', 'rne',
             'zona', 'pais', 'whatsapp', 'email_secundario',
-            'nome_mae', 'nome_pai', 'codigo_inep'];
+            'nome_mae', 'nome_pai', 'codigo_inep', 'ra_digito', 'ra_uf', 'cgm'];
         $colsExistentes = $this->colunasAlunos();
         if (!$this->mapaColunasTemNomes($colsExistentes)) {
             $camposOpcionais = [];
