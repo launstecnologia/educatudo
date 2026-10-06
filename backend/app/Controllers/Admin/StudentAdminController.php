@@ -3467,6 +3467,8 @@ class StudentAdminController extends AdminBaseController
             return [
                 'conteudo' => (string) ($row['conteudo'] ?? ''),
                 'updated_at' => $row['updated_at'] ?? null,
+                'versoes' => $cfg->listarVersoesObservacao($alunoId),
+                'log' => $cfg->listarLogObservacao($alunoId),
             ];
         } catch (Throwable $e) {
             error_log('AdminController boletimObservacaoSafe aluno #' . $alunoId . ': ' . $e->getMessage());
@@ -3510,17 +3512,117 @@ class StudentAdminController extends AdminBaseController
             require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
             $cfg = new BoletimConfig();
             $cfg->ensureSchema();
-            $cfg->saveObservacaoCoordenacao($alunoId, $conteudo, (int) ($user['id'] ?? 0));
-            $row = $cfg->getObservacaoCoordenacao($alunoId);
-            $this->json([
-                'success' => true,
-                'conteudo' => (string) ($row['conteudo'] ?? ''),
-                'updated_at' => $row['updated_at'] ?? null,
-            ]);
+            $cfg->saveObservacaoCoordenacao($alunoId, $conteudo, (int) ($user['id'] ?? 0), (string) ($user['nome'] ?? ''));
+            $this->responderObservacaoBoletim($cfg, $alunoId);
         } catch (Throwable $e) {
             error_log('AdminController salvarObservacaoBoletim aluno #' . $alunoId . ': ' . $e->getMessage());
             $this->json(['error' => 'Erro ao salvar observação'], 500);
         }
+    }
+
+    public function limparObservacaoBoletim($id)
+    {
+        $user = $this->auth->getUser();
+        if (!$this->coordenacaoPodeEditarBoletim($user)) {
+            $this->json(['error' => 'Acesso não autorizado'], 403);
+            return;
+        }
+        $alunoId = (int) $id;
+        if ($alunoId <= 0 || !$this->csrfObservacaoBoletim()) {
+            $this->json(['error' => $alunoId <= 0 ? 'Aluno inválido' : 'Token inválido'], $alunoId <= 0 ? 400 : 419);
+            return;
+        }
+        try {
+            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
+            $cfg = new BoletimConfig();
+            $cfg->ensureSchema();
+            $cfg->limparObservacaoCoordenacao($alunoId, (int) ($user['id'] ?? 0), (string) ($user['nome'] ?? ''));
+            $this->responderObservacaoBoletim($cfg, $alunoId);
+        } catch (Throwable $e) {
+            error_log('AdminController limparObservacaoBoletim aluno #' . $alunoId . ': ' . $e->getMessage());
+            $this->json(['error' => 'Erro ao apagar observação'], 500);
+        }
+    }
+
+    public function excluirVersoesObservacaoBoletim($id)
+    {
+        $user = $this->auth->getUser();
+        if (!$this->coordenacaoPodeEditarBoletim($user)) {
+            $this->json(['error' => 'Acesso não autorizado'], 403);
+            return;
+        }
+        $alunoId = (int) $id;
+        $payload = $this->payloadObservacaoBoletim();
+        if ($alunoId <= 0 || !$this->csrfObservacaoBoletim($payload)) {
+            $this->json(['error' => $alunoId <= 0 ? 'Aluno inválido' : 'Token inválido'], $alunoId <= 0 ? 400 : 419);
+            return;
+        }
+        $senha = trim((string) ($payload['senha'] ?? ''));
+        if ($senha === '') {
+            $this->json(['error' => 'Informe sua senha para apagar todas as versões.'], 400);
+            return;
+        }
+        $usuario = $this->db->fetch(
+            "SELECT id, senha_hash FROM usuarios WHERE id = :id AND tipo IN ('admin', 'admin_escola')",
+            ['id' => (int) ($user['id'] ?? 0)]
+        );
+        if (!$usuario || !password_verify($senha, (string) ($usuario['senha_hash'] ?? ''))) {
+            $this->json(['error' => 'Senha incorreta'], 401);
+            return;
+        }
+        try {
+            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
+            $cfg = new BoletimConfig();
+            $cfg->ensureSchema();
+            $cfg->excluirVersoesObservacao($alunoId, (int) ($user['id'] ?? 0), (string) ($user['nome'] ?? ''));
+            $this->responderObservacaoBoletim($cfg, $alunoId);
+        } catch (Throwable $e) {
+            error_log('AdminController excluirVersoesObservacaoBoletim aluno #' . $alunoId . ': ' . $e->getMessage());
+            $this->json(['error' => 'Erro ao apagar as versões'], 500);
+        }
+    }
+
+    private function responderObservacaoBoletim(BoletimConfig $cfg, int $alunoId): void
+    {
+        $row = $cfg->getObservacaoCoordenacao($alunoId);
+        $this->json([
+            'success' => true,
+            'conteudo' => (string) ($row['conteudo'] ?? ''),
+            'updated_at' => $row['updated_at'] ?? null,
+            'versoes' => $cfg->listarVersoesObservacao($alunoId),
+            'log' => $cfg->listarLogObservacao($alunoId),
+        ]);
+    }
+
+    /**
+     * @param array<string,mixed>|null $payload
+     */
+    private function csrfObservacaoBoletim(?array $payload = null): bool
+    {
+        $payload = $payload ?? $this->payloadObservacaoBoletim();
+        $token = (string) ($payload['_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+
+        return $this->verifyCsrfToken($token);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function payloadObservacaoBoletim(): array
+    {
+        $payload = $_POST;
+        if ($payload !== []) {
+            return $payload;
+        }
+        $raw = file_get_contents('php://input');
+        if (is_string($raw) && trim($raw) !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
     }
 
     public function excluirBoletimGerado($id, $regraId = 0)

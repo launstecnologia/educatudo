@@ -205,6 +205,36 @@ class BoletimConfig
                 CONSTRAINT fk_boletim_observacoes_aluno FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
+        $this->ensureObservacaoVersoes();
+    }
+
+    private function ensureObservacaoVersoes(): void
+    {
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS boletim_observacao_versoes (
+                id INT NOT NULL AUTO_INCREMENT,
+                aluno_id INT NOT NULL,
+                conteudo TEXT NOT NULL,
+                usuario_id INT NULL,
+                usuario_nome VARCHAR(150) NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_boletim_obs_versoes_aluno (aluno_id, id),
+                CONSTRAINT fk_boletim_obs_versoes_aluno FOREIGN KEY (aluno_id) REFERENCES alunos(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        $this->db->query(
+            "CREATE TABLE IF NOT EXISTS boletim_observacao_log (
+                id INT NOT NULL AUTO_INCREMENT,
+                aluno_id INT NOT NULL,
+                acao VARCHAR(30) NOT NULL,
+                usuario_id INT NULL,
+                usuario_nome VARCHAR(150) NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_boletim_obs_log_aluno (aluno_id, id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
     }
 
     public function getObservacaoCoordenacao(int $alunoId): ?array
@@ -222,17 +252,26 @@ class BoletimConfig
         return $row ?: null;
     }
 
-    public function saveObservacaoCoordenacao(int $alunoId, string $conteudo, ?int $userId = null): bool
+    public function saveObservacaoCoordenacao(int $alunoId, string $conteudo, ?int $userId = null, string $usuarioNome = ''): bool
     {
         if ($alunoId <= 0) {
             return false;
         }
-        $conteudo = trim($conteudo);
-        if (mb_strlen($conteudo, 'UTF-8') > 5000) {
-            $conteudo = mb_substr($conteudo, 0, 5000, 'UTF-8');
+        $conteudo = $this->limitarObservacao($conteudo);
+        if ($conteudo === '') {
+            return $this->limparObservacaoCoordenacao($alunoId, $userId, $usuarioNome);
         }
 
         $existente = $this->getObservacaoCoordenacao($alunoId);
+        $anterior = trim((string) ($existente['conteudo'] ?? ''));
+        if ($anterior === $conteudo) {
+            return true;
+        }
+
+        $usuarioId = $userId !== null && $userId > 0 ? $userId : null;
+        if ($anterior !== '') {
+            $this->preservarTextoComoVersao($alunoId, $anterior, $usuarioId, $usuarioNome);
+        }
         if ($existente) {
             $this->db->update(
                 "UPDATE boletim_observacoes
@@ -242,23 +281,325 @@ class BoletimConfig
                  WHERE id = :id",
                 [
                     'conteudo' => $conteudo,
-                    'updated_by' => $userId !== null && $userId > 0 ? $userId : null,
+                    'updated_by' => $usuarioId,
                     'id' => (int) $existente['id'],
                 ]
             );
+        } else {
+            $this->db->insert(
+                "INSERT INTO boletim_observacoes (aluno_id, conteudo, updated_by)
+                 VALUES (:aluno_id, :conteudo, :updated_by)",
+                [
+                    'aluno_id' => $alunoId,
+                    'conteudo' => $conteudo,
+                    'updated_by' => $usuarioId,
+                ]
+            );
+        }
+        $this->gravarVersaoObservacao($alunoId, $conteudo, $usuarioId, $usuarioNome);
+        $this->gravarLogObservacao($alunoId, 'salvou', $usuarioId, $usuarioNome);
+
+        return true;
+    }
+
+    /**
+     * Tira o texto do boletim atual e mantém as versões já escritas.
+     */
+    public function limparObservacaoCoordenacao(int $alunoId, ?int $userId = null, string $usuarioNome = ''): bool
+    {
+        if ($alunoId <= 0) {
+            return false;
+        }
+        $existente = $this->getObservacaoCoordenacao($alunoId);
+        $anterior = $this->limitarObservacao((string) ($existente['conteudo'] ?? ''));
+        if ($anterior === '') {
             return true;
         }
+        $usuarioId = $userId !== null && $userId > 0 ? $userId : null;
+        $this->preservarTextoComoVersao($alunoId, $anterior, $usuarioId, $usuarioNome);
+        $this->db->update(
+            "UPDATE boletim_observacoes
+             SET conteudo = '',
+                 updated_by = :updated_by,
+                 updated_at = NOW()
+             WHERE aluno_id = :aluno_id",
+            [
+                'updated_by' => $usuarioId,
+                'aluno_id' => $alunoId,
+            ]
+        );
+        $this->gravarLogObservacao($alunoId, 'limpou', $usuarioId, $usuarioNome);
 
+        return true;
+    }
+
+    /**
+     * Apaga o histórico escrito. O registro de quem fez isso permanece no log.
+     */
+    public function excluirVersoesObservacao(int $alunoId, ?int $userId = null, string $usuarioNome = ''): bool
+    {
+        if ($alunoId <= 0) {
+            return false;
+        }
+        $usuarioId = $userId !== null && $userId > 0 ? $userId : null;
+        $this->db->query(
+            "DELETE FROM boletim_observacao_versoes WHERE aluno_id = :aluno_id",
+            ['aluno_id' => $alunoId]
+        );
+        $existente = $this->getObservacaoCoordenacao($alunoId);
+        if ($existente) {
+            $this->db->update(
+                "UPDATE boletim_observacoes
+                 SET conteudo = '',
+                     updated_by = :updated_by,
+                     updated_at = NOW()
+                 WHERE aluno_id = :aluno_id",
+                [
+                    'updated_by' => $usuarioId,
+                    'aluno_id' => $alunoId,
+                ]
+            );
+        }
+        $this->gravarLogObservacao($alunoId, 'excluiu_versoes', $usuarioId, $usuarioNome);
+
+        return true;
+    }
+
+    /**
+     * @return list<array{conteudo:string,usuario_nome:string,criado_em:string}>
+     */
+    public function listarVersoesObservacao(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT conteudo, usuario_nome, created_at
+             FROM boletim_observacao_versoes
+             WHERE aluno_id = :aluno_id
+             ORDER BY id DESC
+             LIMIT 50",
+            ['aluno_id' => $alunoId]
+        ) ?: [];
+
+        return $this->formatarVersoesObservacao($rows);
+    }
+
+    /**
+     * @return list<array{acao:string,rotulo:string,usuario_nome:string,criado_em:string}>
+     */
+    public function listarLogObservacao(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT acao, usuario_nome, created_at
+             FROM boletim_observacao_log
+             WHERE aluno_id = :aluno_id
+             ORDER BY id DESC
+             LIMIT 80",
+            ['aluno_id' => $alunoId]
+        ) ?: [];
+
+        return $this->formatarLogObservacao($rows);
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, list<array{conteudo:string,usuario_nome:string,criado_em:string}>>
+     */
+    public function listarVersoesObservacaoPorAlunos(array $alunoIds): array
+    {
+        return $this->listarHistoricoObservacaoPorAlunos($alunoIds, 'versoes');
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, list<array{acao:string,rotulo:string,usuario_nome:string,criado_em:string}>>
+     */
+    public function listarLogObservacaoPorAlunos(array $alunoIds): array
+    {
+        return $this->listarHistoricoObservacaoPorAlunos($alunoIds, 'log');
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, list<array<string,string>>>
+     */
+    private function listarHistoricoObservacaoPorAlunos(array $alunoIds, string $tipo): array
+    {
+        $ids = [];
+        foreach ($alunoIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $params = [];
+        $placeholders = [];
+        foreach (array_values($ids) as $i => $id) {
+            $chave = 'a' . $i;
+            $placeholders[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        $tabela = $tipo === 'log' ? 'boletim_observacao_log' : 'boletim_observacao_versoes';
+        $colunas = $tipo === 'log'
+            ? 'aluno_id, acao, usuario_nome, created_at'
+            : 'aluno_id, conteudo, usuario_nome, created_at';
+        $rows = $this->db->fetchAll(
+            "SELECT {$colunas}
+             FROM {$tabela}
+             WHERE aluno_id IN (" . implode(',', $placeholders) . ")
+             ORDER BY id DESC",
+            $params
+        ) ?: [];
+        $porAluno = [];
+        foreach ($rows as $row) {
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            if ($alunoId <= 0) {
+                continue;
+            }
+            if (!isset($porAluno[$alunoId])) {
+                $porAluno[$alunoId] = [];
+            }
+            if (count($porAluno[$alunoId]) >= ($tipo === 'log' ? 80 : 50)) {
+                continue;
+            }
+            $porAluno[$alunoId][] = $row;
+        }
+        $out = [];
+        foreach ($porAluno as $alunoId => $lista) {
+            $out[$alunoId] = $tipo === 'log'
+                ? $this->formatarLogObservacao($lista)
+                : $this->formatarVersoesObservacao($lista);
+        }
+
+        return $out;
+    }
+
+    private function preservarTextoComoVersao(int $alunoId, string $conteudo, ?int $usuarioId, string $usuarioNome): void
+    {
+        $ultima = $this->db->fetch(
+            "SELECT conteudo
+             FROM boletim_observacao_versoes
+             WHERE aluno_id = :aluno_id
+             ORDER BY id DESC
+             LIMIT 1",
+            ['aluno_id' => $alunoId]
+        );
+        if (is_array($ultima) && trim((string) ($ultima['conteudo'] ?? '')) === $conteudo) {
+            return;
+        }
+        $this->gravarVersaoObservacao($alunoId, $conteudo, $usuarioId, $usuarioNome);
+    }
+
+    private function gravarVersaoObservacao(int $alunoId, string $conteudo, ?int $usuarioId, string $usuarioNome): void
+    {
         $this->db->insert(
-            "INSERT INTO boletim_observacoes (aluno_id, conteudo, updated_by)
-             VALUES (:aluno_id, :conteudo, :updated_by)",
+            "INSERT INTO boletim_observacao_versoes (aluno_id, conteudo, usuario_id, usuario_nome)
+             VALUES (:aluno_id, :conteudo, :usuario_id, :usuario_nome)",
             [
                 'aluno_id' => $alunoId,
                 'conteudo' => $conteudo,
-                'updated_by' => $userId !== null && $userId > 0 ? $userId : null,
+                'usuario_id' => $usuarioId,
+                'usuario_nome' => $this->nomeUsuarioObservacao($usuarioNome),
             ]
         );
-        return true;
+    }
+
+    private function gravarLogObservacao(int $alunoId, string $acao, ?int $usuarioId, string $usuarioNome): void
+    {
+        $this->db->insert(
+            "INSERT INTO boletim_observacao_log (aluno_id, acao, usuario_id, usuario_nome)
+             VALUES (:aluno_id, :acao, :usuario_id, :usuario_nome)",
+            [
+                'aluno_id' => $alunoId,
+                'acao' => $acao,
+                'usuario_id' => $usuarioId,
+                'usuario_nome' => $this->nomeUsuarioObservacao($usuarioNome),
+            ]
+        );
+    }
+
+    private function limitarObservacao(string $conteudo): string
+    {
+        $conteudo = trim($conteudo);
+        if (mb_strlen($conteudo, 'UTF-8') > 5000) {
+            $conteudo = mb_substr($conteudo, 0, 5000, 'UTF-8');
+        }
+
+        return $conteudo;
+    }
+
+    private function nomeUsuarioObservacao(string $nome): ?string
+    {
+        $nome = trim($nome);
+        if ($nome === '') {
+            return null;
+        }
+        if (mb_strlen($nome, 'UTF-8') > 150) {
+            $nome = mb_substr($nome, 0, 150, 'UTF-8');
+        }
+
+        return $nome;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array{conteudo:string,usuario_nome:string,criado_em:string}>
+     */
+    private function formatarVersoesObservacao(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'conteudo' => (string) ($row['conteudo'] ?? ''),
+                'usuario_nome' => (string) ($row['usuario_nome'] ?? ''),
+                'criado_em' => $this->formatarDataObservacao($row['created_at'] ?? null),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array{acao:string,rotulo:string,usuario_nome:string,criado_em:string}>
+     */
+    private function formatarLogObservacao(array $rows): array
+    {
+        $rotulos = [
+            'salvou' => 'Salvou',
+            'limpou' => 'Apagou a observação atual',
+            'excluiu_versoes' => 'Apagou todas as versões',
+        ];
+        $out = [];
+        foreach ($rows as $row) {
+            $acao = (string) ($row['acao'] ?? '');
+            $out[] = [
+                'acao' => $acao,
+                'rotulo' => $rotulos[$acao] ?? $acao,
+                'usuario_nome' => (string) ($row['usuario_nome'] ?? ''),
+                'criado_em' => $this->formatarDataObservacao($row['created_at'] ?? null),
+            ];
+        }
+
+        return $out;
+    }
+
+    private function formatarDataObservacao($valor): string
+    {
+        $texto = trim((string) $valor);
+        if ($texto === '') {
+            return '';
+        }
+        $ts = strtotime($texto);
+
+        return $ts ? date('d/m/Y H:i', $ts) : $texto;
     }
 
     /**

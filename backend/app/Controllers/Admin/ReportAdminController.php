@@ -356,6 +356,9 @@ class ReportAdminController extends AdminBaseController
                     $relatorio['grupos'] = $this->anexarHtmlDemonstrativoGrupos((array) ($relatorio['grupos'] ?? []));
                 }
             }
+            if (is_array($relatorio)) {
+                $relatorio = $this->anexarHistoricoObservacaoRelatorio($relatorio);
+            }
         }
 
         $flash = $this->getFlashMessage();
@@ -392,6 +395,74 @@ class ReportAdminController extends AdminBaseController
             'flash_message' => (string) ($flash['message'] ?? ''),
             'zip_job' => $zipJob,
         ]);
+    }
+
+    /**
+     * @param array<string,mixed> $relatorio
+     * @return array<string,mixed>
+     */
+    private function anexarHistoricoObservacaoRelatorio(array $relatorio): array
+    {
+        $ids = [];
+        $coletar = static function ($alunos) use (&$ids): void {
+            foreach ((array) $alunos as $aluno) {
+                if (!is_array($aluno)) {
+                    continue;
+                }
+                $id = (int) ($aluno['id'] ?? 0);
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
+        };
+        $coletar($relatorio['alunos'] ?? []);
+        foreach ((array) ($relatorio['grupos'] ?? []) as $grupo) {
+            if (is_array($grupo)) {
+                $coletar($grupo['alunos'] ?? []);
+            }
+        }
+        if ($ids === []) {
+            return $relatorio;
+        }
+        try {
+            require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
+            $cfg = new \BoletimConfig();
+            $cfg->ensureSchema();
+            $versoes = $cfg->listarVersoesObservacaoPorAlunos(array_values($ids));
+            $log = $cfg->listarLogObservacaoPorAlunos(array_values($ids));
+        } catch (\Throwable $e) {
+            error_log('Histórico da observação da coordenação: ' . $e->getMessage());
+
+            return $relatorio;
+        }
+        $aplicar = static function (array $aluno) use ($versoes, $log): array {
+            $id = (int) ($aluno['id'] ?? 0);
+            $aluno['observacao_versoes'] = $versoes[$id] ?? [];
+            $aluno['observacao_log'] = $log[$id] ?? [];
+
+            return $aluno;
+        };
+        if (isset($relatorio['alunos']) && is_array($relatorio['alunos'])) {
+            foreach ($relatorio['alunos'] as $i => $aluno) {
+                if (is_array($aluno)) {
+                    $relatorio['alunos'][$i] = $aplicar($aluno);
+                }
+            }
+        }
+        if (isset($relatorio['grupos']) && is_array($relatorio['grupos'])) {
+            foreach ($relatorio['grupos'] as $g => $grupo) {
+                if (!is_array($grupo) || !is_array($grupo['alunos'] ?? null)) {
+                    continue;
+                }
+                foreach ($grupo['alunos'] as $i => $aluno) {
+                    if (is_array($aluno)) {
+                        $relatorio['grupos'][$g]['alunos'][$i] = $aplicar($aluno);
+                    }
+                }
+            }
+        }
+
+        return $relatorio;
     }
 
     public function exportarBoletimCoordenacao()
@@ -2828,6 +2899,7 @@ class ReportAdminController extends AdminBaseController
                  INNER JOIN alunos a ON a.id = m.aluno_id
                  INNER JOIN turmas t ON t.id = m.turma_id
                  WHERE m.status = \'transferido\'
+                   AND a.ativo = 1
                    AND t.nome IN (' . implode(',', $holders) . ')
                    AND NOT EXISTS (
                         SELECT 1 FROM matricula ma

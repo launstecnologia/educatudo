@@ -350,9 +350,12 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                             <h4 class="text-sm font-semibold text-gray-800">Observação da coordenação</h4>
                         </div>
                         <?php if (!empty($pode_editar_observacao)): ?>
-                        <button type="button" class="coord-observation-edit text-sm font-semibold hover:opacity-75" style="color: var(--button-primary-color)">
-                            <?= $observacaoAluno !== '' ? 'Editar' : 'Adicionar observação' ?>
-                        </button>
+                        <div class="flex items-center gap-3">
+                            <button type="button" class="coord-observation-clear text-sm font-medium text-gray-600 hover:text-gray-800 <?= $observacaoAluno === '' ? 'hidden' : '' ?>">Apagar observação</button>
+                            <button type="button" class="coord-observation-edit text-sm font-semibold hover:opacity-75" style="color: var(--button-primary-color)">
+                                <?= $observacaoAluno !== '' ? 'Editar' : 'Adicionar observação' ?>
+                            </button>
+                        </div>
                         <?php endif; ?>
                     </div>
                     <div class="coord-observation-view">
@@ -367,6 +370,23 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                         </div>
                     </div>
                     <span class="coord-observation-status block mt-2 text-xs text-gray-500"></span>
+                    <?php endif; ?>
+                    <?php
+                    $obs_versoes = is_array($aluno['observacao_versoes'] ?? null) ? $aluno['observacao_versoes'] : [];
+                    $obs_log = is_array($aluno['observacao_log'] ?? null) ? $aluno['observacao_log'] : [];
+                    require __DIR__ . '/../../partials/observacao_coordenacao_historico.php';
+                    ?>
+                    <?php if (!empty($pode_editar_observacao)): ?>
+                    <div class="coord-observation-purge-wrap mt-3 <?= $obs_versoes === [] ? 'hidden' : '' ?>">
+                        <button type="button" class="coord-observation-purge text-sm font-medium text-red-700 hover:text-red-800">Apagar todas as versões</button>
+                        <div class="coord-observation-purge-box hidden mt-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                            <p class="text-xs text-red-800 mb-2">Apagar todas as versões exige a sua senha. O registro de quem alterou permanece.</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="password" autocomplete="off" class="coord-observation-senha w-48 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Sua senha">
+                                <button type="button" class="coord-observation-purge-confirm px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700">Confirmar exclusão</button>
+                            </div>
+                        </div>
+                    </div>
                     <?php endif; ?>
                 </div>
             </section>
@@ -658,13 +678,67 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         var status = block.querySelector('.coord-observation-status');
         if (!editButton || !view || !formWrap || !textarea) return;
 
+        var clearButton = block.querySelector('.coord-observation-clear');
+        var purgeButton = block.querySelector('.coord-observation-purge');
+        var purgeWrap = block.querySelector('.coord-observation-purge-wrap');
+        var purgeBox = block.querySelector('.coord-observation-purge-box');
+        var purgeConfirm = block.querySelector('.coord-observation-purge-confirm');
+        var senhaInput = block.querySelector('.coord-observation-senha');
+        var historico = block.querySelector('.obs-historico');
         var saved = textarea.value || '';
+        function escapar(valor) {
+            return String(valor || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        function pintarHistorico(data) {
+            if (!historico || !data) return;
+            var versoes = Array.isArray(data.versoes) ? data.versoes : [];
+            var log = Array.isArray(data.log) ? data.log : [];
+            var html = '<div class="obs-versoes">';
+            if (versoes.length) {
+                html += '<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Versões escritas</p><ul class="space-y-2">';
+                versoes.forEach(function (versao) {
+                    var quem = [versao.usuario_nome || '', versao.criado_em || ''].filter(Boolean).join(' · ');
+                    html += '<li class="rounded-lg border border-gray-200 bg-white px-3 py-2"><p class="text-sm text-gray-800 whitespace-pre-wrap break-words">' + escapar(versao.conteudo) + '</p><p class="mt-1 text-xs text-gray-500">' + escapar(quem) + '</p></li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div><div class="obs-log">';
+            if (log.length) {
+                html += '<p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Registro de alterações</p><ul class="space-y-1">';
+                log.forEach(function (item) {
+                    var quem = item.usuario_nome || 'Coordenação';
+                    html += '<li class="text-xs text-gray-600">' + escapar(item.criado_em) + ' — ' + escapar(quem) + ' — ' + escapar(item.rotulo) + '</li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div>';
+            historico.innerHTML = html;
+            if (purgeWrap) purgeWrap.classList.toggle('hidden', versoes.length === 0);
+        }
+        function enviar(url, extra) {
+            var payload = new FormData();
+            payload.append('_token', block.dataset.csrf || '');
+            Object.keys(extra || {}).forEach(function (chave) {
+                payload.append(chave, extra[chave]);
+            });
+            return fetch(url, {
+                method: 'POST',
+                body: payload,
+                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
+            }).then(function (response) {
+                return response.json().then(function (data) {
+                    if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao salvar observação');
+                    return data;
+                });
+            });
+        }
         function renderView() {
             var hasContent = saved.trim() !== '';
             text.textContent = hasContent ? saved : 'Nenhuma observação registrada.';
             text.classList.toggle('italic', !hasContent);
             text.classList.toggle('text-gray-400', !hasContent);
             editButton.textContent = hasContent ? 'Editar' : 'Adicionar observação';
+            if (clearButton) clearButton.classList.toggle('hidden', !hasContent);
             view.classList.remove('hidden');
             formWrap.classList.add('hidden');
         }
@@ -680,21 +754,10 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             saveButton.disabled = true;
             status.textContent = 'Salvando...';
             status.className = 'coord-observation-status text-xs text-gray-500';
-            var payload = new FormData();
-            payload.append('_token', block.dataset.csrf || '');
-            payload.append('conteudo', textarea.value || '');
-            fetch(block.dataset.endpoint || '', {
-                method: 'POST',
-                body: payload,
-                headers: {'X-Requested-With': 'XMLHttpRequest'}
-            }).then(function (response) {
-                return response.json().then(function (data) {
-                    if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao salvar observação');
-                    return data;
-                });
-            }).then(function (data) {
+            enviar(block.dataset.endpoint || '', {conteudo: textarea.value || ''}).then(function (data) {
                 saved = data.conteudo || '';
                 textarea.value = saved;
+                pintarHistorico(data);
                 renderView();
                 status.textContent = 'Observação salva.';
                 status.className = 'coord-observation-status text-xs text-emerald-600';
@@ -705,6 +768,59 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                 saveButton.disabled = false;
             });
         });
+        if (clearButton) {
+            clearButton.addEventListener('click', function () {
+                if (!window.confirm('Apagar a observação atual? O texto continua salvo nas versões.')) return;
+                clearButton.disabled = true;
+                status.textContent = 'Apagando...';
+                enviar((block.dataset.endpoint || '') + '/limpar', {}).then(function (data) {
+                    saved = data.conteudo || '';
+                    textarea.value = saved;
+                    pintarHistorico(data);
+                    renderView();
+                    status.textContent = 'Observação apagada. A versão escrita foi mantida.';
+                    status.className = 'coord-observation-status text-xs text-emerald-600';
+                }).catch(function (error) {
+                    status.textContent = error.message || 'Erro ao apagar observação.';
+                    status.className = 'coord-observation-status text-xs text-red-600';
+                }).finally(function () {
+                    clearButton.disabled = false;
+                });
+            });
+        }
+        if (purgeButton && purgeBox) {
+            purgeButton.addEventListener('click', function () {
+                purgeBox.classList.toggle('hidden');
+                if (senhaInput && !purgeBox.classList.contains('hidden')) senhaInput.focus();
+            });
+        }
+        if (purgeConfirm) {
+            purgeConfirm.addEventListener('click', function () {
+                var senha = senhaInput ? senhaInput.value : '';
+                if (!senha) {
+                    status.textContent = 'Informe sua senha.';
+                    status.className = 'coord-observation-status text-xs text-red-600';
+                    return;
+                }
+                purgeConfirm.disabled = true;
+                status.textContent = 'Apagando versões...';
+                enviar((block.dataset.endpoint || '') + '/versoes/excluir', {senha: senha}).then(function (data) {
+                    saved = '';
+                    textarea.value = '';
+                    if (senhaInput) senhaInput.value = '';
+                    if (purgeBox) purgeBox.classList.add('hidden');
+                    pintarHistorico(data);
+                    renderView();
+                    status.textContent = 'Versões apagadas.';
+                    status.className = 'coord-observation-status text-xs text-emerald-600';
+                }).catch(function (error) {
+                    status.textContent = error.message || 'Erro ao apagar as versões.';
+                    status.className = 'coord-observation-status text-xs text-red-600';
+                }).finally(function () {
+                    purgeConfirm.disabled = false;
+                });
+            });
+        }
     });
 })();
 </script>

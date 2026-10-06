@@ -107,6 +107,8 @@ $router->get('/admin/students/{id}', 'Admin/StudentAdminController@mostrarAluno'
 $router->get('/admin/students/{id}/tab/provas', 'Admin/StudentAdminController@provasTabFragment');
 $router->get('/admin/students/{id}/auditoria', 'Admin/StudentAdminController@auditoriaAluno');
 $router->post('/admin/students/{id}/boletim/observacao', 'Admin/StudentAdminController@salvarObservacaoBoletim');
+$router->post('/admin/students/{id}/boletim/observacao/limpar', 'Admin/StudentAdminController@limparObservacaoBoletim');
+$router->post('/admin/students/{id}/boletim/observacao/versoes/excluir', 'Admin/StudentAdminController@excluirVersoesObservacaoBoletim');
 $router->get('/admin/students/{id}/boletim/pdf', 'Admin/StudentAdminController@gerarBoletimPdf');
 $router->post('/admin/students/{id}/boletim/{regraId}/excluir', 'Admin/StudentAdminController@excluirBoletimGerado');
 $router->get('/admin/students/{id}/acessar-como', 'Admin/StudentAdminController@acessarComoAluno');
