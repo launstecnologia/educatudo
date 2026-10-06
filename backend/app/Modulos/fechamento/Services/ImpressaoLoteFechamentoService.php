@@ -31,6 +31,8 @@ class ImpressaoLoteFechamentoService
     /** Acima disso a geração pede uma turma, para não montar a escola inteira. */
     public const MAX_ALUNOS = 80;
 
+    private string $rotuloJob = '';
+
     private DocumentoOficialService $documentos;
     private HistoricoEscolarService $historicos;
     private VidaEscolarPdfService $pdfHistorico;
@@ -112,6 +114,7 @@ class ImpressaoLoteFechamentoService
         $turmaId = (int) ($payload['turma_id'] ?? 0);
         $serie = trim((string) ($payload['serie'] ?? ''));
         $usuarioId = (int) ($payload['user_id'] ?? 0);
+        $this->rotuloJob = trim((string) ($payload['turma_nome'] ?? ''));
         $slug = $this->slugTenant((string) ($payload['tenant_slug'] ?? ''));
         if ($jobId <= 0 || $anoLetivo <= 0 || !isset(self::DOCUMENTOS[$documento])) {
             throw new RuntimeException('Lote de impressão incompleto.');
@@ -169,6 +172,7 @@ class ImpressaoLoteFechamentoService
             'arquivo_key' => $chave,
             'documento' => $documento,
             'andamento' => 'PDF salvo',
+            'rotulo' => $this->rotuloJob,
             'tenant_slug' => $slug,
         ];
     }
@@ -610,6 +614,7 @@ class ImpressaoLoteFechamentoService
                 [
                     'result' => json_encode([
                         'documento' => $documento,
+                        'rotulo' => $this->rotuloJob,
                         'andamento' => $andamento,
                         'iniciado_em' => date('Y-m-d H:i:s'),
                     ], JSON_UNESCAPED_UNICODE),

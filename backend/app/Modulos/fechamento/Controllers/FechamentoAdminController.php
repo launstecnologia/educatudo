@@ -266,12 +266,19 @@ class FechamentoAdminController extends AdminBaseController
         [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
         $serie = trim((string) ($_GET['serie'] ?? ''));
-        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
+        $turmas = $svc->homologacao()->model()->turmasAtivas($anoLetivo);
+        if ($turmaId > 0 && $serie === '') {
+            $serie = $this->serieDaTurma($turmas, $turmaId);
+        }
         $lote = new ImpressaoLoteFechamentoService();
+        $escopoOk = $lote->escopoInformado($turmaId, $serie);
+        $paineis = $escopoOk
+            ? $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie)
+            : [];
         $resumo = $lote->resumo($paineis);
         $voltar = $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
         if ((string) ($_GET['documento'] ?? '') !== '') {
-            $this->setFlashMessage('A geração agora roda em segundo plano. Escolha a turma ou a série e clique em Gerar.', 'success');
+            $this->setFlashMessage('Escolha a série e clique em Emitir tudo. Cada turma ganha o próprio PDF.', 'success');
             $this->redirect($voltar);
             return;
         }
@@ -286,10 +293,10 @@ class FechamentoAdminController extends AdminBaseController
             'periodo_numero' => $periodoNumero,
             'turma_id' => $turmaId,
             'serie' => $serie,
-            'series' => $this->seriesDasTurmas($svc->homologacao()->model()->turmasAtivas($anoLetivo)),
-            'turmas' => $svc->homologacao()->model()->turmasAtivas($anoLetivo),
-            'escopo_ok' => $lote->escopoInformado($turmaId, $serie),
-            'pdfs_salvos' => $this->pdfsSalvos($lote, $anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie),
+            'series' => $this->seriesDasTurmas($turmas),
+            'turmas' => $turmas,
+            'escopo_ok' => $escopoOk,
+            'linhas' => $this->linhasImpressao($paineis, $lote, $anoLetivo, $periodoTipo, $periodoNumero),
             'jobs' => $this->jobsDaQuery(),
             'impressao_lote' => $resumo,
             'documentos' => ImpressaoLoteFechamentoService::DOCUMENTOS,
@@ -326,8 +333,8 @@ class FechamentoAdminController extends AdminBaseController
             $this->redirect($voltar);
             return;
         }
-        if (!$lote->resumo($paineis)['pode']) {
-            $this->setFlashMessage('Prepare os históricos só depois de homologar todas as turmas deste filtro.', 'error');
+        if ((int) $lote->resumo($paineis)['homologadas'] < 1) {
+            $this->setFlashMessage('Prepare os históricos só nas turmas já homologadas.', 'error');
             $this->redirect($voltar);
             return;
         }
@@ -367,7 +374,7 @@ class FechamentoAdminController extends AdminBaseController
         }
         $lote = new ImpressaoLoteFechamentoService();
         if (!$lote->escopoInformado($turmaId, $serie)) {
-            $this->setFlashMessage('Escolha uma turma ou uma série. A escola inteira de uma vez deixa a geração pesada.', 'error');
+            $this->setFlashMessage('Escolha uma série ou uma turma. A escola inteira de uma vez deixa a geração pesada.', 'error');
             $this->redirect($voltar);
             return;
         }
@@ -381,17 +388,27 @@ class FechamentoAdminController extends AdminBaseController
             }
         }
         $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
-        if (!$lote->resumo($paineis)['pode']) {
-            $this->setFlashMessage('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.', 'error');
+        $alvos = [];
+        $fora = [];
+        foreach ($paineis as $painel) {
+            $tid = (int) ($painel['turma']['id'] ?? 0);
+            $nome = trim((string) ($painel['turma']['nome'] ?? 'Turma'));
+            if ($tid <= 0) {
+                continue;
+            }
+            if (($painel['status'] ?? '') !== FechamentoMaquinaEstados::HOMOLOGADO) {
+                $fora[] = $nome !== '' ? $nome : 'Turma';
+                continue;
+            }
+            $alvos[] = ['id' => $tid, 'nome' => $nome !== '' ? $nome : 'Turma', 'painel' => $painel];
+        }
+        if ($alvos === []) {
+            $this->setFlashMessage('Nenhuma turma homologada neste recorte. Homologue a turma antes de emitir.', 'error');
             $this->redirect($voltar);
             return;
         }
-        try {
-            foreach ($documentos as $documento) {
-                $lote->exigirEscopoLeve($paineis, $documento);
-            }
-        } catch (Throwable $e) {
-            $this->setFlashMessage($e->getMessage(), 'error');
+        if (count($alvos) > 12) {
+            $this->setFlashMessage('Escolha uma série com até 12 turmas homologadas. Este recorte tem ' . count($alvos) . '.', 'error');
             $this->redirect($voltar);
             return;
         }
@@ -407,36 +424,46 @@ class FechamentoAdminController extends AdminBaseController
         require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
         $jobs = [];
         $jaSalvos = 0;
+        $avisos = [];
         try {
-            foreach ($documentos as $documento) {
-                $chave = ImpressaoLoteFechamentoService::chavePdf(
-                    $anoLetivo,
-                    $periodoTipo,
-                    $periodoNumero,
-                    $turmaId,
-                    $serie,
-                    $documento
-                );
-                if (!$regenerar && $lote->pdfSalvo($chave, $tenantSlug)) {
-                    $jaSalvos++;
-                    continue;
+            foreach ($alvos as $alvo) {
+                foreach ($documentos as $documento) {
+                    try {
+                        $lote->exigirEscopoLeve([$alvo['painel']], $documento);
+                    } catch (Throwable $e) {
+                        $avisos[] = $alvo['nome'] . ': ' . $e->getMessage();
+                        continue;
+                    }
+                    $chave = ImpressaoLoteFechamentoService::chavePdf(
+                        $anoLetivo,
+                        $periodoTipo,
+                        $periodoNumero,
+                        (int) $alvo['id'],
+                        '',
+                        $documento
+                    );
+                    if (!$regenerar && $lote->pdfSalvo($chave, $tenantSlug)) {
+                        $jaSalvos++;
+                        continue;
+                    }
+                    $jobs[] = \App\Services\AIJobService::enqueue(
+                        ImpressaoLoteFechamentoService::TIPO_JOB,
+                        [
+                            'documento' => $documento,
+                            'ano_letivo' => $anoLetivo,
+                            'periodo_tipo' => $periodoTipo,
+                            'periodo_numero' => $periodoNumero,
+                            'turma_id' => (int) $alvo['id'],
+                            'serie' => '',
+                            'turma_nome' => (string) $alvo['nome'],
+                            'user_id' => $userId,
+                            'tenant_slug' => $tenantSlug,
+                        ],
+                        $userId > 0 ? $userId : null,
+                        'admin',
+                        false
+                    );
                 }
-                $jobs[] = \App\Services\AIJobService::enqueue(
-                    ImpressaoLoteFechamentoService::TIPO_JOB,
-                    [
-                        'documento' => $documento,
-                        'ano_letivo' => $anoLetivo,
-                        'periodo_tipo' => $periodoTipo,
-                        'periodo_numero' => $periodoNumero,
-                        'turma_id' => $turmaId,
-                        'serie' => $serie,
-                        'user_id' => $userId,
-                        'tenant_slug' => is_string($tenantSlug) ? $tenantSlug : '',
-                    ],
-                    $userId > 0 ? $userId : null,
-                    'admin',
-                    false
-                );
             }
             if ($jobs !== []) {
                 \App\Services\AIJobService::tentarDispararWorker();
@@ -448,12 +475,24 @@ class FechamentoAdminController extends AdminBaseController
         }
 
         if ($jobs === []) {
-            $this->setFlashMessage('Os PDFs deste recorte já estão salvos. Abra abaixo, sem gerar de novo.', 'success');
+            $msg = $jaSalvos > 0
+                ? 'Os PDFs deste recorte já estão salvos. Abra em Ações, em cada turma.'
+                : 'Nada novo para gerar neste recorte.';
+            if ($avisos !== []) {
+                $msg .= ' ' . implode(' ', array_slice($avisos, 0, 3));
+            }
+            $this->setFlashMessage($msg, $avisos === [] ? 'success' : 'error');
             $this->redirect($voltar);
             return;
         }
-        $aviso = 'Geração iniciada em segundo plano. O PDF fica salvo'
+        $aviso = 'Geração iniciada, um PDF por turma. O download aparece em Ações quando ficar pronto'
             . ($jaSalvos > 0 ? ' (' . $jaSalvos . ' já existia e foi reaproveitado).' : '.');
+        if ($fora !== []) {
+            $aviso .= ' Sem homologação, ficaram de fora: ' . implode(', ', $fora) . '.';
+        }
+        if ($avisos !== []) {
+            $aviso .= ' ' . implode(' ', array_slice($avisos, 0, 2));
+        }
         $this->setFlashMessage($aviso, 'success');
         $this->redirect($voltar . (str_contains($voltar, '?') ? '&' : '?') . 'jobs=' . implode(',', $jobs));
     }
@@ -701,32 +740,62 @@ class FechamentoAdminController extends AdminBaseController
     }
 
     /**
-     * @return array<string,string>
+     * @param list<array<string,mixed>> $turmas
      */
-    private function pdfsSalvos(
-        ImpressaoLoteFechamentoService $lote,
-        int $ano,
-        string $periodoTipo,
-        int $periodoNumero,
-        int $turmaId,
-        string $serie
-    ): array {
-        if (!$lote->escopoInformado($turmaId, $serie)) {
-            return [];
-        }
-        $slug = $this->slugEscola();
-        if ($slug === '') {
-            return [];
-        }
-        $salvos = [];
-        foreach (array_keys(ImpressaoLoteFechamentoService::DOCUMENTOS) as $documento) {
-            $chave = ImpressaoLoteFechamentoService::chavePdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
-            if ($lote->pdfSalvo($chave, $slug)) {
-                $salvos[$documento] = $chave;
+    private function serieDaTurma(array $turmas, int $turmaId): string
+    {
+        foreach ($turmas as $turma) {
+            if ((int) ($turma['id'] ?? 0) === $turmaId) {
+                return trim((string) ($turma['serie'] ?? ''));
             }
         }
 
-        return $salvos;
+        return '';
+    }
+
+    /**
+     * Um PDF por turma. Trocar o filtro não mistura o arquivo de outra classe.
+     *
+     * @param list<array<string,mixed>> $paineis
+     * @return list<array{id:int,nome:string,alunos:int,status:string,status_rotulo:string,homologada:bool,pdfs:array<string,string>}>
+     */
+    private function linhasImpressao(
+        array $paineis,
+        ImpressaoLoteFechamentoService $lote,
+        int $ano,
+        string $periodoTipo,
+        int $periodoNumero
+    ): array {
+        $slug = $this->slugEscola();
+        $linhas = [];
+        foreach ($paineis as $painel) {
+            $tid = (int) ($painel['turma']['id'] ?? 0);
+            if ($tid <= 0) {
+                continue;
+            }
+            $homologada = ($painel['status'] ?? '') === FechamentoMaquinaEstados::HOMOLOGADO;
+            $pdfs = [];
+            if ($homologada && $slug !== '') {
+                foreach (array_keys(ImpressaoLoteFechamentoService::DOCUMENTOS) as $documento) {
+                    $chave = ImpressaoLoteFechamentoService::chavePdf($ano, $periodoTipo, $periodoNumero, $tid, '', $documento);
+                    if ($lote->pdfSalvo($chave, $slug)) {
+                        $pdfs[$documento] = $chave;
+                    }
+                }
+            }
+            $nome = trim((string) ($painel['turma']['nome'] ?? ''));
+            $linhas[] = [
+                'id' => $tid,
+                'nome' => $nome !== '' ? $nome : 'Turma',
+                'alunos' => (int) ($painel['resumo']['total'] ?? 0),
+                'status' => (string) ($painel['status'] ?? ''),
+                'status_rotulo' => (string) ($painel['status_rotulo'] ?? ''),
+                'homologada' => $homologada,
+                'pdfs' => $pdfs,
+            ];
+        }
+
+        return $linhas;
     }
 
     private function slugEscola(): string
