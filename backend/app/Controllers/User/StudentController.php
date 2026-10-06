@@ -1449,40 +1449,35 @@ if (!class_exists('StudentController')) {
     }
 
     /**
-     * Notas e boletim liberados para o aluno (vis_aluno). Filhas ocultas saem na leitura.
+     * Notas liberadas para o aluno (vis_aluno). O boletim fica só na coordenação.
      *
-     * @return array{0:list<array<string,mixed>>,1:list<array<string,mixed>>}
+     * @return list<array<string,mixed>>
      */
     private function boletinsVisiveisNoPortal(int $alunoId, string $perfil): array
     {
-        $notas = [];
-        $boletim = [];
         if ($alunoId <= 0) {
-            return [$notas, $boletim];
+            return [];
         }
         try {
             $path = __DIR__ . '/../../Models/System/BoletimConfig.php';
             if (!is_file($path)) {
-                return [$notas, $boletim];
+                return [];
             }
             require_once $path;
             $cfg = new \BoletimConfig();
-            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, null) as $ev) {
-                if (!is_array($ev)) {
-                    continue;
-                }
-                $exibir = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
-                if ($exibir === 'notas') {
+            $notas = [];
+            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, 'notas') as $ev) {
+                if (is_array($ev)) {
                     $notas[] = $ev;
-                } else {
-                    $boletim[] = $ev;
                 }
             }
+
+            return $notas;
         } catch (Throwable $e) {
             error_log('Portal de notas (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
-        }
 
-        return [$notas, $boletim];
+            return [];
+        }
     }
 
     public function notasBoletins()
@@ -1507,7 +1502,7 @@ if (!class_exists('StudentController')) {
         } catch (\Throwable $e) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
-        [$boletinsPortalNotas, $boletinsPortalBoletim] = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno');
+        $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno');
 
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
@@ -1523,7 +1518,7 @@ if (!class_exists('StudentController')) {
             'boletins_gerados' => [],
             'boletins_gerados_notas' => $boletinsPortalNotas,
             'boletins_gerados_notas_extra' => [],
-            'boletins_gerados_boletim' => $boletinsPortalBoletim,
+            'boletins_gerados_boletim' => [],
             'boletins_gerados_complementar' => [],
             'boletim_observacao' => ['conteudo' => '', 'updated_at' => null],
             'quadro_oficial' => null,

@@ -548,9 +548,15 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
 };
 ?>
 
+<?php
+$notasMensagemVazia = trim((string) ($notas_mensagem_vazia ?? ''));
+if ($notasMensagemVazia === '') {
+    $notasMensagemVazia = 'Nenhuma nota visível para coordenação.';
+}
+?>
 <?php if ($linhasPeriodo === []): ?>
     <div class="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-        <p class="text-gray-500">Nenhuma nota visível para coordenação.</p>
+        <p class="text-gray-500"><?= $esc($notasMensagemVazia) ?></p>
     </div>
 <?php else: ?>
     <div class="bg-white rounded-xl shadow-sm border border-gray-200">
