@@ -289,6 +289,7 @@ class FechamentoAdminController extends AdminBaseController
             'series' => $this->seriesDasTurmas($svc->homologacao()->model()->turmasAtivas($anoLetivo)),
             'turmas' => $svc->homologacao()->model()->turmasAtivas($anoLetivo),
             'escopo_ok' => $lote->escopoInformado($turmaId, $serie),
+            'pdfs_salvos' => $this->pdfsSalvos($lote, $anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie),
             'jobs' => $this->jobsDaQuery(),
             'impressao_lote' => $resumo,
             'documentos' => ImpressaoLoteFechamentoService::DOCUMENTOS,
@@ -395,12 +396,31 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
 
-        $tenantSlug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        $tenantSlug = $this->slugEscola();
+        if ($tenantSlug === '') {
+            $this->setFlashMessage('Não foi possível identificar a escola para salvar o PDF.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
         $userId = (int) ($this->auth->getUser()['id'] ?? 0);
+        $regenerar = !empty($_POST['regenerar']);
         require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
         $jobs = [];
+        $jaSalvos = 0;
         try {
             foreach ($documentos as $documento) {
+                $chave = ImpressaoLoteFechamentoService::chavePdf(
+                    $anoLetivo,
+                    $periodoTipo,
+                    $periodoNumero,
+                    $turmaId,
+                    $serie,
+                    $documento
+                );
+                if (!$regenerar && $lote->pdfSalvo($chave, $tenantSlug)) {
+                    $jaSalvos++;
+                    continue;
+                }
                 $jobs[] = \App\Services\AIJobService::enqueue(
                     ImpressaoLoteFechamentoService::TIPO_JOB,
                     [
@@ -418,14 +438,23 @@ class FechamentoAdminController extends AdminBaseController
                     false
                 );
             }
-            \App\Services\AIJobService::tentarDispararWorker();
+            if ($jobs !== []) {
+                \App\Services\AIJobService::tentarDispararWorker();
+            }
         } catch (Throwable $e) {
             $this->setFlashMessage('Não foi possível iniciar a geração. Tente de novo em instantes.', 'error');
             $this->redirect($voltar);
             return;
         }
 
-        $this->setFlashMessage('Geração iniciada em segundo plano. Esta página avisa quando cada documento puder ser aberto.', 'success');
+        if ($jobs === []) {
+            $this->setFlashMessage('Os PDFs deste recorte já estão salvos. Abra abaixo, sem gerar de novo.', 'success');
+            $this->redirect($voltar);
+            return;
+        }
+        $aviso = 'Geração iniciada em segundo plano. O PDF fica salvo'
+            . ($jaSalvos > 0 ? ' (' . $jaSalvos . ' já existia e foi reaproveitado).' : '.');
+        $this->setFlashMessage($aviso, 'success');
         $this->redirect($voltar . (str_contains($voltar, '?') ? '&' : '?') . 'jobs=' . implode(',', $jobs));
     }
 
@@ -455,6 +484,11 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $resultado = json_decode((string) ($job['result'] ?? ''), true);
+        $chave = is_array($resultado) ? (string) ($resultado['arquivo_key'] ?? '') : '';
+        if ($chave !== '') {
+            $this->redirect('/admin/fechamento/impressao-lote/pdf?chave=' . rawurlencode($chave));
+            return;
+        }
         $slug = is_array($resultado) ? (string) ($resultado['tenant_slug'] ?? '') : '';
         $path = ImpressaoLoteFechamentoService::caminhoArquivo($jobId, $slug);
         if ($path === null || !is_file($path)) {
@@ -466,6 +500,33 @@ class FechamentoAdminController extends AdminBaseController
         header('Content-Type: text/html; charset=UTF-8');
         header('Content-Disposition: inline; filename="' . $nome . '_' . $jobId . '.html"');
         readfile($path);
+        exit;
+    }
+
+    public function abrirPdf(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
+            return;
+        }
+        $chave = (string) ($_GET['chave'] ?? '');
+        $lote = new ImpressaoLoteFechamentoService();
+        $voltar = '/admin/fechamento/impressao-lote';
+        if (!$lote->chaveValida($chave)) {
+            $this->setFlashMessage('PDF não encontrado.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $bin = $lote->lerPdf($chave, $this->slugEscola());
+        if ($bin === null || $bin === '') {
+            $this->setFlashMessage('PDF não encontrado.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $nome = basename($chave);
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $nome . '"');
+        header('Content-Length: ' . strlen($bin));
+        echo $bin;
         exit;
     }
 
@@ -637,6 +698,46 @@ class FechamentoAdminController extends AdminBaseController
         sort($lista, SORT_NATURAL);
 
         return $lista;
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function pdfsSalvos(
+        ImpressaoLoteFechamentoService $lote,
+        int $ano,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $turmaId,
+        string $serie
+    ): array {
+        if (!$lote->escopoInformado($turmaId, $serie)) {
+            return [];
+        }
+        $slug = $this->slugEscola();
+        if ($slug === '') {
+            return [];
+        }
+        $salvos = [];
+        foreach (array_keys(ImpressaoLoteFechamentoService::DOCUMENTOS) as $documento) {
+            $chave = ImpressaoLoteFechamentoService::chavePdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
+            if ($lote->pdfSalvo($chave, $slug)) {
+                $salvos[$documento] = $chave;
+            }
+        }
+
+        return $salvos;
+    }
+
+    private function slugEscola(): string
+    {
+        $slug = defined('TENANT_SLUG') ? (string) TENANT_SLUG : '';
+        if ($slug === '' && is_array($this->config ?? null)) {
+            $slug = (string) ($this->config['tenant']['slug'] ?? ($this->config['school']['code'] ?? ''));
+        }
+        $limpo = preg_replace('/[^a-z0-9_-]/i', '', $slug);
+
+        return is_string($limpo) ? $limpo : '';
     }
 
     /**

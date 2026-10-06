@@ -77,6 +77,9 @@ class AIJobController
                 if (!empty($decoded['documento'])) {
                     $response['documento'] = (string) $decoded['documento'];
                 }
+                if (!empty($decoded['arquivo_key'])) {
+                    $response['arquivo_key'] = (string) $decoded['arquivo_key'];
+                }
             }
 
             if (!empty($_GET['debug']) && $_GET['debug'] === '1') {

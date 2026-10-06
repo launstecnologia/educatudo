@@ -10,6 +10,7 @@ $series = is_array($series ?? null) ? $series : [];
 $turmas = is_array($turmas ?? null) ? $turmas : [];
 $escopoOk = !empty($escopo_ok);
 $jobs = is_array($jobs ?? null) ? $jobs : [];
+$pdfsSalvos = is_array($pdfs_salvos ?? null) ? $pdfs_salvos : [];
 $documentos = is_array($documentos ?? null) ? $documentos : [];
 $qs = http_build_query(array_filter([
     'ano_letivo' => $anoLetivo,
@@ -82,7 +83,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 <div id="lote-jobs" class="mb-6 p-4 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-sm"
      data-jobs="<?= htmlspecialchars(implode(',', $jobs), ENT_QUOTES, 'UTF-8') ?>"
      data-status="<?= URL ?>/admin/ai-job/"
-     data-arquivo="<?= URL ?>/admin/fechamento/impressao-lote/arquivo/">
+     data-pdf="<?= URL ?>/admin/fechamento/impressao-lote/pdf?chave=">
     Geração em andamento. Pode deixar esta página aberta.
     <ul class="mt-2 space-y-1" id="lote-jobs-lista"></ul>
 </div>
@@ -93,7 +94,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     if (!caixa || !lista) return;
     var ids = (caixa.getAttribute('data-jobs') || '').split(',').filter(Boolean);
     var baseStatus = caixa.getAttribute('data-status') || '';
-    var baseArquivo = caixa.getAttribute('data-arquivo') || '';
+    var basePdf = caixa.getAttribute('data-pdf') || '';
     var nomes = <?= json_encode(ImpressaoLoteFechamentoService::DOCUMENTOS, JSON_UNESCAPED_UNICODE) ?>;
     function desenhar(id, dados) {
         var item = document.getElementById('job-' + id);
@@ -105,11 +106,16 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         var doc = (dados && dados.documento && nomes[dados.documento]) ? nomes[dados.documento] : ('Documento ' + id);
         var status = dados && dados.status ? dados.status : 'pending';
         if (status === 'done') {
-            item.innerHTML = doc + ' — <a class="underline font-medium" target="_blank" rel="noopener" href="' + baseArquivo + id + '">Abrir para imprimir</a>';
+            var chave = dados && (dados.arquivo_key || (dados.result && dados.result.arquivo_key)) ? (dados.arquivo_key || dados.result.arquivo_key) : '';
+            if (chave) {
+                item.innerHTML = doc + ' — <a class="underline font-medium" target="_blank" rel="noopener" href="' + basePdf + encodeURIComponent(chave) + '">Abrir PDF</a>';
+            } else {
+                item.textContent = doc + ' — pronto, mas o PDF não foi localizado.';
+            }
             return true;
         }
         if (status === 'failed') {
-            item.textContent = doc + ' — a geração falhou. Tente de novo.';
+            item.textContent = doc + ' — ' + ((dados && dados.error) ? dados.error : 'a geração falhou. Tente de novo.');
             return true;
         }
         item.textContent = doc + ' — ' + ((dados && dados.andamento) ? dados.andamento : 'na fila');
@@ -170,6 +176,9 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
             <input type="hidden" name="serie" value="<?= htmlspecialchars($serie, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="documento" value="pacote">
+            <label class="flex items-center gap-2 text-sm text-gray-600 mb-3 md:mb-0 md:mr-4">
+                <input type="checkbox" name="regenerar" value="1"> Gerar de novo
+            </label>
             <button type="submit" class="btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold shrink-0">
                 <i class="fa-solid fa-print mr-2"></i> Gerar tudo
             </button>
@@ -195,6 +204,13 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col">
         <h3 class="text-lg font-semibold text-gray-900 mb-2"><?= htmlspecialchars((string) $rotulo) ?></h3>
         <p class="text-sm text-gray-500 mb-6 flex-1"><?= htmlspecialchars($descricoes[$chave] ?? '') ?></p>
+        <?php if (!empty($pdfs_salvos[$chave])): ?>
+        <a href="<?= URL ?>/admin/fechamento/impressao-lote/pdf?chave=<?= rawurlencode((string) $pdfs_salvos[$chave]) ?>"
+           target="_blank" rel="noopener"
+           class="inline-flex items-center text-sm font-medium text-indigo-700 hover:underline mb-4">
+            <i class="fa-solid fa-file-pdf mr-2"></i> Abrir PDF salvo
+        </a>
+        <?php endif; ?>
         <form method="post" action="<?= URL ?>/admin/fechamento/impressao-lote/enfileirar">
             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">

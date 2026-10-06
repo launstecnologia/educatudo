@@ -9,6 +9,7 @@ $router->get('/admin/fechamento', 'Modulos/fechamento/FechamentoAdminController@
 $router->get('/admin/fechamento/impressao-lote', 'Modulos/fechamento/FechamentoAdminController@impressaoLote');
 $router->post('/admin/fechamento/impressao-lote/enfileirar', 'Modulos/fechamento/FechamentoAdminController@enfileirarImpressao');
 $router->get('/admin/fechamento/impressao-lote/arquivo/{id}', 'Modulos/fechamento/FechamentoAdminController@arquivoImpressao');
+$router->get('/admin/fechamento/impressao-lote/pdf', 'Modulos/fechamento/FechamentoAdminController@abrirPdf');
 $router->post('/admin/fechamento/impressao-lote/preparar-historicos', 'Modulos/fechamento/FechamentoAdminController@prepararHistoricos');
 $router->get('/admin/fechamento/turma/{id}/homologacoes/dados', 'Modulos/fechamento/FechamentoAdminController@dadosHomologacoes');
 $router->get('/admin/fechamento/turma/{id}/documentos/dados', 'Modulos/fechamento/FechamentoAdminController@dadosDocumentos');

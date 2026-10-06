@@ -26,6 +26,8 @@ class ImpressaoLoteFechamentoService
 
     public const TIPO_JOB = 'fechamento_impressao_lote';
 
+    public const TIPO_ARQUIVO = 'fechamento_impressao';
+
     /** Acima disso a geração pede uma turma, para não montar a escola inteira. */
     public const MAX_ALUNOS = 80;
 
@@ -117,13 +119,18 @@ class ImpressaoLoteFechamentoService
         if (!$this->escopoInformado($turmaId, $serie)) {
             throw new RuntimeException('Escolha uma turma ou uma série antes de gerar.');
         }
+        $this->gravarAndamento($jobId, $documento, 'Lendo a turma…');
 
         $paineis = (new FechamentoService())->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
         $resumo = $this->resumo($paineis);
         if (!$resumo['pode']) {
             throw new RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
         }
+        $chave = self::chavePdf($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
         $this->gravarAndamento($jobId, $documento, 'Montando documentos…');
+        if (function_exists('ini_set')) {
+            @ini_set('memory_limit', '512M');
+        }
         $html = $this->htmlParaImpressao(
             $documento,
             $paineis,
@@ -135,22 +142,79 @@ class ImpressaoLoteFechamentoService
             '',
             $jobId
         );
-        $dir = self::diretorio($slug);
-        if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
-            throw new RuntimeException('Não foi possível criar a pasta da impressão.');
+        $this->gravarAndamento($jobId, $documento, 'Gerando o PDF…');
+        $orientacao = in_array($documento, ['relatorio', 'resultado', 'boletim'], true) ? 'landscape' : 'portrait';
+        $pdf = $this->pdfDeHtml($html, $orientacao);
+        unset($html);
+        if ($pdf === '') {
+            throw new RuntimeException('O PDF saiu vazio.');
         }
-        $nome = 'lote_' . $jobId . '.html';
-        $path = $dir . '/' . $nome;
-        if (file_put_contents($path, $html) === false) {
-            throw new RuntimeException('Não foi possível gravar a impressão.');
+        $tmp = tempnam(sys_get_temp_dir(), 'fechpdf');
+        if ($tmp === false || file_put_contents($tmp, $pdf) === false) {
+            throw new RuntimeException('Não foi possível gravar o PDF temporário.');
+        }
+        try {
+            $media = $this->media($slug);
+            if (!$media->put(self::TIPO_ARQUIVO, $chave, $tmp, 'application/pdf')) {
+                throw new RuntimeException('Não foi possível salvar o PDF no armazenamento da escola.');
+            }
+        } finally {
+            if (is_file($tmp)) {
+                @unlink($tmp);
+            }
         }
 
         return [
-            'arquivo' => $nome,
+            'arquivo' => $chave,
+            'arquivo_key' => $chave,
             'documento' => $documento,
-            'andamento' => 'Pronto para abrir',
+            'andamento' => 'PDF salvo',
             'tenant_slug' => $slug,
         ];
+    }
+
+    public static function chavePdf(
+        int $ano,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $turmaId,
+        string $serie,
+        string $documento
+    ): string {
+        $periodoTipo = strtolower(preg_replace('/[^a-z]/i', '', $periodoTipo) ?: 'ano');
+        $documento = strtolower(preg_replace('/[^a-z_]/i', '', $documento) ?: 'doc');
+        if ($turmaId > 0) {
+            $escopo = 'turma-' . $turmaId;
+        } else {
+            $slugSerie = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $serie));
+            $slugSerie = trim($slugSerie, '-');
+            $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
+        }
+
+        return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $documento . '.pdf';
+    }
+
+    public function pdfSalvo(string $chave, string $slug): bool
+    {
+        if (!$this->chaveValida($chave)) {
+            return false;
+        }
+
+        return $this->media($slug)->exists(self::TIPO_ARQUIVO, $chave);
+    }
+
+    public function lerPdf(string $chave, string $slug): ?string
+    {
+        if (!$this->chaveValida($chave)) {
+            return null;
+        }
+
+        return $this->media($slug)->getContents(self::TIPO_ARQUIVO, $chave);
+    }
+
+    public function chaveValida(string $chave): bool
+    {
+        return preg_match('#^\d{4}/[a-z]+-\d+/(turma-\d+|serie-[a-z0-9-]+)/[a-z_]+\.pdf$#', $chave) === 1;
     }
 
     public static function caminhoArquivo(int $jobId, string $slug): ?string
@@ -556,6 +620,70 @@ class ImpressaoLoteFechamentoService
         } catch (Throwable $e) {
             error_log('ImpressaoLoteFechamento andamento job=' . $jobId . ': ' . $e->getMessage());
         }
+    }
+
+    private function pdfDeHtml(string $html, string $orientacao): string
+    {
+        $autoload = dirname(__DIR__, 4) . '/vendor/autoload.php';
+        if (!class_exists(\Dompdf\Dompdf::class) && is_file($autoload)) {
+            require_once $autoload;
+        }
+        $options = new \Dompdf\Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', $orientacao === 'landscape' ? 'landscape' : 'portrait');
+        $dompdf->render();
+
+        return (string) $dompdf->output();
+    }
+
+    private function media(string $slug): \MediaStorageService
+    {
+        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
+        $config = $this->configApp();
+        $config['tenant']['slug'] = $slug;
+
+        return new \MediaStorageService($config);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function configApp(): array
+    {
+        static $carregado = null;
+        if (is_array($carregado)) {
+            return $carregado;
+        }
+        $path = dirname(__DIR__, 4) . '/config/app.php';
+        if (!is_file($path)) {
+            return $carregado = [];
+        }
+        $loaded = require $path;
+        if (!is_array($loaded) && function_exists('env')) {
+            $loaded = [
+                'media' => [
+                    'storage' => env('MEDIA_STORAGE', 'local'),
+                    'local_base' => dirname($path),
+                    'files_base' => 'storage/files',
+                    'tenant_prefix' => env('MEDIA_TENANT_PREFIX', '') === 'true',
+                ],
+                'aws' => [
+                    'bucket' => env('AWS_BUCKET', ''),
+                    'key' => env('AWS_ACCESS_KEY', ''),
+                    'secret' => env('AWS_SECRET_KEY', ''),
+                    'region' => env('AWS_REGION', 'us-east-1'),
+                ],
+                'tenant' => [
+                    'slug' => defined('TENANT_SLUG') ? (string) TENANT_SLUG : '',
+                ],
+            ];
+        }
+
+        return $carregado = is_array($loaded) ? $loaded : [];
     }
 
     private function slugTenant(string $slug): string

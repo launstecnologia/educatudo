@@ -584,7 +584,7 @@ class AIJobService
     private static function dispatchFechamentoImpressaoLote(array $payload): array
     {
         require_once __DIR__ . '/../Modulos/fechamento/Services/ImpressaoLoteFechamentoService.php';
-        return (new ImpressaoLoteFechamentoService())->executarJob($payload);
+        return (new \ImpressaoLoteFechamentoService())->executarJob($payload);
     }
 
     private static function dispatchBoletimGerar(array $payload): array
