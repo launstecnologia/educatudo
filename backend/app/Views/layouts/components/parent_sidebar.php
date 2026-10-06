@@ -84,7 +84,13 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
             </a>
 
             <?php if ($filhoId): ?>
-            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/notas#notas" class="flex items-center px-4 py-3 <?= $current_page === 'notas' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
+            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/notas#boletim" class="flex items-center px-4 py-3 <?= $current_page === 'notas' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
+                <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="sidebar-text">Boletim</span>
+            </a>
+            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/notas?secao=notas" class="flex items-center px-4 py-3 text-white/90 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>

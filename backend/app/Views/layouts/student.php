@@ -900,6 +900,14 @@
 
                         <?php if (LayoutHelper::isModuleEnabled('aluno_provas')): ?>
                         <?php $provasEnabled = $modulosAlunoColag['provas']; ?>
+                        <a href="<?= $provasEnabled ? URL . '/notas-boletins#boletim' : '#' ?>"
+                           onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Boletim\'); return false;' ?>"
+                           class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'notas_boletins' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$provasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
+                            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="sidebar-text text-sm">Boletim</span>
+                        </a>
                         <a href="<?= $provasEnabled ? URL . '/notas-boletins#notas' : '#' ?>"
                            onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Notas\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'notas_boletins' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$provasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">

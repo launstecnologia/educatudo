@@ -1449,15 +1449,16 @@ if (!class_exists('StudentController')) {
     }
 
     /**
-     * Notas liberadas para o aluno (vis_aluno). O boletim fica só na coordenação.
+     * Notas ou boletim liberados para o aluno (vis_aluno) ou para o responsável (vis_pais).
      *
      * @return list<array<string,mixed>>
      */
-    private function boletinsVisiveisNoPortal(int $alunoId, string $perfil): array
+    private function boletinsVisiveisNoPortal(int $alunoId, string $perfil, string $exibir = 'notas'): array
     {
         if ($alunoId <= 0) {
             return [];
         }
+        $exibir = $exibir === 'boletim' ? 'boletim' : 'notas';
         try {
             $path = __DIR__ . '/../../Models/System/BoletimConfig.php';
             if (!is_file($path)) {
@@ -1465,16 +1466,20 @@ if (!class_exists('StudentController')) {
             }
             require_once $path;
             $cfg = new \BoletimConfig();
-            $notas = [];
-            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, 'notas') as $ev) {
-                if (is_array($ev)) {
-                    $notas[] = $ev;
+            $lista = [];
+            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, $exibir) as $ev) {
+                if (!is_array($ev)) {
+                    continue;
                 }
+                if ($exibir === 'boletim' && strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
+                    continue;
+                }
+                $lista[] = $ev;
             }
 
-            return $notas;
+            return $lista;
         } catch (Throwable $e) {
-            error_log('Portal de notas (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
+            error_log('Portal de ' . $exibir . ' (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
 
             return [];
         }
@@ -1502,7 +1507,8 @@ if (!class_exists('StudentController')) {
         } catch (\Throwable $e) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
-        $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno');
+        $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'notas');
+        $boletinsPortalBoletim = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'boletim');
 
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
@@ -1518,7 +1524,7 @@ if (!class_exists('StudentController')) {
             'boletins_gerados' => [],
             'boletins_gerados_notas' => $boletinsPortalNotas,
             'boletins_gerados_notas_extra' => [],
-            'boletins_gerados_boletim' => [],
+            'boletins_gerados_boletim' => $boletinsPortalBoletim,
             'boletins_gerados_complementar' => [],
             'boletim_observacao' => ['conteudo' => '', 'updated_at' => null],
             'quadro_oficial' => null,

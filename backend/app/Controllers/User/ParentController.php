@@ -786,15 +786,16 @@ class ParentController extends BaseController
     }
 
     /**
-     * Notas liberadas para o responsável (vis_pais). O boletim fica só na coordenação.
+     * Notas ou boletim liberados para o responsável (vis_pais).
      *
      * @return list<array<string,mixed>>
      */
-    private function boletinsVisiveisNoPortal(int $alunoId, string $perfil): array
+    private function boletinsVisiveisNoPortal(int $alunoId, string $perfil, string $exibir = 'notas'): array
     {
         if ($alunoId <= 0) {
             return [];
         }
+        $exibir = $exibir === 'boletim' ? 'boletim' : 'notas';
         try {
             $path = __DIR__ . '/../../Models/System/BoletimConfig.php';
             if (!is_file($path)) {
@@ -802,16 +803,20 @@ class ParentController extends BaseController
             }
             require_once $path;
             $cfg = new \BoletimConfig();
-            $notas = [];
-            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, 'notas') as $ev) {
-                if (is_array($ev)) {
-                    $notas[] = $ev;
+            $lista = [];
+            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, $exibir) as $ev) {
+                if (!is_array($ev)) {
+                    continue;
                 }
+                if ($exibir === 'boletim' && strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
+                    continue;
+                }
+                $lista[] = $ev;
             }
 
-            return $notas;
+            return $lista;
         } catch (Throwable $e) {
-            error_log('Portal de notas (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
+            error_log('Portal de ' . $exibir . ' (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
 
             return [];
         }
@@ -897,11 +902,11 @@ class ParentController extends BaseController
         $notasLancamentoEventosBase = [];
         $boletinsGerados = [];
         $boletinsNotas = $this->filtrarBoletinsPortalPorPeriodo(
-            $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais'),
+            $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais', 'notas'),
             $anoLetivo,
             $bimestre
         );
-        $boletinsBoletim = [];
+        $boletinsBoletim = $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais', 'boletim');
         $boletinsNotasExtra = [];
         $boletinsComplementar = [];
         $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
