@@ -363,8 +363,15 @@ class MysqlProvisioningService
         if (empty($selectedFiles)) {
             return;
         }
+        $repetirCarga2025 = false;
+        foreach ($selectedFiles as $rawName) {
+            if (stripos((string) $rawName, 'escola_teste_em_2025') !== false) {
+                $repetirCarga2025 = true;
+                break;
+            }
+        }
         if (function_exists('set_time_limit')) {
-            @set_time_limit(180);
+            @set_time_limit($repetirCarga2025 ? 0 : 180);
         }
         $list = self::resolverArquivosMigrationSelecionados($selectedFiles);
         if ($list === []) {
@@ -385,7 +392,8 @@ class MysqlProvisioningService
             "INSERT IGNORE INTO migrations_escolas (escola_id, migration_name) VALUES (?, ?)"
         );
         foreach ($list as $m) {
-            if (isset($executadas[$m['file']])) {
+            $repetir = stripos($m['file'], 'escola_teste_em_2025') !== false;
+            if (isset($executadas[$m['file']]) && !$repetir) {
                 continue;
             }
             $sql = self::lerSqlMigration($m['path']);

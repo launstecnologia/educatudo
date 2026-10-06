@@ -589,12 +589,13 @@ $masterPendentes = $master_pendentes ?? [];
             cb.name = 'migrations[]';
             cb.value = file;
             cb.id = 'mig-' + file.replace(/[^a-z0-9_]/gi, '-');
-            cb.checked = soCargas || !isCarga;
+            var ehApagar = String(file).indexOf('_apagar') !== -1;
+            cb.checked = !ehApagar && (soCargas || !isCarga);
             cb.className = 'rounded border-slate-300 text-blue-600 focus:ring-blue-500';
             var label = document.createElement('label');
             label.htmlFor = cb.id;
             label.className = 'text-sm text-slate-700 font-mono cursor-pointer';
-            label.textContent = file + (isCarga ? '  (carga)' : '');
+            label.textContent = file + (ehApagar ? '  (apagar seed 2025)' : (isCarga ? '  (carga)' : ''));
             li.appendChild(cb);
             li.appendChild(label);
             modalLista.appendChild(li);
@@ -617,7 +618,10 @@ $masterPendentes = $master_pendentes ?? [];
     var btnDesmarcarTodos = document.getElementById('modal-escolher-desmarcar-todos');
     if (btnMarcarTodos) {
         btnMarcarTodos.addEventListener('click', function() {
-            marcarCheckboxesMigration(formEscolher, true);
+            if (!formEscolher) return;
+            formEscolher.querySelectorAll('input[name="migrations[]"]').forEach(function(cb) {
+                cb.checked = String(cb.value).indexOf('_apagar') === -1;
+            });
         });
     }
     if (btnDesmarcarTodos) {
