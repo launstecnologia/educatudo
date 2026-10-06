@@ -918,7 +918,7 @@ BEGIN
     vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places,
     default_data_inicio, default_data_fim, ativo, boletim_id
   )
-  SELECT CONCAT('ET25 ', p.rotulo), CONCAT('et25-em-t', p.n, '-notas'),
+  SELECT p.rotulo, CONCAT('et25-em-t', p.n, '-notas'),
          'ET25 Evento de notas do trimestre, válido para todo o Ensino Médio.',
          '(SIM1 + SIM2 + SIM3 + max(PROVA, min(REC, 6))) / 4',
          r.materias_ids, r.series_ids, r.turmas_ids, 'notas',
