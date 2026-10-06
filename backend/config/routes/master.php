@@ -86,6 +86,7 @@ $router->post('/master/usuarios/atualizar', 'Master/MasterUsuariosController@upd
 $router->post('/master/usuarios/desativar', 'Master/MasterUsuariosController@desativar');
 $router->post('/master/migrations/executar-escola', 'Master/MasterMigrationsController@executarEscola');
     $router->post('/master/migrations/executar-escola-selecionadas', 'Master/MasterMigrationsController@executarEscolaSelecionadas');
+    $router->get('/master/migrations/job', 'Master/MasterMigrationsController@job');
     $router->post('/master/migrations/marcar-executadas', 'Master/MasterMigrationsController@marcarExecutadas');
     $router->post('/master/migrations/executar-master', 'Master/MasterMigrationsController@executarMaster');
     $router->post('/master/migrations/executar-master-selecionadas', 'Master/MasterMigrationsController@executarMasterSelecionadas');

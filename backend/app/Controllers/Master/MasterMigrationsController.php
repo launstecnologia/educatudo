@@ -321,6 +321,49 @@ class MasterMigrationsController extends BaseController
             exit;
         }
 
+        $emBackground = false;
+        foreach ($selected as $file) {
+            if (stripos($file, 'escola_teste_em_2025') !== false) {
+                $emBackground = true;
+                break;
+            }
+        }
+        if ($emBackground) {
+            require_once __DIR__ . '/../../Services/MasterFilaService.php';
+            header('Content-Type: application/json; charset=utf-8');
+            try {
+                if (!MasterFilaService::tabelaExiste($masterPdo)) {
+                    echo json_encode(['success' => false, 'error' => 'A fila do Master não está configurada. Rode a migration 2026_09_16_fila_jobs_master.sql no banco master.'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                if (MasterFilaService::temJobAbertoDaEscola(MasterFilaService::TIPO_MIGRATION_ESCOLA, $escolaId)) {
+                    echo json_encode(['success' => false, 'error' => 'Já existe uma carga desta escola rodando em segundo plano.'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                $jobId = MasterFilaService::enfileirar(
+                    MasterFilaService::TIPO_MIGRATION_ESCOLA,
+                    ['escola_id' => $escolaId, 'migrations' => $selected],
+                    null,
+                    $escolaId,
+                    (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)
+                );
+                echo json_encode([
+                    'success' => true,
+                    'background' => true,
+                    'job_id' => $jobId,
+                    'resultado' => [
+                        'escola_id' => $escolaId,
+                        'nome' => $escola['nome'],
+                        'status' => 'background',
+                        'message' => 'Carga em segundo plano. Pode fechar esta janela.',
+                    ],
+                ], JSON_UNESCAPED_UNICODE);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
+        }
+
         try {
             $host = $escola['host'] ?? 'localhost';
             $port = (int) ($escola['porta'] ?? 3306);
@@ -363,6 +406,23 @@ class MasterMigrationsController extends BaseController
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
+    }
+
+    /**
+     * Status de uma carga enfileirada (polling da tela de migrations).
+     */
+    public function job()
+    {
+        $this->requireMaster();
+        require_once __DIR__ . '/../../Services/MasterFilaService.php';
+        $job = MasterFilaService::buscar((int) ($_GET['id'] ?? 0));
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$job || (string) ($job['tipo'] ?? '') !== MasterFilaService::TIPO_MIGRATION_ESCOLA) {
+            echo json_encode(['success' => false, 'error' => 'Job não encontrado'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode(['success' => true, 'job' => $job], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     /**

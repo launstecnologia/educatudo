@@ -275,6 +275,7 @@ $masterPendentes = $master_pendentes ?? [];
                         <button type="button" id="modal-escolher-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
                         <button type="button" id="modal-escolher-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
                     </div>
+                    <p id="modal-escolher-status" class="hidden w-full text-sm text-slate-600"></p>
                     <div class="flex gap-2">
                     <button type="button" id="modal-escolher-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Executar selecionadas</button>
@@ -642,6 +643,40 @@ $masterPendentes = $master_pendentes ?? [];
         });
     });
 
+    function acompanharCarga(jobId, btnSubmit, origText, statusEl) {
+        var tentativas = 0;
+        var timer = setInterval(function() {
+            tentativas++;
+            fetch(baseUrl + '/master/migrations/job?id=' + encodeURIComponent(jobId))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var job = data.job || {};
+                    var msg = (job.resultado_decoded && job.resultado_decoded.mensagem) || '';
+                    if (job.status === 'done') {
+                        clearInterval(timer);
+                        if (statusEl) statusEl.textContent = 'Carga concluída. Atualizando a página...';
+                        setTimeout(function() { location.reload(); }, 600);
+                        return;
+                    }
+                    if (job.status === 'failed') {
+                        clearInterval(timer);
+                        if (statusEl) statusEl.textContent = job.mensagem_erro || 'A carga falhou.';
+                        alert('Erro: ' + (job.mensagem_erro || 'a carga falhou'));
+                        btnSubmit.disabled = false;
+                        btnSubmit.textContent = origText;
+                        return;
+                    }
+                    if (statusEl && msg) statusEl.textContent = msg + ' Pode fechar esta janela.';
+                    btnSubmit.textContent = job.status === 'pending' ? 'Na fila...' : 'Em segundo plano...';
+                })
+                .catch(function() {
+                    if (tentativas > 40 && statusEl) {
+                        statusEl.textContent = 'Sem resposta do status. A carga pode continuar no servidor.';
+                    }
+                });
+        }, 5000);
+    }
+
     if (formEscolher) {
         formEscolher.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -657,12 +692,22 @@ $masterPendentes = $master_pendentes ?? [];
                 formData.append('migrations[]', cb.value);
             });
             var btnSubmit = formEscolher.querySelector('button[type="submit"]');
+            var statusEl = document.getElementById('modal-escolher-status');
             var origText = btnSubmit.textContent;
             btnSubmit.disabled = true;
-            btnSubmit.textContent = 'Executando...';
+            btnSubmit.textContent = 'Enviando...';
             fetch(baseUrl + '/master/migrations/executar-escola-selecionadas', { method: 'POST', body: formData })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
+                    if (data.success && data.background && data.job_id) {
+                        if (statusEl) {
+                            statusEl.classList.remove('hidden');
+                            statusEl.textContent = 'Rodando em segundo plano. Pode fechar esta janela; a carga continua no servidor.';
+                        }
+                        btnSubmit.textContent = 'Em segundo plano...';
+                        acompanharCarga(data.job_id, btnSubmit, origText, statusEl);
+                        return;
+                    }
                     if (data.success) {
                         closeModalEscolher();
                         if (data.resultado && data.resultado.status === 'ok') {
