@@ -109,7 +109,7 @@
                         </div>
                         <div class="flex space-x-2">
                             <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>" class="flex-1 bg-purple-600 text-white text-center py-2 rounded text-sm hover:bg-purple-700 transition-colors">Ver Detalhes</a>
-                            <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>/notas" class="flex-1 bg-blue-600 text-white text-center py-2 rounded text-sm hover:bg-blue-700 transition-colors">Provas</a>
+                            <a href="<?= URL ?>/pais/filhos/<?= $f['id'] ?>/notas#boletim" class="flex-1 bg-blue-600 text-white text-center py-2 rounded text-sm hover:bg-blue-700 transition-colors">Boletim</a>
                         </div>
                     </div>
                 <?php endforeach; ?>
