@@ -198,6 +198,46 @@ class ImpressaoLoteFechamentoService
         return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $documento . '.pdf';
     }
 
+    /**
+     * PDF já salvo só é reaproveitado. Histórico em rascunho não conta: o clique emite o documento.
+     *
+     * @param array<string,mixed> $painel
+     */
+    public function podeReaproveitarPdf(
+        string $documento,
+        string $chave,
+        string $slug,
+        array $painel,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero
+    ): bool {
+        if (!$this->pdfSalvo($chave, $slug)) {
+            return false;
+        }
+        if ($documento !== 'historico') {
+            return true;
+        }
+        $turmaId = (int) ($painel['turma']['id'] ?? 0);
+        if ($turmaId <= 0) {
+            return false;
+        }
+        $preview = $this->documentos->homologacao()->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $viuAluno = false;
+        foreach ($preview['linhas'] ?? [] as $linha) {
+            $alunoId = (int) ($linha['aluno']['id'] ?? 0);
+            if ($alunoId <= 0) {
+                continue;
+            }
+            $viuAluno = true;
+            if ($this->historicoOficial($this->historicos->listarPorAluno($alunoId)) === null) {
+                return false;
+            }
+        }
+
+        return $viuAluno;
+    }
+
     public function pdfSalvo(string $chave, string $slug): bool
     {
         if (!$this->chaveValida($chave)) {
@@ -358,7 +398,7 @@ class ImpressaoLoteFechamentoService
                     }
                     continue;
                 }
-                $historico = $this->htmlHistoricoAluno($alunoId, $alunoNome, $turmaNome, $configApp, $avisos);
+                $historico = $this->htmlHistoricoAluno($alunoId, $alunoNome, $turmaNome, $usuarioId, $configApp, $avisos);
                 if ($historico !== null) {
                     $htmls[] = $historico;
                     $feitos++;
@@ -443,18 +483,22 @@ class ImpressaoLoteFechamentoService
         int $alunoId,
         string $alunoNome,
         string $turmaNome,
+        int $usuarioId,
         ?array $configApp,
         array &$avisos
     ): ?string {
         $docs = $this->historicos->listarPorAluno($alunoId);
         $doc = $this->historicoOficial($docs);
-        $rascunho = false;
         if ($doc === null) {
-            $doc = $this->historicoRascunho($docs);
-            $rascunho = $doc !== null;
+            $emitido = $this->historicos->emitirRascunhoDoFechamento($alunoId, $usuarioId);
+            if (empty($emitido['success'])) {
+                $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ' . (string) ($emitido['error'] ?? 'não foi possível emitir o histórico.');
+                return null;
+            }
+            $doc = $this->historicos->findById((int) ($emitido['id'] ?? 0));
         }
         if ($doc === null) {
-            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ainda não há histórico. Prepare os rascunhos nesta tela antes de imprimir.';
+            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': não foi possível emitir o histórico.';
             return null;
         }
         $dados = $this->historicos->dadosParaPdf((int) ($doc['id'] ?? 0));
@@ -464,17 +508,11 @@ class ImpressaoLoteFechamentoService
         }
         $dados['resultado_labels'] = HistoricoEscolarService::RESULTADO_LABELS;
         try {
-            $html = $this->pdfHistorico->htmlHistorico($dados, $configApp);
+            return $this->pdfHistorico->htmlHistorico($dados, $configApp);
         } catch (Throwable $e) {
             $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ' . $e->getMessage();
             return null;
         }
-        if ($rascunho) {
-            $avisos[] = $turmaNome . ' — ' . $alunoNome . ': histórico ainda não emitido; saiu como rascunho.';
-            $html = $this->marcarRascunho($html);
-        }
-
-        return $html;
     }
 
     /**
@@ -505,16 +543,6 @@ class ImpressaoLoteFechamentoService
         }
 
         return null;
-    }
-
-    private function marcarRascunho(string $html): string
-    {
-        $faixa = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">Rascunho — histórico ainda não emitido</div>';
-        if (preg_match('/<body[^>]*>/i', $html)) {
-            return (string) preg_replace('/(<body[^>]*>)/i', '$1' . $faixa, $html, 1);
-        }
-
-        return $faixa . $html;
     }
 
     /**

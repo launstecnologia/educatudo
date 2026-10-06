@@ -421,10 +421,22 @@ class FechamentoAdminController extends AdminBaseController
         }
         $userId = (int) ($this->auth->getUser()['id'] ?? 0);
         $regenerar = !empty($_POST['regenerar']);
+        $avisos = [];
+        if (in_array('historico', $documentos, true) && !$this->podeAlterarResultados()) {
+            $documentos = array_values(array_filter(
+                $documentos,
+                static fn ($documento) => $documento !== 'historico'
+            ));
+            if ($documentos === []) {
+                $this->setFlashMessage('Emitir o histórico exige permissão para alterar resultados finais.', 'error');
+                $this->redirect($voltar);
+                return;
+            }
+            $avisos[] = 'O histórico não entrou: falta permissão para alterar resultados finais.';
+        }
         require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
         $jobs = [];
         $jaSalvos = 0;
-        $avisos = [];
         try {
             foreach ($alvos as $alvo) {
                 foreach ($documentos as $documento) {
@@ -442,7 +454,15 @@ class FechamentoAdminController extends AdminBaseController
                         '',
                         $documento
                     );
-                    if (!$regenerar && $lote->pdfSalvo($chave, $tenantSlug)) {
+                    if (!$regenerar && $lote->podeReaproveitarPdf(
+                        $documento,
+                        $chave,
+                        $tenantSlug,
+                        $alvo['painel'],
+                        $anoLetivo,
+                        $periodoTipo,
+                        $periodoNumero
+                    )) {
                         $jaSalvos++;
                         continue;
                     }

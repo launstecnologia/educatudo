@@ -487,6 +487,9 @@ class VidaEscolarPdfService
     }
 
     /**
+     * Quadro no formato de histórico: componentes nas linhas, um ano/série por coluna,
+     * e abaixo os estabelecimentos dos anos anteriores.
+     *
      * @param array<string,mixed> $dados
      */
     private function historicoOficialHtml(array $dados): string
@@ -494,45 +497,118 @@ class VidaEscolarPdfService
         $itens = is_array($dados['itens'] ?? null) ? $dados['itens'] : [];
         $resultados = is_array($dados['resultados'] ?? null) ? $dados['resultados'] : [];
         $labels = is_array($dados['resultado_labels'] ?? null) ? $dados['resultado_labels'] : [];
-        $porAno = [];
+        $unidade = is_array($dados['unidade'] ?? null) ? $dados['unidade'] : [];
+        $escolaAtual = trim((string) ($unidade['razao_social'] ?? $unidade['nome'] ?? ''));
+        $colunas = [];
+        $componentes = [];
+        $notas = [];
+        $cargas = [];
         foreach ($itens as $it) {
-            $k = (string) ($it['ano_letivo'] ?? '') . '|' . (string) ($it['serie_ano'] ?? '');
-            if (!isset($porAno[$k])) {
-                $porAno[$k] = [
-                    'ano' => (string) ($it['ano_letivo'] ?? ''),
-                    'serie' => (string) ($it['serie_ano'] ?? ''),
-                    'escola' => (string) ($it['escola_origem'] ?? ''),
-                    'itens' => [],
-                ];
+            $ano = trim((string) ($it['ano_letivo'] ?? ''));
+            $serie = trim((string) ($it['serie_ano'] ?? ''));
+            $chaveCol = $ano . '|' . $serie;
+            if (!isset($colunas[$chaveCol])) {
+                $colunas[$chaveCol] = ['ano' => $ano, 'serie' => $serie !== '' ? $serie : 'Série'];
             }
-            $porAno[$k]['itens'][] = $it;
+            $comp = trim((string) ($it['componente'] ?? ''));
+            if ($comp === '') {
+                continue;
+            }
+            $chaveComp = function_exists('mb_strtolower') ? mb_strtolower($comp, 'UTF-8') : strtolower($comp);
+            if (!isset($componentes[$chaveComp])) {
+                $componentes[$chaveComp] = $comp;
+            }
+            $notas[$chaveComp][$chaveCol] = $this->notaHistorico($it['resultado_valor'] ?? '');
+            $ch = $it['carga_horaria'] ?? null;
+            if ($ch !== null && $ch !== '' && is_numeric($ch)) {
+                $cargas[$chaveComp] = ($cargas[$chaveComp] ?? 0) + (int) $ch;
+            }
         }
-        ksort($porAno);
+        uksort($colunas, static function (string $a, string $b): int {
+            return strcmp($a, $b);
+        });
         $resultMap = [];
         foreach ($resultados as $r) {
             $resultMap[(string) ($r['ano_letivo'] ?? '') . '|' . (string) ($r['serie_ano'] ?? '')] = $r;
         }
-        if ($porAno === []) {
-            return '<p>Sem componentes lançados neste histórico.</p>';
-        }
+        $borda = 'border:1px solid #111;border-collapse:collapse;width:100%;font-size:8pt;';
+        $cel = 'border:1px solid #111;padding:3px 4px;';
         $html = '';
-        foreach ($porAno as $k => $bloco) {
-            $res = $resultMap[$k] ?? [];
-            $resLabel = (string) ($labels[$res['resultado'] ?? ''] ?? ($res['resultado'] ?? '—'));
-            $html .= '<h3>' . $this->esc($bloco['ano'] . ' · ' . $bloco['serie']) . '</h3>'
-                . '<p style="font-size:9pt;color:#4b5563;">'
-                . $this->esc($bloco['escola'] !== '' ? $bloco['escola'] : 'Esta instituição')
-                . ' · Resultado: ' . $this->esc($resLabel) . '</p>'
-                . '<table class="dados"><tr><td class="label">Componente</td><td class="label">Nota</td>'
-                . '<td class="label">Carga horária</td><td class="label">Origem</td></tr>';
-            foreach ($bloco['itens'] as $it) {
-                $html .= '<tr><td>' . $this->esc($it['componente'] ?? '') . '</td>'
-                    . '<td>' . $this->esc($it['resultado_valor'] ?? '—') . '</td>'
-                    . '<td>' . $this->esc($it['carga_horaria'] ?? '—') . '</td>'
-                    . '<td>' . $this->esc($it['origem'] ?? '') . '</td></tr>';
+        if ($colunas !== [] && $componentes !== []) {
+            $html .= '<p style="font-size:9pt;font-weight:700;margin:10px 0 4px;">COMPONENTES CURRICULARES</p>';
+            $html .= '<table style="' . $borda . '"><tr>';
+            $html .= '<td style="' . $cel . 'font-weight:700;">Componente</td>';
+            foreach ($colunas as $col) {
+                $html .= '<td style="' . $cel . 'font-weight:700;text-align:center;">'
+                    . $this->esc($col['serie']) . '<br>' . $this->esc($col['ano']) . '</td>';
             }
-            $html .= '</table>';
+            $html .= '<td style="' . $cel . 'font-weight:700;text-align:center;">Carga horária</td></tr>';
+            foreach ($componentes as $chaveComp => $nome) {
+                $html .= '<tr><td style="' . $cel . '">' . $this->esc($nome) . '</td>';
+                foreach (array_keys($colunas) as $chaveCol) {
+                    $html .= '<td style="' . $cel . 'text-align:center;">' . $this->esc($notas[$chaveComp][$chaveCol] ?? '—') . '</td>';
+                }
+                $chTotal = $cargas[$chaveComp] ?? null;
+                $html .= '<td style="' . $cel . 'text-align:center;">' . $this->esc($chTotal !== null && $chTotal > 0 ? (string) $chTotal : '—') . '</td></tr>';
+            }
+            $html .= '<tr><td style="' . $cel . 'font-weight:700;">Resultado</td>';
+            foreach ($colunas as $chaveCol => $col) {
+                $res = $resultMap[$chaveCol] ?? [];
+                $resLabel = (string) ($labels[$res['resultado'] ?? ''] ?? ($res['resultado'] ?? '—'));
+                $html .= '<td style="' . $cel . 'text-align:center;font-weight:700;">' . $this->esc($resLabel) . '</td>';
+            }
+            $html .= '<td style="' . $cel . '"></td></tr></table>';
+        } else {
+            $html .= '<p>Sem componentes lançados neste histórico.</p>';
         }
+
+        $estudos = is_array($dados['estudos'] ?? null) ? $dados['estudos'] : [];
+        if ($estudos === []) {
+            foreach ($colunas as $chaveCol => $col) {
+                $escola = '';
+                foreach ($itens as $it) {
+                    if (((string) ($it['ano_letivo'] ?? '') . '|' . (string) ($it['serie_ano'] ?? '')) !== $chaveCol) {
+                        continue;
+                    }
+                    $escola = trim((string) ($it['escola_origem'] ?? ''));
+                    if ($escola !== '') {
+                        break;
+                    }
+                }
+                if ($escola === '') {
+                    $escola = $escolaAtual;
+                }
+                $estudos[] = [
+                    'ano_letivo' => $col['ano'],
+                    'serie_ano' => $col['serie'],
+                    'escola' => $escola,
+                    'municipio' => '',
+                    'uf' => '',
+                ];
+            }
+        }
+        $html .= '<p style="font-size:9pt;font-weight:700;margin:12px 0 4px;">ESTUDOS REALIZADOS</p>';
+        $html .= '<table style="' . $borda . '"><tr>'
+            . '<td style="' . $cel . 'font-weight:700;">Série</td>'
+            . '<td style="' . $cel . 'font-weight:700;">Ano</td>'
+            . '<td style="' . $cel . 'font-weight:700;">Estabelecimento de ensino</td>'
+            . '<td style="' . $cel . 'font-weight:700;">Município</td>'
+            . '<td style="' . $cel . 'font-weight:700;">UF</td></tr>';
+        if ($estudos === []) {
+            $html .= '<tr><td style="' . $cel . '" colspan="5">Nenhum ano de escolarização informado.</td></tr>';
+        }
+        foreach ($estudos as $estudo) {
+            if (!is_array($estudo)) {
+                continue;
+            }
+            $html .= '<tr><td style="' . $cel . '">' . $this->esc($estudo['serie_ano'] ?? '') . '</td>'
+                . '<td style="' . $cel . '">' . $this->esc($estudo['ano_letivo'] ?? '') . '</td>'
+                . '<td style="' . $cel . '">' . $this->esc($estudo['escola'] ?? '') . '</td>'
+                . '<td style="' . $cel . '">' . $this->esc($estudo['municipio'] ?? '') . '</td>'
+                . '<td style="' . $cel . '">' . $this->esc($estudo['uf'] ?? '') . '</td></tr>';
+        }
+        $html .= '</table>';
+
         $assinaturas = is_array($dados['assinaturas'] ?? null) ? $dados['assinaturas'] : [];
         if ($assinaturas !== []) {
             $html .= '<p style="font-size:9pt;margin-top:12px;">Assinaturas: ';
@@ -546,7 +622,26 @@ class VidaEscolarPdfService
         if ($url !== '') {
             $html .= '<p style="font-size:8pt;color:#4b5563;">Validação: ' . $this->esc($url) . '</p>';
         }
+
         return $html;
+    }
+
+    private function notaHistorico($valor): string
+    {
+        $s = trim((string) $valor);
+        if ($s === '') {
+            return '—';
+        }
+        $normal = str_replace(',', '.', $s);
+        if (!is_numeric($normal)) {
+            return $s;
+        }
+        $casas = 1;
+        if (preg_match('/[.,](\d+)/', $s, $m)) {
+            $casas = min(2, strlen($m[1]));
+        }
+
+        return number_format((float) $normal, $casas, ',', '');
     }
 
     /**

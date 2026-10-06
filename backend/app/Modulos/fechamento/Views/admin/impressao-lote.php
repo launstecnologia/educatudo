@@ -147,7 +147,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <h3 class="text-lg font-semibold text-gray-900"><?= $turmaId > 0 ? 'Esta turma' : htmlspecialchars($serie) ?></h3>
             <p class="text-sm text-gray-500 mt-1">
                 <?= $homologadas ?> de <?= count($linhas) ?> turma(s) homologada(s).
-                Emitir tudo gera boletim, ficha individual, histórico e resultado final, um arquivo por turma.
+                Emite boletim, ficha, histórico e resultado final só do que ainda não tem PDF. O histórico sai emitido, com as escolas dos anos anteriores.
             </p>
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
@@ -173,11 +173,8 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
                 <input type="hidden" name="serie" value="<?= htmlspecialchars($serie, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="documento" value="pacote">
-                <label class="flex items-center gap-2 text-sm text-gray-600">
-                    <input type="checkbox" name="regenerar" value="1"> Gerar de novo
-                </label>
                 <button type="submit" class="btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold">
-                    <i class="fa-solid fa-print mr-2"></i> Emitir tudo
+                    <i class="fa-solid fa-print mr-2"></i> Emitir o que falta
                 </button>
             </form>
             <?php endif; ?>

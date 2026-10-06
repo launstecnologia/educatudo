@@ -25,6 +25,11 @@ class HistoricoEscolarService
     /** @var DeclarationService */
     private $declarations;
 
+    /** @var list<array<string,mixed>>|null */
+    private $cacheEscolarizacao = null;
+
+    private int $cacheEscolarizacaoAluno = 0;
+
     public const RESULTADO_LABELS = [
         'Aprovado' => 'Aprovado',
         'Aprovado_Conselho' => 'Aprovado pelo Conselho de Classe',
@@ -152,8 +157,10 @@ class HistoricoEscolarService
             $id = (int) $editavel['id'];
             $campos = [
                 'finalidade' => $finalidade,
-                'observacoes_gerais' => $observacoes,
             ];
+            if ($observacoes !== null) {
+                $campos['observacoes_gerais'] = $observacoes;
+            }
             // Qualquer reconsolidação após conferência exige nova conferência.
             if (($editavel['status'] ?? '') === 'Conferido') {
                 $campos['status'] = 'Rascunho';
@@ -268,9 +275,41 @@ class HistoricoEscolarService
     }
 
     /**
+     * No fechamento, o clique de gerar já emite: consolida os anos (inclusive outra escola) e congela o documento.
+     *
+     * @return array{success: bool, id?: int, error?: string}
+     */
+    public function emitirRascunhoDoFechamento(int $alunoId, int $userId): array
+    {
+        $gerado = $this->gerarRascunho($alunoId, 'Conclusao', $userId > 0 ? $userId : null);
+        if (empty($gerado['success'])) {
+            return $gerado;
+        }
+        $id = (int) ($gerado['id'] ?? 0);
+        $doc = $this->model->findById($id);
+        if (!$doc) {
+            return ['success' => false, 'error' => 'Histórico não encontrado.'];
+        }
+        if ((string) ($doc['status'] ?? '') === 'Rascunho') {
+            $conferido = $this->conferir($id, $userId > 0 ? $userId : 0);
+            if (empty($conferido['success'])) {
+                return $conferido;
+            }
+        }
+        if ((string) ($this->model->findById($id)['status'] ?? '') === 'Conferido') {
+            $emitido = $this->emitir($id, $userId > 0 ? $userId : 0, false);
+            if (empty($emitido['success'])) {
+                return $emitido;
+            }
+        }
+
+        return ['success' => true, 'id' => $id];
+    }
+
+    /**
      * Congela o documento, gera hash e snapshot. PDF é gerado on-demand a partir do snapshot.
      */
-    public function emitir(int $historicoId, int $userId): array
+    public function emitir(int $historicoId, int $userId, bool $exigirChecklist = true): array
     {
         $doc = $this->model->findById($historicoId);
         if (!$doc) {
@@ -280,13 +319,15 @@ class HistoricoEscolarService
             return ['success' => false, 'error' => 'Confera o histórico antes de emitir.'];
         }
 
-        $checklist = $this->checklist((int) $doc['aluno_id']);
-        if (!$checklist['ok']) {
-            return [
-                'success' => false,
-                'error' => 'Checklist incompleto. Complete os dados do aluno e da unidade antes de emitir.',
-                'checklist' => $checklist,
-            ];
+        if ($exigirChecklist) {
+            $checklist = $this->checklist((int) $doc['aluno_id']);
+            if (!$checklist['ok']) {
+                return [
+                    'success' => false,
+                    'error' => 'Checklist incompleto. Complete os dados do aluno e da unidade antes de emitir.',
+                    'checklist' => $checklist,
+                ];
+            }
         }
 
         $payload = $this->montarPayload($historicoId);
@@ -330,7 +371,7 @@ class HistoricoEscolarService
             return ['success' => false, 'error' => 'Falha ao emitir o histórico: ' . $e->getMessage()];
         }
 
-        return ['success' => true, 'hash' => $hash];
+        return ['success' => true, 'id' => $historicoId, 'hash' => $hash];
     }
 
     public function assinar(int $historicoId, int $userId, string $userNome, string $cargo, ?string $ip): array
@@ -682,10 +723,7 @@ class HistoricoEscolarService
 
         foreach ($eventos as $ev) {
             $ano = (string) ((int) ($ev['ano_letivo_calc'] ?? $ev['ano_letivo'] ?? 0) ?: date('Y'));
-            $serie = trim((string) ($ev['turma_serie'] ?? $ev['serie'] ?? ''));
-            if ($serie === '') {
-                $serie = 'Série não informada';
-            }
+            $serie = $this->serieDoAno($alunoId, $ano, trim((string) ($ev['turma_serie'] ?? $ev['serie'] ?? '')));
             $cols = is_array($ev['colunas'] ?? null) ? $ev['colunas'] : [];
             $linhas = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
             $finalCodes = $this->codigosColunaFinal($cols);
@@ -821,10 +859,7 @@ class HistoricoEscolarService
                 if ($ano === '0') {
                     continue;
                 }
-                $serie = trim((string) ($doc['turma_serie'] ?? ''));
-                if ($serie === '') {
-                    $serie = 'Série não informada';
-                }
+                $serie = $this->serieDoAno($alunoId, $ano, trim((string) ($doc['turma_serie'] ?? '')));
                 $resultadoAno = $this->mapearSituacaoHistorico((string) ($doc['situacao'] ?? ''));
                 foreach ($model->listarItens((int) $doc['id']) as $item) {
                     $materia = trim((string) ($item['materia_nome'] ?? ''));
@@ -848,7 +883,7 @@ class HistoricoEscolarService
                         'resultado_valor' => $valor !== null && $valor !== '' ? (string) $valor : null,
                         'carga_horaria' => isset($item['carga_horaria']) && $item['carga_horaria'] !== '' && $item['carga_horaria'] !== null
                             ? (int) $item['carga_horaria']
-                            : null,
+                            : (!empty($item['materia_id']) ? $this->cargaHorariaMateria((int) $item['materia_id']) : null),
                         'frequencia_percentual' => $item['frequencia_percentual'] ?? ($doc['frequencia_percentual'] ?? null),
                         '_resultado_ano' => $resultadoAno,
                     ];
@@ -965,16 +1000,166 @@ class HistoricoEscolarService
         $alunoId = (int) ($doc['aluno_id'] ?? 0);
         $aluno = $this->declarations->getAluno($alunoId) ?: [];
         $unidade = $this->declarations->getUnidadeForAluno($aluno) ?: [];
+        $itens = $this->model->listarItens($historicoId);
+
         return [
             'aluno' => $aluno,
             'unidade' => $unidade,
-            'itens' => $this->model->listarItens($historicoId),
+            'itens' => $itens,
             'resultados' => $this->model->listarResultados($historicoId),
+            'estudos' => $this->estudosDoAluno($alunoId, $unidade, $itens),
             'observacoes_gerais' => $doc['observacoes_gerais'] ?? null,
             'numero_registro_sed' => $doc['numero_registro_sed'] ?? null,
             'finalidade' => $doc['finalidade'] ?? 'Solicitacao',
             'versao' => (int) ($doc['versao'] ?? 1),
         ];
+    }
+
+    /**
+     * Anos cursados nesta escola e em escolas anteriores, para o quadro de estudos do histórico.
+     *
+     * @param array<string,mixed> $unidade
+     * @param list<array<string,mixed>> $itens
+     * @return list<array{ano_letivo:string,serie_ano:string,escola:string,municipio:string,uf:string}>
+     */
+    private function estudosDoAluno(int $alunoId, array $unidade, array $itens): array
+    {
+        $escolaAtual = trim((string) ($unidade['razao_social'] ?? $unidade['nome'] ?? ''));
+        $cidadeAtual = trim((string) ($unidade['cidade'] ?? $unidade['municipio'] ?? ''));
+        $ufAtual = trim((string) ($unidade['estado'] ?? $unidade['uf'] ?? ''));
+        $linhas = [];
+        $vistos = [];
+        $temExterno = false;
+        foreach ($this->anosEscolarizacaoDoAluno($alunoId) as $ano) {
+            $anoLetivo = trim((string) ($ano['ano_letivo'] ?? ''));
+            $serie = trim((string) ($ano['serie_ano'] ?? ''));
+            $chave = $anoLetivo . '|' . $serie;
+            if ($anoLetivo === '' || isset($vistos[$chave])) {
+                continue;
+            }
+            $externo = (string) ($ano['origem'] ?? '') === 'externo';
+            $escola = trim((string) ($ano['escola_nome'] ?? ''));
+            if ($escola === '' && !$externo) {
+                $escola = $escolaAtual;
+            }
+            if ($externo) {
+                $temExterno = true;
+            }
+            $vistos[$chave] = true;
+            $linhas[] = [
+                'ano_letivo' => $anoLetivo,
+                'serie_ano' => $serie !== '' ? $serie : 'Série não informada',
+                'escola' => $escola !== '' ? $escola : ($externo ? 'Escola anterior' : $escolaAtual),
+                'municipio' => trim((string) ($ano['municipio'] ?? '')) ?: ($externo ? '' : $cidadeAtual),
+                'uf' => trim((string) ($ano['uf'] ?? '')) ?: ($externo ? '' : $ufAtual),
+            ];
+        }
+        foreach ($itens as $item) {
+            $anoLetivo = trim((string) ($item['ano_letivo'] ?? ''));
+            $serie = trim((string) ($item['serie_ano'] ?? ''));
+            $chave = $anoLetivo . '|' . $serie;
+            if ($anoLetivo === '' || isset($vistos[$chave])) {
+                continue;
+            }
+            $externo = (string) ($item['origem'] ?? '') === 'Externo';
+            $escola = trim((string) ($item['escola_origem'] ?? ''));
+            if ($externo) {
+                $temExterno = true;
+            }
+            if ($escola === '' && !$externo) {
+                $escola = $escolaAtual;
+            }
+            $vistos[$chave] = true;
+            $linhas[] = [
+                'ano_letivo' => $anoLetivo,
+                'serie_ano' => $serie !== '' ? $serie : 'Série não informada',
+                'escola' => $escola !== '' ? $escola : ($externo ? 'Escola anterior' : $escolaAtual),
+                'municipio' => $externo ? '' : $cidadeAtual,
+                'uf' => $externo ? '' : $ufAtual,
+            ];
+        }
+        if (!$temExterno && $alunoId > 0) {
+            $anterior = $this->escolaAnteriorDoAluno($alunoId);
+            if ($anterior !== '') {
+                $linhas[] = [
+                    'ano_letivo' => '',
+                    'serie_ano' => 'Anos anteriores',
+                    'escola' => $anterior,
+                    'municipio' => '',
+                    'uf' => '',
+                ];
+            }
+        }
+        usort($linhas, static function (array $a, array $b): int {
+            return strcmp((string) $a['ano_letivo'], (string) $b['ano_letivo']);
+        });
+
+        return $linhas;
+    }
+
+    private function escolaAnteriorDoAluno(int $alunoId): string
+    {
+        try {
+            $row = $this->db->fetch(
+                'SELECT aluno_escola_anterior
+                 FROM matricula_processos
+                 WHERE aluno_id = :id
+                   AND aluno_escola_anterior IS NOT NULL
+                   AND TRIM(aluno_escola_anterior) <> \'\'
+                 ORDER BY id DESC
+                 LIMIT 1',
+                ['id' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return is_array($row) ? trim((string) ($row['aluno_escola_anterior'] ?? '')) : '';
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function anosEscolarizacaoDoAluno(int $alunoId): array
+    {
+        if ($this->cacheEscolarizacaoAluno === $alunoId && is_array($this->cacheEscolarizacao)) {
+            return $this->cacheEscolarizacao;
+        }
+        $this->cacheEscolarizacaoAluno = $alunoId;
+        $this->cacheEscolarizacao = [];
+        if ($alunoId <= 0) {
+            return [];
+        }
+        try {
+            require_once __DIR__ . '/../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            if ($svc->model()->schemaPronto()) {
+                $this->cacheEscolarizacao = $svc->model()->listarAnosEscolarizacao($alunoId);
+            }
+        } catch (\Throwable $e) {
+            $this->cacheEscolarizacao = [];
+        }
+
+        return $this->cacheEscolarizacao;
+    }
+
+    private function serieDoAno(int $alunoId, string $ano, string $serie): string
+    {
+        $serie = trim($serie);
+        if ($serie !== '' && $serie !== 'Série não informada') {
+            return $serie;
+        }
+        foreach ($this->anosEscolarizacaoDoAluno($alunoId) as $anoEsc) {
+            if ((string) ($anoEsc['ano_letivo'] ?? '') !== $ano) {
+                continue;
+            }
+            $daTrajetoria = trim((string) ($anoEsc['serie_ano'] ?? ''));
+            if ($daTrajetoria !== '') {
+                return $daTrajetoria;
+            }
+        }
+
+        return $serie !== '' ? $serie : 'Série não informada';
     }
 
     /**
