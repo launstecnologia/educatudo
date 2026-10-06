@@ -5,8 +5,10 @@
 --
 -- Master → Migrations → Escola teste → Escolher → marque SÓ este arquivo.
 -- Não entra em "Executar todas" nem no bootstrap (nome importar_dados_*).
--- Pode rodar de novo: apaga o próprio seed e recria.
--- Para só esvaziar: 2026_10_06_importar_dados_escola_teste_em_2025_apagar.sql
+-- Pode rodar de novo: apaga o próprio seed, apaga as cargas antigas da escola
+-- teste (EM 2026 et.* e Fundamental II 2026 etf.*) e recria só o EM 2025.
+-- Não mexe em catálogo de componentes, tipos de avaliação, unidade nem equipe.
+-- Para só esvaziar o EM 2025: 2026_10_06_importar_dados_escola_teste_em_2025_apagar.sql
 -- Rode antes as migrations de schema dessa escola.
 -- Volume alto (diário do ano + chamada). Se o navegador estourar o tempo,
 -- execute este arquivo com o cliente mysql no banco da escola teste.
@@ -15,6 +17,7 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET time_zone = '-03:00';
 
 DROP PROCEDURE IF EXISTS apagar_escola_teste_em_2025;
+DROP PROCEDURE IF EXISTS limpar_cargas_anteriores_escola_teste;
 DROP PROCEDURE IF EXISTS seed_escola_teste_em_2025;
 
 DELIMITER $$
@@ -151,6 +154,228 @@ BEGIN
 END$$
 -- END APAGAR
 
+CREATE PROCEDURE limpar_cargas_anteriores_escola_teste()
+BEGIN
+  DECLARE v_tem_log INT DEFAULT 0;
+  DECLARE v_tem_boletim_id INT DEFAULT 0;
+
+  DROP TABLE IF EXISTS et25_tmp_antigos;
+  CREATE TABLE et25_tmp_antigos (
+    aluno_id INT NOT NULL,
+    PRIMARY KEY (aluno_id)
+  ) ENGINE=InnoDB;
+
+  INSERT INTO et25_tmp_antigos (aluno_id)
+  SELECT id FROM alunos
+  WHERE nickname LIKE 'et.%' OR nickname LIKE 'etf.%';
+
+  INSERT IGNORE INTO et25_tmp_antigos (aluno_id)
+  SELECT a.id FROM alunos a
+  INNER JOIN turmas t ON t.id = a.turma_id
+  WHERE t.ano_letivo = 2026;
+
+  INSERT IGNORE INTO et25_tmp_antigos (aluno_id)
+  SELECT m.aluno_id FROM matricula m
+  INNER JOIN turmas t ON t.id = m.turma_id
+  WHERE t.ano_letivo = 2026;
+
+  DELETE FROM presenca_eventos
+  WHERE id_externo LIKE 'et-%' OR id_externo LIKE 'etf-%'
+     OR aluno_id IN (SELECT aluno_id FROM et25_tmp_antigos);
+
+  DELETE h FROM ocorrencias_historico h
+  INNER JOIN alunos_ocorrencias o ON o.id = h.ocorrencia_id
+  WHERE o.aluno_id IN (SELECT aluno_id FROM et25_tmp_antigos);
+
+  DELETE i FROM alunos_ocorrencias_itens i
+  INNER JOIN alunos_ocorrencias o ON o.id = i.ocorrencia_id
+  WHERE o.aluno_id IN (SELECT aluno_id FROM et25_tmp_antigos);
+
+  DELETE FROM alunos_ocorrencias
+  WHERE aluno_id IN (SELECT aluno_id FROM et25_tmp_antigos);
+
+  DELETE l FROM faltas_lancamentos l
+  INNER JOIN faltas_eventos e ON e.id = l.evento_id
+  WHERE e.nome LIKE 'ET Faltas %' OR e.nome LIKE 'ETF Faltas %'
+     OR l.aluno_id IN (SELECT aluno_id FROM et25_tmp_antigos);
+
+  DELETE FROM faltas_eventos
+  WHERE nome LIKE 'ET Faltas %' OR nome LIKE 'ETF Faltas %';
+
+  DELETE FROM diario_aulas
+  WHERE conteudo_realizado LIKE 'ET %'
+     OR conteudo_realizado LIKE 'ETF %'
+     OR observacoes LIKE 'ET-SEED%'
+     OR observacoes LIKE 'ETF-SEED%'
+     OR turma_id IN (SELECT id FROM turmas WHERE ano_letivo = 2026);
+
+  DELETE FROM planos_aula
+  WHERE titulo LIKE 'ET %' OR titulo LIKE 'ETF %';
+
+  SET v_tem_boletim_id = (
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'boletim_regras'
+      AND column_name = 'boletim_id'
+  );
+  IF v_tem_boletim_id > 0 THEN
+    UPDATE boletim_regras r
+    INNER JOIN boletins b ON b.id = r.boletim_id
+    SET r.boletim_id = NULL
+    WHERE b.ano_letivo = 2026
+       OR r.ano_letivo = 2026
+       OR r.codigo LIKE 'et-2026-%'
+       OR r.codigo LIKE 'etf-2026-%';
+  END IF;
+
+  DELETE b FROM boletins b
+  INNER JOIN boletim_regras r ON r.id = b.regra_id
+  WHERE r.codigo LIKE 'et-2026-%' OR r.codigo LIKE 'etf-2026-%' OR r.ano_letivo = 2026;
+
+  DELETE FROM boletins WHERE ano_letivo = 2026;
+
+  DELETE FROM boletim_regras
+  WHERE (codigo LIKE 'et-2026-%' OR codigo LIKE 'etf-2026-%' OR ano_letivo = 2026)
+    AND codigo NOT LIKE 'et25-%';
+
+  DELETE n FROM notas_tipo_finais n
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = n.aluno_id;
+
+  SET v_tem_log = (
+    SELECT COUNT(*) FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND table_name = 'provas_blocos_notas_lancadas_log'
+  );
+  IF v_tem_log > 0 THEN
+    DELETE lg FROM provas_blocos_notas_lancadas_log lg
+    INNER JOIN provas_blocos pb ON pb.id = lg.bloco_id
+    WHERE pb.ano_letivo = 2026
+       OR pb.titulo LIKE 'ET %'
+       OR pb.titulo LIKE 'ETF %';
+  END IF;
+
+  DELETE n FROM provas_blocos_notas_lancadas n
+  INNER JOIN provas_blocos pb ON pb.id = n.bloco_id
+  WHERE pb.ano_letivo = 2026
+     OR pb.titulo LIKE 'ET %'
+     OR pb.titulo LIKE 'ETF %'
+     OR n.aluno_id IN (SELECT aluno_id FROM et25_tmp_antigos);
+
+  UPDATE diario_aulas da
+  INNER JOIN provas_blocos pb ON pb.id = da.evento_bloco_id
+  SET da.evento_bloco_id = NULL
+  WHERE pb.ano_letivo = 2026
+     OR pb.titulo LIKE 'ET %'
+     OR pb.titulo LIKE 'ETF %';
+
+  DELETE FROM provas_blocos
+  WHERE ano_letivo = 2026
+     OR titulo LIKE 'ET %'
+     OR titulo LIKE 'ETF %';
+
+  DELETE e FROM resultado_documento_emissoes e
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = e.aluno_id;
+
+  DELETE r FROM resultado_academico r
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = r.aluno_id;
+
+  DELETE h FROM fechamento_periodo_historico h
+  INNER JOIN fechamento_periodo f ON f.id = h.fechamento_id
+  WHERE f.ano_letivo = 2026
+     OR f.turma_id IN (SELECT id FROM turmas WHERE ano_letivo = 2026);
+
+  DELETE FROM fechamento_periodo
+  WHERE ano_letivo = 2026
+     OR turma_id IN (SELECT id FROM turmas WHERE ano_letivo = 2026);
+
+  DELETE h FROM historico_documentos h
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = h.aluno_id;
+
+  DELETE d FROM alunos_documentos d
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = d.aluno_id;
+
+  DELETE f FROM alunos_ficha_complementar f
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = f.aluno_id;
+
+  DELETE s FROM alunos_historico_status s
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = s.student_id;
+
+  UPDATE alunos a
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = a.id
+  SET a.responsavel_id = NULL;
+
+  DELETE a FROM alunos a
+  INNER JOIN et25_tmp_antigos x ON x.aluno_id = a.id;
+
+  DELETE FROM responsaveis
+  WHERE email LIKE 'mae.et.%@educateste.local'
+     OR email LIKE 'pai.et.%@educateste.local'
+     OR email LIKE 'mae.etf.%@educateste.local'
+     OR email LIKE 'pai.etf.%@educateste.local';
+
+  DELETE gh FROM grade_horaria gh
+  INNER JOIN turmas t ON t.id = gh.turma_id
+  WHERE t.ano_letivo = 2026;
+
+  DELETE FROM turmas WHERE ano_letivo = 2026;
+
+  DELETE d FROM professores_documentos d
+  INNER JOIN professores p ON p.id = d.professor_id
+  WHERE p.codigo_prof LIKE 'ET-%' OR p.codigo_prof LIKE 'ETF-%';
+
+  DELETE FROM professores
+  WHERE codigo_prof LIKE 'ET-%' OR codigo_prof LIKE 'ETF-%';
+
+  DELETE c FROM matrizes_curriculares_componentes c
+  INNER JOIN matrizes_curriculares m ON m.id = c.matriz_id
+  WHERE m.codigo IN ('ET-EM1', 'ET-EM2', 'ET-EM3', 'ETF-EF6', 'ETF-EF7', 'ETF-EF8', 'ETF-EF9');
+
+  DELETE FROM matrizes_curriculares
+  WHERE codigo IN ('ET-EM1', 'ET-EM2', 'ET-EM3', 'ETF-EF6', 'ETF-EF7', 'ETF-EF8', 'ETF-EF9');
+
+  DELETE FROM school_locations
+  WHERE codigo LIKE 'ET-SALA-%' OR codigo LIKE 'ETF-SALA-%';
+
+  DELETE FROM regras_academicas
+  WHERE codigo IN ('em-educa-teste', 'ef2-educa-teste');
+
+  DELETE s FROM serie s
+  INNER JOIN curso c ON c.id = s.curso_id
+  WHERE c.nome = 'Ensino Fundamental II'
+    AND c.descricao LIKE '%Educa Teste%'
+    AND s.nome IN ('6º Ano EF', '7º Ano EF', '8º Ano EF', '9º Ano EF')
+    AND NOT EXISTS (SELECT 1 FROM turmas t WHERE t.serie_id = s.id);
+
+  DELETE c FROM curso c
+  WHERE c.nome = 'Ensino Fundamental II'
+    AND c.descricao LIKE '%Educa Teste%'
+    AND NOT EXISTS (SELECT 1 FROM serie s WHERE s.curso_id = c.id);
+
+  DELETE v FROM calendario_letivo_vinculos v
+  INNER JOIN calendario_letivo c ON c.id = v.calendario_id
+  WHERE c.ano = 2026 OR c.observacao = 'Calendário Escola Educa Teste';
+
+  DELETE e FROM calendario_letivo_eventos e
+  INNER JOIN calendario_letivo c ON c.id = e.calendario_id
+  WHERE c.ano = 2026 OR c.observacao = 'Calendário Escola Educa Teste';
+
+  DELETE FROM calendario_letivo
+  WHERE ano = 2026 OR observacao = 'Calendário Escola Educa Teste';
+
+  DELETE a FROM ano_letivo a
+  WHERE a.ano = 2026
+    AND NOT EXISTS (SELECT 1 FROM turmas t WHERE t.ano_letivo = 2026)
+    AND NOT EXISTS (SELECT 1 FROM matricula m WHERE m.ano_letivo_id = a.id)
+    AND NOT EXISTS (SELECT 1 FROM alunos_turma_chamada c WHERE c.ano_letivo_id = a.id);
+
+  UPDATE config_layout
+  SET config_value = 'Ensino Médio · 2025'
+  WHERE config_key = 'system_subtitle'
+    AND (config_value LIKE '%2026%' OR config_value LIKE '%Fundamental%');
+
+  DROP TABLE IF EXISTS et25_tmp_antigos;
+END$$
+
 CREATE PROCEDURE seed_escola_teste_em_2025()
 BEGIN
   DECLARE v_hash VARCHAR(255) DEFAULT '$2y$10$7BYAIlOgLu03H4QGEYTDn.VR01w.LYWq6Z/gNjBIMn528kciOFbOa';
@@ -211,6 +436,7 @@ BEGIN
   DECLARE v_mats JSON;
 
   CALL apagar_escola_teste_em_2025();
+  CALL limpar_cargas_anteriores_escola_teste();
 
   INSERT INTO usuarios (tipo, perfil_admin, nome, email, senha_hash, ativo)
   SELECT 'admin_escola', 'dev', 'Admin Escola Educa Teste', 'admin@educateste.local', v_hash, 1 FROM DUAL
@@ -1393,4 +1619,5 @@ DELIMITER ;
 
 CALL seed_escola_teste_em_2025();
 DROP PROCEDURE IF EXISTS seed_escola_teste_em_2025;
+DROP PROCEDURE IF EXISTS limpar_cargas_anteriores_escola_teste;
 DROP PROCEDURE IF EXISTS apagar_escola_teste_em_2025;
