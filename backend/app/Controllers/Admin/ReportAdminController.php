@@ -459,12 +459,8 @@ class ReportAdminController extends AdminBaseController
             $this->exportarBoletimCoordenacaoTxt($relatorios, $incluirAssinatura, $filenameBase);
             return;
         }
-        if ($formato === 'excel' && count($relatorios) > 1) {
-            $this->exportarExcelEventosBoletimCoordenacao($relatorios, $incluirAssinatura, $filenameBase);
-            return;
-        }
         if ($formato === 'excel') {
-            $this->exportarBoletimCoordenacaoExcel($relatorio, $incluirAssinatura, $filenameBase);
+            $this->exportarPlanilhaMediasBoletim($relatorios, $filenameBase);
             return;
         }
 
@@ -2611,102 +2607,611 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
+     * Planilha no formato da secretaria: uma aba por turma, alunos nas linhas e matérias nas colunas.
+     *
      * @param list<array<string,mixed>> $relatorios
      */
-    private function exportarExcelEventosBoletimCoordenacao(array $relatorios, bool $incluirAssinatura, string $filenameBase): void
+    private function exportarPlanilhaMediasBoletim(array $relatorios, string $filenameBase): void
     {
-        $colunasUniao = [];
-        $decimalPlaces = 1;
+        $turmas = [];
         foreach ($relatorios as $relatorio) {
-            $decimalPlaces = max($decimalPlaces, (int) ($relatorio['decimal_places'] ?? 1));
-            foreach ((array) ($relatorio['columns'] ?? []) as $column) {
-                if (!is_array($column)) {
-                    continue;
-                }
-                $codigo = trim((string) ($column['codigo'] ?? ''));
-                if ($codigo === '') {
-                    continue;
-                }
-                $label = trim((string) ($column['label'] ?? ''));
-                if ($label === '') {
-                    $label = 'Nota';
-                }
-                if (!isset($colunasUniao[$codigo])) {
-                    $colunasUniao[$codigo] = $label;
-                    continue;
-                }
-                if ($colunasUniao[$codigo] === $label) {
-                    continue;
-                }
-                $colunasUniao[$codigo] = $label . ' (' . $codigo . ')';
+            if (!is_array($relatorio)) {
+                continue;
             }
-        }
-        $usados = [];
-        foreach ($colunasUniao as $codigo => $label) {
-            $base = $label;
-            if (isset($usados[$base])) {
-                $colunasUniao[$codigo] = $base . ' (' . $codigo . ')';
-            }
-            $usados[$colunasUniao[$codigo]] = true;
-        }
-        $headers = ['Boletim', 'Bimestre', 'Ano', 'Criado em', 'Aluno'];
-        if ($incluirAssinatura) {
-            $headers[] = 'Assinatura';
-        }
-        $headers[] = 'RA';
-        $headers[] = 'Turma';
-        $headers[] = 'Matéria';
-        foreach ($colunasUniao as $label) {
-            $headers[] = $label;
-        }
-        $headers[] = 'Observação da coordenação';
-
-        $rows = [];
-        foreach ($relatorios as $relatorio) {
-            $nomeEvento = (string) ($relatorio['evento_nome'] ?? 'Boletim');
-            $bimestre = (string) ($relatorio['bimestre_rotulo'] ?? '');
-            $ano = (int) ($relatorio['ano_letivo'] ?? 0);
-            $criadoEm = (string) ($relatorio['evento_criado_em'] ?? '');
             foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
                 if (!is_array($aluno)) {
                     continue;
                 }
-                $primeiraMateria = true;
+                $turma = trim((string) ($aluno['turma'] ?? ''));
+                if ($turma !== '') {
+                    $turmas[$turma] = true;
+                }
+            }
+        }
+        $nomesTurmas = array_keys($turmas);
+        $tiposEnsino = $this->tiposEnsinoPorTurmaPlanilha($nomesTurmas);
+        $transferidos = $this->transferidosPorTurmaPlanilha($nomesTurmas);
+        $variosEventos = count($relatorios) > 1;
+        $abas = [];
+        $nomesAbas = [];
+        foreach ($relatorios as $relatorio) {
+            if (!is_array($relatorio)) {
+                continue;
+            }
+            $codigoNota = $this->codigoNotaPlanilhaBoletim($relatorio);
+            $casas = max(0, min(2, (int) ($relatorio['decimal_places'] ?? 1)));
+            $periodo = $this->rotuloPeriodoPlanilhaBoletim($relatorio);
+            $grupos = [];
+            foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
+                if (!is_array($aluno)) {
+                    continue;
+                }
+                $turma = trim((string) ($aluno['turma'] ?? ''));
+                if ($turma === '') {
+                    $turma = 'Sem turma';
+                }
+                if (!isset($grupos[$turma])) {
+                    $grupos[$turma] = ['materias' => [], 'alunos' => [], 'ids' => []];
+                }
+                $notas = [];
                 foreach ((array) ($aluno['materias'] ?? []) as $materia) {
                     if (!is_array($materia)) {
                         continue;
                     }
-                    $row = [
-                        $nomeEvento,
-                        $bimestre,
-                        $ano > 0 ? (string) $ano : '',
-                        $criadoEm,
-                        (string) ($aluno['nome'] ?? ''),
-                    ];
-                    if ($incluirAssinatura) {
-                        $row[] = '';
+                    $nomeMateria = trim((string) ($materia['nome'] ?? ''));
+                    if ($nomeMateria === '') {
+                        continue;
                     }
-                    $row[] = (string) ($aluno['ra'] ?? '');
-                    $row[] = (string) ($aluno['turma'] ?? '');
-                    $row[] = (string) ($materia['nome'] ?? '');
-                    foreach ($colunasUniao as $codigo => $_label) {
-                        $value = $materia['notas'][$codigo] ?? null;
-                        $row[] = is_numeric($value) ? (float) $value : (string) ($value ?? '');
+                    if (!in_array($nomeMateria, $grupos[$turma]['materias'], true)) {
+                        $grupos[$turma]['materias'][] = $nomeMateria;
                     }
-                    $row[] = $primeiraMateria ? (string) ($aluno['observacao'] ?? '') : '';
-                    $rows[] = $row;
-                    $primeiraMateria = false;
+                    $valor = $codigoNota !== '' ? ($materia['notas'][$codigoNota] ?? null) : null;
+                    $notas[$nomeMateria] = $valor;
+                }
+                $alunoId = (int) ($aluno['id'] ?? 0);
+                $grupos[$turma]['alunos'][] = [
+                    'id' => $alunoId,
+                    'nome' => (string) ($aluno['nome'] ?? ''),
+                    'notas' => $notas,
+                ];
+                if ($alunoId > 0) {
+                    $grupos[$turma]['ids'][$alunoId] = true;
                 }
             }
+            foreach ($transferidos as $turma => $lista) {
+                if (!isset($grupos[$turma])) {
+                    continue;
+                }
+                foreach ($lista as $alunoId => $nomeAluno) {
+                    if (isset($grupos[$turma]['ids'][$alunoId])) {
+                        continue;
+                    }
+                    $grupos[$turma]['alunos'][] = [
+                        'id' => $alunoId,
+                        'nome' => $nomeAluno,
+                        'notas' => [],
+                        'transferido' => true,
+                    ];
+                    $grupos[$turma]['ids'][$alunoId] = true;
+                }
+            }
+            if ($grupos === []) {
+                $grupos['Sem turma'] = ['materias' => [], 'alunos' => [], 'ids' => []];
+            }
+            foreach ($grupos as $turma => $grupo) {
+                $idsTransferidos = $transferidos[$turma] ?? [];
+                $linhas = [];
+                foreach ($grupo['alunos'] as $aluno) {
+                    $alunoId = (int) ($aluno['id'] ?? 0);
+                    $transferido = !empty($aluno['transferido']) || isset($idsTransferidos[$alunoId]);
+                    $valores = [];
+                    foreach ($grupo['materias'] as $nomeMateria) {
+                        if ($transferido) {
+                            $valores[] = 'TR';
+                            continue;
+                        }
+                        $valor = $aluno['notas'][$nomeMateria] ?? null;
+                        if (is_string($valor) && strtoupper(trim($valor)) === 'TR') {
+                            $valores[] = 'TR';
+                            continue;
+                        }
+                        $valores[] = is_numeric($valor) ? (float) $valor : null;
+                    }
+                    $linhas[] = [
+                        'nome' => mb_strtoupper(trim((string) ($aluno['nome'] ?? '')), 'UTF-8'),
+                        'valores' => $valores,
+                        'ordem' => $this->chaveOrdenacaoNomePlanilha((string) ($aluno['nome'] ?? '')),
+                    ];
+                }
+                usort($linhas, static function (array $a, array $b): int {
+                    return $a['ordem'] <=> $b['ordem'];
+                });
+                $siglas = $this->siglasMateriasPlanilha($grupo['materias']);
+                $tituloTurma = $this->rotuloTurmaPlanilha($turma, (string) ($tiposEnsino[$turma] ?? ''));
+                $nomeAba = $variosEventos ? trim($periodo . ' ' . $turma) : $turma;
+                $abas[] = [
+                    'nome' => $this->nomeAbaPlanilha($nomeAba, $nomesAbas),
+                    'titulo_turma' => $tituloTurma,
+                    'periodo' => $periodo,
+                    'siglas' => $siglas,
+                    'linhas' => $linhas,
+                    'casas' => $casas,
+                ];
+            }
+        }
+        if ($abas === []) {
+            $abas[] = [
+                'nome' => 'Notas',
+                'titulo_turma' => 'Turma',
+                'periodo' => '',
+                'siglas' => [],
+                'linhas' => [],
+                'casas' => 1,
+            ];
         }
 
-        $xlsx = $this->criarXlsxBoletimCoordenacao($headers, $rows, max(0, min(2, $decimalPlaces)));
+        $xlsx = $this->criarXlsxPlanilhaMedias($abas);
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $filenameBase . '.xlsx"');
         header('Pragma: no-cache');
         header('Content-Length: ' . strlen($xlsx));
         echo $xlsx;
         exit;
+    }
+
+    /**
+     * @param list<string> $nomes
+     * @return array<string,string>
+     */
+    private function tiposEnsinoPorTurmaPlanilha(array $nomes): array
+    {
+        $nomes = array_values(array_unique(array_filter(array_map(static function ($nome): string {
+            return trim((string) $nome);
+        }, $nomes), static function (string $nome): bool {
+            return $nome !== '';
+        })));
+        if ($nomes === []) {
+            return [];
+        }
+        $params = [];
+        $holders = [];
+        foreach ($nomes as $i => $nome) {
+            $chave = 'turma_nome_' . $i;
+            $holders[] = ':' . $chave;
+            $params[$chave] = $nome;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT nome, tipo_ensino FROM turmas WHERE nome IN (' . implode(',', $holders) . ')',
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $nome = trim((string) ($row['nome'] ?? ''));
+            if ($nome === '' || isset($out[$nome])) {
+                continue;
+            }
+            $out[$nome] = trim((string) ($row['tipo_ensino'] ?? ''));
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string> $nomes
+     * @return array<string, array<int, string>>
+     */
+    private function transferidosPorTurmaPlanilha(array $nomes): array
+    {
+        $nomes = array_values(array_unique(array_filter(array_map(static function ($nome): string {
+            return trim((string) $nome);
+        }, $nomes), static function (string $nome): bool {
+            return $nome !== '';
+        })));
+        if ($nomes === []) {
+            return [];
+        }
+        $params = [];
+        $holders = [];
+        foreach ($nomes as $i => $nome) {
+            $chave = 'turma_tr_' . $i;
+            $holders[] = ':' . $chave;
+            $params[$chave] = $nome;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT t.nome AS turma_nome, a.id AS aluno_id, a.nome AS aluno_nome
+                 FROM matricula m
+                 INNER JOIN alunos a ON a.id = m.aluno_id
+                 INNER JOIN turmas t ON t.id = m.turma_id
+                 WHERE m.status = \'transferido\'
+                   AND t.nome IN (' . implode(',', $holders) . ')
+                   AND NOT EXISTS (
+                        SELECT 1 FROM matricula ma
+                        WHERE ma.aluno_id = a.id
+                          AND ma.turma_id = m.turma_id
+                          AND ma.status = \'ativa\'
+                          AND ma.data_saida IS NULL
+                   )',
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $turma = trim((string) ($row['turma_nome'] ?? ''));
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            if ($turma === '' || $alunoId <= 0) {
+                continue;
+            }
+            $out[$turma][$alunoId] = (string) ($row['aluno_nome'] ?? '');
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $relatorio
+     */
+    private function codigoNotaPlanilhaBoletim(array $relatorio): string
+    {
+        $columns = is_array($relatorio['columns'] ?? null) ? $relatorio['columns'] : [];
+        $candidatos = [];
+        foreach ($columns as $column) {
+            if (!is_array($column)) {
+                continue;
+            }
+            $codigo = trim((string) ($column['codigo'] ?? ''));
+            if ($codigo === '') {
+                continue;
+            }
+            $blob = mb_strtolower($codigo . ' ' . (string) ($column['label'] ?? ''), 'UTF-8');
+            if (str_contains($blob, 'falt')) {
+                continue;
+            }
+            $candidatos[] = [$codigo, $blob];
+        }
+        $bimestre = (int) ($relatorio['bimestre'] ?? 0);
+        if ($bimestre > 0) {
+            $marca = '/(^|[^0-9])' . $bimestre . '[\sºoa]*bim/u';
+            foreach ($candidatos as $candidato) {
+                if (preg_match($marca, $candidato[1])) {
+                    return $candidato[0];
+                }
+            }
+        }
+        foreach ($candidatos as $candidato) {
+            if (str_contains($candidato[1], 'media_bim')
+                || str_contains($candidato[1], 'média bimestral')
+                || str_contains($candidato[1], 'media bimestral')) {
+                return $candidato[0];
+            }
+        }
+        foreach ($candidatos as $candidato) {
+            if (str_contains($candidato[1], 'bimestre') || preg_match('/\bbim\b/u', $candidato[1])) {
+                return $candidato[0];
+            }
+        }
+        $final = trim((string) ($relatorio['codigo_media_final'] ?? ''));
+        if ($final !== '') {
+            foreach ($candidatos as $candidato) {
+                if ($candidato[0] === $final) {
+                    return $final;
+                }
+            }
+        }
+        $calculado = $this->codigoMediaFinalColunasBoletim($columns);
+        if ($calculado !== '') {
+            return $calculado;
+        }
+
+        return $candidatos[0][0] ?? '';
+    }
+
+    /**
+     * @param array<string,mixed> $relatorio
+     */
+    private function rotuloPeriodoPlanilhaBoletim(array $relatorio): string
+    {
+        $bimestre = (int) ($relatorio['bimestre'] ?? 0);
+        $rotulo = trim((string) ($relatorio['bimestre_rotulo'] ?? ''));
+        $baixo = mb_strtolower($rotulo, 'UTF-8');
+        $tipo = 'BIM';
+        if (str_contains($baixo, 'trim')) {
+            $tipo = 'TRIM';
+        } elseif (str_contains($baixo, 'semestre') || str_contains($baixo, 'sem ')) {
+            $tipo = 'SEM';
+        }
+        if ($bimestre > 0) {
+            return $bimestre . 'º ' . $tipo;
+        }
+
+        return $rotulo !== '' ? mb_strtoupper($rotulo, 'UTF-8') : 'PERÍODO';
+    }
+
+    private function rotuloTurmaPlanilha(string $turma, string $tipoEnsino): string
+    {
+        $turma = trim($turma);
+        if ($turma === '') {
+            $turma = 'Turma';
+        }
+        $tipo = mb_strtolower(trim($tipoEnsino), 'UTF-8');
+        $curto = '';
+        if (str_contains($tipo, 'fundamental')) {
+            $curto = 'E. Fundamental';
+        } elseif (str_contains($tipo, 'médio') || str_contains($tipo, 'medio')) {
+            $curto = 'E. Médio';
+        } elseif (str_contains($tipo, 'infantil')) {
+            $curto = 'E. Infantil';
+        }
+        if ($curto === '') {
+            return $turma;
+        }
+        $turmaBaixa = mb_strtolower($turma, 'UTF-8');
+        if (str_contains($turmaBaixa, mb_strtolower($curto, 'UTF-8')) || str_contains($turmaBaixa, 'fundamental') || str_contains($turmaBaixa, 'médio') || str_contains($turmaBaixa, 'medio')) {
+            return $turma;
+        }
+
+        return $turma . ' - ' . $curto;
+    }
+
+    /**
+     * @param list<string> $materias
+     * @return list<string>
+     */
+    private function siglasMateriasPlanilha(array $materias): array
+    {
+        $mapa = [
+            'arte' => 'ART',
+            'artes' => 'ART',
+            'biologia' => 'BIO',
+            'ciencias' => 'CIE',
+            'educacao fisica' => 'EDU',
+            'ensino religioso' => 'REL',
+            'espanhol' => 'ESP',
+            'filosofia' => 'FIL',
+            'fisica' => 'FIS',
+            'geografia' => 'GEO',
+            'geometria' => 'GEM',
+            'gramatica' => 'GRA',
+            'historia' => 'HIS',
+            'ingles' => 'ING',
+            'lingua espanhola' => 'ESP',
+            'lingua inglesa' => 'ING',
+            'lingua portuguesa' => 'POR',
+            'leitura' => 'LEI',
+            'leitura e interpretacao' => 'LEI',
+            'literatura' => 'LIT',
+            'matematica' => 'MAT',
+            'musica' => 'MUS',
+            'portugues' => 'POR',
+            'quimica' => 'QUI',
+            'redacao' => 'RED',
+            'sociologia' => 'SOC',
+        ];
+        $usadas = [];
+        $siglas = [];
+        foreach ($materias as $materia) {
+            $chave = $this->chaveOrdenacaoNomePlanilha((string) $materia);
+            $base = $mapa[$chave] ?? '';
+            if ($base === '') {
+                $partes = preg_split('/\s+/', $chave) ?: [];
+                $ignorar = ['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o'];
+                foreach ($partes as $parte) {
+                    if ($parte === '' || in_array($parte, $ignorar, true)) {
+                        continue;
+                    }
+                    $base .= strtoupper(substr($parte, 0, 1));
+                    if (strlen($base) >= 3) {
+                        break;
+                    }
+                }
+                if (strlen($base) < 3) {
+                    $limpo = preg_replace('/[^a-z]/', '', $chave) ?: '';
+                    $base = strtoupper(substr($limpo, 0, 3));
+                }
+            }
+            if ($base === '') {
+                $base = 'MAT';
+            }
+            $sigla = $base;
+            $n = 2;
+            while (isset($usadas[$sigla])) {
+                $sigla = $base . $n;
+                $n++;
+            }
+            $usadas[$sigla] = true;
+            $siglas[] = $sigla;
+        }
+
+        return $siglas;
+    }
+
+    private function chaveOrdenacaoNomePlanilha(string $nome): string
+    {
+        $nome = mb_strtolower(trim($nome), 'UTF-8');
+        return strtr($nome, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
+    }
+
+    /**
+     * @param array<string,bool> $usados
+     */
+    private function nomeAbaPlanilha(string $base, array &$usados): string
+    {
+        $nome = trim((string) preg_replace('/\s+/', ' ', (string) preg_replace('/[\\\\\\/\\?\\*\\:\\[\\]]/', ' ', $base)));
+        if ($nome === '') {
+            $nome = 'Turma';
+        }
+        $nome = mb_substr($nome, 0, 31);
+        $candidato = $nome;
+        $n = 2;
+        while (isset($usados[mb_strtolower($candidato, 'UTF-8')])) {
+            $sufixo = ' ' . $n;
+            $candidato = mb_substr($nome, 0, 31 - mb_strlen($sufixo)) . $sufixo;
+            $n++;
+        }
+        $usados[mb_strtolower($candidato, 'UTF-8')] = true;
+
+        return $candidato;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $abas
+     */
+    private function criarXlsxPlanilhaMedias(array $abas): string
+    {
+        $xml = static function ($value): string {
+            return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        };
+        $coluna = static function (int $index): string {
+            $name = '';
+            do {
+                $name = chr(65 + ($index % 26)) . $name;
+                $index = intdiv($index, 26) - 1;
+            } while ($index >= 0);
+            return $name;
+        };
+        $celulaTexto = static function (string $ref, string $value, int $style) use ($xml): string {
+            $preserve = trim($value) !== $value || strpos($value, "\n") !== false;
+            return '<c r="' . $ref . '" t="inlineStr" s="' . $style . '"><is><t'
+                . ($preserve ? ' xml:space="preserve"' : '') . '>' . $xml($value) . '</t></is></c>';
+        };
+
+        $sheetsXml = '';
+        $rels = '';
+        $overrides = '';
+        $files = [];
+        foreach (array_values($abas) as $i => $aba) {
+            $sheetId = $i + 1;
+            $siglas = is_array($aba['siglas'] ?? null) ? array_values($aba['siglas']) : [];
+            $linhas = is_array($aba['linhas'] ?? null) ? $aba['linhas'] : [];
+            $casas = max(0, min(2, (int) ($aba['casas'] ?? 1)));
+            $totalColunas = max(1, count($siglas) + 1);
+            $ultimaColuna = $coluna($totalColunas - 1);
+            $ultimaLinha = max(3, count($linhas) + 3);
+            $sheetRows = [];
+            $cabecalho = [$celulaTexto('A1', (string) ($aba['titulo_turma'] ?? 'Turma'), 1)];
+            if ($siglas !== []) {
+                $cabecalho[] = $celulaTexto('B1', 'MEDIA BIMESTRAL - PARA DIGITAR NO BOLETIM', 1);
+                for ($c = 2; $c < $totalColunas; $c++) {
+                    $cabecalho[] = $celulaTexto($coluna($c) . '1', '', 1);
+                }
+            }
+            $sheetRows[] = '<row r="1" ht="24" customHeight="1">' . implode('', $cabecalho) . '</row>';
+            $periodoCells = [$celulaTexto('A2', (string) ($aba['periodo'] ?? ''), 2)];
+            foreach ($siglas as $c => $_sigla) {
+                $periodoCells[] = $celulaTexto($coluna($c + 1) . '2', '', 3);
+            }
+            $sheetRows[] = '<row r="2" ht="20" customHeight="1">' . implode('', $periodoCells) . '</row>';
+            $titulos = [$celulaTexto('A3', 'NOME DO ALUNO', 4)];
+            foreach ($siglas as $c => $sigla) {
+                $titulos[] = $celulaTexto($coluna($c + 1) . '3', (string) $sigla, 4);
+            }
+            $sheetRows[] = '<row r="3" ht="20" customHeight="1">' . implode('', $titulos) . '</row>';
+            $estiloNota = 6 + ($casas * 2);
+            $estiloNotaVermelha = $estiloNota + 1;
+            foreach (array_values($linhas) as $indice => $linha) {
+                $excelRow = $indice + 4;
+                $cells = [$celulaTexto('A' . $excelRow, (string) ($linha['nome'] ?? ''), 5)];
+                $valores = is_array($linha['valores'] ?? null) ? $linha['valores'] : [];
+                foreach ($siglas as $c => $_sigla) {
+                    $ref = $coluna($c + 1) . $excelRow;
+                    $valor = $valores[$c] ?? null;
+                    if (is_int($valor) || is_float($valor)) {
+                        $vermelho = round((float) $valor, $casas) <= 6.0;
+                        $cells[] = '<c r="' . $ref . '" s="' . ($vermelho ? $estiloNotaVermelha : $estiloNota) . '"><v>' . (float) $valor . '</v></c>';
+                        continue;
+                    }
+                    $texto = trim((string) ($valor ?? ''));
+                    $cells[] = $celulaTexto($ref, $texto, 12);
+                }
+                $sheetRows[] = '<row r="' . $excelRow . '" ht="18" customHeight="1">' . implode('', $cells) . '</row>';
+            }
+            $merge = '';
+            if (count($siglas) > 1) {
+                $merge = '<mergeCells count="1"><mergeCell ref="B1:' . $ultimaColuna . '1"/></mergeCells>';
+            }
+            $larguraMaterias = $totalColunas > 1
+                ? '<col min="2" max="' . $totalColunas . '" width="8" customWidth="1"/>'
+                : '';
+            $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                . '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
+                . '<dimension ref="A1:' . $ultimaColuna . $ultimaLinha . '"/>'
+                . '<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+                . '<sheetFormatPr defaultRowHeight="18"/>'
+                . '<cols><col min="1" max="1" width="46" customWidth="1"/>' . $larguraMaterias . '</cols>'
+                . '<sheetData>' . implode('', $sheetRows) . '</sheetData>'
+                . $merge
+                . '<pageMargins left="0.4" right="0.4" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>'
+                . '<pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="1"/>'
+                . '</worksheet>';
+            $files['xl/worksheets/sheet' . $sheetId . '.xml'] = $sheet;
+            $sheetsXml .= '<sheet name="' . $xml((string) ($aba['nome'] ?? ('Turma ' . $sheetId))) . '" sheetId="' . $sheetId . '" r:id="rId' . $sheetId . '"/>';
+            $rels .= '<Relationship Id="rId' . $sheetId . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' . $sheetId . '.xml"/>';
+            $overrides .= '<Override PartName="/xl/worksheets/sheet' . $sheetId . '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+        }
+        $rels .= '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+
+        $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            . '<numFmts count="3">'
+            . '<numFmt numFmtId="164" formatCode="0"/>'
+            . '<numFmt numFmtId="165" formatCode="0.0"/>'
+            . '<numFmt numFmtId="166" formatCode="0.00"/>'
+            . '</numFmts>'
+            . '<fonts count="3">'
+            . '<font><sz val="11"/><name val="Calibri"/></font>'
+            . '<font><b/><sz val="11"/><name val="Calibri"/></font>'
+            . '<font><b/><color rgb="FFFF0000"/><sz val="11"/><name val="Calibri"/></font>'
+            . '</fonts>'
+            . '<fills count="3">'
+            . '<fill><patternFill patternType="none"/></fill>'
+            . '<fill><patternFill patternType="gray125"/></fill>'
+            . '<fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill>'
+            . '</fills>'
+            . '<borders count="2"><border/>'
+            . '<border><left style="medium"><color rgb="FF0000FF"/></left><right style="medium"><color rgb="FF0000FF"/></right><top style="medium"><color rgb="FF0000FF"/></top><bottom style="medium"><color rgb="FF0000FF"/></bottom><diagonal/></border>'
+            . '</borders>'
+            . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+            . '<cellXfs count="13">'
+            . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+            . '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+            . '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>'
+            . '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+            . '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="164" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="165" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="166" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+            . '</cellXfs>'
+            . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+            . '</styleSheet>';
+
+        $files = [
+            '[Content_Types].xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' . $overrides . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+            '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+            'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' . $sheetsXml . '</sheets></workbook>',
+            'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . $rels . '</Relationships>',
+            'xl/styles.xml' => $styles,
+        ] + $files;
+
+        return $this->criarZipArmazenado($files);
     }
 
     /**
@@ -2799,164 +3304,6 @@ class ReportAdminController extends AdminBaseController
         header('Content-Length: ' . strlen($conteudo));
         echo $conteudo;
         exit;
-    }
-
-    private function exportarBoletimCoordenacaoExcel(array $relatorio, bool $incluirAssinatura, string $filenameBase): void
-    {
-        $headers = ['Aluno'];
-        if ($incluirAssinatura) {
-            $headers[] = 'Assinatura';
-        }
-        $refEvento = (int) ($relatorio['regra_id'] ?? 0);
-        if ($refEvento > 0) {
-            $headers[] = 'Ref';
-        }
-        $headers[] = 'Bimestre';
-        $headers[] = 'Ano';
-        $headers[] = 'Criado em';
-        $headers[] = 'RA';
-        $headers[] = 'Turma';
-        $headers[] = 'Matéria';
-        foreach ((array) ($relatorio['columns'] ?? []) as $column) {
-            $headers[] = (string) ($column['label'] ?? 'Nota');
-        }
-        $headers[] = 'Observação da coordenação';
-
-        $bimestre = (string) ($relatorio['bimestre_rotulo'] ?? '');
-        $ano = (int) ($relatorio['ano_letivo'] ?? 0);
-        $criadoEm = (string) ($relatorio['evento_criado_em'] ?? '');
-        $rows = [];
-        foreach ((array) ($relatorio['alunos'] ?? []) as $aluno) {
-            $primeiraMateria = true;
-            foreach ((array) ($aluno['materias'] ?? []) as $materia) {
-                $row = [(string) ($aluno['nome'] ?? '')];
-                if ($incluirAssinatura) {
-                    $row[] = '';
-                }
-                if ($refEvento > 0) {
-                    $row[] = $refEvento;
-                }
-                $row[] = $bimestre;
-                $row[] = $ano > 0 ? (string) $ano : '';
-                $row[] = $criadoEm;
-                // RA deve permanecer texto para não perder zeros à esquerda.
-                $row[] = (string) ($aluno['ra'] ?? '');
-                $row[] = (string) ($aluno['turma'] ?? '');
-                $row[] = (string) ($materia['nome'] ?? '');
-                foreach ((array) ($relatorio['columns'] ?? []) as $column) {
-                    $value = $materia['notas'][$column['codigo']] ?? null;
-                    $row[] = is_numeric($value) ? (float) $value : (string) ($value ?? '');
-                }
-                $row[] = $primeiraMateria ? (string) ($aluno['observacao'] ?? '') : '';
-                $rows[] = $row;
-                $primeiraMateria = false;
-            }
-        }
-
-        $xlsx = $this->criarXlsxBoletimCoordenacao(
-            $headers,
-            $rows,
-            max(0, min(2, (int) ($relatorio['decimal_places'] ?? 1)))
-        );
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $filenameBase . '.xlsx"');
-        header('Pragma: no-cache');
-        header('Content-Length: ' . strlen($xlsx));
-        echo $xlsx;
-        exit;
-    }
-
-    /**
-     * Gera um XLSX real sem depender da extensão ZipArchive, ausente na imagem PHP
-     * atual. O pacote usa arquivos OpenXML armazenados (sem compressão) em ZIP.
-     */
-    private function criarXlsxBoletimCoordenacao(array $headers, array $rows, int $decimalPlaces): string
-    {
-        $xml = static function ($value): string {
-            return htmlspecialchars((string) $value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-        };
-        $columnName = static function (int $index): string {
-            $name = '';
-            do {
-                $name = chr(65 + ($index % 26)) . $name;
-                $index = intdiv($index, 26) - 1;
-            } while ($index >= 0);
-            return $name;
-        };
-        $cellString = static function (string $ref, string $value, int $style = 0) use ($xml): string {
-            $preserve = trim($value) !== $value || strpos($value, "\n") !== false;
-            return '<c r="' . $ref . '" t="inlineStr" s="' . $style . '"><is><t'
-                . ($preserve ? ' xml:space="preserve"' : '') . '>' . $xml($value) . '</t></is></c>';
-        };
-
-        $sheetRows = [];
-        $raColumnIndex = array_search('RA', $headers, true);
-        $headerCells = [];
-        foreach (array_values($headers) as $col => $header) {
-            $headerCells[] = $cellString($columnName($col) . '1', (string) $header, 1);
-        }
-        $sheetRows[] = '<row r="1" ht="24" customHeight="1">' . implode('', $headerCells) . '</row>';
-        foreach (array_values($rows) as $rowIndex => $row) {
-            $excelRow = $rowIndex + 2;
-            $cells = [];
-            foreach (array_values($row) as $col => $value) {
-                $ref = $columnName($col) . $excelRow;
-                if (is_int($value) || is_float($value)) {
-                    $cells[] = '<c r="' . $ref . '" s="3"><v>' . (float) $value . '</v></c>';
-                } else {
-                    $cells[] = $cellString($ref, (string) $value, $col === $raColumnIndex ? 4 : 2);
-                }
-            }
-            $sheetRows[] = '<row r="' . $excelRow . '">' . implode('', $cells) . '</row>';
-        }
-
-        $lastColumn = $columnName(max(0, count($headers) - 1));
-        $lastRow = max(1, count($rows) + 1);
-        $signatureOffset = in_array('Assinatura', $headers, true) ? 1 : 0;
-        $columnsXml = '<cols>'
-            . '<col min="1" max="1" width="30" customWidth="1"/>'
-            . ($signatureOffset ? '<col min="2" max="2" width="28" customWidth="1"/>' : '')
-            . '<col min="' . (2 + $signatureOffset) . '" max="' . (2 + $signatureOffset) . '" width="14" customWidth="1"/>'
-            . '<col min="' . (3 + $signatureOffset) . '" max="' . (3 + $signatureOffset) . '" width="18" customWidth="1"/>'
-            . '<col min="' . (4 + $signatureOffset) . '" max="' . (4 + $signatureOffset) . '" width="25" customWidth="1"/>'
-            . '<col min="' . (5 + $signatureOffset) . '" max="' . max(5 + $signatureOffset, count($headers) - 1) . '" width="15" customWidth="1"/>'
-            . '<col min="' . count($headers) . '" max="' . count($headers) . '" width="45" customWidth="1"/>'
-            . '</cols>';
-
-        $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            . '<dimension ref="A1:' . $lastColumn . $lastRow . '"/>'
-            . '<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
-            . '<sheetFormatPr defaultRowHeight="18"/>' . $columnsXml
-            . '<sheetData>' . implode('', $sheetRows) . '</sheetData>'
-            . '<autoFilter ref="A1:' . $lastColumn . $lastRow . '"/>'
-            . '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'
-            . '</worksheet>';
-
-        $numberFormat = $decimalPlaces <= 0 ? '0' : '0.' . str_repeat('0', $decimalPlaces);
-        $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            . '<numFmts count="1"><numFmt numFmtId="164" formatCode="' . $numberFormat . '"/></numFmts>'
-            . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts>'
-            . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF5B21B6"/><bgColor indexed="64"/></patternFill></fill></fills>'
-            . '<borders count="2"><border/><border><left style="thin"><color rgb="FFD1D5DB"/></left><right style="thin"><color rgb="FFD1D5DB"/></right><top style="thin"><color rgb="FFD1D5DB"/></top><bottom style="thin"><color rgb="FFD1D5DB"/></bottom><diagonal/></border></borders>'
-            . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-            . '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-            . '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
-            . '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
-            . '<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
-            . '<xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
-            . '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
-
-        $files = [
-            '[Content_Types].xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
-            '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-            'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Notas" sheetId="1" r:id="rId1"/></sheets></workbook>',
-            'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
-            'xl/worksheets/sheet1.xml' => $sheet,
-            'xl/styles.xml' => $styles,
-        ];
-        return $this->criarZipArmazenado($files);
     }
 
     /** @param array<string,string> $files */
