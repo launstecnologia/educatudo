@@ -446,15 +446,16 @@ class FechamentoAdminController extends AdminBaseController
                         $avisos[] = $alvo['nome'] . ': ' . $e->getMessage();
                         continue;
                     }
-                    $chave = ImpressaoLoteFechamentoService::chavePdf(
+                    $chave = $lote->chaveJaSalva(
                         $anoLetivo,
                         $periodoTipo,
                         $periodoNumero,
                         (int) $alvo['id'],
                         '',
-                        $documento
+                        $documento,
+                        $tenantSlug
                     );
-                    if (!$regenerar && $lote->podeReaproveitarPdf(
+                    if (!$regenerar && $chave !== '' && $lote->podeReaproveitarPdf(
                         $documento,
                         $chave,
                         $tenantSlug,
@@ -797,8 +798,8 @@ class FechamentoAdminController extends AdminBaseController
             $pdfs = [];
             if ($homologada && $slug !== '') {
                 foreach (array_keys(ImpressaoLoteFechamentoService::DOCUMENTOS) as $documento) {
-                    $chave = ImpressaoLoteFechamentoService::chavePdf($ano, $periodoTipo, $periodoNumero, $tid, '', $documento);
-                    if ($lote->pdfSalvo($chave, $slug)) {
+                    $chave = $lote->chaveJaSalva($ano, $periodoTipo, $periodoNumero, $tid, '', $documento, $slug);
+                    if ($chave !== '') {
                         $pdfs[$documento] = $chave;
                     }
                 }

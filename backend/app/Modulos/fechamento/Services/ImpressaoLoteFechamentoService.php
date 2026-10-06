@@ -201,6 +201,55 @@ class ImpressaoLoteFechamentoService
     }
 
     /**
+     * Nomes já usados para o mesmo PDF. O mais novo vem primeiro; os antigos continuam valendo.
+     *
+     * @return list<string>
+     */
+    public static function chavesPdf(
+        int $ano,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $turmaId,
+        string $serie,
+        string $documento
+    ): array {
+        $atual = self::chavePdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
+        $pasta = dirname($atual);
+        $documento = strtolower(preg_replace('/[^a-z_]/i', '', $documento) ?: 'doc');
+        $nomes = [$documento . '.pdf'];
+        if ($documento === 'historico') {
+            $nomes[] = 'historico_v2.pdf';
+        }
+        $chaves = [$atual];
+        foreach ($nomes as $nome) {
+            $chave = $pasta . '/' . $nome;
+            if (!in_array($chave, $chaves, true)) {
+                $chaves[] = $chave;
+            }
+        }
+
+        return $chaves;
+    }
+
+    public function chaveJaSalva(
+        int $ano,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $turmaId,
+        string $serie,
+        string $documento,
+        string $slug
+    ): string {
+        foreach (self::chavesPdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento) as $chave) {
+            if ($this->pdfSalvo($chave, $slug)) {
+                return $chave;
+            }
+        }
+
+        return '';
+    }
+
+    /**
      * PDF já salvo só é reaproveitado. Histórico em rascunho não conta: o clique emite o documento.
      *
      * @param array<string,mixed> $painel
@@ -663,7 +712,7 @@ class ImpressaoLoteFechamentoService
     private function htmlSemBarraDeTela(string $html): string
     {
         $limpo = preg_replace('/<div class="lote-barra">.*?<\/div>/is', '', $html);
-        $limpo = preg_replace('/<div class="lote-avisos">.*?<\/div>/is', is_string($limpo) ? $limpo : $html);
+        $limpo = preg_replace('/<div class="lote-avisos">.*?<\/div>/is', '', is_string($limpo) ? $limpo : $html);
 
         return is_string($limpo) ? $limpo : $html;
     }
