@@ -51,6 +51,13 @@ BEGIN
 
   DELETE FROM planos_aula WHERE titulo LIKE 'ET25 %';
 
+  DELETE b FROM boletins b
+  INNER JOIN boletim_regras r ON r.id = b.regra_id
+  WHERE r.codigo LIKE 'et25-%';
+
+  DELETE FROM boletins
+  WHERE ano_letivo = 2025 AND nome LIKE 'Boletim % T% 2025';
+
   DELETE FROM boletim_regras WHERE codigo LIKE 'et25-%';
 
   DELETE n FROM notas_tipo_finais n
@@ -846,6 +853,63 @@ BEGIN
     END WHILE;
     SET v_t = v_t + 1;
   END WHILE;
+
+  SET @et25_sql = IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletins' AND COLUMN_NAME = 'regra_academica_id') = 0,
+    'ALTER TABLE boletins ADD COLUMN regra_academica_id INT UNSIGNED NULL DEFAULT NULL',
+    'SELECT 1'
+  );
+  PREPARE et25_stmt FROM @et25_sql;
+  EXECUTE et25_stmt;
+  DEALLOCATE PREPARE et25_stmt;
+
+  SET @et25_sql = IF(
+    (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletim_regras' AND COLUMN_NAME = 'boletim_id') = 0,
+    'ALTER TABLE boletim_regras ADD COLUMN boletim_id INT UNSIGNED NULL DEFAULT NULL',
+    'SELECT 1'
+  );
+  PREPARE et25_stmt FROM @et25_sql;
+  EXECUTE et25_stmt;
+  DEALLOCATE PREPARE et25_stmt;
+
+  UPDATE boletim_regras
+  SET materias_ids = (
+    SELECT JSON_ARRAYAGG(m.id) FROM materias m
+    WHERE m.nome IN ('Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia')
+  )
+  WHERE codigo LIKE 'et25-%' AND exibir_em = 'boletim';
+
+  INSERT INTO boletins (
+    nome, finalidade, ano_letivo, materias_ids, series_ids, turmas_ids,
+    nota_minima_aprovacao, vis_aluno, vis_pais, vis_coordenacao, regra_id, regra_academica_id, ativo
+  )
+  SELECT r.nome, 'oficial', 2025, r.materias_ids, r.series_ids, r.turmas_ids,
+         6.00, 1, 1, 1, r.id, v_regra_acad, 1
+  FROM boletim_regras r
+  WHERE r.codigo LIKE 'et25-%' AND r.exibir_em = 'boletim'
+    AND NOT EXISTS (SELECT 1 FROM boletins b WHERE b.regra_id = r.id);
+
+  INSERT INTO boletim_regras (
+    nome, codigo, descricao_curta, formula_final, materias_ids, series_ids, turmas_ids, exibir_em,
+    ano_letivo, bimestre, nota_minima_aprovacao, usar_resultado_aprovacao,
+    vis_aluno, vis_pais, vis_coordenacao, round_mode, decimal_places,
+    default_data_inicio, default_data_fim, ativo, boletim_id
+  )
+  SELECT CONCAT('Notas ', r.nome), CONCAT(r.codigo, '-notas'), r.descricao_curta, r.formula_final,
+         r.materias_ids, r.series_ids, r.turmas_ids, 'notas',
+         r.ano_letivo, r.bimestre, r.nota_minima_aprovacao, r.usar_resultado_aprovacao,
+         r.vis_aluno, r.vis_pais, r.vis_coordenacao, r.round_mode, r.decimal_places,
+         r.default_data_inicio, r.default_data_fim, 1, b.id
+  FROM boletim_regras r
+  INNER JOIN boletins b ON b.regra_id = r.id
+  WHERE r.codigo LIKE 'et25-%' AND r.exibir_em = 'boletim'
+    AND NOT EXISTS (SELECT 1 FROM boletim_regras n WHERE n.codigo = CONCAT(r.codigo, '-notas'));
+
+  INSERT INTO boletim_componentes (regra_id, codigo, nome, source_type, calc_type, peso, blocos_ids, config_json, obrigatorio, ordem, ativo)
+  SELECT n.id, c.codigo, c.nome, c.source_type, c.calc_type, c.peso, c.blocos_ids, c.config_json, c.obrigatorio, c.ordem, c.ativo
+  FROM boletim_componentes c
+  INNER JOIN boletim_regras r ON r.id = c.regra_id AND r.codigo LIKE 'et25-%' AND r.exibir_em = 'boletim'
+  INNER JOIN boletim_regras n ON n.codigo = CONCAT(r.codigo, '-notas');
 
   INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
   SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,

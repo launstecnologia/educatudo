@@ -43,6 +43,13 @@ BEGIN
 
   DELETE FROM planos_aula WHERE titulo LIKE 'ET25 %';
 
+  DELETE b FROM boletins b
+  INNER JOIN boletim_regras r ON r.id = b.regra_id
+  WHERE r.codigo LIKE 'et25-%';
+
+  DELETE FROM boletins
+  WHERE ano_letivo = 2025 AND nome LIKE 'Boletim % T% 2025';
+
   DELETE FROM boletim_regras WHERE codigo LIKE 'et25-%';
 
   DELETE n FROM notas_tipo_finais n
