@@ -823,33 +823,65 @@ class ParentController extends BaseController
     }
 
     /**
-     * Quadro do boletim oficial (vida escolar), o mesmo da coordenação.
+     * Ficha do boletim oficial, a mesma do detalhe do aluno.
      *
-     * @return list<array<string,mixed>>
+     * @return array{quadro:?array<string,mixed>,fichas:list<array<string,mixed>>,ficha_id:int,observacao:array<string,mixed>}
      */
-    private function quadrosBoletimPortal(int $alunoId): array
+    private function boletimOficialPortal(int $alunoId, int $fichaId = 0): array
     {
+        $vazio = [
+            'quadro' => null,
+            'fichas' => [],
+            'ficha_id' => 0,
+            'observacao' => ['conteudo' => '', 'updated_at' => null],
+        ];
         if ($alunoId <= 0) {
-            return [];
+            return $vazio;
         }
         try {
             if (!class_exists('LayoutHelper', false)) {
                 require_once __DIR__ . '/../../Core/LayoutHelper.php';
             }
             if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
-                return [];
+                return $vazio;
             }
-            $path = __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
-            if (!is_file($path)) {
-                return [];
+            require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $model = $vida->model();
+            $fichas = $model->schemaPronto() ? $model->listarFichasAluno($alunoId) : [];
+            $fichaIdEscolhida = 0;
+            if ($fichaId > 0) {
+                foreach ($fichas as $ficha) {
+                    if ((int) ($ficha['id'] ?? 0) === $fichaId) {
+                        $fichaIdEscolhida = $fichaId;
+                        break;
+                    }
+                }
             }
-            require_once $path;
+            if ($fichaIdEscolhida <= 0 && $fichas !== []) {
+                $fichaIdEscolhida = (int) ($fichas[0]['id'] ?? 0);
+            }
+            $observacao = ['conteudo' => '', 'updated_at' => null];
+            try {
+                require_once __DIR__ . '/../../Models/System/BoletimConfig.php';
+                $row = (new \BoletimConfig())->getObservacaoCoordenacao($alunoId);
+                if (is_array($row)) {
+                    $observacao = $row;
+                }
+            } catch (Throwable $e) {
+                error_log('Observação do boletim aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
 
-            return (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadrosPortal($alunoId);
+            return [
+                'quadro' => $fichaIdEscolhida > 0 ? $vida->quadro($fichaIdEscolhida, true) : null,
+                'fichas' => $fichas,
+                'ficha_id' => $fichaIdEscolhida,
+                'observacao' => $observacao,
+            ];
         } catch (Throwable $e) {
             error_log('Portal de boletim aluno #' . $alunoId . ': ' . $e->getMessage());
 
-            return [];
+            return $vazio;
         }
     }
 
@@ -937,11 +969,11 @@ class ParentController extends BaseController
             $anoLetivo,
             $bimestre
         );
-        $boletinsBoletim = $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais', 'boletim');
-        $quadrosBoletimPortal = $this->quadrosBoletimPortal((int) $filho['id']);
+        $fichaIdPortal = isset($_GET['ficha_id']) ? (int) $_GET['ficha_id'] : 0;
+        $boletimOficial = $this->boletimOficialPortal((int) $filho['id'], $fichaIdPortal);
         $boletinsNotasExtra = [];
         $boletinsComplementar = [];
-        $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
+        $boletimObservacao = $boletimOficial['observacao'];
         $quadroOficial = null;
         $paineisNotas = [];
         $portalNotasOcultas = true;
@@ -988,8 +1020,9 @@ class ParentController extends BaseController
             'boletins_gerados' => $boletinsGerados,
             'boletins_gerados_notas' => $boletinsNotas,
             'boletins_gerados_notas_extra' => $boletinsNotasExtra,
-            'boletins_gerados_boletim' => $boletinsBoletim,
-            'boletim_quadros_portal' => $quadrosBoletimPortal,
+            'boletins_gerados_boletim' => [],
+            'boletim_oficial' => $boletimOficial,
+            'boletim_url_ficha' => rtrim((string) URL, '/') . '/pais/filhos/' . (int) $filho['id'] . '/notas?secao=boletim',
             'boletins_gerados_complementar' => $boletinsComplementar,
             'boletim_observacao' => $boletimObservacao,
             'quadro_oficial' => $quadroOficial,

@@ -430,13 +430,15 @@ class VidaEscolarService
      *
      * @return array<string,mixed>|null
      */
-    public function quadro(int $fichaId): ?array
+    public function quadro(int $fichaId, bool $somenteLeitura = false): ?array
     {
         $ficha = $this->model->findFicha($fichaId);
         if (!$ficha) {
             return null;
         }
-        $this->alinharFichaAoModelo($ficha);
+        if (!$somenteLeitura) {
+            $this->alinharFichaAoModelo($ficha);
+        }
         $linhas = $this->model->listarLinhas($fichaId);
         $celulas = $this->model->listarCelulas($fichaId);
         $porLinha = [];
