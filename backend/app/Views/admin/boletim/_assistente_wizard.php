@@ -703,6 +703,9 @@ $boletimWizardSteps = [
 
     function htmlBimestresPeca(key, opts) {
         var bimsPeca = normalizarBimestresPeca(opts && opts.bimestres);
+        if (!bimsPeca.length && periodoNumeroValido(estado && estado.bimestre)) {
+            bimsPeca = [Number(estado.bimestre)];
+        }
         var campo = rotuloCampoPeriodo();
         var campoMin = campo.toLocaleLowerCase('pt-BR');
         var html = '<div><span class="text-xs font-medium text-gray-600">' + esc(campo) + ' dos eventos</span>';

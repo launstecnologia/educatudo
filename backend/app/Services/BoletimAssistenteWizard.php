@@ -312,10 +312,8 @@ class BoletimAssistenteWizard
         if (($estado['round_mode'] ?? '') === '') {
             $estado['round_mode'] = (string) ($bol['round_mode'] ?? 'half');
         }
-        // Casas decimais vêm da regra de aprovação vigente, não do valor gravado no evento.
-        $estado['decimal_places'] = ((int) ($bol['decimal_places'] ?? 2) === 1) ? 1 : 2;
-        if (is_array($estado['rascunho_preservado'] ?? null)) {
-            $estado['rascunho_preservado']['decimal_places'] = $estado['decimal_places'];
+        if (!isset($estado['decimal_places']) || $estado['decimal_places'] === '' || $estado['decimal_places'] === null) {
+            $estado['decimal_places'] = ((int) ($bol['decimal_places'] ?? 2) === 1) ? 1 : 2;
         }
     }
 
@@ -598,6 +596,7 @@ class BoletimAssistenteWizard
                 $this->aplicarMateriaUnicaNasPecasOpcoes($estado);
                 $this->aplicarJornadaDoFormulario($estado, $comps);
                 $this->aplicarGrupoLinhaDoFormulario($estado, $comps);
+                $this->marcarBimestreSalvoNasPecas($estado);
                 $estado['passo'] = 'revisar';
                 $estado['rascunho_preservado'] = [
                     'modo' => ($regraIdAtual !== null && $regraIdAtual > 0) ? 'editar' : 'criar',
@@ -1777,7 +1776,6 @@ class BoletimAssistenteWizard
         $merged['fontes_faltas'] = $this->normalizarFontesBimestres($merged['fontes_faltas'] ?? []);
         $this->reidratarNomesDosComponentes($merged);
         $this->reidratarFormulasDosComponentes($merged);
-        $this->aplicarEscopoDoBoletimCadastro($merged);
         return $merged;
     }
 
@@ -3645,6 +3643,39 @@ class BoletimAssistenteWizard
      * @param array<string,mixed> $estado
      * @param list<array<string,mixed>> $comps
      */
+    /**
+     * O bimestre do evento salvo volta marcado nas peças. Sem isso, o 3º bimestre
+     * abre com a caixa desmarcada mesmo sendo a configuração gravada.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function marcarBimestreSalvoNasPecas(array &$estado): void
+    {
+        $bim = (int) ($estado['bimestre'] ?? 0);
+        if ($bim < 1 || $bim > 4) {
+            return;
+        }
+        if (!is_array($estado['pecas_opcoes'] ?? null)) {
+            $estado['pecas_opcoes'] = [];
+        }
+        foreach ($estado['pecas_opcoes'] as $key => $opts) {
+            if (!is_array($opts)) {
+                continue;
+            }
+            $bims = $this->normalizarBimestresLista($opts['bimestres'] ?? []);
+            if ($bims === []) {
+                $estado['pecas_opcoes'][$key]['bimestres'] = [$bim];
+            }
+        }
+        $jornadaBims = $this->normalizarBimestresLista($estado['jornada_bimestres'] ?? []);
+        if ($jornadaBims === [] && in_array('jornada', (array) ($estado['pecas'] ?? []), true)) {
+            $estado['jornada_bimestres'] = [$bim];
+            if (($estado['jornada_modo'] ?? '') !== 'selecionadas') {
+                $estado['jornada_modo'] = 'bimestre';
+            }
+        }
+    }
+
     private function aplicarJornadaDoFormulario(array &$estado, array $comps): void
     {
         foreach ($comps as $c) {
