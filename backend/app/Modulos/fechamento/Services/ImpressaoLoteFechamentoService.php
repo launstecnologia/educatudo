@@ -195,7 +195,9 @@ class ImpressaoLoteFechamentoService
             $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
         }
 
-        return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $documento . '.pdf';
+        $arquivo = ($documento === 'historico' ? 'historico_v3' : $documento . '_v2') . '.pdf';
+
+        return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $arquivo;
     }
 
     /**
@@ -258,7 +260,7 @@ class ImpressaoLoteFechamentoService
 
     public function chaveValida(string $chave): bool
     {
-        return preg_match('#^\d{4}/[a-z]+-\d+/(turma-\d+|serie-[a-z0-9-]+)/[a-z_]+\.pdf$#', $chave) === 1;
+        return preg_match('#^\d{4}/[a-z]+-\d+/(turma-\d+|serie-[a-z0-9-]+)/[a-z0-9_]+\.pdf$#', $chave) === 1;
     }
 
     public static function caminhoArquivo(int $jobId, string $slug): ?string
@@ -655,6 +657,17 @@ class ImpressaoLoteFechamentoService
         }
     }
 
+    /**
+     * A faixa de voltar/imprimir fica só na tela. O PDF começa no documento.
+     */
+    private function htmlSemBarraDeTela(string $html): string
+    {
+        $limpo = preg_replace('/<div class="lote-barra">.*?<\/div>/is', '', $html);
+        $limpo = preg_replace('/<div class="lote-avisos">.*?<\/div>/is', is_string($limpo) ? $limpo : $html);
+
+        return is_string($limpo) ? $limpo : $html;
+    }
+
     private function pdfDeHtml(string $html, string $orientacao): string
     {
         $autoload = dirname(__DIR__, 4) . '/vendor/autoload.php';
@@ -665,6 +678,8 @@ class ImpressaoLoteFechamentoService
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', false);
         $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('defaultMediaType', 'print');
+        $html = $this->htmlSemBarraDeTela($html);
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', $orientacao === 'landscape' ? 'landscape' : 'portrait');

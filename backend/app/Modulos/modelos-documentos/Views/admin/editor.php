@@ -225,6 +225,9 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <select id="edoc-emissao-tipo">
                     <option value="">Não vincular</option>
                     <option value="ficha_individual">Ficha individual</option>
+                    <option value="boletim">Boletim</option>
+                    <option value="ata_resultados">Ata de resultados finais</option>
+                    <option value="historico">Histórico escolar</option>
                     <option value="relatorio">Relatório final</option>
                 </select>
                 <label>Curso</label>

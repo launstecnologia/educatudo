@@ -171,9 +171,9 @@ class VidaEscolarPdfService
     public function htmlHistorico(array $dadosPdf, ?array $config): string
     {
         $this->garantirModelos();
-        $modelo = $this->modelos->findByCodigo(self::CODIGO_HISTORICO);
+        $modelo = $this->modeloHistorico($dadosPdf);
         if (!$modelo) {
-            throw new \RuntimeException('Modelo vida_escolar_historico indisponível. Cadastre-o em Layout de documentos.');
+            throw new \RuntimeException('Nenhum layout de histórico disponível. Vincule um em Layout de documentos.');
         }
         $aluno = is_array($dadosPdf['aluno'] ?? null) ? $dadosPdf['aluno'] : [];
         $unidade = is_array($dadosPdf['unidade'] ?? null) ? $dadosPdf['unidade'] : [];
@@ -199,6 +199,10 @@ class VidaEscolarPdfService
         $filiacao = trim((string) ($aluno['nome_mae'] ?? '') . ' / ' . (string) ($aluno['nome_pai'] ?? ''), ' /');
         if ($filiacao !== '') {
             $vars['resp_nome'] = htmlspecialchars($filiacao, ENT_QUOTES, 'UTF-8');
+        }
+        $serieTurma = trim((string) ($aluno['turma_serie'] ?? ''));
+        if ($serieTurma !== '') {
+            $vars['serie'] = htmlspecialchars($serieTurma, ENT_QUOTES, 'UTF-8');
         }
         $vars['historico_html'] = $this->historicoOficialHtml($dadosPdf);
         $vars['titulo'] = htmlspecialchars($tituloDoc, ENT_QUOTES, 'UTF-8');
@@ -505,10 +509,10 @@ class VidaEscolarPdfService
         $cargas = [];
         foreach ($itens as $it) {
             $ano = trim((string) ($it['ano_letivo'] ?? ''));
-            $serie = trim((string) ($it['serie_ano'] ?? ''));
+            $serie = $this->serieVisivel($dados, trim((string) ($it['serie_ano'] ?? '')));
             $chaveCol = $ano . '|' . $serie;
             if (!isset($colunas[$chaveCol])) {
-                $colunas[$chaveCol] = ['ano' => $ano, 'serie' => $serie !== '' ? $serie : 'Série'];
+                $colunas[$chaveCol] = ['ano' => $ano, 'serie' => $serie];
             }
             $comp = trim((string) ($it['componente'] ?? ''));
             if ($comp === '') {
@@ -529,35 +533,51 @@ class VidaEscolarPdfService
         });
         $resultMap = [];
         foreach ($resultados as $r) {
-            $resultMap[(string) ($r['ano_letivo'] ?? '') . '|' . (string) ($r['serie_ano'] ?? '')] = $r;
+            $anoRes = trim((string) ($r['ano_letivo'] ?? ''));
+            $serieRes = $this->serieVisivel($dados, trim((string) ($r['serie_ano'] ?? '')));
+            $resultMap[$anoRes . '|' . $serieRes] = $r;
         }
-        $borda = 'border:1px solid #111;border-collapse:collapse;width:100%;font-size:8pt;';
-        $cel = 'border:1px solid #111;padding:3px 4px;';
-        $html = '';
+        $temCarga = $cargas !== [];
+        $html = '<style>'
+            . '.hist-sec{font-size:10pt;font-weight:700;letter-spacing:.04em;color:#1e3a5f;margin:14px 0 6px;padding-bottom:2px;border-bottom:2px solid #1e3a5f;}'
+            . '.hist-quadro{width:100%;border-collapse:collapse;margin:0 0 8px;font-size:9pt;}'
+            . '.hist-quadro th{background:#1e3a5f;color:#fff;border:1px solid #1e3a5f;padding:6px 5px;text-align:center;font-size:8pt;font-weight:700;}'
+            . '.hist-quadro td{border:1px solid #cbd5e1;padding:5px 6px;}'
+            . '.hist-quadro td.comp{text-align:left;}'
+            . '.hist-quadro td.num{text-align:center;}'
+            . '.hist-quadro tr.resultado td{background:#f1f5f9;font-weight:700;}'
+            . '</style>';
         if ($colunas !== [] && $componentes !== []) {
-            $html .= '<p style="font-size:9pt;font-weight:700;margin:10px 0 4px;">COMPONENTES CURRICULARES</p>';
-            $html .= '<table style="' . $borda . '"><tr>';
-            $html .= '<td style="' . $cel . 'font-weight:700;">Componente</td>';
+            $html .= '<p class="hist-sec">COMPONENTES CURRICULARES</p>';
+            $html .= '<table class="hist-quadro"><tr><th class="comp">Componente</th>';
             foreach ($colunas as $col) {
-                $html .= '<td style="' . $cel . 'font-weight:700;text-align:center;">'
-                    . $this->esc($col['serie']) . '<br>' . $this->esc($col['ano']) . '</td>';
+                $html .= '<th>' . $this->esc($col['serie']) . '<br>' . $this->esc($col['ano']) . '</th>';
             }
-            $html .= '<td style="' . $cel . 'font-weight:700;text-align:center;">Carga horária</td></tr>';
+            if ($temCarga) {
+                $html .= '<th>Carga horária</th>';
+            }
+            $html .= '</tr>';
             foreach ($componentes as $chaveComp => $nome) {
-                $html .= '<tr><td style="' . $cel . '">' . $this->esc($nome) . '</td>';
+                $html .= '<tr><td class="comp">' . $this->esc($nome) . '</td>';
                 foreach (array_keys($colunas) as $chaveCol) {
-                    $html .= '<td style="' . $cel . 'text-align:center;">' . $this->esc($notas[$chaveComp][$chaveCol] ?? '—') . '</td>';
+                    $html .= '<td class="num">' . $this->esc($notas[$chaveComp][$chaveCol] ?? '—') . '</td>';
                 }
-                $chTotal = $cargas[$chaveComp] ?? null;
-                $html .= '<td style="' . $cel . 'text-align:center;">' . $this->esc($chTotal !== null && $chTotal > 0 ? (string) $chTotal : '—') . '</td></tr>';
+                if ($temCarga) {
+                    $chTotal = $cargas[$chaveComp] ?? null;
+                    $html .= '<td class="num">' . $this->esc($chTotal !== null && $chTotal > 0 ? (string) $chTotal : '—') . '</td>';
+                }
+                $html .= '</tr>';
             }
-            $html .= '<tr><td style="' . $cel . 'font-weight:700;">Resultado</td>';
+            $html .= '<tr class="resultado"><td class="comp">Resultado</td>';
             foreach ($colunas as $chaveCol => $col) {
                 $res = $resultMap[$chaveCol] ?? [];
                 $resLabel = (string) ($labels[$res['resultado'] ?? ''] ?? ($res['resultado'] ?? '—'));
-                $html .= '<td style="' . $cel . 'text-align:center;font-weight:700;">' . $this->esc($resLabel) . '</td>';
+                $html .= '<td class="num">' . $this->esc($resLabel) . '</td>';
             }
-            $html .= '<td style="' . $cel . '"></td></tr></table>';
+            if ($temCarga) {
+                $html .= '<td></td>';
+            }
+            $html .= '</tr></table>';
         } else {
             $html .= '<p>Sem componentes lançados neste histórico.</p>';
         }
@@ -587,25 +607,21 @@ class VidaEscolarPdfService
                 ];
             }
         }
-        $html .= '<p style="font-size:9pt;font-weight:700;margin:12px 0 4px;">ESTUDOS REALIZADOS</p>';
-        $html .= '<table style="' . $borda . '"><tr>'
-            . '<td style="' . $cel . 'font-weight:700;">Série</td>'
-            . '<td style="' . $cel . 'font-weight:700;">Ano</td>'
-            . '<td style="' . $cel . 'font-weight:700;">Estabelecimento de ensino</td>'
-            . '<td style="' . $cel . 'font-weight:700;">Município</td>'
-            . '<td style="' . $cel . 'font-weight:700;">UF</td></tr>';
+        $html .= '<p class="hist-sec">ESTUDOS REALIZADOS</p>';
+        $html .= '<table class="hist-quadro"><tr>'
+            . '<th>Série</th><th>Ano</th><th>Estabelecimento de ensino</th><th>Município</th><th>UF</th></tr>';
         if ($estudos === []) {
-            $html .= '<tr><td style="' . $cel . '" colspan="5">Nenhum ano de escolarização informado.</td></tr>';
+            $html .= '<tr><td class="comp" colspan="5">Nenhum ano de escolarização informado.</td></tr>';
         }
         foreach ($estudos as $estudo) {
             if (!is_array($estudo)) {
                 continue;
             }
-            $html .= '<tr><td style="' . $cel . '">' . $this->esc($estudo['serie_ano'] ?? '') . '</td>'
-                . '<td style="' . $cel . '">' . $this->esc($estudo['ano_letivo'] ?? '') . '</td>'
-                . '<td style="' . $cel . '">' . $this->esc($estudo['escola'] ?? '') . '</td>'
-                . '<td style="' . $cel . '">' . $this->esc($estudo['municipio'] ?? '') . '</td>'
-                . '<td style="' . $cel . '">' . $this->esc($estudo['uf'] ?? '') . '</td></tr>';
+            $html .= '<tr><td class="comp">' . $this->esc($this->serieVisivel($dados, (string) ($estudo['serie_ano'] ?? ''))) . '</td>'
+                . '<td class="num">' . $this->esc($estudo['ano_letivo'] ?? '') . '</td>'
+                . '<td class="comp">' . $this->esc($estudo['escola'] ?? '') . '</td>'
+                . '<td class="comp">' . $this->esc($estudo['municipio'] ?? '') . '</td>'
+                . '<td class="num">' . $this->esc($estudo['uf'] ?? '') . '</td></tr>';
         }
         $html .= '</table>';
 
@@ -624,6 +640,111 @@ class VidaEscolarPdfService
         }
 
         return $html;
+    }
+
+    /**
+     * Usa o layout vinculado à emissão do histórico. Sem vínculo, o modelo oficial da escola.
+     *
+     * @param array<string,mixed> $dadosPdf
+     * @return array<string,mixed>|null
+     */
+    private function modeloHistorico(array $dadosPdf): ?array
+    {
+        $aluno = is_array($dadosPdf['aluno'] ?? null) ? $dadosPdf['aluno'] : [];
+        $cursoId = 0;
+        $serieId = 0;
+        $alunoId = (int) ($aluno['id'] ?? 0);
+        if ($alunoId > 0) {
+            try {
+                $row = $this->db->fetch(
+                    'SELECT t.curso_novo_id, t.serie_id
+                     FROM alunos a
+                     INNER JOIN turmas t ON t.id = a.turma_id
+                     WHERE a.id = :id
+                     LIMIT 1',
+                    ['id' => $alunoId]
+                );
+                if (is_array($row)) {
+                    $cursoId = (int) ($row['curso_novo_id'] ?? 0);
+                    $serieId = (int) ($row['serie_id'] ?? 0);
+                }
+            } catch (\Throwable $e) {
+                $cursoId = 0;
+            }
+        }
+        $candidatos = [];
+        $vinculado = $this->modelos->codigoParaEmissao('historico', $cursoId, $serieId);
+        if (is_string($vinculado) && $vinculado !== '') {
+            $candidatos[] = $vinculado;
+        }
+        try {
+            require_once dirname(__DIR__, 3) . '/Models/Education/ResultadoAcademico.php';
+            $candidatos[] = (new \ResultadoAcademico())->getLayoutCodigo('historico');
+        } catch (\Throwable $e) {
+            $candidatos[] = '';
+        }
+        $candidatos[] = self::CODIGO_HISTORICO;
+        foreach ($candidatos as $codigo) {
+            $codigo = trim((string) $codigo);
+            if ($codigo === '') {
+                continue;
+            }
+            $modelo = $this->modelos->findByCodigo($codigo);
+            if (is_array($modelo) && $this->modeloTemQuadroHistorico($modelo)) {
+                return $modelo;
+            }
+        }
+
+        return $this->modelos->findByCodigo(self::CODIGO_HISTORICO);
+    }
+
+    /**
+     * @param array<string,mixed> $modelo
+     */
+    private function modeloTemQuadroHistorico(array $modelo): bool
+    {
+        $bruto = (string) ($modelo['corpo_html'] ?? '') . (string) ($modelo['estrutura_json'] ?? '');
+
+        return str_contains($bruto, 'historico_html') || str_contains($bruto, '"type":"historico"');
+    }
+
+    /**
+     * @param array<string,mixed> $dados
+     */
+    private function serieVisivel(array $dados, string $serie): string
+    {
+        $serie = trim($serie);
+        if ($serie !== '' && $serie !== 'Série não informada') {
+            return $serie;
+        }
+        $aluno = is_array($dados['aluno'] ?? null) ? $dados['aluno'] : [];
+        $daTurma = trim((string) ($aluno['turma_serie'] ?? ''));
+        if ($daTurma === '') {
+            $daTurma = $this->serieDaTurma((int) ($aluno['id'] ?? 0));
+        }
+
+        return $daTurma !== '' ? $daTurma : 'Série';
+    }
+
+    private function serieDaTurma(int $alunoId): string
+    {
+        if ($alunoId <= 0) {
+            return '';
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT t.serie
+                 FROM alunos a
+                 INNER JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.id = :id
+                 LIMIT 1',
+                ['id' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return is_array($row) ? trim((string) ($row['serie'] ?? '')) : '';
     }
 
     private function notaHistorico($valor): string

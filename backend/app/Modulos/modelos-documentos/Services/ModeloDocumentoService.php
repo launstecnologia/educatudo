@@ -1724,7 +1724,7 @@ class ModeloDocumentoService
             return null;
         }
         $tipo = (string) ($emissao['tipo'] ?? '');
-        if (!in_array($tipo, ['ficha_individual', 'relatorio'], true)) {
+        if (!in_array($tipo, ['ficha_individual', 'relatorio', 'boletim', 'ata_resultados', 'historico'], true)) {
             return null;
         }
         return [
@@ -1992,7 +1992,7 @@ class ModeloDocumentoService
     public function codigoParaEmissao(string $tipo, int $cursoId, int $serieId): ?string
     {
         $chave = str_starts_with($tipo, 'relatorio_') ? 'relatorio' : $tipo;
-        if (!in_array($chave, ['ficha_individual', 'relatorio'], true) || !$this->temColuna('estrutura_json')) {
+        if (!in_array($chave, ['ficha_individual', 'relatorio', 'boletim', 'ata_resultados', 'historico'], true) || !$this->temColuna('estrutura_json')) {
             return null;
         }
         $rows = $this->db->fetchAll(

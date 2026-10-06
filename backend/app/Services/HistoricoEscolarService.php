@@ -1143,6 +1143,27 @@ class HistoricoEscolarService
         return $this->cacheEscolarizacao;
     }
 
+    private function serieDaTurmaAtual(int $alunoId): string
+    {
+        if ($alunoId <= 0) {
+            return '';
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT t.serie
+                 FROM alunos a
+                 INNER JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.id = :id
+                 LIMIT 1',
+                ['id' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return is_array($row) ? trim((string) ($row['serie'] ?? '')) : '';
+    }
+
     private function serieDoAno(int $alunoId, string $ano, string $serie): string
     {
         $serie = trim($serie);
@@ -1159,7 +1180,9 @@ class HistoricoEscolarService
             }
         }
 
-        return $serie !== '' ? $serie : 'Série não informada';
+        $daTurma = $this->serieDaTurmaAtual($alunoId);
+
+        return $daTurma !== '' ? $daTurma : ($serie !== '' ? $serie : 'Série não informada');
     }
 
     /**
