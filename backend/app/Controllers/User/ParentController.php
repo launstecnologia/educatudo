@@ -823,6 +823,37 @@ class ParentController extends BaseController
     }
 
     /**
+     * Quadro do boletim oficial (vida escolar), o mesmo da coordenação.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function quadrosBoletimPortal(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once __DIR__ . '/../../Core/LayoutHelper.php';
+            }
+            if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return [];
+            }
+            $path = __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            if (!is_file($path)) {
+                return [];
+            }
+            require_once $path;
+
+            return (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadrosPortal($alunoId);
+        } catch (Throwable $e) {
+            error_log('Portal de boletim aluno #' . $alunoId . ': ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
      * @param list<array<string,mixed>> $eventos
      * @return list<array<string,mixed>>
      */
@@ -907,6 +938,7 @@ class ParentController extends BaseController
             $bimestre
         );
         $boletinsBoletim = $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais', 'boletim');
+        $quadrosBoletimPortal = $this->quadrosBoletimPortal((int) $filho['id']);
         $boletinsNotasExtra = [];
         $boletinsComplementar = [];
         $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
@@ -957,6 +989,7 @@ class ParentController extends BaseController
             'boletins_gerados_notas' => $boletinsNotas,
             'boletins_gerados_notas_extra' => $boletinsNotasExtra,
             'boletins_gerados_boletim' => $boletinsBoletim,
+            'boletim_quadros_portal' => $quadrosBoletimPortal,
             'boletins_gerados_complementar' => $boletinsComplementar,
             'boletim_observacao' => $boletimObservacao,
             'quadro_oficial' => $quadroOficial,

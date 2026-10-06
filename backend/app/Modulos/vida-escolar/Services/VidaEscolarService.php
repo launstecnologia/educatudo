@@ -70,6 +70,96 @@ class VidaEscolarService
         return $this->quadro((int) $fichas[0]['id']);
     }
 
+    /**
+     * Boletim oficial da vida escolar, no mesmo quadro da coordenação, para consulta.
+     *
+     * @return list<array{titulo:string,colunas:list<array{codigo:string,label:string}>,linhas:list<array{materia:string,notas:array<string,mixed>}>}>
+     */
+    public function quadrosPortal(int $alunoId): array
+    {
+        if ($alunoId <= 0 || !$this->model->schemaPronto()) {
+            return [];
+        }
+        $pathPeriodo = dirname(__DIR__, 3) . '/Core/PeriodoLetivo.php';
+        if (is_file($pathPeriodo) && !class_exists('PeriodoLetivo', false)) {
+            require_once $pathPeriodo;
+        }
+        $saida = [];
+        foreach ($this->model->listarFichasAluno($alunoId) as $ficha) {
+            if (!is_array($ficha)) {
+                continue;
+            }
+            $fichaId = (int) ($ficha['id'] ?? 0);
+            if ($fichaId <= 0) {
+                continue;
+            }
+            $quadro = $this->quadro($fichaId);
+            if (!is_array($quadro)) {
+                continue;
+            }
+            $ano = (int) ($ficha['ano_letivo'] ?? 0);
+            $info = class_exists('PeriodoLetivo', false)
+                ? PeriodoLetivo::doAno($ano > 0 ? $ano : (int) date('Y'))
+                : ['quantidade' => 4, 'rotulos' => [1 => '1º Bimestre', 2 => '2º Bimestre', 3 => '3º Bimestre', 4 => '4º Bimestre']];
+            $quantidade = max(1, (int) ($info['quantidade'] ?? 4));
+            $rotulos = is_array($info['rotulos'] ?? null) ? $info['rotulos'] : [];
+            $linhas = [];
+            $periodosComDado = [];
+            foreach ((array) ($quadro['grid'] ?? []) as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $celulas = is_array($row['celulas'] ?? null) ? $row['celulas'] : [];
+                $notas = [];
+                for ($periodo = 1; $periodo <= $quantidade; $periodo++) {
+                    $cel = is_array($celulas[$periodo] ?? null) ? $celulas[$periodo] : [];
+                    $nota = $cel['nota'] ?? null;
+                    if ($nota === null || $nota === '') {
+                        $nota = $cel['conceito'] ?? null;
+                    }
+                    $faltas = $cel['faltas'] ?? null;
+                    $notas['n' . $periodo] = is_numeric($nota) ? (float) $nota : (is_string($nota) && trim($nota) !== '' ? trim($nota) : null);
+                    $notas['f' . $periodo] = is_numeric($faltas) ? (int) $faltas : null;
+                    if ($notas['n' . $periodo] !== null || $notas['f' . $periodo] !== null) {
+                        $periodosComDado[$periodo] = true;
+                    }
+                }
+                $nome = trim((string) ($row['linha']['componente_nome'] ?? ''));
+                $linhas[] = [
+                    'materia' => $nome !== '' ? $nome : 'Sem matéria',
+                    'notas' => $notas,
+                ];
+            }
+            if ($linhas === [] || $periodosComDado === []) {
+                continue;
+            }
+            $colunas = [];
+            $unico = count($periodosComDado) === 1;
+            foreach (array_keys($periodosComDado) as $periodo) {
+                $colunas[] = [
+                    'codigo' => 'n' . $periodo,
+                    'label' => (string) ($rotulos[$periodo] ?? ($periodo . 'º')),
+                ];
+                $colunas[] = [
+                    'codigo' => 'f' . $periodo,
+                    'label' => $unico ? 'Faltas' : ('Faltas ' . $periodo . 'º'),
+                ];
+            }
+            $turma = trim((string) ($ficha['turma_nome'] ?? ''));
+            $titulo = 'Boletim' . ($ano > 0 ? ' ' . $ano : '');
+            if ($turma !== '') {
+                $titulo .= ' · ' . $turma;
+            }
+            $saida[] = [
+                'titulo' => $titulo,
+                'colunas' => $colunas,
+                'linhas' => $linhas,
+            ];
+        }
+
+        return $saida;
+    }
+
     public static function aoVincularTurma(int $alunoId, int $turmaId, int $anoLetivo): void
     {
         try {

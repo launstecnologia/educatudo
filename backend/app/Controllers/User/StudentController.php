@@ -1485,6 +1485,37 @@ if (!class_exists('StudentController')) {
         }
     }
 
+    /**
+     * Quadro do boletim oficial (vida escolar), o mesmo da coordenação.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function quadrosBoletimPortal(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        try {
+            if (!class_exists('LayoutHelper', false)) {
+                require_once __DIR__ . '/../../Core/LayoutHelper.php';
+            }
+            if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return [];
+            }
+            $path = __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+            if (!is_file($path)) {
+                return [];
+            }
+            require_once $path;
+
+            return (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->quadrosPortal($alunoId);
+        } catch (Throwable $e) {
+            error_log('Portal de boletim aluno #' . $alunoId . ': ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
     public function notasBoletins()
     {
         $user = $this->authManager->getUser();
@@ -1509,6 +1540,7 @@ if (!class_exists('StudentController')) {
         }
         $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'notas');
         $boletinsPortalBoletim = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'boletim');
+        $quadrosBoletimPortal = $this->quadrosBoletimPortal((int) $aluno['id']);
 
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
@@ -1525,6 +1557,7 @@ if (!class_exists('StudentController')) {
             'boletins_gerados_notas' => $boletinsPortalNotas,
             'boletins_gerados_notas_extra' => [],
             'boletins_gerados_boletim' => $boletinsPortalBoletim,
+            'boletim_quadros_portal' => $quadrosBoletimPortal,
             'boletins_gerados_complementar' => [],
             'boletim_observacao' => ['conteudo' => '', 'updated_at' => null],
             'quadro_oficial' => null,
