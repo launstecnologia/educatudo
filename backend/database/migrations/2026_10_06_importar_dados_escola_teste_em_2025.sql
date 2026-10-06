@@ -903,7 +903,7 @@ BEGIN
     rec DECIMAL(6,2) NULL,
     media_antes DECIMAL(8,2) NULL,
     media_final DECIMAL(8,2) NULL,
-    KEY idx_et25_media (aluno_id, periodo),
+    PRIMARY KEY (aluno_id, turma_id, materia_id, periodo),
     KEY idx_et25_media_turma (turma_id, periodo)
   ) ENGINE=InnoDB;
 
@@ -959,7 +959,7 @@ BEGIN
     periodo TINYINT NOT NULL,
     aulas INT NOT NULL,
     presencas INT NOT NULL,
-    KEY idx_et25_freq (aluno_id, turma_id, periodo)
+    PRIMARY KEY (aluno_id, turma_id, periodo)
   ) ENGINE=InnoDB;
 
   INSERT INTO et25_tmp_freq (aluno_id, turma_id, periodo, aulas, presencas)
