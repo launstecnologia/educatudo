@@ -785,6 +785,68 @@ class ParentController extends BaseController
         $this->redirect('/pais/filhos/' . (int) $id . '/notas');
     }
 
+    /**
+     * Notas e boletim liberados para o responsável (vis_pais).
+     *
+     * @return array{0:list<array<string,mixed>>,1:list<array<string,mixed>>}
+     */
+    private function boletinsVisiveisNoPortal(int $alunoId, string $perfil): array
+    {
+        $notas = [];
+        $boletim = [];
+        if ($alunoId <= 0) {
+            return [$notas, $boletim];
+        }
+        try {
+            $path = __DIR__ . '/../../Models/System/BoletimConfig.php';
+            if (!is_file($path)) {
+                return [$notas, $boletim];
+            }
+            require_once $path;
+            $cfg = new \BoletimConfig();
+            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, null) as $ev) {
+                if (!is_array($ev)) {
+                    continue;
+                }
+                $exibir = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
+                if ($exibir === 'notas') {
+                    $notas[] = $ev;
+                } else {
+                    $boletim[] = $ev;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('Portal de notas (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
+        }
+
+        return [$notas, $boletim];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $eventos
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarBoletinsPortalPorPeriodo(array $eventos, ?int $anoLetivo, ?int $bimestre): array
+    {
+        if ($anoLetivo === null && $bimestre === null) {
+            return $eventos;
+        }
+
+        return array_values(array_filter($eventos, static function ($ev) use ($anoLetivo, $bimestre): bool {
+            if (!is_array($ev)) {
+                return false;
+            }
+            if ($anoLetivo !== null && (int) ($ev['ano_letivo'] ?? 0) !== $anoLetivo) {
+                return false;
+            }
+            if ($bimestre !== null && (int) ($ev['bimestre'] ?? 0) !== $bimestre) {
+                return false;
+            }
+
+            return true;
+        }));
+    }
+
     public function notasFilho($id)
     {
         $user = $this->auth->getUser();
@@ -795,7 +857,6 @@ class ParentController extends BaseController
             $this->redirect('/pais/filhos');
         }
 
-        // Boletim e notas não entram no acesso dos pais. A rota só exibe provas.
         $secao = 'provas';
         $anoLetivo = isset($_GET['ano_letivo']) && $_GET['ano_letivo'] !== '' ? (int) $_GET['ano_letivo'] : null;
         $bimestre = isset($_GET['bimestre']) && $_GET['bimestre'] !== '' ? (int) $_GET['bimestre'] : null;
@@ -837,13 +898,13 @@ class ParentController extends BaseController
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
 
-        // Boletim, quadro oficial e notas de eventos não são carregados para o responsável.
         $notasLancamentoEventos = [];
         $notasLancamentoEventosBase = [];
         $boletinsGerados = [];
-        $boletinsNotas = [];
+        [$boletinsNotas, $boletinsBoletim] = $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais');
+        $boletinsNotas = $this->filtrarBoletinsPortalPorPeriodo($boletinsNotas, $anoLetivo, $bimestre);
+        $boletinsBoletim = $this->filtrarBoletinsPortalPorPeriodo($boletinsBoletim, $anoLetivo, $bimestre);
         $boletinsNotasExtra = [];
-        $boletinsBoletim = [];
         $boletinsComplementar = [];
         $boletimObservacao = ['conteudo' => '', 'updated_at' => null];
         $quadroOficial = null;

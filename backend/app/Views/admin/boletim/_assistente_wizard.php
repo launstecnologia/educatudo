@@ -446,6 +446,7 @@ $boletimWizardSteps = [
             }
             if (gl.nome) linha.label = gl.nome;
             if (gl.aplicar_em === 'ambos' || gl.aplicar_em === 'boletim') linha.aplicar_em = gl.aplicar_em;
+            linha.ocultar_filhas = !!gl.exemplo_sem_filhas;
             c.config.group_line = linha;
         });
         return r;
@@ -4821,7 +4822,7 @@ $boletimWizardSteps = [
                 var nomeExemploArea = String(gl.nome || '').trim() || 'Língua Portuguesa';
                 html += '<label class="ml-6 inline-flex items-start gap-2 text-sm text-gray-800">';
                 html += '<input type="checkbox" id="bw-grupo-exemplo-sem-filhas" class="mt-0.5 rounded border-gray-300 text-indigo-600"' + (gl.exemplo_sem_filhas ? ' checked' : '') + '>';
-                html += '<span>Se quiser, exibir o exemplo de <strong>' + esc(nomeExemploArea) + '</strong> sem as matérias agrupadas.</span></label>';
+                html += '<span>Exibir só <strong>' + esc(nomeExemploArea) + '</strong>, sem as matérias filhas. Vale no detalhe do aluno, no PDF, nas notas geradas e no acesso de pais e alunos.</span></label>';
                 if (gl.exemplo_sem_filhas) {
                     html += '<div id="bw-preview-wrap" class="ml-6"></div>';
                 }

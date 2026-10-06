@@ -1448,6 +1448,43 @@ if (!class_exists('StudentController')) {
         $this->viewWithLayout('student', 'student/desempenho-provas', $data);
     }
 
+    /**
+     * Notas e boletim liberados para o aluno (vis_aluno). Filhas ocultas saem na leitura.
+     *
+     * @return array{0:list<array<string,mixed>>,1:list<array<string,mixed>>}
+     */
+    private function boletinsVisiveisNoPortal(int $alunoId, string $perfil): array
+    {
+        $notas = [];
+        $boletim = [];
+        if ($alunoId <= 0) {
+            return [$notas, $boletim];
+        }
+        try {
+            $path = __DIR__ . '/../../Models/System/BoletimConfig.php';
+            if (!is_file($path)) {
+                return [$notas, $boletim];
+            }
+            require_once $path;
+            $cfg = new \BoletimConfig();
+            foreach ($cfg->getGeneratedBoletinsByAluno($alunoId, $perfil, null) as $ev) {
+                if (!is_array($ev)) {
+                    continue;
+                }
+                $exibir = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
+                if ($exibir === 'notas') {
+                    $notas[] = $ev;
+                } else {
+                    $boletim[] = $ev;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('Portal de notas (' . $perfil . ') aluno #' . $alunoId . ': ' . $e->getMessage());
+        }
+
+        return [$notas, $boletim];
+    }
+
     public function notasBoletins()
     {
         $user = $this->authManager->getUser();
@@ -1459,7 +1496,6 @@ if (!class_exists('StudentController')) {
             $this->redirect('/logout');
         }
 
-        // Boletim e notas não entram no acesso do aluno. A rota só exibe provas.
         try {
             $provasRealizadas = $this->getProvasRealizadasAlunoComBloco((int) $aluno['id']);
         } catch (\Throwable $e) {
@@ -1471,6 +1507,7 @@ if (!class_exists('StudentController')) {
         } catch (\Throwable $e) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
+        [$boletinsPortalNotas, $boletinsPortalBoletim] = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno');
 
         require_once __DIR__ . '/../../Core/LayoutHelper.php';
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
@@ -1484,9 +1521,9 @@ if (!class_exists('StudentController')) {
             'provas_matriz_blocos' => $provasMatrizBlocos,
             'notas_lancamento_eventos' => [],
             'boletins_gerados' => [],
-            'boletins_gerados_notas' => [],
+            'boletins_gerados_notas' => $boletinsPortalNotas,
             'boletins_gerados_notas_extra' => [],
-            'boletins_gerados_boletim' => [],
+            'boletins_gerados_boletim' => $boletinsPortalBoletim,
             'boletins_gerados_complementar' => [],
             'boletim_observacao' => ['conteudo' => '', 'updated_at' => null],
             'quadro_oficial' => null,

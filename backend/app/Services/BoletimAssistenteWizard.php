@@ -4929,6 +4929,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $ids,
             'aplicar_em' => $aplicarEm,
             'arredondamento' => $g['arredondamento'] ?? 'todos',
+            'ocultar_filhas' => !empty($g['exemplo_sem_filhas']),
         ];
         if ($g['agrupamento_id'] > 0) {
             $out['agrupamento_id'] = $g['agrupamento_id'];
@@ -5111,6 +5112,7 @@ class BoletimAssistenteWizard
                     'arredondamento' => in_array(strtolower((string) ($gl['arredondamento'] ?? 'todos')), ['filhas', 'mae'], true)
                         ? strtolower((string) $gl['arredondamento'])
                         : 'todos',
+                    'exemplo_sem_filhas' => !empty($gl['ocultar_filhas']) || !empty($gl['exemplo_sem_filhas']),
                 ];
                 return;
             }
@@ -5157,6 +5159,7 @@ class BoletimAssistenteWizard
                 'arredondamento' => in_array(strtolower((string) ($gl['arredondamento'] ?? 'todos')), ['filhas', 'mae'], true)
                     ? strtolower((string) $gl['arredondamento'])
                     : 'todos',
+                'exemplo_sem_filhas' => !empty($gl['ocultar_filhas']) || !empty($gl['exemplo_sem_filhas']),
             ];
             return;
         }

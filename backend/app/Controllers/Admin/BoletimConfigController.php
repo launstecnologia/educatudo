@@ -6813,6 +6813,9 @@ class BoletimConfigController extends BaseController
                 if ($arredJa !== 'todos') {
                     $grupos[$gkMesmaArea]['arredondamento'] = $arredJa;
                 }
+                if (!empty($grp['ocultar_filhas'])) {
+                    $grupos[$gkMesmaArea]['ocultar_filhas'] = true;
+                }
                 continue;
             }
             $modoGrupo = strtolower(trim((string) ($grp['modo_padrao'] ?? '')));
@@ -6828,6 +6831,7 @@ class BoletimConfigController extends BaseController
                 'rotulo_ids' => $rotuloIds,
                 'agrupamento_id' => $agId,
                 'arredondamento' => $this->normalizarArredondamentoGrupo($grp['arredondamento'] ?? 'todos'),
+                'ocultar_filhas' => !empty($grp['ocultar_filhas']),
             ];
         }
         if ($grupos === []) {
@@ -6991,9 +6995,13 @@ class BoletimConfigController extends BaseController
                 'grupo_key' => $g['key'],
                 'grupo_filhos_qtd' => count($filhosLinhas),
             ];
+            $linhasGrupo = [$pai];
+            if (empty($g['ocultar_filhas'])) {
+                $linhasGrupo = array_merge($linhasGrupo, $filhosLinhas);
+            }
             $blocos[] = [
                 'sort' => $g['label_key'] !== '' ? $g['label_key'] : 'grupo',
-                'linhas' => array_merge([$pai], $filhosLinhas),
+                'linhas' => $linhasGrupo,
             ];
         }
 
@@ -10496,6 +10504,7 @@ class BoletimConfigController extends BaseController
                 ? 'nota_unica_todas_linhas'
                 : 'por_materia',
             'agrupamento_id' => $agrupamentoId > 0 ? $agrupamentoId : 0,
+            'ocultar_filhas' => !empty($grp['ocultar_filhas']) || !empty($grp['exemplo_sem_filhas']),
         ];
     }
 
@@ -11825,6 +11834,7 @@ class BoletimConfigController extends BaseController
         if ($agrupamentoId > 0) {
             $out['agrupamento_id'] = $agrupamentoId;
         }
+        $out['ocultar_filhas'] = !empty($grp['ocultar_filhas']) || !empty($grp['exemplo_sem_filhas']);
         return $out;
     }
 

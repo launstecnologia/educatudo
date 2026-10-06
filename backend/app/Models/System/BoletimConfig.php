@@ -25,6 +25,8 @@ class BoletimConfig
     private array $tabelaExisteCache = [];
     /** @var array<int, list<array{id:int,versao:int,created_at:string}>> */
     private array $configVersoesCasarCache = [];
+    /** @var array<int, array{ids:array<int,true>,labels:array<string,true>}> */
+    private array $filhasOcultasCache = [];
 
     public function __construct()
     {
@@ -433,6 +435,7 @@ class BoletimConfig
                 g.preview,
                 g.data_inicio,
                 g.data_fim,
+                g.materia_id,
                 g.materia_nome,
                 g.ordem_linha,
                 g.colunas_json,
@@ -494,9 +497,16 @@ class BoletimConfig
             $notasRaw = trim((string) ($r['notas_json'] ?? ''));
             $decNotas = $notasRaw !== '' ? json_decode($notasRaw, true) : [];
             $boletins[$chave]['linhas'][] = [
+                'materia_id' => (int) ($r['materia_id'] ?? 0),
                 'materia' => (string) ($r['materia_nome'] ?? 'Sem matéria'),
                 'notas' => is_array($decNotas) ? $decNotas : [],
             ];
+        }
+        foreach ($boletins as $chaveBol => $bol) {
+            $boletins[$chaveBol]['linhas'] = $this->filtrarLinhasSemFilhasOcultas(
+                (int) ($bol['regra_id'] ?? 0),
+                is_array($bol['linhas'] ?? null) ? $bol['linhas'] : []
+            );
         }
 
         return [
@@ -604,6 +614,7 @@ class BoletimConfig
                 'notas' => is_array($decNotas) ? $decNotas : [],
             ];
         }
+        $evento['linhas'] = $this->filtrarLinhasSemFilhasOcultas($regraId, $evento['linhas']);
         return $evento;
     }
 
@@ -3180,6 +3191,12 @@ class BoletimConfig
                 'notas' => is_array($decNotas) ? $decNotas : [],
             ];
         }
+        foreach ($eventos as $kEvento => $eventoFiltro) {
+            $eventos[$kEvento]['linhas'] = $this->filtrarLinhasSemFilhasOcultas(
+                (int) ($eventoFiltro['regra_id'] ?? 0),
+                is_array($eventoFiltro['linhas'] ?? null) ? $eventoFiltro['linhas'] : []
+            );
+        }
 
         $maisRecentes = [];
         foreach (array_values($eventos) as $evento) {
@@ -3226,6 +3243,124 @@ class BoletimConfig
         $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
 
         return is_array($decoded) && !empty($decoded['oculto_lista_avaliacoes']);
+    }
+
+    /**
+     * Matérias filhas que não devem aparecer quando o evento pede só a linha-mãe.
+     *
+     * @return array{ids:array<int,true>,labels:array<string,true>}
+     */
+    private function filhasOcultasDaRegra(int $regraId): array
+    {
+        if ($regraId <= 0) {
+            return ['ids' => [], 'labels' => []];
+        }
+        if (isset($this->filhasOcultasCache[$regraId])) {
+            return $this->filhasOcultasCache[$regraId];
+        }
+        $ids = [];
+        $labels = [];
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT config_json FROM boletim_componentes WHERE regra_id = :rid AND ativo = 1',
+                ['rid' => $regraId]
+            ) ?: [];
+        } catch (Throwable $e) {
+            $this->filhasOcultasCache[$regraId] = ['ids' => [], 'labels' => []];
+
+            return $this->filhasOcultasCache[$regraId];
+        }
+        foreach ($rows as $row) {
+            $cfg = json_decode((string) ($row['config_json'] ?? ''), true);
+            if (!is_array($cfg)) {
+                continue;
+            }
+            $gl = $cfg['group_line'] ?? null;
+            if (!is_array($gl) || empty($gl['enabled'])) {
+                continue;
+            }
+            if (empty($gl['ocultar_filhas']) && empty($gl['exemplo_sem_filhas'])) {
+                continue;
+            }
+            $label = $this->chaveNomeMateria((string) ($gl['label'] ?? ''));
+            if ($label !== '') {
+                $labels[$label] = true;
+            }
+            foreach ((array) ($gl['materias_ids'] ?? []) as $mid) {
+                $mid = (int) $mid;
+                if ($mid > 0) {
+                    $ids[$mid] = true;
+                }
+            }
+        }
+        $this->filhasOcultasCache[$regraId] = ['ids' => $ids, 'labels' => $labels];
+
+        return $this->filhasOcultasCache[$regraId];
+    }
+
+    /**
+     * Tira as filhas do quadro já gravado quando a linha-mãe está presente.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarLinhasSemFilhasOcultas(int $regraId, array $linhas): array
+    {
+        if ($linhas === []) {
+            return [];
+        }
+        $cfg = $this->filhasOcultasDaRegra($regraId);
+        $ocultas = $cfg['ids'];
+        $labels = $cfg['labels'];
+        if ($ocultas === [] || $labels === []) {
+            return $linhas;
+        }
+        $temMae = false;
+        foreach ($linhas as $lin) {
+            if (!is_array($lin)) {
+                continue;
+            }
+            if ((int) ($lin['materia_id'] ?? 0) > 0) {
+                continue;
+            }
+            $nome = $this->chaveNomeMateria((string) ($lin['materia_nome'] ?? $lin['materia'] ?? ''));
+            if ($nome !== '' && isset($labels[$nome])) {
+                $temMae = true;
+                break;
+            }
+        }
+        if (!$temMae) {
+            return $linhas;
+        }
+        $out = [];
+        foreach ($linhas as $lin) {
+            if (!is_array($lin)) {
+                continue;
+            }
+            $mid = (int) ($lin['materia_id'] ?? 0);
+            if ($mid > 0 && isset($ocultas[$mid])) {
+                continue;
+            }
+            $out[] = $lin;
+        }
+
+        return $out;
+    }
+
+    private function chaveNomeMateria(string $nome): string
+    {
+        $nome = mb_strtolower(trim($nome), 'UTF-8');
+        if ($nome === '') {
+            return '';
+        }
+        $map = [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ü' => 'u', 'ç' => 'c',
+        ];
+
+        return strtr($nome, $map);
     }
 
     public function getGeneratedBoletimByAlunoAndRegra(int $alunoId, int $regraId): ?array
@@ -3302,6 +3437,7 @@ class BoletimConfig
                 'notas' => is_array($decNotas) ? $decNotas : [],
             ];
         }
+        $ev['linhas'] = $this->filtrarLinhasSemFilhasOcultas($regraId, $ev['linhas']);
 
         return $ev;
     }
