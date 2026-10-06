@@ -18,6 +18,7 @@ if ($alunoIdPortal <= 0 && is_array($filho ?? null)) {
 $student = ['id' => $alunoIdPortal];
 $aluno_id = $alunoIdPortal;
 $notas_mensagem_vazia = 'Nenhuma nota disponível.';
+$ocultar_ref_notas = true;
 $boletim_eventos_notas = [];
 $vistosPortalNotas = [];
 $idsListaPortal = static function ($raw): array {

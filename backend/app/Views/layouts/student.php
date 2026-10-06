@@ -908,7 +908,7 @@
                             </svg>
                             <span class="sidebar-text text-sm">Notas</span>
                         </a>
-                        <a href="<?= $provasEnabled ? URL . '/notas-boletins' : '#' ?>"
+                        <a href="<?= $provasEnabled ? URL . '/notas-boletins#provas' : '#' ?>"
                            onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Provas\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'notas_boletins' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$provasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
                             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

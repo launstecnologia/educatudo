@@ -90,7 +90,7 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 </svg>
                 <span class="sidebar-text">Notas</span>
             </a>
-            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/notas" class="flex items-center px-4 py-3 text-white/90 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 sidebar-nav-item">
+            <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/notas?secao=provas" class="flex items-center px-4 py-3 text-white/90 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z"></path>
                 </svg>

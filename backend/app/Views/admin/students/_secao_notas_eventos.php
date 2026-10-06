@@ -553,6 +553,7 @@ $notasMensagemVazia = trim((string) ($notas_mensagem_vazia ?? ''));
 if ($notasMensagemVazia === '') {
     $notasMensagemVazia = 'Nenhuma nota visível para coordenação.';
 }
+$ocultarRefNotas = !empty($ocultar_ref_notas);
 ?>
 <?php if ($linhasPeriodo === []): ?>
     <div class="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
@@ -564,7 +565,9 @@ if ($notasMensagemVazia === '') {
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <?php if (!$ocultarRefNotas): ?>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref</th>
+                        <?php endif; ?>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano letivo</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><?= $esc($cabPeriodo) ?></th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
@@ -583,7 +586,9 @@ if ($notasMensagemVazia === '') {
                             : ($anoP > 0 && $bimP > 0 ? PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
                         ?>
                         <tr class="hover:bg-gray-50">
+                            <?php if (!$ocultarRefNotas): ?>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $refP > 0 ? $refP : '—' ?></td>
+                            <?php endif; ?>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $anoP > 0 ? $anoP : '—' ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800"><?= $esc($celulaPeriodo($anoP, $bimP, $cabPeriodo)) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-800"><?= $esc($descricao !== '' ? $descricao : '—') ?></td>
