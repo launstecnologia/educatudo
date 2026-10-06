@@ -48,7 +48,7 @@ $secretariaNavOpen = in_array($cur, [
     'vida_escolar', 'vida_escolar_oficios', 'almoxarifado', 'patrimonio',
 ], true) || $curMovimentacao;
 $paineisOpen = in_array($cur, [
-    'paineis', 'dashboard', 'saude_academica', 'relatorios', 'reports_boletim_coordenacao',
+    'paineis', 'dashboard', 'saude_academica', 'relatorios', 'reports_boletim_coordenacao', 'paineis_documentos',
 ], true);
 $gestaoOpen = $secretariaNavOpen;
 ?>
@@ -110,10 +110,10 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Professores</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['alunos'])): ?>
-        <a href="<?= $urlBase ?>/admin/students" class="<?= $linkCls($cur === 'students') ?>">
-            <i class="fa-solid fa-user-graduate w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Alunos</span>
+        <?php if ($secCan(['salas']) && $modOn('salas') && AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
+        <a href="<?= $urlBase ?>/admin/salas" class="<?= $linkCls($cur === 'salas') ?>">
+            <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Salas / Ambientes</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['turmas'])): ?>
@@ -122,16 +122,16 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Turmas</span>
         </a>
         <?php endif; ?>
+        <?php if ($secCan(['alunos'])): ?>
+        <a href="<?= $urlBase ?>/admin/students" class="<?= $linkCls($cur === 'students') ?>">
+            <i class="fa-solid fa-user-graduate w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Alunos</span>
+        </a>
+        <?php endif; ?>
         <?php if ($secCan(['grade_horaria']) && $modOn('grade_horaria')): ?>
         <a href="<?= $urlBase ?>/admin/grade-horaria" class="<?= $linkCls($cur === 'grade_horaria') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Grade Horária</span>
-        </a>
-        <?php endif; ?>
-        <?php if ($secCan(['salas']) && $modOn('salas') && AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
-        <a href="<?= $urlBase ?>/admin/salas" class="<?= $linkCls($cur === 'salas') ?>">
-            <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Salas / Ambientes</span>
         </a>
         <?php endif; ?>
         </div>
@@ -262,7 +262,7 @@ $gestaoOpen = $secretariaNavOpen;
         <?php $menu_subcab_titulo = 'Fim de período'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div class="sidebar-sublista">
         <?php if ($secCan(['resultados_finais']) && $modOn('resultados_finais')): ?>
-        <a href="<?= $urlBase ?>/admin/fechamento" class="<?= $linkCls(in_array($cur, ['fechamento', 'homologacoes', 'documentos-periodo'], true)) ?>">
+        <a href="<?= $urlBase ?>/admin/fechamento" class="<?= $linkCls(in_array($cur, ['fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais'], true)) ?>">
             <i class="fa-solid fa-flag-checkered w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
@@ -271,12 +271,6 @@ $gestaoOpen = $secretariaNavOpen;
         <a href="<?= $urlBase ?>/admin/conselhos" class="<?= $linkCls($cur === 'conselho_classe') ?>">
             <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conselho de Classe</span>
-        </a>
-        <?php endif; ?>
-        <?php if ($secCan(['resultados_finais']) && $modOn('resultados_finais')): ?>
-        <a href="<?= $urlBase ?>/admin/resultados-finais" class="<?= $linkCls($cur === 'resultados-finais') ?>">
-            <i class="fa-solid fa-check-double w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Resultados Finais</span>
         </a>
         <?php endif; ?>
         </div>
@@ -352,7 +346,7 @@ $gestaoOpen = $secretariaNavOpen;
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['dashboard', 'saude_academica', 'relatorios_gerais'])): ?>
+<?php if ($secCan(['dashboard', 'saude_academica', 'relatorios_gerais', 'declaracoes_aluno'])): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cur === 'paineis' ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/paineis" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -376,6 +370,12 @@ $gestaoOpen = $secretariaNavOpen;
         <a href="<?= $urlBase ?>/admin/saude-academica" class="<?= $linkCls($cur === 'saude_academica') ?>">
             <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['declaracoes_aluno'])): ?>
+        <a href="<?= $urlBase ?>/admin/paineis/documentos" class="<?= $linkCls($cur === 'paineis_documentos') ?>">
+            <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Documentos</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['relatorios_gerais'])): ?>

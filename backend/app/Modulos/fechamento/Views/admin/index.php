@@ -39,6 +39,10 @@ $loteTitulo = $lotePronto
     ? 'Imprimir boletim, ficha, histórico e resultado final das turmas homologadas'
     : ('Homologue todas as turmas deste filtro para imprimir em lote (' . $loteHomologadas . ' de ' . $loteTotal . ').');
 ob_start();
+?>
+<a href="<?= URL ?>/admin/resultados-finais/layouts" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Layouts</a>
+<a href="<?= URL ?>/admin/resultados-finais/relatorios" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Relatórios</a>
+<?php
 if ($lotePronto):
     $ui_btn_variant = 'complementar';
     $ui_btn_label = 'Imprimir em lote';
@@ -211,7 +215,11 @@ $statusBadge = static function (string $status): string {
                         <?php endif; ?>
                         <a href="<?= URL ?>/admin/resultados-finais/turma/<?= $tid ?>?<?= htmlspecialchars($qs) ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-check-double text-gray-400 w-4 text-center"></i> Resultados finais
+                            <i class="fa-solid fa-check-double text-gray-400 w-4 text-center"></i> Alunos e homologação
+                        </a>
+                        <a href="<?= URL ?>/admin/resultados-finais/turma/<?= $tid ?>/ata?<?= htmlspecialchars($qs) ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center"></i> Ata
                         </a>
                         <?php if ($podeHomologar): ?>
                         <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/homologar" class="block"

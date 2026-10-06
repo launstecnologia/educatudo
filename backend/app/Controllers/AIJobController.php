@@ -71,6 +71,12 @@ class AIJobController
                 if (!empty($decoded['finalizado_em'])) {
                     $response['finalizado_em'] = (string) $decoded['finalizado_em'];
                 }
+                if (!empty($decoded['andamento'])) {
+                    $response['andamento'] = (string) $decoded['andamento'];
+                }
+                if (!empty($decoded['documento'])) {
+                    $response['documento'] = (string) $decoded['documento'];
+                }
             }
 
             if (!empty($_GET['debug']) && $_GET['debug'] === '1') {

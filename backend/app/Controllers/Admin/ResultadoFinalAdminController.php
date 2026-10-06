@@ -28,40 +28,8 @@ class ResultadoFinalAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
             return;
         }
-        $svc = $this->homologacao();
-        $anos = $svc->model()->anosLetivosTurmas();
-        $anoLetivo = (int) ($_GET['ano_letivo'] ?? ($anos[0] ?? date('Y')));
-        if (!in_array($anoLetivo, $anos, true)) {
-            $anoLetivo = (int) ($anos[0] ?? date('Y'));
-        }
-        [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
-        $turmaId = (int) ($_GET['turma_id'] ?? 0);
-        $turmas = $svc->model()->turmasAtivas($anoLetivo);
-        $paineis = [];
-        foreach ($turmas as $turma) {
-            if ($turmaId > 0 && (int) $turma['id'] !== $turmaId) {
-                continue;
-            }
-            $paineis[] = $svc->previewTurma((int) $turma['id'], $anoLetivo, $periodoTipo, $periodoNumero);
-        }
-
-        $flash = $this->getFlashMessage();
-        $this->viewWithLayout('admin', 'admin/resultados-finais/index', [
-            'title' => 'Resultados finais - EducaTudo',
-            'user' => $this->auth->getUser(),
-            'current_page' => 'resultados-finais',
-            'anos' => $anos,
-            'ano_letivo' => $anoLetivo,
-            'periodo_tipo' => $periodoTipo,
-            'periodo_numero' => $periodoNumero,
-            'turma_id' => $turmaId,
-            'turmas' => $turmas,
-            'paineis' => $paineis,
-            'config' => $svc->model()->getConfigFechamento(),
-            'csrf_token' => $this->generateCsrfToken(),
-            'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
-            'flash_message' => $flash['message'] ?? '',
-        ]);
+        $qs = (string) ($_SERVER['QUERY_STRING'] ?? '');
+        $this->redirect('/admin/fechamento' . ($qs !== '' ? '?' . $qs : ''));
     }
 
     public function turma($turmaId): void

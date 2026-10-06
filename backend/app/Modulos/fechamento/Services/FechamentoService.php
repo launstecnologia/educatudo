@@ -323,7 +323,7 @@ class FechamentoService
     /**
      * @return list<array<string,mixed>>
      */
-    public function painel(int $anoLetivo, string $periodoTipo, int $periodoNumero, int $turmaFiltro = 0): array
+    public function painel(int $anoLetivo, string $periodoTipo, int $periodoNumero, int $turmaFiltro = 0, string $serieFiltro = ''): array
     {
         $turmas = $this->homologacao->model()->turmasAtivas($anoLetivo);
         $linhas = [];
@@ -333,6 +333,9 @@ class FechamentoService
                 continue;
             }
             if ($turmaFiltro > 0 && $tid !== $turmaFiltro) {
+                continue;
+            }
+            if ($serieFiltro !== '' && trim((string) ($turma['serie'] ?? '')) !== $serieFiltro) {
                 continue;
             }
             $preview = $this->homologacao->previewTurma($tid, $anoLetivo, $periodoTipo, $periodoNumero);

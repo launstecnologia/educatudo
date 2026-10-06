@@ -24,6 +24,11 @@ class ImpressaoLoteFechamentoService
     /** Os quatro documentos do pacote, na ordem de impressão. */
     public const PACOTE = ['boletim', 'ficha', 'historico', 'resultado'];
 
+    public const TIPO_JOB = 'fechamento_impressao_lote';
+
+    /** Acima disso a geração pede uma turma, para não montar a escola inteira. */
+    public const MAX_ALUNOS = 80;
+
     private DocumentoOficialService $documentos;
     private HistoricoEscolarService $historicos;
     private VidaEscolarPdfService $pdfHistorico;
@@ -67,6 +72,113 @@ class ImpressaoLoteFechamentoService
         ];
     }
 
+    public function escopoInformado(int $turmaId, string $serie): bool
+    {
+        return $turmaId > 0 || trim($serie) !== '';
+    }
+
+    /**
+     * @param list<array<string,mixed>> $paineis
+     */
+    public function exigirEscopoLeve(array $paineis, string $documento): void
+    {
+        $resumo = $this->resumo($paineis);
+        if ($resumo['total_turmas'] > 12) {
+            throw new RuntimeException('Escolha uma turma ou uma série menor. Este recorte ainda tem ' . $resumo['total_turmas'] . ' turmas.');
+        }
+        if (in_array($documento, ['boletim', 'ficha', 'historico'], true) && $resumo['total_alunos'] > self::MAX_ALUNOS) {
+            $nome = self::DOCUMENTOS[$documento] ?? 'documento';
+            throw new RuntimeException(
+                'Este recorte tem ' . $resumo['total_alunos'] . ' alunos. Escolha uma turma com até '
+                . self::MAX_ALUNOS . ' alunos para gerar ' . $nome . '.'
+            );
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array{arquivo:string,documento:string,andamento:string}
+     */
+    public function executarJob(array $payload): array
+    {
+        require_once __DIR__ . '/FechamentoService.php';
+        $jobId = (int) ($payload['_job_id'] ?? 0);
+        $documento = (string) ($payload['documento'] ?? '');
+        $anoLetivo = (int) ($payload['ano_letivo'] ?? 0);
+        $periodoTipo = (string) ($payload['periodo_tipo'] ?? 'ano');
+        $periodoNumero = (int) ($payload['periodo_numero'] ?? 0);
+        $turmaId = (int) ($payload['turma_id'] ?? 0);
+        $serie = trim((string) ($payload['serie'] ?? ''));
+        $usuarioId = (int) ($payload['user_id'] ?? 0);
+        $slug = $this->slugTenant((string) ($payload['tenant_slug'] ?? ''));
+        if ($jobId <= 0 || $anoLetivo <= 0 || !isset(self::DOCUMENTOS[$documento])) {
+            throw new RuntimeException('Lote de impressão incompleto.');
+        }
+        if (!$this->escopoInformado($turmaId, $serie)) {
+            throw new RuntimeException('Escolha uma turma ou uma série antes de gerar.');
+        }
+
+        $paineis = (new FechamentoService())->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
+        $resumo = $this->resumo($paineis);
+        if (!$resumo['pode']) {
+            throw new RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
+        }
+        $this->gravarAndamento($jobId, $documento, 'Montando documentos…');
+        $html = $this->htmlParaImpressao(
+            $documento,
+            $paineis,
+            $anoLetivo,
+            $periodoTipo,
+            $periodoNumero,
+            $usuarioId,
+            null,
+            '',
+            $jobId
+        );
+        $dir = self::diretorio($slug);
+        if (!is_dir($dir) && !mkdir($dir, 0770, true) && !is_dir($dir)) {
+            throw new RuntimeException('Não foi possível criar a pasta da impressão.');
+        }
+        $nome = 'lote_' . $jobId . '.html';
+        $path = $dir . '/' . $nome;
+        if (file_put_contents($path, $html) === false) {
+            throw new RuntimeException('Não foi possível gravar a impressão.');
+        }
+
+        return [
+            'arquivo' => $nome,
+            'documento' => $documento,
+            'andamento' => 'Pronto para abrir',
+            'tenant_slug' => $slug,
+        ];
+    }
+
+    public static function caminhoArquivo(int $jobId, string $slug): ?string
+    {
+        if ($jobId <= 0) {
+            return null;
+        }
+        $dir = self::diretorio($slug);
+        $path = $dir . '/lote_' . $jobId . '.html';
+        $realDir = realpath($dir);
+        $realFile = realpath($path);
+        if ($realDir === false || $realFile === false || !str_starts_with($realFile, $realDir . DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        return $realFile;
+    }
+
+    public static function diretorio(string $slug): string
+    {
+        $limpo = preg_replace('/[^a-z0-9_-]/i', '', $slug);
+        if (!is_string($limpo) || $limpo === '') {
+            throw new RuntimeException('Slug da escola ausente; não é possível gravar a impressão.');
+        }
+        $base = defined('BASE_PATH') ? (string) BASE_PATH : dirname(__DIR__, 4);
+        return rtrim($base, '/\\') . '/storage/exports/' . $limpo . '/fechamento';
+    }
+
     /**
      * @param list<array<string,mixed>> $paineis
      * @param array<string,mixed>|null $configApp
@@ -79,7 +191,8 @@ class ImpressaoLoteFechamentoService
         int $periodoNumero,
         int $usuarioId,
         ?array $configApp,
-        string $voltarUrl
+        string $voltarUrl,
+        int $jobId = 0
     ): string {
         if (!isset(self::DOCUMENTOS[$documento])) {
             throw new InvalidArgumentException('Documento de impressão desconhecido.');
@@ -89,9 +202,14 @@ class ImpressaoLoteFechamentoService
             throw new RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
         }
 
-        @set_time_limit(180);
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+        $this->exigirEscopoLeve($paineis, $documento);
         $avisos = [];
         $htmls = [];
+        $feitos = 0;
+        $totalFolhas = $this->estimarFolhas($paineis, $documento);
         $orientacao = in_array($documento, ['relatorio', 'resultado', 'boletim'], true) ? 'landscape' : 'portrait';
 
         foreach ($paineis as $painel) {
@@ -100,6 +218,7 @@ class ImpressaoLoteFechamentoService
             if ($turmaId <= 0) {
                 continue;
             }
+            $this->pulso($jobId, $feitos, $totalFolhas, $documento);
             if ($documento === 'relatorio' || $documento === 'resultado') {
                 $emitido = $documento === 'resultado'
                     ? $this->documentos->emitirAta(
@@ -123,6 +242,7 @@ class ImpressaoLoteFechamentoService
                         false
                     );
                 $htmls[] = (string) ($emitido['html'] ?? '');
+                $feitos++;
                 if (($emitido['orientacao'] ?? '') === 'landscape') {
                     $orientacao = 'landscape';
                 }
@@ -160,6 +280,8 @@ class ImpressaoLoteFechamentoService
                                 false
                             );
                         $htmls[] = (string) ($emitido['html'] ?? '');
+                        $feitos++;
+                        $this->pulso($jobId, $feitos, $totalFolhas, $documento);
                         if (($emitido['orientacao'] ?? '') === 'landscape') {
                             $orientacao = 'landscape';
                         }
@@ -171,6 +293,8 @@ class ImpressaoLoteFechamentoService
                 $historico = $this->htmlHistoricoAluno($alunoId, $alunoNome, $turmaNome, $configApp, $avisos);
                 if ($historico !== null) {
                     $htmls[] = $historico;
+                    $feitos++;
+                    $this->pulso($jobId, $feitos, $totalFolhas, $documento);
                 }
             }
         }
@@ -378,5 +502,74 @@ class ImpressaoLoteFechamentoService
             . $avisosHtml
             . implode('', $partes)
             . '</body></html>';
+    }
+
+    /**
+     * @param list<array<string,mixed>> $paineis
+     */
+    private function estimarFolhas(array $paineis, string $documento): int
+    {
+        if ($documento === 'resultado' || $documento === 'relatorio') {
+            return count($paineis);
+        }
+        $total = 0;
+        foreach ($paineis as $painel) {
+            $total += (int) ($painel['resumo']['total'] ?? 0);
+        }
+
+        return $total;
+    }
+
+    private function pulso(int $jobId, int $feitos, int $total, string $documento): void
+    {
+        if ($jobId <= 0) {
+            return;
+        }
+        require_once __DIR__ . '/../../../Services/AIJobService.php';
+        \App\Services\AIJobService::renovarHeartbeat($jobId);
+        $nome = self::DOCUMENTOS[$documento] ?? 'Documento';
+        $this->gravarAndamento($jobId, $documento, $nome . ': ' . $feitos . ' de ' . max($total, $feitos));
+    }
+
+    private function gravarAndamento(int $jobId, string $documento, string $andamento): void
+    {
+        if ($jobId <= 0) {
+            return;
+        }
+        $db = Database::getInstance();
+        if (!$db->tableExists('ai_jobs')) {
+            return;
+        }
+        try {
+            $db->query(
+                'UPDATE ai_jobs SET result = :result WHERE id = :id AND status = :status',
+                [
+                    'result' => json_encode([
+                        'documento' => $documento,
+                        'andamento' => $andamento,
+                        'iniciado_em' => date('Y-m-d H:i:s'),
+                    ], JSON_UNESCAPED_UNICODE),
+                    'id' => $jobId,
+                    'status' => 'processing',
+                ]
+            );
+        } catch (Throwable $e) {
+            error_log('ImpressaoLoteFechamento andamento job=' . $jobId . ': ' . $e->getMessage());
+        }
+    }
+
+    private function slugTenant(string $slug): string
+    {
+        $limpo = preg_replace('/[^a-z0-9_-]/i', '', $slug);
+        if (is_string($limpo) && $limpo !== '') {
+            return $limpo;
+        }
+        if (defined('TENANT_SLUG')) {
+            $constante = preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG);
+            if (is_string($constante) && $constante !== '') {
+                return $constante;
+            }
+        }
+        throw new RuntimeException('Slug da escola ausente; não é possível gravar a impressão.');
     }
 }

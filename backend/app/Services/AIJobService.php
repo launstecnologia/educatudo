@@ -417,8 +417,8 @@ class AIJobService
                AND started_at IS NOT NULL
                AND attempts < ?
                AND (
-                    (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
-                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
                )",
             [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
         );
@@ -432,8 +432,8 @@ class AIJobService
                AND started_at IS NOT NULL
                AND attempts >= ?
                AND (
-                    (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
-                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
                )",
             [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
         );
@@ -547,6 +547,9 @@ class AIJobService
             case 'vida_escolar_boletins_zip':
                 return self::dispatchVidaEscolarBoletinsZip($payload);
 
+            case 'fechamento_impressao_lote':
+                return self::dispatchFechamentoImpressaoLote($payload);
+
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");
         }
@@ -576,6 +579,12 @@ class AIJobService
         } finally {
             $db->fetch('SELECT RELEASE_LOCK(:nome) AS ok', ['nome' => $lockNome]);
         }
+    }
+
+    private static function dispatchFechamentoImpressaoLote(array $payload): array
+    {
+        require_once __DIR__ . '/../Modulos/fechamento/Services/ImpressaoLoteFechamentoService.php';
+        return (new ImpressaoLoteFechamentoService())->executarJob($payload);
     }
 
     private static function dispatchBoletimGerar(array $payload): array

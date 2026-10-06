@@ -99,26 +99,26 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Professores</span>
         </a>
         <?php endif; ?>
-        <?php if ($showAlunosMenu): ?>
-        <a href="<?= URL ?>/admin/students" class="<?= $linkCls($cp === 'students') ?>">
-            <i class="fa-solid fa-user-graduate w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Alunos</span>
+        <?php if ($modOn('salas') && $canViewSidebar(['salas'])): ?>
+        <a href="<?= URL ?>/admin/salas" class="<?= $linkCls($cp === 'salas') ?>">
+            <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Salas / Ambientes</span>
         </a>
         <?php endif; ?>
         <a href="<?= URL ?>/admin/turmas" class="<?= $linkCls($cp === 'turmas') ?>">
             <i class="fa-solid fa-school w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Turmas</span>
         </a>
+        <?php if ($showAlunosMenu): ?>
+        <a href="<?= URL ?>/admin/students" class="<?= $linkCls($cp === 'students') ?>">
+            <i class="fa-solid fa-user-graduate w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Alunos</span>
+        </a>
+        <?php endif; ?>
         <?php if ($modOn('grade_horaria')): ?>
         <a href="<?= URL ?>/admin/grade-horaria" class="<?= $linkCls($cp === 'grade_horaria') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Grade Horária</span>
-        </a>
-        <?php endif; ?>
-        <?php if ($modOn('salas') && $canViewSidebar(['salas'])): ?>
-        <a href="<?= URL ?>/admin/salas" class="<?= $linkCls($cp === 'salas') ?>">
-            <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Salas / Ambientes</span>
         </a>
         <?php endif; ?>
         </div>
@@ -220,7 +220,7 @@ if ($nomeMenuEscola === '') {
         <?php $menu_subcab_titulo = 'Fim de período'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div class="sidebar-sublista">
         <?php if ($canViewSidebar(['resultados_finais']) && $modOn('resultados_finais')): ?>
-        <a href="<?= URL ?>/admin/fechamento" class="<?= $linkCls(in_array($cp, ['fechamento', 'homologacoes', 'documentos-periodo'], true)) ?>">
+        <a href="<?= URL ?>/admin/fechamento" class="<?= $linkCls(in_array($cp, ['fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais'], true)) ?>">
             <i class="fa-solid fa-flag-checkered w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
@@ -229,12 +229,6 @@ if ($nomeMenuEscola === '') {
         <a href="<?= URL ?>/admin/conselhos" class="<?= $linkCls($cp === 'conselho_classe') ?>">
             <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conselho de Classe</span>
-        </a>
-        <?php endif; ?>
-        <?php if ($canViewSidebar(['resultados_finais']) && $modOn('resultados_finais')): ?>
-        <a href="<?= URL ?>/admin/resultados-finais" class="<?= $linkCls($cp === 'resultados-finais') ?>">
-            <i class="fa-solid fa-check-double w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Resultados Finais</span>
         </a>
         <?php endif; ?>
         </div>
@@ -557,6 +551,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         <a href="<?= URL ?>/admin/conformidade" class="<?= $linkCls($cp === 'conformidade') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conformidade</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($canViewSidebar(['declaracoes_aluno'])): ?>
+        <a href="<?= URL ?>/admin/paineis/documentos" class="<?= $linkCls($cp === 'paineis_documentos') ?>">
+            <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Documentos</span>
         </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['relatorios_gerais'])): ?>
