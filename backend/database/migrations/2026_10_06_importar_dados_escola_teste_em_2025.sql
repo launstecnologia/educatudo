@@ -479,12 +479,40 @@ BEGIN
     WHILE v_slot <= 50 DO
       SET v_nick = CONCAT('et25.', v_serie_cod, LOWER(v_letra), LPAD(v_slot, 2, '0'));
       SET v_nome = CONCAT(
-        ELT(1 + ((v_t * 17 + v_slot) MOD 16), 'Ana','Bruno','Carla','Diego','Elisa','Felipe','Gabriela','Henrique','Isabela','João','Karina','Lucas','Marina','Nicolas','Olivia','Pedro'),
+        IF(v_slot MOD 2 = 0,
+          ELT(1 + (((v_t - 1) * 50 + (v_slot - 1)) MOD 36), 'Ana','Beatriz','Camila','Daniela','Eduarda','Fernanda','Gabriela','Helena','Isabela','Juliana','Larissa','Mariana','Natália','Patrícia','Rafaela','Sabrina','Tatiane','Vanessa','Yasmin','Alice','Bianca','Carolina','Débora','Elisa','Flávia','Giovana','Heloísa','Ingrid','Jéssica','Letícia','Melissa','Nicole','Renata','Sofia','Taís','Vitória'),
+          ELT(1 + (((v_t - 1) * 50 + (v_slot - 1)) MOD 36), 'André','Bruno','Carlos','Diego','Eduardo','Felipe','Gabriel','Henrique','Igor','João','Kaique','Lucas','Marcos','Nicolas','Otávio','Pedro','Rafael','Samuel','Thiago','Vinícius','Antônio','Bernardo','Caio','Daniel','Enzo','Fernando','Gustavo','Heitor','Isaac','José','Leandro','Matheus','Nathan','Paulo','Ricardo','Rodrigo')
+        ),
         ' ',
-        ELT(1 + ((v_slot * 3 + v_t) MOD 12), 'Almeida','Barbosa','Cardoso','Dias','Fernandes','Gomes','Lima','Oliveira','Silva','Souza','Ribeiro','Teixeira')
+        IF(v_slot MOD 2 = 0,
+          ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) DIV 7) MOD 20), 'Clara','Cristina','Luiza','Aparecida','Regina','Vitória','Beatriz','Helena','Fernanda','Cecília','Lorena','Maitê','Pietra','Valentina','Alice','Lívia','Maya','Lara','Isis','Aurora'),
+          ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) DIV 7) MOD 20), 'Miguel','Henrique','Eduardo','Antônio','Gabriel','Luiz','Fernando','Augusto','Roberto','Paulo','Vinícius','Heitor','Davi','Benício','Theo','Arthur','Samuel','Isaac','Caio','Enzo')
+        ),
+        ' ',
+        ELT(1 + (((v_t - 1) * 50 + (v_slot - 1)) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira'),
+        ' ',
+        ELT(1 + (IF(
+          ELT(1 + (((v_t - 1) * 50 + (v_slot - 1)) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira') = ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) * 3 + 11) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira'),
+          (((v_t - 1) * 50 + (v_slot - 1)) + 1) MOD 40,
+          (((v_t - 1) * 50 + (v_slot - 1)) * 3 + 11) MOD 40
+        )), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira')
       );
-      SET v_nome_mae = CONCAT(ELT(1 + (v_slot MOD 8), 'Ana','Carla','Elisa','Helena','Marina','Olivia','Rafaela','Talita'), ' ', SUBSTRING_INDEX(v_nome, ' ', -1));
-      SET v_nome_pai = IF(v_slot = 42, NULL, CONCAT(ELT(1 + (v_slot MOD 8), 'Bruno','Diego','Eduardo','Felipe','Henrique','João','Marcos','Pedro'), ' ', SUBSTRING_INDEX(v_nome, ' ', -1)));
+      SET v_nome_mae = CONCAT(
+        ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) + 5) MOD 36), 'Ana','Beatriz','Camila','Daniela','Eduarda','Fernanda','Gabriela','Helena','Isabela','Juliana','Larissa','Mariana','Natália','Patrícia','Rafaela','Sabrina','Tatiane','Vanessa','Yasmin','Alice','Bianca','Carolina','Débora','Elisa','Flávia','Giovana','Heloísa','Ingrid','Jéssica','Letícia','Melissa','Nicole','Renata','Sofia','Taís','Vitória'), ' ',
+        ELT(1 + (((((v_t - 1) * 50 + (v_slot - 1)) DIV 5) + 3) MOD 20), 'Clara','Cristina','Luiza','Aparecida','Regina','Vitória','Beatriz','Helena','Fernanda','Cecília','Lorena','Maitê','Pietra','Valentina','Alice','Lívia','Maya','Lara','Isis','Aurora'), ' ',
+        ELT(1 + (((v_t - 1) * 50 + (v_slot - 1)) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira'), ' ',
+        ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) + 13) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira')
+      );
+      SET v_nome_pai = IF(v_slot = 42, NULL, CONCAT(
+        ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) + 9) MOD 36), 'André','Bruno','Carlos','Diego','Eduardo','Felipe','Gabriel','Henrique','Igor','João','Kaique','Lucas','Marcos','Nicolas','Otávio','Pedro','Rafael','Samuel','Thiago','Vinícius','Antônio','Bernardo','Caio','Daniel','Enzo','Fernando','Gustavo','Heitor','Isaac','José','Leandro','Matheus','Nathan','Paulo','Ricardo','Rodrigo'), ' ',
+        ELT(1 + (((((v_t - 1) * 50 + (v_slot - 1)) DIV 5) + 2) MOD 20), 'Miguel','Henrique','Eduardo','Antônio','Gabriel','Luiz','Fernando','Augusto','Roberto','Paulo','Vinícius','Heitor','Davi','Benício','Theo','Arthur','Samuel','Isaac','Caio','Enzo'), ' ',
+        ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) + 17) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira'), ' ',
+        ELT(1 + (IF(
+          ELT(1 + (((v_t - 1) * 50 + (v_slot - 1)) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira') = ELT(1 + ((((v_t - 1) * 50 + (v_slot - 1)) * 3 + 11) MOD 40), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira'),
+          (((v_t - 1) * 50 + (v_slot - 1)) + 1) MOD 40,
+          (((v_t - 1) * 50 + (v_slot - 1)) * 3 + 11) MOD 40
+        )), 'Silva','Santos','Oliveira','Souza','Lima','Pereira','Ferreira','Almeida','Costa','Rodrigues','Martins','Araújo','Barbosa','Cardoso','Correia','Dias','Fernandes','Gomes','Lopes','Mendes','Nascimento','Nunes','Pinto','Ramos','Ribeiro','Rocha','Teixeira','Carvalho','Castro','Monteiro','Moreira','Freitas','Azevedo','Cunha','Duarte','Farias','Melo','Moura','Rezende','Vieira')
+      ));
       SET v_entrada = IF(v_slot = 46, '2025-06-02', '2025-02-03');
       SET v_saida = IF(v_slot = 47, '2025-06-20', IF(v_slot = 48, '2025-09-15', NULL));
 
