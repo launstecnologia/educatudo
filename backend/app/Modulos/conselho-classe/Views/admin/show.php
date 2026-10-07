@@ -99,7 +99,7 @@ if ($periodo === '') {
                 <tr>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">Aluno</th>
                     <?php foreach ($componentes as $comp): ?>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap"><?= htmlspecialchars((string) $comp['nome']) ?></th>
+                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title="<?= htmlspecialchars((string) $comp['nome']) ?>"><?= htmlspecialchars((string) ($comp['sigla'] ?? $comp['nome'])) ?></th>
                     <?php endforeach; ?>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequência</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preliminar</th>
@@ -134,7 +134,7 @@ if ($periodo === '') {
                         $media = $cel['media'] ?? null;
                         $isAbaixo = $media !== null && in_array((string) $comp['nome'], $abaixo, true);
                     ?>
-                    <td class="px-4 py-3 text-sm <?= $isAbaixo ? 'text-amber-800 font-semibold' : 'text-gray-700' ?>">
+                    <td class="px-3 py-3 text-sm text-center <?= $isAbaixo ? 'text-amber-800 font-semibold' : 'text-gray-700' ?>">
                         <?= $media !== null ? number_format((float) $media, 1, ',', '.') : '—' ?>
                     </td>
                     <?php endforeach; ?>

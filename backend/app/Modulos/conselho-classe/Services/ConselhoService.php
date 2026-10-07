@@ -558,7 +558,7 @@ class ConselhoService
     /**
      * Consome o snapshot já gerado do boletim. Não recalcula fórmula.
      *
-     * @return array{componentes:list<array{id:?int,nome:string}>, por_aluno:array<int,array<string,array<string,mixed>>>, nota_minima:float}
+     * @return array{componentes:list<array{id:?int,nome:string,sigla:string}>, por_aluno:array<int,array<string,array<string,mixed>>>, nota_minima:float}
      */
     private function notasDoBoletim(int $turmaId, int $anoLetivo, int $bimestre): array
     {
@@ -620,10 +620,76 @@ class ConselhoService
             ];
         }
 
+        $siglas = $this->siglasDasMaterias(array_map(static fn (array $comp): int => (int) ($comp['id'] ?? 0), $componentes));
+        foreach ($componentes as &$comp) {
+            $sigla = trim((string) ($siglas[(int) ($comp['id'] ?? 0)] ?? ''));
+            $comp['sigla'] = $sigla !== '' ? $sigla : $this->abreviarComponente((string) $comp['nome']);
+        }
+        unset($comp);
+
         $vazio['componentes'] = $componentes;
         $vazio['por_aluno'] = $porAluno;
         $vazio['nota_minima'] = $notaMinima;
         return $vazio;
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array<int,string>
+     */
+    private function siglasDasMaterias(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === [] || !$this->model->tabelaExiste('materias')) {
+            return [];
+        }
+        $placeholders = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $chave = 'id' . $i;
+            $placeholders[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT id, sigla FROM materias WHERE id IN (' . implode(', ', $placeholders) . ')',
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $out[(int) ($row['id'] ?? 0)] = trim((string) ($row['sigla'] ?? ''));
+        }
+
+        return $out;
+    }
+
+    private function abreviarComponente(string $nome): string
+    {
+        $nome = trim($nome);
+        if ($nome === '') {
+            return '';
+        }
+        $partes = preg_split('/\s+/u', $nome) ?: [];
+        $ignorar = ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'a', 'o'];
+        $iniciais = '';
+        foreach ($partes as $parte) {
+            if (in_array(mb_strtolower($parte), $ignorar, true)) {
+                continue;
+            }
+            $iniciais .= mb_strtoupper(mb_substr($parte, 0, 1));
+        }
+        if (mb_strlen($iniciais) >= 2) {
+            return mb_substr($iniciais, 0, 6);
+        }
+        $base = mb_strtoupper((string) preg_replace('/[^\p{L}]/u', '', $nome));
+
+        return mb_substr($base, 0, 3);
     }
 
     /**

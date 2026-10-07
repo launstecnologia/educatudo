@@ -35,7 +35,7 @@ $podeObs = in_array($status, ['em_andamento', 'reaberto'], true);
                 <tr>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
                     <?php foreach ($componentes as $comp): ?>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"><?= htmlspecialchars((string) $comp['nome']) ?></th>
+                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap" title="<?= htmlspecialchars((string) $comp['nome']) ?>"><?= htmlspecialchars((string) ($comp['sigla'] ?? $comp['nome'])) ?></th>
                     <?php endforeach; ?>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frequência</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preliminar</th>
@@ -53,7 +53,7 @@ $podeObs = in_array($status, ['em_andamento', 'reaberto'], true);
                         $chave = mb_strtolower((string) $comp['nome']);
                         $media = $linha['componentes'][$chave]['media'] ?? null;
                     ?>
-                    <td class="px-4 py-3 text-sm text-gray-700"><?= $media !== null ? number_format((float) $media, 1, ',', '.') : '—' ?></td>
+                    <td class="px-3 py-3 text-sm text-center text-gray-700"><?= $media !== null ? number_format((float) $media, 1, ',', '.') : '—' ?></td>
                     <?php endforeach; ?>
                     <td class="px-4 py-3 text-sm text-gray-700"><?= $freq !== null ? number_format((float) $freq, 1, ',', '.') . '%' : '—' ?></td>
                     <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($prelim['label'] ?? '—')) ?></td>
