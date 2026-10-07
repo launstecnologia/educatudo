@@ -155,6 +155,12 @@ class VidaEscolarAdminController extends AdminBaseController
             $this->redirectAluno($id);
             return;
         }
+        try {
+            require_once dirname(__DIR__, 3) . '/Controllers/Admin/BoletimConfigController.php';
+            (new \BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno((int) $id);
+        } catch (\Throwable $e) {
+            error_log('Vida escolar alimentar boletim oficial: ' . $e->getMessage());
+        }
         $res = $this->service()->alimentarDoCalculo(
             (int) $id,
             trim((string) ($_POST['periodo_ref'] ?? '')) ?: null,

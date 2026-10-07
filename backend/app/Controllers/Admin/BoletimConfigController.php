@@ -2306,46 +2306,12 @@ class BoletimConfigController extends BaseController
             ]);
         }
 
-        // Se esse aluno já tem boletim OFICIAL gravado (publicado) pra esse evento e
-        // período, regrava automaticamente com o novo valor — senão a sobrescrita só
-        // valeria na simulação, e quem já tinha o boletim publicado não veria a
-        // correção até alguém lembrar de clicar em "Gravar boletim oficial" de novo.
-        if (!empty($resultado['success']) && $this->boletimConfig->hasOfficialResult($regraId, $alunoId, $periodoRef)) {
+        // A nota do evento precisa recalcular o resultado final e cair no boletim
+        // oficial da vida escolar (linha única, ex.: Língua Portuguesa).
+        if (!empty($resultado['success'])) {
             try {
-                $regra = $this->boletimConfig->getRuleById($regraId);
-                if ($regra) {
-                    $range = $this->periodoToRange($periodoRef);
-                    $dataInicio = $range['inicio'] !== null ? substr((string) $range['inicio'], 0, 10) : null;
-                    $dataFim = $range['fim'] !== null ? substr((string) $range['fim'], 0, 10) : null;
-                    $sim = $this->simularRegraAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
-                    $matriz = $sim['matriz_materias'] ?? null;
-                    $colunas = is_array($matriz) && is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
-                    $linhas = is_array($matriz) && is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
-                    if ($colunas !== [] && $linhas !== []) {
-                        $userEdit = $this->auth->getUser();
-                        $geracaoId = $this->boletimConfig->criarGeracao(
-                            $regraId,
-                            $periodoRef,
-                            'edicao',
-                            (int) ($userEdit['id'] ?? 0) ?: null,
-                            (string) ($userEdit['nome'] ?? '') ?: null
-                        );
-                        $this->boletimConfig->replaceGeneratedResultsForAluno(
-                            $regraId,
-                            $alunoId,
-                            $periodoRef,
-                            $dataInicio,
-                            $dataFim,
-                            $colunas,
-                            $linhas,
-                            false,
-                            $geracaoId
-                        );
-                        if ($geracaoId !== null) {
-                            $this->boletimConfig->atualizarGeracaoTotais($geracaoId, 1, 0, count($linhas), 0, 0, ['modo' => 'edicao']);
-                        }
-                        $resultado['boletim_oficial_atualizado'] = true;
-                    }
+                if ($this->propagarNotaNoBoletimOficial($regraId, $alunoId, $periodoRef)) {
+                    $resultado['boletim_oficial_atualizado'] = true;
                 }
             } catch (Throwable $e) {
                 error_log('salvarNotaManualMateriaAjax: falha ao regravar boletim oficial: ' . $e->getMessage());
@@ -2465,6 +2431,11 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash'] = implode(' | ', $erros);
             $_SESSION['boletim_flash_type'] = 'error';
         } else {
+            try {
+                $this->propagarNotaNoBoletimOficial($regraId, $alunoId, $periodoRef);
+            } catch (Throwable $e) {
+                error_log('salvarNotasManuais: falha ao atualizar boletim oficial: ' . $e->getMessage());
+            }
             $_SESSION['boletim_flash'] = 'Notas manuais salvas com sucesso.';
             $_SESSION['boletim_flash_type'] = 'success';
         }
@@ -3392,6 +3363,180 @@ class BoletimConfigController extends BaseController
             }
             error_log('Boletim ' . $logContexto . ' lote: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Recalcula o evento alterado e o boletim oficial ligado a ele, para o
+     * resultado final (linha única, ex.: Língua Portuguesa) entrar na ficha.
+     */
+    public function propagarNotaNoBoletimOficial(int $regraId, int $alunoId, string $periodoRef): bool
+    {
+        if ($regraId <= 0 || $alunoId <= 0 || trim($periodoRef) === '') {
+            return false;
+        }
+        $regra = $this->boletimConfig->getRuleById($regraId);
+        if (!is_array($regra)) {
+            return false;
+        }
+        $periodoRef = trim($periodoRef);
+        $range = $this->periodoToRange($periodoRef);
+        $dataInicio = $range['inicio'] !== null ? substr((string) $range['inicio'], 0, 10) : null;
+        $dataFim = $range['fim'] !== null ? substr((string) $range['fim'], 0, 10) : null;
+        $usuario = $this->auth->getUser();
+        $usuario = is_array($usuario) ? $usuario : [];
+
+        $atualizou = false;
+        if ($this->boletimConfig->hasOfficialResult($regraId, $alunoId, $periodoRef)) {
+            $atualizou = $this->regravarResultadoOficialAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim, $usuario);
+        }
+
+        $exibir = strtolower(trim((string) ($regra['exibir_em'] ?? '')));
+        if ($exibir === 'notas') {
+            $doc = $this->regraBoletimDestino($regra);
+            if (is_array($doc)) {
+                $docId = (int) ($doc['id'] ?? 0);
+                $periodoDoc = $this->periodoRefOficialAluno($docId, $alunoId);
+                $gravarPeriodo = $periodoDoc !== '' ? $periodoDoc : $periodoRef;
+                $boletimJaPublicado = $docId > 0 && $this->boletimConfig->hasOfficialResult($docId, $alunoId, $gravarPeriodo);
+                if ($docId > 0 && ($boletimJaPublicado || $atualizou)) {
+                    $simulado = $this->simularRegraAluno($doc, $alunoId, $periodoRef, $dataInicio, $dataFim);
+                    $atualizou = $this->gravarSimulacaoOficial($docId, $alunoId, $gravarPeriodo, $dataInicio, $dataFim, $simulado, $usuario) || $atualizou;
+                }
+            }
+        }
+
+        $this->sincronizarFichaVidaEscolar($alunoId, $usuario, $periodoRef, $regraId);
+
+        return $atualizou;
+    }
+
+    /**
+     * Atualiza os boletins oficiais já gravados deste aluno a partir dos eventos de notas.
+     */
+    public function atualizarBoletinsOficiaisDoAluno(int $alunoId): void
+    {
+        if ($alunoId <= 0) {
+            return;
+        }
+        $rows = Database::getInstance()->fetchAll(
+            "SELECT DISTINCT r.id AS regra_id, g.periodo_ref
+             FROM boletim_resultados_gerados g
+             INNER JOIN boletim_regras r ON r.id = g.regra_id
+             WHERE g.aluno_id = :aluno_id AND g.preview = 0
+               AND r.ativo = 1 AND r.exibir_em = 'notas'"
+            . $this->boletimConfig->sqlFiltroVigente('g'),
+            ['aluno_id' => $alunoId]
+        ) ?: [];
+        foreach ($rows as $row) {
+            $regraId = (int) ($row['regra_id'] ?? 0);
+            $periodoRef = trim((string) ($row['periodo_ref'] ?? ''));
+            if ($regraId <= 0 || $periodoRef === '') {
+                continue;
+            }
+            try {
+                $this->propagarNotaNoBoletimOficial($regraId, $alunoId, $periodoRef);
+            } catch (Throwable $e) {
+                error_log('atualizarBoletinsOficiaisDoAluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $regraNotas
+     * @return array<string,mixed>|null
+     */
+    private function regraBoletimDestino(array $regraNotas): ?array
+    {
+        $boletimId = (int) ($regraNotas['boletim_id'] ?? 0);
+        if ($boletimId <= 0) {
+            return null;
+        }
+        $item = (new BoletimCadastroService())->model()->findById($boletimId);
+        $docId = (int) ($item['regra_id'] ?? 0);
+        if ($docId <= 0 || $docId === (int) ($regraNotas['id'] ?? 0)) {
+            return null;
+        }
+        $doc = $this->boletimConfig->getRuleById($docId);
+
+        return is_array($doc) ? $doc : null;
+    }
+
+    private function periodoRefOficialAluno(int $regraId, int $alunoId): string
+    {
+        if ($regraId <= 0 || $alunoId <= 0) {
+            return '';
+        }
+        $row = Database::getInstance()->fetch(
+            "SELECT periodo_ref FROM boletim_resultados_gerados
+             WHERE regra_id = :regra_id AND aluno_id = :aluno_id AND preview = 0"
+            . $this->boletimConfig->sqlFiltroVigente('') . "
+             ORDER BY id DESC LIMIT 1",
+            ['regra_id' => $regraId, 'aluno_id' => $alunoId]
+        );
+
+        return trim((string) ($row['periodo_ref'] ?? ''));
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @param array<string,mixed> $usuario
+     */
+    private function regravarResultadoOficialAluno(
+        array $regra,
+        int $alunoId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $usuario
+    ): bool {
+        $regraId = (int) ($regra['id'] ?? 0);
+        $sim = $this->simularRegraAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
+
+        return $this->gravarSimulacaoOficial($regraId, $alunoId, $periodoRef, $dataInicio, $dataFim, $sim, $usuario);
+    }
+
+    /**
+     * @param array<string,mixed> $sim
+     * @param array<string,mixed> $usuario
+     */
+    private function gravarSimulacaoOficial(
+        int $regraId,
+        int $alunoId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $sim,
+        array $usuario
+    ): bool {
+        $matriz = $sim['matriz_materias'] ?? null;
+        $colunas = is_array($matriz) && is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
+        $linhas = is_array($matriz) && is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+        if ($regraId <= 0 || $colunas === [] || $linhas === []) {
+            return false;
+        }
+        $geracaoId = $this->boletimConfig->criarGeracao(
+            $regraId,
+            $periodoRef,
+            'edicao',
+            (int) ($usuario['id'] ?? 0) ?: null,
+            (string) ($usuario['nome'] ?? '') ?: null
+        );
+        $this->boletimConfig->replaceGeneratedResultsForAluno(
+            $regraId,
+            $alunoId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            $colunas,
+            $linhas,
+            false,
+            $geracaoId
+        );
+        if ($geracaoId !== null) {
+            $this->boletimConfig->atualizarGeracaoTotais($geracaoId, 1, 0, count($linhas), 0, 0, ['modo' => 'edicao']);
+        }
+
+        return true;
     }
 
     private function sincronizarFichaVidaEscolar(int $alunoId, array $usuario, ?string $periodoRef = null, ?int $regraId = null): void

@@ -35,6 +35,8 @@ class VidaEscolarService
     private array $gruposLinhaCache = [];
     /** @var array<int, int>|null */
     private ?array $paiPorFilhoCache = null;
+    /** @var array<int, string> */
+    private array $nomeMateriaCache = [];
     private ?BoletimCadastroService $boletimCadastro = null;
     /** @var array<string, array<string,mixed>|null> */
     private array $modeloBoletimCache = [];
@@ -438,6 +440,7 @@ class VidaEscolarService
         }
         if (!$somenteLeitura) {
             $this->alinharFichaAoModelo($ficha);
+            $this->garantirLinhasDeGrupo($ficha);
         }
         $linhas = $this->model->listarLinhas($fichaId);
         $celulas = $this->model->listarCelulas($fichaId);
@@ -778,6 +781,7 @@ class VidaEscolarService
         }
 
         $this->alinharFichaAoModelo($ficha);
+        $this->garantirLinhasDeGrupo($ficha);
         $linhas = $this->model->listarLinhas($fichaId);
         $porId = [];
         $porNome = [];
@@ -2701,6 +2705,157 @@ class VidaEscolarService
     }
 
     /**
+     * A ficha ainda mostra desdobramento (Gramática, Leitura, Literatura) porque
+     * a linha oficial (Língua Portuguesa) não tem o resultado final.
+     */
+    public function precisaRecolherDesdobramentos(int $fichaId): bool
+    {
+        if ($fichaId <= 0) {
+            return false;
+        }
+        $ficha = $this->model->findFicha($fichaId);
+        if (!is_array($ficha) || ($ficha['status'] ?? '') === 'homologada') {
+            return false;
+        }
+        $linhas = $this->model->listarLinhas($fichaId);
+        $porLinha = [];
+        foreach ($this->model->listarCelulas($fichaId) as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $porLinha[(int) ($c['linha_id'] ?? 0)][(int) ($c['periodo_numero'] ?? 0)] = $c;
+        }
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $mid = (int) ($l['materia_id'] ?? 0);
+            if ($mid <= 0 || (!$this->paiIdDaMateria($mid) && !$this->materiaEstaEmGrupo($mid, $alunoId, $ano))) {
+                continue;
+            }
+            $lid = (int) ($l['id'] ?? 0);
+            if (!$this->celulasLinhaTemValor($porLinha[$lid] ?? [])) {
+                continue;
+            }
+            if (!$this->linhaOficialDoFilhoTemValor($mid, $linhas, $porLinha, $alunoId, $ano)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function materiaEstaEmGrupo(int $materiaId, int $alunoId, int $anoLetivo): bool
+    {
+        if ($materiaId <= 0) {
+            return false;
+        }
+        foreach ($this->gruposLinhaDoAluno($alunoId, $anoLetivo) as $g) {
+            foreach ((array) ($g['materias_ids'] ?? []) as $id) {
+                if ((int) $id === $materiaId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** Pai quando a matéria é desdobramento; a própria matéria quando é oficial. */
+    private function materiaOficialId(int $materiaId): int
+    {
+        if ($materiaId <= 0) {
+            return 0;
+        }
+        $pai = $this->paiIdDaMateria($materiaId);
+
+        return $pai > 0 ? $pai : $materiaId;
+    }
+
+    private function nomeDaMateria(int $materiaId): string
+    {
+        if ($materiaId <= 0) {
+            return '';
+        }
+        if (array_key_exists($materiaId, $this->nomeMateriaCache)) {
+            return $this->nomeMateriaCache[$materiaId];
+        }
+        $nome = '';
+        try {
+            $row = $this->db->fetch('SELECT nome FROM materias WHERE id = :id LIMIT 1', ['id' => $materiaId]);
+            $nome = trim((string) ($row['nome'] ?? ''));
+        } catch (\Throwable $e) {
+            $nome = '';
+        }
+        $this->nomeMateriaCache[$materiaId] = $nome;
+
+        return $nome;
+    }
+
+    /**
+     * Garante a linha do grupo (Língua Portuguesa) para o resultado final cair nela,
+     * e não numa filha (Gramática, Leitura, Literatura).
+     *
+     * @param array<string,mixed> $ficha
+     */
+    private function garantirLinhasDeGrupo(array $ficha): void
+    {
+        $fichaId = (int) ($ficha['id'] ?? 0);
+        if ($fichaId <= 0 || ($ficha['status'] ?? '') === 'homologada') {
+            return;
+        }
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        $grupos = $this->gruposLinhaDoAluno($alunoId, $ano);
+        if ($grupos === []) {
+            return;
+        }
+        $linhas = $this->model->listarLinhas($fichaId);
+        $nomes = [];
+        $ordemMax = 0;
+        foreach ($linhas as $ln) {
+            if (!is_array($ln)) {
+                continue;
+            }
+            $nome = mb_strtolower(trim((string) ($ln['componente_nome'] ?? '')));
+            if ($nome !== '') {
+                $nomes[$nome] = true;
+            }
+            $ordemMax = max($ordemMax, (int) ($ln['ordem'] ?? 0));
+        }
+        foreach ($grupos as $g) {
+            $label = trim((string) ($g['label'] ?? ''));
+            $key = mb_strtolower($label);
+            if ($key === '' || isset($nomes[$key])) {
+                continue;
+            }
+            $paiId = 0;
+            foreach ((array) ($g['materias_ids'] ?? []) as $fid) {
+                $pai = $this->paiIdDaMateria((int) $fid);
+                if ($pai > 0) {
+                    $paiId = $pai;
+                    $nomePai = $this->nomeDaMateria($pai);
+                    if ($nomePai !== '') {
+                        $label = $nomePai;
+                        $key = mb_strtolower($label);
+                    }
+                    break;
+                }
+            }
+            if ($key !== '' && isset($nomes[$key])) {
+                continue;
+            }
+            $ordemMax++;
+            $this->criarLinhaFichaCompleta($fichaId, $paiId > 0 ? $paiId : null, $label, $ordemMax);
+            if ($key !== '') {
+                $nomes[$key] = true;
+            }
+        }
+    }
+
+    /**
      * @return list<int>
      */
     private function filhosDaMateria(int $paiId): array
@@ -2754,6 +2909,9 @@ class VidaEscolarService
         int $ordemGerada = 0
     ): ?array {
         $nomeKey = mb_strtolower(trim($materiaNome));
+        if ($materiaId > 0 && $this->paiIdDaMateria($materiaId) > 0) {
+            return $this->linhaOficialDoPaiNaFicha($materiaId, $nomeKey, $porId, $alunoId, $anoLetivo);
+        }
         $linha = $this->encontrarLinhaFicha($materiaId, $nomeKey, $porId, $porNome, $linhasExistentes);
         if (!$linha) {
             $linha = $this->linhaOficialDoPaiNaFicha($materiaId, $nomeKey, $porId, $alunoId, $anoLetivo);
@@ -2882,6 +3040,13 @@ class VidaEscolarService
     {
         $idsPermitidos = $this->materiaIdsDoModeloDaFicha($ficha);
         $ordemModelo = $this->ordemMateriasDoModeloDaFicha($ficha);
+        $labelsGrupo = [];
+        foreach ($this->gruposLinhaDoAluno((int) ($ficha['aluno_id'] ?? 0), (int) ($ficha['ano_letivo'] ?? 0)) as $g) {
+            $label = mb_strtolower(trim((string) ($g['label'] ?? '')));
+            if ($label !== '') {
+                $labelsGrupo[$label] = true;
+            }
+        }
         $porMateria = [];
         $semMateria = [];
         foreach ($linhas as $l) {
@@ -2893,7 +3058,19 @@ class VidaEscolarService
                 continue;
             }
             if ($mid > 0 && $idsPermitidos !== [] && !isset($idsPermitidos[$mid])) {
-                continue;
+                $nomeOficial = mb_strtolower(trim((string) ($l['componente_nome'] ?? '')));
+                $ehLinhaOficial = $nomeOficial !== '' && isset($labelsGrupo[$nomeOficial]);
+                if (!$ehLinhaOficial) {
+                    foreach ($this->filhosDaMateria($mid) as $fid) {
+                        if (isset($idsPermitidos[$fid])) {
+                            $ehLinhaOficial = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$ehLinhaOficial) {
+                    continue;
+                }
             }
             if ($mid > 0) {
                 $prev = $porMateria[$mid] ?? null;
@@ -2902,7 +3079,8 @@ class VidaEscolarService
                 }
                 continue;
             }
-            if ($idsPermitidos !== []) {
+            $nomeLinha = mb_strtolower(trim((string) ($l['componente_nome'] ?? '')));
+            if ($idsPermitidos !== [] && ($nomeLinha === '' || !isset($labelsGrupo[$nomeLinha]))) {
                 continue;
             }
             $semMateria[] = $l;
@@ -3089,11 +3267,14 @@ class VidaEscolarService
             }
         }
         foreach ($comps as $comp) {
-            $mid = (int) ($comp['materia_id'] ?? 0);
+            $mid = $this->materiaOficialId((int) ($comp['materia_id'] ?? 0));
             if ($mid <= 0 || isset($jaTem[$mid])) {
                 continue;
             }
-            $nome = (string) ($comp['componente_nome'] ?? 'Componente');
+            $nome = $this->nomeDaMateria($mid);
+            if ($nome === '') {
+                $nome = (string) ($comp['componente_nome'] ?? 'Componente');
+            }
             $nova = $this->criarLinhaFichaCompleta(
                 $fichaId,
                 $mid,
@@ -3371,6 +3552,9 @@ class VidaEscolarService
      */
     private function podeCriarLinhaComponente(int $fichaId, int $materiaId, array $linhasExistentes): bool
     {
+        if ($materiaId > 0 && $this->paiIdDaMateria($materiaId) > 0) {
+            return false;
+        }
         foreach ($linhasExistentes as $ln) {
             if (!is_array($ln)) {
                 continue;
@@ -3395,8 +3579,10 @@ class VidaEscolarService
     }
 
     /**
-     * Filhos do group_line (ex.: Literatura) somem do quadro quando a linha
-     * agrupada já existe na ficha e o filho não tem lançamento próprio.
+     * Desdobramentos (Gramática, Leitura, Literatura) não entram no boletim.
+     * A linha oficial é o pai ou o grupo (Língua Portuguesa). Some quando essa
+     * linha já tem o resultado final; se ela ainda está vazia, o filho com nota
+     * permanece até a sincronização gravar a linha oficial.
      *
      * @param list<array<string,mixed>> $linhas
      * @param array<int, array<int, array<string,mixed>>> $porLinha
@@ -3412,9 +3598,6 @@ class VidaEscolarService
             return [];
         }
         $grupos = $this->gruposLinhaDoAluno($alunoId, $anoLetivo);
-        if ($grupos === []) {
-            return [];
-        }
         $nomesNaFicha = [];
         foreach ($linhas as $l) {
             if (!is_array($l)) {
@@ -3463,13 +3646,62 @@ class VidaEscolarService
                 continue;
             }
             $lid = (int) ($l['id'] ?? 0);
-            if ($this->celulasLinhaTemValor($porLinha[$lid] ?? [])) {
+            if ($this->celulasLinhaTemValor($porLinha[$lid] ?? [])
+                && !$this->linhaOficialDoFilhoTemValor($mid, $linhas, $porLinha, $alunoId, $anoLetivo)
+            ) {
                 continue;
             }
             $out[$mid] = true;
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @param array<int, array<int, array<string,mixed>>> $porLinha
+     */
+    private function linhaOficialDoFilhoTemValor(
+        int $filhoId,
+        array $linhas,
+        array $porLinha,
+        int $alunoId,
+        int $anoLetivo
+    ): bool {
+        $pai = $this->paiIdDaMateria($filhoId);
+        $labels = [];
+        if ($pai > 0) {
+            $nomePai = mb_strtolower($this->nomeDaMateria($pai));
+            if ($nomePai !== '') {
+                $labels[$nomePai] = true;
+            }
+        }
+        foreach ($this->gruposLinhaDoAluno($alunoId, $anoLetivo) as $g) {
+            $ids = array_map('intval', (array) ($g['materias_ids'] ?? []));
+            if (!in_array($filhoId, $ids, true)) {
+                continue;
+            }
+            $label = mb_strtolower(trim((string) ($g['label'] ?? '')));
+            if ($label !== '') {
+                $labels[$label] = true;
+            }
+        }
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $mid = (int) ($l['materia_id'] ?? 0);
+            $nome = mb_strtolower(trim((string) ($l['componente_nome'] ?? '')));
+            $bate = ($pai > 0 && $mid === $pai) || ($nome !== '' && isset($labels[$nome]));
+            if (!$bate) {
+                continue;
+            }
+            if ($this->celulasLinhaTemValor($porLinha[(int) ($l['id'] ?? 0)] ?? [])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
