@@ -170,58 +170,30 @@ class VidaEscolarPdfService
      */
     public function htmlHistorico(array $dadosPdf, ?array $config): string
     {
-        $this->garantirModelos();
-        $modelo = $this->modeloHistorico($dadosPdf);
-        if (!$modelo) {
-            throw new \RuntimeException('Nenhum layout de histórico disponível. Vincule um em Layout de documentos.');
-        }
-        $aluno = is_array($dadosPdf['aluno'] ?? null) ? $dadosPdf['aluno'] : [];
+        require_once __DIR__ . '/GradeHistoricoOficial.php';
+        require_once __DIR__ . '/../../modelos-documentos/Services/GiradorTextoVerticalDocumento.php';
         $unidade = is_array($dadosPdf['unidade'] ?? null) ? $dadosPdf['unidade'] : [];
+        $logo = '';
+        try {
+            $logo = $this->modelos->logoHtmlInstitucional($unidade, $config);
+        } catch (\Throwable $e) {
+            $logo = '';
+        }
+        $tabela = GradeHistoricoOficial::html($dadosPdf, $logo);
+        $tabela = \App\Modulos\ModelosDocumentos\Services\GiradorTextoVerticalDocumento::aplicar($tabela);
+        $cssPath = dirname(__DIR__, 4) . '/public/static/css/folha-oficial.css';
+        $css = is_file($cssPath) ? (string) file_get_contents($cssPath) : '';
         $doc = is_array($dadosPdf['documento'] ?? null) ? $dadosPdf['documento'] : [];
-        $finalidade = (string) ($doc['finalidade'] ?? '');
-        $tituloDoc = $finalidade === 'Transferencia'
-            ? 'Histórico Escolar para Transferência'
-            : 'Histórico Escolar';
-        $viewData = [
-            'tipo' => 'historico',
-            'titulo' => $tituloDoc,
-            'dados' => [
-                'aluno' => $aluno,
-                'unidade' => $unidade,
-                'matricula' => null,
-            ],
-            'numero' => (int) ($doc['versao'] ?? 1),
-            'ano' => (int) date('Y'),
-            'gerado_em' => date('d/m/Y'),
-            'cidade_data' => $this->cidadeData($unidade),
-        ];
-        $vars = $this->modelos->varsFromDeclaracao($viewData);
-        $filiacao = trim((string) ($aluno['nome_mae'] ?? '') . ' / ' . (string) ($aluno['nome_pai'] ?? ''), ' /');
-        if ($filiacao !== '') {
-            $vars['resp_nome'] = htmlspecialchars($filiacao, ENT_QUOTES, 'UTF-8');
-        }
-        $serieTurma = trim((string) ($aluno['turma_serie'] ?? ''));
-        if ($serieTurma !== '') {
-            $vars['serie'] = htmlspecialchars($serieTurma, ENT_QUOTES, 'UTF-8');
-        }
-        $vars['historico_html'] = $this->historicoOficialHtml($dadosPdf);
-        $vars['titulo'] = htmlspecialchars($tituloDoc, ENT_QUOTES, 'UTF-8');
-        $vars['observacoes'] = htmlspecialchars(
-            (string) ($dadosPdf['observacoes_gerais'] ?? $doc['observacoes_gerais'] ?? ''),
-            ENT_QUOTES,
-            'UTF-8'
-        );
+        $titulo = (string) ($doc['finalidade'] ?? '') === 'Transferencia'
+            ? 'Histórico escolar para transferência'
+            : 'Histórico escolar';
 
-        $html = $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config);
-        if ($finalidade === 'Transferencia') {
-            $html = str_replace(
-                '<h1 class="doc-title">Histórico Escolar</h1>',
-                '<h1 class="doc-title">Histórico Escolar para Transferência</h1>',
-                $html
-            );
-        }
-
-        return $html;
+        return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>'
+            . htmlspecialchars($titulo, ENT_QUOTES, 'UTF-8')
+            . '</title><style>@page { size: A4 portrait; margin: 6mm; }'
+            . 'body{margin:0;font-family:DejaVu Sans,sans-serif;}'
+            . $css
+            . '</style></head><body>' . $tabela . '</body></html>';
     }
 
     /**

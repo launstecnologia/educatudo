@@ -194,11 +194,7 @@ class ImpressaoLoteFechamentoService
             $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
         }
 
-        $versao = match ($documento) {
-            'historico' => 'v3',
-            'resultado', 'ficha' => 'v4',
-            default => 'v2',
-        };
+        $versao = in_array($documento, ['historico', 'resultado', 'ficha'], true) ? 'v4' : 'v2';
         $arquivo = $documento . '_' . $versao . '.pdf';
 
         return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $arquivo;
@@ -206,7 +202,7 @@ class ImpressaoLoteFechamentoService
 
     /**
      * Nomes já usados para o mesmo PDF. O mais novo vem primeiro.
-     * Consolidado e ficha não herdam arquivo antigo: o layout mudou e o PDF salvo era a ata de quatro colunas.
+     * Consolidado, ficha e histórico não herdam arquivo antigo: o layout mudou.
      *
      * @return list<string>
      */
@@ -220,14 +216,11 @@ class ImpressaoLoteFechamentoService
     ): array {
         $atual = self::chavePdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
         $documento = strtolower(preg_replace('/[^a-z_]/i', '', $documento) ?: 'doc');
-        if (in_array($documento, ['resultado', 'ficha'], true)) {
+        if (in_array($documento, ['resultado', 'ficha', 'historico'], true)) {
             return [$atual];
         }
         $pasta = dirname($atual);
         $nomes = [$documento . '.pdf'];
-        if ($documento === 'historico') {
-            $nomes[] = 'historico_v2.pdf';
-        }
         $chaves = [$atual];
         foreach ($nomes as $nome) {
             $chave = $pasta . '/' . $nome;
