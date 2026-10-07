@@ -788,6 +788,45 @@ class ResultadoAcademico
     }
 
     /**
+     * Alunos por turma no ano, sem carregar a ficha de cada um.
+     *
+     * @return array<int,int>
+     */
+    public function contarAlunosPorTurma(int $anoLetivo): array
+    {
+        $porTurma = [];
+        if ($anoLetivo > 0 && $this->tabelaExiste('matricula') && $this->tabelaExiste('ano_letivo')) {
+            $rows = $this->db->fetchAll(
+                "SELECT m.turma_id, COUNT(DISTINCT m.aluno_id) AS total
+                 FROM matricula m
+                 INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                 WHERE al.ano = :ano
+                   AND m.status IN ('ativa', 'concluido', 'transferido')
+                 GROUP BY m.turma_id",
+                ['ano' => $anoLetivo]
+            ) ?: [];
+            foreach ($rows as $row) {
+                $porTurma[(int) ($row['turma_id'] ?? 0)] = (int) ($row['total'] ?? 0);
+            }
+        }
+        if ($this->tabelaExiste('alunos')) {
+            $atuais = $this->db->fetchAll(
+                'SELECT turma_id, COUNT(*) AS total
+                 FROM alunos
+                 WHERE ativo = 1
+                 GROUP BY turma_id'
+            ) ?: [];
+            foreach ($atuais as $row) {
+                $tid = (int) ($row['turma_id'] ?? 0);
+                if ($tid > 0 && empty($porTurma[$tid])) {
+                    $porTurma[$tid] = (int) ($row['total'] ?? 0);
+                }
+            }
+        }
+        return $porTurma;
+    }
+
+    /**
      * @return list<int>
      */
     public function anosLetivosTurmas(): array

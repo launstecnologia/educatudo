@@ -326,6 +326,13 @@ class FechamentoService
     public function painel(int $anoLetivo, string $periodoTipo, int $periodoNumero, int $turmaFiltro = 0, string $serieFiltro = ''): array
     {
         $turmas = $this->homologacao->model()->turmasAtivas($anoLetivo);
+        $periodo = $this->homologacao->resolverPeriodo($anoLetivo, $periodoTipo, $periodoNumero);
+        $vigentes = $this->model->listarVigentes(
+            $anoLetivo,
+            (string) ($periodo['tipo'] ?? $periodoTipo),
+            (int) ($periodo['numero'] ?? $periodoNumero)
+        );
+        $contagens = $this->homologacao->model()->contarAlunosPorTurma($anoLetivo);
         $linhas = [];
         foreach ($turmas as $turma) {
             $tid = (int) ($turma['id'] ?? 0);
@@ -338,11 +345,37 @@ class FechamentoService
             if ($serieFiltro !== '' && trim((string) ($turma['serie'] ?? '')) !== $serieFiltro) {
                 continue;
             }
-            $preview = $this->homologacao->previewTurma($tid, $anoLetivo, $periodoTipo, $periodoNumero);
-            $fechamento = $this->model->findVigente($tid, $anoLetivo, $periodoTipo, $periodoNumero);
+            $fechamento = $vigentes[$tid] ?? null;
             $status = $fechamento
                 ? FechamentoMaquinaEstados::normalizar((string) $fechamento['status'])
                 : FechamentoMaquinaEstados::ABERTO;
+            $travado = FechamentoMaquinaEstados::estaTravado($status);
+            if ($travado) {
+                $total = (int) ($contagens[$tid] ?? 0);
+                $linhas[] = [
+                    'turma' => $turma,
+                    'periodo' => $periodo,
+                    'resumo' => [
+                        'total' => $total,
+                        'homologados' => $total,
+                        'pendencias' => 0,
+                        'elegiveis' => 0,
+                        'aprovados' => 0,
+                        'reprovados' => 0,
+                        'recuperacao' => 0,
+                        'outros' => 0,
+                        'chamadas_pendentes' => 0,
+                    ],
+                    'fechamento' => $fechamento,
+                    'status' => $status,
+                    'status_rotulo' => FechamentoMaquinaEstados::rotulo($status),
+                    'travado' => true,
+                    'pendencias' => 0,
+                    'pode_homologar' => false,
+                ];
+                continue;
+            }
+            $preview = $this->homologacao->previewTurma($tid, $anoLetivo, $periodoTipo, $periodoNumero);
             $linhas[] = [
                 'turma' => $preview['turma'] ?: $turma,
                 'periodo' => $preview['periodo'],
@@ -350,9 +383,9 @@ class FechamentoService
                 'fechamento' => $fechamento,
                 'status' => $status,
                 'status_rotulo' => FechamentoMaquinaEstados::rotulo($status),
-                'travado' => FechamentoMaquinaEstados::estaTravado($status),
+                'travado' => false,
                 'pendencias' => (int) ($preview['resumo']['pendencias'] ?? 0),
-                'pode_homologar' => !empty($preview['pode_homologar']) && !FechamentoMaquinaEstados::estaTravado($status),
+                'pode_homologar' => !empty($preview['pode_homologar']),
             ];
         }
         return $linhas;

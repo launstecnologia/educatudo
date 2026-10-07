@@ -120,6 +120,34 @@ class FechamentoPeriodo
         return $row ?: null;
     }
 
+    /**
+     * Fechamento vigente de todas as turmas do período, indexado por turma_id.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function listarVigentes(int $anoLetivo, string $periodoTipo, int $periodoNumero): array
+    {
+        if (!$this->schemaPronto() || $anoLetivo <= 0) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT * FROM fechamento_periodo
+             WHERE ano_letivo = :ano
+               AND periodo_tipo = :tipo AND periodo_numero = :num
+               AND vigente = 1',
+            [
+                'ano' => $anoLetivo,
+                'tipo' => $periodoTipo,
+                'num' => $periodoNumero,
+            ]
+        ) ?: [];
+        $porTurma = [];
+        foreach ($rows as $row) {
+            $porTurma[(int) ($row['turma_id'] ?? 0)] = $row;
+        }
+        return $porTurma;
+    }
+
     public function estaTravado(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero): bool
     {
         $row = $this->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
