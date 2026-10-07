@@ -161,7 +161,7 @@
         ], true);
         $sistemaOpen = in_array($cp, ['sistema', 'avatares_alunos', 'essays_config', 'dev_tickets'], true);
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
-        $zConfigOpen = in_array($cp, ['z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos'], true);
+        $zConfigOpen = in_array($cp, ['z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos', 'layouts_documentos'], true);
         $boletimNestedOpen = in_array($cp, ['boletim_config', 'boletim_guia'], true);
         $estruturaNestedOpen = in_array($cp, [
             'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
@@ -902,6 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'gestao_usuarios': 'usuarios',
         'usuarios': 'usuarios',
         'monitors': 'usuarios',
+        'layouts_documentos': 'z-configuracao',
         'z_configuracao': 'z-configuracao',
         'dev': 'z-configuracao',
         'unidades': 'z-configuracao',

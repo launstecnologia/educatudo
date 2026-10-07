@@ -51,6 +51,15 @@ if ($podeHub('slider_dashboard')) {
     ];
 }
 
+if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('resultados_finais'))) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/resultados-finais/layouts',
+        'title' => 'Layouts',
+        'description' => 'Modelos dos documentos do fechamento.',
+        'icon' => 'fa-solid fa-table-columns',
+    ];
+}
+
 if (($user['perfil_admin'] ?? '') === 'dev') {
     $hub_cards[] = [
         'href' => URL . '/admin/configuracao/ui-modelos',

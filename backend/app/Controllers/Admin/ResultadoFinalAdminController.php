@@ -397,7 +397,7 @@ class ResultadoFinalAdminController extends AdminBaseController
         $this->viewWithLayout('admin', 'admin/resultados-finais/layouts', [
             'title' => 'Layouts dos documentos - EducaTudo',
             'user' => $this->auth->getUser(),
-            'current_page' => 'resultados-finais',
+            'current_page' => 'layouts_documentos',
             'tipos' => ResultadoAcademico::DOCUMENTO_TIPOS,
             'escolhidos' => $model->listarLayoutsEscola(),
             'modelos' => $this->documentos()->modelosDisponiveis(),

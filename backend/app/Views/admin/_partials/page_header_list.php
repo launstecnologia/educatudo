@@ -20,7 +20,7 @@ $page_header_actions = (string) ($page_header_actions ?? '');
             <?php endif; ?>
         </div>
         <?php if ($page_header_actions !== ''): ?>
-        <div class="flex items-center gap-3 flex-shrink-0">
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
             <?= $page_header_actions ?>
         </div>
         <?php endif; ?>

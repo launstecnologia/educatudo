@@ -266,10 +266,6 @@ $gestaoOpen = $secretariaNavOpen;
             <i class="fa-solid fa-flag-checkered w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
-        <a href="<?= $urlBase ?>/admin/fechamento/apoio-digitacao" class="<?= $linkCls($cur === 'apoio-digitacao') ?>">
-            <i class="fa-solid fa-file-excel w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Apoio à digitação</span>
-        </a>
         <?php endif; ?>
         <?php if ($secCan(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
         <a href="<?= $urlBase ?>/admin/conselhos" class="<?= $linkCls($cur === 'conselho_classe') ?>">

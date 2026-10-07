@@ -224,10 +224,6 @@ if ($nomeMenuEscola === '') {
             <i class="fa-solid fa-flag-checkered w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
-        <a href="<?= URL ?>/admin/fechamento/apoio-digitacao" class="<?= $linkCls($cp === 'apoio-digitacao') ?>">
-            <i class="fa-solid fa-file-excel w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Apoio à digitação</span>
-        </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
         <a href="<?= URL ?>/admin/conselhos" class="<?= $linkCls($cp === 'conselho_classe') ?>">
@@ -785,6 +781,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         <a href="<?= URL ?>/admin/settings#slider-dashboard" class="<?= $linkCls($cp === 'settings') ?>">
             <i class="fa-solid fa-images w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Slider Dashboard</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($canViewSidebar(['resultados_finais']) && $modOn('resultados_finais')): ?>
+        <a href="<?= URL ?>/admin/resultados-finais/layouts" class="<?= $linkCls($cp === 'layouts_documentos') ?>">
+            <i class="fa-solid fa-table-columns w-4 h-4 mr-3"></i>
+            <span class="sidebar-text text-sm">Layouts</span>
         </a>
         <?php endif; ?>
         <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>

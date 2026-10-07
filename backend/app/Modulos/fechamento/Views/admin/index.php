@@ -34,17 +34,15 @@ $loteQs = http_build_query([
     'turma_id' => $turmaIdFiltro,
 ]);
 $loteTitulo = $lotePronto
-    ? 'Imprimir ficha, histórico e consolidado final das turmas homologadas'
-    : ('Homologue todas as turmas deste filtro para imprimir em lote (' . $loteHomologadas . ' de ' . $loteTotal . ').');
+    ? 'Gerar a consolidação final das turmas homologadas'
+    : ('Homologue todas as turmas deste filtro para gerar a consolidação final (' . $loteHomologadas . ' de ' . $loteTotal . ').');
 ob_start();
 ?>
-<a href="<?= URL ?>/admin/resultados-finais/layouts" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Layouts</a>
 <a href="<?= URL ?>/admin/resultados-finais/relatorios" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Relatórios</a>
-<a href="<?= URL ?>/admin/fechamento/apoio-digitacao?<?= htmlspecialchars($loteQs) ?>" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Apoio à digitação</a>
 <?php
 if ($lotePronto):
     $ui_btn_variant = 'complementar';
-    $ui_btn_label = 'Imprimir em lote';
+    $ui_btn_label = 'Consolidação Final';
     $ui_btn_icon = 'fa-solid fa-print';
     $ui_btn_href = URL . '/admin/fechamento/impressao-lote?' . $loteQs;
     $ui_btn_attrs = 'title="' . htmlspecialchars($loteTitulo, ENT_QUOTES, 'UTF-8') . '"';
@@ -53,7 +51,7 @@ else:
 ?>
 <span class="inline-flex items-center px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed"
       title="<?= htmlspecialchars($loteTitulo, ENT_QUOTES, 'UTF-8') ?>">
-    <i class="fa-solid fa-print mr-2"></i> Imprimir em lote
+    <i class="fa-solid fa-print mr-2"></i> Consolidação Final
 </span>
 <?php
 endif;
