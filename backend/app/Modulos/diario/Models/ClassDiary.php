@@ -4,6 +4,7 @@ namespace App\Modulos\Diario\Models;
 
 use Database;
 use DateTime;
+use PeriodoLetivo;
 use RuntimeException;
 use Throwable;
 
