@@ -194,14 +194,19 @@ class ImpressaoLoteFechamentoService
             $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
         }
 
-        $versao = in_array($documento, ['historico', 'resultado', 'ficha'], true) ? 'v3' : 'v2';
+        $versao = match ($documento) {
+            'historico' => 'v3',
+            'resultado', 'ficha' => 'v4',
+            default => 'v2',
+        };
         $arquivo = $documento . '_' . $versao . '.pdf';
 
         return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $arquivo;
     }
 
     /**
-     * Nomes já usados para o mesmo PDF. O mais novo vem primeiro; os antigos continuam valendo.
+     * Nomes já usados para o mesmo PDF. O mais novo vem primeiro.
+     * Consolidado e ficha não herdam arquivo antigo: o layout mudou e o PDF salvo era a ata de quatro colunas.
      *
      * @return list<string>
      */
@@ -214,8 +219,11 @@ class ImpressaoLoteFechamentoService
         string $documento
     ): array {
         $atual = self::chavePdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
-        $pasta = dirname($atual);
         $documento = strtolower(preg_replace('/[^a-z_]/i', '', $documento) ?: 'doc');
+        if (in_array($documento, ['resultado', 'ficha'], true)) {
+            return [$atual];
+        }
+        $pasta = dirname($atual);
         $nomes = [$documento . '.pdf'];
         if ($documento === 'historico') {
             $nomes[] = 'historico_v2.pdf';
@@ -610,6 +618,12 @@ class ImpressaoLoteFechamentoService
             $partes[] = '<section class="lote-folha" style="' . $quebra . '">' . $corpo . '</section>';
         }
         $size = $orientacao === 'landscape' ? 'A4 landscape' : 'A4 portrait';
+        if (preg_match('/@page\s*\{/', $css)) {
+            $css = (string) preg_replace('/@page\s*\{/', '@page { size: ' . $size . '; ', $css, 1);
+            $pagina = '';
+        } else {
+            $pagina = '@page { size: ' . $size . '; margin: 12mm; }';
+        }
         $avisosHtml = '';
         if ($avisos !== []) {
             $itens = '';
@@ -623,7 +637,7 @@ class ImpressaoLoteFechamentoService
 
         return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>' . $tituloEsc . '</title><style>'
             . $css
-            . '@page { size: ' . $size . '; }'
+            . $pagina
             . '.lote-barra{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 16px;background:#0f172a;color:#fff;font-family:sans-serif}'
             . '.lote-barra a,.lote-barra button{font:inherit;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;text-decoration:none}'
             . '.lote-barra a{background:transparent;color:#fff}'
