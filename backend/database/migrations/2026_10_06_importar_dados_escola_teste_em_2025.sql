@@ -77,6 +77,35 @@ BEGIN
   INNER JOIN alunos a ON a.id = e.aluno_id
   WHERE a.nickname LIKE 'et25.%' OR e.hash_validacao LIKE 'et25%';
 
+  DELETE o FROM conselho_observacoes o
+  INNER JOIN conselho_sessoes cs ON cs.id = o.sessao_id
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
+  DELETE e FROM conselho_encaminhamentos e
+  INNER JOIN conselho_sessoes cs ON cs.id = e.sessao_id
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
+  DELETE d FROM conselho_deliberacoes d
+  INNER JOIN conselho_sessoes cs ON cs.id = d.sessao_id
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
+  DELETE a FROM conselho_atas a
+  INNER JOIN conselho_sessoes cs ON cs.id = a.sessao_id
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
+  DELETE p FROM conselho_participantes p
+  INNER JOIN conselho_sessoes cs ON cs.id = p.sessao_id
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
+  DELETE cs FROM conselho_sessoes cs
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
   DELETE FROM resultado_academico
   WHERE aluno_id IN (SELECT id FROM alunos WHERE nickname LIKE 'et25.%');
 
@@ -1606,6 +1635,111 @@ BEGIN
       WHERE df.aluno_id = a.id AND da.data_aula = d.data_aula AND da.turma_id = a.turma_id
         AND df.situacao IN ('presente','atraso','saida_antecipada','falta_justificada')
     );
+
+  INSERT INTO conselho_sessoes (
+    turma_id, ano_letivo, bimestre, status, data_reuniao, pauta,
+    criado_por, aberto_por, aberto_em, finalizado_por, finalizado_em
+  )
+  SELECT t.id, 2025, per.bim, 'finalizado', per.data_reuniao,
+         CONCAT('ET25 Conselho ', per.rotulo, ' — ', t.nome),
+         v_admin, v_admin, TIMESTAMP(per.data_reuniao, '18:00:00'),
+         v_admin, TIMESTAMP(per.data_reuniao, '19:30:00')
+  FROM turmas t
+  CROSS JOIN (
+    SELECT 1 bim, '2025-05-16' data_reuniao, '1º trimestre' rotulo
+    UNION ALL SELECT 2, '2025-08-29', '2º trimestre'
+    UNION ALL SELECT 3, '2025-12-12', 'final'
+  ) per
+  WHERE t.observacoes LIKE 'ET25 %';
+
+  INSERT INTO conselho_participantes (sessao_id, usuario_id, nome, cargo, presente)
+  SELECT cs.id, v_admin, 'Helena Duarte', 'coordenacao', 1
+  FROM conselho_sessoes cs
+  INNER JOIN turmas t ON t.id = cs.turma_id
+  WHERE t.observacoes LIKE 'ET25 %' AND cs.pauta LIKE 'ET25 Conselho %';
+
+  INSERT INTO conselho_participantes (sessao_id, professor_id, nome, cargo, presente)
+  SELECT cs.id, p.id, p.nome, 'professor', 1
+  FROM conselho_sessoes cs
+  INNER JOIN turmas t ON t.id = cs.turma_id AND t.observacoes LIKE 'ET25 %'
+  INNER JOIN (
+    SELECT DISTINCT turma_id, professor_id FROM grade_horaria
+  ) g ON g.turma_id = t.id
+  INNER JOIN professores p ON p.id = g.professor_id
+  WHERE cs.pauta LIKE 'ET25 Conselho %';
+
+  INSERT INTO conselho_deliberacoes (
+    sessao_id, aluno_id, materia_id, resultado_anterior, resultado_decisao, justificativa, registrado_por
+  )
+  SELECT cs.id, r.aluno_id, NULL,
+    CASE r.situacao
+      WHEN 'aprovado_conselho' THEN 'reprovado_rendimento'
+      WHEN 'aprovado_recuperacao' THEN 'recuperacao'
+      ELSE r.situacao
+    END,
+    CASE r.situacao
+      WHEN 'aprovado_conselho' THEN 'aprovado_conselho'
+      WHEN 'aprovado' THEN 'manter'
+      WHEN 'aprovado_recuperacao' THEN 'manter'
+      WHEN 'reprovado_rendimento' THEN 'retido'
+      WHEN 'reprovado_frequencia' THEN 'manter'
+      WHEN 'transferido' THEN 'transferido'
+      ELSE 'manter'
+    END,
+    CASE r.situacao
+      WHEN 'aprovado_conselho' THEN 'ET25 Média entre 5 e 6 após recuperação. Conselho delibera aprovação pela trajetória e pelo comprometimento.'
+      WHEN 'aprovado_recuperacao' THEN 'ET25 Aprovado após recuperação. Conselho mantém o resultado.'
+      WHEN 'reprovado_rendimento' THEN 'ET25 Médias abaixo da mínima. Conselho registra a retenção.'
+      WHEN 'reprovado_frequencia' THEN 'ET25 Frequência abaixo do mínimo. Conselho mantém a reprovação por frequência.'
+      WHEN 'transferido' THEN 'ET25 Aluno transferido. Conselho registra a movimentação.'
+      WHEN 'desistente' THEN 'ET25 Desistência registrada. Conselho mantém a situação.'
+      ELSE 'ET25 Conselho mantém o resultado preliminar do período.'
+    END,
+    v_admin
+  FROM conselho_sessoes cs
+  INNER JOIN turmas t ON t.id = cs.turma_id AND t.observacoes LIKE 'ET25 %'
+  INNER JOIN resultado_academico r
+    ON r.turma_id = t.id AND r.ano_letivo = 2025 AND r.status = 'homologado'
+   AND (
+        (cs.bimestre IN (1, 2) AND r.periodo_tipo = 'trimestre' AND r.periodo_numero = cs.bimestre)
+     OR (cs.bimestre = 3 AND r.periodo_tipo = 'ano' AND r.periodo_numero = 0)
+   )
+  WHERE cs.pauta LIKE 'ET25 Conselho %';
+
+  INSERT INTO conselho_encaminhamentos (sessao_id, aluno_id, tipo, detalhe, criado_por)
+  SELECT d.sessao_id, d.aluno_id,
+    CASE
+      WHEN d.resultado_decisao = 'aprovado_conselho' THEN 'decisao_final'
+      WHEN d.resultado_decisao = 'retido' THEN 'recuperacao'
+      ELSE 'contato_responsavel'
+    END,
+    d.justificativa,
+    v_admin
+  FROM conselho_deliberacoes d
+  INNER JOIN conselho_sessoes cs ON cs.id = d.sessao_id AND cs.pauta LIKE 'ET25 Conselho %'
+  WHERE d.resultado_decisao IN ('aprovado_conselho', 'retido')
+     OR d.resultado_anterior = 'reprovado_frequencia';
+
+  INSERT INTO conselho_observacoes (sessao_id, aluno_id, professor_id, texto)
+  SELECT cs.id, d.aluno_id, prof.professor_id,
+         'ET25 Participou da recuperação e apresentou evolução. Indico aprovação pelo Conselho.'
+  FROM conselho_deliberacoes d
+  INNER JOIN conselho_sessoes cs ON cs.id = d.sessao_id AND cs.pauta LIKE 'ET25 Conselho %'
+  INNER JOIN (
+    SELECT turma_id, MIN(professor_id) AS professor_id
+    FROM grade_horaria
+    GROUP BY turma_id
+  ) prof ON prof.turma_id = cs.turma_id
+  WHERE d.resultado_decisao = 'aprovado_conselho';
+
+  INSERT INTO conselho_atas (sessao_id, pauta, sintese, decisoes, conteudo_json, gerada_por, gerada_em)
+  SELECT cs.id, cs.pauta,
+         'ET25 Reunião finalizada. Rendimento, frequência e recuperação conferidos com a equipe.',
+         'ET25 Deliberações lançadas. Casos entre 5 e 6 ficam aprovados pelo Conselho; retenção, frequência e transferência permanecem registradas.',
+         JSON_OBJECT('origem', 'ET25', 'status', 'finalizado'),
+         v_admin, cs.finalizado_em
+  FROM conselho_sessoes cs
+  WHERE cs.pauta LIKE 'ET25 Conselho %';
 
   DROP TABLE IF EXISTS et25_tmp_media;
   DROP TABLE IF EXISTS et25_tmp_freq;
