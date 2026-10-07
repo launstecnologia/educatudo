@@ -223,11 +223,6 @@ $statusBadge = static function (string $status): string {
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-id-card text-gray-400 w-4 text-center"></i> Ficha
                         </a>
-                        <a href="<?= URL ?>/admin/resultados-finais/aluno/<?= $aid ?>/boletim/pdf?<?= htmlspecialchars($qsAluno) ?>"
-                           target="_blank" rel="noopener"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-table text-gray-400 w-4 text-center"></i> Boletim
-                        </a>
                         <a href="<?= URL ?>/admin/students/<?= $aid ?>/historico-escolar"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-scroll text-gray-400 w-4 text-center"></i> Histórico

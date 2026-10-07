@@ -86,13 +86,14 @@ class EstruturaDocumentosOficiais
             self::secaoBloco('observacoes', true),
         ];
         self::assinaturas($est);
+        self::rodapeInstitucional($est);
         return $est;
     }
 
     /** @return array<string,mixed> */
     public static function ata(): array
     {
-        $est = self::base('retrato');
+        $est = self::base('paisagem');
         self::cabecalho($est, 'ATA DE RESULTADOS FINAIS');
         $est['body']['sections'] = [
             self::secaoTexto(
@@ -112,6 +113,7 @@ class EstruturaDocumentosOficiais
             self::secaoTexto('Espaço adicional para assinaturas do Conselho de Classe, quando previsto pela instituição.'),
         ];
         self::assinaturas($est);
+        self::rodapeInstitucional($est);
         return $est;
     }
 
@@ -136,6 +138,7 @@ class EstruturaDocumentosOficiais
             self::secaoBloco('observacoes', true),
         ];
         self::assinaturas($est);
+        self::rodapeInstitucional($est);
         return $est;
     }
 
@@ -279,6 +282,19 @@ class EstruturaDocumentosOficiais
         $ass['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura('texto_rico', ['html' => $htmlEsq], ['textAlign' => 'center']);
         $ass['columns'][1]['elements'][] = ModeloDocumentoService::elementoEstrutura('texto_rico', ['html' => $htmlDir], ['textAlign' => 'center']);
         $est['footer']['sections'] = [$ass];
+    }
+
+    /** @param array<string,mixed> $est */
+    private static function rodapeInstitucional(array &$est): void
+    {
+        $sec = ModeloDocumentoService::secaoPadrao([100], 'footer');
+        $sec['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura(
+            'texto',
+            ['text' => '{{escola_nome}} · {{escola_endereco}} · {{escola_docs}} · Tel. {{escola_telefone}} · nº {{numero}}/{{ano}}'],
+            ['textAlign' => 'center', 'fontSize' => 8, 'color' => '#6b7280']
+        );
+        $atual = is_array($est['footer']['sections'] ?? null) ? $est['footer']['sections'] : [];
+        $est['footer']['sections'] = array_merge([$sec], $atual);
     }
 
     /** @return array<string,mixed> */

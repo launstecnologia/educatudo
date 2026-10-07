@@ -34,7 +34,7 @@ $loteQs = http_build_query([
     'turma_id' => $turmaIdFiltro,
 ]);
 $loteTitulo = $lotePronto
-    ? 'Imprimir boletim, ficha, histórico e resultado final das turmas homologadas'
+    ? 'Imprimir ficha, histórico e consolidado final das turmas homologadas'
     : ('Homologue todas as turmas deste filtro para imprimir em lote (' . $loteHomologadas . ' de ' . $loteTotal . ').');
 ob_start();
 ?>

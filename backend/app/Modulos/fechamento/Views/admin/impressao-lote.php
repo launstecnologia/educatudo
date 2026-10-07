@@ -19,7 +19,7 @@ $painelQs = http_build_query([
 ]);
 $homologadas = (int) ($resumo['homologadas'] ?? 0);
 $page_header_title = 'Impressão em lote';
-$page_header_subtitle = 'Escolha a série, emita os quatro documentos e baixe cada um no menu da turma.';
+$page_header_subtitle = 'Escolha a série, emita os três documentos e baixe cada um no menu da turma.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/fechamento?<?= htmlspecialchars($painelQs) ?>" class="text-gray-600 hover:text-gray-900 text-sm">← Fechamento</a>
@@ -58,7 +58,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </select>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Trocar a turma mostra o download dela. Boletim, ficha e histórico aceitam até <?= (int) ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
+    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Trocar a turma mostra o download dela. Ficha e histórico aceitam até <?= (int) ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
 </form>
 
 <?php if ($jobs !== []): ?>
@@ -134,7 +134,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 <?php if (!$escopoOk): ?>
 <div class="mb-6 p-4 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-sm">
-    Escolha a série. A lista mostra cada turma, e em Ações você baixa o boletim, a ficha, o histórico e o resultado final.
+    Escolha a série. A lista mostra cada turma, e em Ações você baixa a ficha, o histórico e o consolidado final.
 </div>
 <?php elseif ($linhas === []): ?>
 <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
@@ -147,7 +147,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <h3 class="text-lg font-semibold text-gray-900"><?= $turmaId > 0 ? 'Esta turma' : htmlspecialchars($serie) ?></h3>
             <p class="text-sm text-gray-500 mt-1">
                 <?= $homologadas ?> de <?= count($linhas) ?> turma(s) homologada(s).
-                Emite boletim, ficha, histórico e resultado final só do que ainda não tem PDF. O histórico sai emitido, com as escolas dos anos anteriores.
+                Emite ficha, histórico e consolidado final só do que ainda não tem PDF. O histórico sai emitido, com as escolas dos anos anteriores.
             </p>
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
@@ -254,7 +254,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <input type="hidden" name="documento" value="pacote">
                             <input type="hidden" name="regenerar" value="1">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <i class="fa-solid fa-rotate text-gray-400 w-4 text-center"></i> Gerar os quatro de novo
+                                <i class="fa-solid fa-rotate text-gray-400 w-4 text-center"></i> Gerar os três de novo
                             </button>
                         </form>
                         <?php

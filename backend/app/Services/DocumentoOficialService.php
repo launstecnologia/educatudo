@@ -87,17 +87,21 @@ class DocumentoOficialService
         ) ?: [];
         $turma = array_merge($turma, $detalhe);
         $turma['turno_label'] = $this->rotuloTurno((string) ($turma['turno'] ?? ''));
+        if (empty($turma['ano_letivo'])) {
+            $turma['ano_letivo'] = (int) ($preview['periodo']['ano_letivo'] ?? $anoLetivo);
+        }
+        $unidade = $this->unidadeDaTurma($turmaId);
         $payload = [
             'turma' => $turma,
             'periodo' => $preview['periodo'],
             'linhas' => $linhas,
             'resumo' => $preview['resumo'],
-            'tabela_html' => $this->tabelaAtaHtml($linhas),
+            'tabela_html' => $this->tabelaAtaHtml($linhas, $turma, $totais, $unidade),
             'ata_totais' => $totais['texto'],
             'total_aprovados' => $totais['aprovados'],
             'total_retidos' => $totais['retidos'],
             'total_transferidos' => $totais['transferidos'],
-            'unidade' => $this->unidadeDaTurma($turmaId),
+            'unidade' => $unidade,
         ];
         $payload['conselho_label'] = $this->ehEmissaoOficial('ata_resultados', $payload) ? 'Homologado' : 'Prévia';
         return $this->emitirDocumento('ata_resultados', $payload, $usuarioId, $configApp, null, $turmaId, $registrarEmissao);
@@ -250,14 +254,23 @@ class DocumentoOficialService
      */
     private function renderComModelo(string $codigo, array $vars, string $tipo, array $payload, ?array $configApp): array
     {
+        $unidade = is_array($payload['unidade'] ?? null) ? $payload['unidade'] : null;
+        if (trim((string) ($vars['logo_html'] ?? '')) === '') {
+            require_once __DIR__ . '/../Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
+            $svcLogo = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
+            $vars['logo_html'] = $svcLogo->logoHtmlInstitucional($unidade, $configApp);
+        }
+        if ($tipo === 'ata_resultados' || $tipo === 'ficha_individual') {
+            return [
+                'html' => $this->renderFallbackPhp($tipo, $payload, $vars),
+                'orientacao' => $tipo === 'ata_resultados' ? 'landscape' : 'portrait',
+                'papel' => 'A4',
+            ];
+        }
         $modelo = $this->buscarModelo($codigo);
         if ($modelo) {
             require_once __DIR__ . '/../Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
             $svc = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
-            $unidade = is_array($payload['unidade'] ?? null) ? $payload['unidade'] : null;
-            if (trim((string) ($vars['logo_html'] ?? '')) === '') {
-                $vars['logo_html'] = $svc->logoHtmlInstitucional($unidade, $configApp);
-            }
             $html = $svc->renderHtml($modelo, $vars, \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::estiloDoModelo($modelo), $configApp);
             return [
                 'html' => $html,
@@ -1087,28 +1100,83 @@ class DocumentoOficialService
     /**
      * @param list<array<string,mixed>> $linhas
      */
-    public function tabelaAtaHtml(array $linhas): string
+    /**
+     * Capa da turma e mapa de notas: uma coluna por componente.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @param array<string,mixed> $turma
+     * @param array<string,mixed> $totais
+     * @param array<string,mixed> $unidade
+     */
+    public function tabelaAtaHtml(array $linhas, array $turma = [], array $totais = [], array $unidade = []): string
     {
         $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-        $html = '<table class="dados"><tr>'
-            . '<td class="label">Nº</td><td class="label">Aluno</td>'
-            . '<td class="label">Frequência</td><td class="label">Resultado Final</td>'
-            . '<td class="label">Destino/Observação</td></tr>';
+        $fmt = static function ($v): string {
+            return is_numeric($v) ? number_format((float) $v, 1, ',', '.') : '—';
+        };
+        $materias = [];
+        foreach ($linhas as $linha) {
+            foreach (is_array($linha['componentes'] ?? null) ? $linha['componentes'] : [] as $comp) {
+                $nome = trim((string) ($comp['materia_nome'] ?? ''));
+                if ($nome === '' || isset($materias[$nome])) {
+                    continue;
+                }
+                $materias[$nome] = (int) ($comp['ordem'] ?? count($materias) + 1);
+            }
+        }
+        asort($materias);
+        $nomes = array_keys($materias);
+
+        $ano = (string) ($turma['ano_letivo'] ?? '');
+        $capa = '<section class="capa">'
+            . '<h2>Ata de resultados finais</h2>'
+            . '<p class="lead">Consolidado da turma após o encerramento do ano letivo. As páginas seguintes trazem a nota final de cada componente.</p>'
+            . '<table class="dados"><tr>'
+            . '<td class="label">Turma</td><td>' . $esc($turma['nome'] ?? '') . '</td>'
+            . '<td class="label">Ano letivo</td><td>' . $esc($ano !== '' ? $ano : date('Y')) . '</td></tr>'
+            . '<tr><td class="label">Etapa</td><td>' . $esc($turma['curso_nome'] ?? $turma['serie_nome'] ?? '—') . '</td>'
+            . '<td class="label">Turno</td><td>' . $esc($turma['turno_label'] ?? $this->rotuloTurno((string) ($turma['turno'] ?? ''))) . '</td></tr>'
+            . '<tr><td class="label">Alunos</td><td>' . count($linhas) . '</td>'
+            . '<td class="label">Aprovados</td><td>' . (int) ($totais['aprovados'] ?? 0) . '</td></tr>'
+            . '<tr><td class="label">Reprovados</td><td>' . (int) ($totais['retidos'] ?? 0) . '</td>'
+            . '<td class="label">Transferidos</td><td>' . (int) ($totais['transferidos'] ?? 0) . '</td></tr>'
+            . '</table>'
+            . '<p class="totais">' . $esc((string) ($totais['texto'] ?? '')) . '</p>'
+            . '<table class="assin"><tr>'
+            . '<td><span>' . $esc($unidade['diretor_nome'] ?? 'Direção') . '<br>Direção</span></td>'
+            . '<td><span>' . $esc($unidade['secretario_nome'] ?? 'Secretaria') . '<br>Secretaria</span></td>'
+            . '</tr></table></section>';
+
+        $html = $capa . '<table class="grade"><thead><tr>'
+            . '<th>Nº</th><th class="aluno">Aluno</th>';
+        foreach ($nomes as $nome) {
+            $html .= '<th class="disc">' . $esc($nome) . '</th>';
+        }
+        $html .= '<th>Freq.</th><th>Resultado</th></tr></thead><tbody>';
         $i = 0;
+        $colunas = count($nomes) + 4;
         foreach ($linhas as $linha) {
             $i++;
+            $porNome = [];
+            foreach (is_array($linha['componentes'] ?? null) ? $linha['componentes'] : [] as $comp) {
+                $nome = trim((string) ($comp['materia_nome'] ?? ''));
+                if ($nome !== '') {
+                    $porNome[$nome] = $comp['media_final'] ?? $comp['media'] ?? null;
+                }
+            }
             $freq = $linha['frequencia']['percentual'] ?? null;
             $freqTxt = is_numeric($freq) ? number_format((float) $freq, 1, ',', '.') . '%' : '—';
             $html .= '<tr><td>' . str_pad((string) $i, 2, '0', STR_PAD_LEFT) . '</td>'
-                . '<td>' . $esc($linha['aluno']['nome'] ?? '') . '</td>'
-                . '<td>' . $esc($freqTxt) . '</td>'
-                . '<td>' . $esc($linha['rotulo'] ?? '—') . '</td>'
-                . '<td>' . $esc($this->destinoAta($linha)) . '</td></tr>';
+                . '<td class="aluno">' . $esc($linha['aluno']['nome'] ?? '') . '</td>';
+            foreach ($nomes as $nome) {
+                $html .= '<td>' . $esc($fmt($porNome[$nome] ?? null)) . '</td>';
+            }
+            $html .= '<td>' . $esc($freqTxt) . '</td><td>' . $esc($linha['rotulo'] ?? '—') . '</td></tr>';
         }
         if ($i === 0) {
-            $html .= '<tr><td colspan="5">Nenhum aluno neste recorte.</td></tr>';
+            $html .= '<tr><td colspan="' . $colunas . '">Nenhum aluno neste recorte.</td></tr>';
         }
-        return $html . '</table>';
+        return $html . '</tbody></table>';
     }
 
     /**

@@ -9,20 +9,19 @@ use App\Services\HistoricoEscolarService;
 
 /**
  * Impressão em lote do fechamento homologado:
- * boletim, ficha individual, histórico e resultado final (ata) da turma.
+ * ficha individual, histórico e consolidado final (ata) da turma.
  */
 class ImpressaoLoteFechamentoService
 {
     public const DOCUMENTOS = [
-        'boletim' => 'Boletim',
         'ficha' => 'Ficha individual',
         'historico' => 'Histórico escolar',
-        'resultado' => 'Resultado final por turma',
+        'resultado' => 'Consolidado final',
         'relatorio' => 'Relatório de fechamento por turma',
     ];
 
-    /** Os quatro documentos do pacote, na ordem de impressão. */
-    public const PACOTE = ['boletim', 'ficha', 'historico', 'resultado'];
+    /** Os três documentos do pacote, na ordem de impressão. */
+    public const PACOTE = ['ficha', 'historico', 'resultado'];
 
     public const TIPO_JOB = 'fechamento_impressao_lote';
 
@@ -90,7 +89,7 @@ class ImpressaoLoteFechamentoService
         if ($resumo['total_turmas'] > 12) {
             throw new RuntimeException('Escolha uma turma ou uma série menor. Este recorte ainda tem ' . $resumo['total_turmas'] . ' turmas.');
         }
-        if (in_array($documento, ['boletim', 'ficha', 'historico'], true) && $resumo['total_alunos'] > self::MAX_ALUNOS) {
+        if (in_array($documento, ['ficha', 'historico'], true) && $resumo['total_alunos'] > self::MAX_ALUNOS) {
             $nome = self::DOCUMENTOS[$documento] ?? 'documento';
             throw new RuntimeException(
                 'Este recorte tem ' . $resumo['total_alunos'] . ' alunos. Escolha uma turma com até '
@@ -146,7 +145,7 @@ class ImpressaoLoteFechamentoService
             $jobId
         );
         $this->gravarAndamento($jobId, $documento, 'Gerando o PDF…');
-        $orientacao = in_array($documento, ['relatorio', 'resultado', 'boletim'], true) ? 'landscape' : 'portrait';
+        $orientacao = in_array($documento, ['relatorio', 'resultado'], true) ? 'landscape' : 'portrait';
         $pdf = $this->pdfDeHtml($html, $orientacao);
         unset($html);
         if ($pdf === '') {
@@ -369,7 +368,7 @@ class ImpressaoLoteFechamentoService
         $htmls = [];
         $feitos = 0;
         $totalFolhas = $this->estimarFolhas($paineis, $documento);
-        $orientacao = in_array($documento, ['relatorio', 'resultado', 'boletim'], true) ? 'landscape' : 'portrait';
+        $orientacao = in_array($documento, ['relatorio', 'resultado'], true) ? 'landscape' : 'portrait';
 
         foreach ($paineis as $painel) {
             $turmaId = (int) ($painel['turma']['id'] ?? 0);
@@ -415,20 +414,9 @@ class ImpressaoLoteFechamentoService
                 if ($alunoId <= 0) {
                     continue;
                 }
-                if ($documento === 'ficha' || $documento === 'boletim') {
+                if ($documento === 'ficha') {
                     try {
-                        $emitido = $documento === 'boletim'
-                            ? $this->documentos->emitirBoletim(
-                                $alunoId,
-                                $turmaId,
-                                $anoLetivo,
-                                $periodoTipo,
-                                $periodoNumero,
-                                $usuarioId > 0 ? $usuarioId : null,
-                                $configApp,
-                                false
-                            )
-                            : $this->documentos->emitirFicha(
+                        $emitido = $this->documentos->emitirFicha(
                                 $alunoId,
                                 $turmaId,
                                 $anoLetivo,
