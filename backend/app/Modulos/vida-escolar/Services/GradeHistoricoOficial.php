@@ -22,8 +22,15 @@ class GradeHistoricoOficial
         $estudos = is_array($dados['estudos'] ?? null) ? $dados['estudos'] : [];
 
         $quadro = self::quadro($itens, $resultados);
+        $transf = is_array($dados['transferencia'] ?? null) ? $dados['transferencia'] : null;
+        if ($transf !== null) {
+            $quadro['ultimo']['resultado'] = 'Transferido';
+        }
         $escola = self::escola($unidade);
         $etapa = $quadro['ensino_medio'] ? 'ENSINO MÉDIO' : 'ENSINO FUNDAMENTAL';
+        $tituloFolha = $transf !== null
+            ? 'HISTÓRICO ESCOLAR PARA TRANSFERÊNCIA — ' . $etapa
+            : 'HISTÓRICO ESCOLAR — ' . $etapa;
         $obs = trim((string) ($dados['observacoes_gerais'] ?? $doc['observacoes_gerais'] ?? ''));
         if ($quadro['sobra'] !== []) {
             $extra = 'Outros componentes: ' . implode(', ', $quadro['sobra']) . '.';
@@ -32,10 +39,19 @@ class GradeHistoricoOficial
 
         $c = self::cols([3.2, 3.2, 12, 8, 25.6, 16, 16, 16]);
         $linhas = self::cabecalho($escola, $logoHtml);
-        $linhas[] = self::tr(self::td('HISTÓRICO ESCOLAR — ' . $etapa, 8, 1, 'edoc-titulo'), '6.2mm');
+        $linhas[] = self::tr(self::td($tituloFolha, 8, 1, 'edoc-titulo'), '6.2mm');
         $linhas[] = self::identidade($aluno);
         $linhas[] = self::nascimento($aluno);
         $linhas[] = self::tr(self::td('Data: ' . self::dataBr((string) ($aluno['data_nasc'] ?? '')), 8), '5mm');
+        if ($transf !== null) {
+            $linhas[] = self::tr(
+                self::td('Transferência', 2, 1, 'edoc-negrito')
+                . self::td('Data de saída: ' . trim((string) ($transf['data_saida_br'] ?? '')), 2)
+                . self::td('Turma: ' . trim((string) ($transf['turma'] ?? '')), 2)
+                . self::td('Ano letivo: ' . trim((string) ($transf['ano_letivo'] ?? '')), 2),
+                '5mm'
+            );
+        }
 
         $divLinhas = $quadro['diversificada'];
         $rsFund = 2 + 11 + 1 + count($divLinhas) + 3;
@@ -142,8 +158,13 @@ class GradeHistoricoOficial
         $linhas[] = self::tr(self::td('OBSERVAÇÕES: ' . $obs, 8), '6mm');
         $linhas[] = self::tr(self::td('CERTIFICADO', 8, 1, 'edoc-titulo'), '5mm');
         $linhas[] = self::tr(self::td(self::certificado($aluno, $escola, $quadro), 8), '9mm');
-        $registro = trim((string) ($dados['numero_registro_sed'] ?? $doc['numero_registro_sed'] ?? ''));
-        $linhas[] = self::tr(self::td('Número de publicação de concluinte: ' . $registro, 8), '5mm');
+        if ($transf !== null) {
+            $dataSaida = trim((string) ($transf['data_saida_br'] ?? ''));
+            $linhas[] = self::tr(self::td('Data da transferência: ' . ($dataSaida !== '' ? $dataSaida : '—'), 8), '5mm');
+        } else {
+            $registro = trim((string) ($dados['numero_registro_sed'] ?? $doc['numero_registro_sed'] ?? ''));
+            $linhas[] = self::tr(self::td('Número de publicação de concluinte: ' . $registro, 8), '5mm');
+        }
 
         $url = trim((string) ($dados['validation_url'] ?? ''));
         $rodape = $url !== ''

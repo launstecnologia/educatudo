@@ -21,7 +21,7 @@ use ResultadoAcademico;
  */
 class EmissaoDocumentosAlunoService
 {
-    public const TIPOS = ['historico', 'ficha', 'boletim', 'demonstrativo'];
+    public const TIPOS = ['historico', 'historico_transferencia', 'ficha', 'boletim', 'demonstrativo'];
 
     private const ROTULOS = [
         'ficha_individual' => 'Ficha do aluno',
@@ -44,8 +44,8 @@ class EmissaoDocumentosAlunoService
     public function catalogo(int $alunoId): array
     {
         $transferencia = $this->paraTransferencia($alunoId);
-
-        return [
+        $saida = $this->transferenciaDoAluno($alunoId);
+        $catalogo = [
             [
                 'tipo' => 'historico',
                 'nome' => $transferencia ? 'Histórico para transferência' : 'Histórico escolar',
@@ -54,6 +54,20 @@ class EmissaoDocumentosAlunoService
                     : 'O boletim deste ano já foi homologado.',
                 'icone' => 'fa-file-lines',
             ],
+        ];
+        if ($saida !== null) {
+            $quando = $this->dataBr((string) ($saida['data_saida'] ?? ''));
+            $catalogo[] = [
+                'tipo' => 'historico_transferencia',
+                'nome' => 'Histórico de transferência',
+                'descricao' => $quando !== ''
+                    ? 'Notas do período cursado até a saída em ' . $quando . ', com turma e situação de transferido.'
+                    : 'Notas do período cursado até a saída, com turma e situação de transferido.',
+                'icone' => 'fa-right-from-bracket',
+            ];
+        }
+
+        return array_merge($catalogo, [
             [
                 'tipo' => 'ficha',
                 'nome' => 'Ficha do aluno',
@@ -72,7 +86,7 @@ class EmissaoDocumentosAlunoService
                 'descricao' => 'Quadro vigente de notas do aluno.',
                 'icone' => 'fa-list-ol',
             ],
-        ];
+        ]);
     }
 
     /**
@@ -148,8 +162,8 @@ class EmissaoDocumentosAlunoService
         $userNome = trim((string) ($usuario['nome'] ?? ''));
         $slug = preg_replace('/[^a-z0-9]+/i', '_', (string) ($aluno['nome'] ?? 'aluno')) ?: 'aluno';
 
-        if ($tipo === 'historico') {
-            $this->emitirHistorico($aluno, $userId, $userNome, $config, $slug);
+        if ($tipo === 'historico' || $tipo === 'historico_transferencia') {
+            $this->emitirHistorico($aluno, $userId, $userNome, $config, $slug, $tipo === 'historico_transferencia');
             return;
         }
         if ($tipo === 'demonstrativo') {
@@ -223,13 +237,134 @@ class EmissaoDocumentosAlunoService
     }
 
     /**
+     * Última matrícula encerrada por transferência, com turma e data de saída.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function transferenciaDoAluno(int $alunoId): ?array
+    {
+        if ($alunoId <= 0) {
+            return null;
+        }
+        try {
+            $existe = $this->db->fetch("SHOW TABLES LIKE 'matricula'");
+            if (!$existe) {
+                return null;
+            }
+            $row = $this->db->fetch(
+                "SELECT m.data_saida, m.data_entrada, m.status,
+                        t.nome AS turma_nome, t.serie AS turma_serie,
+                        al.ano AS ano_letivo
+                 FROM matricula m
+                 LEFT JOIN turmas t ON t.id = m.turma_id
+                 LEFT JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                 WHERE m.aluno_id = :id AND m.status = 'transferido'
+                 ORDER BY m.data_saida DESC, m.id DESC
+                 LIMIT 1",
+                ['id' => $alunoId]
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @param array<string,mixed> $dados
+     * @param array<string,mixed> $saida
+     * @return array<string,mixed>
+     */
+    private function aplicarDadosTransferencia(array $dados, array $saida): array
+    {
+        $data = substr(trim((string) ($saida['data_saida'] ?? '')), 0, 10);
+        $dataBr = $this->dataBr($data);
+        $turma = trim((string) ($saida['turma_nome'] ?? ''));
+        $serie = trim((string) ($saida['turma_serie'] ?? ''));
+        $ano = trim((string) ($saida['ano_letivo'] ?? ''));
+        $dados['transferencia'] = [
+            'data_saida' => $data,
+            'data_saida_br' => $dataBr,
+            'turma' => $turma,
+            'serie' => $serie,
+            'ano_letivo' => $ano,
+        ];
+        if (!is_array($dados['documento'] ?? null)) {
+            $dados['documento'] = [];
+        }
+        $dados['documento']['finalidade'] = 'Transferencia';
+
+        $onde = [];
+        if ($turma !== '') {
+            $onde[] = 'da turma ' . $turma;
+        }
+        if ($serie !== '') {
+            $onde[] = 'série ' . $serie;
+        }
+        if ($ano !== '') {
+            $onde[] = 'ano letivo de ' . $ano;
+        }
+        $frase = 'Aluno transferido'
+            . ($dataBr !== '' ? ' em ' . $dataBr : '')
+            . ($onde !== [] ? ', ' . implode(', ', $onde) : '')
+            . '. As notas deste ano correspondem ao período cursado até a saída.';
+        $obs = trim((string) ($dados['observacoes_gerais'] ?? ''));
+        if (!str_contains($obs, 'Aluno transferido')) {
+            $dados['observacoes_gerais'] = trim($obs . ($obs !== '' ? ' ' : '') . $frase);
+        }
+
+        $resultados = is_array($dados['resultados'] ?? null) ? $dados['resultados'] : [];
+        $marcou = false;
+        $ultimoIndice = null;
+        foreach ($resultados as $i => $resultado) {
+            if (!is_array($resultado)) {
+                continue;
+            }
+            $ultimoIndice = $i;
+            if ($ano !== '' && trim((string) ($resultado['ano_letivo'] ?? '')) === $ano) {
+                $resultados[$i]['resultado'] = 'Transferido';
+                $marcou = true;
+            }
+        }
+        if (!$marcou && $ultimoIndice !== null && $ano === '') {
+            $resultados[$ultimoIndice]['resultado'] = 'Transferido';
+            $marcou = true;
+        }
+        if (!$marcou) {
+            $resultados[] = [
+                'ano_letivo' => $ano,
+                'serie_ano' => $serie,
+                'resultado' => 'Transferido',
+            ];
+        }
+        $dados['resultados'] = $resultados;
+
+        return $dados;
+    }
+
+    private function dataBr(string $data): string
+    {
+        $data = substr(trim($data), 0, 10);
+        if ($data === '' || $data === '0000-00-00') {
+            return '';
+        }
+        $dt = \DateTime::createFromFormat('Y-m-d', $data);
+
+        return $dt instanceof \DateTime ? $dt->format('d/m/Y') : '';
+    }
+
+    /**
      * @param array<string,mixed> $aluno
      * @param array<string,mixed>|null $config
      */
-    private function emitirHistorico(array $aluno, ?int $userId, string $userNome, ?array $config, string $slug): void
+    private function emitirHistorico(array $aluno, ?int $userId, string $userNome, ?array $config, string $slug, bool $somenteTransferencia = false): void
     {
         $alunoId = (int) ($aluno['id'] ?? 0);
-        $transferencia = $this->paraTransferencia($alunoId);
+        $saida = $somenteTransferencia ? $this->transferenciaDoAluno($alunoId) : null;
+        if ($somenteTransferencia && $saida === null) {
+            throw new \RuntimeException('Este aluno não tem transferência registrada.');
+        }
+        $transferencia = $somenteTransferencia || $this->paraTransferencia($alunoId);
         $finalidade = $transferencia ? 'Transferencia' : 'Conclusao';
         $svc = new HistoricoEscolarService($this->db);
         $id = $this->historicoProntoParaPdf($alunoId);
@@ -247,19 +382,23 @@ class EmissaoDocumentosAlunoService
         if (is_array($dados['documento'] ?? null)) {
             $dados['documento']['finalidade'] = $finalidade;
         }
+        if ($saida !== null) {
+            $dados = $this->aplicarDadosTransferencia($dados, $saida);
+        }
         $html = (new VidaEscolarPdfService($this->db))->htmlHistorico($dados, $config);
-        $tipoLog = $transferencia ? 'historico_transferencia' : 'historico';
+        $tipoLog = $somenteTransferencia || $transferencia ? 'historico_transferencia' : 'historico';
+        $titulo = $somenteTransferencia ? 'Histórico de transferência' : self::ROTULOS[$tipoLog];
         $this->registrar(
             $alunoId,
             (int) ($aluno['turma_id'] ?? 0),
             (int) ($aluno['ano_letivo'] ?? 0) ?: (int) date('Y'),
             $tipoLog,
-            self::ROTULOS[$tipoLog],
+            $titulo,
             $userId,
             $userNome
         );
-        $arquivo = ($transferencia ? 'historico_transferencia_' : 'historico_escolar_') . $slug . '.pdf';
-        $this->enviar($html, $arquivo, ['orientacao' => 'paisagem'], $alunoId, self::ROTULOS[$tipoLog], $tipoLog, $userId, $userNome, $config);
+        $arquivo = ($somenteTransferencia ? 'historico_de_transferencia_' : ($transferencia ? 'historico_transferencia_' : 'historico_escolar_')) . $slug . '.pdf';
+        $this->enviar($html, $arquivo, ['orientacao' => 'paisagem'], $alunoId, $titulo, $tipoLog, $userId, $userNome, $config);
     }
 
     /**
