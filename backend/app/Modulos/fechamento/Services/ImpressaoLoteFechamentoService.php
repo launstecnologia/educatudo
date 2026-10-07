@@ -194,7 +194,8 @@ class ImpressaoLoteFechamentoService
             $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
         }
 
-        $arquivo = ($documento === 'historico' ? 'historico_v3' : $documento . '_v2') . '.pdf';
+        $versao = in_array($documento, ['historico', 'resultado', 'ficha'], true) ? 'v3' : 'v2';
+        $arquivo = $documento . '_' . $versao . '.pdf';
 
         return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $arquivo;
     }
