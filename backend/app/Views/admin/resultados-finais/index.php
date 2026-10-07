@@ -94,7 +94,7 @@ include __DIR__ . '/_filtros.php';
                     </td>
                     <td class="px-6 py-4 text-right">
                         <?php ob_start(); ?>
-                        <a href="<?= URL ?>/admin/resultados-finais/turma/<?= $tid ?>?<?= htmlspecialchars($qs) ?>"
+                        <a href="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>?<?= htmlspecialchars($qs) ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-list-check text-gray-400 w-4 text-center"></i> Fechamento
                         </a>

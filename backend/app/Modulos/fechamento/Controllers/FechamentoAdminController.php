@@ -80,6 +80,14 @@ class FechamentoAdminController extends AdminBaseController
         $preview = $svc->homologacao()->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         $fechamento = $svc->model()->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         $historico = $fechamento ? $svc->model()->listarHistorico((int) $fechamento['id']) : [];
+        $especiais = $model->listarEspeciaisTurma($turmaId, $anoLetivo);
+        $componentes = [];
+        try {
+            require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
+            $componentes = (new ComponenteCurricular())->getAll(false) ?: [];
+        } catch (Throwable $e) {
+            $componentes = [];
+        }
         $flash = $this->getFlashMessage();
 
         $this->viewWithLayout('admin', 'admin/fechamento/turma', [
@@ -93,6 +101,8 @@ class FechamentoAdminController extends AdminBaseController
             'preview' => $preview,
             'fechamento' => $fechamento,
             'historico' => $historico,
+            'especiais' => $especiais,
+            'componentes' => $componentes,
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',

@@ -186,7 +186,7 @@ $statusBadge = static function (string $status): string {
                         <?php ob_start(); ?>
                         <a href="<?= $urlTurma ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-list-check text-gray-400 w-4 text-center"></i> Conferir turma
+                            <i class="fa-solid fa-list-check text-gray-400 w-4 text-center"></i> Turma
                         </a>
                         <?php if ($podeFechar): ?>
                         <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/iniciar" class="block">
@@ -214,10 +214,6 @@ $statusBadge = static function (string $status): string {
                             </button>
                         </form>
                         <?php endif; ?>
-                        <a href="<?= URL ?>/admin/resultados-finais/turma/<?= $tid ?>?<?= htmlspecialchars($qs) ?>"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-check-double text-gray-400 w-4 text-center"></i> Alunos e homologação
-                        </a>
                         <a href="<?= URL ?>/admin/resultados-finais/turma/<?= $tid ?>/ata?<?= htmlspecialchars($qs) ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center"></i> Ata

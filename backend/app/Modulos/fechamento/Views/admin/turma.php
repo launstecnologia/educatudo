@@ -10,6 +10,8 @@ $linhas = is_array($preview['linhas'] ?? null) ? $preview['linhas'] : [];
 $resumo = is_array($preview['resumo'] ?? null) ? $preview['resumo'] : [];
 $fechamento = is_array($fechamento ?? null) ? $fechamento : null;
 $historico = is_array($historico ?? null) ? $historico : [];
+$especiais = is_array($especiais ?? null) ? $especiais : [];
+$componentes = is_array($componentes ?? null) ? $componentes : [];
 $anoLetivo = (int) ($ano_letivo ?? ($periodo['ano_letivo'] ?? date('Y')));
 $periodoTipo = (string) ($periodo_tipo ?? ($periodo['tipo'] ?? 'ano'));
 $periodoNumero = (int) ($periodo_numero ?? ($periodo['numero'] ?? 0));
@@ -23,10 +25,14 @@ $podeIniciar = $statusPeriodo === FechamentoMaquinaEstados::ABERTO && $errosInic
 $motivoIniciar = $errosIniciar[0] ?? '';
 
 $page_header_title = 'Fechamento · ' . (string) ($turma['nome'] ?? 'Turma');
-$page_header_subtitle = ($periodo['label'] ?? 'Ano letivo') . ' / ' . $anoLetivo . ' — conferência por aluno e disciplina antes de homologar.';
+$page_header_subtitle = ($periodo['label'] ?? 'Ano letivo') . ' / ' . $anoLetivo;
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/fechamento?<?= htmlspecialchars($qs) ?>" class="text-gray-600 hover:text-gray-900 text-sm">← Voltar</a>
+<a href="<?= URL ?>/admin/resultados-finais/turma/<?= $turmaId ?>/ata?<?= htmlspecialchars($qs) ?>"
+   class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+    <i class="fa-solid fa-file-lines mr-2"></i> Ata
+</a>
 <?php
 $page_header_actions = ob_get_clean();
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
@@ -48,7 +54,7 @@ $statusBadge = static function (string $status): string {
 };
 ?>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
+<div id="frequencia" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
     <div>
         <div class="text-xs text-gray-500 uppercase tracking-wide">Estado do período</div>
         <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusBadge($statusPeriodo) ?>">
@@ -58,7 +64,7 @@ $statusBadge = static function (string $status): string {
             <span class="ml-2 text-xs text-gray-500"><?= htmlspecialchars((string) $fechamento['periodo_ref']) ?></span>
         <?php endif; ?>
         <?php if ($travado): ?>
-            <p class="text-xs text-amber-800 mt-2">Período homologado: notas, faltas e boletim oficial estão travados. Só retificação com justificativa reabre o fluxo oficial.</p>
+            <p class="text-xs text-amber-800 mt-2">Notas, faltas e boletim travados. Para alterar, retifique com justificativa.</p>
         <?php elseif ($statusPeriodo === FechamentoMaquinaEstados::ABERTO && $motivoIniciar !== ''): ?>
             <p class="text-xs text-amber-800 mt-2">Conferir a turma não inicia o fechamento. <?= htmlspecialchars($motivoIniciar) ?></p>
         <?php elseif ($statusPeriodo === FechamentoMaquinaEstados::EM_FECHAMENTO && $motivoIniciar !== ''): ?>
@@ -108,22 +114,31 @@ $statusBadge = static function (string $status): string {
 </form>
 <?php endif; ?>
 
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
     <?php
     $cards = [
-        ['Alunos', (string) (int) ($resumo['total'] ?? 0), 'alunos'],
-        ['Chamadas pendentes', $travado ? 'Encerrado' : (string) (int) ($resumo['chamadas_pendentes'] ?? 0), ''],
-        ['Pendências', (string) (int) ($resumo['pendencias'] ?? 0), ''],
-        ['Recuperação', (string) (int) ($resumo['recuperacao'] ?? 0), 'recuperacao'],
+        ['Alunos', (int) ($resumo['total'] ?? 0), 'text-gray-900', 'alunos'],
+        ['Homologados', (int) ($resumo['homologados'] ?? 0), 'text-green-700', ''],
+        ['Aprovados', (int) ($resumo['aprovados'] ?? 0), 'text-emerald-700', ''],
+        ['Reprovados', (int) ($resumo['reprovados'] ?? 0), 'text-rose-700', ''],
+        ['Pendências', (int) ($resumo['pendencias'] ?? 0), 'text-gray-900', ''],
     ];
-    foreach ($cards as [$lab, $val, $anchor]):
+    foreach ($cards as [$lab, $val, $cls, $anchor]):
     ?>
     <div <?= $anchor !== '' ? 'id="' . htmlspecialchars($anchor) . '"' : '' ?> class="rounded-xl border border-gray-200 bg-white p-4">
         <div class="text-xs text-gray-500 uppercase tracking-wide"><?= htmlspecialchars($lab) ?></div>
-        <div class="mt-1 text-2xl font-semibold text-gray-900"><?= htmlspecialchars((string) $val, ENT_QUOTES, 'UTF-8') ?></div>
+        <div class="mt-1 text-2xl font-semibold <?= htmlspecialchars($cls) ?>"><?= $val ?></div>
     </div>
     <?php endforeach; ?>
 </div>
+<?php if (!$travado): ?>
+<p class="text-sm text-gray-600 mb-6">
+    Chamadas pendentes: <span class="font-medium text-gray-900"><?= (int) ($resumo['chamadas_pendentes'] ?? 0) ?></span>
+    · Recuperação: <span id="recuperacao" class="font-medium text-gray-900"><?= (int) ($resumo['recuperacao'] ?? 0) ?></span>
+</p>
+<?php else: ?>
+<span id="recuperacao" class="hidden"></span>
+<?php endif; ?>
 
 <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>/homologar" class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8"
       onsubmit="return confirm('Homologar os alunos elegíveis? Quem estiver em recuperação ou exame final não entra no snapshot até ter resultado definitivo (aprovado ou reprovado).');">
@@ -133,20 +148,24 @@ $statusBadge = static function (string $status): string {
     <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
+            <?php $colunas = $travado ? 7 : 8; ?>
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-3 py-3"><input type="checkbox" id="fech-check-all" class="rounded border-gray-300" <?= $travado ? 'disabled' : '' ?>></th>
+                    <?php if (!$travado): ?>
+                    <th class="px-3 py-3"><input type="checkbox" id="fech-check-all" class="rounded border-gray-300"></th>
+                    <?php endif; ?>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Regra</th>
-                    <th id="frequencia" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frequência</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notas</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frequência</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conselho</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Resultado</th>
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pendência</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Conta</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
                 <?php if ($linhas === []): ?>
-                <tr><td colspan="7" class="px-6 py-12 text-center text-gray-500">Nenhum aluno nesta turma.</td></tr>
+                <tr><td colspan="<?= $colunas ?>" class="px-6 py-12 text-center text-gray-500">Nenhum aluno nesta turma.</td></tr>
                 <?php else: foreach ($linhas as $idx => $linha):
                     $aluno = $linha['aluno'] ?? [];
                     $aid = (int) ($aluno['id'] ?? 0);
@@ -154,45 +173,74 @@ $statusBadge = static function (string $status): string {
                     $criticas = !empty($linha['pendencias_criticas']);
                     $freq = $linha['frequencia']['percentual'] ?? null;
                     $freqTxt = is_numeric($freq) ? number_format((float) $freq, 1, ',', '.') . '%' : '—';
-                    $regraNome = (string) ($linha['regra']['nome'] ?? '');
+                    $conselhoLinha = is_array($linha['conselho'] ?? null) ? $linha['conselho'] : [];
                     $qsAluno = $qs . '&turma_id=' . $turmaId;
+                    $podeMarcar = $statusAluno !== 'homologado' && !$criticas && !$travado;
                 ?>
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50 <?= !empty($aluno['transferido']) ? 'opacity-70' : '' ?>">
+                    <?php if (!$travado): ?>
                     <td class="px-3 py-3">
-                        <?php if ($statusAluno !== 'homologado' && !$criticas && !$travado): ?>
+                        <?php if ($podeMarcar): ?>
                         <input type="checkbox" name="aluno_ids[]" value="<?= $aid ?>" class="fech-check rounded border-gray-300">
                         <?php endif; ?>
                     </td>
+                    <?php endif; ?>
                     <td class="px-4 py-3">
                         <div class="font-medium text-gray-900"><?= htmlspecialchars((string) ($aluno['nome'] ?? '')) ?></div>
-                        <div class="text-xs text-gray-500"><?= htmlspecialchars((string) ($aluno['ra'] ?? '')) ?></div>
+                        <div class="text-xs text-gray-500">
+                            <?= htmlspecialchars((string) ($aluno['ra'] ?? '')) ?>
+                            <?php if (!empty($aluno['transferido'])): ?> · transferido<?php endif; ?>
+                        </div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
-                        <?= $regraNome !== '' ? htmlspecialchars($regraNome) : '—' ?>
-                        <?php if (!empty($linha['regra']['versao'])): ?>
-                            <div class="text-xs text-gray-500">v<?= (int) $linha['regra']['versao'] ?></div>
+                    <td class="px-4 py-3 text-sm">
+                        <?php if (!empty($linha['notas_completas'])): ?>
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">OK</span>
+                        <?php else: ?>
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Incompletas</span>
                         <?php endif; ?>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars($freqTxt) ?></td>
+                    <td class="px-4 py-3 text-sm text-gray-700"><?= htmlspecialchars((string) ($conselhoLinha['resultado'] ?? '—')) ?></td>
                     <td class="px-4 py-3">
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($linha['rotulo'] ?? '—')) ?></div>
+                        <?php if (!$travado): ?>
                         <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusAluno === 'homologado' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600' ?>">
                             <?= htmlspecialchars(ResultadoAcademico::STATUS[$statusAluno] ?? $statusAluno) ?>
                         </span>
+                        <?php endif; ?>
                     </td>
                     <td class="px-4 py-3 text-xs text-gray-600">
                         <?= !empty($linha['pendencias']) ? htmlspecialchars(implode(', ', $linha['pendencias'])) : '—' ?>
                     </td>
                     <td class="px-4 py-3 text-right">
+                        <?php ob_start(); ?>
                         <button type="button"
-                                class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                 onclick="document.getElementById('conta-<?= $idx ?>').classList.toggle('hidden')">
-                            Ver a conta
+                            <i class="fa-solid fa-list text-gray-400 w-4 text-center"></i> Disciplinas
                         </button>
+                        <a href="<?= URL ?>/admin/resultados-finais/aluno/<?= $aid ?>/ficha?<?= htmlspecialchars($qsAluno) ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-id-card text-gray-400 w-4 text-center"></i> Ficha
+                        </a>
+                        <a href="<?= URL ?>/admin/resultados-finais/aluno/<?= $aid ?>/boletim/pdf?<?= htmlspecialchars($qsAluno) ?>"
+                           target="_blank" rel="noopener"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-table text-gray-400 w-4 text-center"></i> Boletim
+                        </a>
+                        <a href="<?= URL ?>/admin/students/<?= $aid ?>/historico-escolar"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-scroll text-gray-400 w-4 text-center"></i> Histórico
+                        </a>
+                        <?php
+                        $row_actions_dropdown_items = ob_get_clean();
+                        $row_actions_dropdown_id = 'row-fech-al-' . $aid;
+                        include __DIR__ . '/../../../../Views/admin/_partials/row_actions_dropdown.php';
+                        ?>
                     </td>
                 </tr>
                 <tr id="conta-<?= $idx ?>" class="hidden bg-slate-50">
-                    <td colspan="7" class="px-6 py-4">
+                    <td colspan="<?= $colunas ?>" class="px-6 py-4">
                         <?php
                         $regra = is_array($linha['regra'] ?? null) ? $linha['regra'] : [];
                         $comps = is_array($linha['componentes'] ?? null) ? $linha['componentes'] : [];
@@ -235,19 +283,15 @@ $statusBadge = static function (string $status): string {
                                 </tbody>
                             </table>
                         </div>
-                        <div class="mt-3 flex flex-wrap gap-2">
-                            <a href="<?= URL ?>/admin/resultados-finais/aluno/<?= $aid ?>/ficha?<?= htmlspecialchars($qsAluno) ?>" class="text-xs text-accent underline">Ficha</a>
-                            <a href="<?= URL ?>/admin/resultados-finais/aluno/<?= $aid ?>/boletim/pdf?<?= htmlspecialchars($qsAluno) ?>" target="_blank" rel="noopener" class="text-xs text-accent underline">Boletim (rascunho se não homologado)</a>
-                            <a href="<?= URL ?>/admin/students/<?= $aid ?>/historico-escolar" class="text-xs text-accent underline">Histórico escolar</a>
-                        </div>
                     </td>
                 </tr>
                 <?php endforeach; endif; ?>
             </tbody>
         </table>
     </div>
+    <?php if (!$travado): ?>
     <div class="px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
-        <p class="text-xs text-gray-500">Homologação grava o snapshot oficial. Aluno em recuperação ou exame final não fecha — só aprovado ou reprovado. Período homologado não reabre: só retifica.</p>
+        <p class="text-xs text-gray-500">Homologar grava o resultado oficial. Recuperação e exame final ficam de fora até o resultado ser definitivo.</p>
         <?php
         $pendTurma = (int) ($resumo['pendencias'] ?? 0);
         $chamadasTurma = (int) ($resumo['chamadas_pendentes'] ?? 0);
@@ -279,7 +323,93 @@ $statusBadge = static function (string $status): string {
         </span>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 </form>
+
+<?php if ($especiais !== [] || !$travado): ?>
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-900 mb-1">Dispensa, aproveitamento e dependência</h3>
+    <p class="text-sm text-gray-500 mb-4">Situação que não é nota. O fechamento não inventa média para componente dispensado.</p>
+    <?php if ($especiais !== []): ?>
+    <div class="overflow-x-auto mb-6">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Componente</th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Obs.</th>
+                    <?php if (!$travado): ?><th class="px-4 py-2"></th><?php endif; ?>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                <?php foreach ($especiais as $esp): ?>
+                <tr>
+                    <td class="px-4 py-2"><?= htmlspecialchars((string) ($esp['aluno_nome'] ?? '')) ?></td>
+                    <td class="px-4 py-2"><?= htmlspecialchars(ResultadoAcademico::ESPECIAIS[$esp['tipo'] ?? ''] ?? (string) ($esp['tipo'] ?? '')) ?></td>
+                    <td class="px-4 py-2"><?= htmlspecialchars((string) ($esp['materia_nome'] ?? 'Geral')) ?></td>
+                    <td class="px-4 py-2 text-gray-500"><?= htmlspecialchars((string) ($esp['observacao'] ?? '')) ?></td>
+                    <?php if (!$travado): ?>
+                    <td class="px-4 py-2 text-right">
+                        <form method="POST" action="<?= URL ?>/admin/resultados-finais/turma/<?= $turmaId ?>/especial/<?= (int) $esp['id'] ?>/excluir"
+                              onsubmit="return confirm('Remover esta situação?')">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                            <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
+                            <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
+                            <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
+                            <button type="submit" class="text-sm text-red-600 hover:underline">Excluir</button>
+                        </form>
+                    </td>
+                    <?php endif; ?>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+    <?php if (!$travado): ?>
+    <form method="POST" action="<?= URL ?>/admin/resultados-finais/turma/<?= $turmaId ?>/especial" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
+        <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
+        <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Aluno</label>
+            <select name="aluno_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                <option value="">Selecione</option>
+                <?php foreach ($linhas as $linhaEsp): ?>
+                    <option value="<?= (int) ($linhaEsp['aluno']['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($linhaEsp['aluno']['nome'] ?? '')) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+            <select name="tipo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                <?php foreach (ResultadoAcademico::ESPECIAIS as $cod => $lab): ?>
+                    <option value="<?= htmlspecialchars($cod) ?>"><?= htmlspecialchars($lab) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Componente</label>
+            <select name="materia_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                <option value="0">Geral</option>
+                <?php foreach ($componentes as $c): ?>
+                    <option value="<?= (int) ($c['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($c['nome'] ?? '')) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Observação</label>
+            <input type="text" name="observacao" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" maxlength="255">
+        </div>
+        <div class="md:col-span-2 flex justify-end">
+            <button type="submit" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold">Registrar</button>
+        </div>
+    </form>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($historico !== []): ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

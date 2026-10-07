@@ -37,59 +37,7 @@ class ResultadoFinalAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
             return;
         }
-        $turmaId = (int) $turmaId;
-        $svc = $this->homologacao();
-        $model = $svc->model();
-        $anos = $model->anosLetivosTurmas();
-        $anoTurma = $model->anoDaTurma($turmaId);
-        $anoLetivo = (int) ($_GET['ano_letivo'] ?? 0);
-        if ($anoLetivo <= 0) {
-            $anoLetivo = $anoTurma > 0 ? $anoTurma : (int) ($anos[0] ?? date('Y'));
-        }
-        [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
-        $alinhado = $model->alinharTurmaAoAnoLetivo($turmaId, $anoLetivo);
-        if ((int) $alinhado['turma_id'] !== $turmaId || (int) $alinhado['ano_letivo'] !== $anoLetivo) {
-            $this->redirect($this->urlTurma(
-                (int) $alinhado['turma_id'],
-                (int) $alinhado['ano_letivo'],
-                $periodoTipo,
-                $periodoNumero
-            ));
-            return;
-        }
-        $preview = $svc->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
-        $especiais = $svc->model()->listarEspeciaisTurma($turmaId, $anoLetivo);
-        $fechamentoTravado = false;
-        $fechamentoPath = __DIR__ . '/../../Modulos/fechamento/Models/FechamentoPeriodo.php';
-        if (is_file($fechamentoPath)) {
-            require_once $fechamentoPath;
-            try {
-                $fp = new FechamentoPeriodo();
-                $fechamentoTravado = $fp->schemaPronto()
-                    && $fp->estaTravado($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
-            } catch (Throwable $e) {
-                $fechamentoTravado = false;
-            }
-        }
-
-        $flash = $this->getFlashMessage();
-        $this->viewWithLayout('admin', 'admin/resultados-finais/turma', [
-            'title' => 'Fechamento da turma - EducaTudo',
-            'user' => $this->auth->getUser(),
-            'current_page' => 'resultados-finais',
-            'anos' => $anos,
-            'ano_letivo' => $anoLetivo,
-            'periodo_tipo' => $periodoTipo,
-            'periodo_numero' => $periodoNumero,
-            'preview' => $preview,
-            'especiais' => $especiais,
-            'componentes' => $this->componentesCatalogo(),
-            'alunos' => $preview['linhas'],
-            'fechamento_travado' => $fechamentoTravado,
-            'csrf_token' => $this->generateCsrfToken(),
-            'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
-            'flash_message' => $flash['message'] ?? '',
-        ]);
+        $this->redirect($this->urlTurma((int) $turmaId));
     }
 
     public function homologar($turmaId): void
@@ -521,7 +469,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             'periodo_tipo' => $tipo ?? ($_GET['periodo_tipo'] ?? $_POST['periodo_tipo'] ?? 'ano'),
             'periodo_numero' => $numero ?? ($_GET['periodo_numero'] ?? $_POST['periodo_numero'] ?? 0),
         ], static fn ($v) => $v !== null && $v !== '');
-        return '/admin/resultados-finais/turma/' . $turmaId . ($qs ? ('?' . http_build_query($qs)) : '');
+        return '/admin/fechamento/turma/' . $turmaId . ($qs ? ('?' . http_build_query($qs)) : '');
     }
 
     private function csrfOuRedirect(string $voltar): bool

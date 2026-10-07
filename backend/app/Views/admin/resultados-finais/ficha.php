@@ -48,7 +48,7 @@ $page_header_title = 'Ficha individual';
 $page_header_subtitle = (string) ($aluno['nome'] ?? 'Aluno') . ' · ' . $anoLetivo;
 ob_start();
 ?>
-<a href="<?= URL ?>/admin/resultados-finais/turma/<?= $turmaId ?>?<?= htmlspecialchars($qs) ?>" class="text-gray-600 hover:text-gray-900 text-sm">← Voltar</a>
+<a href="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>?<?= htmlspecialchars($qs) ?>" class="text-gray-600 hover:text-gray-900 text-sm">← Voltar</a>
 <a href="<?= URL ?>/admin/resultados-finais/aluno/<?= $alunoId ?>/ficha/pdf?<?= htmlspecialchars($qs) ?>"
    target="_blank" rel="noopener"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90">
