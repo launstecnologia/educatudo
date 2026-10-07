@@ -27,7 +27,7 @@ $freq = $linha['frequencia'] ?? null;
             <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= htmlspecialchars((string) ($aluno['nome'] ?? 'Aluno')) ?></h2>
             <p class="text-gray-600">
                 Ficha no Conselho · <?= htmlspecialchars((string) ($sessao['turma_nome'] ?? '')) ?>
-                · <?= (int) ($sessao['bimestre'] ?? 0) ?>º Bimestre / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
+                · <?= htmlspecialchars(class_exists('PeriodoLetivo') ? (PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
             </p>
         </div>
         <a href="<?= URL ?>/admin/conselhos/<?= $sid ?>" class="text-gray-600 hover:text-gray-900">← Voltar à matriz</a>

@@ -28,8 +28,7 @@ class ConselhoAdminController extends AdminBaseController
         if (!in_array($anoLetivo, $anos, true)) {
             $anoLetivo = (int) ($anos[0] ?? date('Y'));
         }
-        $bimestre = (int) ($_GET['bimestre'] ?? $this->bimestreAtual());
-        $bimestre = max(1, min(4, $bimestre));
+        $bimestre = $this->periodoSelecionado($anoLetivo);
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
 
         $flash = $this->getFlashMessage();
@@ -64,7 +63,7 @@ class ConselhoAdminController extends AdminBaseController
         $svc = $this->service();
         $anos = $svc->model()->anosLetivosTurmas();
         $anoLetivo = (int) ($_GET['ano_letivo'] ?? ($anos[0] ?? date('Y')));
-        $bimestre = max(1, min(4, (int) ($_GET['bimestre'] ?? $this->bimestreAtual())));
+        $bimestre = $this->periodoSelecionado($anoLetivo);
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
 
         $flash = $this->getFlashMessage();
@@ -348,9 +347,14 @@ class ConselhoAdminController extends AdminBaseController
         return null;
     }
 
-    private function bimestreAtual(): int
+    private function periodoSelecionado(int $anoLetivo): int
     {
-        return (int) ceil(((int) date('n')) / 3);
+        if (!class_exists('PeriodoLetivo', false)) {
+            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+        }
+        $quantidade = max(1, (int) PeriodoLetivo::doAno($anoLetivo)['quantidade']);
+        $bimestre = (int) ($_GET['bimestre'] ?? PeriodoLetivo::numeroPadrao($anoLetivo));
+        return max(1, min($quantidade, $bimestre));
     }
 }
 }

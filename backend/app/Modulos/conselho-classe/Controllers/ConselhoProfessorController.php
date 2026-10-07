@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../../../Core/BaseController.php';
 require_once __DIR__ . '/../../../Core/AuthManager.php';
 require_once __DIR__ . '/../../../Models/User/Teacher.php';
+require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 require_once __DIR__ . '/../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
@@ -38,7 +39,9 @@ class ConselhoProfessorController extends BaseController
             if (!in_array($anoLetivo, $anos, true)) {
                 $anoLetivo = (int) ($anos[0] ?? date('Y'));
             }
-            $bimestre = max(1, min(4, (int) ($_GET['bimestre'] ?? (int) ceil(((int) date('n')) / 3))));
+            $quantidade = max(1, (int) PeriodoLetivo::doAno($anoLetivo)['quantidade']);
+            $bimestre = (int) ($_GET['bimestre'] ?? PeriodoLetivo::numeroPadrao($anoLetivo));
+            $bimestre = max(1, min($quantidade, $bimestre));
             $turmaIds = $svc->model()->turmaIdsDoProfessor((int) $professor['id']);
             $linhas = [];
             foreach ($turmaIds as $tid) {

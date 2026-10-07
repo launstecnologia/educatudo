@@ -137,8 +137,17 @@ class FechamentoPeriodo
         if ($this->estaTravado($turmaId, $anoLetivo, 'ano', 0)) {
             return true;
         }
-        if ($bimestre >= 1 && $bimestre <= 4 && $this->estaTravado($turmaId, $anoLetivo, 'bimestre', $bimestre)) {
-            return true;
+        if (!class_exists('PeriodoLetivo', false)) {
+            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+        }
+        $info = PeriodoLetivo::doAno($anoLetivo);
+        $tipo = (string) $info['tipo'];
+        $quantidade = max(1, (int) $info['quantidade']);
+        if ($dataYmd !== '' && ($bimestre < 1 || $bimestre > $quantidade)) {
+            $bimestre = PeriodoLetivo::numeroDaData($anoLetivo, $dataYmd);
+        }
+        if ($tipo !== 'ano' && $bimestre >= 1 && $bimestre <= $quantidade) {
+            return $this->estaTravado($turmaId, $anoLetivo, $tipo, $bimestre);
         }
         return false;
     }

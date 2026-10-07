@@ -52,6 +52,10 @@ BEGIN
 
   DELETE FROM diario_aulas WHERE observacoes LIKE 'ET25-SEED%';
 
+  DELETE df FROM diario_fechamentos df
+  INNER JOIN turmas t ON t.id = df.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
   DELETE FROM planos_aula WHERE titulo LIKE 'ET25 %';
 
   DELETE b FROM boletins b
@@ -1740,6 +1744,20 @@ BEGIN
          v_admin, cs.finalizado_em
   FROM conselho_sessoes cs
   WHERE cs.pauta LIKE 'ET25 Conselho %';
+
+  INSERT INTO diario_fechamentos (
+    turma_id, materia_id, professor_id, ano_letivo, bimestre, status, fechado_por, fechado_em, observacoes
+  )
+  SELECT g.turma_id, g.materia_id, g.professor_id, 2025, per.bim, 'fechado', v_admin,
+         TIMESTAMP('2025-12-12', '18:00:00'), 'ET25 diário fechado com o trimestre'
+  FROM (
+    SELECT DISTINCT gh.turma_id, gh.materia_id, gh.professor_id
+    FROM grade_horaria gh
+    INNER JOIN turmas t ON t.id = gh.turma_id AND t.observacoes LIKE 'ET25 %'
+  ) g
+  CROSS JOIN (
+    SELECT 1 AS bim UNION ALL SELECT 2 UNION ALL SELECT 3
+  ) per;
 
   DROP TABLE IF EXISTS et25_tmp_media;
   DROP TABLE IF EXISTS et25_tmp_freq;

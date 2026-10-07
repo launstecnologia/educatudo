@@ -764,21 +764,14 @@ class ResultadoHomologacaoService
             $periodoNumero = 0;
             $inicio = sprintf('%04d-01-01', $anoLetivo);
             $fim = sprintf('%04d-12-31', $anoLetivo);
-        } elseif ($periodoTipo === 'bimestre') {
-            $periodoNumero = max(1, min(4, $periodoNumero));
-            $p = $this->diario->periodoDoBimestre($anoLetivo, $periodoNumero);
+        } else {
+            if (!class_exists('PeriodoLetivo', false)) {
+                require_once __DIR__ . '/../Core/PeriodoLetivo.php';
+            }
+            $periodoNumero = max(1, min(PeriodoLetivo::quantidade($periodoTipo), $periodoNumero));
+            $p = PeriodoLetivo::intervalo($anoLetivo, $periodoNumero, $periodoTipo);
             $inicio = $p['inicio'];
             $fim = $p['fim'];
-        } elseif ($periodoTipo === 'trimestre') {
-            $periodoNumero = max(1, min(3, $periodoNumero));
-            $mesInicio = ($periodoNumero - 1) * 4 + 1;
-            $inicio = sprintf('%04d-%02d-01', $anoLetivo, $mesInicio);
-            $fim = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $anoLetivo, $mesInicio + 3)));
-        } else {
-            $periodoNumero = max(1, min(2, $periodoNumero));
-            $mesInicio = $periodoNumero === 1 ? 1 : 7;
-            $inicio = sprintf('%04d-%02d-01', $anoLetivo, $mesInicio);
-            $fim = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $anoLetivo, $mesInicio + 5)));
         }
 
         return [

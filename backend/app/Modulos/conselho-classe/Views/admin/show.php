@@ -15,7 +15,12 @@ $professoresTurma = is_array($matriz['professores_turma'] ?? null) ? $matriz['pr
 $csrf_token = $csrf_token ?? '';
 $status = (string) ($sessao['status'] ?? '');
 $sid = (int) ($sessao['id'] ?? 0);
-$periodo = (int) ($sessao['bimestre'] ?? 0) . 'º Bimestre';
+$periodo = class_exists('PeriodoLetivo')
+    ? PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0))
+    : '';
+if ($periodo === '') {
+    $periodo = (int) ($sessao['bimestre'] ?? 0) . 'º período';
+}
 ?>
 <div class="mb-8">
     <div class="flex justify-between items-start gap-4 flex-wrap">

@@ -178,6 +178,77 @@ class PeriodoLetivo
         return $numero >= 1 && $numero <= (int) $info['quantidade'];
     }
 
+    /**
+     * Intervalo civil do período. Sem tipo, usa a divisão gravada no ano letivo.
+     * Trimestre: jan–abr, mai–ago, set–dez. Bimestre: blocos de três meses.
+     *
+     * @return array{inicio:string,fim:string}
+     */
+    public static function intervalo(int $ano, int $numero, ?string $tipo = null): array
+    {
+        $ano = $ano > 0 ? $ano : (int) date('Y');
+        $tipoInformado = strtolower(trim((string) $tipo));
+        $tipo = ($tipoInformado === '' || $tipoInformado === 'ano')
+            ? (string) self::doAno($ano)['tipo']
+            : self::normalizarTipo($tipoInformado);
+        $quantidade = self::quantidade($tipo);
+        $numero = max(1, min($quantidade, $numero));
+        if ($tipo === 'etapa_unica') {
+            return [
+                'inicio' => sprintf('%04d-01-01', $ano),
+                'fim' => sprintf('%04d-12-31', $ano),
+            ];
+        }
+        if ($tipo === 'semestre') {
+            $mesInicio = $numero === 1 ? 1 : 7;
+            $alcance = 5;
+        } elseif ($tipo === 'trimestre') {
+            $mesInicio = ($numero - 1) * 4 + 1;
+            $alcance = 3;
+        } else {
+            $mesInicio = ($numero - 1) * 3 + 1;
+            $alcance = 2;
+        }
+        return [
+            'inicio' => sprintf('%04d-%02d-01', $ano, $mesInicio),
+            'fim' => date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $ano, $mesInicio + $alcance))),
+        ];
+    }
+
+    public static function numeroDaData(int $ano, string $data): int
+    {
+        $ano = $ano > 0 ? $ano : (int) date('Y', strtotime($data) ?: time());
+        $info = self::doAno($ano);
+        $quantidade = max(1, (int) $info['quantidade']);
+        $mes = (int) date('n', strtotime($data) ?: time());
+        if ($mes < 1) {
+            $mes = 1;
+        }
+        $numero = match ((string) $info['tipo']) {
+            'trimestre' => (int) ceil($mes / 4),
+            'semestre' => $mes <= 6 ? 1 : 2,
+            'etapa_unica' => 1,
+            default => (int) ceil($mes / 3),
+        };
+        return max(1, min($quantidade, $numero));
+    }
+
+    /**
+     * Período ao abrir a tela: o que contém hoje, ou o último se o ano já passou.
+     */
+    public static function numeroPadrao(int $ano): int
+    {
+        $quantidade = max(1, (int) self::doAno($ano)['quantidade']);
+        $anoHoje = (int) date('Y');
+        if ($ano > 0 && $ano < $anoHoje) {
+            return $quantidade;
+        }
+        if ($ano > $anoHoje) {
+            return 1;
+        }
+        return self::numeroDaData($ano > 0 ? $ano : $anoHoje, date('Y-m-d'));
+    }
+
     public static function rotulo(int $ano, int $numero): string
     {
         $info = self::doAno($ano);

@@ -52,7 +52,7 @@ $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
     <h3 class="text-base font-semibold text-gray-900 mb-3">Prévia da reunião</h3>
     <p class="text-sm text-gray-600 mb-2">
         <?= htmlspecialchars((string) ($sessao['turma_nome'] ?? '')) ?>
-        · <?= (int) ($sessao['bimestre'] ?? 0) ?>º Bimestre / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
+        · <?= htmlspecialchars(class_exists('PeriodoLetivo') ? (PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
         · <?= ConselhoService::statusLabel((string) ($sessao['status'] ?? '')) ?>
     </p>
     <p class="text-sm font-medium text-gray-800 mt-4 mb-2">Participantes presentes</p>

@@ -278,7 +278,7 @@ class DiarioProfessorController extends BaseController
                 throw new RuntimeException(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             $this->service->fechar($turmaId, $materiaId, $professorId, $anoLetivo, $bimestre, (int) ($user['id'] ?? 0));
-            $this->setFlashMessage('Bimestre fechado com sucesso.', 'success');
+            $this->setFlashMessage('Período fechado com sucesso.', 'success');
         } catch (Throwable $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
         }

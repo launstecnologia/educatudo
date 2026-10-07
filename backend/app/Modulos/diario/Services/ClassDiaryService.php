@@ -544,10 +544,10 @@ class ClassDiaryService
     }
 
     /**
-     * Fechamento de um bimestre. O período do bimestre é sempre calculado no
-     * servidor (`ClassDiary::periodoDoBimestre()`, trimestre do calendário
-     * civil) — nunca a partir de datas vindas do cliente, pra não permitir
-     * contornar a checagem de pendências enviando um intervalo estreito.
+     * Fechamento de um período. O intervalo é o mesmo do fechamento oficial
+     * (`PeriodoLetivo::intervalo()`, pela divisão do ano letivo) — nunca a
+     * partir de datas vindas do cliente, pra não permitir contornar a
+     * checagem de pendências enviando um intervalo estreito.
      * Bloqueia se houver chamada pendente no período. Notas/avaliações
      * pendentes são só informativas nesta fase — a validação de fechamento
      * cobre a parte que o próprio Diário controla (chamadas).

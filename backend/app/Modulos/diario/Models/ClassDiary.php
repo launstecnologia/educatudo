@@ -509,7 +509,7 @@ class ClassDiary
             }
             $anoRow = $this->db->fetch('SELECT ano_letivo FROM turmas WHERE id = :id LIMIT 1', ['id' => $turmaId]);
             $ano = (int) ($anoRow['ano_letivo'] ?? date('Y', strtotime($data)));
-            $bim = $this->bimestreDaData($data);
+            $bim = $this->bimestreDaData($data, $ano);
             if ($model->estaTravadoNaData($turmaId, $ano, $data, $bim)) {
                 throw new RuntimeException($model->mensagemBloqueioOficial());
             }
@@ -546,12 +546,24 @@ class ClassDiary
     {
         $start = new DateTime($inicio);
         $end = new DateTime($fim);
+        if ($turmaId > 0) {
+            $janela = $this->janelaLetivaTurma($turmaId);
+            if ($janela !== null) {
+                if ($start->format('Y-m-d') < $janela['inicio']) {
+                    $start = new DateTime($janela['inicio']);
+                }
+                if ($end->format('Y-m-d') > $janela['fim']) {
+                    $end = new DateTime($janela['fim']);
+                }
+            }
+        }
         if ($end < $start) return [];
         if ((int) $start->diff($end)->days > 100) $end = (clone $start)->modify('+100 days');
         $naoLetivos = $turmaId > 0
             ? $this->datasNaoLetivas($start->format('Y-m-d'), $end->format('Y-m-d'), $turmaId)
             : [];
         $mapasTurma = [];
+        $janelasTurma = [];
         $out = [];
         for ($date = clone $start; $date <= $end; $date->modify('+1 day')) {
             $data = $date->format('Y-m-d');
@@ -590,6 +602,14 @@ class ClassDiary
                         continue;
                     }
                 }
+                $tidLinha = (int) ($row['turma_id'] ?? 0);
+                if (!isset($janelasTurma[$tidLinha])) {
+                    $janelasTurma[$tidLinha] = $this->janelaLetivaTurma($tidLinha);
+                }
+                $janelaLinha = $janelasTurma[$tidLinha];
+                if ($janelaLinha !== null && ($data < $janelaLinha['inicio'] || $data > $janelaLinha['fim'])) {
+                    continue;
+                }
                 $row['data_aula'] = $data;
                 $row['status'] = 'pendente';
                 $row['faltas'] = 0;
@@ -610,6 +630,15 @@ class ClassDiary
     {
         if ($turmaId <= 0 || $inicio === '' || $fim === '') {
             return [];
+        }
+        $janela = $this->janelaLetivaTurma($turmaId);
+        if ($janela !== null) {
+            if ($inicio < $janela['inicio']) {
+                $inicio = $janela['inicio'];
+            }
+            if ($fim > $janela['fim']) {
+                $fim = $janela['fim'];
+            }
         }
         if ($somenteVencidas) {
             $hoje = date('Y-m-d');
@@ -1119,29 +1148,25 @@ class ClassDiary
     // ── Fechamento por período (diario_fechamentos) ─────────────────────────
 
     /**
-     * Intervalo de datas de um bimestre. Fase 1 não integra com o Calendário
-     * Letivo (ver specs/PRD.md §9) — usa o trimestre do calendário civil como
-     * convenção fixa e ÚNICA fonte de verdade do período (nunca aceitar
-     * inicio/fim vindos do cliente para decidir se um bimestre pode fechar ou
-     * se uma data está dentro de um bimestre fechado).
+     * Intervalo do período na mesma divisão do fechamento (ano_letivo.periodo_tipo).
+     * Não aceita início/fim do cliente para decidir se o período pode fechar.
      *
      * @return array{inicio:string,fim:string}
      */
     public function periodoDoBimestre(int $anoLetivo, int $bimestre): array
     {
-        $bimestre = max(1, min(4, $bimestre));
-        $mesInicio = ($bimestre - 1) * 3 + 1;
-        $mesFim = $mesInicio + 2;
-        $inicio = sprintf('%04d-%02d-01', $anoLetivo, $mesInicio);
-        $fim = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $anoLetivo, $mesFim)));
-        return ['inicio' => $inicio, 'fim' => $fim];
+        $this->garantirPeriodoLetivo();
+        return PeriodoLetivo::intervalo($anoLetivo, $bimestre);
     }
 
-    /** Bimestre (1-4) correspondente a uma data, pela convenção de `periodoDoBimestre()`. */
-    public function bimestreDaData(string $data): int
+    /** Número do período da data, na divisão do ano letivo informado. */
+    public function bimestreDaData(string $data, int $anoLetivo = 0): int
     {
-        $mes = (int) date('n', strtotime($data));
-        return (int) ceil($mes / 3);
+        $this->garantirPeriodoLetivo();
+        if ($anoLetivo <= 0) {
+            $anoLetivo = (int) date('Y', strtotime($data) ?: time());
+        }
+        return PeriodoLetivo::numeroDaData($anoLetivo, $data);
     }
 
     /**
@@ -1151,7 +1176,7 @@ class ClassDiary
     public function fechamentoDaData(int $turmaId, int $materiaId, int $professorId, string $data): ?array
     {
         $anoLetivo = (int) date('Y', strtotime($data));
-        return $this->getFechamento($turmaId, $materiaId, $professorId, $anoLetivo, $this->bimestreDaData($data));
+        return $this->getFechamento($turmaId, $materiaId, $professorId, $anoLetivo, $this->bimestreDaData($data, $anoLetivo));
     }
 
     public function getFechamento(int $turmaId, int $materiaId, int $professorId, int $anoLetivo, int $bimestre): ?array
@@ -1375,6 +1400,51 @@ class ClassDiary
      *
      * @return array<string,true> mapa Y-m-d => true
      */
+    private function garantirPeriodoLetivo(): void
+    {
+        if (!class_exists('PeriodoLetivo', false)) {
+            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
+        }
+    }
+
+    /**
+     * Limites do ano letivo da turma. Fora desse intervalo a grade não gera chamada.
+     *
+     * @return array{inicio:string,fim:string}|null
+     */
+    private function janelaLetivaTurma(int $turmaId): ?array
+    {
+        if ($turmaId <= 0) {
+            return null;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT t.ano_letivo, al.data_inicio, al.data_fim
+                 FROM turmas t
+                 LEFT JOIN ano_letivo al ON al.id = t.ano_letivo_id
+                 WHERE t.id = :id
+                 LIMIT 1',
+                ['id' => $turmaId]
+            );
+        } catch (Throwable $e) {
+            return null;
+        }
+        if (!$row) {
+            return null;
+        }
+        $inicio = (string) ($row['data_inicio'] ?? '');
+        $fim = (string) ($row['data_fim'] ?? '');
+        $ano = (int) ($row['ano_letivo'] ?? 0);
+        if ($inicio === '' || $fim === '') {
+            if ($ano <= 0) {
+                return null;
+            }
+            $inicio = sprintf('%04d-01-01', $ano);
+            $fim = sprintf('%04d-12-31', $ano);
+        }
+        return ['inicio' => $inicio, 'fim' => $fim];
+    }
+
     private function datasNaoLetivas(string $inicio, string $fim, int $turmaId = 0): array
     {
         $slugs = ['feriado', 'recesso', 'suspensao'];

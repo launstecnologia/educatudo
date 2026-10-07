@@ -41,6 +41,10 @@ BEGIN
 
   DELETE FROM diario_aulas WHERE observacoes LIKE 'ET25-SEED%';
 
+  DELETE df FROM diario_fechamentos df
+  INNER JOIN turmas t ON t.id = df.turma_id
+  WHERE t.observacoes LIKE 'ET25 %';
+
   DELETE FROM planos_aula WHERE titulo LIKE 'ET25 %';
 
   DELETE b FROM boletins b

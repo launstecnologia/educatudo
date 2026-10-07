@@ -33,7 +33,7 @@
                                 — peça à coordenação para reabrir se precisar editar.
                             </p>
                         <?php elseif ($pendentesB > 0): ?>
-                            <p class="text-xs text-red-700 mt-0.5"><?= $pendentesB ?> chamada(s) pendente(s) neste bimestre.</p>
+                            <p class="text-xs text-red-700 mt-0.5"><?= $pendentesB ?> chamada(s) pendente(s) neste período.</p>
                         <?php else: ?>
                             <p class="text-xs text-green-700 mt-0.5">Sem pendências — apto para fechamento.</p>
                         <?php endif; ?>
