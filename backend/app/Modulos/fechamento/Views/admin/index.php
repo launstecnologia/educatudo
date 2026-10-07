@@ -1,7 +1,5 @@
 <?php
-require_once __DIR__ . '/../../../../Models/Education/ResultadoAcademico.php';
 require_once __DIR__ . '/../../Services/FechamentoMaquinaEstados.php';
-require_once __DIR__ . '/../../Services/FechamentoGates.php';
 
 $paineis = is_array($paineis ?? null) ? $paineis : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));
@@ -128,23 +126,7 @@ $statusBadge = static function (string $status): string {
                     $totalAlunos = (int) ($resumo['total'] ?? 0);
                     $chamadasPendentes = (int) ($resumo['chamadas_pendentes'] ?? 0);
                     $urlTurma = URL . '/admin/fechamento/turma/' . $tid . '?' . htmlspecialchars($qs);
-                    $errosIniciar = FechamentoGates::errosIniciarFechamento($resumo);
-                    $motivoFechar = $errosIniciar[0] ?? '';
-                    $podeFechar = $status === FechamentoMaquinaEstados::ABERTO && $errosIniciar === [];
-                    $podeReabrir = $status === FechamentoMaquinaEstados::EM_FECHAMENTO;
-                    $podeHomologar = !empty($p['pode_homologar']);
                     $periodoEncerrado = $status === FechamentoMaquinaEstados::HOMOLOGADO;
-                    $motivoHomologar = '';
-                    $recTurma = (int) ($resumo['recuperacao'] ?? 0);
-                    if ($chamadasPendentes > 0) {
-                        $motivoHomologar = FechamentoGates::mensagemChamadasPendentes($chamadasPendentes);
-                    } elseif ($recTurma > 0) {
-                        $motivoHomologar = FechamentoGates::mensagemAlunosEmRecuperacao($recTurma);
-                    } elseif ($pend > 0) {
-                        $motivoHomologar = 'Há ' . $pend . ' pendência(s) crítica(s). Resolva antes de homologar.';
-                    } elseif ($totalAlunos <= 0) {
-                        $motivoHomologar = 'Nenhum aluno nesta turma.';
-                    }
                 ?>
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4">
@@ -188,67 +170,12 @@ $statusBadge = static function (string $status): string {
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-list-check text-gray-400 w-4 text-center"></i> Turma
                         </a>
-                        <?php if ($podeFechar): ?>
-                        <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/iniciar" class="block">
-                            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
-                            <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
-                            <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
-                            <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
-                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <i class="fa-solid fa-lock text-gray-400 w-4 text-center"></i> Fechar
-                            </button>
-                        </form>
-                        <?php elseif ($status === FechamentoMaquinaEstados::ABERTO): ?>
-                        <span class="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 cursor-not-allowed" title="<?= htmlspecialchars($motivoFechar, ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="fa-solid fa-lock w-4 text-center"></i> Fechar — <?= htmlspecialchars($motivoFechar !== '' ? $motivoFechar : 'Há pendências', ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                        <?php endif; ?>
-                        <?php if ($podeReabrir): ?>
-                        <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/reabrir" class="block">
-                            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
-                            <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
-                            <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
-                            <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
-                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <i class="fa-solid fa-lock-open text-gray-400 w-4 text-center"></i> Voltar para aberto
-                            </button>
-                        </form>
-                        <?php endif; ?>
-                        <a href="<?= URL ?>/admin/resultados-finais/turma/<?= $tid ?>/ata?<?= htmlspecialchars($qs) ?>"
-                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center"></i> Ata
-                        </a>
-                        <?php if ($podeHomologar): ?>
-                        <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/homologar" class="block"
-                              onsubmit="return confirm('Homologar esta turma agora? Isso registra autor e horário e trava notas, faltas e o boletim oficial.');">
-                            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
-                            <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
-                            <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
-                            <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
-                            <input type="hidden" name="homologar_todos" value="1">
-                            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <i class="fa-solid fa-stamp text-gray-400 w-4 text-center"></i> Homologar
-                            </button>
-                        </form>
-                        <?php elseif (empty($p['travado'])): ?>
-                        <span class="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 cursor-not-allowed" title="<?= htmlspecialchars($motivoHomologar, ENT_QUOTES, 'UTF-8') ?>">
-                            <i class="fa-solid fa-stamp w-4 text-center"></i> Homologar — <?= htmlspecialchars($motivoHomologar !== '' ? $motivoHomologar : 'Há pendências', ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                        <?php endif; ?>
-                        <?php if ($status === FechamentoMaquinaEstados::HOMOLOGADO): ?>
+                        <?php if ($periodoEncerrado): ?>
                         <a href="<?= URL ?>/admin/fechamento/impressao-lote?<?= htmlspecialchars($qs) ?>&amp;turma_id=<?= $tid ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir em lote
+                            <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir esta turma
                         </a>
                         <?php endif; ?>
-                        <button type="button"
-                                data-fechamento-consulta="documentos"
-                                data-turma-id="<?= $tid ?>"
-                                data-turma-nome="<?= htmlspecialchars((string) ($turma['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
-                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center"></i> Documentos
-                        </button>
-                        <div class="border-t border-gray-100 my-1"></div>
                         <button type="button"
                                 data-fechamento-consulta="homologacoes"
                                 data-turma-id="<?= $tid ?>"
