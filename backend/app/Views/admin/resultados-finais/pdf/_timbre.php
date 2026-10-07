@@ -21,7 +21,8 @@ if ($parte === 'css'):
     table.dados td, table.grade th, table.grade td { border: 1px solid #ccc; padding: 3px 4px; }
     table.dados td.label, table.grade th { background: #f3f4f6; font-size: 8px; }
     .muted, .lead { color: #444; font-size: 10px; text-align: center; }
-    .capa { page-break-after: always; }
+    .capa, .folha-aluno { page-break-after: always; }
+    .folha-aluno.ultima { page-break-after: auto; }
     .quebra { page-break-before: always; }
     table.assin td { border: none; text-align: center; padding-top: 28px; width: 50%; }
     table.assin span { display: block; border-top: 1px solid #333; margin: 0 28px; padding-top: 4px; font-size: 9px; }

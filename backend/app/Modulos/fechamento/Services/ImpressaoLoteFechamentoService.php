@@ -145,7 +145,7 @@ class ImpressaoLoteFechamentoService
             $jobId
         );
         $this->gravarAndamento($jobId, $documento, 'Gerando o PDF…');
-        $orientacao = in_array($documento, ['relatorio', 'resultado'], true) ? 'landscape' : 'portrait';
+        $orientacao = $documento === 'relatorio' ? 'landscape' : 'portrait';
         $pdf = $this->pdfDeHtml($html, $orientacao);
         unset($html);
         if ($pdf === '') {
@@ -194,7 +194,11 @@ class ImpressaoLoteFechamentoService
             $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
         }
 
-        $versao = in_array($documento, ['historico', 'resultado', 'ficha'], true) ? 'v4' : 'v2';
+        $versao = match ($documento) {
+            'resultado' => 'v5',
+            'historico', 'ficha' => 'v4',
+            default => 'v2',
+        };
         $arquivo = $documento . '_' . $versao . '.pdf';
 
         return $ano . '/' . $periodoTipo . '-' . $periodoNumero . '/' . $escopo . '/' . $arquivo;
@@ -370,7 +374,7 @@ class ImpressaoLoteFechamentoService
         $htmls = [];
         $feitos = 0;
         $totalFolhas = $this->estimarFolhas($paineis, $documento);
-        $orientacao = in_array($documento, ['relatorio', 'resultado'], true) ? 'landscape' : 'portrait';
+        $orientacao = $documento === 'relatorio' ? 'landscape' : 'portrait';
 
         foreach ($paineis as $painel) {
             $turmaId = (int) ($painel['turma']['id'] ?? 0);

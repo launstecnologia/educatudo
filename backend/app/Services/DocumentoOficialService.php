@@ -263,7 +263,7 @@ class DocumentoOficialService
         if ($tipo === 'ata_resultados' || $tipo === 'ficha_individual') {
             return [
                 'html' => $this->renderFallbackPhp($tipo, $payload, $vars),
-                'orientacao' => $tipo === 'ata_resultados' ? 'landscape' : 'portrait',
+                'orientacao' => 'portrait',
                 'papel' => 'A4',
             ];
         }
@@ -1101,7 +1101,7 @@ class DocumentoOficialService
      * @param list<array<string,mixed>> $linhas
      */
     /**
-     * Capa da turma e mapa de notas: uma coluna por componente.
+     * Capa da turma e, em seguida, uma página por aluno no quadro da ficha individual.
      *
      * @param list<array<string,mixed>> $linhas
      * @param array<string,mixed> $turma
@@ -1111,31 +1111,21 @@ class DocumentoOficialService
     public function tabelaAtaHtml(array $linhas, array $turma = [], array $totais = [], array $unidade = []): string
     {
         $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-        $fmt = static function ($v): string {
-            return is_numeric($v) ? number_format((float) $v, 1, ',', '.') : '—';
-        };
-        $materias = [];
-        foreach ($linhas as $linha) {
-            foreach (is_array($linha['componentes'] ?? null) ? $linha['componentes'] : [] as $comp) {
-                $nome = trim((string) ($comp['materia_nome'] ?? ''));
-                if ($nome === '' || isset($materias[$nome])) {
-                    continue;
-                }
-                $materias[$nome] = (int) ($comp['ordem'] ?? count($materias) + 1);
-            }
-        }
-        asort($materias);
-        $nomes = array_keys($materias);
-
         $ano = (string) ($turma['ano_letivo'] ?? '');
+        $turmaNome = trim((string) ($turma['nome'] ?? ''));
+        $etapa = trim((string) ($turma['curso_nome'] ?? $turma['serie_nome'] ?? $turma['serie'] ?? ''));
+        $turno = (string) ($turma['turno_label'] ?? $this->rotuloTurno((string) ($turma['turno'] ?? '')));
+        $tituloCapa = $turmaNome !== '' ? $turmaNome : 'Turma';
+
         $capa = '<section class="capa">'
             . '<h2>Ata de resultados finais</h2>'
-            . '<p class="lead">Consolidado da turma após o encerramento do ano letivo. As páginas seguintes trazem a nota final de cada componente.</p>'
+            . '<p class="lead">' . $esc($tituloCapa) . '</p>'
+            . '<p class="lead">Capa da turma. A partir da página seguinte, cada aluno ocupa uma página, com o quadro de notas da ficha individual.</p>'
             . '<table class="dados"><tr>'
-            . '<td class="label">Turma</td><td>' . $esc($turma['nome'] ?? '') . '</td>'
+            . '<td class="label">Turma</td><td>' . $esc($turmaNome !== '' ? $turmaNome : '—') . '</td>'
             . '<td class="label">Ano letivo</td><td>' . $esc($ano !== '' ? $ano : date('Y')) . '</td></tr>'
-            . '<tr><td class="label">Etapa</td><td>' . $esc($turma['curso_nome'] ?? $turma['serie_nome'] ?? '—') . '</td>'
-            . '<td class="label">Turno</td><td>' . $esc($turma['turno_label'] ?? $this->rotuloTurno((string) ($turma['turno'] ?? ''))) . '</td></tr>'
+            . '<tr><td class="label">Etapa</td><td>' . $esc($etapa !== '' ? $etapa : '—') . '</td>'
+            . '<td class="label">Turno</td><td>' . $esc($turno) . '</td></tr>'
             . '<tr><td class="label">Alunos</td><td>' . count($linhas) . '</td>'
             . '<td class="label">Aprovados</td><td>' . (int) ($totais['aprovados'] ?? 0) . '</td></tr>'
             . '<tr><td class="label">Reprovados</td><td>' . (int) ($totais['retidos'] ?? 0) . '</td>'
@@ -1147,36 +1137,55 @@ class DocumentoOficialService
             . '<td><span>' . $esc($unidade['secretario_nome'] ?? 'Secretaria') . '<br>Secretaria</span></td>'
             . '</tr></table></section>';
 
-        $html = $capa . '<table class="grade"><thead><tr>'
-            . '<th>Nº</th><th class="aluno">Aluno</th>';
-        foreach ($nomes as $nome) {
-            $html .= '<th class="disc">' . $esc($nome) . '</th>';
-        }
-        $html .= '<th>Freq.</th><th>Resultado</th></tr></thead><tbody>';
+        $total = count($linhas);
+        $folhas = '';
         $i = 0;
-        $colunas = count($nomes) + 4;
         foreach ($linhas as $linha) {
             $i++;
-            $porNome = [];
-            foreach (is_array($linha['componentes'] ?? null) ? $linha['componentes'] : [] as $comp) {
-                $nome = trim((string) ($comp['materia_nome'] ?? ''));
-                if ($nome !== '') {
-                    $porNome[$nome] = $comp['media_final'] ?? $comp['media'] ?? null;
-                }
-            }
+            $aluno = is_array($linha['aluno'] ?? null) ? $linha['aluno'] : [];
             $freq = $linha['frequencia']['percentual'] ?? null;
             $freqTxt = is_numeric($freq) ? number_format((float) $freq, 1, ',', '.') . '%' : '—';
-            $html .= '<tr><td>' . str_pad((string) $i, 2, '0', STR_PAD_LEFT) . '</td>'
-                . '<td class="aluno">' . $esc($linha['aluno']['nome'] ?? '') . '</td>';
-            foreach ($nomes as $nome) {
-                $html .= '<td>' . $esc($fmt($porNome[$nome] ?? null)) . '</td>';
-            }
-            $html .= '<td>' . $esc($freqTxt) . '</td><td>' . $esc($linha['rotulo'] ?? '—') . '</td></tr>';
+            $ra = trim((string) ($aluno['ra'] ?? $aluno['codigo_aluno'] ?? ''));
+            $nasc = $this->dataDocumento((string) ($aluno['data_nasc'] ?? ''));
+            $mae = trim((string) ($aluno['nome_mae'] ?? ''));
+            $pai = trim((string) ($aluno['nome_pai'] ?? ''));
+            $filiacao = trim(implode(' / ', array_filter([$mae, $pai], static fn ($v) => $v !== '')));
+            $componentes = is_array($linha['componentes'] ?? null) ? $linha['componentes'] : [];
+            $classe = $i === $total ? 'folha-aluno ultima' : 'folha-aluno';
+            $folhas .= '<section class="' . $classe . '">'
+                . '<h2>' . $esc($aluno['nome'] ?? 'Aluno') . '</h2>'
+                . '<p class="lead">Aluno ' . str_pad((string) $i, 2, '0', STR_PAD_LEFT) . ' de ' . $total
+                . ' · ' . $esc($tituloCapa) . ' · ' . $esc($ano !== '' ? $ano : date('Y')) . '</p>'
+                . '<table class="dados"><tr>'
+                . '<td class="label">Aluno(a)</td><td>' . $esc($aluno['nome'] ?? '') . '</td>'
+                . '<td class="label">RA</td><td>' . $esc($ra !== '' ? $ra : '—') . '</td></tr>'
+                . '<tr><td class="label">Nascimento</td><td>' . $esc($nasc !== '' ? $nasc : '—') . '</td>'
+                . '<td class="label">Filiação</td><td>' . $esc($filiacao !== '' ? $filiacao : '—') . '</td></tr>'
+                . '<tr><td class="label">Turma</td><td>' . $esc($tituloCapa) . '</td>'
+                . '<td class="label">Etapa</td><td>' . $esc($etapa !== '' ? $etapa : '—') . '</td></tr>'
+                . '<tr><td class="label">Frequência</td><td>' . $esc($freqTxt) . '</td>'
+                . '<td class="label">Resultado</td><td>' . $esc($linha['rotulo'] ?? '—') . '</td></tr>'
+                . '</table>'
+                . '<h2>Componentes curriculares</h2>'
+                . $this->quadroFichaHtml($componentes)
+                . '</section>';
         }
-        if ($i === 0) {
-            $html .= '<tr><td colspan="' . $colunas . '">Nenhum aluno neste recorte.</td></tr>';
+        if ($folhas === '') {
+            $folhas = '<section class="folha-aluno ultima"><p>Nenhum aluno neste recorte.</p></section>';
         }
-        return $html . '</tbody></table>';
+
+        return $capa . $folhas;
+    }
+
+    private function dataDocumento(string $data): string
+    {
+        $data = substr(trim($data), 0, 10);
+        if ($data === '' || $data === '0000-00-00') {
+            return '';
+        }
+        $dt = DateTime::createFromFormat('Y-m-d', $data);
+
+        return $dt instanceof DateTime ? $dt->format('d/m/Y') : '';
     }
 
     /**
