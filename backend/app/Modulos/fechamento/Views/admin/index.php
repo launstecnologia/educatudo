@@ -168,12 +168,12 @@ $statusBadge = static function (string $status): string {
                         <?php ob_start(); ?>
                         <a href="<?= $urlTurma ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-list-check text-gray-400 w-4 text-center"></i> Turma
+                            <i class="fa-solid fa-user-group text-gray-400 w-4 text-center"></i> Alunos
                         </a>
                         <?php if ($periodoEncerrado): ?>
                         <a href="<?= URL ?>/admin/fechamento/impressao-lote?<?= htmlspecialchars($qs) ?>&amp;turma_id=<?= $tid ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir esta turma
+                            <i class="fa-solid fa-folder-open text-gray-400 w-4 text-center"></i> Documentação
                         </a>
                         <?php endif; ?>
                         <button type="button"
