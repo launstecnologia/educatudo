@@ -98,6 +98,37 @@ uasort($linhasPeriodo, static function (array $a, array $b): int {
     return (int) $a['numero'] <=> (int) $b['numero'];
 });
 
+$bimsOrigemExterna = [];
+$anoFichaNotas = (int) ((($quadro ?? [])['ficha']['ano_letivo'] ?? 0));
+foreach (is_array(($quadro ?? [])['grid'] ?? null) ? $quadro['grid'] : [] as $rowExterna) {
+    if (!is_array($rowExterna)) {
+        continue;
+    }
+    foreach (is_array($rowExterna['celulas'] ?? null) ? $rowExterna['celulas'] : [] as $pExterna => $cExterna) {
+        $pExterna = (int) $pExterna;
+        if ($pExterna < 1 || $pExterna > 4 || !is_array($cExterna) || (string) ($cExterna['origem'] ?? '') !== 'externa') {
+            continue;
+        }
+        $temValorExterno = (($cExterna['nota'] ?? '') !== '' && $cExterna['nota'] !== null)
+            || (($cExterna['faltas'] ?? '') !== '' && $cExterna['faltas'] !== null);
+        if ($temValorExterno && $anoFichaNotas > 0) {
+            $bimsOrigemExterna[$anoFichaNotas . ':' . $pExterna] = true;
+        }
+    }
+}
+if ($bimsOrigemExterna !== []) {
+    $tinhaPeriodoNotas = $linhasPeriodo !== [];
+    foreach ($linhasPeriodo as $chavePeriodoNotas => $linhaPeriodoNotas) {
+        $chaveExterna = (int) ($linhaPeriodoNotas['ano'] ?? 0) . ':' . (int) ($linhaPeriodoNotas['numero'] ?? 0);
+        if (isset($bimsOrigemExterna[$chaveExterna])) {
+            unset($linhasPeriodo[$chavePeriodoNotas]);
+        }
+    }
+    if ($tinhaPeriodoNotas && $linhasPeriodo === []) {
+        $notas_mensagem_vazia = 'Os períodos lançados de outra escola estão no boletim e não aparecem aqui como referência.';
+    }
+}
+
 $cabPeriodo = 'Período';
 $rotulosCab = [];
 foreach ($linhasPeriodo as $linhaP) {

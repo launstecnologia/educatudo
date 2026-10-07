@@ -27,6 +27,7 @@ $rotuloAcao = [
     'reabrir' => 'Reabriu',
     'salvar_celula' => 'Salvou nota',
     'importar_externa' => 'Importou de outra escola',
+    'importar_meio_ano' => 'Lançou notas de outra escola',
     'fechar_bimestre' => 'Fechou bimestre',
     'alimentar_calculo' => 'Sincronizou eventos',
     'alimentar' => 'Sincronizou eventos',

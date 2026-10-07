@@ -221,14 +221,25 @@ foreach ($documentos as $d) {
 </div>
 <?php endif; ?>
 
+<?php
+$veOrigemInicial = (string) ($_GET['ve_origem'] ?? '') === 'meio' ? 'meio' : 'historico';
+$vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? '') === 'dev';
+?>
 <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
 <div class="bg-white rounded-xl shadow-lg p-6">
-    <div class="flex flex-wrap gap-2 text-sm mb-4" role="tablist">
-        <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full bg-primary text-white" data-ve-origem="historico" onclick="veAbaOrigem('historico')">Histórico de outra escola</button>
-        <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200" data-ve-origem="meio" onclick="veAbaOrigem('meio')">Chegou no meio do ano</button>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-sm mb-4">
+        <div class="flex flex-wrap gap-2" role="tablist">
+            <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full <?= $veOrigemInicial === 'historico' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-ve-origem="historico" onclick="veAbaOrigem('historico')">Histórico de outra escola</button>
+            <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full <?= $veOrigemInicial === 'meio' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-ve-origem="meio" onclick="veAbaOrigem('meio')">Chegou no meio do ano</button>
+        </div>
+        <?php if ($vePodeVerLog): ?>
+        <button type="button" onclick="veAbrirLogMeioAno()" class="inline-flex items-center px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+            <i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i>Log
+        </button>
+        <?php endif; ?>
     </div>
 
-    <div data-ve-origem-painel="historico">
+    <div data-ve-origem-painel="historico" class="<?= $veOrigemInicial === 'historico' ? '' : 'hidden' ?>">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <p class="text-sm text-gray-500 flex-1 min-w-[16rem]">Anos já concluídos. Anexe o PDF para a leitura ou digite o ano. O ano desta escola entra sozinho na homologação do boletim.</p>
             <button type="button" onclick="veAbrirLancarEscola()"
@@ -346,7 +357,7 @@ foreach ($documentos as $d) {
         </form>
     </div>
 
-    <div data-ve-origem-painel="meio" class="hidden">
+    <div data-ve-origem-painel="meio" class="<?= $veOrigemInicial === 'meio' ? '' : 'hidden' ?>">
     <?php
     $anoTurma = 0;
     if (is_array($aluno ?? null)) {
@@ -375,7 +386,7 @@ foreach ($documentos as $d) {
     $tipoPeriodo = (string) ($infoPeriodo['tipo'] ?? 'bimestre');
     $rotuloDivisao = (string) (PeriodoLetivo::TIPOS[$tipoPeriodo] ?? 'Bimestral (4 períodos)');
     ?>
-    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou <?= $esc($nomePeriodos) ?> de <?= (int) $anoPeriodo ?>. Essas notas entram no boletim daqui. Anos fechados ficam na outra aba.</p>
+    <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou <?= $esc($nomePeriodos) ?> de <?= (int) $anoPeriodo ?>. A nota digitada entra no boletim e esse período sai da aba Notas, porque veio de outra escola. Anos fechados ficam na outra aba.</p>
     <p class="text-xs text-gray-500 mb-4">Ano letivo <?= (int) $anoPeriodo ?> · <?= $esc($rotuloDivisao) ?>. As colunas seguem essa divisão (bimestre, trimestre, semestre ou etapa única), a mesma do boletim.</p>
     <?php
     $outrasImp = [];
@@ -396,9 +407,22 @@ foreach ($documentos as $d) {
         </ul>
     <?php endif; ?>
     <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
+    <?php
+    $dataTransfMeio = '';
+    foreach ($importacoes as $impData) {
+        $rawData = trim((string) ($impData['data_transferencia'] ?? ''));
+        if ($rawData !== '') {
+            $dataTransfMeio = substr($rawData, 0, 10);
+            break;
+        }
+    }
+    ?>
     <form method="post" action="<?= $base ?>/importar" class="space-y-5" id="form-importar-transferencia">
         <input type="hidden" name="_token" value="<?= $esc($token) ?>">
         <input type="hidden" name="anos_qtd" value="0">
+        <input type="hidden" name="aplicar_boletim" value="1">
+        <input type="hidden" name="ano_letivo" value="<?= (int) $anoPeriodo ?>">
+        <input type="hidden" name="senha_confirmacao" id="ve-senha-meio" value="">
         <div class="rounded-xl border border-gray-200 p-4">
             <h4 class="text-sm font-semibold text-gray-900 mb-3">Escola de origem</h4>
             <div class="space-y-3">
@@ -409,7 +433,7 @@ foreach ($documentos as $d) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Data da transferência</label>
-                        <input type="date" name="data_transferencia" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" style="width:100%;box-sizing:border-box;">
+                        <input type="date" name="data_transferencia" value="<?= $esc($dataTransfMeio) ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white" style="width:100%;box-sizing:border-box;">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Documento anexado</label>
@@ -450,6 +474,62 @@ foreach ($documentos as $d) {
         }
         $nBlocos = count($componentesBim);
         $celBim = 'w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center bg-white';
+        $meioPorId = [];
+        $meioPorNome = [];
+        $guardarMeio = static function (int $mid, string $nome, int $periodo, string $nota, string $faltas) use (&$meioPorId, &$meioPorNome): void {
+            if ($periodo < 1 || $periodo > 4 || ($nota === '' && $faltas === '')) {
+                return;
+            }
+            $cel = ['nota' => $nota, 'faltas' => $faltas];
+            if ($mid > 0 && !isset($meioPorId[$mid][$periodo])) {
+                $meioPorId[$mid][$periodo] = $cel;
+            }
+            $nomeKey = mb_strtolower(trim($nome));
+            if ($nomeKey !== '' && !isset($meioPorNome[$nomeKey][$periodo])) {
+                $meioPorNome[$nomeKey][$periodo] = $cel;
+            }
+        };
+        foreach ($importacoes as $impMeio) {
+            if (!is_array($impMeio) || (string) ($impMeio['status'] ?? '') === 'cancelada') {
+                continue;
+            }
+            $payloadMeio = $decodificarPayload($impMeio);
+            foreach (is_array($payloadMeio['bimestres_atuais'] ?? null) ? $payloadMeio['bimestres_atuais'] : [] as $bMeio) {
+                if (!is_array($bMeio)) {
+                    continue;
+                }
+                $guardarMeio(
+                    (int) ($bMeio['materia_id'] ?? 0),
+                    (string) ($bMeio['componente'] ?? $bMeio['componente_original'] ?? ''),
+                    (int) ($bMeio['periodo_numero'] ?? $bMeio['bimestre'] ?? 0),
+                    trim((string) ($bMeio['nota'] ?? '')),
+                    trim((string) ($bMeio['faltas'] ?? ''))
+                );
+            }
+        }
+        foreach (is_array(($quadro ?? [])['grid'] ?? null) ? $quadro['grid'] : [] as $rowMeio) {
+            $linhaMeio = is_array($rowMeio['linha'] ?? null) ? $rowMeio['linha'] : [];
+            $midMeio = (int) ($linhaMeio['materia_id'] ?? 0);
+            $nomeMeio = (string) ($linhaMeio['componente_nome'] ?? '');
+            foreach (is_array($rowMeio['celulas'] ?? null) ? $rowMeio['celulas'] : [] as $pMeio => $cMeio) {
+                if (!is_array($cMeio) || (string) ($cMeio['origem'] ?? '') !== 'externa') {
+                    continue;
+                }
+                $notaMeio = $cMeio['nota'] ?? '';
+                if (is_numeric($notaMeio)) {
+                    $notaMeio = number_format((float) $notaMeio, 1, ',', '');
+                }
+                $faltasMeio = ($cMeio['faltas'] ?? '') !== '' && $cMeio['faltas'] !== null ? (string) (int) $cMeio['faltas'] : '';
+                $periodoMeio = (int) $pMeio;
+                if ($midMeio > 0) {
+                    $meioPorId[$midMeio][$periodoMeio] = ['nota' => (string) $notaMeio, 'faltas' => $faltasMeio];
+                }
+                $nomeKeyMeio = mb_strtolower(trim($nomeMeio));
+                if ($nomeKeyMeio !== '') {
+                    $meioPorNome[$nomeKeyMeio][$periodoMeio] = ['nota' => (string) $notaMeio, 'faltas' => $faltasMeio];
+                }
+            }
+        }
         ?>
         <div class="flex items-center justify-between gap-3 mb-3">
             <p class="text-sm text-gray-600"><?= $nBlocos > 0 ? 'Componentes da turma. Preencha só os ' . $esc($nomePeriodos) . ' que constam no documento.' : 'A turma ainda não tem componentes. Adicione os que constam no documento.' ?></p>
@@ -487,8 +567,13 @@ foreach ($documentos as $d) {
                             <input name="bim_comp[<?= $i ?>]" value="<?= $esc($compB['nome'] ?? '') ?>" class="w-44 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white">
                         </td>
                         <?php foreach ($periodosMeio as $p => $rotuloP): ?>
-                        <td class="px-2 py-2 text-center"><input name="bim_nota[<?= $i ?>][<?= (int) $p ?>]" inputmode="decimal" class="<?= $celBim ?>"></td>
-                        <td class="px-2 py-2 text-center"><input name="bim_faltas[<?= $i ?>][<?= (int) $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
+                        <?php
+                        $salvoMeio = $meioPorId[(int) ($compB['id'] ?? 0)][(int) $p]
+                            ?? $meioPorNome[mb_strtolower((string) ($compB['nome'] ?? ''))][(int) $p]
+                            ?? null;
+                        ?>
+                        <td class="px-2 py-2 text-center"><input name="bim_nota[<?= $i ?>][<?= (int) $p ?>]" value="<?= $esc(is_array($salvoMeio) ? ($salvoMeio['nota'] ?? '') : '') ?>" inputmode="decimal" class="<?= $celBim ?>"></td>
+                        <td class="px-2 py-2 text-center"><input name="bim_faltas[<?= $i ?>][<?= (int) $p ?>]" value="<?= $esc(is_array($salvoMeio) ? ($salvoMeio['faltas'] ?? '') : '') ?>" inputmode="numeric" class="<?= $celBim ?>"></td>
                         <?php endforeach; ?>
                         <td class="px-2 py-2 text-center">
                             <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
@@ -520,11 +605,96 @@ foreach ($documentos as $d) {
                 </td>
             </tr>
         </template>
-        <button class="btn-primary-custom mt-4 px-4 py-2 rounded-lg text-sm font-semibold">Salvar rascunho das notas</button>
+        <button class="btn-primary-custom mt-4 px-4 py-2 rounded-lg text-sm font-semibold">Salvar notas no boletim</button>
     </form>
+    <div id="veModalSenhaMeio" class="fixed inset-0 z-[100] hidden" aria-modal="true" role="dialog">
+        <div class="absolute inset-0 bg-black/50" onclick="veFecharSenhaMeio()"></div>
+        <div class="relative mx-auto mt-24 w-full max-w-md bg-white rounded-xl shadow-xl p-6">
+            <h3 class="text-lg font-semibold text-gray-900">Confirmar senha</h3>
+            <p class="text-sm text-gray-600 mt-1">Digite a senha da sua conta para lançar essas notas no boletim. O registro fica no log, com quem lançou e o horário.</p>
+            <div class="mt-4">
+                <label for="veSenhaMeioInput" class="block text-sm font-medium text-gray-700 mb-1">Senha de acesso</label>
+                <input type="password" id="veSenhaMeioInput" autocomplete="current-password"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();veConfirmarSenhaMeio();}">
+                <p id="veSenhaMeioErro" class="hidden text-xs text-red-600 mt-2"></p>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" onclick="veFecharSenhaMeio()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm">Cancelar</button>
+                <button type="button" onclick="veConfirmarSenhaMeio()" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Salvar</button>
+            </div>
+        </div>
+    </div>
     <?php endif; ?>
     </div>
 </div>
+<?php if ($vePodeVerLog): ?>
+<?php
+$logsMeioAno = is_array(($quadro['log_meio_ano'] ?? null)) ? $quadro['log_meio_ano'] : [];
+?>
+<div id="veLogMeioBackdrop" class="fixed inset-0 bg-black/40 z-[97] hidden" onclick="veFecharLogMeioAno()"></div>
+<aside id="veLogMeioDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[98] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true"
+       role="dialog"
+       aria-labelledby="veLogMeioTitulo">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div>
+            <h2 id="veLogMeioTitulo" class="text-xl font-bold text-gray-900">Log do meio do ano</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Quem lançou as notas da outra escola, o horário e o que entrou no boletim.</p>
+        </div>
+        <button type="button" onclick="veFecharLogMeioAno()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <?php if ($logsMeioAno === []): ?>
+            <p class="text-sm text-gray-500">Nenhum lançamento registrado.</p>
+        <?php else: ?>
+            <?php foreach ($logsMeioAno as $logMeio): ?>
+                <?php
+                if (!is_array($logMeio)) {
+                    continue;
+                }
+                $detMeio = json_decode((string) ($logMeio['valor_novo'] ?? ''), true);
+                $detMeio = is_array($detMeio) ? $detMeio : [];
+                $itensMeio = is_array($detMeio['itens'] ?? null) ? $detMeio['itens'] : [];
+                $quandoMeio = !empty($logMeio['created_at']) ? date('d/m/Y H:i', strtotime((string) $logMeio['created_at'])) : '—';
+                ?>
+                <article class="rounded-xl border border-gray-200 p-4">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-sm font-semibold text-gray-900"><?= $esc($logMeio['usuario_nome'] ?? 'Usuário') ?></p>
+                        <p class="text-xs text-gray-500 tabular-nums"><?= $esc($quandoMeio) ?></p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <?= $esc($logMeio['usuario_perfil'] ?? '') ?>
+                        <?php if (!empty($detMeio['escola'])): ?>
+                            · <?= $esc((string) $detMeio['escola']) ?>
+                        <?php endif; ?>
+                        <?php if (!empty($detMeio['ano_letivo'])): ?>
+                            · <?= (int) $detMeio['ano_letivo'] ?>
+                        <?php endif; ?>
+                    </p>
+                    <?php if ($itensMeio !== []): ?>
+                    <ul class="mt-3 space-y-1 text-sm text-gray-800">
+                        <?php foreach ($itensMeio as $itemMeio): ?>
+                            <?php if (!is_array($itemMeio)) { continue; } ?>
+                            <?php $pItem = (int) ($itemMeio['periodo'] ?? 0); ?>
+                            <li>
+                                <span class="font-medium"><?= $esc($itemMeio['componente'] ?? 'Componente') ?></span>
+                                · <?= $esc((string) ($periodosMeio[$pItem] ?? ($pItem . 'º'))) ?>
+                                · nota <?= $esc(($itemMeio['nota'] ?? '') !== '' ? (string) $itemMeio['nota'] : '—') ?>
+                                · faltas <?= $esc(($itemMeio['faltas'] ?? '') !== '' && $itemMeio['faltas'] !== null ? (string) $itemMeio['faltas'] : '—') ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</aside>
+<?php endif; ?>
 <?php endif; ?>
 <script>
 (function () {
@@ -618,10 +788,93 @@ function veFecharLancarEscola() {
 }
 document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    var modalSenha = document.getElementById('veModalSenhaMeio');
+    if (modalSenha && !modalSenha.classList.contains('hidden')) {
+        veFecharSenhaMeio();
+        return;
+    }
+    var logDrawer = document.getElementById('veLogMeioDrawer');
+    if (logDrawer && logDrawer.getAttribute('aria-hidden') === 'false') {
+        veFecharLogMeioAno();
+        return;
+    }
     var drawer = document.getElementById('veLancarEscolaDrawer');
     if (!drawer || drawer.getAttribute('aria-hidden') === 'true') return;
     veFecharLancarEscola();
 });
+function veAbrirLogMeioAno() {
+    var drawer = document.getElementById('veLogMeioDrawer');
+    var backdrop = document.getElementById('veLogMeioBackdrop');
+    if (!drawer || !backdrop) return;
+    backdrop.classList.remove('hidden');
+    requestAnimationFrame(function () {
+        drawer.classList.remove('translate-x-full');
+        drawer.setAttribute('aria-hidden', 'false');
+    });
+    document.body.style.overflow = 'hidden';
+}
+function veFecharLogMeioAno() {
+    var drawer = document.getElementById('veLogMeioDrawer');
+    var backdrop = document.getElementById('veLogMeioBackdrop');
+    if (drawer) {
+        drawer.classList.add('translate-x-full');
+        drawer.setAttribute('aria-hidden', 'true');
+    }
+    if (backdrop) backdrop.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+function veFecharSenhaMeio() {
+    var modal = document.getElementById('veModalSenhaMeio');
+    if (modal) modal.classList.add('hidden');
+}
+function veConfirmarSenhaMeio() {
+    var form = document.getElementById('form-importar-transferencia');
+    var input = document.getElementById('veSenhaMeioInput');
+    var hidden = document.getElementById('ve-senha-meio');
+    var erro = document.getElementById('veSenhaMeioErro');
+    var senha = input ? (input.value || '').trim() : '';
+    if (senha === '') {
+        if (erro) {
+            erro.textContent = 'Informe sua senha.';
+            erro.classList.remove('hidden');
+        }
+        return;
+    }
+    if (hidden) hidden.value = senha;
+    if (input) input.value = '';
+    if (form) {
+        form.setAttribute('data-ve-senha-ok', '1');
+        form.submit();
+    }
+}
+(function () {
+    var form = document.getElementById('form-importar-transferencia');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+        if (form.getAttribute('data-ve-senha-ok') === '1') return;
+        e.preventDefault();
+        var tem = false;
+        form.querySelectorAll('input[name^="bim_nota"], input[name^="bim_faltas"]').forEach(function (inp) {
+            if ((inp.value || '').trim() !== '') tem = true;
+        });
+        if (!tem) {
+            window.alert('Informe ao menos uma nota ou falta de um período.');
+            return;
+        }
+        var modal = document.getElementById('veModalSenhaMeio');
+        var erro = document.getElementById('veSenhaMeioErro');
+        var input = document.getElementById('veSenhaMeioInput');
+        if (erro) {
+            erro.textContent = '';
+            erro.classList.add('hidden');
+        }
+        if (input) input.value = '';
+        if (modal) {
+            modal.classList.remove('hidden');
+            setTimeout(function () { if (input) input.focus(); }, 50);
+        }
+    });
+})();
 function veToggleBoletimAno(btn) {
     var id = btn.getAttribute('data-ve-boletim-toggle');
     var painel = id ? document.getElementById(id) : null;

@@ -745,6 +745,20 @@ class VidaEscolar
         return is_array($rows) ? $rows : [];
     }
 
+    /** @return list<array<string,mixed>> */
+    public function listarAuditoriaAcao(int $fichaId, string $acao, int $limite = 50): array
+    {
+        $limite = max(1, min(100, $limite));
+        $rows = $this->db->fetchAll(
+            "SELECT * FROM boletim_ficha_auditoria
+             WHERE ficha_id = :id AND acao = :acao
+             ORDER BY id DESC
+             LIMIT $limite",
+            ['id' => $fichaId, 'acao' => $acao]
+        );
+        return is_array($rows) ? $rows : [];
+    }
+
     public function criarAnoEscolarizacao(array $data): int
     {
         return (int) $this->db->insert(

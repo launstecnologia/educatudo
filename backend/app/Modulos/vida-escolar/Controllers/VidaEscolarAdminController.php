@@ -628,11 +628,61 @@ class VidaEscolarAdminController extends AdminBaseController
             $this->redirectAluno($id);
             return;
         }
+        $aplicarBoletim = (string) ($_POST['aplicar_boletim'] ?? '') === '1';
+        $senha = trim((string) ($_POST['senha_confirmacao'] ?? ''));
+        unset($_POST['senha_confirmacao']);
         $input = $this->montarPayloadImportacao($_POST);
         $input['documento_id'] = $this->documentoIdDoAluno((int) $id, $input['documento_id'] ?? 0);
-        $res = $this->service()->salvarImportacao((int) $id, $input, $this->auth->getUser());
+        if ($aplicarBoletim) {
+            if ($senha === '' || !$this->senhaConfereUsuarioLogado($senha)) {
+                $this->setFlashMessage($senha === '' ? 'Informe sua senha para lançar as notas no boletim.' : 'Senha incorreta.', 'error');
+                $this->redirectAluno($id, 'trajetoria', 0, 0, ['ve_origem' => 'meio']);
+                return;
+            }
+            if (($input['bimestres_atuais'] ?? []) === []) {
+                $this->setFlashMessage('Informe ao menos uma nota ou falta de um período.', 'error');
+                $this->redirectAluno($id, 'trajetoria', 0, 0, ['ve_origem' => 'meio']);
+                return;
+            }
+        }
+        $svc = $this->service();
+        $res = $svc->salvarImportacao((int) $id, $input, $this->auth->getUser());
+        if ($aplicarBoletim && !empty($res['success'])) {
+            $val = $svc->validarImportacao((int) $res['id'], $this->auth->getUser());
+            if (empty($val['success'])) {
+                $svc->model()->atualizarImportacao((int) $res['id'], ['status' => 'cancelada']);
+                $this->setFlashMessage($val['error'] ?? 'Não foi possível lançar as notas no boletim.', 'error');
+                $this->redirectAluno($id, 'trajetoria', 0, 0, ['ve_origem' => 'meio']);
+                return;
+            }
+            $this->setFlashMessage('Notas da outra escola entraram no boletim. Esses períodos saíram da aba Notas.', 'success');
+            $this->redirectAluno($id, 'trajetoria', 0, 0, ['ve_origem' => 'meio']);
+            return;
+        }
         $this->setFlashMessage($res['success'] ? 'Rascunho da importação salvo. Confira e valide.' : ($res['error'] ?? 'Falha.'), $res['success'] ? 'success' : 'error');
         $this->redirectAluno($id, 'trajetoria');
+    }
+
+    private function senhaConfereUsuarioLogado(string $senha): bool
+    {
+        $senha = trim($senha);
+        if ($senha === '') {
+            return false;
+        }
+        $user = $this->auth->getUser();
+        $uid = (int) ($user['id'] ?? 0);
+        if ($uid <= 0) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            'SELECT senha_hash FROM usuarios WHERE id = :id LIMIT 1',
+            ['id' => $uid]
+        );
+        if (!$row || empty($row['senha_hash'])) {
+            return false;
+        }
+
+        return password_verify($senha, (string) $row['senha_hash']);
     }
 
     public function validarImportacao($id, $importacaoId): void
@@ -762,12 +812,13 @@ class VidaEscolarAdminController extends AdminBaseController
             'data_transferencia' => $post['data_transferencia'] ?? '',
             'data_entrada' => $post['data_entrada'] ?? '',
             'documento_id' => $post['documento_id'] ?? 0,
+            'ano_letivo' => (int) ($post['ano_letivo'] ?? 0),
             'anos_anteriores' => $anos,
             'bimestres_atuais' => $bims,
         ];
     }
 
-    private function redirectAluno($id, string $aba = '', int $fichaId = 0, int $aiJobId = 0): void
+    private function redirectAluno($id, string $aba = '', int $fichaId = 0, int $aiJobId = 0, array $extra = []): void
     {
         $qs = ['tab' => 'vida-escolar'];
         $aba = $aba !== '' ? $aba : 'boletim';
@@ -775,6 +826,12 @@ class VidaEscolarAdminController extends AdminBaseController
             $aba = 'boletim';
         }
         $qs['ve_aba'] = $aba;
+        foreach ($extra as $chave => $valor) {
+            if (!is_string($chave) || $chave === '' || !is_scalar($valor)) {
+                continue;
+            }
+            $qs[$chave] = $valor;
+        }
         if ($fichaId > 0) {
             $qs['ficha_id'] = $fichaId;
         }
