@@ -2705,6 +2705,28 @@ class VidaEscolarService
     }
 
     /**
+     * Aluno, pais e secretaria leem a mesma ficha. Se Gramática, Leitura ou
+     * Literatura ainda estiverem no lugar de Língua Portuguesa, grava o resultado final.
+     */
+    public function recolherDesdobramentosSePrecisar(int $fichaId): void
+    {
+        if (!$this->precisaRecolherDesdobramentos($fichaId)) {
+            return;
+        }
+        $ficha = $this->model->findFicha($fichaId);
+        $alunoId = (int) (is_array($ficha) ? ($ficha['aluno_id'] ?? 0) : 0);
+        if ($alunoId <= 0) {
+            return;
+        }
+        try {
+            require_once dirname(__DIR__, 3) . '/Controllers/Admin/BoletimConfigController.php';
+            (new \BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno($alunoId);
+        } catch (\Throwable $e) {
+            error_log('Vida escolar recolher desdobramentos aluno #' . $alunoId . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
      * A ficha ainda mostra desdobramento (Gramática, Leitura, Literatura) porque
      * a linha oficial (Língua Portuguesa) não tem o resultado final.
      */
@@ -3039,7 +3061,6 @@ class VidaEscolarService
     private function linhasUnicasDoQuadro(array $ficha, array $linhas, array $idsOcultos): array
     {
         $idsPermitidos = $this->materiaIdsDoModeloDaFicha($ficha);
-        $ordemModelo = $this->ordemMateriasDoModeloDaFicha($ficha);
         $labelsGrupo = [];
         foreach ($this->gruposLinhaDoAluno((int) ($ficha['aluno_id'] ?? 0), (int) ($ficha['ano_letivo'] ?? 0)) as $g) {
             $label = mb_strtolower(trim((string) ($g['label'] ?? '')));
@@ -3103,39 +3124,33 @@ class VidaEscolarService
                 $nomesUsados[$n] = true;
             }
         }
-        usort($out, static function ($a, $b) use ($ordemModelo) {
-            $ma = (int) ($a['materia_id'] ?? 0);
-            $mb = (int) ($b['materia_id'] ?? 0);
-            $oa = $ordemModelo[$ma] ?? 1000 + (int) ($a['ordem'] ?? 0);
-            $ob = $ordemModelo[$mb] ?? 1000 + (int) ($b['ordem'] ?? 0);
-            if ($oa !== $ob) {
-                return $oa <=> $ob;
+        usort($out, static function ($a, $b) {
+            $cmp = strcmp(
+                self::chaveOrdemAlfabetica((string) ($a['componente_nome'] ?? '')),
+                self::chaveOrdemAlfabetica((string) ($b['componente_nome'] ?? ''))
+            );
+            if ($cmp !== 0) {
+                return $cmp;
             }
+
             return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
         });
 
         return $out;
     }
 
-    /**
-     * @param array<string,mixed> $ficha
-     * @return array<int, int> materia_id => ordem
-     */
-    private function ordemMateriasDoModeloDaFicha(array $ficha): array
+    private static function chaveOrdemAlfabetica(string $nome): string
     {
-        $modelo = $this->modeloOficialDaFicha($ficha);
-        if (!is_array($modelo)) {
-            return [];
-        }
-        $ordem = [];
-        foreach ($this->boletimCadastro()->componentesParaFicha($modelo) as $c) {
-            $id = (int) ($c['materia_id'] ?? 0);
-            if ($id > 0 && !isset($ordem[$id])) {
-                $ordem[$id] = (int) ($c['ordem'] ?? (count($ordem) + 1));
-            }
-        }
+        $nome = mb_strtolower(trim($nome));
 
-        return $ordem;
+        return strtr($nome, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
     }
 
     /**

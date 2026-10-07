@@ -34,23 +34,6 @@ class ProntuarioVidaEscolarService
         $this->db = Database::getInstance();
     }
 
-    /**
-     * Recalcula o boletim oficial do aluno para a linha única (Língua Portuguesa)
-     * receber o resultado final do evento de notas.
-     */
-    private function recolherDesdobramentosNoBoletim(int $alunoId): void
-    {
-        if ($alunoId <= 0) {
-            return;
-        }
-        try {
-            require_once dirname(__DIR__, 3) . '/Controllers/Admin/BoletimConfigController.php';
-            (new \BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno($alunoId);
-        } catch (\Throwable $e) {
-            error_log('Prontuário recolher desdobramentos aluno #' . $alunoId . ': ' . $e->getMessage());
-        }
-    }
-
     public static function abaValida(?string $aba): string
     {
         $aba = strtolower(trim((string) $aba));
@@ -104,8 +87,8 @@ class ProntuarioVidaEscolarService
         if ($fichaId <= 0 && $fichas !== []) {
             $fichaId = (int) $fichas[0]['id'];
         }
-        if ($fichaId > 0 && $vida->precisaRecolherDesdobramentos($fichaId)) {
-            $this->recolherDesdobramentosNoBoletim($alunoId);
+        if ($fichaId > 0) {
+            $vida->recolherDesdobramentosSePrecisar($fichaId);
         }
         $quadro = $fichaId > 0 ? $vida->quadro($fichaId) : null;
 

@@ -1535,6 +1535,10 @@ if (!class_exists('StudentController')) {
                 error_log('Observação do boletim aluno #' . $alunoId . ': ' . $e->getMessage());
             }
 
+            if ($fichaIdEscolhida > 0) {
+                $vida->recolherDesdobramentosSePrecisar($fichaIdEscolhida);
+            }
+
             return [
                 'quadro' => $fichaIdEscolhida > 0 ? $vida->quadro($fichaIdEscolhida, true) : null,
                 'fichas' => $fichas,
