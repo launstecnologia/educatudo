@@ -2576,7 +2576,10 @@ class TeacherExamController extends BaseController
             if ($cmp !== 0) {
                 return $cmp;
             }
-            return strcasecmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
+            return strcmp(
+                AlunoLancamentoNotaHelper::normalizarNome((string) ($a['aluno_nome'] ?? '')),
+                AlunoLancamentoNotaHelper::normalizarNome((string) ($b['aluno_nome'] ?? ''))
+            );
         });
 
         $comNota = 0;
@@ -3128,7 +3131,10 @@ class TeacherExamController extends BaseController
             }
 
             $cmpTurma = strcasecmp((string) ($a['turma_nome'] ?? ''), (string) ($b['turma_nome'] ?? ''));
-            $cmpNome = strcasecmp((string) ($a['aluno_nome'] ?? ''), (string) ($b['aluno_nome'] ?? ''));
+            $cmpNome = strcmp(
+                AlunoLancamentoNotaHelper::normalizarNome((string) ($a['aluno_nome'] ?? '')),
+                AlunoLancamentoNotaHelper::normalizarNome((string) ($b['aluno_nome'] ?? ''))
+            );
             if ($descNome) {
                 $cmpNome = -$cmpNome;
             }
