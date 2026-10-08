@@ -442,6 +442,13 @@ class VidaEscolarService
             $this->alinharFichaAoModelo($ficha);
             $this->garantirLinhasDeGrupo($ficha);
         }
+        if (($ficha['status'] ?? '') !== 'homologada') {
+            try {
+                $this->reaplicarNotasMeioAno($ficha);
+            } catch (\Throwable $e) {
+                error_log('Vida escolar notas meio do ano ficha #' . $fichaId . ': ' . $e->getMessage());
+            }
+        }
         $linhas = $this->model->listarLinhas($fichaId);
         $celulas = $this->model->listarCelulas($fichaId);
         $porLinha = [];
@@ -1401,7 +1408,7 @@ class VidaEscolarService
      *
      * @return array{success: bool, error?: string, resumo?: array<string,int>}
      */
-    public function validarImportacao(int $importacaoId, array $usuario): array
+    public function validarImportacao(int $importacaoId, array $usuario, int $fichaIdPreferida = 0): array
     {
         $imp = $this->model->findImportacao($importacaoId);
         if (!$imp) {
@@ -1442,14 +1449,18 @@ class VidaEscolarService
         $turmaId = (int) ($aluno['turma_id'] ?? 0);
         $anoAtual = $this->anoLetivoReal(is_array($aluno) ? $aluno : [], (int) ($payload['ano_letivo'] ?? 0));
         if ($bims !== []) {
-            if ($turmaId <= 0) {
-                return ['success' => false, 'error' => 'Aluno sem turma para lançar as notas no boletim.'];
+            $fichaIdAlvo = $this->fichaDoBoletimNaTela($alunoId, $fichaIdPreferida);
+            if ($fichaIdAlvo <= 0) {
+                if ($turmaId <= 0) {
+                    return ['success' => false, 'error' => 'Aluno sem turma para lançar as notas no boletim.'];
+                }
+                $g = $this->garantirFicha($alunoId, $turmaId, $anoAtual, $usuario['id'] ?? null);
+                if (empty($g['success'])) {
+                    return ['success' => false, 'error' => $g['error'] ?? 'Não foi possível abrir a ficha do boletim.'];
+                }
+                $fichaIdAlvo = (int) ($g['id'] ?? 0);
             }
-            $g = $this->garantirFicha($alunoId, $turmaId, $anoAtual, $usuario['id'] ?? null);
-            if (empty($g['success'])) {
-                return ['success' => false, 'error' => $g['error'] ?? 'Não foi possível abrir a ficha do boletim.'];
-            }
-            $aplicado = $this->aplicarBimestresExternos((int) $g['id'], $bims, $escola, (int) ($imp['documento_id'] ?? 0), $usuario, $anoAtual);
+            $aplicado = $this->aplicarBimestresExternos($fichaIdAlvo, $bims, $escola, (int) ($imp['documento_id'] ?? 0), $usuario, $anoAtual);
             if (!empty($aplicado['erro'])) {
                 return ['success' => false, 'error' => (string) $aplicado['erro']];
             }
@@ -1504,6 +1515,239 @@ class VidaEscolarService
     }
 
     /**
+     * A ficha aberta na tela do aluno, quando o lançamento veio desse boletim.
+     */
+    private function fichaDoBoletimNaTela(int $alunoId, int $fichaId): int
+    {
+        if ($alunoId <= 0 || $fichaId <= 0) {
+            return 0;
+        }
+        $ficha = $this->model->findFicha($fichaId);
+        if (!is_array($ficha) || (int) ($ficha['aluno_id'] ?? 0) !== $alunoId) {
+            return 0;
+        }
+        if (($ficha['status'] ?? '') === 'homologada') {
+            return 0;
+        }
+        $this->alinharFichaAoModelo($ficha);
+        $this->garantirLinhasDeGrupo($ficha);
+
+        return $fichaId;
+    }
+
+    /**
+     * Copia para as linhas visíveis do boletim as notas já validadas de quem
+     * chegou no meio do ano. O evento de notas deixa 0,0 nesses bimestres;
+     * a nota da escola anterior precisa ficar no lugar.
+     *
+     * @param array<string,mixed> $ficha
+     */
+    private function reaplicarNotasMeioAno(array $ficha): void
+    {
+        $fichaId = (int) ($ficha['id'] ?? 0);
+        $alunoId = (int) ($ficha['aluno_id'] ?? 0);
+        if ($fichaId <= 0 || $alunoId <= 0 || ($ficha['status'] ?? '') === 'homologada') {
+            return;
+        }
+        $itens = $this->notasMeioAnoValidadas($alunoId);
+        if ($itens === []) {
+            return;
+        }
+        $linhas = $this->model->listarLinhas($fichaId);
+        $porLinha = [];
+        foreach ($this->model->listarCelulas($fichaId) as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $porLinha[(int) ($c['linha_id'] ?? 0)][(int) ($c['periodo_numero'] ?? 0)] = $c;
+        }
+        $visiveis = $this->linhasUnicasDoQuadro(
+            $ficha,
+            $linhas,
+            $this->materiaIdsOcultosPorAgrupamento($alunoId, (int) ($ficha['ano_letivo'] ?? 0), $linhas, $porLinha)
+        );
+        $gravado = [];
+        $linhasTocadas = [];
+        $anoFicha = (int) ($ficha['ano_letivo'] ?? 0);
+        foreach ($itens as $item) {
+            $anoItem = (int) ($item['ano_letivo'] ?? 0);
+            if ($anoItem >= 2000 && $anoFicha >= 2000 && $anoItem !== $anoFicha) {
+                continue;
+            }
+            $periodo = (int) ($item['periodo_numero'] ?? 0);
+            if ($periodo < 1 || $periodo > 4) {
+                continue;
+            }
+            $nota = $this->notaOuNull($item['nota'] ?? null);
+            $faltas = ($item['faltas'] ?? '') !== '' && $item['faltas'] !== null ? (int) $item['faltas'] : null;
+            if ($nota === null && $faltas === null) {
+                continue;
+            }
+            foreach ($this->linhasDaNotaExterna($visiveis, (int) ($item['materia_id'] ?? 0), (string) ($item['componente'] ?? '')) as $linha) {
+                $linhaId = (int) ($linha['id'] ?? 0);
+                $chave = $linhaId . ':' . $periodo;
+                if ($linhaId <= 0 || isset($gravado[$chave])) {
+                    continue;
+                }
+                $cel = $porLinha[$linhaId][$periodo] ?? null;
+                if (!$cel) {
+                    $this->model->criarCelula([
+                        'linha_id' => $linhaId,
+                        'periodo_numero' => $periodo,
+                        'origem' => 'vazia',
+                        'status' => 'aberta',
+                    ]);
+                    $cel = $this->model->findCelulaLinhaPeriodo($linhaId, $periodo);
+                }
+                if (!is_array($cel)) {
+                    continue;
+                }
+                if (!$this->celulaAceitaNotaDeOutraEscola($cel)) {
+                    $gravado[$chave] = true;
+                    continue;
+                }
+                $gravado[$chave] = true;
+                $campos = [
+                    'origem' => 'externa',
+                    'status' => 'fechada',
+                    'escola_origem' => trim((string) ($item['escola'] ?? '')) ?: null,
+                    'documento_id' => (int) ($item['documento_id'] ?? 0) > 0 ? (int) $item['documento_id'] : null,
+                ];
+                if ($nota !== null) {
+                    $campos['nota'] = $nota;
+                    $campos['nota_original'] = trim((string) ($item['nota'] ?? '')) ?: null;
+                }
+                if ($faltas !== null) {
+                    $campos['faltas'] = $faltas;
+                }
+                $this->model->atualizarCelula((int) $cel['id'], $campos);
+                $linhasTocadas[$linhaId] = true;
+            }
+        }
+        foreach (array_keys($linhasTocadas) as $linhaId) {
+            $this->recalcularFinal((int) $linhaId, $ficha);
+        }
+    }
+
+    /**
+     * Importações já validadas, da mais recente para a mais antiga.
+     *
+     * @return list<array{materia_id:int,componente:string,periodo_numero:int,nota:string,faltas:string,escola:string,documento_id:int,ano_letivo:int}>
+     */
+    private function notasMeioAnoValidadas(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        $out = [];
+        $vistos = [];
+        foreach ($this->model->listarImportacoes($alunoId) as $imp) {
+            if (!is_array($imp) || (string) ($imp['status'] ?? '') !== 'validada') {
+                continue;
+            }
+            $payload = json_decode((string) ($imp['payload_json'] ?? ''), true);
+            if (!is_array($payload)) {
+                continue;
+            }
+            $escola = trim((string) ($imp['escola_origem'] ?? ''));
+            $doc = (int) ($imp['documento_id'] ?? 0);
+            $bims = is_array($payload['bimestres_atuais'] ?? null) ? $payload['bimestres_atuais'] : [];
+            foreach ($bims as $b) {
+                if (!is_array($b)) {
+                    continue;
+                }
+                $periodo = (int) ($b['periodo_numero'] ?? $b['bimestre'] ?? 0);
+                $nome = trim((string) ($b['componente'] ?? $b['componente_original'] ?? ''));
+                $mid = (int) ($b['materia_id'] ?? 0);
+                $nota = trim((string) ($b['nota'] ?? ''));
+                $faltas = trim((string) ($b['faltas'] ?? ''));
+                if ($periodo < 1 || $periodo > 4 || ($nota === '' && $faltas === '')) {
+                    continue;
+                }
+                $chave = $mid . '|' . self::chaveOrdemAlfabetica($nome) . '|' . $periodo;
+                if (isset($vistos[$chave])) {
+                    continue;
+                }
+                $vistos[$chave] = true;
+                $out[] = [
+                    'materia_id' => $mid,
+                    'componente' => $nome,
+                    'periodo_numero' => $periodo,
+                    'nota' => $nota,
+                    'faltas' => $faltas,
+                    'escola' => $escola,
+                    'documento_id' => $doc,
+                    'ano_letivo' => (int) ($payload['ano_letivo'] ?? 0),
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Linha do componente, a do pai oficial e qualquer linha com o mesmo nome.
+     *
+     * @param list<array<string,mixed>> $linhas
+     * @return list<array<string,mixed>>
+     */
+    private function linhasDaNotaExterna(array $linhas, int $materiaId, string $nome): array
+    {
+        $out = [];
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $id = (int) ($l['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $mid = (int) ($l['materia_id'] ?? 0);
+            $bate = ($materiaId > 0 && $mid === $materiaId)
+                || $this->nomesBoletimIguais($nome, (string) ($l['componente_nome'] ?? ''));
+            if ($bate) {
+                $out[$id] = $l;
+            }
+        }
+
+        return array_values($out);
+    }
+
+    private function nomesBoletimIguais(string $a, string $b): bool
+    {
+        if (trim($a) === '' || trim($b) === '') {
+            return false;
+        }
+
+        return self::chaveOrdemAlfabetica($a) === self::chaveOrdemAlfabetica($b);
+    }
+
+    /**
+     * Só entra nota de outra escola em célula aberta que ainda está vazia ou com o 0,0 do evento.
+     * Nota já lançada nesta escola (qualquer valor diferente de zero) permanece.
+     *
+     * @param array<string,mixed>|null $cel
+     */
+    private function celulaAceitaNotaDeOutraEscola(?array $cel): bool
+    {
+        if ($cel === null) {
+            return true;
+        }
+        if (in_array((string) ($cel['status'] ?? ''), ['fechada', 'homologada'], true)) {
+            return false;
+        }
+        if ((string) ($cel['origem'] ?? '') === 'externa') {
+            return false;
+        }
+        $nota = $cel['nota'] ?? null;
+        if ($nota === null || $nota === '') {
+            return true;
+        }
+
+        return is_numeric($nota) && abs((float) $nota) < 0.001;
+    }
+
+    /**
      * @param list<array<string,mixed>> $bims
      * @param array<string,mixed> $usuario
      * @return array{n:int,itens:list<array<string,mixed>>,periodos:list<int>,erro:?string}
@@ -1521,31 +1765,22 @@ class VidaEscolarService
             return $vazio;
         }
         $linhas = $this->model->listarLinhas($fichaId);
-        $porNome = [];
-        $porId = [];
-        foreach ($linhas as $l) {
-            $porNome[mb_strtolower(trim((string) $l['componente_nome']))] = $l;
-            $mid = (int) ($l['materia_id'] ?? 0);
-            if ($mid > 0) {
-                $porId[$mid] = $l;
-            }
-        }
         $n = 0;
         $itens = [];
         $periodos = [];
         $perfil = trim((string) ($usuario['perfil_admin'] ?? $usuario['tipo'] ?? ''));
         foreach ($bims as $item) {
             $nomeOriginal = trim((string) ($item['componente'] ?? $item['componente_original'] ?? ''));
-            $nome = mb_strtolower($nomeOriginal);
             $mid = (int) ($item['materia_id'] ?? 0);
-            $linha = ($mid > 0 ? ($porId[$mid] ?? null) : null) ?? ($porNome[$nome] ?? null);
-            if (!$linha) {
-                continue;
-            }
             $periodo = (int) ($item['periodo_numero'] ?? $item['bimestre'] ?? 0);
             if ($periodo < 1 || $periodo > 4) {
                 continue;
             }
+            $alvos = $this->linhasDaNotaExterna($linhas, $mid, $nomeOriginal);
+            if ($alvos === []) {
+                continue;
+            }
+            foreach ($alvos as $linha) {
             $cel = $this->model->findCelulaLinhaPeriodo((int) $linha['id'], $periodo);
             if (!$cel) {
                 $this->model->criarCelula([
@@ -1597,6 +1832,7 @@ class VidaEscolarService
             ];
             $periodos[$periodo] = $periodo;
             $n++;
+            }
         }
         if ($n > 0) {
             sort($periodos);

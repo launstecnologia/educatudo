@@ -654,7 +654,7 @@ class VidaEscolarAdminController extends AdminBaseController
         $svc = $this->service();
         $res = $svc->salvarImportacao((int) $id, $input, $this->auth->getUser());
         if ($aplicarBoletim && !empty($res['success'])) {
-            $val = $svc->validarImportacao((int) $res['id'], $this->auth->getUser());
+            $val = $svc->validarImportacao((int) $res['id'], $this->auth->getUser(), (int) ($_POST['ficha_id'] ?? 0));
             if (empty($val['success'])) {
                 $svc->model()->atualizarImportacao((int) $res['id'], ['status' => 'cancelada']);
                 $this->setFlashMessage($val['error'] ?? 'Não foi possível lançar as notas no boletim.', 'error');

@@ -421,6 +421,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
         <input type="hidden" name="_token" value="<?= $esc($token) ?>">
         <input type="hidden" name="anos_qtd" value="0">
         <input type="hidden" name="aplicar_boletim" value="1">
+        <input type="hidden" name="ficha_id" value="<?= (int) ($fichaMeio['id'] ?? 0) ?>">
         <input type="hidden" name="ano_letivo" value="<?= (int) $anoPeriodo ?>">
         <input type="hidden" name="senha_confirmacao" id="ve-senha-meio" value="">
         <div class="rounded-xl border border-gray-200 p-4">
