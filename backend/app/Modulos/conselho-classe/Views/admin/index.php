@@ -31,7 +31,7 @@ if ($turmaId > 0) {
 $selectCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500';
 
 $page_header_title = 'Conselho de Classe';
-$page_header_subtitle = 'Etapa colegiada de análise pedagógica. Consome boletim, diário e ocorrências — não duplica nota nem frequência.';
+$page_header_subtitle = 'Etapa colegiada de análise pedagógica. Consome boletim, diário e ocorrências.';
 ob_start();
 $ui_btn_variant = 'filtro';
 $ui_btn_label = 'Filtros';

@@ -352,9 +352,15 @@ class ConselhoAdminController extends AdminBaseController
         if (!class_exists('PeriodoLetivo', false)) {
             require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
         }
-        $quantidade = max(1, (int) PeriodoLetivo::doAno($anoLetivo)['quantidade']);
-        $bimestre = (int) ($_GET['bimestre'] ?? PeriodoLetivo::numeroPadrao($anoLetivo));
-        return max(1, min($quantidade, $bimestre));
+        try {
+            $quantidade = max(1, (int) PeriodoLetivo::doAno($anoLetivo)['quantidade']);
+            $bimestre = (int) ($_GET['bimestre'] ?? PeriodoLetivo::numeroPadrao($anoLetivo));
+            return max(1, min($quantidade, $bimestre));
+        } catch (Throwable $e) {
+            error_log('ConselhoAdminController::periodoSelecionado: ' . $e->getMessage());
+            $bimestre = (int) ($_GET['bimestre'] ?? 1);
+            return max(1, min(4, $bimestre > 0 ? $bimestre : 1));
+        }
     }
 }
 }

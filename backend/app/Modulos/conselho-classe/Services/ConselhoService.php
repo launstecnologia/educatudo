@@ -3,18 +3,19 @@
 namespace App\Modulos\ConselhoClasse\Services;
 
 require_once __DIR__ . '/../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
+require_once __DIR__ . '/../../diario/Models/ClassDiary.php';
 require_once __DIR__ . '/../../../Services/FrequencyService.php';
 require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
-use ClassDiary;
+use App\Modulos\Diario\Models\ClassDiary;
 use Database;
 use FrequencyService;
 use PeriodoLetivo;
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
 use App\Modulos\Ocorrencias\Services\OcorrenciaService;
 use LayoutHelper;
+use Throwable;
 
 /**
  * EducaTudo - Conselho de Classe
@@ -151,10 +152,20 @@ class ConselhoService
      */
     public function painel(int $anoLetivo, int $bimestre, int $turmaId = 0): array
     {
-        $linhas = $this->model->listarPainel($anoLetivo, $bimestre, $turmaId);
+        try {
+            $linhas = $this->model->listarPainel($anoLetivo, $bimestre, $turmaId);
+        } catch (Throwable $e) {
+            error_log('ConselhoService::painel listar: ' . $e->getMessage());
+            return [];
+        }
         foreach ($linhas as &$linha) {
             $tid = (int) $linha['turma_id'];
-            $pendencias = $this->contarPendencias($tid, $anoLetivo, $bimestre);
+            try {
+                $pendencias = $this->contarPendencias($tid, $anoLetivo, $bimestre);
+            } catch (Throwable $e) {
+                error_log('ConselhoService::painel pendencias turma=' . $tid . ': ' . $e->getMessage());
+                $pendencias = ['total' => 0, 'diarios' => 0, 'notas' => 0, 'frequencia' => 0];
+            }
             $linha['pendencias'] = $pendencias;
             $linha['status_exibicao'] = $linha['sessao_id']
                 ? (string) $linha['status']
@@ -568,17 +579,25 @@ class ConselhoService
         }
 
         $params = ['turma_id' => $turmaId, 'ano_letivo' => $anoLetivo, 'bimestre' => $bimestre];
-        $rows = $this->db->fetchAll(
-            "SELECT g.aluno_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json,
-                    r.nota_minima_aprovacao
-             FROM boletim_resultados_gerados g
-             INNER JOIN boletim_regras r ON r.id = g.regra_id
-             INNER JOIN alunos a ON a.id = g.aluno_id
-             WHERE g.preview = 0 AND g.vigente = 1 AND a.turma_id = :turma_id
-               AND r.ano_letivo = :ano_letivo AND r.bimestre = :bimestre
-             ORDER BY g.ordem_linha ASC, g.id ASC",
-            $params
-        ) ?: [];
+        $vigenteSql = $this->model->colunaExiste('boletim_resultados_gerados', 'vigente')
+            ? ' AND g.vigente = 1'
+            : '';
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT g.aluno_id, g.materia_id, g.materia_nome, g.media_final, g.notas_json,
+                        r.nota_minima_aprovacao
+                 FROM boletim_resultados_gerados g
+                 INNER JOIN boletim_regras r ON r.id = g.regra_id
+                 INNER JOIN alunos a ON a.id = g.aluno_id
+                 WHERE g.preview = 0{$vigenteSql} AND a.turma_id = :turma_id
+                   AND r.ano_letivo = :ano_letivo AND r.bimestre = :bimestre
+                 ORDER BY g.ordem_linha ASC, g.id ASC",
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('ConselhoService::notasDoBoletim: ' . $e->getMessage());
+            return $vazio;
+        }
 
         $componentes = [];
         $vistosComp = [];
@@ -697,8 +716,13 @@ class ConselhoService
      */
     private function frequenciasPorAluno(int $turmaId, int $anoLetivo, int $bimestre): array
     {
-        $periodo = $this->diario->periodoDoBimestre($anoLetivo, $bimestre);
-        $lista = $this->frequencia->alunosPercentual($turmaId, $periodo['inicio'], $periodo['fim']);
+        try {
+            $periodo = $this->diario->periodoDoBimestre($anoLetivo, $bimestre);
+            $lista = $this->frequencia->alunosPercentual($turmaId, $periodo['inicio'], $periodo['fim']);
+        } catch (Throwable $e) {
+            error_log('ConselhoService::frequenciasPorAluno: ' . $e->getMessage());
+            return [];
+        }
         $out = [];
         foreach ($lista as $item) {
             $out[(int) $item['aluno_id']] = [

@@ -3,6 +3,7 @@
 namespace App\Modulos\ConselhoClasse\Models;
 
 use Database;
+use Throwable;
 
 /**
  * EducaTudo - Conselho de Classe
@@ -78,6 +79,33 @@ class ConselhoSessao
             $cache[$tenantKey][$tabela] = false;
         }
         return $cache[$tenantKey][$tabela];
+    }
+
+    public function colunaExiste(string $tabela, string $coluna): bool
+    {
+        static $cache = [];
+        $tabela = preg_replace('/[^a-z0-9_]/i', '', $tabela) ?? '';
+        $coluna = preg_replace('/[^a-z0-9_]/i', '', $coluna) ?? '';
+        if ($tabela === '' || $coluna === '') {
+            return false;
+        }
+        $tenantKey = defined('TENANT_ID') ? ('t' . (int) TENANT_ID) : 'no_tenant';
+        $chave = $tabela . '.' . $coluna;
+        if (isset($cache[$tenantKey][$chave])) {
+            return $cache[$tenantKey][$chave];
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = :tabela AND column_name = :coluna LIMIT 1",
+                ['tabela' => $tabela, 'coluna' => $coluna]
+            );
+            $cache[$tenantKey][$chave] = !empty($row['ok']);
+        } catch (Throwable $e) {
+            error_log('ConselhoSessao::colunaExiste: ' . $e->getMessage());
+            $cache[$tenantKey][$chave] = false;
+        }
+        return $cache[$tenantKey][$chave];
     }
 
     public function findById(int $id): ?array
@@ -222,38 +250,62 @@ class ConselhoSessao
 
         $matriculados = [];
         if ($this->tabelaExiste('matricula')) {
-            $matriculados = $this->db->fetchAll(
-                "SELECT a.id, a.nome, a.ra, a.ativo,
-                        IF(m.status = 'transferido', 1, 0) AS transferido
-                 FROM matricula m
-                 INNER JOIN alunos a ON a.id = m.aluno_id
-                 WHERE m.turma_id = :turma_id AND m.status IN ('ativa', 'concluido', 'transferido')
-                 ORDER BY a.nome ASC",
-                ['turma_id' => $turmaId]
-            ) ?: [];
+            try {
+                $matriculados = $this->db->fetchAll(
+                    "SELECT a.id, a.nome, a.ra, a.ativo,
+                            IF(m.status = 'transferido', 1, 0) AS transferido
+                     FROM matricula m
+                     INNER JOIN alunos a ON a.id = m.aluno_id
+                     WHERE m.turma_id = :turma_id AND m.status IN ('ativa', 'concluido', 'transferido')
+                     ORDER BY a.nome ASC",
+                    ['turma_id' => $turmaId]
+                ) ?: [];
+            } catch (Throwable $e) {
+                error_log('ConselhoSessao::alunosDaTurma matriculados: ' . $e->getMessage());
+            }
         }
 
         $saidos = [];
         if ($this->tabelaExiste('alunos_turmas_historico')) {
-            $transferidoExpr = $this->tabelaExiste('matricula')
+            $temMatricula = $this->tabelaExiste('matricula');
+            $transferidoExpr = $temMatricula
                 ? "CASE WHEN EXISTS (
                         SELECT 1 FROM matricula mt
                         WHERE mt.aluno_id = a.id AND mt.turma_id = :turma_tr AND mt.status = 'transferido'
                    ) THEN 1 ELSE 0 END"
                 : '1';
             $paramsSaidos = ['turma_id' => $turmaId, 'turma_id2' => $turmaId];
-            if ($this->tabelaExiste('matricula')) {
+            if ($temMatricula) {
                 $paramsSaidos['turma_tr'] = $turmaId;
             }
-            $saidos = $this->db->fetchAll(
-                "SELECT a.id, a.nome, a.ra, a.ativo, {$transferidoExpr} AS transferido
-                 FROM alunos_turmas_historico h
-                 INNER JOIN alunos a ON a.id = h.aluno_id
-                 WHERE h.turma_id = :turma_id AND h.data_fim IS NOT NULL
-                   AND (a.turma_id IS NULL OR a.turma_id <> :turma_id2)
-                 ORDER BY a.nome ASC",
-                $paramsSaidos
-            ) ?: [];
+            try {
+                $saidos = $this->db->fetchAll(
+                    "SELECT a.id, a.nome, a.ra, a.ativo, {$transferidoExpr} AS transferido
+                     FROM alunos_turmas_historico h
+                     INNER JOIN alunos a ON a.id = h.aluno_id
+                     WHERE h.turma_id = :turma_id AND h.data_fim IS NOT NULL
+                       AND (a.turma_id IS NULL OR a.turma_id <> :turma_id2)
+                     ORDER BY a.nome ASC",
+                    $paramsSaidos
+                ) ?: [];
+            } catch (Throwable $e) {
+                error_log('ConselhoSessao::alunosDaTurma saidos: ' . $e->getMessage());
+                // Fallback sem subquery de matrícula (schema antigo / ENUM diferente).
+                try {
+                    $saidos = $this->db->fetchAll(
+                        "SELECT a.id, a.nome, a.ra, a.ativo, 1 AS transferido
+                         FROM alunos_turmas_historico h
+                         INNER JOIN alunos a ON a.id = h.aluno_id
+                         WHERE h.turma_id = :turma_id AND h.data_fim IS NOT NULL
+                           AND (a.turma_id IS NULL OR a.turma_id <> :turma_id2)
+                         ORDER BY a.nome ASC",
+                        ['turma_id' => $turmaId, 'turma_id2' => $turmaId]
+                    ) ?: [];
+                } catch (Throwable $e2) {
+                    error_log('ConselhoSessao::alunosDaTurma saidos fallback: ' . $e2->getMessage());
+                    $saidos = [];
+                }
+            }
         }
 
         $vistos = [];
