@@ -1068,9 +1068,13 @@ class TeacherExamController extends BaseController
         $linhasCsv = [];
         $linhasCsv[] = implode(';', array_map($csvCell, $cabecalho));
         foreach ($porAluno as $aluno) {
+            $nomeExport = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                (string) ($aluno['aluno'] ?? ''),
+                !empty($aluno['transferido'])
+            );
             $row = [
                 $aluno['turma'],
-                $aluno['aluno'],
+                $nomeExport,
                 !empty($aluno['transferido']) ? 'Sim' : 'Não',
             ];
             foreach (array_keys($colunas) as $chaveCol) {
@@ -2185,7 +2189,7 @@ class TeacherExamController extends BaseController
                 foreach ($alunos as $al) {
                     $tid = (int) ($al['turma_id'] ?? 0);
                     $aid = (int) ($al['id'] ?? 0);
-                    if ($tid <= 0 || $aid <= 0) {
+                    if ($tid <= 0 || $aid <= 0 || !empty($al['transferido'])) {
                         continue;
                     }
                     if (!isset($notasPost[$pid][$mid][$tid][$aid]) && !isset($obsPost[$pid][$mid][$tid][$aid])) {
@@ -2207,7 +2211,7 @@ class TeacherExamController extends BaseController
                 foreach ($alunos as $al) {
                     $tid = (int) ($al['turma_id'] ?? 0);
                     $aid = (int) ($al['id'] ?? 0);
-                    if ($tid <= 0 || $aid <= 0) {
+                    if ($tid <= 0 || $aid <= 0 || !empty($al['transferido'])) {
                         continue;
                     }
                     if (!isset($notasPost[$pid][$mid][$tid][$aid]) && !isset($obsPost[$pid][$mid][$tid][$aid])) {
@@ -2245,7 +2249,7 @@ class TeacherExamController extends BaseController
                 foreach ($alunos as $al) {
                     $tid = (int) ($al['turma_id'] ?? 0);
                     $aid = (int) ($al['id'] ?? 0);
-                    if ($tid <= 0 || $aid <= 0) {
+                    if ($tid <= 0 || $aid <= 0 || !empty($al['transferido'])) {
                         continue;
                     }
                     $valorRaw = $notasPost[$pid][$mid][$tid][$aid] ?? '';
@@ -2287,7 +2291,7 @@ class TeacherExamController extends BaseController
                 foreach ($alunos as $al) {
                     $tid = (int) ($al['turma_id'] ?? 0);
                     $aid = (int) ($al['id'] ?? 0);
-                    if ($tid <= 0 || $aid <= 0 || !array_key_exists($aid, $mapBaseAluno)) {
+                    if ($tid <= 0 || $aid <= 0 || !empty($al['transferido']) || !array_key_exists($aid, $mapBaseAluno)) {
                         continue;
                     }
                     $linhas[] = [
@@ -2322,7 +2326,7 @@ class TeacherExamController extends BaseController
             foreach ($alunos as $al) {
                 $tid = (int) ($al['turma_id'] ?? 0);
                 $aid = (int) ($al['id'] ?? 0);
-                if ($tid <= 0 || $aid <= 0) {
+                if ($tid <= 0 || $aid <= 0 || !empty($al['transferido'])) {
                     continue;
                 }
                 $temNotaPost = isset($notasPost[$pid][$mid][$tid][$aid]);
@@ -2687,10 +2691,14 @@ class TeacherExamController extends BaseController
         $temSerie = $this->tabelaTenantExiste('serie');
         $serieSelect = $temSerie ? 't.serie_id, s.nome AS serie_nome' : 'NULL AS serie_id, NULL AS serie_nome';
         $serieJoin = $temSerie ? 'LEFT JOIN serie s ON s.id = t.serie_id' : '';
-        $campos = "a.id, a.nome, t.id AS turma_id, t.nome AS turma_nome,
+        $campos = "a.id, a.nome, a.ativo, t.id AS turma_id, t.nome AS turma_nome,
                     {$serieSelect}, {$sexoSelect}, {$chamadaSelect}";
 
         $temMatricula = $this->tabelaTenantExiste('matricula');
+        $temStatusAluno = $this->alunosTemColuna('status');
+        if ($temStatusAluno) {
+            $campos .= ', a.status';
+        }
 
         if ($temMatricula) {
             $camposComTransferido = $campos . ",
@@ -2710,6 +2718,7 @@ class TeacherExamController extends BaseController
                         ) THEN 1
                         ELSE 0
                     END AS transferido";
+            $condVisivel = AlunoLancamentoNotaHelper::sqlCondicaoAlunoVisivel('a', 't', true);
             $rows = $this->db->fetchAll(
                 "SELECT DISTINCT {$camposComTransferido}
                  FROM turmas t
@@ -2726,15 +2735,7 @@ class TeacherExamController extends BaseController
                  {$serieJoin}
                  {$chamadaJoin}
                  WHERE t.id IN ($placeholders)
-                   AND (
-                        a.ativo = 1 OR a.ativo IS NULL
-                        OR EXISTS (
-                            SELECT 1 FROM matricula mx
-                            WHERE mx.aluno_id = a.id
-                              AND mx.turma_id = t.id
-                              AND mx.status = 'transferido'
-                        )
-                   )
+                   AND {$condVisivel}
                  ORDER BY t.nome ASC, a.nome ASC",
                 $params
             );
@@ -2922,7 +2923,7 @@ class TeacherExamController extends BaseController
      */
     private function filtrarAlunosLancamentoNota(array $alunos): array
     {
-        return AlunoLancamentoNotaHelper::filtrarAlunosTeste($alunos, 'nome');
+        return AlunoLancamentoNotaHelper::filtrarAlunosExibicao($alunos, 'nome');
     }
 
     private function alunosTemColuna(string $coluna): bool

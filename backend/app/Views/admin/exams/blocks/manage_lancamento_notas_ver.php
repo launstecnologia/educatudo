@@ -68,13 +68,19 @@ $formatarNota = static function ($notaRaw): string {
         : number_format((float) $notaRaw, 2, ',', '.');
 };
 
+if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
+}
 $exportLinhas = [];
 foreach ($linhasExportSrc as $ln) {
     $nChamada = (int) ($ln['numero_chamada'] ?? 0);
     $exportLinhas[] = [
         'turma' => (string) ($ln['turma_nome'] ?? ''),
         'numero' => $nChamada > 0 ? (string) $nChamada : '',
-        'aluno' => (string) ($ln['aluno_nome'] ?? ''),
+        'aluno' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+            (string) ($ln['aluno_nome'] ?? ''),
+            !empty($ln['transferido'])
+        ),
         'nota' => $formatarNota($ln['nota'] ?? null),
         'observacao' => (string) ($ln['observacao'] ?? ''),
     ];
@@ -88,19 +94,16 @@ if ($slugArquivo === '') {
 $renderLinha = static function (array $ln): void {
     $transferido = !empty($ln['transferido']);
     $nChamada = (int) ($ln['numero_chamada'] ?? 0);
+    $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+        (string) ($ln['aluno_nome'] ?? ''),
+        $transferido
+    );
     ?>
     <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : '' ?>">
         <td class="px-4 py-3 text-sm <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>"><?= htmlspecialchars((string) ($ln['turma_nome'] ?? '')) ?></td>
         <td class="px-4 py-3 text-sm text-center font-semibold <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= $nChamada > 0 ? $nChamada : '—' ?></td>
         <td class="px-4 py-3 text-sm <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>">
-            <?php if ($transferido): ?>
-                <span class="inline-flex items-center gap-1.5">
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
-                    <span><?= htmlspecialchars((string) ($ln['aluno_nome'] ?? '')) ?></span>
-                </span>
-            <?php else: ?>
-                <?= htmlspecialchars((string) ($ln['aluno_nome'] ?? '')) ?>
-            <?php endif; ?>
+            <?= htmlspecialchars($nomeAluno) ?>
         </td>
         <td class="px-4 py-3 text-sm">
             <?php if (($ln['nota'] ?? null) === null || ($ln['nota'] ?? '') === ''): ?>

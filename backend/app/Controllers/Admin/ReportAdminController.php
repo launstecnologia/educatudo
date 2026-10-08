@@ -265,19 +265,32 @@ class ReportAdminController extends AdminBaseController
         $codigoSelect = $this->colunaAlunosCodigoExisteBoletimCoordenacao()
             ? 'a.codigo_aluno'
             : 'NULL AS codigo_aluno';
+        $condVisivelBusca = $this->sqlAlunoVisivelBoletimCoordenacao('a', 't');
+        $transferidoBusca = $this->sqlTransferidoSelectBoletimCoordenacao('a', 't');
         $rows = $this->db->fetchAll(
-            "SELECT a.id, a.nome, a.ra, {$codigoSelect},
-                    COALESCE(t.nome, '') AS turma_nome
+            "SELECT a.id, a.nome, a.ra, a.ativo, {$codigoSelect},
+                    COALESCE(t.nome, '') AS turma_nome,
+                    {$transferidoBusca} AS transferido
              FROM alunos a
              LEFT JOIN turmas t ON t.id = a.turma_id
-             WHERE a.ativo = 1{$whereAluno}{$whereTurma}
+             WHERE {$condVisivelBusca}{$whereAluno}{$whereTurma}
              ORDER BY a.nome ASC
              LIMIT 15",
             $params
         ) ?: [];
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
         $alunos = [];
         foreach ($rows as $row) {
-            $nome = trim((string) ($row['nome'] ?? ''));
+            if (!AlunoLancamentoNotaHelper::deveExibirAluno($row, 'nome')) {
+                continue;
+            }
+            $transferido = !empty($row['transferido']);
+            $nome = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                trim((string) ($row['nome'] ?? '')),
+                $transferido
+            );
             $turma = trim((string) ($row['turma_nome'] ?? ''));
             $ra = trim((string) ($row['ra'] ?? ''));
             $rotulo = $turma !== '' ? ($turma . ' · ' . $nome) : $nome;
@@ -290,6 +303,7 @@ class ReportAdminController extends AdminBaseController
                 'ra' => $ra,
                 'codigo_aluno' => trim((string) ($row['codigo_aluno'] ?? '')),
                 'turma_nome' => $turma,
+                'transferido' => $transferido ? 1 : 0,
                 'rotulo' => $rotulo,
             ];
         }
@@ -2087,9 +2101,12 @@ class ReportAdminController extends AdminBaseController
         }
         $rows = [];
         try {
+            $condAlunoVisivel = $this->sqlAlunoVisivelBoletimCoordenacao('a', 't');
+            $transferidoSelect = $this->sqlTransferidoSelectBoletimCoordenacao('a', 't');
             $rows = $this->db->fetchAll(
                 "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
-                        a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
+                        a.nome AS aluno_nome, a.ra, a.ativo, t.nome AS turma_nome,
+                        {$transferidoSelect} AS transferido,
                         r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo, r.bimestre,
                         r.created_at AS regra_created_at,
                         o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
@@ -2099,7 +2116,7 @@ class ReportAdminController extends AdminBaseController
                  LEFT JOIN turmas t ON t.id = a.turma_id
                  LEFT JOIN boletim_observacoes o ON o.aluno_id = a.id
                  WHERE g.preview = 0 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
-                   AND a.ativo = 1{$whereTurma}{$whereAluno}
+                   AND {$condAlunoVisivel}{$whereTurma}{$whereAluno}
                    {$filtroVersao}
                  ORDER BY t.nome ASC, a.nome ASC, g.ordem_linha ASC, g.id ASC",
                 $params
@@ -2109,9 +2126,12 @@ class ReportAdminController extends AdminBaseController
         }
         if ($rows === [] && $usarVigente) {
             // Fallback: vigente do período, ou qualquer linha do período (ambientes sem versão).
+            $condAlunoVisivel = $this->sqlAlunoVisivelBoletimCoordenacao('a', 't');
+            $transferidoSelect = $this->sqlTransferidoSelectBoletimCoordenacao('a', 't');
             $rows = $this->db->fetchAll(
                 "SELECT g.aluno_id, g.materia_nome, g.ordem_linha, g.colunas_json, g.notas_json,
-                        a.nome AS aluno_nome, a.ra, t.nome AS turma_nome,
+                        a.nome AS aluno_nome, a.ra, a.ativo, t.nome AS turma_nome,
+                        {$transferidoSelect} AS transferido,
                         r.nome AS evento_nome, r.series_ids, r.decimal_places, r.ano_letivo, r.bimestre,
                         r.created_at AS regra_created_at,
                         o.conteudo AS observacao_conteudo, o.updated_at AS observacao_updated_at
@@ -2121,7 +2141,7 @@ class ReportAdminController extends AdminBaseController
                  LEFT JOIN turmas t ON t.id = a.turma_id
                  LEFT JOIN boletim_observacoes o ON o.aluno_id = a.id
                  WHERE g.preview = 0 AND g.regra_id = :regra_id AND g.periodo_ref = :periodo_ref
-                   AND a.ativo = 1{$whereTurma}{$whereAluno}
+                   AND {$condAlunoVisivel}{$whereTurma}{$whereAluno}
                    AND (g.vigente = 1 OR NOT EXISTS (
                         SELECT 1 FROM boletim_resultados_gerados g3
                         WHERE g3.aluno_id = g.aluno_id AND g3.regra_id = g.regra_id
@@ -2173,15 +2193,30 @@ class ReportAdminController extends AdminBaseController
         }
         $columns = $this->selecionarColunasNotasBoletim($columnsRaw, true);
         $decimalPlaces = max(0, min(2, (int) ($rows[0]['decimal_places'] ?? 1)));
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
         $alunos = [];
         foreach ($rows as $row) {
             $alunoId = (int) ($row['aluno_id'] ?? 0);
+            if ($alunoId <= 0 || !AlunoLancamentoNotaHelper::deveExibirAluno([
+                'nome' => (string) ($row['aluno_nome'] ?? ''),
+                'ativo' => $row['ativo'] ?? 1,
+                'transferido' => $row['transferido'] ?? 0,
+            ])) {
+                continue;
+            }
             if (!isset($alunos[$alunoId])) {
+                $transferido = !empty($row['transferido']);
                 $alunos[$alunoId] = [
                     'id' => $alunoId,
-                    'nome' => (string) ($row['aluno_nome'] ?? ''),
+                    'nome' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                        (string) ($row['aluno_nome'] ?? ''),
+                        $transferido
+                    ),
                     'ra' => (string) ($row['ra'] ?? ''),
                     'turma' => (string) ($row['turma_nome'] ?? ''),
+                    'transferido' => $transferido ? 1 : 0,
                     'observacao' => (string) ($row['observacao_conteudo'] ?? ''),
                     'observacao_updated_at' => $row['observacao_updated_at'] ?? null,
                     'materias' => [],
@@ -2363,8 +2398,9 @@ class ReportAdminController extends AdminBaseController
             [$whereAluno, $paramsAluno] = $this->whereAlunoBuscaBoletimCoordenacao($alunoQ, 'a');
             $idsPermitidos = [];
             if ($whereAluno !== '') {
+                $condBuscaVisivel = $this->sqlAlunoVisivelBoletimCoordenacao('a', null);
                 $achados = $this->db->fetchAll(
-                    "SELECT a.id FROM alunos a WHERE a.ativo = 1{$whereAluno} LIMIT 500",
+                    "SELECT a.id FROM alunos a WHERE {$condBuscaVisivel}{$whereAluno} LIMIT 500",
                     $paramsAluno
                 ) ?: [];
                 foreach ($achados as $rowId) {
@@ -2414,12 +2450,20 @@ class ReportAdminController extends AdminBaseController
                 ];
             }
             $obsAluno = $obs[$alunoId] ?? [];
+            if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+            }
+            $transferidoVe = !empty($ficha['transferido']);
             $alunos[] = [
                 'id' => $alunoId,
                 'ficha_id' => $fichaId,
-                'nome' => (string) ($ficha['aluno_nome'] ?? ''),
+                'nome' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                    (string) ($ficha['aluno_nome'] ?? ''),
+                    $transferidoVe
+                ),
                 'ra' => (string) ($ficha['ra'] ?? ''),
                 'turma' => (string) ($ficha['turma_nome'] ?? ''),
+                'transferido' => $transferidoVe ? 1 : 0,
                 'observacao' => (string) ($obsAluno['conteudo'] ?? ''),
                 'observacao_updated_at' => $obsAluno['updated_at'] ?? null,
                 'materias' => $materias,
@@ -3010,7 +3054,6 @@ class ReportAdminController extends AdminBaseController
                  INNER JOIN alunos a ON a.id = m.aluno_id
                  INNER JOIN turmas t ON t.id = m.turma_id
                  WHERE m.status = \'transferido\'
-                   AND a.ativo = 1
                    AND t.nome IN (' . implode(',', $holders) . ')
                    AND NOT EXISTS (
                         SELECT 1 FROM matricula ma
@@ -3024,6 +3067,9 @@ class ReportAdminController extends AdminBaseController
         } catch (\Throwable $e) {
             return [];
         }
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
         $out = [];
         foreach ($rows as $row) {
             $turma = trim((string) ($row['turma_nome'] ?? ''));
@@ -3031,10 +3077,78 @@ class ReportAdminController extends AdminBaseController
             if ($turma === '' || $alunoId <= 0) {
                 continue;
             }
-            $out[$turma][$alunoId] = (string) ($row['aluno_nome'] ?? '');
+            $out[$turma][$alunoId] = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                (string) ($row['aluno_nome'] ?? ''),
+                true
+            );
         }
 
         return $out;
+    }
+
+    private function sqlAlunoVisivelBoletimCoordenacao(string $aliasAluno = 'a', ?string $aliasTurma = 't'): string
+    {
+        $a = preg_replace('/[^a-zA-Z0-9_]/', '', $aliasAluno) ?: 'a';
+        $temMatricula = false;
+        try {
+            $temMatricula = (bool) $this->db->fetch("SHOW TABLES LIKE 'matricula'");
+        } catch (\Throwable $e) {
+            $temMatricula = false;
+        }
+        if (!$temMatricula) {
+            return "({$a}.ativo = 1 OR {$a}.ativo IS NULL)";
+        }
+        if ($aliasTurma === null || $aliasTurma === '') {
+            return "(
+                {$a}.ativo = 1 OR {$a}.ativo IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM matricula mx
+                    WHERE mx.aluno_id = {$a}.id AND mx.status = 'transferido'
+                )
+            )";
+        }
+        $t = preg_replace('/[^a-zA-Z0-9_]/', '', $aliasTurma) ?: 't';
+
+        return "(
+            {$a}.ativo = 1 OR {$a}.ativo IS NULL
+            OR EXISTS (
+                SELECT 1 FROM matricula mx
+                WHERE mx.aluno_id = {$a}.id
+                  AND (mx.turma_id = {$t}.id OR {$t}.id IS NULL)
+                  AND mx.status = 'transferido'
+            )
+        )";
+    }
+
+    private function sqlTransferidoSelectBoletimCoordenacao(string $aliasAluno = 'a', string $aliasTurma = 't'): string
+    {
+        $a = preg_replace('/[^a-zA-Z0-9_]/', '', $aliasAluno) ?: 'a';
+        $t = preg_replace('/[^a-zA-Z0-9_]/', '', $aliasTurma) ?: 't';
+        $temMatricula = false;
+        try {
+            $temMatricula = (bool) $this->db->fetch("SHOW TABLES LIKE 'matricula'");
+        } catch (\Throwable $e) {
+            $temMatricula = false;
+        }
+        if (!$temMatricula) {
+            return '0';
+        }
+
+        return "CASE
+            WHEN EXISTS (
+                SELECT 1 FROM matricula ma
+                WHERE ma.aluno_id = {$a}.id
+                  AND (ma.turma_id = {$t}.id OR {$t}.id IS NULL)
+                  AND ma.status = 'ativa' AND ma.data_saida IS NULL
+            ) THEN 0
+            WHEN EXISTS (
+                SELECT 1 FROM matricula mt
+                WHERE mt.aluno_id = {$a}.id
+                  AND (mt.turma_id = {$t}.id OR {$t}.id IS NULL)
+                  AND mt.status = 'transferido'
+            ) THEN 1
+            ELSE 0
+        END";
     }
 
     /**

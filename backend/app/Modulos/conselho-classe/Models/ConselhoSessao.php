@@ -235,14 +235,24 @@ class ConselhoSessao
 
         $saidos = [];
         if ($this->tabelaExiste('alunos_turmas_historico')) {
+            $transferidoExpr = $this->tabelaExiste('matricula')
+                ? "CASE WHEN EXISTS (
+                        SELECT 1 FROM matricula mt
+                        WHERE mt.aluno_id = a.id AND mt.turma_id = :turma_tr AND mt.status = 'transferido'
+                   ) THEN 1 ELSE 0 END"
+                : '1';
+            $paramsSaidos = ['turma_id' => $turmaId, 'turma_id2' => $turmaId];
+            if ($this->tabelaExiste('matricula')) {
+                $paramsSaidos['turma_tr'] = $turmaId;
+            }
             $saidos = $this->db->fetchAll(
-                "SELECT a.id, a.nome, a.ra, a.ativo, 1 AS transferido
+                "SELECT a.id, a.nome, a.ra, a.ativo, {$transferidoExpr} AS transferido
                  FROM alunos_turmas_historico h
                  INNER JOIN alunos a ON a.id = h.aluno_id
                  WHERE h.turma_id = :turma_id AND h.data_fim IS NOT NULL
                    AND (a.turma_id IS NULL OR a.turma_id <> :turma_id2)
                  ORDER BY a.nome ASC",
-                ['turma_id' => $turmaId, 'turma_id2' => $turmaId]
+                $paramsSaidos
             ) ?: [];
         }
 
@@ -256,6 +266,10 @@ class ConselhoSessao
             $vistos[$id] = true;
             $out[] = $aluno;
         }
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
+        $out = AlunoLancamentoNotaHelper::filtrarAlunosExibicao($out, 'nome');
         usort($out, static fn ($a, $b) => strcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? '')));
         return $out;
     }

@@ -42,13 +42,22 @@ $podeObs = in_array($status, ['em_andamento', 'reaberto'], true);
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-                <?php foreach ($linhas as $linha):
+                <?php
+                if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
+                }
+                foreach ($linhas as $linha):
                     $aluno = $linha['aluno'];
                     $freq = $linha['frequencia']['percentual'] ?? null;
                     $prelim = $linha['resultado_preliminar'] ?? [];
+                    $transferidoProfCc = !empty($aluno['transferido']);
+                    $nomeProfCc = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                        (string) ($aluno['nome'] ?? ''),
+                        $transferidoProfCc
+                    );
                 ?>
-                <tr>
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) $aluno['nome']) ?></td>
+                <tr class="<?= $transferidoProfCc ? 'bg-gray-100 text-gray-500' : '' ?>">
+                    <td class="px-4 py-3 text-sm font-medium <?= $transferidoProfCc ? 'text-gray-500' : 'text-gray-900' ?>"><?= htmlspecialchars($nomeProfCc) ?></td>
                     <?php foreach ($componentes as $comp):
                         $chave = mb_strtolower((string) $comp['nome']);
                         $media = $linha['componentes'][$chave]['media'] ?? null;

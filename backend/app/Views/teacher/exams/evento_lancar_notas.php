@@ -51,19 +51,33 @@ $materiaId = (int) ($materia['id'] ?? $_GET['materia_id'] ?? 0);
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <?php foreach ($alunos as $al): ?>
-                            <?php
+                        <?php
+                        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                            require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
+                        }
+                        foreach ($alunos as $al):
                             $aid = (int) ($al['id'] ?? 0);
                             $nk = $tid . '_' . $aid;
                             $nv = $notas_map[$nk] ?? null;
                             $notaStr = ($nv && isset($nv['nota']) && $nv['nota'] !== null) ? number_format((float) $nv['nota'], 2, '.', '') : '';
-                            ?>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 text-gray-900 font-medium"><?= htmlspecialchars((string) ($al['nome'] ?? '')) ?></td>
+                            $transferido = !empty($al['transferido']);
+                            $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                                (string) ($al['nome'] ?? ''),
+                                $transferido
+                            );
+                        ?>
+                            <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>">
+                                <td class="px-4 py-3 font-medium <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>"><?= htmlspecialchars($nomeAluno) ?></td>
                                 <td class="px-4 py-3">
-                                    <input type="text" inputmode="decimal" name="notas[<?= $tid ?>][<?= $aid ?>]" value="<?= htmlspecialchars($notaStr) ?>"
-                                           class="w-full max-w-xs border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                                           placeholder="—" autocomplete="off">
+                                    <?php if ($transferido): ?>
+                                        <input type="text" inputmode="decimal" value="<?= htmlspecialchars($notaStr) ?>"
+                                               class="w-full max-w-xs border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-gray-100 text-gray-500"
+                                               placeholder="—" autocomplete="off" disabled readonly>
+                                    <?php else: ?>
+                                        <input type="text" inputmode="decimal" name="notas[<?= $tid ?>][<?= $aid ?>]" value="<?= htmlspecialchars($notaStr) ?>"
+                                               class="w-full max-w-xs border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                                               placeholder="—" autocomplete="off">
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

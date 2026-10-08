@@ -84,7 +84,11 @@ include __DIR__ . '/_filtros.php';
             <tbody class="divide-y divide-gray-200">
                 <?php if ($linhas === []): ?>
                 <tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">Nenhum aluno nesta turma.</td></tr>
-                <?php else: foreach ($linhas as $linha):
+                <?php else:
+                if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                    require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
+                }
+                foreach ($linhas as $linha):
                     $aluno = $linha['aluno'] ?? [];
                     $aid = (int) ($aluno['id'] ?? 0);
                     $status = (string) ($linha['status'] ?? 'em_andamento');
@@ -92,18 +96,22 @@ include __DIR__ . '/_filtros.php';
                     $freq = $linha['frequencia']['percentual'] ?? null;
                     $freqTxt = is_numeric($freq) ? number_format((float) $freq, 1, ',', '.') . '%' : '—';
                     $qsAluno = $qs . '&turma_id=' . $turmaId;
+                    $transferidoRf = !empty($aluno['transferido']);
+                    $nomeRf = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                        (string) ($aluno['nome'] ?? ''),
+                        $transferidoRf
+                    );
                 ?>
-                <tr class="hover:bg-gray-50 <?= !empty($aluno['transferido']) ? 'opacity-70' : '' ?>">
+                <tr class="<?= $transferidoRf ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>">
                     <td class="px-3 py-3">
-                        <?php if ($status !== 'homologado' && !$criticas && empty($fechamento_travado)): ?>
+                        <?php if (!$transferidoRf && $status !== 'homologado' && !$criticas && empty($fechamento_travado)): ?>
                         <input type="checkbox" name="aluno_ids[]" value="<?= $aid ?>" class="rf-check rounded border-gray-300">
                         <?php endif; ?>
                     </td>
                     <td class="px-4 py-3">
-                        <div class="font-medium text-gray-900"><?= htmlspecialchars((string) ($aluno['nome'] ?? '')) ?></div>
+                        <div class="font-medium <?= $transferidoRf ? 'text-gray-500' : 'text-gray-900' ?>"><?= htmlspecialchars($nomeRf) ?></div>
                         <div class="text-xs text-gray-500">
                             <?= htmlspecialchars((string) ($aluno['ra'] ?? '')) ?>
-                            <?php if (!empty($aluno['transferido'])): ?> · transferido<?php endif; ?>
                         </div>
                     </td>
                     <td class="px-4 py-3 text-sm">

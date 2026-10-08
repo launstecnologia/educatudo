@@ -294,8 +294,11 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             <?php if (!is_array($aluno)) { continue; } ?>
             <?php
             $observacaoAluno = trim((string) ($aluno['observacao'] ?? ''));
+            $transferidoAluno = !empty($aluno['transferido']);
             $nomeAluno = (string) ($aluno['nome'] ?? '');
             $tituloImpressao = $nomeAluno;
+            $classeCabecalhoAluno = $transferidoAluno ? 'bg-gray-100 text-gray-500' : 'bg-gray-50';
+            $classeNomeAluno = $transferidoAluno ? 'text-gray-500' : 'text-gray-900';
             if ($fonteRelatorio === 'demonstrativo' || $fonteRelatorio === 'evento') {
                 $tituloImpressao = trim($nomeAluno . ($rotuloGrupo !== '' ? ' — ' . $rotuloGrupo : ''));
             } else {
@@ -306,10 +309,10 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                 ? URL . '/admin/students/' . (int) $aluno['id'] . '/vida-escolar/pdf?ficha_id=' . $fichaAluno
                 : '';
             ?>
-            <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden" data-print-title="<?= htmlspecialchars($tituloImpressao, ENT_QUOTES, 'UTF-8') ?>">
+            <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden <?= $transferidoAluno ? 'opacity-90' : '' ?>" data-print-title="<?= htmlspecialchars($tituloImpressao, ENT_QUOTES, 'UTF-8') ?>">
                 <div class="coord-aluno-impressao">
-                <div class="px-5 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-2">
-                    <strong class="text-gray-900"><?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?></strong>
+                <div class="px-5 py-3 <?= $classeCabecalhoAluno ?> border-b border-gray-200 flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <strong class="<?= $classeNomeAluno ?>"><?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?></strong>
                     <?php if (!empty($incluir_assinatura)): ?><span class="text-sm text-gray-600">Assinatura: <span class="inline-block w-52 border-b border-gray-500"></span></span><?php endif; ?>
                     <span class="text-sm text-gray-500">Turma: <?= htmlspecialchars((string) ($aluno['turma'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
                     <?php if ($fonteRelatorio === 'evento' || $fonteRelatorio === 'demonstrativo'): ?>

@@ -112,21 +112,27 @@ if ($periodo === '') {
                     <td colspan="<?= 4 + count($componentes) ?>" class="px-6 py-12 text-center text-gray-500">Nenhum aluno nesta turma.</td>
                 </tr>
                 <?php else: ?>
-                <?php foreach ($linhas as $linha):
+                <?php
+                if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
+                }
+                foreach ($linhas as $linha):
                     $aluno = $linha['aluno'];
                     $prelim = $linha['resultado_preliminar'] ?? [];
                     $homolog = $linha['resultado_homologado'];
                     $freq = $linha['frequencia']['percentual'] ?? null;
                     $abaixo = $prelim['abaixo'] ?? [];
+                    $transferidoCc = !empty($aluno['transferido']);
+                    $nomeCc = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                        (string) ($aluno['nome'] ?? ''),
+                        $transferidoCc
+                    );
                 ?>
-                <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-3 text-sm sticky left-0 bg-white">
-                        <a href="<?= URL ?>/admin/conselhos/<?= $sid ?>/aluno/<?= (int) $aluno['id'] ?>" class="font-medium text-gray-900 hover:underline">
-                            <?= htmlspecialchars((string) $aluno['nome']) ?>
+                <tr class="<?= $transferidoCc ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>">
+                    <td class="px-4 py-3 text-sm sticky left-0 <?= $transferidoCc ? 'bg-gray-100' : 'bg-white' ?>">
+                        <a href="<?= URL ?>/admin/conselhos/<?= $sid ?>/aluno/<?= (int) $aluno['id'] ?>" class="font-medium <?= $transferidoCc ? 'text-gray-500' : 'text-gray-900' ?> hover:underline">
+                            <?= htmlspecialchars($nomeCc) ?>
                         </a>
-                        <?php if (!empty($aluno['transferido'])): ?>
-                            <span class="block text-xs text-gray-500">Transferido</span>
-                        <?php endif; ?>
                     </td>
                     <?php foreach ($componentes as $comp):
                         $chave = mb_strtolower((string) $comp['nome']);

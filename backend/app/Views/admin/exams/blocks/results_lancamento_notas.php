@@ -61,6 +61,9 @@ if ($fTransferido === '1') {
     $filtrosAtivosChips[] = 'Somente ativos';
 }
 
+if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
+}
 $exportLinhas = [];
 foreach ($notas_linhas ?? [] as $ln) {
     $notaRaw = $ln['nota'] ?? null;
@@ -71,7 +74,10 @@ foreach ($notas_linhas ?? [] as $ln) {
         'materia' => (string) ($ln['materia_nome'] ?? ''),
         'professor' => (string) ($ln['professor_nome'] ?? ''),
         'turma' => (string) ($ln['turma_nome'] ?? ''),
-        'aluno' => (string) ($ln['aluno_nome'] ?? ''),
+        'aluno' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+            (string) ($ln['aluno_nome'] ?? ''),
+            !empty($ln['transferido'])
+        ),
         'transferido' => !empty($ln['transferido']) ? 'Sim' : 'Não',
         'nota' => $notaFmt,
         'atualizado' => !empty($ln['updated_at']) ? date('d/m/Y H:i', strtotime((string) $ln['updated_at'])) : '',
@@ -215,7 +221,10 @@ if ($slugArquivo === '') {
                         <?php foreach ($notas_linhas as $ln): ?>
                         <?php
                         $transferido = !empty($ln['transferido']);
-                        $nomeAluno = (string) ($ln['aluno_nome'] ?? '');
+                        $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                            (string) ($ln['aluno_nome'] ?? ''),
+                            $transferido
+                        );
                         $temNota = ($ln['nota'] !== null && $ln['nota'] !== '');
                         $classeLinha = $transferido
                             ? 'bg-gray-100 text-gray-500'
@@ -225,15 +234,8 @@ if ($slugArquivo === '') {
                             <td class="px-3 py-2"><?= htmlspecialchars($ln['materia_nome'] ?? '') ?></td>
                             <td class="px-3 py-2"><?= htmlspecialchars($ln['professor_nome'] ?? '') ?></td>
                             <td class="px-3 py-2"><?= htmlspecialchars($ln['turma_nome'] ?? '') ?></td>
-                            <td class="px-3 py-2 font-medium">
-                                <?php if ($transferido): ?>
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
-                                        <span><?= htmlspecialchars($nomeAluno) ?></span>
-                                    </span>
-                                <?php else: ?>
-                                    <?= htmlspecialchars($nomeAluno) ?>
-                                <?php endif; ?>
+                            <td class="px-3 py-2 font-medium <?= $transferido ? 'text-gray-500' : '' ?>">
+                                <?= htmlspecialchars($nomeAluno) ?>
                             </td>
                             <td class="px-3 py-2">
                                 <?php if (!$temNota): ?>

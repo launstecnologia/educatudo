@@ -363,12 +363,23 @@ class ExamController extends BaseController
                     ]
                 );
                 $tidsL = array_values(array_filter(array_map('intval', array_column($turmasProfRows ?: [], 'turma_id'))));
-                $alunosL = !empty($tidsL) ? $this->turmaModel->getAlunosByTurmasIds($tidsL) : [];
+                if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                    require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+                }
+                $alunosL = !empty($tidsL)
+                    ? AlunoLancamentoNotaHelper::filtrarAlunosExibicao($this->turmaModel->getAlunosByTurmasIds($tidsL))
+                    : [];
                 $uniqAlunos = [];
                 foreach ($alunosL as $al) {
-                    $uniqAlunos[(int) ($al['id'] ?? 0)] = true;
+                    if (!empty($al['transferido'])) {
+                        continue;
+                    }
+                    $aidL = (int) ($al['id'] ?? 0);
+                    if ($aidL > 0) {
+                        $uniqAlunos[$aidL] = true;
+                    }
                 }
-                $lancamentoTotalAlunos = count(array_filter(array_keys($uniqAlunos)));
+                $lancamentoTotalAlunos = count($uniqAlunos);
                 $notasMg = new ExamBlockManualGrade();
                 $lancamentoPreenchidas = $notasMg->countComNota((int) $ev['id'], (int) $professor['id'], (int) $ev['materia_id']);
             }
@@ -1064,7 +1075,7 @@ class ExamController extends BaseController
         }
         $turmaIdList = array_keys($turmasIds);
         require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
-        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosTeste(
+        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
             $this->turmaModel->getAlunosByTurmasIds($turmaIdList)
         );
         $porTurma = [];
@@ -1169,15 +1180,16 @@ class ExamController extends BaseController
         }
         $alunosPermitidos = [];
         require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
-        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosTeste(
+        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
             $this->turmaModel->getAlunosByTurmasIds(array_keys($turmasPermitidas))
         );
         foreach ($alunosFlat as $a) {
             $tid = (int) ($a['turma_id'] ?? 0);
             $aid = (int) ($a['id'] ?? 0);
-            if ($tid > 0 && $aid > 0 && isset($turmasPermitidas[$tid])) {
-                $alunosPermitidos[$tid . '_' . $aid] = ['turma_id' => $tid, 'aluno_id' => $aid];
+            if ($tid <= 0 || $aid <= 0 || !isset($turmasPermitidas[$tid]) || !empty($a['transferido'])) {
+                continue;
             }
+            $alunosPermitidos[$tid . '_' . $aid] = ['turma_id' => $tid, 'aluno_id' => $aid];
         }
         $notasPost = $_POST['notas'] ?? [];
         $obsPost = $_POST['observacoes'] ?? [];
@@ -1277,14 +1289,14 @@ class ExamController extends BaseController
             if (empty($idsTurma)) {
                 continue;
             }
-            $alunosMid = AlunoLancamentoNotaHelper::filtrarAlunosTeste(
+            $alunosMid = AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
                 $this->turmaModel->getAlunosByTurmasIds($idsTurma)
             );
             $linhasMid = [];
             foreach ($alunosMid as $a) {
                 $aid = (int) ($a['id'] ?? 0);
                 $tid = (int) ($a['turma_id'] ?? 0);
-                if ($aid <= 0 || $tid <= 0 || !array_key_exists($aid, $mapPorAluno)) {
+                if ($aid <= 0 || $tid <= 0 || !empty($a['transferido']) || !array_key_exists($aid, $mapPorAluno)) {
                     continue;
                 }
                 $linhasMid[] = [

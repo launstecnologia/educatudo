@@ -148,8 +148,40 @@ class VidaEscolar
             $whereTurmaSub = ' AND turma_id = :turma_id';
             $params['turma_id'] = $turmaId;
         }
+        $temMatricula = false;
+        try {
+            $temMatricula = (bool) $this->db->fetch("SHOW TABLES LIKE 'matricula'");
+        } catch (\Throwable $e) {
+            $temMatricula = false;
+        }
+        $transferidoSelect = $temMatricula
+            ? ", CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM matricula ma
+                        WHERE ma.aluno_id = a.id
+                          AND (f.turma_id IS NULL OR ma.turma_id = f.turma_id)
+                          AND ma.status = 'ativa' AND ma.data_saida IS NULL
+                    ) THEN 0
+                    WHEN EXISTS (
+                        SELECT 1 FROM matricula mt
+                        WHERE mt.aluno_id = a.id
+                          AND (f.turma_id IS NULL OR mt.turma_id = f.turma_id)
+                          AND mt.status = 'transferido'
+                    ) THEN 1
+                    ELSE 0
+                 END AS transferido"
+            : ', 0 AS transferido';
+        $condVisivel = $temMatricula
+            ? "(a.ativo = 1 OR a.ativo IS NULL OR EXISTS (
+                    SELECT 1 FROM matricula mx
+                    WHERE mx.aluno_id = a.id
+                      AND (f.turma_id IS NULL OR mx.turma_id = f.turma_id)
+                      AND mx.status = 'transferido'
+               ))"
+            : '(a.ativo = 1 OR a.ativo IS NULL)';
         $rows = $this->db->fetchAll(
-            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome, a.ra, t.nome AS turma_nome
+            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome, a.ra, a.ativo,
+                    t.nome AS turma_nome{$transferidoSelect}
              FROM boletim_fichas f
              INNER JOIN (
                 SELECT aluno_id, MAX(id) AS id
@@ -159,11 +191,18 @@ class VidaEscolar
              ) ult ON ult.id = f.id
              INNER JOIN alunos a ON a.id = f.aluno_id
              LEFT JOIN turmas t ON t.id = f.turma_id
-             WHERE a.ativo = 1
+             WHERE {$condVisivel}
              ORDER BY t.nome ASC, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
             $params
         );
-        return is_array($rows) ? $rows : [];
+        if (!is_array($rows)) {
+            return [];
+        }
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
+
+        return AlunoLancamentoNotaHelper::filtrarAlunosExibicao($rows, 'aluno_nome');
     }
 
     public function criarFicha(array $data): int

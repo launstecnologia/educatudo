@@ -181,7 +181,7 @@ class ExamBlockManualGrade
 
         $rows = $this->db->fetchAll(
             'SELECT n.turma_id, n.aluno_id, n.nota, n.observacao,
-                    t.nome AS turma_nome, a.nome AS aluno_nome' . $transferidoSelect . '
+                    t.nome AS turma_nome, a.nome AS aluno_nome, a.ativo' . $transferidoSelect . '
              FROM provas_blocos_notas_lancadas n
              INNER JOIN alunos a ON a.id = n.aluno_id
              INNER JOIN turmas t ON t.id = n.turma_id
@@ -228,7 +228,7 @@ class ExamBlockManualGrade
         $rows = $this->db->fetchAll(
             'SELECT n.professor_id, n.materia_id, n.turma_id, n.aluno_id, n.nota, n.observacao, n.updated_at,
                     pr.nome AS professor_nome, m.nome AS materia_nome,
-                    a.nome AS aluno_nome, t.nome AS turma_nome' . $transferidoSelect . '
+                    a.nome AS aluno_nome, a.ativo, t.nome AS turma_nome' . $transferidoSelect . '
              FROM provas_blocos_notas_lancadas n
              LEFT JOIN professores pr ON pr.id = n.professor_id
              LEFT JOIN materias m ON m.id = n.materia_id
@@ -252,7 +252,7 @@ class ExamBlockManualGrade
             require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
         }
 
-        return AlunoLancamentoNotaHelper::filtrarAlunosTeste($rows, 'aluno_nome');
+        return AlunoLancamentoNotaHelper::filtrarAlunosExibicao($rows, 'aluno_nome');
     }
 
     private function tabelaAuxiliarExiste(string $tabela): bool

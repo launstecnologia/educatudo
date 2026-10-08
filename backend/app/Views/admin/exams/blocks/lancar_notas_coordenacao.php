@@ -159,8 +159,11 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                         <td colspan="<?= (int) $colunasTabela ?>" class="px-4 py-8 text-center text-gray-500">Nenhum aluno encontrado para o filtro selecionado.</td>
                     </tr>
                     <?php else: ?>
-                        <?php foreach ($linhas as $ln): ?>
-                            <?php
+                        <?php
+                        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+                            require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
+                        }
+                        foreach ($linhas as $ln):
                             $pid = (int) ($ln['professor_id'] ?? 0);
                             $mid = (int) ($ln['materia_id'] ?? 0);
                             $tid = (int) ($ln['turma_id'] ?? 0);
@@ -170,8 +173,12 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                             $nChamada = (int) ($ln['numero_chamada'] ?? 0);
                             $bloqueada = $temNota && !$edicaoDesbloqueada;
                             $transferido = !empty($ln['transferido']);
-                            $nomeAluno = (string) ($ln['aluno_nome'] ?? '');
-                            ?>
+                            $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                                (string) ($ln['aluno_nome'] ?? ''),
+                                $transferido
+                            );
+                            $somenteLeitura = $bloqueada || $transferido;
+                        ?>
                             <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>" data-tem-nota="<?= $temNota ? '1' : '0' ?>">
                                 <?php if (!$notaUnicaTodasMaterias): ?>
                                 <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['materia_nome'] ?? '')) ?></td>
@@ -180,42 +187,56 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                                 <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['turma_nome'] ?? '')) ?></td>
                                 <td class="px-4 py-3 text-center <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?> font-semibold"><?= $nChamada > 0 ? $nChamada : '—' ?></td>
                                 <td class="px-4 py-3 font-medium <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>">
-                                    <?php if ($transferido): ?>
-                                        <span class="inline-flex items-center gap-1.5">
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-gray-300 text-gray-700">TR</span>
-                                            <span><?= htmlspecialchars($nomeAluno) ?></span>
-                                        </span>
-                                    <?php else: ?>
-                                        <?= htmlspecialchars($nomeAluno) ?>
-                                    <?php endif; ?>
+                                    <?= htmlspecialchars($nomeAluno) ?>
                                 </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-1.5">
+                                        <?php if ($transferido): ?>
+                                        <input type="text"
+                                               inputmode="decimal"
+                                               value="<?= htmlspecialchars($notaStr) ?>"
+                                               class="w-full px-2 py-1.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                                               placeholder="—"
+                                               autocomplete="off"
+                                               disabled
+                                               readonly>
+                                        <?php else: ?>
                                         <input type="text"
                                                inputmode="decimal"
                                                name="notas[<?= $pid ?>][<?= $mid ?>][<?= $tid ?>][<?= $aid ?>]"
                                                value="<?= htmlspecialchars($notaStr) ?>"
-                                               class="js-nota-input w-full px-2 py-1.5 border border-gray-300 rounded-lg <?= $bloqueada ? 'bg-gray-100 text-gray-600' : '' ?>"
+                                               class="js-nota-input w-full px-2 py-1.5 border border-gray-300 rounded-lg <?= $somenteLeitura ? 'bg-gray-100 text-gray-600' : '' ?>"
                                                placeholder="—"
                                                autocomplete="off"
                                                data-original="<?= htmlspecialchars($notaStr) ?>"
-                                               <?= $bloqueada ? 'readonly' : '' ?>>
+                                               <?= $somenteLeitura ? 'readonly' : '' ?>>
                                         <?php if ($bloqueada): ?>
                                         <button type="button" class="shrink-0 text-amber-600" title="Bloqueada — use Desbloquear edição" onclick="abrirModalSenha()" aria-label="Desbloquear">
                                             <i class="fa-solid fa-lock text-xs" aria-hidden="true"></i>
                                         </button>
                                         <?php endif; ?>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
+                                    <?php if ($transferido): ?>
+                                    <input type="text"
+                                           value="<?= htmlspecialchars((string) ($ln['observacao'] ?? '')) ?>"
+                                           class="w-full px-2 py-1.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
+                                           maxlength="500"
+                                           placeholder="Opcional"
+                                           disabled
+                                           readonly>
+                                    <?php else: ?>
                                     <input type="text"
                                            name="observacoes[<?= $pid ?>][<?= $mid ?>][<?= $tid ?>][<?= $aid ?>]"
                                            value="<?= htmlspecialchars((string) ($ln['observacao'] ?? '')) ?>"
-                                           class="js-obs-input w-full px-2 py-1.5 border border-gray-300 rounded-lg <?= $bloqueada ? 'bg-gray-100 text-gray-600' : '' ?>"
+                                           class="js-obs-input w-full px-2 py-1.5 border border-gray-300 rounded-lg <?= $somenteLeitura ? 'bg-gray-100 text-gray-600' : '' ?>"
                                            maxlength="500"
                                            placeholder="Opcional"
                                            data-original="<?= htmlspecialchars((string) ($ln['observacao'] ?? '')) ?>"
-                                           <?= $bloqueada ? 'readonly' : '' ?>>
+                                           <?= $somenteLeitura ? 'readonly' : '' ?>>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

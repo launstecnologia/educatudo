@@ -217,33 +217,57 @@ class AlunoTurmaResolver
         $placeholders = implode(',', array_fill(0, count($turmaIds), '?'));
 
         if ($this->supportsMatricula()) {
-            $params = array_merge($turmaIds, $turmaIds, $turmaIds);
-            $sql = "SELECT x.id, x.nome, x.ra, x.turma_id, t.nome AS turma_nome
-                    FROM (
-                        SELECT DISTINCT a.id, a.nome, a.ra,
-                            COALESCE(
-                                (SELECT MIN(m.turma_id) FROM matricula m
-                                 WHERE m.aluno_id = a.id AND m.status = 'ativa' AND m.turma_id IN ($placeholders)),
-                                NULLIF(a.turma_id, 0)
-                            ) AS turma_id
-                        FROM alunos a
-                        WHERE a.ativo = 1
-                        AND (
-                            a.turma_id IN ($placeholders)
-                            OR EXISTS (
-                                SELECT 1 FROM matricula m2
-                                WHERE m2.aluno_id = a.id AND m2.turma_id IN ($placeholders) AND m2.status = 'ativa'
+            // Ativos com matrícula ativa + transferidos da turma (mesmo se inativos no cadastro).
+            $sql = "SELECT DISTINCT a.id, a.nome, a.ra, a.ativo, t.id AS turma_id, t.nome AS turma_nome,
+                           CASE
+                               WHEN EXISTS (
+                                   SELECT 1 FROM matricula ma
+                                   WHERE ma.aluno_id = a.id AND ma.turma_id = t.id
+                                     AND ma.status = 'ativa' AND ma.data_saida IS NULL
+                               ) THEN 0
+                               WHEN EXISTS (
+                                   SELECT 1 FROM matricula mt
+                                   WHERE mt.aluno_id = a.id AND mt.turma_id = t.id
+                                     AND mt.status = 'transferido'
+                               ) THEN 1
+                               ELSE 0
+                           END AS transferido
+                    FROM turmas t
+                    INNER JOIN alunos a ON (
+                        EXISTS (
+                            SELECT 1 FROM matricula m
+                            WHERE m.aluno_id = a.id AND m.turma_id = t.id
+                              AND m.status = 'ativa' AND m.data_saida IS NULL
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM matricula mt2
+                            WHERE mt2.aluno_id = a.id AND mt2.turma_id = t.id
+                              AND mt2.status = 'transferido'
+                        )
+                        OR (
+                            a.turma_id = t.id AND a.ativo = 1
+                            AND NOT EXISTS (
+                                SELECT 1 FROM matricula mx
+                                WHERE mx.aluno_id = a.id AND mx.turma_id = t.id
                             )
                         )
-                    ) x
-                    INNER JOIN turmas t ON t.id = x.turma_id
-                    ORDER BY t.nome, x.nome";
+                    )
+                    WHERE t.id IN ($placeholders)
+                      AND (
+                          a.ativo = 1
+                          OR EXISTS (
+                              SELECT 1 FROM matricula mtr
+                              WHERE mtr.aluno_id = a.id AND mtr.turma_id = t.id
+                                AND mtr.status = 'transferido'
+                          )
+                      )
+                    ORDER BY t.nome, a.nome";
 
-            return $this->db->fetchAll($sql, $params) ?: [];
+            return $this->db->fetchAll($sql, $turmaIds) ?: [];
         }
 
         return $this->db->fetchAll(
-            "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
+            "SELECT a.id, a.nome, a.ra, a.ativo, a.turma_id, t.nome AS turma_nome, 0 AS transferido
              FROM alunos a
              JOIN turmas t ON t.id = a.turma_id
              WHERE a.turma_id IN ($placeholders) AND a.ativo = 1
