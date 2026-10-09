@@ -977,8 +977,15 @@ class TeacherEssayController extends BaseController
         $this->ensureEssayModuleEnabled();
         $user = $this->authManager->getUser();
         $teacherId = $this->getTeacherId();
+        $id = (int) $id;
         $proposal = $this->proposalModel->findById($id);
-        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId) || !$proposal['ativo']) {
+        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId)) {
+            $this->setFlashMessage('Proposta não encontrada ou sem permissão de acesso', 'error');
+            $this->redirect(URL . '/professor/redacao-configuravel');
+        }
+        // Rascunho continua editável mesmo se a coluna ativo faltar/vier 0;
+        // só proposta publicada desativada pela coordenação fica bloqueada.
+        if (($proposal['status'] ?? '') !== 'draft' && !$this->proposalModel->propostaEstaAtiva($proposal)) {
             $this->setFlashMessage('Proposta não encontrada ou desativada pela coordenação', 'error');
             $this->redirect(URL . '/professor/redacao-configuravel');
         }
@@ -1014,12 +1021,16 @@ class TeacherEssayController extends BaseController
                 $this->json(['error' => 'Token inválido'], 400);
             }
             $teacherId = $this->getTeacherId();
+        $id = (int) $id;
         $proposal = $this->proposalModel->findById($id);
         // Bug pré-existente encontrado ao investigar 404 real em produção:
         // esta checagem era só do dono (teacher_id), mas edit() já permite
         // professor com acesso compartilhado (canAccessProposal) abrir o
         // formulário — ele preenchia e salvava, e só aqui era barrado.
-        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId) || !$proposal['ativo']) {
+        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId)) {
+            $this->json(['error' => 'Proposta não encontrada ou sem permissão de acesso'], 404);
+        }
+        if (($proposal['status'] ?? '') !== 'draft' && !$this->proposalModel->propostaEstaAtiva($proposal)) {
             $this->json(['error' => 'Proposta não encontrada ou desativada pela coordenação'], 404);
         }
         $boardId = (int) ($_POST['board_id'] ?? 0);
@@ -1130,7 +1141,7 @@ class TeacherEssayController extends BaseController
         }
         $teacherId = $this->getTeacherId();
         $proposal = $this->proposalModel->findById($proposalId);
-        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId) || !$proposal['ativo']) {
+        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId) || !$this->proposalModel->propostaEstaAtiva($proposal)) {
             $this->json(['error' => 'Proposta não encontrada ou desativada pela coordenação'], 403);
         }
         $studentId = (int) ($_POST['student_id'] ?? 0);
@@ -1238,7 +1249,7 @@ class TeacherEssayController extends BaseController
         }
         $teacherId = $this->getTeacherId();
         $proposal = $this->proposalModel->findById($proposalId);
-        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId) || !$proposal['ativo']) {
+        if (!$proposal || !$this->canAccessProposal($proposal, $teacherId) || !$this->proposalModel->propostaEstaAtiva($proposal)) {
             $this->json(['error' => 'Proposta não encontrada ou desativada pela coordenação'], 403);
         }
         $studentsWithAccess = $this->proposalModel->getStudentsWithAccess($proposalId);

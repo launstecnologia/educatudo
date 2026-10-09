@@ -203,11 +203,11 @@ $router->get('/professor/redacao-configuravel/envios/{submissionId}/audio-feedba
 $router->post('/professor/redacao-configuravel/envios/{submissionId}/audio-feedback', 'Essays/TeacherEssayController@uploadTeacherFeedbackAudio');
 $router->post('/professor/redacao-configuravel/envios/{submissionId}/audio-feedback/remover', 'Essays/TeacherEssayController@removeTeacherFeedbackAudio');
 $router->get('/professor/redacao-configuravel/{id}/exportar-excel', 'Essays/TeacherEssayController@exportExcel');
-$router->get('/professor/redacao-configuravel/{id}', 'Essays/TeacherEssayController@show');
 $router->get('/professor/redacao-configuravel/{id}/editar', 'Essays/TeacherEssayController@edit');
 $router->put('/professor/redacao-configuravel/{id}', 'Essays/TeacherEssayController@update');
 $router->post('/professor/redacao-configuravel/{id}', 'Essays/TeacherEssayController@update');
 $router->post('/professor/redacao-configuravel/{id}/toggle-status', 'Essays/TeacherEssayController@toggleStatus');
+$router->get('/professor/redacao-configuravel/{id}', 'Essays/TeacherEssayController@show');
 
 // Redação Livre (Professor) — upload e correção sem proposta/jornada; módulo habilitável no Master
 $router->get('/professor/redacao-livre', 'Essays/TeacherRedacaoLivreController@index');

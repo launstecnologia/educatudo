@@ -219,13 +219,16 @@ class EssayProposal
 
     public function findById($id)
     {
+        // LEFT JOIN no professor: a listagem do professor não exige esse vínculo
+        // (dono pode ter sido desativado/removido; acesso compartilhado ainda vale).
+        // INNER JOIN fazia edit() falhar com "proposta não encontrada".
         return $this->db->fetch(
             "SELECT p.*, b.name as board_name, b.slug as board_slug, t.name as text_type_name, t.slug as text_type_slug,
                     prof.nome as teacher_name
              FROM redacoes_orientadas_propostas p
              JOIN redacoes_orientadas_quadros b ON p.board_id = b.id
              JOIN redacoes_orientadas_tipos_texto t ON p.text_type_id = t.id
-             JOIN professores prof ON p.teacher_id = prof.id
+             LEFT JOIN professores prof ON p.teacher_id = prof.id
              WHERE p.id = :id",
             ['id' => (int) $id]
         );
