@@ -5,7 +5,9 @@ $turmas = is_array($turmas ?? null) ? $turmas : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));
 $periodoTipo = (string) ($periodo_tipo ?? 'ano');
 $periodoNumero = (int) ($periodo_numero ?? 0);
-$turmaId = (int) ($turma_id ?? 0);
+// Não sobrescrever $turmaId da página (ex.: fechamento/turma.php) — isso zerava
+// o id nos forms de homologar/iniciar e mandava o POST para /turma/0.
+$filtroTurmaId = (int) ($turma_id ?? 0);
 $action = (string) ($filtros_action ?? URL . '/admin/resultados-finais');
 $mostrarTurma = !empty($filtros_mostrar_turma);
 $extraHidden = is_array($filtros_hidden ?? null) ? $filtros_hidden : [];
@@ -53,7 +55,7 @@ ob_start();
         <select id="filtro_turma_id" name="turma_id" class="<?= $selectCls ?>">
             <option value="0">Todas</option>
             <?php foreach ($turmas as $turma): ?>
-                <option value="<?= (int) $turma['id'] ?>" <?= $turmaId === (int) $turma['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $turma['nome']) ?></option>
+                <option value="<?= (int) $turma['id'] ?>" <?= $filtroTurmaId === (int) $turma['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $turma['nome']) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -130,5 +132,5 @@ document.addEventListener('keydown', function (e) {
 </form>
 <?php
 endif;
-unset($filtros_offcanvas, $filtrosOffcanvas, $filtrosHiddenHtml, $filtrosCamposHtml, $selectCls);
+unset($filtros_offcanvas, $filtrosOffcanvas, $filtrosHiddenHtml, $filtrosCamposHtml, $selectCls, $filtroTurmaId);
 ?>

@@ -98,6 +98,7 @@ class FechamentoAdminController extends AdminBaseController
             'ano_letivo' => $anoLetivo,
             'periodo_tipo' => $periodoTipo,
             'periodo_numero' => $periodoNumero,
+            'turma_id' => $turmaId,
             'preview' => $preview,
             'fechamento' => $fechamento,
             'historico' => $historico,
@@ -168,6 +169,11 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $turmaId = (int) $turmaId;
+        if ($turmaId <= 0) {
+            $this->setFlashMessage('Turma inválida no homologar. Abra a turma pelo painel e tente de novo.', 'error');
+            $this->redirect('/admin/fechamento');
+            return;
+        }
         [$anoLetivo, $periodoTipo, $periodoNumero] = $this->anoPeriodoDoPostTurma($turmaId);
         $voltar = $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if (!$this->csrfOuRedirect($voltar)) {
