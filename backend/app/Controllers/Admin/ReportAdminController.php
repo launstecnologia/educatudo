@@ -340,21 +340,30 @@ class ReportAdminController extends AdminBaseController
         $pagina = max(1, (int) ($_GET['pagina'] ?? 1));
         if ($executar) {
             if ($fonte === 'vida_escolar') {
-                $relatorio = $this->paginarAlunosRelatorioBoletimCoordenacao(
-                    $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId),
-                    $pagina,
-                    20
-                );
-                $relatorio['grupos'] = [[
-                    'alunos' => $relatorio['alunos'],
-                    'columns' => $relatorio['columns'],
-                    'decimal_places' => $relatorio['decimal_places'],
-                    'regra_id' => 0,
-                    'evento_rotulo' => (string) ($relatorio['evento_nome'] ?? ''),
-                    'evento_detalhe' => '',
-                ]];
-                $relatorio['indice'] = [];
-                $relatorio['eventos_total'] = 1;
+                try {
+                    $relatorio = $this->paginarAlunosRelatorioBoletimCoordenacao(
+                        $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId),
+                        $pagina,
+                        20
+                    );
+                } catch (\Throwable $e) {
+                    error_log('boletimCoordenacao vida_escolar: ' . $e->getMessage());
+                    $this->setFlashMessage('Não foi possível montar o boletim com estes filtros. Tente outra turma ou período.', 'error');
+                    $relatorio = null;
+                    $executar = false;
+                }
+                if (is_array($relatorio)) {
+                    $relatorio['grupos'] = [[
+                        'alunos' => $relatorio['alunos'],
+                        'columns' => $relatorio['columns'],
+                        'decimal_places' => $relatorio['decimal_places'],
+                        'regra_id' => 0,
+                        'evento_rotulo' => (string) ($relatorio['evento_nome'] ?? ''),
+                        'evento_detalhe' => '',
+                    ]];
+                    $relatorio['indice'] = [];
+                    $relatorio['eventos_total'] = 1;
+                }
             } else {
                 $relatorio = $this->montarPaginaEventosBoletimCoordenacao(
                     $selecionados,
@@ -2428,7 +2437,13 @@ class ReportAdminController extends AdminBaseController
             if ($fichaId <= 0 || $alunoId <= 0) {
                 continue;
             }
-            $quadro = $vida->quadro($fichaId);
+            // Relatório só lê: evita alinhar/reaplicar notas (escrita) em lote e derrubar a tela.
+            try {
+                $quadro = $vida->quadro($fichaId, true);
+            } catch (\Throwable $e) {
+                error_log('Notas da Coordenação quadro ficha #' . $fichaId . ': ' . $e->getMessage());
+                $quadro = null;
+            }
             $grid = (is_array($quadro) && is_array($quadro['grid'] ?? null)) ? $quadro['grid'] : [];
             $materias = [];
             foreach ($grid as $row) {
@@ -3133,13 +3148,21 @@ class ReportAdminController extends AdminBaseController
         if (!$temMatricula) {
             return '0';
         }
+        $temDataSaida = false;
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM `matricula` LIKE 'data_saida'");
+            $temDataSaida = is_array($col) && $col !== [];
+        } catch (\Throwable $e) {
+            $temDataSaida = false;
+        }
+        $ativaExtra = $temDataSaida ? ' AND ma.data_saida IS NULL' : '';
 
         return "CASE
             WHEN EXISTS (
                 SELECT 1 FROM matricula ma
                 WHERE ma.aluno_id = {$a}.id
                   AND (ma.turma_id = {$t}.id OR {$t}.id IS NULL)
-                  AND ma.status = 'ativa' AND ma.data_saida IS NULL
+                  AND ma.status = 'ativa'{$ativaExtra}
             ) THEN 0
             WHEN EXISTS (
                 SELECT 1 FROM matricula mt

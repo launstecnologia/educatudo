@@ -441,12 +441,12 @@ class VidaEscolarService
         if (!$somenteLeitura) {
             $this->alinharFichaAoModelo($ficha);
             $this->garantirLinhasDeGrupo($ficha);
-        }
-        if (($ficha['status'] ?? '') !== 'homologada') {
-            try {
-                $this->reaplicarNotasMeioAno($ficha);
-            } catch (\Throwable $e) {
-                error_log('Vida escolar notas meio do ano ficha #' . $fichaId . ': ' . $e->getMessage());
+            if (($ficha['status'] ?? '') !== 'homologada') {
+                try {
+                    $this->reaplicarNotasMeioAno($ficha);
+                } catch (\Throwable $e) {
+                    error_log('Vida escolar notas meio do ano ficha #' . $fichaId . ': ' . $e->getMessage());
+                }
             }
         }
         $linhas = $this->model->listarLinhas($fichaId);

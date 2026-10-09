@@ -148,19 +148,16 @@ class VidaEscolar
             $whereTurmaSub = ' AND turma_id = :turma_id';
             $params['turma_id'] = $turmaId;
         }
-        $temMatricula = false;
-        try {
-            $temMatricula = (bool) $this->db->fetch("SHOW TABLES LIKE 'matricula'");
-        } catch (\Throwable $e) {
-            $temMatricula = false;
-        }
+        $temMatricula = $this->tabelaExiste('matricula');
+        $temDataSaida = $temMatricula && $this->colunaExiste('matricula', 'data_saida');
+        $ativaExtra = $temDataSaida ? ' AND ma.data_saida IS NULL' : '';
         $transferidoSelect = $temMatricula
             ? ", CASE
                     WHEN EXISTS (
                         SELECT 1 FROM matricula ma
                         WHERE ma.aluno_id = a.id
                           AND (f.turma_id IS NULL OR ma.turma_id = f.turma_id)
-                          AND ma.status = 'ativa' AND ma.data_saida IS NULL
+                          AND ma.status = 'ativa'{$ativaExtra}
                     ) THEN 0
                     WHEN EXISTS (
                         SELECT 1 FROM matricula mt
@@ -179,30 +176,68 @@ class VidaEscolar
                       AND mx.status = 'transferido'
                ))"
             : '(a.ativo = 1 OR a.ativo IS NULL)';
-        $rows = $this->db->fetchAll(
-            "SELECT f.*, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS aluno_nome, a.ra, a.ativo,
-                    t.nome AS turma_nome{$transferidoSelect}
-             FROM boletim_fichas f
-             INNER JOIN (
-                SELECT aluno_id, MAX(id) AS id
-                FROM boletim_fichas
-                WHERE ano_letivo = :ano" . $whereTurmaSub . "
-                GROUP BY aluno_id
-             ) ult ON ult.id = f.id
-             INNER JOIN alunos a ON a.id = f.aluno_id
-             LEFT JOIN turmas t ON t.id = f.turma_id
-             WHERE {$condVisivel}
-             ORDER BY t.nome ASC, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
-            $params
-        );
+        $nomeSelect = $this->colunaExiste('alunos', 'nome_social')
+            ? "COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome)"
+            : 'a.nome';
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT f.*, {$nomeSelect} AS aluno_nome, a.ra, a.ativo,
+                        t.nome AS turma_nome{$transferidoSelect}
+                 FROM boletim_fichas f
+                 INNER JOIN (
+                    SELECT aluno_id, MAX(id) AS id
+                    FROM boletim_fichas
+                    WHERE ano_letivo = :ano" . $whereTurmaSub . "
+                    GROUP BY aluno_id
+                 ) ult ON ult.id = f.id
+                 INNER JOIN alunos a ON a.id = f.aluno_id
+                 LEFT JOIN turmas t ON t.id = f.turma_id
+                 WHERE {$condVisivel}
+                 ORDER BY t.nome ASC, {$nomeSelect} ASC",
+                $params
+            );
+        } catch (\Throwable $e) {
+            error_log('VidaEscolar::listarFichasAnoLetivo: ' . $e->getMessage());
+            // Fallback sem matrícula/transferido (schema incompleto não pode derrubar Notas da Coordenação).
+            try {
+                $rows = $this->db->fetchAll(
+                    "SELECT f.*, {$nomeSelect} AS aluno_nome, a.ra, a.ativo,
+                            t.nome AS turma_nome, 0 AS transferido
+                     FROM boletim_fichas f
+                     INNER JOIN (
+                        SELECT aluno_id, MAX(id) AS id
+                        FROM boletim_fichas
+                        WHERE ano_letivo = :ano" . $whereTurmaSub . "
+                        GROUP BY aluno_id
+                     ) ult ON ult.id = f.id
+                     INNER JOIN alunos a ON a.id = f.aluno_id
+                     LEFT JOIN turmas t ON t.id = f.turma_id
+                     WHERE (a.ativo = 1 OR a.ativo IS NULL)
+                     ORDER BY t.nome ASC, {$nomeSelect} ASC",
+                    $params
+                );
+            } catch (\Throwable $e2) {
+                error_log('VidaEscolar::listarFichasAnoLetivo fallback: ' . $e2->getMessage());
+                return [];
+            }
+        }
         if (!is_array($rows)) {
             return [];
         }
         if (!class_exists('AlunoLancamentoNotaHelper', false)) {
             require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
         }
+        // f.status (em_curso/fechada/homologada) não é status do aluno — evita falso positivo no filtro.
+        $linhas = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            unset($row['status']);
+            $linhas[] = $row;
+        }
 
-        return AlunoLancamentoNotaHelper::filtrarAlunosExibicao($rows, 'aluno_nome');
+        return AlunoLancamentoNotaHelper::filtrarAlunosExibicao($linhas, 'aluno_nome');
     }
 
     public function criarFicha(array $data): int
@@ -1235,5 +1270,31 @@ class VidaEscolar
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool
+    {
+        static $cache = [];
+        $tabela = preg_replace('/[^a-z0-9_]/i', '', $tabela) ?? '';
+        $coluna = preg_replace('/[^a-z0-9_]/i', '', $coluna) ?? '';
+        if ($tabela === '' || $coluna === '') {
+            return false;
+        }
+        $chave = $tabela . '.' . $coluna;
+        if (array_key_exists($chave, $cache)) {
+            return $cache[$chave];
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c LIMIT 1",
+                ['t' => $tabela, 'c' => $coluna]
+            );
+            $cache[$chave] = !empty($row['ok']);
+        } catch (\Throwable $e) {
+            $cache[$chave] = false;
+        }
+
+        return $cache[$chave];
     }
 }
