@@ -702,7 +702,8 @@ class ResultadoHomologacaoService
             } elseif (!$usarSnapshot && $status === 'homologado') {
                 $status = 'reaberto';
                 $versaoProxima++;
-            } elseif ($status !== 'homologado' && FechamentoGates::situacaoPermiteHomologar($sitGravada)) {
+            }
+            if ($status !== 'homologado' && FechamentoGates::situacaoPermiteHomologar($sitGravada)) {
                 // Reaberto para re-homologar: mantém aprovado/reprovado já gravado.
                 $avaliado['situacao'] = $sitGravada;
                 $avaliado['rotulo'] = (string) ($homolog['rotulo'] !== null && $homolog['rotulo'] !== ''
