@@ -194,9 +194,9 @@ class ImpressaoLoteFechamentoService
             $escopo = 'serie-' . ($slugSerie !== '' ? $slugSerie : 'x') . '-' . substr(md5($serie), 0, 8);
         }
 
+        // v6: migration 2026_10_09 limpa emissões; chave nova evita reaproveitar PDF antigo no storage.
         $versao = match ($documento) {
-            'resultado' => 'v5',
-            'historico', 'ficha' => 'v4',
+            'resultado', 'historico', 'ficha' => 'v6',
             default => 'v2',
         };
         $arquivo = $documento . '_' . $versao . '.pdf';
