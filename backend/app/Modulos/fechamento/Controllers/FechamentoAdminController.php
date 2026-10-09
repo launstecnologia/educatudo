@@ -115,12 +115,11 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $turmaId = (int) $turmaId;
-        $voltar = $this->urlTurma($turmaId);
+        [$anoLetivo, $periodoTipo, $periodoNumero] = $this->anoPeriodoDoPostTurma($turmaId);
+        $voltar = $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? date('Y'));
-        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
         $result = $this->service()->transitar(
             $turmaId,
             $anoLetivo,
@@ -142,12 +141,11 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $turmaId = (int) $turmaId;
-        $voltar = $this->urlTurma($turmaId);
+        [$anoLetivo, $periodoTipo, $periodoNumero] = $this->anoPeriodoDoPostTurma($turmaId);
+        $voltar = $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? date('Y'));
-        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
         $result = $this->service()->transitar(
             $turmaId,
             $anoLetivo,
@@ -170,12 +168,11 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $turmaId = (int) $turmaId;
-        $voltar = $this->urlTurma($turmaId);
+        [$anoLetivo, $periodoTipo, $periodoNumero] = $this->anoPeriodoDoPostTurma($turmaId);
+        $voltar = $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? date('Y'));
-        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
         $ids = [];
         foreach ((array) ($_POST['aluno_ids'] ?? []) as $id) {
             $ids[] = (int) $id;
@@ -208,12 +205,11 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $turmaId = (int) $turmaId;
-        $voltar = $this->urlTurma($turmaId);
+        [$anoLetivo, $periodoTipo, $periodoNumero] = $this->anoPeriodoDoPostTurma($turmaId);
+        $voltar = $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? date('Y'));
-        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
         $result = $this->service()->retificar(
             $turmaId,
             $anoLetivo,
@@ -1031,10 +1027,40 @@ class FechamentoAdminController extends AdminBaseController
         return $ids;
     }
 
+    /**
+     * Ano/período do POST, com fallback no ano da turma (nunca date('Y') às cegas —
+     * em 2026 isso mandava o fechamento de 2025 para um ano vazio).
+     *
+     * @return array{0:int,1:string,2:int}
+     */
+    private function anoPeriodoDoPostTurma(int $turmaId): array
+    {
+        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
+        $model = $this->service()->homologacao()->model();
+        $anoTurma = $model->anoDaTurma($turmaId);
+        $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
+        if ($anoLetivo <= 0) {
+            $anoLetivo = $anoTurma > 0 ? $anoTurma : (int) date('Y');
+        }
+        if ($anoTurma > 0 && $anoLetivo !== $anoTurma) {
+            $alunosNoAno = $model->alunosDaTurma($turmaId, $anoLetivo);
+            if ($alunosNoAno === []) {
+                $anoLetivo = $anoTurma;
+            }
+        }
+
+        return [$anoLetivo, $periodoTipo, $periodoNumero];
+    }
+
     private function urlTurma(int $turmaId, ?int $ano = null, ?string $tipo = null, ?int $numero = null): string
     {
+        $anoQs = $ano ?? ($_GET['ano_letivo'] ?? $_POST['ano_letivo'] ?? null);
+        if ($anoQs === null || $anoQs === '') {
+            $anoTurma = $this->service()->homologacao()->model()->anoDaTurma($turmaId);
+            $anoQs = $anoTurma > 0 ? $anoTurma : null;
+        }
         $qs = array_filter([
-            'ano_letivo' => $ano ?? ($_GET['ano_letivo'] ?? $_POST['ano_letivo'] ?? null),
+            'ano_letivo' => $anoQs,
             'periodo_tipo' => $tipo ?? ($_GET['periodo_tipo'] ?? $_POST['periodo_tipo'] ?? 'ano'),
             'periodo_numero' => $numero ?? ($_GET['periodo_numero'] ?? $_POST['periodo_numero'] ?? 0),
         ], static fn ($v) => $v !== null && $v !== '');

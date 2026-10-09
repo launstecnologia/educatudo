@@ -100,7 +100,8 @@ class ResultadoHomologacaoService
             }
             if (!empty($linha['pendencias_criticas'])) {
                 $resumo['pendencias']++;
-            } elseif (($linha['status'] ?? '') !== 'homologado') {
+            } elseif (($linha['status'] ?? '') !== 'homologado'
+                && FechamentoGates::situacaoPermiteHomologar((string) ($linha['situacao'] ?? ''))) {
                 $resumo['elegiveis']++;
             }
             $sit = (string) ($linha['situacao'] ?? '');
@@ -203,12 +204,19 @@ class ResultadoHomologacaoService
         }
 
         if ($homologados === 0) {
+            $total = (int) ($preview['resumo']['total'] ?? count($preview['linhas'] ?? []));
             $emRec = (int) ($preview['resumo']['recuperacao'] ?? 0);
+            if ($total <= 0) {
+                return [
+                    'success' => false,
+                    'error' => 'Nenhum aluno nesta turma para o ano/período enviado. Confira o filtro (ex.: 2025) e tente de novo.',
+                ];
+            }
             return [
                 'success' => false,
                 'error' => $emRec > 0
                     ? FechamentoGates::mensagemAlunosEmRecuperacao($emRec)
-                    : 'Nenhum aluno elegível para homologar.',
+                    : ('Nenhum aluno elegível para homologar (' . $total . ' na turma, ' . $ignorados . ' ignorados).'),
             ];
         }
 

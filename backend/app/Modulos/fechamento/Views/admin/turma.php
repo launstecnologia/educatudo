@@ -141,11 +141,13 @@ $statusBadge = static function (string $status): string {
 <?php endif; ?>
 
 <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>/homologar" class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8"
-      onsubmit="return confirm('Homologar os alunos elegíveis? Quem estiver em recuperação ou exame final não entra no snapshot até ter resultado definitivo (aprovado ou reprovado).');">
+      id="fech-form-homologar"
+      onsubmit="return confirm(this.dataset.confirmMsg || 'Homologar os alunos elegíveis? Quem estiver em recuperação ou exame final não entra no snapshot até ter resultado definitivo (aprovado ou reprovado).');">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
-    <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
+    <input type="hidden" name="ano_letivo" value="<?= (int) $anoLetivo ?>">
     <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
-    <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
+    <input type="hidden" name="periodo_numero" value="<?= (int) $periodoNumero ?>">
+    <input type="hidden" name="homologar_todos" id="fech-homologar-todos" value="">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <?php $colunas = $travado ? 7 : 8; ?>
@@ -303,11 +305,14 @@ $statusBadge = static function (string $status): string {
         ?>
         <?php if (!$travado && $podeHomologarTurma): ?>
         <div class="flex flex-wrap items-center gap-2">
-            <button type="submit" class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90">
+            <button type="submit"
+                    class="btn-primary-custom px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90"
+                    onclick="var f=document.getElementById('fech-form-homologar'); var h=document.getElementById('fech-homologar-todos'); if(h) h.value=''; if(f) f.dataset.confirmMsg='Homologar só os alunos marcados?';">
                 Homologar selecionados
             </button>
-            <button type="submit" name="homologar_todos" value="1"
-                    class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    onclick="var f=document.getElementById('fech-form-homologar'); var h=document.getElementById('fech-homologar-todos'); if(h) h.value='1'; if(f) f.dataset.confirmMsg='Homologar todos os alunos elegíveis? Quem estiver em recuperação ou exame final não entra até ter resultado definitivo.';">
                 Homologar todos os elegíveis
             </button>
         </div>
