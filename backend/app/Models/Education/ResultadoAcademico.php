@@ -851,7 +851,7 @@ class ResultadoAcademico
     {
         if ($anoLetivo !== null && $anoLetivo > 0 && $this->tabelaExiste('matricula') && $this->tabelaExiste('ano_letivo')) {
             $porMatricula = $this->db->fetchAll(
-                "SELECT a.id, a.nome, a.ra, a.ativo,
+                "SELECT a.id, a.nome, a.ra, a.ativo, m.status AS matricula_status,
                         CASE WHEN m.status = 'transferido' THEN 1 ELSE 0 END AS transferido
                  FROM matricula m
                  INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
@@ -872,7 +872,9 @@ class ResultadoAcademico
                     $vistos[$id] = true;
                     $out[] = $aluno;
                 }
-                return $this->filtrarAlunosVisiveisAcademico($out);
+                // Matrícula do ano (ativa/concluído/transferido) manda no fechamento —
+                // aluno inativado após o ano ainda entra na homologação.
+                return $this->filtrarAlunosMatriculaAno($out);
             }
             $anoTurma = $this->anoDaTurma($turmaId);
             if ($anoTurma > 0 && $anoTurma !== $anoLetivo) {
@@ -935,6 +937,33 @@ class ResultadoAcademico
         }
 
         return AlunoLancamentoNotaHelper::filtrarAlunosExibicao($alunos, 'nome');
+    }
+
+    /**
+     * Lista do fechamento via matrícula do ano: só oculta cadastro de teste.
+     *
+     * @param list<array<string,mixed>> $alunos
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarAlunosMatriculaAno(array $alunos): array
+    {
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
+
+        $out = [];
+        foreach ($alunos as $aluno) {
+            if (!is_array($aluno)) {
+                continue;
+            }
+            $nome = (string) ($aluno['nome'] ?? '');
+            if (AlunoLancamentoNotaHelper::ehAlunoTesteOcultar($nome)) {
+                continue;
+            }
+            $out[] = $aluno;
+        }
+
+        return $out;
     }
 
     public function anoDaTurma(int $turmaId): int

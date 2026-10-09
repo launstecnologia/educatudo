@@ -683,41 +683,56 @@ class ResultadoHomologacaoService
             }
         }
 
-        $pendencias = [];
-        $pendenciasCriticas = [];
-        if ($config['exigir_notas'] && !$temNota && !$transferido && $especialGeral !== 'dispensado') {
-            $pendencias[] = 'Notas incompletas';
-            $pendenciasCriticas[] = 'notas';
-        }
-        if ($config['exigir_frequencia'] && ($freq['percentual'] ?? null) === null && !$transferido) {
-            $pendencias[] = 'Frequência pendente';
-            $pendenciasCriticas[] = 'frequencia';
-        }
-        if ($config['exigir_conselho'] && empty($conselho['sessao_finalizada']) && !$transferido) {
-            $pendencias[] = 'Conselho pendente';
-            $pendenciasCriticas[] = 'conselho';
-        }
-        if (!$transferido && !FechamentoGates::situacaoPermiteHomologar((string) ($avaliado['situacao'] ?? ''))) {
-            $pendencias[] = FechamentoGates::rotuloPendenciaProcessual((string) ($avaliado['situacao'] ?? ''));
-            $pendenciasCriticas[] = 'recuperacao';
-        }
-
         $status = 'em_andamento';
         $versaoProxima = 1;
+        $usouSituacaoGravada = false;
         if (is_array($homolog)) {
             $status = (string) ($homolog['status'] ?? 'em_andamento');
             $versaoProxima = (int) ($homolog['versao'] ?? 1);
             if ($status === 'reaberto') {
                 $versaoProxima++;
             }
+            $sitGravada = (string) ($homolog['situacao'] ?? '');
             if ($usarSnapshot && $status === 'homologado') {
-                $avaliado['situacao'] = (string) $homolog['situacao'];
-                $avaliado['rotulo'] = (string) $homolog['rotulo'];
+                $avaliado['situacao'] = $sitGravada;
+                $avaliado['rotulo'] = (string) ($homolog['rotulo'] ?? '');
                 $avaliado['media_final'] = $homolog['media_final'];
+                $usouSituacaoGravada = true;
+                $temNota = true;
             } elseif (!$usarSnapshot && $status === 'homologado') {
                 $status = 'reaberto';
                 $versaoProxima++;
+            } elseif ($status !== 'homologado' && FechamentoGates::situacaoPermiteHomologar($sitGravada)) {
+                // Reaberto para re-homologar: mantém aprovado/reprovado já gravado.
+                $avaliado['situacao'] = $sitGravada;
+                $avaliado['rotulo'] = (string) ($homolog['rotulo'] !== null && $homolog['rotulo'] !== ''
+                    ? $homolog['rotulo']
+                    : $this->motor->rotuloSituacao($sitGravada, $regra));
+                if (isset($homolog['media_final']) && is_numeric($homolog['media_final'])) {
+                    $avaliado['media_final'] = (float) $homolog['media_final'];
+                }
+                $usouSituacaoGravada = true;
+                $temNota = true;
             }
+        }
+
+        $pendencias = [];
+        $pendenciasCriticas = [];
+        if ($config['exigir_notas'] && !$temNota && !$transferido && $especialGeral !== 'dispensado') {
+            $pendencias[] = 'Notas incompletas';
+            $pendenciasCriticas[] = 'notas';
+        }
+        if ($config['exigir_frequencia'] && ($freq['percentual'] ?? null) === null && !$transferido && !$usouSituacaoGravada) {
+            $pendencias[] = 'Frequência pendente';
+            $pendenciasCriticas[] = 'frequencia';
+        }
+        if ($config['exigir_conselho'] && empty($conselho['sessao_finalizada']) && !$transferido && !$usouSituacaoGravada) {
+            $pendencias[] = 'Conselho pendente';
+            $pendenciasCriticas[] = 'conselho';
+        }
+        if (!$transferido && !FechamentoGates::situacaoPermiteHomologar((string) ($avaliado['situacao'] ?? ''))) {
+            $pendencias[] = FechamentoGates::rotuloPendenciaProcessual((string) ($avaliado['situacao'] ?? ''));
+            $pendenciasCriticas[] = 'recuperacao';
         }
 
         return [
