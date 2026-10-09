@@ -140,7 +140,14 @@ $statusBadge = static function (string $status): string {
 <span id="recuperacao" class="hidden"></span>
 <?php endif; ?>
 
-<form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>/homologar" class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8"
+<?php
+$fechHomologarQs = http_build_query([
+    'ano_letivo' => (int) $anoLetivo,
+    'periodo_tipo' => $periodoTipo,
+    'periodo_numero' => (int) $periodoNumero,
+]);
+?>
+<form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>/homologar?<?= htmlspecialchars($fechHomologarQs) ?>" class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8"
       id="fech-form-homologar"
       onsubmit="return confirm(this.dataset.confirmMsg || 'Homologar os alunos elegíveis? Quem estiver em recuperação ou exame final não entra no snapshot até ter resultado definitivo (aprovado ou reprovado).');">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">

@@ -1036,12 +1036,21 @@ class FechamentoAdminController extends AdminBaseController
     private function anoPeriodoDoPostTurma(int $turmaId): array
     {
         [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
+        // GET na action do form é backup se o POST perder o campo.
+        $anoLetivo = (int) ($_POST['ano_letivo'] ?? $_GET['ano_letivo'] ?? 0);
+        $periodoTipo = (string) ($_POST['periodo_tipo'] ?? $_GET['periodo_tipo'] ?? $periodoTipo);
+        if (isset($_POST['periodo_numero']) || isset($_GET['periodo_numero'])) {
+            $periodoNumero = (int) ($_POST['periodo_numero'] ?? $_GET['periodo_numero'] ?? $periodoNumero);
+        }
+        if ($periodoTipo === 'ano') {
+            $periodoNumero = 0;
+        }
         $model = $this->service()->homologacao()->model();
         $anoTurma = $model->anoDaTurma($turmaId);
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
         if ($anoLetivo <= 0) {
             $anoLetivo = $anoTurma > 0 ? $anoTurma : (int) date('Y');
         }
+        // Se o ano do POST/GET não tem alunos e a turma é de outro ano, usa o ano da turma.
         if ($anoTurma > 0 && $anoLetivo !== $anoTurma) {
             $alunosNoAno = $model->alunosDaTurma($turmaId, $anoLetivo);
             if ($alunosNoAno === []) {

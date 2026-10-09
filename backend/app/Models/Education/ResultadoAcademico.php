@@ -849,43 +849,56 @@ class ResultadoAcademico
      */
     public function alunosDaTurma(int $turmaId, ?int $anoLetivo = null): array
     {
-        if ($anoLetivo !== null && $anoLetivo > 0 && $this->tabelaExiste('matricula') && $this->tabelaExiste('ano_letivo')) {
+        $anoTurma = $this->anoDaTurma($turmaId);
+        $anoFiltro = ($anoLetivo !== null && $anoLetivo > 0) ? $anoLetivo : 0;
+
+        // 1) Matrícula do ano (fechamento: inclui inativo no cadastro)
+        if ($anoFiltro > 0 && $this->tabelaExiste('matricula') && $this->tabelaExiste('ano_letivo')) {
             $porMatricula = $this->db->fetchAll(
                 "SELECT a.id, a.nome, a.ra, a.ativo, m.status AS matricula_status,
                         CASE WHEN m.status = 'transferido' THEN 1 ELSE 0 END AS transferido
                  FROM matricula m
                  INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
                  INNER JOIN alunos a ON a.id = m.aluno_id
-                 WHERE m.turma_id = :turma_id AND al.ano = :ano
+                 WHERE m.turma_id = :turma_id
+                   AND CAST(al.ano AS UNSIGNED) = :ano
                    AND m.status IN ('ativa', 'concluido', 'transferido')
                  ORDER BY a.nome ASC",
-                ['turma_id' => $turmaId, 'ano' => $anoLetivo]
+                ['turma_id' => $turmaId, 'ano' => $anoFiltro]
             ) ?: [];
             if ($porMatricula !== []) {
-                $vistos = [];
-                $out = [];
-                foreach ($porMatricula as $aluno) {
-                    $id = (int) $aluno['id'];
-                    if (isset($vistos[$id])) {
-                        continue;
-                    }
-                    $vistos[$id] = true;
-                    $out[] = $aluno;
-                }
-                // Matrícula do ano (ativa/concluído/transferido) manda no fechamento —
-                // aluno inativado após o ano ainda entra na homologação.
-                return $this->filtrarAlunosMatriculaAno($out);
-            }
-            $anoTurma = $this->anoDaTurma($turmaId);
-            if ($anoTurma > 0 && $anoTurma !== $anoLetivo) {
-                return [];
+                return $this->filtrarAlunosMatriculaAno($this->deduplicarAlunos($porMatricula));
             }
         }
 
+        // 2) Chamada da turma no ano (seed ET25 / diário)
+        if ($anoFiltro > 0 && $this->tabelaExiste('alunos_turma_chamada') && $this->tabelaExiste('ano_letivo')) {
+            $porChamada = $this->db->fetchAll(
+                "SELECT a.id, a.nome, a.ra, a.ativo,
+                        CASE WHEN IFNULL(c.marcado_tr, 0) = 1 THEN 1 ELSE 0 END AS transferido
+                 FROM alunos_turma_chamada c
+                 INNER JOIN ano_letivo al ON al.id = c.ano_letivo_id
+                 INNER JOIN alunos a ON a.id = c.aluno_id
+                 WHERE c.turma_id = :turma_id
+                   AND CAST(al.ano AS UNSIGNED) = :ano
+                 ORDER BY a.nome ASC",
+                ['turma_id' => $turmaId, 'ano' => $anoFiltro]
+            ) ?: [];
+            if ($porChamada !== []) {
+                return $this->filtrarAlunosMatriculaAno($this->deduplicarAlunos($porChamada));
+            }
+        }
+
+        // Ano pedido diferente do ano da turma e sem vínculo → vazio
+        if ($anoFiltro > 0 && $anoTurma > 0 && $anoTurma !== $anoFiltro) {
+            return [];
+        }
+
+        // 3) Fallback: alunos vinculados à turma (ativos e inativos — fechamento)
         $atuais = $this->db->fetchAll(
             "SELECT a.id, a.nome, a.ra, a.ativo, 0 AS transferido
              FROM alunos a
-             WHERE a.turma_id = :turma_id AND a.ativo = 1
+             WHERE a.turma_id = :turma_id
              ORDER BY a.nome ASC",
             ['turma_id' => $turmaId]
         ) ?: [];
@@ -913,17 +926,30 @@ class ResultadoAcademico
             ) ?: [];
         }
 
+        return $this->filtrarAlunosMatriculaAno($this->deduplicarAlunos(array_merge($atuais, $saidos)));
+    }
+
+    /**
+     * @param list<array<string,mixed>> $alunos
+     * @return list<array<string,mixed>>
+     */
+    private function deduplicarAlunos(array $alunos): array
+    {
         $vistos = [];
         $out = [];
-        foreach (array_merge($atuais, $saidos) as $aluno) {
-            $id = (int) $aluno['id'];
-            if (isset($vistos[$id])) {
+        foreach ($alunos as $aluno) {
+            if (!is_array($aluno)) {
+                continue;
+            }
+            $id = (int) ($aluno['id'] ?? 0);
+            if ($id <= 0 || isset($vistos[$id])) {
                 continue;
             }
             $vistos[$id] = true;
             $out[] = $aluno;
         }
-        return $this->filtrarAlunosVisiveisAcademico($out);
+
+        return $out;
     }
 
     /**
