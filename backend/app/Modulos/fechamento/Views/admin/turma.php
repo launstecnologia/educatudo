@@ -149,7 +149,7 @@ $fechHomologarQs = http_build_query([
 ?>
 <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>/homologar?<?= htmlspecialchars($fechHomologarQs) ?>" class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8"
       id="fech-form-homologar"
-      onsubmit="return confirm(this.dataset.confirmMsg || 'Homologar os alunos elegíveis? Quem estiver em recuperação ou exame final não entra no snapshot até ter resultado definitivo (aprovado ou reprovado).');">
+      onsubmit="return window.fechIniciarHomologacao(this);">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
     <input type="hidden" name="ano_letivo" value="<?= (int) $anoLetivo ?>">
     <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
@@ -437,8 +437,37 @@ $fechHomologarQs = http_build_query([
 </div>
 <?php endif; ?>
 
+<div id="fech-homologar-overlay" class="hidden fixed inset-0 z-[9999] bg-slate-900/60 flex items-center justify-center p-4" aria-live="polite" aria-busy="true">
+    <div class="bg-white rounded-xl shadow-xl px-6 py-5 max-w-sm w-full text-center">
+        <i class="fa-solid fa-spinner fa-spin text-2xl text-indigo-600 mb-3" aria-hidden="true"></i>
+        <p class="text-base font-semibold text-gray-900">Homologando…</p>
+        <p class="text-sm text-gray-500 mt-1">Gravando o resultado oficial. Aguarde sem fechar a página.</p>
+    </div>
+</div>
+
 <script>
 document.getElementById('fech-check-all')?.addEventListener('change', function () {
     document.querySelectorAll('.fech-check').forEach(function (el) { el.checked = this.checked; }, this);
 });
+
+window.fechIniciarHomologacao = function (form) {
+    if (!form || form.dataset.fechEnviando === '1') {
+        return false;
+    }
+    var msg = form.dataset.confirmMsg
+        || 'Homologar os alunos elegíveis? Quem estiver em recuperação ou exame final não entra no snapshot até ter resultado definitivo (aprovado ou reprovado).';
+    if (!window.confirm(msg)) {
+        return false;
+    }
+    form.dataset.fechEnviando = '1';
+    var overlay = document.getElementById('fech-homologar-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+    }
+    form.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-60', 'cursor-wait');
+    });
+    return true;
+};
 </script>
