@@ -262,7 +262,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     <?php if ((int) ($relatorio['total_alunos'] ?? 0) <= 0): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?php
             if ($fonteRelatorio === 'vida_escolar') {
-                echo 'Nenhuma ficha encontrada para os filtros selecionados.';
+                echo 'Nenhuma ficha de boletim na Vida Escolar para estes filtros. Sincronize o boletim oficial do ano em Vida Escolar / Modelo de Boletim (ou materialize as fichas do ano no ambiente de teste).';
             } elseif ($fonteRelatorio === 'demonstrativo') {
                 echo 'Nenhum demonstrativo de notas encontrado para os filtros selecionados.';
             } else {

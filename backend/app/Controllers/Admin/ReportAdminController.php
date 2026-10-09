@@ -341,14 +341,23 @@ class ReportAdminController extends AdminBaseController
         if ($executar) {
             if ($fonte === 'vida_escolar') {
                 try {
-                    $relatorio = $this->paginarAlunosRelatorioBoletimCoordenacao(
-                        $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId),
+                    $relatorio = $this->montarRelatorioVidaEscolarCoordenacao(
+                        $anoLetivo,
+                        $turmaId,
+                        $notaAbaixoDe,
+                        $materiasExibicao,
+                        $alunoQ,
+                        $periodo,
+                        $cursoId,
                         $pagina,
                         20
                     );
                 } catch (\Throwable $e) {
                     error_log('boletimCoordenacao vida_escolar: ' . $e->getMessage());
-                    $this->setFlashMessage('Não foi possível montar o boletim com estes filtros. Tente outra turma ou período.', 'error');
+                    $this->setFlashMessage(
+                        'Não foi possível montar o boletim. Confira se as fichas da Vida Escolar do ano foram geradas (Modelo de Boletim / sincronizar) ou filtre por uma turma.',
+                        'error'
+                    );
                     $relatorio = null;
                     $executar = false;
                 }
@@ -508,8 +517,13 @@ class ReportAdminController extends AdminBaseController
             if ($anoLetivo <= 0) {
                 return [];
             }
-            $relatorio = $this->montarRelatorioVidaEscolarCoordenacao($anoLetivo, $turmaId, $notaAbaixoDe, $materiasExibicao, $alunoQ, $periodo, $cursoId);
-            $coletar($relatorio['alunos'] ?? []);
+            // Só IDs das fichas — sem montar quadro (evita timeout ao apagar observações).
+            foreach ($this->listarFichasVidaEscolarFiltradas($anoLetivo, $turmaId, $alunoQ, $cursoId) as $ficha) {
+                $id = (int) ($ficha['aluno_id'] ?? 0);
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
 
             return array_values($ids);
         }
@@ -2355,47 +2369,25 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
-     * @return array<string,mixed>
+     * @return list<array<string,mixed>>
      */
-    private function montarRelatorioVidaEscolarCoordenacao(
+    private function listarFichasVidaEscolarFiltradas(
         int $anoLetivo,
         int $turmaId,
-        ?float $notaAbaixoDe = null,
-        string $materiasExibicao = 'todas',
         string $alunoQ = '',
-        int $periodo = 0,
         int $cursoId = 0
     ): array {
-        $columns = $this->colunasFichaVidaEscolar($anoLetivo, $periodo);
-        $codigoCorte = $periodo > 0 ? ('n' . $periodo) : 'n0';
-        $base = [
-            'fonte' => 'vida_escolar',
-            'evento_nome' => 'Boletim ' . $anoLetivo,
-            'periodo_ref' => '',
-            'ano_letivo' => $anoLetivo,
-            'decimal_places' => 1,
-            'columns' => $columns,
-            'alunos' => [],
-            'total_alunos' => 0,
-            'total_linhas' => 0,
-            'nota_abaixo_de' => $notaAbaixoDe,
-            'materias_exibicao' => $materiasExibicao,
-            'codigo_media_final' => $codigoCorte,
-            'alunos_com_ficha' => 0,
-            'alunos_sem_ficha' => 0,
-        ];
         if (!class_exists('LayoutHelper', false)) {
             require_once __DIR__ . '/../../Core/LayoutHelper.php';
         }
         if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
-            return $base;
+            return [];
         }
         require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
         $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
         if (!$vida->model()->schemaPronto()) {
-            return $base;
+            return [];
         }
-
         $fichas = $vida->model()->listarFichasAnoLetivo($anoLetivo, $turmaId);
         if ($turmaId <= 0 && $cursoId > 0) {
             $turmasCurso = array_flip($this->idsTurmasDoCursoBoletimCoordenacao($cursoId));
@@ -2420,18 +2412,96 @@ class ReportAdminController extends AdminBaseController
                 }
             }
             if ($idsPermitidos === []) {
-                return $base;
+                return [];
             }
             $fichas = array_values(array_filter($fichas, static function (array $ficha) use ($idsPermitidos): bool {
                 return isset($idsPermitidos[(int) ($ficha['aluno_id'] ?? 0)]);
             }));
         }
+
+        return $fichas;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function montarRelatorioVidaEscolarCoordenacao(
+        int $anoLetivo,
+        int $turmaId,
+        ?float $notaAbaixoDe = null,
+        string $materiasExibicao = 'todas',
+        string $alunoQ = '',
+        int $periodo = 0,
+        int $cursoId = 0,
+        int $pagina = 0,
+        int $porPagina = 20
+    ): array {
+        $columns = $this->colunasFichaVidaEscolar($anoLetivo, $periodo);
+        $codigoCorte = $periodo > 0 ? ('n' . $periodo) : 'n0';
+        $base = [
+            'fonte' => 'vida_escolar',
+            'evento_nome' => 'Boletim ' . $anoLetivo,
+            'periodo_ref' => '',
+            'ano_letivo' => $anoLetivo,
+            'decimal_places' => 1,
+            'columns' => $columns,
+            'alunos' => [],
+            'total_alunos' => 0,
+            'total_linhas' => 0,
+            'nota_abaixo_de' => $notaAbaixoDe,
+            'materias_exibicao' => $materiasExibicao,
+            'codigo_media_final' => $codigoCorte,
+            'alunos_com_ficha' => 0,
+            'alunos_sem_ficha' => 0,
+            'pagina' => 1,
+            'total_paginas' => 1,
+            'por_pagina' => max(1, $porPagina),
+        ];
+        if (!class_exists('LayoutHelper', false)) {
+            require_once __DIR__ . '/../../Core/LayoutHelper.php';
+        }
+        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+            return $base;
+        }
+        require_once __DIR__ . '/../../Modulos/vida-escolar/Services/VidaEscolarService.php';
+        $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+        if (!$vida->model()->schemaPronto()) {
+            return $base;
+        }
+
+        $fichas = $this->listarFichasVidaEscolarFiltradas($anoLetivo, $turmaId, $alunoQ, $cursoId);
+        if ($fichas === []) {
+            return $base;
+        }
+
+        // Tela: pagina as fichas antes de montar o quadro (Todas as turmas não pode carregar tudo).
+        // Exportação / filtro por nota: carrega o conjunto completo.
+        $paginarAntes = $pagina > 0 && $notaAbaixoDe === null;
+        $totalFichas = count($fichas);
+        if ($paginarAntes) {
+            $porPagina = max(1, $porPagina);
+            $totalPaginas = max(1, (int) ceil($totalFichas / $porPagina));
+            $pagina = min(max(1, $pagina), $totalPaginas);
+            $fichasPagina = array_slice($fichas, ($pagina - 1) * $porPagina, $porPagina);
+            $base['pagina'] = $pagina;
+            $base['total_paginas'] = $totalPaginas;
+            $base['por_pagina'] = $porPagina;
+            $base['total_alunos'] = $totalFichas;
+            $base['alunos_com_ficha'] = $totalFichas;
+        } else {
+            $fichasPagina = $fichas;
+        }
+
         $obs = $this->observacoesAlunosBoletimCoordenacao(array_map(static function (array $f): int {
             return (int) ($f['aluno_id'] ?? 0);
-        }, $fichas));
+        }, $fichasPagina));
+
+        if (!class_exists('AlunoLancamentoNotaHelper', false)) {
+            require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
+        }
 
         $alunos = [];
-        foreach ($fichas as $ficha) {
+        foreach ($fichasPagina as $ficha) {
             $fichaId = (int) ($ficha['id'] ?? 0);
             $alunoId = (int) ($ficha['aluno_id'] ?? 0);
             if ($fichaId <= 0 || $alunoId <= 0) {
@@ -2449,15 +2519,15 @@ class ReportAdminController extends AdminBaseController
             foreach ($grid as $row) {
                 $celulas = is_array($row['celulas'] ?? null) ? $row['celulas'] : [];
                 $notas = [];
-                foreach ([1, 2, 3, 4, 0] as $periodo) {
-                    $cel = is_array($celulas[$periodo] ?? null) ? $celulas[$periodo] : [];
+                foreach ([1, 2, 3, 4, 0] as $numPeriodo) {
+                    $cel = is_array($celulas[$numPeriodo] ?? null) ? $celulas[$numPeriodo] : [];
                     $nota = $cel['nota'] ?? null;
                     if ($nota === null || $nota === '') {
                         $nota = $cel['conceito'] ?? null;
                     }
-                    $notas['n' . $periodo] = is_numeric($nota) ? (float) $nota : $nota;
+                    $notas['n' . $numPeriodo] = is_numeric($nota) ? (float) $nota : $nota;
                     $faltas = $cel['faltas'] ?? null;
-                    $notas['f' . $periodo] = is_numeric($faltas) ? (int) $faltas : $faltas;
+                    $notas['f' . $numPeriodo] = is_numeric($faltas) ? (int) $faltas : $faltas;
                 }
                 $materias[] = [
                     'nome' => (string) ($row['linha']['componente_nome'] ?? 'Sem matéria'),
@@ -2465,9 +2535,6 @@ class ReportAdminController extends AdminBaseController
                 ];
             }
             $obsAluno = $obs[$alunoId] ?? [];
-            if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                require_once __DIR__ . '/../../Helpers/AlunoLancamentoNotaHelper.php';
-            }
             $transferidoVe = !empty($ficha['transferido']);
             $alunos[] = [
                 'id' => $alunoId,
@@ -2507,6 +2574,21 @@ class ReportAdminController extends AdminBaseController
                 }
                 unset($alunoFiltrado);
             }
+            if ($pagina > 0) {
+                $relatorioTmp = ['alunos' => $alunos];
+                $relatorioTmp = $this->paginarAlunosRelatorioBoletimCoordenacao($relatorioTmp, $pagina, $porPagina);
+                $alunos = (array) ($relatorioTmp['alunos'] ?? []);
+                $base['pagina'] = (int) ($relatorioTmp['pagina'] ?? 1);
+                $base['total_paginas'] = (int) ($relatorioTmp['total_paginas'] ?? 1);
+                $base['por_pagina'] = (int) ($relatorioTmp['por_pagina'] ?? $porPagina);
+                $base['total_alunos'] = (int) ($relatorioTmp['total_alunos'] ?? count($alunos));
+            } else {
+                $base['total_alunos'] = count($alunos);
+            }
+            $base['alunos_com_ficha'] = $base['total_alunos'];
+        } elseif (!$paginarAntes) {
+            $base['total_alunos'] = count($alunos);
+            $base['alunos_com_ficha'] = count($alunos);
         }
 
         $totalLinhas = 0;
@@ -2514,9 +2596,7 @@ class ReportAdminController extends AdminBaseController
             $totalLinhas += count((array) ($aluno['materias'] ?? []));
         }
         $base['alunos'] = $alunos;
-        $base['total_alunos'] = count($alunos);
         $base['total_linhas'] = $totalLinhas;
-        $base['alunos_com_ficha'] = count($alunos);
         $base['alunos_sem_ficha'] = 0;
         return $base;
     }

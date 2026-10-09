@@ -100,6 +100,7 @@ final class FecharHomologar2025Educa
             $this->carimbarBimestresHomologados();
         } else {
             $this->carimbarAnoHomologado();
+            $this->materializarFichas();
             $this->reescreverFichas();
         }
         $this->resumo();
@@ -436,6 +437,54 @@ final class FecharHomologar2025Educa
             '    ' . $nomeTurma . " {$tipo}#{$num} "
             . ($ok ? 'HOMOLOGADO' : ('SKIP ' . (string) ($res['error'] ?? 'falha')))
         );
+    }
+
+    private function materializarFichas(): void
+    {
+        if (!$this->vida->model()->schemaPronto()) {
+            return;
+        }
+        $adminUser = ['id' => $this->adminId, 'nome' => 'Admin', 'tipo' => 'admin_escola'];
+        $alunos = $this->db->fetchAll(
+            "SELECT DISTINCT a.id
+             FROM alunos a
+             INNER JOIN turmas t ON t.id = a.turma_id
+             WHERE t.ativo = 1 AND t.ano_letivo = :ano
+               AND (a.ativo = 1 OR a.ativo IS NULL)",
+            ['ano' => ANO]
+        ) ?: [];
+        if ($alunos === [] && $this->db->fetch("SHOW TABLES LIKE 'matricula'")) {
+            $alunos = $this->db->fetchAll(
+                "SELECT DISTINCT a.id
+                 FROM matricula m
+                 INNER JOIN alunos a ON a.id = m.aluno_id
+                 INNER JOIN turmas t ON t.id = m.turma_id
+                 INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                 WHERE al.ano = :ano AND t.ano_letivo = :ano
+                   AND m.status IN ('ativa', 'concluido', 'transferido')",
+                ['ano' => ANO]
+            ) ?: [];
+        }
+        $criadas = 0;
+        $ok = 0;
+        foreach ($alunos as $row) {
+            $alunoId = (int) ($row['id'] ?? 0);
+            if ($alunoId <= 0) {
+                continue;
+            }
+            try {
+                $res = $this->vida->materializarFichaOficialSeFaltar($alunoId, $adminUser);
+                if (!empty($res['success']) && (int) ($res['id'] ?? 0) > 0) {
+                    $ok++;
+                    if (!empty($res['criada'])) {
+                        $criadas++;
+                    }
+                }
+            } catch (Throwable $e) {
+                println('    materializar aluno ' . $alunoId . ': ' . $e->getMessage());
+            }
+        }
+        println('  fichas vida escolar materializadas: ' . $ok . ' (novas=' . $criadas . ')');
     }
 
     private function reescreverFichas(): void
